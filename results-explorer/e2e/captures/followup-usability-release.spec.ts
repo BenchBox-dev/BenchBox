@@ -35,7 +35,7 @@ import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -185,18 +185,20 @@ test.describe("@followup-usability release-gate route walk", () => {
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
+    await openAnalysisCard(page, "query_heatmap");
 
     const switcher = page.getByTestId("benchmark-switcher");
     await expect(switcher).toBeVisible();
     await expect(switcher.locator("option", { hasText: "SSB" })).toBeAttached();
 
-    const platformHeader = page
+    const heatmap = page.getByTestId("query-heatmap-scroll-container");
+    const platformHeader = heatmap
       .locator("thead th")
       .filter({ has: page.locator("button", { hasText: /^Platform/ }) })
       .first();
     await expect(platformHeader).toHaveCSS("position", "sticky");
 
-    const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
+    const firstHeatmapRow = heatmap.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
     // The platform name is the receipt link, so matrix reachability needs no
     // disclosure and costs the row no extra height.
@@ -224,19 +226,11 @@ test.describe("@followup-usability release-gate route walk", () => {
     await enabledCompareCheckboxes.first().uncheck();
     expect(await countDisabled(compareCheckboxes)).toBe(baselineDisabledCount);
 
-    // The filter strip only renders when allPlatformResults.length >= 25.
-    // The committed audit corpus exceeds that threshold; the small browser
-    // test fixture (10 results across 3 cohorts) does not. Assert the
-    // strip is consistent with the row count rather than hard-coding
-    // visibility — the contract is "shows when >=25, hidden otherwise".
-    const tableRows = await page.locator("tbody tr[data-testid]").count();
+    // The cohort filter panel stays mounted at every cohort size now (it
+    // used to hide below a 25-row threshold).
     const filters = page.getByTestId("platform-detail-filters");
-    if (tableRows >= 25) {
-      await expect(filters).toBeVisible();
-      await expect(filters.getByTestId("platform-filter-benchmark")).toBeVisible();
-    } else {
-      await expect(filters).toHaveCount(0);
-    }
+    await expect(filters).toBeVisible();
+    await expect(filters.getByTestId("platform-filter-benchmark")).toBeVisible();
 
     await maybeCapture(page, "platform-detail-filters");
   });

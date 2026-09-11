@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForDataLoaded } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForDataLoaded } from "../support/fixtures";
 
 test("tablet matrix exposes query timings after horizontal scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto("/results/tpch/");
+  await openAnalysisCard(page, "query_heatmap");
   const scroller = page.getByTestId("query-heatmap-scroll-container");
   const cell = scroller.locator("tbody td[data-cell]").first();
   await waitForDataElement(page, cell);

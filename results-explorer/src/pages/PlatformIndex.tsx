@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import type { DetailResult } from "@/types";
 import { PlatformBasisControl } from "@/components/PlatformBasisControl";
 import { platformRowsForBasis } from "@/lib/platformMeasurementBasis";
@@ -9,8 +10,14 @@ import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 import { getCohortBasisDetails, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
-import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
+import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { singleValueFilterReason } from "@/lib/cohortFilterReason";
+import { CohortFilterPanel, type CohortFilterFieldSpec } from "@/components/CohortFilterPanel";
+import { ResultsCardToolbar, GroupBySelect, ResultsBasisStatement } from "@/components/ResultsCard";
+import { AnalysisCard, AnalysisCardGrid } from "@/components/AnalysisCardGrid";
+import { paletteColor, timeSeriesColor } from "@/lib/chartTheme";
 import {
+  canonicalBenchmarkSlug,
   formatArchitecture,
   formatBenchmarkLabel,
   formatCpuFamily,
@@ -59,7 +66,6 @@ import type { SortState } from "@/types";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import {
-  COHORT_GROUP_BY_LABELS,
   groupCohortRows,
   limitCohortGroups,
   type CohortGroupBy,
@@ -84,10 +90,12 @@ const PLATFORM_TABLE_COLUMNS = [
   "date",
   "power_score",
   "geomean",
+  "queries",
   "source",
   "arch",
   "cpu_family",
   "memory_gb",
+  "receipt",
 ] as const;
 type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
@@ -114,6 +122,7 @@ const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "platform_version",
   "arch",
   "cpu_family",
+  "memory_gb",
 ];
 
 interface TrendCohort {
@@ -299,6 +308,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
   const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
+  const [openAnalysisCardIds, setOpenAnalysisCardIds] = useState<Set<string>>(() => new Set());
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
@@ -307,43 +317,32 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
   const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
-  const trustFilter = singleFacetValue(facets.trust_tier, "all") ?? "all";
   const validationFilter = singleFacetValue(facets.validation_status, "all") ?? "all";
+  const archFilter = singleFacetValue(facets.arch, "all") ?? "all";
+  const cpuFamilyFilter = singleFacetValue(facets.cpu_family, "all") ?? "all";
+  const memoryFilter = singleFacetValue(facets.memory_gb, "all") ?? "all";
   const platformVersionFilter = facets.platform_version.length === 0
     ? "all"
     : facets.platform_version.length === 1
       ? facets.platform_version[0]!
       : "__multiple__";
+  const trustFilterValue =
+    facets.trust_tier.length === 0 ? "all" : facets.trust_tier.length === 1 ? facets.trust_tier[0]! : "__multiple__";
   const dateWindowFilter: DateWindowFacet = facets.date_window;
-  // Helper for the five string-array facets that share the "all means
-  // empty array" pattern. date_window has its own DateWindowFacet shape
-  // and uses toDateWindowFacet directly.
+  // Helper for the string-array facets that share the "all means empty
+  // array" pattern. date_window has its own DateWindowFacet shape.
   const setSingleArrayFacet = (
-    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status" | "platform_version",
+    key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status" | "platform_version" | "arch" | "cpu_family" | "memory_gb",
     value: string,
   ) => setFacet(key, value === "all" ? [] : [value]);
-  const w5FilterKeys: ExplorerFacetKey[] = [
-    "benchmark",
-    "scale_factor",
-    "phase",
-    "trust_tier",
-    "validation_status",
-    "date_window",
-    "platform_version",
-    "arch",
-    "cpu_family",
-  ];
-  const hasW5Filters = hasActiveFacets(facets, w5FilterKeys);
-  const resetW5Filters = () => {
-    setFacet("benchmark", []);
-    setFacet("scale_factor", []);
-    setFacet("phase", []);
-    setFacet("trust_tier", []);
-    setFacet("validation_status", []);
-    setFacet("date_window", "all");
-    setFacet("platform_version", []);
-    setFacet("arch", []);
-    setFacet("cpu_family", []);
+  // Every filter the cohort filter panel exposes on this page. Used both to
+  // decide whether "Clear filters" is shown and, when clicked, to clear it.
+  const hasPlatformFilters = hasActiveFacets(facets, PLATFORM_RESULT_FACET_KEYS);
+  const resetPlatformFilters = () => {
+    for (const key of PLATFORM_RESULT_FACET_KEYS) {
+      if (key === "date_window") setFacet(key, "all");
+      else setFacet(key, [] as never);
+    }
   };
   // Lead with recency. A cross-benchmark latency sort invites comparison
   // across different workloads and metric contracts.
@@ -407,6 +406,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     facets.cost_status,
     facets.date_window,
     facets.platform_version,
+    facets.arch,
+    facets.cpu_family,
+    facets.memory_gb,
     sort.key,
     sort.direction,
   ]);
@@ -424,9 +426,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     );
   }
 
-  // Match by platform_id (URL slug) - platform_id is stable and URL-safe.
-  // Fall back to matching by display name for backward compatibility with any
-  // old links constructed from the display name.
+  // Match by stable platform_id first, with display-name fallback for
+  // previously generated links.
   const allPlatformResults = platformRowsForBasis(requestedRows, basisDetails, basis);
   const routeMetricContracts = new Set(
     allPlatformResults.map((row) => primaryMetricContract(row.primary_metric)),
@@ -454,7 +455,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
   ].sort();
 
-  // w5: derived option lists for the new filter strip. Each list is built
+  // Derived option lists for the cohort filter panel. Each list is built
   // from the unfiltered cohort (allPlatformResults) so the user can always
   // see every available value, even after narrowing.
   const benchmarkOptions = [...new Set(allPlatformResults.map((r) => r.benchmark))].sort();
@@ -483,8 +484,17 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         .filter((version): version is string => version !== null && version !== undefined),
     ),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  const showW5Filters =
-    allPlatformResults.length >= 25 || platformVersionFilter !== "all" || platformVersionOptions.length > 1;
+  const archOptions = [
+    ...new Set(allPlatformResults.map((r) => r.arch).filter((a): a is string => a !== null && a !== undefined)),
+  ].sort();
+  const cpuFamilyOptions = [
+    ...new Set(allPlatformResults.map((r) => r.cpu_family).filter((c): c is string => c !== null && c !== undefined)),
+  ].sort();
+  const memoryOptions = [
+    ...new Set(
+      allPlatformResults.map((r) => r.memory_gb).filter((m): m is number => m !== null && m !== undefined),
+    ),
+  ].sort((a, b) => a - b);
 
   const platformResultsRaw = allPlatformResults.filter((row) =>
     matchesFacetRow(row, facets, { keys: PLATFORM_RESULT_FACET_KEYS }),
@@ -494,6 +504,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const sparseTrendCohorts = allTrendCohorts.filter(
     (cohort) => cohort.observationCount > 0 && cohort.observationCount < MIN_TREND_OBSERVATIONS,
   );
+  const coverageStats = buildCoverageStats(platformResultsRaw);
   const rowsByResultId = new Map(allPlatformResults.map((row) => [row.result_id, row]));
   const selectedRows = [...selected]
     .map((resultId) => rowsByResultId.get(resultId))
@@ -602,10 +613,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     });
   }
 
-  // w6 (compare-flow-entrypoints): the cohort signature of the first
-  // selected row locks the rest of the table until the user deselects
-  // back to zero. Compatible siblings stay selectable; incompatible
-  // rows render their checkbox disabled with a reason tooltip.
+  // The first selected row defines the comparison cohort. Compatible siblings
+  // stay selectable; incompatible rows show a disabled checkbox and reason.
   const cohortLockSignature = (() => {
     const firstSelectedId = [...selected][0];
     if (firstSelectedId === undefined) return null;
@@ -623,10 +632,123 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return reason;
   }
   const zeroSelectable = platformResults.length > 0 && platformResults.every((row) => comparisonExclusionReason(row));
-  const filtersCausedZeroSelectable = zeroSelectable && hasW5Filters && allPlatformResults.some((row) => !comparisonExclusionReason(row));
+  const filtersCausedZeroSelectable = zeroSelectable && hasPlatformFilters && allPlatformResults.some((row) => !comparisonExclusionReason(row));
   const zeroSelectableReasons = summarizeCompareExclusionReasons(
     platformResults.map((row) => comparisonExclusionReason(row)),
   );
+
+  const platformCohortFilterFields: CohortFilterFieldSpec[] = [
+    {
+      id: "platform-filter-benchmark",
+      testId: "platform-filter-benchmark",
+      label: "Benchmark",
+      value: benchmarkFilter,
+      options: [{ value: "all", label: "All benchmarks" }, ...benchmarkOptions.map((value) => ({ value, label: formatBenchmarkLabel(value) }))],
+      onChange: (value) => setSingleArrayFacet("benchmark", value),
+      disabledReason: singleValueFilterReason(benchmarkOptions.length, benchmarkFilter !== "all"),
+    },
+    {
+      id: "platform-filter-scale",
+      testId: "platform-filter-scale",
+      label: "Scale",
+      value: scaleFilter,
+      options: [{ value: "all", label: "All scales" }, ...scaleOptions.map((value) => ({ value: String(value), label: `SF ${value}` }))],
+      onChange: (value) => setSingleArrayFacet("scale_factor", value),
+      disabledReason: singleValueFilterReason(scaleOptions.length, scaleFilter !== "all"),
+    },
+    {
+      id: "platform-filter-phase",
+      testId: "platform-filter-phase",
+      label: "Phase",
+      value: phaseFilter,
+      options: [{ value: "all", label: "All phases" }, ...phaseOptions.map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) }))],
+      onChange: (value) => setSingleArrayFacet("phase", value),
+      disabledReason: singleValueFilterReason(phaseOptions.length, phaseFilter !== "all"),
+    },
+    {
+      id: "tuning-filter",
+      label: "Tuning",
+      value: tuningFilter,
+      options: [{ value: "all", label: "All" }, ...tuningModes.map((m) => ({ value: m, label: tuningLabel(m) }))],
+      onChange: (value) => setTuningFilter(value),
+      disabledReason: singleValueFilterReason(tuningModes.length, tuningFilter !== "all"),
+    },
+    {
+      id: "platform-filter-version",
+      testId: "platform-filter-version",
+      label: "Platform version",
+      value: platformVersionFilter,
+      options: [{ value: "all", label: "All versions" }, ...platformVersionOptions.map((version) => ({ value: version, label: version }))],
+      onChange: (value) => setSingleArrayFacet("platform_version", value),
+      disabledReason: singleValueFilterReason(platformVersionOptions.length, platformVersionFilter !== "all"),
+      multiValueOption:
+        platformVersionFilter === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.platform_version.length} versions selected` }
+          : undefined,
+    },
+    {
+      id: "platform-filter-trust",
+      testId: "platform-filter-trust",
+      label: "Trust tier",
+      value: trustFilterValue,
+      options: [{ value: "all", label: "All trust tiers" }, ...trustOptions.map((tier) => ({ value: tier, label: formatTrustLabel(tier) }))],
+      onChange: (value) => setSingleArrayFacet("trust_tier", value),
+      disabledReason: singleValueFilterReason(trustOptions.length, trustFilterValue !== "all"),
+      multiValueOption:
+        trustFilterValue === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.trust_tier.length} tiers selected` }
+          : undefined,
+    },
+    {
+      id: "platform-filter-validation",
+      testId: "platform-filter-validation",
+      label: "Validation",
+      value: validationFilter,
+      options: [{ value: "all", label: "All validation" }, ...validationOptions.map((status) => ({ value: status, label: formatValidationStatus(status) }))],
+      onChange: (value) => setSingleArrayFacet("validation_status", value),
+      disabledReason: singleValueFilterReason(validationOptions.length, validationFilter !== "all"),
+    },
+    {
+      id: "platform-filter-arch",
+      testId: "platform-filter-arch",
+      label: "Architecture",
+      value: archFilter,
+      options: [{ value: "all", label: "All architectures" }, ...archOptions.map((option) => ({ value: option, label: formatArchitecture(option) }))],
+      onChange: (value) => setSingleArrayFacet("arch", value),
+      disabledReason: singleValueFilterReason(archOptions.length, archFilter !== "all"),
+    },
+    {
+      id: "platform-filter-cpu-family",
+      testId: "platform-filter-cpu-family",
+      label: "CPU family",
+      value: cpuFamilyFilter,
+      options: [{ value: "all", label: "All CPU families" }, ...cpuFamilyOptions.map((option) => ({ value: option, label: formatCpuFamily(option) }))],
+      onChange: (value) => setSingleArrayFacet("cpu_family", value),
+      disabledReason: singleValueFilterReason(cpuFamilyOptions.length, cpuFamilyFilter !== "all"),
+    },
+    {
+      id: "platform-filter-memory",
+      testId: "platform-filter-memory",
+      label: "Memory",
+      value: memoryFilter,
+      options: [{ value: "all", label: "All memory sizes" }, ...memoryOptions.map((option) => ({ value: String(option), label: formatMemoryGb(option) }))],
+      onChange: (value) => setSingleArrayFacet("memory_gb", value),
+      disabledReason: singleValueFilterReason(memoryOptions.length, memoryFilter !== "all"),
+    },
+    {
+      id: "platform-filter-date-window",
+      testId: "platform-filter-date-window",
+      label: "Run date",
+      value: dateWindowFilter,
+      options: [
+        { value: "all", label: "All time" },
+        { value: "30d", label: "Last 30 days" },
+        { value: "90d", label: "Last 90 days" },
+        { value: "365d", label: "Last 365 days" },
+      ],
+      onChange: (value) => setFacet("date_window", value as DateWindowFacet),
+    },
+  ];
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -650,8 +772,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         }
         actions={
           <>
-          {/* Platform switcher (sibling pivot). Tuning is platform-specific
-              so we do not preserve it across the switch. */}
+          {/* Platform switcher (sibling pivot) is the only header action now;
+              tuning lives in the cohort filter panel below. */}
           {platformOptions.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="platform-switcher">
@@ -679,196 +801,24 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </select>
             </div>
           )}
-          {tuningModes.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
-                Tuning:
-              </label>
-              <select
-                id="tuning-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={tuningFilter}
-                onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
-              >
-                <option value="all">All</option>
-                {tuningModes.map((m) => (
-                  <option key={m} value={m}>
-                    {tuningLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
           </>
         }
       />
 
-      {showW5Filters && (
-        <section
-          class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
-          data-testid="platform-detail-filters"
-          aria-label="Platform result filters"
-        >
-          <div class="flex flex-wrap items-end gap-3">
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-benchmark">
-                Benchmark
-              </label>
-              <select
-                id="platform-filter-benchmark"
-                data-testid="platform-filter-benchmark"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={benchmarkFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("benchmark", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All benchmarks</option>
-                {benchmarkOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {formatBenchmarkLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-scale">
-                Scale
-              </label>
-              <select
-                id="platform-filter-scale"
-                data-testid="platform-filter-scale"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={scaleFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("scale_factor", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All scales</option>
-                {scaleOptions.map((value) => (
-                  <option key={String(value)} value={String(value)}>
-                    SF {value}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-phase">
-                Phase
-              </label>
-              <select
-                id="platform-filter-phase"
-                data-testid="platform-filter-phase"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={phaseFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("phase", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All phases</option>
-                {phaseOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {value.charAt(0).toUpperCase() + value.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-trust">
-                Trust tier
-              </label>
-              <select
-                id="platform-filter-trust"
-                data-testid="platform-filter-trust"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={trustFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("trust_tier", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All trust tiers</option>
-                {trustOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {formatTrustLabel(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-validation">
-                Validation
-              </label>
-              <select
-                id="platform-filter-validation"
-                data-testid="platform-filter-validation"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={validationFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("validation_status", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All validation</option>
-                {validationOptions.map((value) => (
-                  <option key={value} value={value}>
-                    {formatValidationStatus(value)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-version">
-                Platform version
-              </label>
-              <select
-                id="platform-filter-version"
-                data-testid="platform-filter-version"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={platformVersionFilter}
-                onChange={(event) =>
-                  setSingleArrayFacet("platform_version", (event.target as HTMLSelectElement).value)
-                }
-              >
-                <option value="all">All versions</option>
-                {platformVersionFilter === "__multiple__" && (
-                  <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
-                )}
-                {platformVersionOptions.map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-filter-date-window">
-                Date window
-              </label>
-              <select
-                id="platform-filter-date-window"
-                data-testid="platform-filter-date-window"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={dateWindowFilter}
-                onChange={(event) =>
-                  setFacet("date_window", toDateWindowFacet((event.target as HTMLSelectElement).value))
-                }
-              >
-                <option value="all">All time</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="365d">Last 365 days</option>
-              </select>
-            </div>
-            {hasW5Filters && (
-              <button
-                type="button"
-                data-testid="platform-filter-reset"
-                class="ml-auto rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm font-medium text-[var(--bb-data-fg-primary)] shadow-sm hover:bg-[var(--bb-surface-data-muted)]"
-                onClick={resetW5Filters}
-              >
-                Reset filters
-              </button>
-            )}
-          </div>
-        </section>
-      )}
+      {/* One shared cohort filter panel (CohortFilterPanel), same anatomy as
+          the Benchmark page: benchmark, scale, phase, tuning, platform
+          version, trust tier, validation, architecture, CPU family, memory,
+          and run date. Filters are always visible - a filter that pops in
+          and out of existence as the cohort narrows is disorienting - and
+          Scale/Phase both offer an "All" option here, unlike the Benchmark
+          page where the benchmark (and so scale/phase) are always fixed. */}
+      <CohortFilterPanel
+        testId="platform-detail-filters"
+        fields={platformCohortFilterFields}
+        showClear={hasPlatformFilters}
+        clearTestId="platform-filter-reset"
+        onClear={resetPlatformFilters}
+      />
 
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
@@ -921,7 +871,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               </p>
             </div>
             {filtersCausedZeroSelectable && (
-              <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetW5Filters}>
+              <button type="button" class="btn btn-secondary shrink-0 text-sm" onClick={resetPlatformFilters}>
                 Clear filters
               </button>
             )}
@@ -929,8 +879,11 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </section>
       )}
 
-      <PlatformBasisControl basis={basis} options={basisOptions} onChange={setBasis} loading={basisLoading} error={basisError} />
-      {platformResults.length === 0 ? (
+      <section id="platform-section-results" class="scroll-mt-24 overflow-x-hidden" aria-labelledby="platform-heading-results">
+        <h2 id="platform-heading-results" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          Results
+        </h2>
+        {platformResults.length === 0 ? (
         <p class="text-[var(--bb-data-fg-muted)]">
           {allPlatformResults.length > 0 && hasActivePlatformResultFacets(facets)
             ? `No results match the selected filters for platform: ${platformDisplayName}.`
@@ -938,9 +891,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         </p>
       ) : (
         <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+          <ResultsCardToolbar
+            left={
+              <PlatformBasisControl basis={basis} options={basisOptions} onChange={setBasis} loading={basisLoading} error={basisError} />
+            }
+            right={<GroupBySelect id="platform-group-by" testId="platform-group-by" value={groupBy} onChange={setGroupBy} />}
+          />
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-            {/* The header states the cohort size; this line exists only to
-                say when the render limit is holding rows back. */}
+            {/* This line exists only to say when the render limit is holding
+                rows back. */}
             <div>
               {visiblePlatformResults.length === platformResults.length ? null : (
                 <span>
@@ -948,21 +907,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   {platformResults.length.toLocaleString()} published runs
                 </span>
               )}
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="platform-group-by">
-                Group by:
-              </label>
-              <select
-                id="platform-group-by"
-                data-testid="platform-group-by"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
-                value={groupBy}
-                onChange={(event) => setGroupBy((event.target as HTMLSelectElement).value as CohortGroupBy)}
-              >
-                <option value="none">{COHORT_GROUP_BY_LABELS.none}</option>
-                <option value="engine_version">{COHORT_GROUP_BY_LABELS.engine_version}</option>
-              </select>
             </div>
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]">
@@ -978,13 +922,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             />
           </div>
           <div ref={resultsScrollerRef} class="overflow-x-auto" data-testid="platform-results-scroll-container">
-          {/*
-          Basis statement, per w3. Same wording as BenchmarkIndex so the two
-          leaderboards cannot describe the same reduction differently.
-          */}
-          <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
+          <ResultsBasisStatement>
           {isDefaultBasis(basis) ? "Geomean query time uses the median of each query’s published measurement passes, then the geometric mean across queries. Warmup passes are excluded." : `Geomean query time uses ${formatBasisLabel(basis)} across each run’s available queries. Published power scores are hidden for this basis.`}
-          </p>
+          </ResultsBasisStatement>
           <DataTable
             ariaLabel={`${platformDisplayName} results`}
             ariaColCount={platformColumnCount}
@@ -1071,6 +1011,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     {ariaSortAnnouncement("geomean_ms")}
                   </button>
                 </th>
+                <th class="table-th" aria-colindex={platformTableColumnIndex("queries", showMetricContract)}>Queries</th>
                 <th class="table-th" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>Labels</th>
                 <th
                   class="p-0"
@@ -1116,6 +1057,9 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     Memory{sortArrow("memory_gb")}
                     {ariaSortAnnouncement("memory_gb")}
                   </button>
+                </th>
+                <th class="table-th text-right" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)}>
+                  Receipt
                 </th>
               </tr>
             </thead>
@@ -1187,7 +1131,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             </div>
           )}
         </div>
-      )}
+        )}
+      </section>
 
       <TrayAnnouncer count={selected.size} />
       {compareUrl && (
@@ -1214,45 +1159,86 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         />
       )}
 
-      {platformResultsRaw.length > 0 && (
-        <section class="card mt-8" aria-label="Performance trends by comparable ranking">
-          <h2 class="mb-2 text-base font-semibold text-[var(--bb-data-fg-primary)]">Performance trends by ranking</h2>
-          <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
-            Each trend keeps the benchmark, scale, phase, and measurement fixed. A chart needs at least {MIN_TREND_OBSERVATIONS} runs.
-          </p>
-          {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
-            <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
-              No trendable metric values are available for the selected filters.
-            </p>
-          ) : (
-            <div class="space-y-6">
-              {trendCohorts.map((cohort) => (
-                <section key={cohort.key} data-testid={`trend-cohort-${cohort.key}`} class="space-y-2">
-                  <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
-                  <p class="text-xs text-[var(--bb-data-fg-muted)]">
-                    {cohort.observationCount} observations · {cohort.metricDescription}
+      <section id="platform-section-analysis" class="mt-8 scroll-mt-24" aria-labelledby="platform-heading-analysis">
+        <h2 id="platform-heading-analysis" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          Analysis
+        </h2>
+        <AnalysisCardGrid
+          headingId="platform-more-views-title"
+          headingLevel="h3"
+          title="More views"
+          description="Per-query charts (query matrix, ranks, percentiles) need a single ranking and live on each benchmark's page."
+        >
+          <AnalysisCard
+            id="trends"
+            title={`Performance trends (${trendCohorts.length})`}
+            isOpen={openAnalysisCardIds.has("trends")}
+            onToggle={(open) =>
+              setOpenAnalysisCardIds((current) => {
+                const next = new Set(current);
+                if (open) next.add("trends");
+                else next.delete("trends");
+                return next;
+              })
+            }
+            renderThumbnail={() => <TrendsThumbnail cohorts={trendCohorts} />}
+            renderFull={() => (
+              <div>
+                <p class="mb-4 text-sm text-[var(--bb-data-fg-muted)]">
+                  Each trend keeps the benchmark, scale, phase, and measurement fixed. A chart needs at least{" "}
+                  {MIN_TREND_OBSERVATIONS} runs.
+                </p>
+                {trendCohorts.length === 0 && sparseTrendCohorts.length === 0 ? (
+                  <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
+                    No trendable metric values are available for the selected filters.
                   </p>
-                  <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
-                </section>
-              ))}
-              {sparseTrendCohorts.length > 0 && (
-                <details class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3">
-                  <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
-                    {sparseTrendCohorts.length} {sparseTrendCohorts.length === 1 ? "ranking has" : "rankings have"} too few runs for a trend
-                  </summary>
-                  <ul class="mt-3 space-y-2 text-sm text-[var(--bb-data-fg-muted)]">
-                    {sparseTrendCohorts.map((cohort) => (
-                      <li key={cohort.key} data-testid={`trend-sparse-${cohort.key}`}>
-                        <span class="font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</span>: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"} · {cohort.metricDescription}
-                      </li>
+                ) : (
+                  <div class="space-y-6">
+                    {trendCohorts.map((cohort) => (
+                      <section key={cohort.key} data-testid={`trend-cohort-${cohort.key}`} class="space-y-2">
+                        <h3 class="text-sm font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</h3>
+                        <p class="text-xs text-[var(--bb-data-fg-muted)]">
+                          {cohort.observationCount} observations · {cohort.metricDescription}
+                        </p>
+                        <TimeSeries entries={cohort.entries} primaryMetric={cohort.primaryMetric} />
+                      </section>
                     ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-        </section>
-      )}
+                    {sparseTrendCohorts.length > 0 && (
+                      <details class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3">
+                        <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
+                          {sparseTrendCohorts.length} {sparseTrendCohorts.length === 1 ? "ranking has" : "rankings have"} too few runs for a trend
+                        </summary>
+                        <ul class="mt-3 space-y-2 text-sm text-[var(--bb-data-fg-muted)]">
+                          {sparseTrendCohorts.map((cohort) => (
+                            <li key={cohort.key} data-testid={`trend-sparse-${cohort.key}`}>
+                              <span class="font-medium text-[var(--bb-data-fg-primary)]">{cohort.label}</span>: {cohort.observationCount} published {cohort.observationCount === 1 ? "run" : "runs"} · {cohort.metricDescription}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          />
+          <AnalysisCard
+            id="coverage"
+            title={`Coverage (${coverageStats.length} ${coverageStats.length === 1 ? "benchmark" : "benchmarks"})`}
+            isOpen={openAnalysisCardIds.has("coverage")}
+            onToggle={(open) =>
+              setOpenAnalysisCardIds((current) => {
+                const next = new Set(current);
+                if (open) next.add("coverage");
+                else next.delete("coverage");
+                return next;
+              })
+            }
+            renderThumbnail={() => <CoverageThumbnail stats={coverageStats} />}
+            renderFull={() => <CoverageTable stats={coverageStats} />}
+          />
+        </AnalysisCardGrid>
+      </section>
       <ProvenanceLegend />
 </div>
   );
@@ -1304,6 +1290,188 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
   return metric === "power_score" ? row.power_score : row.display_geomean_ms;
 }
 
+/** Shared thumbnail chrome for the Analysis card grid's preview state. */
+function AnalysisMiniFrame({ children }: { children: ComponentChildren }) {
+  return (
+    <div class="summary-chart-thumbnail mt-4 flex items-center justify-center rounded-md bg-[var(--bb-surface-data-muted)] p-2">
+      {children}
+    </div>
+  );
+}
+
+function AnalysisMiniUnavailable({ label }: { label: string }) {
+  return (
+    <AnalysisMiniFrame>
+      <p class="px-3 text-center text-xs text-[var(--bb-data-fg-subtle)]">{label}</p>
+    </AnalysisMiniFrame>
+  );
+}
+
+/** Up to four small sparklines, one per trendable ranking, for the trends card thumbnail. */
+function TrendsThumbnail({ cohorts }: { cohorts: TrendCohort[] }) {
+  const items = cohorts.slice(0, 4);
+  if (items.length === 0) {
+    return <AnalysisMiniUnavailable label="No trendable metric values are available for the selected filters." />;
+  }
+  const width = 80;
+  const height = 28;
+  return (
+    <div class="summary-chart-thumbnail mt-4 grid grid-cols-2 gap-2 rounded-md bg-[var(--bb-surface-data-muted)] p-2">
+      {items.map((cohort, index) => {
+        const values = cohort.entries
+          .map((entry) => trendValue(entry, cohort.primaryMetric))
+          .filter((value): value is number => value !== null);
+        const label = cohort.label;
+        if (values.length === 0) {
+          return (
+            <div key={cohort.key} class="flex flex-col items-center gap-1">
+              <span class="text-[9px] text-[var(--bb-data-fg-subtle)]">No data</span>
+            </div>
+          );
+        }
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const span = max - min || 1;
+        const points = values
+          .map((value, pointIndex) => {
+            const x = values.length > 1 ? (pointIndex / (values.length - 1)) * width : width / 2;
+            const normalized = (value - min) / span;
+            const y = cohort.primaryMetric === "power_score" ? height - normalized * height : normalized * height;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          })
+          .join(" ");
+        return (
+          <div key={cohort.key} class="flex flex-col items-center gap-1">
+            <svg
+              viewBox={`0 0 ${width} ${height}`}
+              class="h-7 w-full"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`${label} trend thumbnail`}
+            >
+              <polyline points={points} fill="none" stroke={timeSeriesColor(index)} stroke-width="1.5" />
+            </svg>
+            <span class="max-w-full truncate text-[9px] text-[var(--bb-data-fg-subtle)]" title={label}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+interface CoverageStat {
+  benchmark: string;
+  scales: number[];
+  runs: number;
+  latestRunDate: string;
+}
+
+/** Runs-per-benchmark coverage for this platform, given the active filters. */
+function buildCoverageStats(rows: PlatformIndexRowRow[]): CoverageStat[] {
+  const byBenchmark = new Map<string, { scales: Set<number>; runs: number; latestRunDate: string }>();
+  for (const row of rows) {
+    let entry = byBenchmark.get(row.benchmark);
+    if (!entry) {
+      entry = { scales: new Set(), runs: 0, latestRunDate: row.run_date };
+      byBenchmark.set(row.benchmark, entry);
+    }
+    entry.scales.add(row.scale_factor);
+    entry.runs += 1;
+    if (row.run_date > entry.latestRunDate) entry.latestRunDate = row.run_date;
+  }
+  return [...byBenchmark.entries()]
+    .map(([benchmark, entry]) => ({
+      benchmark,
+      scales: [...entry.scales].sort((a, b) => a - b),
+      runs: entry.runs,
+      latestRunDate: entry.latestRunDate,
+    }))
+    .sort((a, b) => b.runs - a.runs || a.benchmark.localeCompare(b.benchmark));
+}
+
+interface CoverageBarItem {
+  label: string;
+  runs: number;
+}
+
+/** Top 5 benchmarks by run count, then the rest aggregated into one "N others" bar. */
+function coverageBarItems(stats: CoverageStat[]): CoverageBarItem[] {
+  const top = stats.slice(0, 5).map((stat) => ({ label: humanizeBenchmark(stat.benchmark), runs: stat.runs }));
+  const rest = stats.slice(5);
+  if (rest.length === 0) return top;
+  return [...top, { label: `${rest.length} others`, runs: rest.reduce((total, stat) => total + stat.runs, 0) }];
+}
+
+function CoverageThumbnail({ stats }: { stats: CoverageStat[] }) {
+  if (stats.length === 0) {
+    return <AnalysisMiniUnavailable label="No benchmark coverage is available for the selected filters." />;
+  }
+  const bars = coverageBarItems(stats);
+  const max = Math.max(...bars.map((bar) => bar.runs), 1);
+  return (
+    <div class="summary-chart-thumbnail mt-4 w-full space-y-1.5 rounded-md bg-[var(--bb-surface-data-muted)] p-2">
+      {bars.map((bar, index) => (
+        <div key={bar.label} class="flex items-center gap-1.5">
+          <span class="w-16 shrink-0 truncate text-[9px] text-[var(--bb-data-fg-subtle)]" title={bar.label}>
+            {bar.label}
+          </span>
+          <span class="relative h-2 flex-1 rounded-sm bg-[var(--bb-data-border)]">
+            <span
+              class="absolute inset-y-0 left-0 rounded-sm"
+              style={{ width: `${Math.max(4, (bar.runs / max) * 100)}%`, backgroundColor: paletteColor(index) }}
+            />
+          </span>
+          <span class="w-6 shrink-0 text-right font-mono text-[9px] text-[var(--bb-data-fg-subtle)]">{bar.runs}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CoverageTable({ stats }: { stats: CoverageStat[] }) {
+  if (stats.length === 0) {
+    return (
+      <p class="text-sm text-[var(--bb-data-fg-subtle)] italic">
+        No benchmark coverage is available for the selected filters.
+      </p>
+    );
+  }
+  return (
+    <DataTable
+      ariaLabel="Benchmark coverage"
+      caption="Runs per benchmark for this platform, given the active filters."
+      class="min-w-[28rem] w-full divide-y divide-[var(--bb-data-border)]"
+    >
+      <thead class="bg-[var(--bb-surface-data-muted)]">
+        <tr>
+          <th class="table-th" scope="col">Benchmark</th>
+          <th class="table-th" scope="col">Scales</th>
+          <th class="table-th" scope="col">Runs</th>
+          <th class="table-th" scope="col">Latest run</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
+        {stats.map((stat) => (
+          <tr key={stat.benchmark}>
+            <th class="table-td text-left font-medium" scope="row">
+              <a href={`/results/${canonicalBenchmarkSlug(stat.benchmark)}/`} class="no-underline hover:underline">
+                {humanizeBenchmark(stat.benchmark)}
+              </a>
+            </th>
+            <td class="table-td text-[var(--bb-data-fg-muted)]">{stat.scales.map((sf) => `SF ${sf}`).join(", ")}</td>
+            <td class="table-td font-mono">{stat.runs}</td>
+            <td class="table-td text-[var(--bb-data-fg-muted)]">
+              <RunDateChip runDate={stat.latestRunDate} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </DataTable>
+  );
+}
+
 interface PlatformRowProps {
   entry: PlatformIndexRowRow;
   runIdentityLabel: string;
@@ -1311,12 +1479,7 @@ interface PlatformRowProps {
   checked: boolean;
   onToggle: () => void;
   showMetricContract: boolean;
-  /**
-   * w6 (compare-flow-entrypoints): when a row outside the locked
-   * cohort signature is rendered, the checkbox is disabled with a
-   * tooltip rather than letting the user accumulate a mixed cohort
-   * that Compare would later have to suppress winner claims for.
-   */
+  /** Rows outside the selected cohort cannot be added to the comparison. */
   disabledReason?: string;
 }
 
@@ -1381,6 +1544,7 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("queries", showMetricContract)}>{entry.query_count}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
@@ -1402,6 +1566,15 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
       </td>
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("memory_gb", showMetricContract)}>
         {entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}
+      </td>
+      <td class="table-td text-right" aria-colindex={platformTableColumnIndex("receipt", showMetricContract)}>
+        <a
+          href={resultReceiptHref(entry)}
+          aria-label={resultIdentityAriaLabel(entry, "receipt")}
+          class="text-xs font-medium no-underline"
+        >
+          Receipt →
+        </a>
       </td>
     </tr>
   );

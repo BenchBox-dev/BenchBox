@@ -48,7 +48,8 @@ test.describe("Global header", () => {
     await expect(globalNav.getByRole("link")).toHaveText(GLOBAL_LABELS);
     await expect(globalNav.getByRole("link", { name: "Results" })).toHaveAttribute("aria-current", "page");
     await expect(globalNav.getByRole("link", { name: HEADER_CTA.label })).toHaveAttribute("href", HEADER_CTA.href);
-    await expect(page.getByRole("button", { name: /Theme: system/i })).toBeVisible();
+    await expect(globalNav.getByRole("radiogroup")).toHaveCount(0);
+    await expect(page.getByRole("radiogroup", { name: "Color theme" })).toBeVisible();
 
     const explorerNav = page.getByRole("navigation", { name: "Results Explorer" });
     await expect(explorerNav.getByRole("link")).toHaveText(["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]);
@@ -66,16 +67,18 @@ test.describe("Global header", () => {
     await expect(page.getByRole("navigation", { name: HEADER_NAV_ARIA_LABEL }).getByRole("link")).toHaveText(GLOBAL_LABELS);
   });
 
-  test("@smoke persists the theme choice from the global header", async ({ page }) => {
+  test("@smoke persists the theme choice from the footer radiogroup", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
 
-    const themeToggle = page.getByRole("button", { name: /Theme: system/i });
-    await themeToggle.click();
+    const lightOption = page.getByRole("radio", { name: "Light theme" });
+    await lightOption.click();
+    await expect(lightOption).toHaveAttribute("aria-checked", "true");
     await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
     await page.reload();
     await waitForShell(page);
     await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
+    await expect(page.getByRole("radio", { name: "Light theme" })).toHaveAttribute("aria-checked", "true");
   });
 
   test("Results global header bounding-box meets shared min-height contract", async ({ page }) => {
@@ -103,13 +106,11 @@ test.describe("Global header", () => {
       return box!;
     };
 
-    const lightToggle = page.getByRole("button", { name: /Theme: system/i });
-    await lightToggle.click();
+    await page.getByRole("radio", { name: "Light theme" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "light");
     const lightBox = await measure();
 
-    const darkToggle = page.getByRole("button", { name: /Theme: light/i });
-    await darkToggle.click();
+    await page.getByRole("radio", { name: "Dark theme" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-bb-theme-choice", "dark");
     const darkBox = await measure();
 
@@ -145,7 +146,11 @@ test.describe("Global header cross-surface parity", () => {
       }
       await expect(nav.getByRole("link", { name: HEADER_CTA.label })).toHaveAttribute("href", HEADER_CTA.href);
       await expect(page.getByRole("button", { name: HEADER_TOGGLE_ARIA_LABEL })).toBeVisible();
-      await expect(page.getByRole("button", { name: /Theme: (system|light|dark)\. Activate to switch theme\./i })).toBeVisible();
+      await expect(nav.getByRole("radiogroup")).toHaveCount(0);
+      await expect(page.getByRole("radiogroup", { name: "Color theme" })).toBeVisible();
+      for (const option of ["System theme", "Light theme", "Dark theme"]) {
+        await expect(page.getByRole("radio", { name: option })).toBeVisible();
+      }
 
       const brand = page.locator(".benchbox-site-header__logo");
       await expect(brand).toHaveText(HEADER_BRAND.label);

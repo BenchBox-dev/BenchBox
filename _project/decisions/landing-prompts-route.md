@@ -53,19 +53,21 @@ out of `planning/` without re-litigating product choices.
 
 ## Public label
 
-- **Nav label:** `Instruct an agent`
+- **Entry point:** the landing page's AI Assistant Integration section
+  (`#mcp`) carries an "Instruct a coding agent" block that links to
+  `/prompts/` via "Open the prompt builder →". The route is not a global
+  header nav link.
 - **Page H1 / `<title>`:** `Instruct a coding agent to use BenchBox`
 - **URL slug:** `/prompts/` (unchanged — the path is internal jargon and
   matches the generator artefact name)
 
-Rationale: the nav slot needs to be short and verb-led to compete with
-`Docs / Blog / Results`. The page H1 carries the full intent for users
-who arrive directly. "Prompts" was rejected as too generic next to the
-existing nav items.
+Rationale: the entry point lives alongside the rest of the MCP/AI-assistant
+content on the landing page so visitors discover it in context, rather than
+competing for a `Docs / Blog / Results`-style header slot. The page H1
+carries the full intent for users who arrive directly.
 
-`landing-prompts-launch-gates` w1 must use these strings verbatim in
-`landing/index.html` and `docs/_templates/page.html`. The page title
-appears in `landing/prompts/index.html`.
+This label is used verbatim in `landing/index.html`. The page title appears
+in `landing/prompts/index.html`.
 
 ## Default agent and surface
 
@@ -225,9 +227,10 @@ this PR) has landed on `develop` with the values below. The decision
 record above remains the policy source of truth; this block records the
 concrete state at launch.
 
-- **Final public label:** nav `Instruct an agent`; page H1
-  `Instruct a coding agent to use BenchBox`. Used verbatim in
-  `landing/index.html` and `docs/_templates/page.html`.
+- **Final public label:** page H1 `Instruct a coding agent to use BenchBox`,
+  used verbatim in `landing/prompts/index.html`. Reached from the landing
+  page's AI Assistant Integration section via `Open the prompt builder →`,
+  not a global header nav link.
 - **Default state on first load:** Goal=Test one platform,
   Agent=Generic, Surface=CLI, Interface=SQL, Deployment=Local,
   Platform=duckdb, Benchmark=tpch, Scale=0.01.

@@ -8,6 +8,9 @@ import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listRes
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
 import { facetsToWhereClause, useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { singleValueFilterReason } from "@/lib/cohortFilterReason";
+import { CohortFilterPanel, type CohortFilterFieldSpec } from "@/components/CohortFilterPanel";
+import { ResultsCardToolbar, GroupBySelect, ResultsBasisStatement } from "@/components/ResultsCard";
 import {
   buildCompareUrl,
   compareIdForRow,
@@ -23,14 +26,13 @@ import {
   isTimingDisplayable,
 } from "@/lib/displayEligibility";
 import { describeCompareExclusionReason, summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
+import { compareSelectionLabel } from "@/lib/compareCohort";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
-import { QueryHeatmap } from "@/components/QueryHeatmap";
-import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
 import { RunIdentityLabel } from "@/components/DataTable";
@@ -46,31 +48,27 @@ import {
   formatArchitecture,
   formatCpuFamily,
   formatMemoryGb,
+  formatTrustLabel,
   formatValidationStatus,
 } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
-import {
-  COHORT_GROUP_BY_LABELS,
-  groupCohortRows,
-  limitCohortGroups,
-  type CohortGroupBy,
-} from "@/lib/queryFilters";
+import { groupCohortRows, limitCohortGroups, type CohortGroupBy } from "@/lib/queryFilters";
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
+// Deep-link ids for the expandable analysis cards.
+const CHART_CARD_ANCHORS: Readonly<Record<string, string>> = {
+  query_heatmap: "benchmark-section-matrix",
+  rank_table: "benchmark-section-ranks",
+};
+
 const DATE_WINDOW_OPTIONS: { value: DateWindowFacet; label: string }[] = [
-  { value: "all", label: "Any time" },
+  { value: "all", label: "All time" },
   { value: "30d", label: "Last 30 days" },
   { value: "90d", label: "Last 90 days" },
-  { value: "365d", label: "Last year" },
+  { value: "365d", label: "Last 365 days" },
 ];
-
-// Filters stay mounted even when they offer no real choice (see
-// singleValueFilterReason), so every select needs a visible disabled state
-// rather than just vanishing from the layout.
-const FILTER_SELECT_CLASS =
-  "rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50";
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
@@ -114,31 +112,6 @@ const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "cpu_family",
   "memory_gb",
 ];
-
-const TRUST_LABEL_ABBREV: Record<string, string> = {
-  "maintainer-run": "Maintainer",
-  "community-submission": "Community",
-  "ci-verified": "CI",
-  "local": "Local",
-};
-
-function trustAbbrev(label: string): string {
-  return TRUST_LABEL_ABBREV[label] ?? label.split("-")[0] ?? label;
-}
-
-/**
- * Filters stay visible at all times (a filter that pops in and out of
- * existence as other filters narrow the cohort is disorienting), but one
- * offering no real choice is disabled with an explanation rather than
- * hidden. A filter with an active selection stays enabled even at zero or
- * one remaining option, so it's never impossible to see or clear.
- */
-function singleValueFilterReason(availableCount: number, hasActiveSelection: boolean): string | null {
-  if (hasActiveSelection) return null;
-  if (availableCount === 0) return "No data recorded for this filter in the current results.";
-  if (availableCount === 1) return "Only one value is present in the current results.";
-  return null;
-}
 
 function requestedBenchmarkSection(): ViewMode | null {
   const hash = window.location.hash.replace("#benchmark-section-", "");
@@ -244,7 +217,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     : facets.platform_version.length === 1
       ? facets.platform_version[0]!
       : "__multiple__";
-  const trustFilter = facets.trust_tier.length === 0 ? null : new Set(facets.trust_tier);
   const benchmarkResultWhere = useMemo(
     () =>
       facetsToWhereClause({
@@ -321,10 +293,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       window.removeEventListener("popstate", onNavigation);
     };
   }, []);
-
-  // High contrast / reduced-color mode for the heatmap (explicit user toggle).
-  // Also activates automatically via CSS prefers-contrast: more media query.
-  const [highContrast, setHighContrast] = useState(false);
 
   // Row selection for Compare
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -452,7 +420,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // Native fragment navigation happens before async sections exist. Wait for
   // the current cohort so replacing its skeleton cannot move the target away.
   useEffect(() => {
-    if (!requestedSection || summaryLoading || settledSummaryKey !== summaryKey) return;
+    if (!requestedSection || requestedSection !== "list" || summaryLoading || settledSummaryKey !== summaryKey) return;
     const navigationKey = `${benchmark}:${requestedSection}:${sectionNavigation}`;
     if (completedSectionScroll.current === navigationKey) return;
     const target = document.getElementById(`benchmark-section-${requestedSection}`);
@@ -611,6 +579,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     : null;
   const excludedRows = filteredSummary?.platforms.filter((row) => !isTimingDisplayable(row)) ?? [];
   const rankGateReason = filteredSummary ? formatCohortExclusion(filteredSummary) : null;
+  // Compare eligibility is derived from the filtered summary so the Results
+  // table and analysis cards use the same result_id and cohort boundaries.
+  const compareEligibilityByResultId = new Map(
+    (filteredSummary?.platforms ?? []).map((row) => [row.result_id, row] as const),
+  );
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if (canonicalPhase(result.test_type) !== effectivePhase) return false;
@@ -658,6 +631,121 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const updateSelectedIds = (next: Set<string>) => {
     if (next.size <= MAX_COMPARE_SELECTIONS) setSelectedIds(next);
   };
+
+  const trustFilterValue =
+    facets.trust_tier.length === 0 ? "all" : facets.trust_tier.length === 1 ? facets.trust_tier[0]! : "__multiple__";
+
+  const benchmarkCohortFilterFields: CohortFilterFieldSpec[] = [
+    {
+      id: "scale-filter",
+      label: "Scale",
+      value: effectiveSf,
+      options:
+        scaleFactors.length > 0
+          ? scaleFactors.map((sf) => ({ value: sf, label: `SF ${sf}` }))
+          : [{ value: effectiveSf, label: `SF ${effectiveSf}` }],
+      onChange: (value) => setScaleFilter(value),
+      disabledReason: singleValueFilterReason(scaleFactors.length, false),
+    },
+    {
+      id: "phase-filter",
+      label: "Phase",
+      value: effectivePhase,
+      options:
+        phases.length > 0
+          ? phases.map((ph) => ({ value: ph, label: ph.charAt(0).toUpperCase() + ph.slice(1) }))
+          : [{ value: effectivePhase, label: effectivePhase }],
+      onChange: (value) => setPhaseFilter(value),
+      disabledReason: singleValueFilterReason(phases.length, false),
+    },
+    {
+      id: "tuning-filter",
+      label: "Tuning",
+      value: tuningFilter,
+      options: [{ value: "all", label: "All" }, ...tuningModes.map((m) => ({ value: m, label: tuningLabel(m) }))],
+      onChange: (value) => setTuningFilter(value),
+      disabledReason: singleValueFilterReason(tuningModes.length, tuningFilter !== "all"),
+    },
+    {
+      id: "benchmark-version-filter",
+      testId: "benchmark-version-filter",
+      label: "Platform version",
+      value: platformVersionFilter,
+      options: [{ value: "all", label: "All versions" }, ...platformVersions.map((version) => ({ value: version, label: version }))],
+      onChange: (value) => setFacet("platform_version", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(platformVersions.length, platformVersionFilter !== "all"),
+      multiValueOption:
+        platformVersionFilter === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.platform_version.length} versions selected` }
+          : undefined,
+    },
+    {
+      id: "benchmark-trust-filter",
+      testId: "benchmark-trust-filter",
+      label: "Trust tier",
+      value: trustFilterValue,
+      options: [{ value: "all", label: "All trust tiers" }, ...trustLabels.map((tier) => ({ value: tier, label: formatTrustLabel(tier) }))],
+      onChange: (value) => setTrustFilter(value === "all" ? null : new Set([value])),
+      disabledReason: singleValueFilterReason(trustLabels.length, trustFilterValue !== "all"),
+      multiValueOption:
+        trustFilterValue === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.trust_tier.length} tiers selected` }
+          : undefined,
+    },
+    {
+      id: "benchmark-platform-filter",
+      testId: "benchmark-platform-filter",
+      label: "Platform",
+      value: facets.platform.length === 1 ? facets.platform[0]! : "all",
+      options: [{ value: "all", label: "All platforms" }, ...platformOptions.map((option) => ({ value: option, label: option }))],
+      onChange: (value) => setFacet("platform", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(platformOptions.length, facets.platform.length > 0),
+    },
+    {
+      id: "benchmark-validation-filter",
+      testId: "benchmark-validation-filter",
+      label: "Validation",
+      value: facets.validation_status.length === 1 ? facets.validation_status[0]! : "all",
+      options: [{ value: "all", label: "All validation" }, ...validationOptions.map((status) => ({ value: status, label: formatValidationStatus(status) }))],
+      onChange: (value) => setFacet("validation_status", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(validationOptions.length, facets.validation_status.length > 0),
+    },
+    {
+      id: "benchmark-arch-filter",
+      testId: "benchmark-arch-filter",
+      label: "Architecture",
+      value: facets.arch.length === 1 ? facets.arch[0]! : "all",
+      options: [{ value: "all", label: "All architectures" }, ...archOptions.map((option) => ({ value: option, label: formatArchitecture(option) }))],
+      onChange: (value) => setFacet("arch", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(archOptions.length, facets.arch.length > 0),
+    },
+    {
+      id: "benchmark-cpu-family-filter",
+      testId: "benchmark-cpu-family-filter",
+      label: "CPU family",
+      value: facets.cpu_family.length === 1 ? facets.cpu_family[0]! : "all",
+      options: [{ value: "all", label: "All CPU families" }, ...cpuFamilyOptions.map((option) => ({ value: option, label: formatCpuFamily(option) }))],
+      onChange: (value) => setFacet("cpu_family", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(cpuFamilyOptions.length, facets.cpu_family.length > 0),
+    },
+    {
+      id: "benchmark-memory-filter",
+      testId: "benchmark-memory-filter",
+      label: "Memory",
+      value: facets.memory_gb.length === 1 ? facets.memory_gb[0]! : "all",
+      options: [{ value: "all", label: "All memory sizes" }, ...memoryOptions.map((option) => ({ value: String(option), label: formatMemoryGb(option) }))],
+      onChange: (value) => setFacet("memory_gb", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(memoryOptions.length, facets.memory_gb.length > 0),
+    },
+    {
+      id: "benchmark-date-window-filter",
+      testId: "benchmark-date-window-filter",
+      label: "Run date",
+      value: facets.date_window,
+      options: DATE_WINDOW_OPTIONS,
+      onChange: (value) => setFacet("date_window", value as DateWindowFacet),
+    },
+  ];
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -710,372 +798,25 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               )}
             </select>
           </div>
-
-          {/* Jump nav. Matrix, Ranks, and List are all rendered below - these
-              are anchor links to the section on this same page, not a control
-              that swaps one section in for the other two. */}
-          <nav aria-label="Jump to section" class="flex items-center gap-3 text-sm font-medium text-[var(--bb-data-fg-muted)]">
-            <a href="#benchmark-section-matrix" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">Matrix</a>
-            <a href="#benchmark-section-ranks" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">
-              {rankGateReason ? "Rank Evidence" : "Ranks"}
-            </a>
-            <a href="#benchmark-section-list" class="no-underline hover:text-[var(--bb-data-fg-primary)] hover:underline">List</a>
-          </nav>
-
           </>
         }
       />
 
-      {/* Every filter that narrows the cohort, in one place. These were
-          previously split between the title row and nowhere at all: platform,
-          validation status, and the date window were plumbed through the facet
-          model but had no control.
-
-          Every filter stays mounted regardless of how many values it offers -
-          a filter that appears and disappears as other filters narrow the
-          cohort is disorienting. One with no real choice is disabled (see
-          singleValueFilterReason) with a title explaining why, rather than
-          removed from the layout. */}
-      <section
-        class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3"
-        data-testid="benchmark-filters"
-        aria-label="Cohort filters"
-      >
-          {/* Scale factor filter */}
-          {(() => {
-            const reason = singleValueFilterReason(scaleFactors.length, false);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="scale-filter">
-                  Scale:
-                </label>
-                <select
-                  id="scale-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={effectiveSf}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
-                >
-                  {scaleFactors.map((sf) => (
-                    <option key={sf} value={sf}>
-                      SF {sf}
-                    </option>
-                  ))}
-                  {scaleFactors.length === 0 && <option value={effectiveSf}>SF {effectiveSf}</option>}
-                </select>
-              </div>
-            );
-          })()}
-
-          {/* Phase filter */}
-          {(() => {
-            const reason = singleValueFilterReason(phases.length, false);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="phase-filter">
-                  Phase:
-                </label>
-                <select
-                  id="phase-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={effectivePhase}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
-                >
-                  {phases.map((ph) => (
-                    <option key={ph} value={ph}>
-                      {ph.charAt(0).toUpperCase() + ph.slice(1)}
-                    </option>
-                  ))}
-                  {phases.length === 0 && <option value={effectivePhase}>{effectivePhase}</option>}
-                </select>
-              </div>
-            );
-          })()}
-
-          {/* Tuning filter */}
-          {(() => {
-            const reason = singleValueFilterReason(tuningModes.length, tuningFilter !== "all");
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
-                  Tuning:
-                </label>
-                <select
-                  id="tuning-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={tuningFilter}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
-                >
-                  <option value="all">All</option>
-                  {tuningModes.map((m) => (
-                    <option key={m} value={m}>
-                      {tuningLabel(m)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(platformVersions.length, platformVersionFilter !== "all");
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-version-filter">
-                  Platform version:
-                </label>
-                <select
-                  id="benchmark-version-filter"
-                  data-testid="benchmark-version-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={platformVersionFilter}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("platform_version", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">All versions</option>
-                  {platformVersionFilter === "__multiple__" && (
-                    <option value="__multiple__" disabled>{facets.platform_version.length} versions selected</option>
-                  )}
-                  {platformVersions.map((version) => (
-                    <option key={version} value={version}>{version}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {/* Trust filter chips - default "all tiers shown" */}
-          {(() => {
-            const reason = singleValueFilterReason(trustLabels.length, trustFilter !== null);
-            return (
-              <div class="flex items-center gap-2" title={reason ?? undefined}>
-                <span class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Trust:</span>
-                <div class="flex flex-wrap gap-1">
-                  {trustLabels.map((tier) => {
-                    const active = trustFilter === null || trustFilter.has(tier);
-                    return (
-                      <button
-                        key={tier}
-                        type="button"
-                        disabled={reason !== null}
-                        class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                          active
-                            ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                            : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
-                        }`}
-                        aria-pressed={active}
-                        onClick={() => {
-                          // Toggle this tier in/out of the active set.
-                          const current = trustFilter ?? new Set(trustLabels);
-                          const next = new Set(current);
-                          if (next.has(tier)) {
-                            next.delete(tier);
-                            // Never allow empty selection - reset to "all"
-                            setTrustFilter(next.size === 0 ? null : next);
-                          } else {
-                            next.add(tier);
-                            // Full selection is equivalent to "all"
-                            setTrustFilter(next.size === trustLabels.length ? null : next);
-                          }
-                        }}
-                      >
-                        {trustAbbrev(tier)}
-                      </button>
-                    );
-                  })}
-                  {trustLabels.length === 0 && (
-                    <span class="text-sm text-[var(--bb-data-fg-subtle)]">None recorded</span>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(platformOptions.length, facets.platform.length > 0);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-platform-filter">
-                  Platform:
-                </label>
-                <select
-                  id="benchmark-platform-filter"
-                  data-testid="benchmark-platform-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={facets.platform.length === 1 ? facets.platform[0]! : "all"}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("platform", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">All platforms</option>
-                  {platformOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(validationOptions.length, facets.validation_status.length > 0);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-validation-filter">
-                  Validation:
-                </label>
-                <select
-                  id="benchmark-validation-filter"
-                  data-testid="benchmark-validation-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={facets.validation_status.length === 1 ? facets.validation_status[0]! : "all"}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("validation_status", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">Any status</option>
-                  {validationOptions.map((status) => (
-                    <option key={status} value={status}>{formatValidationStatus(status)}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(archOptions.length, facets.arch.length > 0);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-arch-filter">
-                  Architecture:
-                </label>
-                <select
-                  id="benchmark-arch-filter"
-                  data-testid="benchmark-arch-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={facets.arch.length === 1 ? facets.arch[0]! : "all"}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("arch", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">All architectures</option>
-                  {archOptions.map((option) => (
-                    <option key={option} value={option}>{formatArchitecture(option)}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(cpuFamilyOptions.length, facets.cpu_family.length > 0);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-cpu-family-filter">
-                  CPU family:
-                </label>
-                <select
-                  id="benchmark-cpu-family-filter"
-                  data-testid="benchmark-cpu-family-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={facets.cpu_family.length === 1 ? facets.cpu_family[0]! : "all"}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("cpu_family", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">All CPU families</option>
-                  {cpuFamilyOptions.map((option) => (
-                    <option key={option} value={option}>{formatCpuFamily(option)}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          {(() => {
-            const reason = singleValueFilterReason(memoryOptions.length, facets.memory_gb.length > 0);
-            return (
-              <div class="flex items-center gap-2">
-                <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-memory-filter">
-                  Memory:
-                </label>
-                <select
-                  id="benchmark-memory-filter"
-                  data-testid="benchmark-memory-filter"
-                  class={FILTER_SELECT_CLASS}
-                  value={facets.memory_gb.length === 1 ? facets.memory_gb[0]! : "all"}
-                  disabled={reason !== null}
-                  title={reason ?? undefined}
-                  onChange={(event) => {
-                    const value = (event.target as HTMLSelectElement).value;
-                    setFacet("memory_gb", value === "all" ? [] : [value]);
-                  }}
-                >
-                  <option value="all">All memory sizes</option>
-                  {memoryOptions.map((option) => (
-                    <option key={option} value={String(option)}>{formatMemoryGb(option)}</option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()}
-
-          <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-date-window-filter">
-              Run date:
-            </label>
-            <select
-              id="benchmark-date-window-filter"
-              data-testid="benchmark-date-window-filter"
-              class={FILTER_SELECT_CLASS}
-              value={facets.date_window}
-              onChange={(event) => {
-                setFacet("date_window", (event.target as HTMLSelectElement).value as DateWindowFacet);
-              }}
-            >
-              {DATE_WINDOW_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {hasActiveFacets(facets, BENCHMARK_ROW_FACET_KEYS) && (
-            <button
-              type="button"
-              class="btn btn-subtle text-sm"
-              data-testid="benchmark-clear-filters"
-              onClick={() => {
-                for (const key of BENCHMARK_ROW_FACET_KEYS) {
-                  if (key === "date_window") continue;
-                  setFacet(key, [] as never);
-                }
-                setFacet("date_window", "all");
-              }}
-            >
-              Clear filters
-            </button>
-          )}
-      </section>
+      {/* Keep the full cohort filter set mounted so its layout and explanations
+          stay stable as other filters narrow the available choices. */}
+      <CohortFilterPanel
+        testId="benchmark-filters"
+        fields={benchmarkCohortFilterFields}
+        showClear={hasActiveFacets(facets, BENCHMARK_ROW_FACET_KEYS)}
+        clearTestId="benchmark-clear-filters"
+        onClear={() => {
+          for (const key of BENCHMARK_ROW_FACET_KEYS) {
+            if (key === "date_window") continue;
+            setFacet(key, [] as never);
+          }
+          setFacet("date_window", "all");
+        }}
+      />
 
       {contextNote && (
         <div
@@ -1152,109 +893,58 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </section>
       )}
 
-      <section id="benchmark-section-matrix" class="scroll-mt-24" aria-labelledby="benchmark-heading-matrix">
-        <h2 id="benchmark-heading-matrix" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-          Matrix
-        </h2>
-        {summaryError ? (
-          <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-            Could not load benchmark matrix: {summaryError}
-          </div>
-        ) : summaryLoading ? (
-          <BenchmarkMatrixSkeleton message="Loading matrix..." />
-        ) : !filteredSummary ? (
-          <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-            <p class="font-medium">
-              No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-            </p>
-          </div>
-        ) : (
-          <div id="evidence-matrix" data-testid="evidence-matrix">
-            {/* Palette control sits with the thing it repaints. In the page
-                filter row it read as another cohort filter. */}
-            <div class="mb-2 flex justify-end">
-              <button
-                type="button"
-                class={`rounded-md border px-3 py-1 text-xs transition-colors ${
-                  highContrast
-                    ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                    : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
-                }`}
-                onClick={() => setHighContrast((v) => !v)}
-                aria-pressed={highContrast}
-                title="Switch the heatmap palette to greyscale for color-vision accessibility"
-              >
-                Reduced color
-              </button>
-            </div>
-            <QueryHeatmap
-              summary={analysisSummary ?? filteredSummary}
-              selectedIds={selectedIds}
-              onSelectionChange={updateSelectedIds}
-              selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
-              highContrast={highContrast}
-            />
-          </div>
-        )}
-      </section>
-
-      <section id="benchmark-section-ranks" class="mt-8 scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-ranks">
-        <h2 id="benchmark-heading-ranks" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-          {rankGateReason ? "Rank Evidence" : "Ranks"}
-        </h2>
-        {summaryError ? (
-          <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-            Could not load rank data: {summaryError}
-          </div>
-        ) : summaryLoading ? (
-          <BenchmarkMatrixSkeleton message="Loading ranks..." />
-        ) : !filteredSummary ? (
-          <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-            <p class="font-medium">
-              No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-            </p>
-          </div>
-        ) : rankGateReason ? (
-          <RankGateNotice
-            reason={rankGateReason}
-            benchmark={title}
-            scaleFactor={effectiveSf}
-            phase={effectivePhase}
-          />
-        ) : (
-          <div class="card">
-            <RankTable summary={analysisSummary ?? filteredSummary} />
-          </div>
-        )}
-      </section>
-
-      <section id="benchmark-section-list" class="mt-8 scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-list">
+      <section id="benchmark-section-list" class="scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-list">
         <h2 id="benchmark-heading-list" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-          List
+          Results
         </h2>
+        {summaryError && (
+          <div class="mb-3 rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
+            Could not load compare eligibility for this cohort: {summaryError}
+          </div>
+        )}
         <ListTable
           benchmark={benchmark}
           results={results}
           scaleFactor={effectiveSf}
           phase={effectivePhase}
           facets={facets}
+          compareEligibilityByResultId={compareEligibilityByResultId}
+          compareEligibilityState={
+            summaryLoading || settledSummaryKey !== summaryKey
+              ? "loading"
+              : summaryError
+                ? "error"
+                : "ready"
+          }
+          selectedIds={selectedIds}
+          onSelectionChange={updateSelectedIds}
+          selectionAtCap={selectedIds.size >= MAX_COMPARE_SELECTIONS}
+          selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
         />
       </section>
 
       <ExcludedRunsDisclosure rows={excludedRows} />
 
-      {analysisSummary && analysisSummary.platforms.length > 0 && (
-        <div class="mt-8">
+      {filteredSummary && filteredSummary.platforms.length > 0 && (
+        <section id="benchmark-section-analysis" class="mt-8 scroll-mt-24" aria-labelledby="benchmark-heading-analysis">
+          <h2 id="benchmark-heading-analysis" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+            Analysis
+          </h2>
           <ChartPanel
             context={{
               kind: "summary",
-              summary: analysisSummary,
+              summary: filteredSummary,
               historical: historicalEntries,
             }}
             summaryLayout="long"
-            excludeChartIds={["query_heatmap"]}
+            cardAnchors={CHART_CARD_ANCHORS}
+            forceOpenChartId={
+              requestedSection === "matrix" ? "query_heatmap" : requestedSection === "ranks" ? "rank_table" : undefined
+            }
+            rankGateReason={rankGateReason}
+            rankGateContext={{ benchmark: title, scaleFactor: effectiveSf, phase: effectivePhase }}
           />
-        </div>
+        </section>
       )}
 
       <TrayAnnouncer count={selectedComparableCount} />
@@ -1286,34 +976,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         <ProvenanceLegend />
       </div>
 </div>
-  );
-}
-
-function RankGateNotice({
-  reason,
-  benchmark,
-  scaleFactor,
-  phase,
-}: {
-  reason: string;
-  benchmark: string;
-  scaleFactor: string;
-  phase: string;
-}) {
-  return (
-    <section
-      class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-5 text-sm shadow-sm"
-      data-testid="rank-gate-notice"
-      aria-label="Rank gate"
-    >
-      <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Ranks are unavailable</h2>
-      <p class="mt-2 text-[var(--bb-data-fg-muted)]">
-        {benchmark} SF {scaleFactor} {phase} is not published as a leaderboard because {reason}
-      </p>
-      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
-        Timing evidence and receipts remain available, but BenchBox will not publish a ranking here.
-      </p>
-    </section>
   );
 }
 
@@ -1371,12 +1033,26 @@ function ListTable({
   scaleFactor,
   phase,
   facets,
+  compareEligibilityByResultId,
+  compareEligibilityState,
+  selectedIds,
+  onSelectionChange,
+  selectionAtCap,
+  selectionLimitReasonId,
 }: {
   benchmark: string;
   results: ResultRow[];
   scaleFactor: string;
   phase?: string;
   facets: FacetState;
+  /** The matching summary PlatformRow for a result_id, scoped to the current SF/phase cohort. */
+  compareEligibilityByResultId: Map<string, PlatformRow>;
+  compareEligibilityState: "loading" | "ready" | "error";
+  selectedIds: Set<string>;
+  onSelectionChange: (next: Set<string>) => void;
+  selectionAtCap: boolean;
+  /** ID of the page-level explanation shown when the selection cap is active. */
+  selectionLimitReasonId?: string;
 }) {
   const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
     key: "display_geomean_ms",
@@ -1436,9 +1112,21 @@ function ListTable({
     facets.cost_status,
     facets.date_window,
     facets.platform_version,
+    facets.arch,
+    facets.cpu_family,
+    facets.memory_gb,
     sort.key,
     sort.direction,
   ]);
+
+  const compareEligibilityReady = compareEligibilityState === "ready";
+  const compareEligibilityStatusId = "benchmark-compare-eligibility-status";
+  const compareEligibilityStatus =
+    compareEligibilityState === "loading"
+      ? "Compare eligibility is loading."
+      : compareEligibilityState === "error"
+        ? "Compare eligibility is unavailable for this cohort."
+        : null;
 
   function toggleSort(key: BenchmarkListSortKey) {
     setSort((prev) =>
@@ -1476,43 +1164,48 @@ function ListTable({
   }
 
   return (
-    <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-        <span>
-          Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
-        </span>
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-medium text-[var(--bb-data-fg-muted)]" for="benchmark-list-group-by">
-            Group by:
-          </label>
-          <select
+    <div
+      class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+      style="contain: paint"
+      aria-busy={!compareEligibilityReady}
+    >
+      <ResultsCardToolbar
+        left={
+          <span>
+            Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+          </span>
+        }
+        right={
+          <GroupBySelect
             id="benchmark-list-group-by"
-            data-testid="benchmark-list-group-by"
-            class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-sm shadow-sm"
+            testId="benchmark-list-group-by"
             value={groupBy}
-            onChange={(e) => setGroupBy((e.target as HTMLSelectElement).value as CohortGroupBy)}
-          >
-            <option value="none">{COHORT_GROUP_BY_LABELS.none}</option>
-            <option value="engine_version">{COHORT_GROUP_BY_LABELS.engine_version}</option>
-          </select>
-        </div>
-      </div>
-      {/*
-        The basis statement, per w3. A leaderboard that does not say what its
-        numbers mean is the same defect the compare work is fixing.
-
-        The median-or-min CONTROL is deferred, not forgotten -- see w0.log and
-        deferral #724 for the measurement and the reason.
-      */}
-      <p class="mb-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">
+            onChange={setGroupBy}
+          />
+        }
+      />
+      {compareEligibilityStatus && (
+        <p
+          id={compareEligibilityStatusId}
+          class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]"
+          role="status"
+        >
+          {compareEligibilityStatus}
+        </p>
+      )}
+      <ResultsBasisStatement>
         Geomean query time uses the median of each query's published measurement passes, then the
         geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
         the definitions shown in their columns and receipts.
-      </p>
-      <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+      </ResultsBasisStatement>
+      <div class="overflow-x-auto" data-testid="benchmark-list-scroll-container">
+      <table
+        class="min-w-full divide-y divide-[var(--bb-data-border)]"
+        aria-label={`${canonicalBenchmarkSlug(benchmark)} SF${scaleFactor}${phase ? ` ${phase}` : ""} results`}
+      >
         <thead class="bg-[var(--bb-surface-data-muted)]">
           <tr>
+            <th class="py-3 pl-4 pr-1 text-left" aria-label="Select for comparison" scope="col" />
             <ListSortHeader
               label="Platform"
               sortKey="platform"
@@ -1524,30 +1217,6 @@ function ListTable({
             <ListSortHeader
               label="Scale"
               sortKey="scale_factor"
-              ariaSort={ariaSort}
-              sortArrow={sortArrow}
-              sortAnnouncement={sortAnnouncement}
-              onSort={toggleSort}
-            />
-            <ListSortHeader
-              label="Arch"
-              sortKey="arch"
-              ariaSort={ariaSort}
-              sortArrow={sortArrow}
-              sortAnnouncement={sortAnnouncement}
-              onSort={toggleSort}
-            />
-            <ListSortHeader
-              label="CPU family"
-              sortKey="cpu_family"
-              ariaSort={ariaSort}
-              sortArrow={sortArrow}
-              sortAnnouncement={sortAnnouncement}
-              onSort={toggleSort}
-            />
-            <ListSortHeader
-              label="Memory"
-              sortKey="memory_gb"
               ariaSort={ariaSort}
               sortArrow={sortArrow}
               sortAnnouncement={sortAnnouncement}
@@ -1586,13 +1255,48 @@ function ListTable({
               onSort={toggleSort}
             />
             <th class="table-th text-left">Badges</th>
+            <ListSortHeader
+              label="Arch"
+              sortKey="arch"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="CPU family"
+              sortKey="cpu_family"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Memory"
+              sortKey="memory_gb"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
             <th class="table-th text-right">Receipt</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
           {groupBy === "none"
             ? visibleRows.map((r, index) => (
-                <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
+                <BenchmarkRow
+                  key={r.result_id}
+                  entry={r}
+                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                  compareRow={compareEligibilityByResultId.get(r.result_id)}
+                  compareEligibilityReady={compareEligibilityReady}
+                  compareEligibilityStatusId={compareEligibilityStatusId}
+                  selectedIds={selectedIds}
+                  onSelectionChange={onSelectionChange}
+                  selectionAtCap={selectionAtCap}
+                  selectionLimitReasonId={selectionLimitReasonId}
+                />
               ))
             : groupedRows.map((group) => (
                 <>
@@ -1600,14 +1304,25 @@ function ListTable({
                     key={`group-${group.key}`}
                     class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
                   >
-                    <td colspan={11} class="px-4 py-2">
+                    <td colspan={12} class="px-4 py-2">
                       {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
                     </td>
                   </tr>
                   {group.rows.map((r) => {
                     const index = filtered.findIndex((row) => row.result_id === r.result_id);
                     return (
-                      <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
+                      <BenchmarkRow
+                        key={r.result_id}
+                        entry={r}
+                        runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                        compareRow={compareEligibilityByResultId.get(r.result_id)}
+                        compareEligibilityReady={compareEligibilityReady}
+                        compareEligibilityStatusId={compareEligibilityStatusId}
+                        selectedIds={selectedIds}
+                        onSelectionChange={onSelectionChange}
+                        selectionAtCap={selectionAtCap}
+                        selectionLimitReasonId={selectionLimitReasonId}
+                      />
                     );
                   })}
                 </>
@@ -1630,19 +1345,101 @@ function ListTable({
   );
 }
 
-function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdentityLabel: string }) {
+/**
+ * Return the reason a list row's compare checkbox cannot be checked. A row is
+ * selectable only when its filtered summary row is timing-displayable and
+ * comparable.
+ */
+function listRowDisabledReasonCode(compareRow: PlatformRow | undefined): string | null {
+  if (!compareRow) return "not_in_cohort_summary";
+  if (!isTimingDisplayable(compareRow)) return compareRow.display_exclusion_reason ?? "display_timing_unavailable";
+  if (!isComparable(compareRow)) return compareRow.comparison_exclusion_reason ?? "not_comparable";
+  return null;
+}
+
+function ListCompareDisabledReason({ id, copy }: { id?: string; copy: ReturnType<typeof describeCompareExclusionReason> }) {
+  if (copy === null) return null;
+  return (
+    <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="list-row-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
+  );
+}
+
+function BenchmarkRow({
+  entry,
+  runIdentityLabel,
+  compareRow,
+  compareEligibilityReady,
+  compareEligibilityStatusId,
+  selectedIds,
+  onSelectionChange,
+  selectionAtCap,
+  selectionLimitReasonId,
+}: {
+  entry: ResultRow;
+  runIdentityLabel: string;
+  compareRow: PlatformRow | undefined;
+  compareEligibilityReady: boolean;
+  compareEligibilityStatusId: string;
+  selectedIds: Set<string>;
+  onSelectionChange: (next: Set<string>) => void;
+  selectionAtCap: boolean;
+  selectionLimitReasonId?: string;
+}) {
+  const compareId = compareRow ? compareIdForRow(compareRow) : null;
+  const isSelected = compareId !== null && selectedIds.has(compareId);
+  const disabledReasonCode = compareEligibilityReady ? listRowDisabledReasonCode(compareRow) : null;
+  const disabledCopy = describeCompareExclusionReason(disabledReasonCode);
+  const capDisabled = selectionAtCap && !isSelected;
+  const selectionDisabled = !compareEligibilityReady || disabledCopy !== null || capDisabled;
+  const reasonId = disabledCopy
+    ? `benchmark-list-compare-reason-${entry.result_id}`
+    : capDisabled
+      ? selectionLimitReasonId
+    : compareEligibilityReady
+      ? undefined
+      : compareEligibilityStatusId;
+
+  function toggle() {
+    if (!compareId || selectionDisabled) return;
+    const next = new Set(selectedIds);
+    if (next.has(compareId)) next.delete(compareId);
+    else next.add(compareId);
+    onSelectionChange(next);
+  }
+
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={`list-${entry.result_id}`}>
+      <td class="py-3 pl-4 pr-1">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          disabled={selectionDisabled}
+          onChange={toggle}
+          aria-describedby={reasonId}
+          title={disabledCopy?.detailText ?? undefined}
+          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={compareSelectionLabel({
+            platform: entry.platform,
+            benchmark: entry.benchmark,
+            scaleFactor: entry.scale_factor,
+            phase: canonicalPhase(entry.test_type),
+            runDate: entry.run_date,
+            resultId: entry.result_id,
+          })}
+          data-testid={`benchmark-list-compare-checkbox-${entry.result_id}`}
+        />
+      </td>
       <td class="table-td">
         <RunIdentityLabel label={runIdentityLabel} href={`/results/p/${entry.platform_id}/`} />
         {entry.compliance_class && entry.compliance_class !== "official" && (
           <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(entry.compliance_class)}</span>
         )}
+        <ListCompareDisabledReason id={reasonId} copy={disabledCopy} />
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.arch ? formatArchitecture(entry.arch) : "—"}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
@@ -1660,6 +1457,9 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
           )}
         </div>
       </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.arch ? formatArchitecture(entry.arch) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}</td>
       <td class="table-td text-right">
         <a
           href={resultReceiptHref(entry)}

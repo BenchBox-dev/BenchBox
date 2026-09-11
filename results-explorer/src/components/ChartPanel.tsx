@@ -60,18 +60,21 @@ interface ChartPanelProps {
   summaryLayout?: "tabs" | "long";
   baselineIndex?: number;
   onBaselineIndexChange?: (baselineIndex: number) => void;
-  // w18: thread the Compare-page guardrail (cohort mismatch → suppress
-  // winner language) into chart-level summaries. Without this, ChartPanel
-  // could still surface "Best power" / "Best geomean" claims even when the
-  // page-level decision summary correctly avoided them.
+  // Suppress winner language when the page-level comparison boundary is not
+  // suitable for a sound winner claim.
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
-  // w2 (chart-panel-scope-and-labeling): hosts that already render a
-  // chart at page level (e.g. BenchmarkIndex matrix view rendering
-  // QueryHeatmap above the panel) pass the duplicated chart ids here so
-  // the panel does not expose the same view as a redundant subtab.
+  // Hosts that render a chart at page level can exclude its duplicate from
+  // the panel's chart navigation.
   excludeChartIds?: readonly string[];
   queryFilter?: readonly string[];
+  /** Long layout only: maps a chart id to a DOM id placed on its card, for deep links. */
+  cardAnchors?: Readonly<Record<string, string>>;
+  /** Long layout only: chart id to open (and keep open) on mount / when it changes. */
+  forceOpenChartId?: string | null;
+  /** Long layout only: see `SummaryChartOverview`'s prop of the same name. */
+  rankGateReason?: string | null;
+  rankGateContext?: { benchmark: string; scaleFactor: string; phase: string };
 }
 
 /** URL parameter carrying the open chart. */
@@ -93,7 +96,16 @@ export function ChartPanel(props: ChartPanelProps) {
   if (props.summaryLayout === "long") {
     if (props.context.kind === "summary") {
       if (props.context.summary !== null) {
-        return <SummaryChartOverview context={props.context} excludeChartIds={props.excludeChartIds} />;
+        return (
+          <SummaryChartOverview
+            context={props.context}
+            excludeChartIds={props.excludeChartIds}
+            cardAnchors={props.cardAnchors}
+            forceOpenChartId={props.forceOpenChartId}
+            rankGateReason={props.rankGateReason}
+            rankGateContext={props.rankGateContext}
+          />
+        );
       }
       return <ChartPanelTabs {...props} />;
     }

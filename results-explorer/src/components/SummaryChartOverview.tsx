@@ -1,4 +1,4 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { BenchmarkSummary } from "@/types";
 import {
@@ -32,8 +32,10 @@ import {
 } from "@/lib/displayEligibility";
 import { formatRunIdentitiesForCohort, formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 import { fmtGeomean, fmtScore } from "@/utils";
+import { AnalysisCard, AnalysisCardGrid } from "@/components/AnalysisCardGrid";
 import { DistributionBox } from "@/components/DistributionBox";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
+import { RankGateNotice } from "@/components/RankGateNotice";
 import { QueryHistogram } from "@/components/QueryHistogram";
 import { CostScatter } from "@/components/CostScatter";
 import { TimeSeries } from "@/components/TimeSeries";
@@ -45,6 +47,17 @@ import { RankTable } from "@/components/RankTable";
 interface Props {
   context: Extract<ChartContext, { kind: "summary" }>;
   excludeChartIds?: readonly string[];
+  /** Maps a chart id to a DOM id placed on that card's <details>, for deep links. */
+  cardAnchors?: Readonly<Record<string, string>>;
+  /** Chart id to open (and keep open) on mount / when it changes, e.g. from a hash deep link. */
+  forceOpenChartId?: string | null;
+  /**
+   * When set, the `rank_table` card shows `RankGateNotice` instead of the
+   * rank table, and its thumbnail avoids implying a ranking exists.
+   * Mirrors `formatCohortExclusion` from `@/lib/displayEligibility`.
+   */
+  rankGateReason?: string | null;
+  rankGateContext?: { benchmark: string; scaleFactor: string; phase: string };
 }
 
 // These are the secondary views that carry useful analytical information in
@@ -63,6 +76,7 @@ const LONG_LAYOUT_CHART_IDS = [
 ] as const;
 
 const CHART_DISPLAY_TITLES: Record<string, string> = {
+  query_heatmap: "Query matrix",
   rank_table: "Query ranks",
 };
 
@@ -70,9 +84,33 @@ export function additionalAnalysesLabel(count: number): string {
   return `${count} additional ${count === 1 ? "analysis" : "analyses"}`;
 }
 
-export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
+export function SummaryChartOverview({
+  context,
+  excludeChartIds = [],
+  cardAnchors,
+  forceOpenChartId,
+  rankGateReason,
+  rankGateContext,
+}: Props) {
   const summary = buildRenderableSummary(context);
   const [openChartIds, setOpenChartIds] = useState<Set<string>>(() => new Set());
+  const [highContrast, setHighContrast] = useState(false);
+
+  useEffect(() => {
+    if (!forceOpenChartId) return;
+    setOpenChartIds((current) => (current.has(forceOpenChartId) ? current : new Set(current).add(forceOpenChartId)));
+  }, [forceOpenChartId]);
+
+  useEffect(() => {
+    if (!forceOpenChartId || !openChartIds.has(forceOpenChartId)) return;
+    const anchorId = cardAnchors?.[forceOpenChartId];
+    if (!anchorId) return;
+    const frame = requestAnimationFrame(() => {
+      document.getElementById(anchorId)?.scrollIntoView?.({ block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [cardAnchors, forceOpenChartId, openChartIds]);
+
   const charts = useMemo(() => {
     const applicableById = new Map(applicableCharts(context).map((chart) => [chart.id, chart]));
     const excluded = new Set(excludeChartIds);
@@ -226,7 +264,15 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
           <p>
             The spread is across different queries, not repeated runs of the same query.
             Whiskers show the observed per-query range.{" "}
-            <a class="font-medium text-[var(--bb-accent)]" href="#evidence-matrix">
+            <a
+              class="font-medium text-[var(--bb-accent)]"
+              href={cardAnchors?.query_heatmap ? `#${cardAnchors.query_heatmap}` : "#"}
+              data-testid="see-per-query-matrix-link"
+              onClick={(event) => {
+                if (!cardAnchors?.query_heatmap) event.preventDefault();
+                setOpenChartIds((current) => (current.has("query_heatmap") ? current : new Set(current).add("query_heatmap")));
+              }}
+            >
               See the per-query matrix
             </a>
             .
@@ -235,103 +281,99 @@ export function SummaryChartOverview({ context, excludeChartIds = [] }: Props) {
       </section>
 
       {charts.length > 0 && (
-        <section class="card" aria-labelledby="summary-more-views-title" data-testid="summary-more-views">
-          <div class="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-[var(--bb-data-border)] pb-4">
-            <h2 id="summary-more-views-title" class="text-lg font-semibold text-[var(--bb-data-fg-primary)]">
-              More views
-            </h2>
-            <p class="ml-auto text-sm font-medium text-[var(--bb-accent)]">
-              {additionalAnalysesLabel(charts.length)}
-            </p>
-            <p class="text-sm text-[var(--bb-data-fg-muted)]">
+        <AnalysisCardGrid
+          headingId="summary-more-views-title"
+          headingLevel="h3"
+          count={additionalAnalysesLabel(charts.length)}
+          description={
+            <>
               {excludeChartIds.includes("query_heatmap")
                 ? "The evidence matrix above is the query heatmap. "
                 : ""}
               Each thumbnail is drawn from this cohort when the cohort has data for it. Open a card to
               inspect the full chart and its data scope.
-            </p>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {charts.map((chart) => {
-              const isOpen = openChartIds.has(chart.id);
-              const chartSummary = filterSummaryForChartDataset(summary, chart.eligibilityClass);
-              const isEmpty = shouldShowEmptyState(summary, chartSummary, chart);
-              const exclusions = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
-              return (
-                <details
-                  key={chart.id}
-                  class={`summary-chart-details rounded-lg border border-[var(--bb-data-border)]
-                    bg-[var(--bb-surface-data)] ${isOpen ? "sm:col-span-2 xl:col-span-4" : ""}`}
-                  open={isOpen}
-                  onToggle={(event) => {
-                    const open = (event.currentTarget as HTMLDetailsElement).open;
-                    setOpenChartIds((current) => {
-                      const next = new Set(current);
-                      if (open) next.add(chart.id);
-                      else next.delete(chart.id);
-                      return next;
-                    });
-                  }}
-                  data-testid={`summary-chart-preview-${chart.id}`}
-                >
-                  <summary
-                    class="cursor-pointer list-none p-4 outline-none focus-visible:ring-2
-                      focus-visible:ring-[var(--bb-focus-ring)] focus-visible:ring-inset"
-                  >
-                    {/* The preview exists to say what the card contains before
-                        it is opened. Once the full chart is rendered below,
-                        keeping the thumbnail draws the same chart twice, and
-                        only one of the two carries readable detail. */}
-                    <div class={`flex flex-col ${isOpen ? "" : "min-h-[13rem]"}`}>
-                      <div>
-                        <h3 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">
-                          {CHART_DISPLAY_TITLES[chart.id] ?? chart.shortTitle}
-                        </h3>
-                      </div>
-                      {!isOpen && (
-                        <ChartThumbnail
-                          chartId={chart.id}
-                          summary={chartSummary}
-                          historical={context.historical ?? []}
-                        />
-                      )}
-                      <span class="mt-auto pt-3 text-xs font-medium text-[var(--bb-accent)]">
-                        {isOpen ? "Close full chart" : "Open full chart ↗"}
-                      </span>
+            </>
+          }
+        >
+          {charts.map((chart) => {
+            const isOpen = openChartIds.has(chart.id);
+            const chartSummary = filterSummaryForChartDataset(summary, chart.eligibilityClass);
+            const isEmpty = shouldShowEmptyState(summary, chartSummary, chart);
+            const exclusions = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
+            const isGatedRankCard = chart.id === "rank_table" && Boolean(rankGateReason);
+            return (
+              <AnalysisCard
+                key={chart.id}
+                id={chart.id}
+                anchorId={cardAnchors?.[chart.id]}
+                title={CHART_DISPLAY_TITLES[chart.id] ?? chart.shortTitle}
+                isOpen={isOpen}
+                onToggle={(open) => {
+                  setOpenChartIds((current) => {
+                    const next = new Set(current);
+                    if (open) next.add(chart.id);
+                    else next.delete(chart.id);
+                    return next;
+                  });
+                }}
+                renderThumbnail={() =>
+                  isGatedRankCard ? (
+                    <MiniUnavailable label="Ranking unavailable" />
+                  ) : (
+                    <ChartThumbnail chartId={chart.id} summary={chartSummary} historical={context.historical ?? []} />
+                  )
+                }
+                fullHeaderExtra={
+                  chart.id === "query_heatmap" && !isEmpty ? (
+                    <div class="mb-2 flex justify-end">
+                      <button
+                        type="button"
+                        class={`rounded-md border px-3 py-1 text-xs transition-colors ${
+                          highContrast
+                            ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
+                            : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
+                        }`}
+                        onClick={() => setHighContrast((v) => !v)}
+                        aria-pressed={highContrast}
+                        title="Switch the matrix palette to greyscale for color-vision accessibility"
+                      >
+                        Reduced color
+                      </button>
                     </div>
-                  </summary>
-                  <div
-                    class="border-t border-[var(--bb-data-border)] p-4"
-                    data-testid={`summary-chart-full-${chart.id}`}
-                    data-chart-container
-                  >
-                    {isOpen && (
-                      <>
-                        {isEmpty ? (
-                          <ChartDatasetEmptyState chart={chart} summary={summary} />
-                        ) : (
-                          renderExpandedChart(chart, chartSummary, context.historical ?? []) ?? (
-                            <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
-                              No chart data is available for this view.
-                            </p>
-                          )
-                        )}
-                        {chartSummary.platforms.length > 0 && exclusions.length > 0 && (
-                          <ChartDatasetExclusionSummary
-                            eligibilityClass={chart.eligibilityClass}
-                            originalCount={summary.platforms.length}
-                            renderedCount={chartSummary.platforms.length}
-                            reasons={exclusions}
-                          />
-                        )}
-                      </>
-                    )}
-                  </div>
-                </details>
-              );
-            })}
-          </div>
-        </section>
+                  ) : undefined
+                }
+                renderFull={() =>
+                  isGatedRankCard ? (
+                    <RankGateNotice
+                      reason={rankGateReason as string}
+                      benchmark={rankGateContext?.benchmark ?? summary.benchmark}
+                      scaleFactor={rankGateContext?.scaleFactor ?? String(summary.scale_factor)}
+                      phase={rankGateContext?.phase ?? summary.phase}
+                    />
+                  ) : isEmpty ? (
+                    <ChartDatasetEmptyState chart={chart} summary={summary} />
+                  ) : (
+                    renderExpandedChart(chart, chartSummary, context.historical ?? [], { highContrast }) ?? (
+                      <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
+                        No chart data is available for this view.
+                      </p>
+                    )
+                  )
+                }
+                footer={
+                  !isGatedRankCard && chartSummary.platforms.length > 0 && exclusions.length > 0 ? (
+                    <ChartDatasetExclusionSummary
+                      eligibilityClass={chart.eligibilityClass}
+                      originalCount={summary.platforms.length}
+                      renderedCount={chartSummary.platforms.length}
+                      reasons={exclusions}
+                    />
+                  ) : undefined
+                }
+              />
+            );
+          })}
+        </AnalysisCardGrid>
       )}
     </div>
   );
@@ -435,10 +477,11 @@ function renderExpandedChart(
   chart: ChartRegistryEntry,
   summary: BenchmarkSummary,
   historical: ChartHistoricalEntry[],
+  options: { highContrast?: boolean } = {},
 ): ComponentChildren {
   switch (chart.id) {
     case "query_heatmap":
-      return <QueryHeatmap summary={summary} />;
+      return <QueryHeatmap summary={summary} variant="card" highContrast={options.highContrast} />;
     case "percentile_ladder": {
       // Use the same cohort-aware identity labels as the other expanded
       // charts (query heatmap, CDF, etc.) instead of the bare platform

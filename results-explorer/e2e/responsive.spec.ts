@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
 
 const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
 const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
@@ -99,6 +99,8 @@ test.describe("responsive explorer assertions", () => {
         timeout: 20_000,
       });
 
+      // The query matrix is a collapsed Analysis card by default now.
+      await openAnalysisCard(page, "query_heatmap");
       const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
       await expect(heatmap).toBeAttached();
       const hasHorizontalOverflow = await heatmap.evaluate((element) => element.scrollWidth > element.clientWidth);
@@ -151,6 +153,8 @@ test.describe("responsive explorer assertions", () => {
 
     // The route heading above is shell-rendered, so wait on the heatmap
     // itself: it is data-bound and absent when the snapshot answers cold.
+    // The query matrix is a collapsed Analysis card by default now.
+    await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
     await heatmap.evaluate((container) => {
@@ -193,6 +197,8 @@ test.describe("responsive explorer assertions", () => {
 
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForDataLoaded(page, /TPC-H Results/i);
+    // The query matrix is a collapsed Analysis card by default now.
+    await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
     await expect.poll(() => heatmap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
@@ -266,7 +272,7 @@ test.describe("responsive explorer assertions", () => {
       // is measured. Checking only the default view leaves most of the chart
       // set unmeasured, and the default is the one chart least likely to be
       // wrong.
-      const previews = page.getByTestId("summary-more-views").locator("details");
+      const previews = page.getByTestId("summary-more-views").locator(":scope > div.grid > details");
       const previewCount = await previews.count();
       for (let p = 0; p < previewCount; p += 1) {
         const details = previews.nth(p);

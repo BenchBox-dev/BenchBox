@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForResultRows, waitForShell } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForDataLoaded, waitForResultRows, waitForShell } from "../support/fixtures";
 
 const INSETS = { top: 47, right: 44, bottom: 34, left: 44 } as const;
 const ORIENTATIONS = [
@@ -52,7 +52,9 @@ test.describe("safe area layout", () => {
     await page.goto("/results/tpch/");
     await installSimulatedInsets(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    await waitForResultRows(page, page.getByRole("grid"));
+    await waitForResultRows(page, page.locator("#benchmark-section-list table"));
+    await openAnalysisCard(page, "query_heatmap");
+    await waitForDataElement(page, page.getByTestId("query-heatmap-scroll-container").locator("tbody tr").first());
     await expectInsideHorizontalInsets(page, page.getByTestId("query-heatmap-scroll-container"));
   });
 
@@ -65,7 +67,7 @@ test.describe("safe area layout", () => {
       await waitForDataLoaded(page, /TPC-H Results/);
       for (const id of [fixtureIds.ids.duckdb, fixtureIds.ids.datafusion]) {
         const row = page
-          .locator(`[data-testid="${id}"]:visible, [data-testid="query-heatmap-mobile-card-${id}"]:visible`)
+          .locator(`[data-testid="list-${id}"]:visible`)
           .first();
         await waitForDataElement(page, row);
         await row.getByRole("checkbox").check();

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForResultRows, waitForShell } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForDataLoaded, waitForResultRows, waitForShell } from "../support/fixtures";
 
 const A4_LANDSCAPE_PRINTABLE_WIDTH_PX = 1047;
 const TPCH_DUCKDB_ID = fixtureIds.ids.duckdb;
@@ -12,7 +12,8 @@ test.describe("print rendering", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    await waitForResultRows(page, page.getByRole("grid"));
+    await waitForResultRows(page, page.locator("#benchmark-section-list table"));
+    await openAnalysisCard(page, "query_heatmap");
 
     await page.emulateMedia({ media: "print" });
 

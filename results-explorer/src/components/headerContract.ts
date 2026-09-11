@@ -33,7 +33,7 @@ export interface HeaderLink {
   // When set, this link must render `aria-current="page"` on the surface
   // whose path matches the predicate; e.g. "Results" is active under
   // `/results/*` in the Results Explorer.
-  readonly activeOnSurface?: "landing" | "docs" | "blog" | "results" | "prompts";
+  readonly activeOnSurface?: "landing" | "docs" | "blog" | "results";
 }
 
 export const HEADER_BRAND = {
@@ -46,7 +46,6 @@ export const HEADER_LINKS: readonly HeaderLink[] = [
   { label: "Docs", href: "https://benchbox.dev/docs/", activeOnSurface: "docs" },
   { label: "Blog", href: "https://benchbox.dev/blog/", activeOnSurface: "blog" },
   { label: "Results", href: "https://benchbox.dev/results/", activeOnSurface: "results" },
-  { label: "Instruct an agent", href: "https://benchbox.dev/prompts/", activeOnSurface: "prompts" },
   { label: "GitHub", href: "https://github.com/BenchBox-dev/BenchBox", external: true },
 ];
 
@@ -58,9 +57,15 @@ export const HEADER_CTA = {
 export const HEADER_NAV_ARIA_LABEL = "BenchBox";
 export const HEADER_TOGGLE_ARIA_LABEL = "Toggle site navigation";
 
-export const HEADER_THEME_LABELS = ["System", "Light", "Dark"] as const;
-export const HEADER_THEME_ARIA_PATTERN =
-  /^Theme:\s+(system|light|dark)\.\s+Activate to switch theme\.$/i;
+// The footer renders a three-option theme radiogroup (see
+// `ThemeFooterControl` in `Layout.tsx`). These labels describe that
+// control's options.
+export const FOOTER_THEME_ARIA_LABEL = "Color theme";
+export const FOOTER_THEME_OPTION_LABELS = {
+  system: "System theme",
+  light: "Light theme",
+  dark: "Dark theme",
+} as const;
 
 // Bounding-box parity tolerances. The shared static CSS in
 // `landing/shared/site-header.css` sets `min-height: 4rem` on desktop and

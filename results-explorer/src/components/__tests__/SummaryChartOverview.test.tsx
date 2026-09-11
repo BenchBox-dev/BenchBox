@@ -161,8 +161,12 @@ describe("SummaryChartOverview section chrome", () => {
       .getAllByText(/across different queries, not repeated runs/)
       .filter((el) => el.tagName === "P");
     expect(paragraphs).toHaveLength(1);
-    const matrixLink = screen.getByText(/See the per-query matrix/) as HTMLAnchorElement;
-    expect(matrixLink.getAttribute("href")).toBe("#evidence-matrix");
+    // Clicking the link opens the Query matrix card in place, rather than
+    // navigating to a page-level anchor the matrix no longer owns.
+    const matrixLink = screen.getByTestId("see-per-query-matrix-link") as HTMLAnchorElement;
+    expect(screen.getByTestId("summary-chart-full-query_heatmap").textContent).toBe("");
+    fireEvent.click(matrixLink);
+    expect(screen.getByTestId("summary-chart-full-query_heatmap").textContent).not.toBe("");
     // The old "Inspect exclusions" link pointed at the provenance legend,
     // which is not where a chart's excluded rows are named.
     expect(screen.queryByText(/Inspect exclusions/)).toBeNull();

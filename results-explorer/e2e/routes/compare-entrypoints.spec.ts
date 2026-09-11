@@ -25,10 +25,10 @@ test.describe("compare entrypoint happy paths", () => {
     // The heading renders from the shell, so it can be visible while the
     // keyed row query has answered with zero rows. Wait on a row itself
     // before interacting with it.
-    await waitForDataElement(page, page.getByTestId(DUCKDB.id));
+    await waitForDataElement(page, page.getByTestId(`list-${DUCKDB.id}`));
 
-    await checkRow(page.getByTestId(DUCKDB.id));
-    await checkRow(page.getByTestId(DATAFUSION.id));
+    await checkRow(page.getByTestId(`list-${DUCKDB.id}`));
+    await checkRow(page.getByTestId(`list-${DATAFUSION.id}`));
 
     const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
