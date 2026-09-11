@@ -44,6 +44,24 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def _hash_object(repo: Path, content: str) -> str:
+    """Store ``content`` as a blob and return its SHA.
+
+    Used to build trees through the index so a test can stage two path entries that
+    differ only in case, which a case-insensitive working tree cannot hold at once.
+    """
+    result = subprocess.run(
+        ["git", "hash-object", "-w", "--stdin"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+        input=content,
+        encoding="utf-8",
+    )
+    return result.stdout.strip()
+
+
 def test_applied_only_change_discovers_paired_primary_bundle(tmp_path: Path) -> None:
     """An applied-ledger-only edit must still invoke primary-bundle validation."""
     _git(tmp_path, "init", "--quiet")
@@ -681,3 +699,63 @@ def test_deleted_bundle_with_surviving_legacy_manifest_for_other_bundle_is_allow
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == ""
+
+
+def test_deleted_bundle_with_case_variant_decoy_legacy_manifest_is_rejected(tmp_path: Path) -> None:
+    """An uppercase manifest variant must not hide a dangling lowercase reference.
+
+    Git orders `Submission-Manifest.json` ahead of `submission-manifest.json`, so a
+    guard that stops at the first case-insensitive match reads the decoy and lets a
+    legacy manifest keep pointing at a deleted bundle. The variant tree is built
+    through the index so this reproduces on case-insensitive filesystems too.
+    """
+    _git(tmp_path, "init", "--quiet")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "config", "user.email", "test@example.invalid")
+
+    bundle_dir = "results-data/bundles/duckdb"
+    (tmp_path / bundle_dir).mkdir(parents=True)
+    primary = tmp_path / bundle_dir / "gone.json"
+    primary.write_text('{"gone": 1}\n', encoding="utf-8")
+    _git(tmp_path, "add", str(bundle_dir))
+    _git(tmp_path, "commit", "--quiet", "-m", "base with primary")
+    base_sha = _git(tmp_path, "rev-parse", "HEAD")
+
+    # Build a head tree carrying both case variants, with the authoritative
+    # lowercase manifest still referencing the deleted bundle. The primary is
+    # removed from the index directly: a case-insensitive checkout cannot stage
+    # two paths that differ only in case from the working tree.
+    _git(tmp_path, "update-index", "--force-remove", f"{bundle_dir}/gone.json")
+    decoy_blob = _hash_object(tmp_path, '{"bundle_file": "unrelated.json"}\n')
+    authoritative_blob = _hash_object(tmp_path, '{"bundle_file": "gone.json"}\n')
+    _git(tmp_path, "update-index", "--add", "--cacheinfo", f"100644,{decoy_blob},{bundle_dir}/Submission-Manifest.json")
+    _git(
+        tmp_path,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"100644,{authoritative_blob},{bundle_dir}/submission-manifest.json",
+    )
+    tree = _git(tmp_path, "write-tree")
+    head = subprocess.run(
+        ["git", "commit-tree", tree, "-p", base_sha, "-m", "delete primary, keep dangling manifest"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(tmp_path, "update-ref", "HEAD", head)
+
+    skip_without_posix_shell()
+    result = run_posix_shell(
+        _changed_bundle_discovery_script(),
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "BASE_SHA": base_sha, "MERGE_SHA": head},
+    )
+
+    assert result.returncode != 0, result.stdout
+    assert "file=results-data/bundles/duckdb/submission-manifest.json" in result.stdout
+    assert "also requires deleting its referencing legacy manifest" in result.stdout
