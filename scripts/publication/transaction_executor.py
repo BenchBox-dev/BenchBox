@@ -621,31 +621,29 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         "attestation": attestation,
     }
     # Forward reconciliation of a recovery-required transaction additionally
-    # requires the provider's terminal Pages deployment status bound to the controller SHA.
+    # requires live provider evidence: the Pages deployment status fetched from
+    # the provider API for this transaction's controller SHA. Caller-supplied
+    # status strings are never accepted; without a token the live lookup fails
+    # closed instead of trusting an unverified claim.
     if tx.state == STATE_RECOVERY_REQUIRED and tx.kind == KIND_PROMOTION:
-        expected_deployment_id = (tx.controller or {}).get("workflow_sha")
-        pages_deployment_id = getattr(args, "pages_deployment_id", None) or expected_deployment_id
+        # Deployment identity derives from the journal, never from caller
+        # arguments: the CAS transition requires this same value, so only the
+        # transaction's own deployment can reconcile it forward.
+        pages_deployment_id = (tx.controller or {}).get("workflow_sha")
         if not pages_deployment_id:
             raise TransactionError("Recovery reconciliation requires the transaction's controller workflow SHA")
 
-        simulated_status = getattr(args, "simulated_pages_deployment_status", None)
-        if simulated_status is not None:
-            pages_deployment_status = simulated_status
-        else:
-            token = getattr(args, "github_token", None) or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
-            if not token and getattr(args, "pages_deployment_status", None):
-                pages_deployment_status = args.pages_deployment_status
-            else:
-                repo = (
-                    getattr(args, "repo", None)
-                    or (tx.target or {}).get("repository")
-                    or os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox")
-                )
-                pages_deployment_status = fetch_pages_deployment_status(
-                    repo=repo,
-                    deployment_id=pages_deployment_id,
-                    token=token,
-                )
+        token = getattr(args, "github_token", None) or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+        repo = (
+            getattr(args, "repo", None)
+            or (tx.target or {}).get("repository")
+            or os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox")
+        )
+        pages_deployment_status = fetch_pages_deployment_status(
+            repo=repo,
+            deployment_id=pages_deployment_id,
+            token=token,
+        )
 
         payload["pages_deployment_id"] = pages_deployment_id
         payload["pages_deployment_status"] = pages_deployment_status
@@ -983,18 +981,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_ver.add_argument("--challenge", default=None)
     p_ver.add_argument("--verifier-sha", default=None)
     p_ver.add_argument("--repo", default=None, help="Target repository (e.g. owner/repo)")
-    p_ver.add_argument("--github-token", default=None, help="GitHub token for API queries")
-    p_ver.add_argument("--pages-deployment-id", default=None, help="Provider Pages deployment id/SHA")
-    p_ver.add_argument(
-        "--pages-deployment-status",
-        default=None,
-        help="Provider Pages deployment status (e.g. 'succeed'); fetched live if token is available",
-    )
-    p_ver.add_argument(
-        "--simulated-pages-deployment-status",
-        default=None,
-        help="Simulated Pages deployment status for testing (e.g. 'succeed')",
-    )
+    p_ver.add_argument("--github-token", default=None, help="GitHub token for live Pages deployment lookup")
     p_ver.add_argument("--ref", default=journal.DEFAULT_REF)
     p_ver.add_argument("--repo-path", default=".")
     p_ver.add_argument("--output-tx", default=None)

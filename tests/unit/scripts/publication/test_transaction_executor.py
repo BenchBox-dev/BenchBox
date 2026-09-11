@@ -1159,9 +1159,6 @@ def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, mon
                 verifier_sha="v" * 40,
                 repo=None,
                 github_token=None,
-                pages_deployment_id=None,
-                pages_deployment_status=None,
-                simulated_pages_deployment_status=None,
                 ref="publication",
                 repo_path=str(test_repo),
                 output_tx=str(tx_path),
@@ -1192,9 +1189,6 @@ def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, mon
                 verifier_sha="v" * 40,
                 repo=None,
                 github_token="fake-token",
-                pages_deployment_id=None,
-                pages_deployment_status=None,
-                simulated_pages_deployment_status=None,
                 ref="publication",
                 repo_path=str(test_repo),
                 output_tx=str(tx_path),
@@ -1211,9 +1205,6 @@ def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, mon
             verifier_sha="v" * 40,
             repo=None,
             github_token="fake-token",
-            pages_deployment_id=None,
-            pages_deployment_status=None,
-            simulated_pages_deployment_status=None,
             ref="publication",
             repo_path=str(test_repo),
             output_tx=str(tx_path),
@@ -1225,3 +1216,116 @@ def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, mon
     assert updated.verification["pages_deployment_id"] == "c" * 40
     assert updated.verification["pages_deployment_status"] == "succeed"
     assert updated.verification["reconciled_from"] == STATE_RECOVERY_REQUIRED
+
+
+def test_cmd_record_verification_requires_live_lookup_not_caller_status(
+    test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recovery reconciliation must query the provider live; no CLI flag may inject status."""
+    permit_path = tmp_path / "permit.json"
+    tx_path = tmp_path / "tx.json"
+    approval_path = tmp_path / "approval.json"
+    tx_id = "tx-verif-no-inject"
+
+    cmd_prepare(
+        argparse.Namespace(
+            kind=KIND_PROMOTION,
+            target_repo="BenchBox-dev/BenchBox",
+            target_env="github-pages",
+            target_url="https://benchbox.dev",
+            develop_sha="d" * 40,
+            published_results_sha="p" * 40,
+            candidate_manifest_digest="m" * 64,
+            candidate_artifact_id="103",
+            candidate_archive_sha256="a" * 64,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
+            restore_transaction_id=None,
+            failed_transaction_id=None,
+            barrier_evidence=None,
+            transaction_id=tx_id,
+            workflow_path=".github/workflows/publication-transaction.yml",
+            workflow_sha="e" * 40,
+            writer_run_id="503",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_authenticate_approval(
+        argparse.Namespace(
+            permit=str(permit_path),
+            run_id="503",
+            run_attempt=1,
+            repo="BenchBox-dev/BenchBox",
+            github_token=None,
+            simulated_approval=str(
+                _write_temp_json(
+                    tmp_path / "sim.json",
+                    {
+                        "environments": [{"name": "github-pages"}],
+                        "state": "approved",
+                        "user": {"id": 1, "login": "test"},
+                    },
+                )
+            ),
+            output_approval=str(approval_path),
+        )
+    )
+    cmd_record_prepared(
+        argparse.Namespace(
+            permit=str(permit_path),
+            approval=str(approval_path),
+            tx=str(tx_path),
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_start_write(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_record_failure(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            code="POST_SEND_FAILURE",
+            stage="post_send",
+            reason="Poll timeout",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+
+    probe_path = tmp_path / "probe.json"
+    _write_temp_json(probe_path, {"ok": True, "probes": [{"path": "/", "ok": True}]})
+
+    # The parser no longer offers a status-injection flag: even a crafted
+    # namespace carrying one must not bypass the live provider lookup, which
+    # fails closed without a token.
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    with pytest.raises(TransactionError, match="GitHub token is required"):
+        cmd_record_verification(
+            argparse.Namespace(
+                transaction_id=tx_id,
+                probe_report=str(probe_path),
+                attestation=None,
+                challenge="challenge",
+                verifier_sha="v" * 40,
+                repo=None,
+                github_token=None,
+                pages_deployment_status="succeed",
+                simulated_pages_deployment_status="succeed",
+                ref="publication",
+                repo_path=str(test_repo),
+                output_tx=str(tx_path),
+            )
+        )
