@@ -12,6 +12,11 @@ For an adversarial review, also read
 `references/adversarial-review.md`. The selected domain wrapper supplies its
 own rubric.
 
+To adjudicate findings already received, read
+`references/review-response.md`. It owns the disposition vocabulary and the
+evidence each disposition requires. A domain wrapper may keep its own labels
+and storage bindings; it maps them onto that contract and does not weaken it.
+
 ## 1. Scope [REVIEW-AUTH-001]
 
 Review-shaped actions are read-only except for local capture. They may inspect
