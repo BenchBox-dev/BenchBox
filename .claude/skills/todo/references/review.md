@@ -1,11 +1,10 @@
 # Review TODO quality
 
 Evaluate the quality and readiness of a tracker item before or during
-implementation.
+implementation. Read the item with `show_item(id=...)`, then apply **L2** of
+`shared-review-protocol/SKILL.md`.
 
 ## Review checklist
-
-Audit the item using `show_item(id=...)`:
 
 ### 1. Description
 - Does the description state the problem and the expected outcome?
@@ -24,3 +23,10 @@ Audit the item using `show_item(id=...)`:
 - If `blocked`, is the reason recorded in the description or context?
 
 Report gaps concretely; fix them with `update_item` when authorized.
+
+## Own-edit-target freshness
+
+When the task description quotes a living policy, specification, or goal
+document, re-read the current text of that document and diff it against the
+quotes before implementing. Line-number citations are not durable evidence —
+treat evidence durability as zero when that re-read is absent.

@@ -54,7 +54,7 @@ def test_hostile_receipt_source_is_rejected() -> None:
 
 def test_approved_immutable_rev_only_change_is_narrow_eligible() -> None:
     revs = re.findall(r"rev *= *([0-9a-f]{40})", CONF)
-    assert len(revs) == 3
+    assert len(revs) == 2
     head = _replace_rev(CONF, revs[0], "a" * 40)
 
     decision = compare_manifest_texts(CONF, head, base_ref="b" * 40)
