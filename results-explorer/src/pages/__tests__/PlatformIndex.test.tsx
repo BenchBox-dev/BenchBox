@@ -16,6 +16,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
     getPlatformIndexRows: vi.fn(),
     getResultsBasisAvailability: vi.fn().mockResolvedValue([]),
     getDetailResult: vi.fn().mockResolvedValue(null),
+    getCohortBasisDetails: vi.fn().mockResolvedValue(new Map()),
   };
 });
 
@@ -27,7 +28,11 @@ vi.mock("preact-router", async () => {
   };
 });
 
-import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
+import {
+  getCohortBasisDetails,
+  getResultsBasisAvailability,
+  getPlatformIndexRows,
+} from "@/lib/duckdbQueries";
 import { PlatformIndex } from "@/pages/PlatformIndex";
 
 function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRowRow {
@@ -106,6 +111,17 @@ function getRowOrder(container: ParentNode): string[] {
   return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
     (tr) => tr.getAttribute("data-testid") ?? "",
   );
+}
+
+/**
+ * The Performance trends card lives in the Analysis card grid now, collapsed
+ * by default like every other analysis card. Specs asserting on its expanded
+ * content (trend-cohort-*, trend-sparse-*) must open it first.
+ */
+function openTrendsCard(): void {
+  const details = screen.getByTestId("summary-chart-preview-trends") as HTMLDetailsElement;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
 }
 
 describe("PlatformIndex - sortable table headers", () => {
@@ -470,10 +486,12 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(screen.getByTestId("r-selectable-ssb")).toBeTruthy();
   });
 
-  it("hides the platform filter strip when the cohort has fewer than 25 rows", async () => {
+  it("shows the platform filter strip even when the cohort has fewer than 25 rows", async () => {
+    // Filters used to hide below a 25-row threshold; they now stay mounted
+    // at all times, matching the Benchmark page's cohort filter panel.
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    expect(screen.queryByTestId("platform-detail-filters")).toBeNull();
+    expect(screen.getByTestId("platform-detail-filters")).toBeTruthy();
   });
 
   it("shows persistent compare guidance and cohort labels before selection", async () => {
@@ -556,6 +574,131 @@ describe("PlatformIndex - sortable table headers", () => {
     // Click again; direction flips.
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
     expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
+  });
+
+  it("renders architecture and cpu family columns and supports sorting", async () => {
+    const hwRows: PlatformIndexRowRow[] = [
+      makeRow({ result_id: "r-arm", short_id: "arm00001", run_date: "2026-04-01", arch: "arm64", cpu_family: "apple_silicon" }),
+      makeRow({ result_id: "r-x86-amd", short_id: "x8600002", run_date: "2026-04-02", arch: "x86_64", cpu_family: "amd_epyc" }),
+      makeRow({ result_id: "r-x86-intel", short_id: "x8600001", run_date: "2026-04-03", arch: "x86_64", cpu_family: "intel_xeon" }),
+      makeRow({ result_id: "r-no-hw", short_id: "nohw0001", run_date: "2026-04-04", arch: null, cpu_family: null }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(hwRows);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const table = screen.getByRole("table");
+    expect(within(table).getByText("Apple silicon")).toBeTruthy();
+    expect(within(table).getByText("Intel Xeon")).toBeTruthy();
+    expect(within(table).getByText("AMD EPYC")).toBeTruthy();
+
+    // Arch sort asc (arm64, then x86_64, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    let order = getRowOrder(container);
+    expect(order[0]).toBe("r-arm");
+    expect(order[3]).toBe("r-no-hw");
+
+    // Arch sort desc (x86_64, then arm64, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    order = getRowOrder(container);
+    expect(order[2]).toBe("r-arm");
+    expect(order[3]).toBe("r-no-hw");
+
+    // CPU sort asc (amd_epyc, apple_silicon, intel_xeon, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    order = getRowOrder(container);
+    expect(order[0]).toBe("r-x86-amd");
+    expect(order[1]).toBe("r-arm");
+    expect(order[2]).toBe("r-x86-intel");
+    expect(order[3]).toBe("r-no-hw");
+
+    // CPU sort desc (intel_xeon, apple_silicon, amd_epyc, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    order = getRowOrder(container);
+    expect(order[0]).toBe("r-x86-intel");
+    expect(order[1]).toBe("r-arm");
+    expect(order[2]).toBe("r-x86-amd");
+    expect(order[3]).toBe("r-no-hw");
+  });
+
+  it("filters by tuning, architecture, CPU family, and memory, and Reset clears all four", async () => {
+    const hwRows: PlatformIndexRowRow[] = [
+      makeRow({
+        result_id: "r-tuned",
+        short_id: "tuned001",
+        tuning_mode: "tuned",
+        arch: "arm64",
+        cpu_family: "apple_silicon",
+        memory_gb: 32,
+      }),
+      makeRow({
+        result_id: "r-default",
+        short_id: "default1",
+        tuning_mode: null,
+        arch: "x86_64",
+        cpu_family: "amd_epyc",
+        memory_gb: 64,
+      }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(hwRows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    expect(screen.getByTestId("platform-run-count").textContent).toBe("2 published runs");
+
+    fireEvent.change(screen.getByLabelText("Tuning"), { target: { value: "tuned" } });
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("1 of 2 published runs"));
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("2 published runs"));
+
+    fireEvent.change(screen.getByLabelText("Architecture"), { target: { value: "arm64" } });
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("1 of 2 published runs"));
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("2 published runs"));
+
+    fireEvent.change(screen.getByLabelText("CPU family"), { target: { value: "amd_epyc" } });
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("1 of 2 published runs"));
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("2 published runs"));
+
+    fireEvent.change(screen.getByLabelText("Memory"), { target: { value: "32" } });
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("1 of 2 published runs"));
+    fireEvent.click(screen.getByTestId("platform-filter-reset"));
+    await waitFor(() => expect(screen.getByTestId("platform-run-count").textContent).toBe("2 published runs"));
+    expect(screen.queryByTestId("platform-filter-reset")).toBeNull();
+  });
+
+  it("renders the Queries and Receipt columns with correct aria-colindex and group-row colspan", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-q1", short_id: "queries1", query_count: 22 }),
+      makeRow({ result_id: "r-q2", short_id: "queries2", query_count: 22, platform_version: "1.4.0" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const table = screen.getByRole("table", { name: "DuckDB results" });
+    expect(within(table).getByRole("columnheader", { name: "Queries" })).toBeTruthy();
+    expect(within(table).getByRole("columnheader", { name: "Receipt" })).toBeTruthy();
+    expect(within(table).getAllByText("22").length).toBeGreaterThan(0);
+    const receiptLinks = within(table).getAllByRole("link", { name: /Open receipt for/ });
+    expect(receiptLinks.length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByTestId("platform-group-by"), { target: { value: "engine_version" } });
+    const groupRow = table.querySelector("tbody tr td[colspan]") as HTMLTableCellElement | null;
+    expect(groupRow).toBeTruthy();
+    const colcount = Number(table.getAttribute("aria-colcount"));
+    expect(Number(groupRow?.getAttribute("colspan"))).toBe(colcount);
+  });
+
+  it("keeps the measurement basis control working from the Results card toolbar", async () => {
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const basisControl = screen.getByRole("combobox", { name: "Measurement basis" }) as HTMLSelectElement;
+    expect(basisControl).toBeTruthy();
+    expect(basisControl.closest("section")?.getAttribute("aria-label")).toBe("Measurement basis");
   });
 
   it("restores platform page URL facets for benchmark, cohort, deployment, and cost filters", async () => {
@@ -658,6 +801,7 @@ describe("PlatformIndex - sortable table headers", () => {
 
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
 
     const tpch = screen.getByTestId("trend-cohort-tpch-sf0.01-power-power_score");
     const ssb = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
@@ -797,6 +941,7 @@ describe("PlatformIndex - sortable table headers", () => {
 
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
 
     const tpchTrend = screen.getByTestId("trend-cohort-tpch-sf0.1-power-display_geomean_ms");
     const ssbTrend = screen.getByTestId("trend-cohort-star_schema-sf0.1-power-display_geomean_ms");
@@ -847,6 +992,7 @@ describe("PlatformIndex - sortable table headers", () => {
 
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
 
     const trend = screen.getByTestId("trend-cohort-tpch-sf0.01-standard-display_geomean_ms");
     const duplicateState = within(trend).getByTestId("time-series-duplicate-day");
@@ -877,6 +1023,7 @@ describe("PlatformIndex - sortable table headers", () => {
 
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
 
     expect(screen.queryByRole("img", { name: "Geomean latency trend over time" })).toBeNull();
     const plural = screen.getByTestId("trend-sparse-tpch-sf0.1-power-display_geomean_ms");
@@ -961,6 +1108,129 @@ describe("PlatformIndex - sortable table headers", () => {
   });
 });
 
+describe("PlatformIndex - Analysis card grid", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/results/p/duckdb/");
+  });
+
+  function openCoverageCard(): void {
+    const details = screen.getByTestId("summary-chart-preview-coverage") as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+  }
+
+  it("draws up to four sparklines in the trends thumbnail, one per trendable ranking", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      ...Array.from({ length: 3 }, (_, i) =>
+        makeRow({ result_id: `tpch-${i}`, benchmark: "tpch", scale_factor: 0.1, phase: "power", run_date: `2026-04-0${i + 1}`, primary_metric: "display_geomean_ms", display_geomean_ms: 10 + i }),
+      ),
+      ...Array.from({ length: 3 }, (_, i) =>
+        makeRow({ result_id: `ssb-${i}`, benchmark: "star_schema", scale_factor: 0.1, phase: "power", run_date: `2026-04-0${i + 1}`, primary_metric: "display_geomean_ms", display_geomean_ms: 20 + i }),
+      ),
+    ]);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const card = screen.getByTestId("summary-chart-preview-trends");
+    expect(within(card).getAllByRole("img", { name: /trend thumbnail/ })).toHaveLength(2);
+    expect(container.querySelector("[data-testid='summary-chart-full-trends']")?.textContent).toBe("");
+  });
+
+  it("shows the no-trendable-metric message in the thumbnail when no ranking has enough runs", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r1", benchmark: "tpch", run_date: "2026-04-01" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const card = screen.getByTestId("summary-chart-preview-trends");
+    expect(within(card).getByText("No trendable metric values are available for the selected filters.")).toBeTruthy();
+  });
+
+  it("aggregates coverage into the top 5 benchmarks by run count plus an others bar, and lists every benchmark in the full table", async () => {
+    const counts: Record<string, number> = { b1: 6, b2: 5, b3: 4, b4: 3, b5: 2, b6: 1, b7: 1 };
+    const rows = Object.entries(counts).flatMap(([benchmark, count]) =>
+      Array.from({ length: count }, (_, i) =>
+        makeRow({ result_id: `${benchmark}-${i}`, benchmark, scale_factor: 0.1, run_date: `2026-04-0${(i % 9) + 1}` }),
+      ),
+    );
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    const thumbnail = screen.getByTestId("summary-chart-preview-coverage");
+    expect(within(thumbnail).getByText("2 others")).toBeTruthy();
+    expect(within(thumbnail).queryByText("B6")).toBeNull();
+
+    openCoverageCard();
+    const full = screen.getByTestId("summary-chart-full-coverage");
+    for (const benchmark of Object.keys(counts)) {
+      expect(within(full).getByText(benchmark.toUpperCase())).toBeTruthy();
+    }
+    const link = within(full).getByText("B1").closest("a") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/results/b1/");
+  });
+
+  it("links the coverage table's benchmark cell to the canonical benchmark slug", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r1", benchmark: "star_schema", scale_factor: 0.1, run_date: "2026-04-01" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    openCoverageCard();
+    const full = screen.getByTestId("summary-chart-full-coverage");
+    const link = within(full).getByRole("link", { name: "SSB" }) as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe("/results/ssb/");
+  });
+
+  it("narrows both the trends and coverage cards when a filter is applied", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-tpch-a", benchmark: "tpch", scale_factor: 0.1, run_date: "2026-04-01" }),
+      makeRow({ result_id: "r-tpch-b", benchmark: "tpch", scale_factor: 0.1, run_date: "2026-04-02" }),
+      makeRow({ result_id: "r-tpch-c", benchmark: "tpch", scale_factor: 0.1, run_date: "2026-04-03" }),
+      makeRow({ result_id: "r-ssb-a", benchmark: "star_schema", scale_factor: 0.2, run_date: "2026-04-01" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    fireEvent.change(screen.getByTestId("platform-filter-benchmark"), { target: { value: "tpch" } });
+
+    const trendsCard = screen.getByTestId("summary-chart-preview-trends");
+    expect(within(trendsCard).getByRole("img", { name: /trend thumbnail/ })).toBeTruthy();
+
+    openCoverageCard();
+    const full = screen.getByTestId("summary-chart-full-coverage");
+    expect(within(full).getAllByRole("row")).toHaveLength(2); // header + one benchmark
+    expect(within(full).queryByText("SSB")).toBeNull();
+  });
+
+  it("still renders both cards with their empty styling, and no crash, when filters leave zero rows", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-tpch-a", benchmark: "tpch", scale_factor: 0.1, run_date: "2026-04-01" }),
+      makeRow({ result_id: "r-ssb-a", benchmark: "star_schema", scale_factor: 0.2, run_date: "2026-04-01" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    fireEvent.change(screen.getByTestId("platform-filter-benchmark"), { target: { value: "tpch" } });
+    fireEvent.change(screen.getByTestId("platform-filter-scale"), { target: { value: "0.2" } });
+
+    const trendsCard = screen.getByTestId("summary-chart-preview-trends");
+    expect(within(trendsCard).getByText("No trendable metric values are available for the selected filters.")).toBeTruthy();
+    const coverageCard = screen.getByTestId("summary-chart-preview-coverage");
+    expect(within(coverageCard).getByText("No benchmark coverage is available for the selected filters.")).toBeTruthy();
+    expect(document.querySelectorAll('[style*="NaN"]')).toHaveLength(0);
+  });
+});
+
 describe("platform measurement basis", () => {
   it("reduces mixed benchmarks independently and reuses loaded executions", async () => {
     vi.clearAllMocks();
@@ -968,15 +1238,21 @@ describe("platform measurement basis", () => {
     const rows = [makeRow({ result_id: "run-a", benchmark: "tpch", short_id: "aaaaaaaa" }), makeRow({ result_id: "run-b", benchmark: "clickbench", short_id: "bbbbbbbb" })];
     vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
     vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
-    vi.mocked(getDetailResult).mockImplementation(async (id) => ({
-      ...rows.find((row) => row.result_id === id)!,
-      queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
-      display_timings: [],
-      logical_query_count: 1,
-    } as unknown as import("@/types").DetailResult));
+    vi.mocked(getCohortBasisDetails).mockImplementation(async (ids) => {
+      const map = new Map<string, import("@/types").DetailResult>();
+      for (const id of ids) {
+        map.set(id, {
+          ...rows.find((row) => row.result_id === id)!,
+          queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
+          display_timings: [],
+          logical_query_count: 1,
+        } as unknown as import("@/types").DetailResult);
+      }
+      return map;
+    });
     render(<PlatformIndex platform="duckdb" />);
     const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
-    expect(getDetailResult).not.toHaveBeenCalled();
+    expect(getCohortBasisDetails).not.toHaveBeenCalled();
     fireEvent.change(selector, { target: { value: "all_warm:min" } });
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
     expect(within(screen.getByTestId("run-b")).getByText("25 ms")).toBeTruthy();
@@ -985,7 +1261,8 @@ describe("platform measurement basis", () => {
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("15 ms")).toBeTruthy());
     fireEvent.change(selector, { target: { value: "all_warm:min" } });
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
-    expect(getDetailResult).toHaveBeenCalledTimes(2);
+    expect(getCohortBasisDetails).toHaveBeenCalledTimes(1);
+    expect(getCohortBasisDetails).toHaveBeenCalledWith(["run-a", "run-b"]);
     expect(getResultsBasisAvailability).toHaveBeenCalledTimes(1);
   });
 });
@@ -999,11 +1276,17 @@ it("updates selection eligibility when warmup availability differs from the publ
   ];
   vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
   vi.mocked(getResultsBasisAvailability).mockResolvedValue([{ result_id: "warmup-only", available_bases: "default,warmup", has_warmup: true, measurement_pass_count: 0, warmup_status: "available", varying_pass_queries: null }]);
-  vi.mocked(getDetailResult).mockImplementation(async (id) => ({
-    ...rows.find((row) => row.result_id === id)!,
-    queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
-    display_timings: [], logical_query_count: 2,
-  } as unknown as import("@/types").DetailResult));
+  vi.mocked(getCohortBasisDetails).mockImplementation(async (ids) => {
+    const map = new Map<string, import("@/types").DetailResult>();
+    for (const id of ids) {
+      map.set(id, {
+        ...rows.find((row) => row.result_id === id)!,
+        queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
+        display_timings: [], logical_query_count: 2,
+      } as unknown as import("@/types").DetailResult);
+    }
+    return map;
+  });
   render(<PlatformIndex platform="duckdb" />);
   const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
   const unavailable = screen.getByTestId("platform-compare-checkbox-no-warmup") as HTMLInputElement;
@@ -1023,7 +1306,7 @@ it("suspends comparison during pass loading and clears selections after a failed
   vi.mocked(getPlatformIndexRows).mockResolvedValue([makeRow({ result_id: "first" }), makeRow({ result_id: "second" })]);
   vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
   let reject!: (error: Error) => void;
-  vi.mocked(getDetailResult).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  vi.mocked(getCohortBasisDetails).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
   render(<PlatformIndex platform="duckdb" />);
   const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
   fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));

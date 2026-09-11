@@ -127,6 +127,14 @@ interface QueryHeatmapProps {
   highContrast?: boolean;
   /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
   preserveOrder?: boolean;
+  /**
+   * "card" renders a streamlined read-only matrix for embedding inside a
+   * chart-grid card: no selection checkbox column and no trust/funding/
+   * validation badge column. Selection props are ignored in this variant.
+   * Defaults to "default", the full interactive matrix used on standalone
+   * matrix pages.
+   */
+  variant?: "default" | "card";
 }
 
 const MOBILE_OUTLIER_LIMIT = 3;
@@ -151,13 +159,16 @@ export function QueryHeatmap({
   selectionLimitReasonId,
   highContrast = false,
   preserveOrder = false,
+  variant = "default",
 }: QueryHeatmapProps) {
   const { query_ids, platforms, ranking } = summary;
   const sortedQueryIds = useMemo(
     () => (preserveOrder ? [...query_ids] : sortQueryIds(query_ids)),
     [query_ids, preserveOrder],
   );
-  const hasSelection = onSelectionChange !== undefined;
+  const isCard = variant === "card";
+  const hasSelection = !isCard && onSelectionChange !== undefined;
+  const showLabelsCol = !isCard;
   const selectionAtCap = selectedIds !== undefined && selectedIds.size >= MAX_COMPARE_SELECTIONS;
   const gridRef = useRef<HTMLTableElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -482,14 +493,16 @@ export function QueryHeatmap({
             })}
           </th>
         )}
-        <th
-          role="columnheader"
-          scope="col"
-          class="table-th-dense sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
-          style={stickyHeaderStyle("labels")}
-        >
-          Labels
-        </th>
+        {showLabelsCol && (
+          <th
+            role="columnheader"
+            scope="col"
+            class="table-th-dense sticky z-30 whitespace-nowrap bg-[var(--bb-surface-data-muted)]"
+            style={stickyHeaderStyle("labels")}
+          >
+            Labels
+          </th>
+        )}
         {sortedQueryIds.map((qid) => (
           <th
             key={qid}
@@ -653,9 +666,13 @@ export function QueryHeatmap({
               </div>
 
               <div class="mt-3 flex flex-wrap gap-1.5">
-                <TrustBadge trustLabel={row.trust_label} compact />
-                <FundingChip funding={row.funding} compact />
-                <ValidationBadge validationStatus={row.validation_status} showMissing />
+                {showLabelsCol && (
+                  <>
+                    <TrustBadge trustLabel={row.trust_label} compact />
+                    <FundingChip funding={row.funding} compact />
+                    <ValidationBadge validationStatus={row.validation_status} showMissing />
+                  </>
+                )}
                 {showGeomeanCol && (
                   <span class="rounded-full bg-[var(--bb-surface-app)] px-2 py-0.5 font-mono text-xs text-[var(--bb-data-fg-muted)]">
                     Geomean {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
@@ -856,20 +873,22 @@ export function QueryHeatmap({
                       {fmtGeomean(validPrimaryMetricValue(row, "display_geomean_ms"))}
                     </td>
                   )}
-                  <td
-                    role="gridcell"
-                    class={`table-td-dense sticky z-10 ${
-                      isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
-                    }`}
-                    style={stickyCellStyle("labels")}
-                    data-testid={`heatmap-labels-${row.result_id}`}
-                  >
-                    <div class="flex flex-nowrap items-center gap-1">
-                      <TrustBadge trustLabel={row.trust_label} compact />
-                      <FundingChip funding={row.funding} compact />
-                      <ValidationBadge validationStatus={row.validation_status} showMissing />
-                    </div>
-                  </td>
+                  {showLabelsCol && (
+                    <td
+                      role="gridcell"
+                      class={`table-td-dense sticky z-10 ${
+                        isSelected ? "bg-[var(--bb-tone-info-bg)]" : "bg-[var(--bb-surface-data)]"
+                      }`}
+                      style={stickyCellStyle("labels")}
+                      data-testid={`heatmap-labels-${row.result_id}`}
+                    >
+                      <div class="flex flex-nowrap items-center gap-1">
+                        <TrustBadge trustLabel={row.trust_label} compact />
+                        <FundingChip funding={row.funding} compact />
+                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                      </div>
+                    </td>
+                  )}
                   {sortedQueryIds.map((qid, colIdx) => {
                     const rawMs = row.timings[qid] ?? null;
                     const timingExclusionReason = row.timing_eligibility[qid]?.timing_exclusion_reason ?? null;

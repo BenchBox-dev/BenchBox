@@ -15,7 +15,7 @@ surface.
 | `landing/index.html` and `landing/prompts/index.html` | Dark-first variables in page CSS, hard-coded header colors, gradient glows, cards, badges, inline code, and copy buttons. | `landing/shared/site-theme.css` plus page-level semantic aliases. |
 | `docs/` and `blog/` | Furo owned a separate light/dark contract while the custom BenchBox nav stayed dark; `docs/_static/custom.css` kept raw Cobalt2 code, table, admonition, and blog colors. | Shared BenchBox theme preference mapped to Furo `data-theme`; docs CSS consumes shared semantic variables. |
 | Results Explorer | `results-explorer/src/index.css` mixed dark shell and light analytical panels by design; charts and SVG labels used fixed light hex colors; tests pinned the mixed contract. | `results-explorer/src/lib/theme.ts`, `results-explorer/src/index.css`, and `results-explorer/src/lib/chartTheme.ts`. |
-| Shared header | Three implementations could drift across static pages, docs/blog, and Results. | One visible header contract with `data-benchbox-theme-toggle` and `--bb-site-header-*` variables. |
+| Shared header | Three implementations could drift across static pages, docs/blog, and Results. | One visible footer control with `data-benchbox-theme-option` and `--bb-site-header-*` variables. |
 
 ## Theme Choice
 
@@ -53,14 +53,15 @@ warning states, and loading skeletons use dark tokens instead of light islands.
 - `make lint-site-theme-tokens` scans the static header/theme surfaces,
   landing pages, docs template, docs custom CSS, and the Results header shell.
 - `tests/unit/test_site_header_parity.py` verifies the shared header links,
-  theme assets, and theme toggle are present across landing, prompts,
-  docs/blog, and Results.
+  theme assets, and footer theme radiogroup are present across landing,
+  prompts, docs/blog, and Results.
 - Results Vitest and Playwright checks verify the persisted theme choice,
   route survival, and light/dark visible colors.
 
 ## Decisions
 
-- Use one visible BenchBox theme control in the shared global header.
+- Use one visible BenchBox theme control: a three-option radiogroup in the
+  shared page footer.
 - Keep `system` as the first-visit default and as an explicit reset state.
 - Let Furo continue rendering docs/blog layout, search, sidebars, code blocks,
   tables, admonitions, tags, and archives, but drive its theme through the

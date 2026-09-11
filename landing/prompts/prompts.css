@@ -30,6 +30,11 @@ body::before {
     z-index: 1;
 }
 
+.prompts-footer {
+    position: relative;
+    z-index: 1;
+}
+
 .prompts-header h1 {
     font-size: clamp(1.5rem, 3vw, 2.25rem);
     margin-bottom: var(--space-sm);
@@ -187,6 +192,14 @@ body::before {
     width: 1px;
     height: 1px;
     overflow: hidden;
+}
+
+.prompts-footer {
+    display: flex;
+    justify-content: center;
+    padding: var(--space-lg) 0 var(--space-xl);
+    position: relative;
+    z-index: 1;
 }
 
 @media (max-width: 540px) {

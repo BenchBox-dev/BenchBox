@@ -36,6 +36,7 @@ const SAMPLE_VALUES: { [K in ExplorerFacetKey]: FacetState[K] } = {
   platform_version: ["1.1.0", "1.2.0"],
   arch: ["arm64", "x86_64"],
   cpu_family: ["apple_silicon", "graviton"],
+  memory_gb: ["64", "128"],
 };
 
 function clearSearch() {
@@ -79,6 +80,7 @@ describe("facet URL contract", () => {
       "platform_version",
       "arch",
       "cpu_family",
+      "memory_gb",
     ]);
     expect(ALL_FACET_KEYS).toStrictEqual([
       ...FACET_KEYS,

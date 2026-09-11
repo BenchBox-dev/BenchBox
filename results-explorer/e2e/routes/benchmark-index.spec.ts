@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("BenchmarkIndex", () => {
   test("@smoke loads directly at /results/tpch/ and syncs SF filter into the URL", async ({
@@ -27,9 +27,10 @@ test.describe("BenchmarkIndex", () => {
     await waitForShell(page);
     await expect(page.getByRole("heading", { name: /TPC-H Results/ })).toBeVisible();
 
-    const grid = page.getByRole("grid", { name: /tpch SF0\.01 standard results/i });
+    const table = page.getByRole("table", { name: /tpch SF0\.01 standard results/i });
+    await waitForDataElement(page, table.locator("tbody tr").first());
     for (const platform of ["DuckDB", "DataFusion", "Polars"]) {
-      await expect(grid.getByText(platform, { exact: false }).first()).toBeVisible({
+      await expect(table.getByText(platform, { exact: false }).first()).toBeVisible({
         timeout: 20_000,
       });
     }

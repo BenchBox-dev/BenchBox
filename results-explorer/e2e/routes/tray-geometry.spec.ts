@@ -12,7 +12,7 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     await expect(page.getByTestId("compare-tray-details")).toBeHidden();
     // Compare link must still be visible in collapsed state.
     await expect(page.getByTestId("compare-tray-compare-link")).toBeVisible();
-    const lastRow = page.getByTestId("query-heatmap-mobile-cards").locator(":scope > [role='listitem']").last();
+    const lastRow = benchmarkListLastRow(page);
     await expectTrayClearance(page, lastRow);
   });
 
@@ -22,7 +22,7 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     await page.getByTestId("compare-tray-toggle").click();
     await expect(page.getByTestId("compare-tray")).toHaveAttribute("data-collapsed", "false");
     await expect(page.getByTestId("compare-tray-details")).toBeVisible();
-    const lastRow = page.getByTestId("query-heatmap-mobile-cards").locator(":scope > [role='listitem']").last();
+    const lastRow = benchmarkListLastRow(page);
     await expectTrayClearance(page, lastRow);
   });
 
@@ -51,7 +51,7 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     // Toggle is mobile-only, hidden or absent at desktop.
     const toggle = page.getByTestId("compare-tray-toggle");
     await expect(toggle).toBeHidden();
-    const lastRow = page.getByRole("grid").getByRole("row").last();
+    const lastRow = benchmarkListLastRow(page);
     await expectTrayClearance(page, lastRow);
   });
 
@@ -59,17 +59,17 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openBenchmarkTray(page);
     const tray = page.getByTestId("compare-tray");
-    const scroller = page.locator("[data-testid='query-heatmap-scroll-container']");
+    const scroller = page.locator("[data-testid='benchmark-list-scroll-container']");
     // Ensure scroller has overflow.
     await expect(scroller).toBeVisible({ timeout: 10_000 }).catch(() => {});
     const boxBefore = await tray.boundingBox();
     expect(boxBefore).not.toBeNull();
     // Try to scroll the horizontal container if present.
-    const scrollerHandle = page.locator("[data-testid='query-heatmap-scroll-container']");
+    const scrollerHandle = page.locator("[data-testid='benchmark-list-scroll-container']");
     const scrollerCount = await scrollerHandle.count();
     if (scrollerCount > 0) {
       await page.evaluate(() => {
-        const el = document.querySelector("[data-testid='query-heatmap-scroll-container']") as HTMLElement | null;
+        const el = document.querySelector("[data-testid='benchmark-list-scroll-container']") as HTMLElement | null;
         if (el) el.scrollLeft = 200;
       });
       await page.waitForTimeout(200);
@@ -96,10 +96,7 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
       await page.setViewportSize(viewport);
       await openBenchmarkTray(page);
       await expect(page.getByTestId("compare-tray")).toBeVisible();
-      const lastRow =
-        viewport.width === 390
-          ? page.getByTestId("query-heatmap-mobile-cards").locator(":scope > [role='listitem']").last()
-          : page.getByRole("grid").getByRole("row").last();
+      const lastRow = benchmarkListLastRow(page);
       await expectTrayClearance(page, lastRow);
     }
   });
@@ -109,7 +106,7 @@ test.describe("tray geometry: collapsed and expanded clearance", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openBenchmarkTray(page);
     await expect(page.getByTestId("compare-tray")).toBeVisible();
-    const lastRow = page.getByTestId("query-heatmap-mobile-cards").locator(":scope > [role='listitem']").last();
+    const lastRow = benchmarkListLastRow(page);
     await expectTrayClearance(page, lastRow);
     // Tray border and background must still be distinguishable (basic visibility check).
     const trayStyle = await page.getByTestId("compare-tray").evaluate((el) => getComputedStyle(el).borderTopWidth);
@@ -154,13 +151,20 @@ async function openBenchmarkTray(page: Page): Promise<void> {
   await expect(page.getByTestId("compare-tray")).toBeVisible();
 }
 
+// Compare selection now happens from the Results (List) table's own
+// checkboxes rather than the query matrix, which is a collapsed,
+// non-selectable Analysis card by default. The List table renders the same
+// DOM row at every viewport (no separate mobile-card layout), so one
+// locator covers both mobile and desktop.
 async function checkFixtureRow(page: Page, id: string): Promise<void> {
-  const row = page
-    .locator(`[data-testid="${id}"]:visible, [data-testid="query-heatmap-mobile-card-${id}"]:visible`)
-    .first();
+  const row = page.locator(`#benchmark-section-list [data-testid="list-${id}"]`).first();
   await waitForDataElement(page, row);
   await row.scrollIntoViewIfNeeded();
   await row.getByRole("checkbox").check();
+}
+
+function benchmarkListLastRow(page: Page): Locator {
+  return page.locator("#benchmark-section-list tbody tr[data-testid]").last();
 }
 
 async function expectTrayClearance(page: Page, lastRow: Locator): Promise<void> {

@@ -27,10 +27,10 @@
         document.documentElement.style.colorScheme = effective;
         document.body && document.body.setAttribute("data-theme", effective);
 
-        document.querySelectorAll("[data-benchbox-theme-toggle]").forEach(function (button) {
-            button.setAttribute("aria-label", "Theme: " + choice + ". Activate to switch theme.");
-            button.setAttribute("title", "Theme: " + choice);
-            button.textContent = choice === "system" ? "System" : choice.charAt(0).toUpperCase() + choice.slice(1);
+        document.querySelectorAll("[data-benchbox-theme-option]").forEach(function (button) {
+            var isSelected = button.getAttribute("data-benchbox-theme-option") === choice;
+            button.setAttribute("aria-checked", isSelected ? "true" : "false");
+            button.setAttribute("tabindex", isSelected ? "0" : "-1");
         });
 
         window.dispatchEvent(new CustomEvent("benchbox-theme-change", { detail: { choice: choice, theme: effective } }));
@@ -50,16 +50,57 @@
         applyTheme(choice);
     }
 
-    function nextChoice(choice) {
-        return choices[(choices.indexOf(choice) + 1) % choices.length] || "system";
-    }
-
     function initializeToggles() {
-        document.querySelectorAll("[data-benchbox-theme-toggle]").forEach(function (button) {
+        document.querySelectorAll("[data-benchbox-theme-option]").forEach(function (button) {
             button.addEventListener("click", function () {
-                setChoice(nextChoice(document.documentElement.dataset.bbThemeChoice || storedChoice()));
+                setChoice(button.getAttribute("data-benchbox-theme-option"));
             });
         });
+
+        // Roving-tabindex radiogroup per the WAI-ARIA radio pattern: arrow
+        // keys move focus and selection together and wrap at the ends;
+        // Home/End jump to the first/last option; Space/Enter select.
+        document.querySelectorAll('[role="radiogroup"]').forEach(function (group) {
+            var options = Array.prototype.slice.call(group.querySelectorAll("[data-benchbox-theme-option]"));
+            if (!options.length) return;
+
+            group.addEventListener("keydown", function (event) {
+                var currentIndex = options.indexOf(document.activeElement);
+                if (currentIndex === -1) return;
+
+                var nextIndex = null;
+                switch (event.key) {
+                    case "ArrowRight":
+                    case "ArrowDown":
+                        nextIndex = (currentIndex + 1) % options.length;
+                        break;
+                    case "ArrowLeft":
+                    case "ArrowUp":
+                        nextIndex = (currentIndex - 1 + options.length) % options.length;
+                        break;
+                    case "Home":
+                        nextIndex = 0;
+                        break;
+                    case "End":
+                        nextIndex = options.length - 1;
+                        break;
+                    case " ":
+                    case "Spacebar":
+                    case "Enter":
+                        event.preventDefault();
+                        setChoice(options[currentIndex].getAttribute("data-benchbox-theme-option"));
+                        return;
+                    default:
+                        return;
+                }
+
+                event.preventDefault();
+                var nextButton = options[nextIndex];
+                setChoice(nextButton.getAttribute("data-benchbox-theme-option"));
+                nextButton.focus();
+            });
+        });
+
         applyTheme(storedChoice());
     }
 

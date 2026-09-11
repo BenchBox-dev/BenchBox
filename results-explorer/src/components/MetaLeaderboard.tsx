@@ -293,7 +293,10 @@ export function MetaLeaderboard({
         </p>
       </div>
 
-      <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+      <div
+        class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+        style="contain: paint"
+      >
         <TableScrollHint
           scrollerRef={scrollContainerRef}
           testId="meta-leaderboard-scroll-hint"

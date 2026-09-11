@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 @layer base {
+    html,
+    body {
+        overflow-x: hidden;
+    }
+
     :root {
         color-scheme: light dark;
 

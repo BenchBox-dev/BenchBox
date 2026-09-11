@@ -1,8 +1,10 @@
 import type { ComponentChildren } from "preact";
-import { useState } from "preact/hooks";
+import { useRef, useState } from "preact/hooks";
 import { getCurrentUrl, useRouter } from "preact-router";
-import { nextThemeChoice, useThemeChoice } from "@/lib/theme";
+import { type ThemeChoice, useThemeChoice } from "@/lib/theme";
 import {
+  FOOTER_THEME_ARIA_LABEL,
+  FOOTER_THEME_OPTION_LABELS,
   HEADER_BRAND,
   HEADER_CTA,
   HEADER_LINKS,
@@ -35,7 +37,6 @@ function Header() {
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
   const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
   const [menuOpen, setMenuOpen] = useState(false);
-  const { choice, setChoice } = useThemeChoice();
 
   return (
     <header class="surface-hero" data-surface="hero">
@@ -90,27 +91,17 @@ function Header() {
             >
               {HEADER_CTA.label}
             </a>
-            <button
-              type="button"
-              aria-label={`Theme: ${choice}. Activate to switch theme.`}
-              data-benchbox-theme-toggle
-              class="min-h-8 rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-site-header-control-bg)] px-3 py-1.5 text-sm font-semibold text-[var(--bb-fg-primary)] hover:bg-[var(--bb-site-header-control-hover-bg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)]"
-              onClick={() => setChoice(nextThemeChoice(choice))}
-            >
-              {themeLabel(choice)}
-            </button>
           </nav>
         </div>
       </div>
       <div class="border-t border-[var(--bb-border-default)] bg-[var(--bb-surface-hero-muted)] text-[var(--bb-fg-primary)]">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Wraps to a second row at the smallest mobile widths so the
-              `Query` item never falls off-canvas (audit 2026-05-07). At
-              ≥640px (sm) the row collapses back to single-line. */}
+          {/* Keep every route reachable as the viewport narrows or the page is
+              zoomed; wrapping also avoids creating document-level overflow. */}
           <nav
             aria-label="Results Explorer"
             data-testid="results-explorer-nav"
-            class="flex min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm sm:flex-nowrap sm:overflow-x-auto"
+            class="flex min-w-0 min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm"
           >
             <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>
               Overview
@@ -198,10 +189,6 @@ function isBenchmarkPath(path: string): boolean {
   return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/|local\/)[^/]+\/?$/.test(path);
 }
 
-function themeLabel(choice: string): string {
-  return choice === "system" ? "System" : choice.charAt(0).toUpperCase() + choice.slice(1);
-}
-
 function Footer() {
   return (
     <footer class="surface-hero border-t border-[var(--bb-border-default)] py-8" data-surface="hero">
@@ -211,16 +198,130 @@ function Footer() {
             &copy; {new Date().getFullYear()} BenchBox. Maintainers review every result before publishing it. You can reproduce a run with{" "}
             <code class="rounded bg-[var(--bb-bg-elevated)] px-1 py-0.5 text-xs text-[var(--bb-fg-primary)]">benchbox run</code>.
           </p>
-          <nav class="flex items-center gap-4">
-            <a href="https://benchbox.dev" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
-              benchbox.dev
-            </a>
-            <a href="https://github.com/BenchBox-dev/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
-              GitHub
-            </a>
-          </nav>
+          <div class="flex items-center gap-4">
+            <nav class="flex items-center gap-4">
+              <a href="https://benchbox.dev" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
+                benchbox.dev
+              </a>
+              <a href="https://github.com/BenchBox-dev/BenchBox" class="text-sm text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)] no-underline">
+                GitHub
+              </a>
+            </nav>
+            <span class="h-4 w-px bg-[var(--bb-border-default)]" aria-hidden="true" />
+            <ThemeFooterControl />
+          </div>
         </div>
       </div>
     </footer>
+  );
+}
+
+const THEME_CHOICES_ORDER: readonly ThemeChoice[] = ["system", "light", "dark"];
+
+function ThemeIcon({ option }: { option: ThemeChoice }) {
+  switch (option) {
+    case "system":
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="8" cy="8" r="2.75" />
+          <path d="M8 2.25v1M8 12.75v1M2.25 8h1M12.75 8h1M3.93 3.93l.7.7M3.93 12.07l.7-.7M12.07 3.93l-.7.7" />
+          <path d="M21.5 17.2A5.6 5.6 0 1 1 14.8 10.5a5 5 0 0 0 6.7 6.7z" />
+        </svg>
+      );
+    case "light":
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+        </svg>
+      );
+    case "dark":
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20.5 14.1A8.5 8.5 0 1 1 9.9 3.5a7.6 7.6 0 0 0 10.6 10.6z" />
+        </svg>
+      );
+  }
+}
+
+// Roving-tabindex radiogroup per the WAI-ARIA radio pattern: only the
+// checked option is in the tab order; arrow keys move focus and selection
+// together; Home/End jump to the first/last option.
+function ThemeFooterControl() {
+  const { choice, setChoice } = useThemeChoice();
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function selectAt(index: number, focus: boolean) {
+    const option = THEME_CHOICES_ORDER[index];
+    if (!option) return;
+    setChoice(option);
+    if (focus) optionRefs.current[index]?.focus();
+  }
+
+  function handleKeyDown(event: KeyboardEvent, index: number) {
+    const count = THEME_CHOICES_ORDER.length;
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        selectAt((index + 1) % count, true);
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        selectAt((index - 1 + count) % count, true);
+        break;
+      case "Home":
+        event.preventDefault();
+        selectAt(0, true);
+        break;
+      case "End":
+        event.preventDefault();
+        selectAt(count - 1, true);
+        break;
+      case " ":
+      case "Enter":
+        event.preventDefault();
+        selectAt(index, true);
+        break;
+      default:
+        break;
+    }
+  }
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={FOOTER_THEME_ARIA_LABEL}
+      class="flex items-center gap-0.5 rounded-md border border-[var(--bb-border-default)] bg-[var(--bb-surface-hero)] p-0.5"
+    >
+      {THEME_CHOICES_ORDER.map((option, index) => {
+        const selected = choice === option;
+        const label = FOOTER_THEME_OPTION_LABELS[option];
+        return (
+          <button
+            key={option}
+            ref={(el) => {
+              optionRefs.current[index] = el;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={label}
+            title={label}
+            tabIndex={selected ? 0 : -1}
+            class={`flex h-6 w-7 items-center justify-center rounded border focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
+              selected
+                ? "border-[var(--bb-accent)] bg-[var(--bb-site-header-control-bg)] text-[var(--bb-accent)]"
+                : "border-transparent bg-transparent text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg-primary)]"
+            }`}
+            onClick={() => selectAt(index, true)}
+            onKeyDown={(event) => handleKeyDown(event, index)}
+          >
+            <ThemeIcon option={option} />
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -4,7 +4,12 @@ import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
 
 vi.mock("@/lib/duckdbQueries", async () => {
   const actual = await vi.importActual<typeof import("@/lib/duckdbQueries")>("@/lib/duckdbQueries");
-  return { ...actual, getPlatformIndexRows: vi.fn(), getResultsBasisAvailability: vi.fn().mockResolvedValue([]) };
+  return {
+    ...actual,
+    getPlatformIndexRows: vi.fn(),
+    getResultsBasisAvailability: vi.fn().mockResolvedValue([]),
+    getCohortBasisDetails: vi.fn().mockResolvedValue(new Map()),
+  };
 });
 
 vi.mock("preact-router", async () => {
@@ -79,7 +84,7 @@ describe("PlatformIndex route-constant columns", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
-    expect(table).toHaveAttribute("aria-colcount", "9");
+    expect(table).toHaveAttribute("aria-colcount", "14");
     expect(screen.getByTestId("platform-hoisted-metric-contract")).toHaveTextContent(
       "Results are ranked by: Geomean latency (lower is better)",
     );
@@ -107,7 +112,7 @@ describe("PlatformIndex route-constant columns", () => {
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
     const powerHeader = within(table).getByRole("button", { name: /Power score/ }).closest("th");
-    expect(table).toHaveAttribute("aria-colcount", "10");
+    expect(table).toHaveAttribute("aria-colcount", "15");
     expect(within(table).getByRole("columnheader", { name: "Ranked on" })).toBeTruthy();
     expect(powerHeader).toHaveAttribute("aria-colindex", "8");
 

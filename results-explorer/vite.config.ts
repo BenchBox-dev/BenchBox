@@ -38,6 +38,9 @@ export default defineConfig({
   },
 
   server: {
+    fs: {
+      allow: ["..", resolve(__dirname, "..")],
+    },
     // During dev, /results/ base path is served from root
     headers: {
       "Cross-Origin-Embedder-Policy": "require-corp",

@@ -230,3 +230,20 @@ export async function waitForDataLoaded(page: Page, locator: string | RegExp) {
 export async function waitForResultRows(page: Page, scope: Locator, minimum = 1) {
   await waitForDataElement(page, scope.locator("tbody tr[data-testid]").nth(minimum - 1));
 }
+
+/**
+ * Opens a benchmark page's Analysis card by chart id (e.g. "query_heatmap",
+ * "rank_table"). The query matrix and query ranks cards are collapsed
+ * `<details>` by default now that they live in the shared Analysis card
+ * grid, so specs that assert on their expanded content (the heatmap grid,
+ * the rank table, etc.) must open the card first.
+ */
+export async function openAnalysisCard(page: Page, chartId: string): Promise<Locator> {
+  const details = page.locator(`[data-testid="summary-chart-preview-${chartId}"]`).first();
+  await waitForDataElement(page, details);
+  const isOpen = await details.evaluate((el) => (el as HTMLDetailsElement).open);
+  if (!isOpen) {
+    await details.locator("summary").click();
+  }
+  return details;
+}

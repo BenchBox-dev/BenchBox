@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForShell } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForShell } from "../support/fixtures";
 
 const SAME_VERSION_RUNS = [fixtureIds.ids.duckdb, fixtureIds.ids.duckdbTuned] as const;
 
@@ -31,6 +31,7 @@ test.describe("run identity in index tables", () => {
   test("run identity: ranking eligibility marker has an inline legend", async ({ page }) => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
+    await openAnalysisCard(page, "query_heatmap");
     await waitForDataElement(page, page.locator('[data-testid^="heatmap-compliance-marker-"]').first());
 
     // The marker itself always names its reason; the matrix legend restates it
