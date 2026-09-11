@@ -538,6 +538,24 @@ def _handle_recovery_required(
         obs_digest = payload.get("observation_digest")
         if not obs_digest:
             raise TransactionError("observation_digest is required for recovery reconciliation")
+
+        # The provider status must be bound to *this* transaction's deployment.
+        # The deploy step sends `pages_build_version: github.sha`, which the
+        # provider resolves to the controller's workflow SHA, so that SHA is the
+        # provider-side identity of this transaction's write. It is a journal
+        # field, so it cannot be altered without a CAS-protected journal write.
+        # Requiring the caller to name that same identity makes an unrelated or
+        # stale deployment's success unable to reconcile this transaction.
+        expected_deployment_id = (current.controller or {}).get("workflow_sha")
+        pages_deployment_id = payload.get("pages_deployment_id")
+        if not expected_deployment_id:
+            raise TransactionError("Recovery reconciliation requires the transaction's controller workflow SHA")
+        if pages_deployment_id != expected_deployment_id:
+            raise TransactionError(
+                "Recovery reconciliation requires Pages deployment evidence bound to this transaction's "
+                f"controller SHA {expected_deployment_id!r}, got: {pages_deployment_id!r}"
+            )
+
         pages_status = str(payload.get("pages_deployment_status") or "").lower()
         if pages_status != "succeed":
             raise TransactionError(
@@ -550,6 +568,7 @@ def _handle_recovery_required(
             "challenge": payload.get("challenge"),
             "verifier_sha": payload.get("verifier_sha"),
             "observation_digest": obs_digest,
+            "pages_deployment_id": pages_deployment_id,
             "pages_deployment_status": pages_status,
             "reconciled_from": STATE_RECOVERY_REQUIRED,
             "verified_at": ev["timestamp"],

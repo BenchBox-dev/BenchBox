@@ -42,6 +42,7 @@ def test_transaction_workflow_is_dispatch_only_with_required_inputs() -> None:
     assert inputs["candidate_artifact_id"]["required"] is False
     assert "restore_transaction_id" in inputs
     assert "barrier_evidence" in inputs
+    assert "reconcile_transaction_id" in inputs
 
 
 def test_transaction_workflow_permissions_follow_least_privilege() -> None:
@@ -429,3 +430,28 @@ def test_isolated_job_rollback_contract(tmp_path: Path, monkeypatch: pytest.Monk
     assert report_success.ok is True
     assert report_success.matched_checksums["/"] == restored_root_sha
     assert report_success.matched_checksums["/results/data/results.duckdb"] == restored_db_sha
+
+
+def test_transaction_workflow_reconciliation_wiring() -> None:
+    """Verify reconciliation path wiring: failure overrides, step inputs, and token binding."""
+    wf = _load_yaml(TX_WORKFLOW_PATH)
+    jobs = wf["jobs"]
+
+    # deploy job is skipped during operator reconciliation dispatch
+    assert "reconcile_transaction_id" in jobs["deploy"].get("if", "")
+
+    # verify job executes on success, post-send failure, or reconciliation dispatch
+    verify_if = jobs["verify"].get("if", "")
+    assert "needs.deploy.result == 'success'" in verify_if
+    assert "needs.deploy.result == 'failure'" in verify_if
+    assert "reconcile_transaction_id" in verify_if
+
+    # finalize job strictly requires verify success
+    fin_if = jobs["finalize"].get("if", "")
+    assert "needs.verify.result == 'success'" in fin_if
+
+    # verify job passes github token to record-verification
+    verify_steps = jobs["verify"]["steps"]
+    rec_step = next((s for s in verify_steps if s.get("name") == "Record verification success in journal CAS"), None)
+    assert rec_step is not None
+    assert "--github-token" in rec_step.get("run", "")

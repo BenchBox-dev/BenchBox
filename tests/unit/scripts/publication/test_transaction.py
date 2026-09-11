@@ -408,6 +408,7 @@ def test_recovery_required_reconciles_forward_to_durable(base_context: dict[str,
         tx_mod.EVENT_VERIFY_SUCCESS,
         {
             "observation_digest": obs_digest,
+            "pages_deployment_id": "a" * 40,
             "pages_deployment_status": "succeed",
             "attestation": receipt_for(tx, obs_digest),
         },
@@ -415,6 +416,7 @@ def test_recovery_required_reconciles_forward_to_durable(base_context: dict[str,
     assert tx.state == tx_mod.STATE_EXTERNALLY_VERIFIED
     assert effect.action == "commit_durable"
     assert tx.verification["reconciled_from"] == tx_mod.STATE_RECOVERY_REQUIRED
+    assert tx.verification["pages_deployment_id"] == "a" * 40
     assert tx.verification["pages_deployment_status"] == "succeed"
     assert tx.failure["stage"] == "post_send"
 
@@ -432,7 +434,62 @@ def test_recovery_reconciliation_requires_succeed_status(base_context: dict[str,
             tx_mod.EVENT_VERIFY_SUCCESS,
             {
                 "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
                 "pages_deployment_status": "deployment_failed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_rejects_mismatched_deployment_id(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="bound to this transaction's controller SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "b" * 40,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_rejects_missing_deployment_id(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="bound to this transaction's controller SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_requires_controller_workflow_sha(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    ctx = {**base_context, "controller": {**base_context["controller"], "workflow_sha": ""}}
+    tx = _recovery_required_promotion(ctx)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="requires the transaction's controller workflow SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
+                "pages_deployment_status": "succeed",
                 "attestation": receipt_for(tx, obs_digest),
             },
         )
@@ -459,6 +516,7 @@ def test_recovery_reconciliation_rejects_pre_send_failure(base_context: dict[str
             tx_mod.EVENT_VERIFY_SUCCESS,
             {
                 "observation_digest": "obs" * 20,
+                "pages_deployment_id": "a" * 40,
                 "pages_deployment_status": "succeed",
                 "attestation": receipt_for(tx, "obs" * 20),
             },
@@ -487,6 +545,7 @@ def test_recovery_reconciliation_is_restricted_to_promotions(
             tx_mod.EVENT_VERIFY_SUCCESS,
             {
                 "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
                 "pages_deployment_status": "succeed",
                 "attestation": receipt_for(tx, obs_digest),
             },

@@ -92,6 +92,18 @@ the `PUBLICATION_ATTESTOR_PRIVATE_KEY` environment secret to the matching
 Ed25519 PEM private key in the protected `publication-attestation` and
 `github-pages` environments. There must be no repository-level copy.
 
+## Forward reconciliation of post-send failures
+
+When a promotion deployment write encounters a post-send failure (for example, a polling timeout or network disruption after the request was dispatched), the transaction transitions to `recovery-required` with failure stage `post_send`.
+
+If the provider deployment actually landed and the live routes serve the approved candidate, the transaction may be reconciled forward to `externally-verified` and `durable`:
+
+1. **Deployment identity binding:** The provider deployment status is fetched live via `GET /repos/{owner}/{repo}/pages/deployments/{deployment_id}` and must return `status: "succeed"`. Because the deploy step submits `pages_build_version: '${{ github.sha }}'`, the provider binds the deployment identity to the controller's workflow SHA. The journal and reconciliation engine require the deployment ID to match the transaction's recorded `controller.workflow_sha` (a CAS-protected journal field).
+2. **Attested live receipt:** External public probes must independently verify all required routes against the candidate desired manifest, and the live receipt must be signed with `PUBLICATION_ATTESTOR_PRIVATE_KEY` in the `publication-attestation` environment.
+3. **Execution paths:**
+   - **In-band:** In the publication workflow (`publication-transaction.yml`), the `verify` job executes with a failure override when `deploy` fails on a promotion transaction, verifying live endpoints and recording verification if the deployment succeeded.
+   - **Operator dispatch:** For an active transaction already in `recovery-required`, an authorized operator may dispatch `publication-transaction.yml` with `reconcile_transaction_id=<transaction_id>`. This bypasses candidate materialization and the deploy job, probes live routes, checks the bound Pages deployment status via the API, signs the live receipt, records verification in the journal, and finalizes the durable head.
+
 ## Rollback
 
 Rollback targets the last known-good attested manifest and retained exact artifact. It uses

@@ -282,6 +282,34 @@ def cmd_resume(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_reconcile(args: argparse.Namespace) -> int:
+    """Prepare outputs for an active promotion in recovery-required for forward reconciliation."""
+    repo_path = Path(args.repo_path).resolve()
+    journal_state = journal.read_journal_state(repo_path, ref=args.ref)
+    tx = journal.read_transaction(repo_path, args.transaction_id, ref=args.ref)
+    if tx.kind != KIND_PROMOTION or tx.state != STATE_RECOVERY_REQUIRED:
+        raise TransactionError("Only a promotion transaction in recovery-required can be reconciled forward")
+    failure = tx.failure or {}
+    if failure.get("stage") != "post_send":
+        raise TransactionError("Recovery reconciliation requires a post-send failure with a landed provider write")
+    if journal_state.active_transaction_id != tx.transaction_id:
+        raise TransactionError(
+            f"Transaction {tx.transaction_id} is not the active journal transaction ({journal_state.active_transaction_id})"
+        )
+    if args.output_tx:
+        _write_json(args.output_tx, tx.to_dict())
+    github_output = os.environ.get("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a", encoding="utf-8") as output:
+            output.write(f"transaction_id={tx.transaction_id}\n")
+            output.write(f"generation={tx.generation}\n")
+            output.write(f"kind={tx.kind}\n")
+            output.write(f"candidate_artifact_id={tx.artifact.get('artifact_id') or ''}\n")
+            output.write(f"controller_sha={(tx.controller or {}).get('workflow_sha') or ''}\n")
+    print(f"Prepared forward reconciliation for promotion transaction {tx.transaction_id}")
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # 2. Authenticate Approval
 # ---------------------------------------------------------------------------
@@ -541,6 +569,33 @@ def cmd_acknowledge_write(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+def fetch_pages_deployment_status(
+    repo: str,
+    deployment_id: str,
+    token: str | None = None,
+) -> str:
+    """Fetch Pages deployment status from the GitHub API for a specific deployment ID or SHA."""
+    if not token:
+        raise TransactionError("GitHub token is required to fetch Pages deployment status via API")
+    url = f"https://api.github.com/repos/{repo}/pages/deployments/{deployment_id}"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "benchbox-publication-transaction",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as e:
+        raise TransactionError(f"Failed to fetch Pages deployment status for {deployment_id}: {e}") from e
+
+    status = data.get("status", "")
+    return str(status)
+
+
 def cmd_record_verification(args: argparse.Namespace) -> int:
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
@@ -559,10 +614,35 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         "attestation": attestation,
     }
     # Forward reconciliation of a recovery-required transaction additionally
-    # requires the provider's terminal Pages deployment status.
-    pages_deployment_status = getattr(args, "pages_deployment_status", None)
-    if pages_deployment_status:
+    # requires the provider's terminal Pages deployment status bound to the controller SHA.
+    if tx.state == STATE_RECOVERY_REQUIRED and tx.kind == KIND_PROMOTION:
+        expected_deployment_id = (tx.controller or {}).get("workflow_sha")
+        pages_deployment_id = getattr(args, "pages_deployment_id", None) or expected_deployment_id
+        if not pages_deployment_id:
+            raise TransactionError("Recovery reconciliation requires the transaction's controller workflow SHA")
+
+        simulated_status = getattr(args, "simulated_pages_deployment_status", None)
+        if simulated_status is not None:
+            pages_deployment_status = simulated_status
+        else:
+            token = getattr(args, "github_token", None) or os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+            if not token and getattr(args, "pages_deployment_status", None):
+                pages_deployment_status = args.pages_deployment_status
+            else:
+                repo = (
+                    getattr(args, "repo", None)
+                    or (tx.target or {}).get("repository")
+                    or os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox")
+                )
+                pages_deployment_status = fetch_pages_deployment_status(
+                    repo=repo,
+                    deployment_id=pages_deployment_id,
+                    token=token,
+                )
+
+        payload["pages_deployment_id"] = pages_deployment_id
         payload["pages_deployment_status"] = pages_deployment_status
+
     updated_tx, effect = transaction.transition(tx, event_type, payload=payload)
 
     updated_state, commit_oid = journal.write_journal_update(
@@ -890,10 +970,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_ver.add_argument("--attestation", default=None)
     p_ver.add_argument("--challenge", default=None)
     p_ver.add_argument("--verifier-sha", default=None)
+    p_ver.add_argument("--repo", default=None, help="Target repository (e.g. owner/repo)")
+    p_ver.add_argument("--github-token", default=None, help="GitHub token for API queries")
+    p_ver.add_argument("--pages-deployment-id", default=None, help="Provider Pages deployment id/SHA")
     p_ver.add_argument(
         "--pages-deployment-status",
         default=None,
-        help="Provider Pages deployment status (e.g. 'succeed'); required to reconcile a recovery-required transaction forward",
+        help="Provider Pages deployment status (e.g. 'succeed'); fetched live if token is available",
+    )
+    p_ver.add_argument(
+        "--simulated-pages-deployment-status",
+        default=None,
+        help="Simulated Pages deployment status for testing (e.g. 'succeed')",
     )
     p_ver.add_argument("--ref", default=journal.DEFAULT_REF)
     p_ver.add_argument("--repo-path", default=".")
@@ -937,6 +1025,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_resume.add_argument("--output-permit", required=True)
     p_resume.add_argument("--output-tx", required=True)
     p_resume.set_defaults(func=cmd_resume)
+
+    # reconcile an operator-reconciled promotion
+    p_rec = sub.add_parser("reconcile", help="Prepare an active post-send failed promotion for forward reconciliation")
+    p_rec.add_argument("--transaction-id", required=True)
+    p_rec.add_argument("--ref", default=journal.DEFAULT_REF)
+    p_rec.add_argument("--repo-path", default=".")
+    p_rec.add_argument("--output-tx", default=None)
+    p_rec.set_defaults(func=cmd_reconcile)
 
     return parser
 
