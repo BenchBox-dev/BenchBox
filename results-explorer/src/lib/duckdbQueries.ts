@@ -179,6 +179,7 @@ export interface ResultRow extends CostDeploymentFields {
   physical_rendering_id?: string | null;
   arch?: string | null;
   cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -348,6 +349,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   primary_metric: string;
   arch?: string | null;
   cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface CohortMetadataRow {
@@ -470,7 +472,7 @@ const RESULT_COLUMNS = [
   "physical_rendering_id",
 ].join(", ");
 
-const RESULT_HARDWARE_COLUMNS = `${RESULT_COLUMNS}, arch, cpu_family`;
+const RESULT_HARDWARE_COLUMNS = `${RESULT_COLUMNS}, arch, cpu_family, memory_gb`;
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
   "result_id",
@@ -673,8 +675,21 @@ export function memoizedSnapshotQueryRows<T>(
   );
 }
 
-export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  const sql = `SELECT ${RESULT_HARDWARE_COLUMNS} FROM (SELECT r.*, d.arch, d.cpu_family FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id)) ${where.sql} ORDER BY run_date DESC`;
+export async function listResults(
+  where: FacetWhereClause = { sql: "", params: [] },
+  options: { includeHardware?: boolean } = {},
+): Promise<ResultRow[]> {
+  // Only pay for the result_detail_metrics join when a caller filters on
+  // hardware (arch/cpu_family appear in the facet WHERE clause) or explicitly
+  // asks to display those columns (includeHardware) -- unfiltered browse
+  // queries like Home and CorpusSectionIndex don't touch arch/cpu_family and
+  // shouldn't carry the join cost.
+  const needsHardware = options.includeHardware === true || /\b(?:arch|cpu_family)\b/.test(where.sql);
+  const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
+  const source = needsHardware
+    ? "(SELECT r.*, d.arch, d.cpu_family, d.memory_gb FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id))"
+    : "bench.results";
+  const sql = `SELECT ${columns} FROM ${source} ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
@@ -762,67 +777,52 @@ export async function getQueryExecutions(
 /**
  * Bulk accessor for cohort basis resolution.
  *
- * Issues a single DuckDB-WASM query against `bench.query_executions` for the
- * entire cohort result-id set, avoiding the N-query loop that previously blocked
- * interactive basis selection on the cohort index pages.
+ * Issues one query each against `bench.result_detail_metrics`,
+ * `bench.query_display_timings`, and `bench.query_executions` for the entire
+ * cohort result-id set, avoiding the N-query loop that previously blocked
+ * interactive basis selection on the cohort index pages. Shares
+ * `detailResultFromWideRow` with `getDetailResult` so exclusion reasons,
+ * trust/visibility/compliance labels, and display timings can't silently
+ * diverge between the single-id and bulk read paths.
  */
 export async function getCohortBasisDetails(
   resultIds: readonly string[],
 ): Promise<Map<string, DetailResult>> {
   if (resultIds.length === 0) return new Map();
-  const executions = await getQueryExecutions(resultIds);
-  const byId = new Map<string, DetailResult>();
-  for (const id of resultIds) {
-    byId.set(id, {
-      result_id: id,
-      benchmark: "",
-      scale_factor: 0,
-      platform: "",
-      platform_id: "",
-      driver_version: null,
-      run_date: "",
-      power_score: null,
-      total_duration_s: 0,
-      geomean_ms: null,
-      display_geomean_ms: null,
-      has_display_timing: true,
-      valid_query_count: 0,
-      missing_query_count: 0,
-      zero_timing_count: 0,
-      display_exclusion_reason: null,
-      comparison_exclusion_reason: null,
-      ranking_exclusion_reason: null,
-      environment: {},
-      queries: [],
-      display_timings: [],
-      has_plans: false,
-      has_tuning: false,
-      bundle_download_url: "",
-      trust_label: "",
-      funding: "",
-      visibility: "",
-      platform_version: null,
-      execution_mode: null,
-      tuning_mode: null,
-      tuning_hash: null,
-      test_type: null,
-      validation_status: null,
-      cost_usd: null,
-      compliance_class: null,
-    });
+  const placeholders = resultIds.map(() => "?").join(",");
+  const [wideRows, timingRows, executionRows] = await Promise.all([
+    queryRows<ResultDetailMetricsRow>(
+      `SELECT ${RESULT_DETAIL_METRICS_COLUMNS} FROM bench.result_detail_metrics WHERE result_id IN (${placeholders})`,
+      [...resultIds],
+    ),
+    getQueryDisplayTimings(resultIds),
+    getQueryExecutions(resultIds),
+  ]);
+
+  const timingsByResult = new Map<string, QueryDisplayTimingRow[]>();
+  for (const row of timingRows) {
+    const list = timingsByResult.get(row.result_id);
+    if (list) list.push(row);
+    else timingsByResult.set(row.result_id, [row]);
   }
-  for (const exec of executions) {
-    const detail = byId.get(exec.result_id);
-    if (detail) {
-      detail.queries.push({
-        query_id: exec.query_id,
-        duration_ms: exec.duration_ms,
-        status: exec.status === "pass" || exec.status === "fail" ? exec.status : "fail",
-        run_type: exec.run_type,
-        iter: exec.iter,
-        stream: exec.stream,
-      });
-    }
+
+  const executionsByResult = new Map<string, QueryExecutionRow[]>();
+  for (const row of executionRows) {
+    const list = executionsByResult.get(row.result_id);
+    if (list) list.push(row);
+    else executionsByResult.set(row.result_id, [row]);
+  }
+
+  const byId = new Map<string, DetailResult>();
+  for (const wide of wideRows) {
+    byId.set(
+      wide.result_id,
+      detailResultFromWideRow(
+        wide,
+        executionsByResult.get(wide.result_id) ?? [],
+        timingsByResult.get(wide.result_id) ?? [],
+      ),
+    );
   }
   return byId;
 }
@@ -864,21 +864,20 @@ export async function getResultBasisAvailability(
 }
 
 /**
- * Compose a DetailResult from the canonical DuckDB tables.
+ * Compose a DetailResult from a `result_detail_metrics` wide row plus its
+ * query execution and display timing rows.
  *
- * Returns null when the result_id is not present in `result_detail_metrics`.
- * display_timings and queries are read verbatim from their canonical tables;
- * this helper performs only shape pivoting (wide-row → nested Environment
- * object, row arrays with presentation-ready fields).
+ * Shared by the single-id (`getDetailResult`) and bulk (`getCohortBasisDetails`)
+ * read paths so exclusion reasons, trust/visibility/compliance labels, and
+ * timing data are always sourced from the same mapping -- a bulk accessor that
+ * reimplements this shape independently is how those fields silently drift out
+ * of sync with the per-row path.
  */
-export async function getDetailResult(resultId: string): Promise<DetailResult | null> {
-  const [wide, timingRows, executionRows] = await Promise.all([
-    getResultDetailMetrics(resultId),
-    getQueryDisplayTimings(resultId),
-    getQueryExecutions(resultId),
-  ]);
-  if (!wide) return null;
-
+function detailResultFromWideRow(
+  wide: ResultDetailMetricsRow,
+  executionRows: readonly QueryExecutionRow[],
+  timingRows: readonly QueryDisplayTimingRow[],
+): DetailResult {
   const environment: Environment = {};
   if (wide.os !== null) environment.os = wide.os;
   if (wide.arch !== null) environment.arch = wide.arch;
@@ -990,6 +989,24 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     statement_overhead_median_ms: wide.statement_overhead_median_ms,
     link_status: wide.link_status,
   };
+}
+
+/**
+ * Compose a DetailResult from the canonical DuckDB tables.
+ *
+ * Returns null when the result_id is not present in `result_detail_metrics`.
+ * display_timings and queries are read verbatim from their canonical tables;
+ * detailResultFromWideRow performs only shape pivoting (wide-row → nested
+ * Environment object, row arrays with presentation-ready fields).
+ */
+export async function getDetailResult(resultId: string): Promise<DetailResult | null> {
+  const [wide, timingRows, executionRows] = await Promise.all([
+    getResultDetailMetrics(resultId),
+    getQueryDisplayTimings(resultId),
+    getQueryExecutions(resultId),
+  ]);
+  if (!wide) return null;
+  return detailResultFromWideRow(wide, executionRows, timingRows);
 }
 
 export async function getBenchmarkMatrixCells(
@@ -1245,6 +1262,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.storage_format," +
     " e.arch," +
     " e.cpu_family," +
+    " e.memory_gb," +
     " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +

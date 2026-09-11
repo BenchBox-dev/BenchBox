@@ -514,10 +514,7 @@ describe("Leaderboard", () => {
 
     const resultCall = vi
       .mocked(queryRows)
-      .mock.calls.find(([sql]) => {
-        const s = String(sql).replace(/\s+/g, " ").trim();
-        return s.includes("bench.results") && s.includes("WHERE");
-      });
+      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
     expect(String(resultCall?.[0])).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(String(resultCall?.[0])).toContain("scale_factor IN (?)");
     expect(String(resultCall?.[0])).toContain("THEN 'unknown' ELSE trim(lower(test_type)) END IN (?)");
