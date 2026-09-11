@@ -146,7 +146,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "tests/unit/test_example.py",
         "scripts/publication/reconciliation.py",
         "scripts/publication/check_operational_receipts.py",
-        ".claude/skills/todo-db/SKILL.md",
+        ".claude/skills/todo/SKILL.md",
         ".github/workflows/pr.yml",
         "Makefile",
         "make/inventory.json",

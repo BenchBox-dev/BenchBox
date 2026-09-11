@@ -40,7 +40,6 @@ _FULL_SHA_RE = re.compile(r"[0-9a-f]{40}")
 APPROVED_SOURCE_URLS = frozenset(
     {
         "https://github.com/joeharris76/skill-sync-skills.git",
-        "https://github.com/joeharris76/todo-db.git",
         TOOL_REPOSITORY,
     }
 )
@@ -60,13 +59,13 @@ EXPECTED_GROUPS = [
             "docs",
             "benchbox",
             "tidy-perms",
+            "todo",
             "shared-agent-execution",
             "shared-change-framework",
             "shared-investigation-framework",
             "shared-review-protocol",
         ],
     },
-    {"skills": ["todo-db"]},
     {"skills": ["skill-sync"]},
 ]
 EXPECTED_SKILLS = frozenset(skill for group in EXPECTED_GROUPS for skill in group["skills"])
