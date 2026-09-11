@@ -84,7 +84,7 @@ describe("PlatformIndex route-constant columns", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
-    expect(table).toHaveAttribute("aria-colcount", "11");
+    expect(table).toHaveAttribute("aria-colcount", "12");
     expect(screen.getByTestId("platform-hoisted-metric-contract")).toHaveTextContent(
       "Results are ranked by: Geomean latency (lower is better)",
     );
@@ -112,7 +112,7 @@ describe("PlatformIndex route-constant columns", () => {
 
     const table = screen.getByRole("table", { name: "DuckDB results" });
     const powerHeader = within(table).getByRole("button", { name: /Power score/ }).closest("th");
-    expect(table).toHaveAttribute("aria-colcount", "12");
+    expect(table).toHaveAttribute("aria-colcount", "13");
     expect(within(table).getByRole("columnheader", { name: "Ranked on" })).toBeTruthy();
     expect(powerHeader).toHaveAttribute("aria-colindex", "8");
 

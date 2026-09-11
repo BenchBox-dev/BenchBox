@@ -14,6 +14,7 @@ import {
   formatArchitecture,
   formatBenchmarkLabel,
   formatCpuFamily,
+  formatMemoryGb,
   formatTrustLabel,
   formatValidationStatus,
   isValidationNotClean,
@@ -68,7 +69,7 @@ interface PlatformIndexProps extends RoutableProps {
   platform?: string;
 }
 
-type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms" | "arch" | "cpu_family";
+type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms" | "arch" | "cpu_family" | "memory_gb";
 type TrendMetric = "power_score" | "display_geomean_ms";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
@@ -86,6 +87,7 @@ const PLATFORM_TABLE_COLUMNS = [
   "source",
   "arch",
   "cpu_family",
+  "memory_gb",
 ] as const;
 type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
@@ -519,6 +521,15 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       if (!av) return 1;
       if (!bv) return -1;
       const comparison = dir * av.localeCompare(bv);
+      return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
+    }
+    if (sort.key === "memory_gb") {
+      const av = a.memory_gb ?? null;
+      const bv = b.memory_gb ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      const comparison = dir * (av - bv);
       return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
     }
     const av = a[sort.key];
@@ -1087,8 +1098,23 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                     class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
                     onClick={() => toggleSort("cpu_family")}
                   >
-                    CPU{sortArrow("cpu_family")}
+                    CPU family{sortArrow("cpu_family")}
                     {ariaSortAnnouncement("cpu_family")}
+                  </button>
+                </th>
+                <th
+                  class="p-0"
+                  scope="col"
+                  aria-sort={ariaSort("memory_gb")}
+                  aria-colindex={platformTableColumnIndex("memory_gb", showMetricContract)}
+                >
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("memory_gb")}
+                  >
+                    Memory{sortArrow("memory_gb")}
+                    {ariaSortAnnouncement("memory_gb")}
                   </button>
                 </th>
               </tr>
@@ -1373,6 +1399,9 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
       </td>
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("cpu_family", showMetricContract)}>
         {entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}
+      </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("memory_gb", showMetricContract)}>
+        {entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}
       </td>
     </tr>
   );

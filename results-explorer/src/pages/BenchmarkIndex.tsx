@@ -40,7 +40,14 @@ import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import { RunDateChip } from "@/components/RunAge";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { canonicalBenchmarkSlug, canonicalPhase, formatArchitecture, formatCpuFamily, formatValidationStatus } from "@/lib/displayLabels";
+import {
+  canonicalBenchmarkSlug,
+  canonicalPhase,
+  formatArchitecture,
+  formatCpuFamily,
+  formatMemoryGb,
+  formatValidationStatus,
+} from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
 import {
@@ -64,7 +71,7 @@ interface BenchmarkIndexProps extends RoutableProps {
 }
 
 type ViewMode = "matrix" | "ranks" | "list";
-type BenchmarkListSortKey = "platform" | "scale_factor" | "arch" | "cpu_family" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
+type BenchmarkListSortKey = "platform" | "scale_factor" | "arch" | "cpu_family" | "memory_gb" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
@@ -305,7 +312,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    listResults(benchmarkResultWhere)
+    // The List section always renders Arch/CPU columns, independent of
+    // whether the active facets filter on hardware, so it must always ask
+    // for those columns rather than relying on listResults' filter-sniffing.
+    listResults(benchmarkResultWhere, { includeHardware: true })
       .then((r) => {
         if (!cancelled) setResults(r);
       })
@@ -1347,8 +1357,16 @@ function ListTable({
               onSort={toggleSort}
             />
             <ListSortHeader
-              label="CPU"
+              label="CPU family"
               sortKey="cpu_family"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Memory"
+              sortKey="memory_gb"
               ariaSort={ariaSort}
               sortArrow={sortArrow}
               sortAnnouncement={sortAnnouncement}
@@ -1401,7 +1419,7 @@ function ListTable({
                     key={`group-${group.key}`}
                     class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
                   >
-                    <td colspan={10} class="px-4 py-2">
+                    <td colspan={11} class="px-4 py-2">
                       {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
                     </td>
                   </tr>
@@ -1443,6 +1461,7 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
       <td class="table-td">SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.arch ? formatArchitecture(entry.arch) : "—"}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
@@ -1527,6 +1546,9 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
       b.display_geomean_ms ?? b.geomean_ms,
       sort.direction,
     );
+  }
+  if (sort.key === "memory_gb") {
+    return compareNullableNumber(a.memory_gb ?? null, b.memory_gb ?? null, sort.direction);
   }
   return compareNullableNumber(a[sort.key], b[sort.key], sort.direction);
 }
