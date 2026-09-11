@@ -674,12 +674,7 @@ export function memoizedSnapshotQueryRows<T>(
 }
 
 export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  const needsHardware = /\b(?:arch|cpu_family)\b/.test(where.sql);
-  const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
-  const source = needsHardware
-    ? "(SELECT r.*, d.arch, d.cpu_family FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id))"
-    : "bench.results";
-  const sql = `SELECT ${columns} FROM ${source} ${where.sql} ORDER BY run_date DESC`;
+  const sql = `SELECT ${RESULT_HARDWARE_COLUMNS} FROM (SELECT r.*, d.arch, d.cpu_family FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id)) ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
@@ -712,18 +707,47 @@ export async function getResultDetailMetrics(resultId: string): Promise<ResultDe
   return rows[0] ?? null;
 }
 
-export async function getQueryDisplayTimings(resultId: string): Promise<QueryDisplayTimingRow[]> {
+export async function getQueryDisplayTimings(
+  resultIdOrIds: string | readonly string[],
+): Promise<QueryDisplayTimingRow[]> {
+  if (Array.isArray(resultIdOrIds)) {
+    if (resultIdOrIds.length === 0) return [];
+    const placeholders = resultIdOrIds.map(() => "?").join(",");
+    return queryRows<QueryDisplayTimingRow>(
+      "SELECT result_id, query_id, display_ms, sample_count," +
+        " is_valid_display_timing, timing_exclusion_reason" +
+        " FROM bench.query_display_timings" +
+        ` WHERE result_id IN (${placeholders})` +
+        " ORDER BY query_id",
+      [...resultIdOrIds],
+    );
+  }
   return queryRows<QueryDisplayTimingRow>(
     "SELECT result_id, query_id, display_ms, sample_count," +
       " is_valid_display_timing, timing_exclusion_reason" +
       " FROM bench.query_display_timings" +
       " WHERE result_id = ?" +
       " ORDER BY query_id",
-    [resultId],
+    [resultIdOrIds],
   );
 }
 
-export async function getQueryExecutions(resultId: string): Promise<QueryExecutionRow[]> {
+export async function getQueryExecutions(
+  resultIdOrIds: string | readonly string[],
+): Promise<QueryExecutionRow[]> {
+  if (Array.isArray(resultIdOrIds)) {
+    if (resultIdOrIds.length === 0) return [];
+    const placeholders = resultIdOrIds.map(() => "?").join(",");
+    return queryRows<QueryExecutionRow>(
+      "SELECT result_id, query_id, duration_ms, status, run_type, iter, stream" +
+        " FROM bench.query_executions" +
+        ` WHERE result_id IN (${placeholders})` +
+        " ORDER BY query_id," +
+        " CASE WHEN stream IS NULL THEN 0 ELSE stream END," +
+        " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
+      [...resultIdOrIds],
+    );
+  }
   return queryRows<QueryExecutionRow>(
     "SELECT result_id, query_id, duration_ms, status, run_type, iter, stream" +
       " FROM bench.query_executions" +
@@ -731,8 +755,76 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
       " ORDER BY query_id," +
       " CASE WHEN stream IS NULL THEN 0 ELSE stream END," +
       " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
-    [resultId],
+    [resultIdOrIds],
   );
+}
+
+/**
+ * Bulk accessor for cohort basis resolution.
+ *
+ * Issues a single DuckDB-WASM query against `bench.query_executions` for the
+ * entire cohort result-id set, avoiding the N-query loop that previously blocked
+ * interactive basis selection on the cohort index pages.
+ */
+export async function getCohortBasisDetails(
+  resultIds: readonly string[],
+): Promise<Map<string, DetailResult>> {
+  if (resultIds.length === 0) return new Map();
+  const executions = await getQueryExecutions(resultIds);
+  const byId = new Map<string, DetailResult>();
+  for (const id of resultIds) {
+    byId.set(id, {
+      result_id: id,
+      benchmark: "",
+      scale_factor: 0,
+      platform: "",
+      platform_id: "",
+      driver_version: null,
+      run_date: "",
+      power_score: null,
+      total_duration_s: 0,
+      geomean_ms: null,
+      display_geomean_ms: null,
+      has_display_timing: true,
+      valid_query_count: 0,
+      missing_query_count: 0,
+      zero_timing_count: 0,
+      display_exclusion_reason: null,
+      comparison_exclusion_reason: null,
+      ranking_exclusion_reason: null,
+      environment: {},
+      queries: [],
+      display_timings: [],
+      has_plans: false,
+      has_tuning: false,
+      bundle_download_url: "",
+      trust_label: "",
+      funding: "",
+      visibility: "",
+      platform_version: null,
+      execution_mode: null,
+      tuning_mode: null,
+      tuning_hash: null,
+      test_type: null,
+      validation_status: null,
+      cost_usd: null,
+      compliance_class: null,
+    });
+  }
+  for (const exec of executions) {
+    const detail = byId.get(exec.result_id);
+    if (detail) {
+      detail.queries.push({
+        query_id: exec.query_id,
+        duration_ms: exec.duration_ms,
+        status: exec.status === "pass" || exec.status === "fail" ? exec.status : "fail",
+        run_type: exec.run_type,
+        iter: exec.iter,
+        stream: exec.stream,
+      });
+    }
+  }
+  return byId;
 }
 
 /**

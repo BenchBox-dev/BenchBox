@@ -40,7 +40,7 @@ import { TrayAnnouncer } from "@/components/TrayAnnouncer";
 import { RunDateChip } from "@/components/RunAge";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { canonicalBenchmarkSlug, canonicalPhase, formatValidationStatus } from "@/lib/displayLabels";
+import { canonicalBenchmarkSlug, canonicalPhase, formatArchitecture, formatCpuFamily, formatValidationStatus } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
 import {
@@ -64,7 +64,7 @@ interface BenchmarkIndexProps extends RoutableProps {
 }
 
 type ViewMode = "matrix" | "ranks" | "list";
-type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
+type BenchmarkListSortKey = "platform" | "scale_factor" | "arch" | "cpu_family" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
@@ -1339,6 +1339,22 @@ function ListTable({
               onSort={toggleSort}
             />
             <ListSortHeader
+              label="Arch"
+              sortKey="arch"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="CPU"
+              sortKey="cpu_family"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
               label="Date"
               sortKey="run_date"
               ariaSort={ariaSort}
@@ -1385,7 +1401,7 @@ function ListTable({
                     key={`group-${group.key}`}
                     class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
                   >
-                    <td colspan={8} class="px-4 py-2">
+                    <td colspan={10} class="px-4 py-2">
                       {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
                     </td>
                   </tr>
@@ -1425,6 +1441,8 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
         )}
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.arch ? formatArchitecture(entry.arch) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
@@ -1489,6 +1507,14 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
     return sort.direction === "asc"
       ? a.platform.localeCompare(b.platform)
       : b.platform.localeCompare(a.platform);
+  }
+  if (sort.key === "arch" || sort.key === "cpu_family") {
+    const aVal = a[sort.key] ?? "";
+    const bVal = b[sort.key] ?? "";
+    if (!aVal && !bVal) return 0;
+    if (!aVal) return 1;
+    if (!bVal) return -1;
+    return sort.direction === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
   }
   if (sort.key === "run_date") {
     if (a.run_date === b.run_date) return 0;

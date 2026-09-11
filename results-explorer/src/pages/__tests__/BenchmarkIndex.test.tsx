@@ -134,6 +134,8 @@ const RESULT_ROWS = [
     has_plans: false,
     has_tuning: false,
     bundle_download_url: "",
+    arch: "arm64",
+    cpu_family: "apple_silicon",
   },
   {
     result_id: "r2",
@@ -175,6 +177,8 @@ const RESULT_ROWS = [
     has_plans: false,
     has_tuning: false,
     bundle_download_url: "",
+    arch: "x86_64",
+    cpu_family: "amd_epyc",
   },
 ];
 
@@ -893,7 +897,10 @@ describe("BenchmarkIndex", () => {
 
     const resultCall = vi
       .mocked(queryRows)
-      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
+      .mock.calls.find(([sql]) => {
+        const s = String(sql).replace(/\s+/g, " ").trim();
+        return s.includes("bench.results") && s.includes("WHERE");
+      });
     const resultSql = String(resultCall?.[0]);
     expect(resultSql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");
@@ -975,6 +982,33 @@ describe("BenchmarkIndex", () => {
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+  });
+
+  it("list view renders Arch and CPU headers and sorts by them", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+
+    const list = listRoot(container) as HTMLElement;
+    expect(within(list).getByText("Arm64")).toBeTruthy();
+    expect(within(list).getByText("Apple silicon")).toBeTruthy();
+    expect(within(list).getByText("x86-64")).toBeTruthy();
+    expect(within(list).getByText("AMD EPYC")).toBeTruthy();
+
+    // Arch sort asc (arm64, x86_64)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
+
+    // Arch sort desc (x86_64, arm64)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+
+    // CPU sort asc (amd_epyc, apple_silicon)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+
+    // CPU sort desc (apple_silicon, amd_epyc)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
   });
 
   it("list view caps rendered rows and expands them with Show more", async () => {

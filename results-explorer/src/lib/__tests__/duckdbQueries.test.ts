@@ -11,6 +11,7 @@ import {
   getResultDetailMetrics,
   getQueryDisplayTimings,
   getQueryExecutions,
+  getCohortBasisDetails,
   getDetailResult,
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
@@ -133,6 +134,71 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/CASE WHEN iter IS NULL THEN 0 ELSE iter END/);
     expect(sql).not.toMatch(/COALESCE/);
     expect(params).toEqual(["r1"]);
+  });
+
+  it("getQueryDisplayTimings accepts an array of result IDs and queries them in one IN clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    const emptyResult = await getQueryDisplayTimings([]);
+    expect(emptyResult).toEqual([]);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+
+    await getQueryDisplayTimings(["r1", "r2"]);
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_display_timings/);
+    expect(sql).toContain("WHERE result_id IN (?,?)");
+    expect(sql).toMatch(/ORDER BY query_id/);
+    expect(params).toEqual(["r1", "r2"]);
+  });
+
+  it("getQueryExecutions accepts an array of result IDs and queries them in one IN clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    const emptyResult = await getQueryExecutions([]);
+    expect(emptyResult).toEqual([]);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+
+    await getQueryExecutions(["r1", "r2"]);
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_executions/);
+    expect(sql).toContain("WHERE result_id IN (?,?)");
+    expect(sql).toMatch(/CASE WHEN stream IS NULL THEN 0 ELSE stream END/);
+    expect(params).toEqual(["r1", "r2"]);
+  });
+
+  describe("getCohortBasisDetails - bulk cohort executions accessor", () => {
+    it("returns empty map immediately without querying when given empty IDs", async () => {
+      const result = await getCohortBasisDetails([]);
+      expect(result.size).toBe(0);
+      expect(mockedQueryRows).not.toHaveBeenCalled();
+    });
+
+    it("fetches executions for all cohort IDs in a single query and groups them into DetailResult objects", async () => {
+      mockedQueryRows.mockResolvedValueOnce([
+        { result_id: "r1", query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { result_id: "r1", query_id: "Q2", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { result_id: "r2", query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+
+      const map = await getCohortBasisDetails(["r1", "r2"]);
+      expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockedQueryRows.mock.calls[0]!;
+      expect(sql).toContain("WHERE result_id IN (?,?)");
+      expect(params).toEqual(["r1", "r2"]);
+
+      expect(map.size).toBe(2);
+      const r1 = map.get("r1");
+      const r2 = map.get("r2");
+      expect(r1).toBeDefined();
+      expect(r2).toBeDefined();
+      expect(r1?.result_id).toBe("r1");
+      expect(r1?.queries).toEqual([
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { query_id: "Q2", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+      expect(r2?.result_id).toBe("r2");
+      expect(r2?.queries).toEqual([
+        { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+    });
   });
 
   describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {

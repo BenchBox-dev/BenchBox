@@ -16,6 +16,7 @@ vi.mock("@/lib/duckdbQueries", async () => {
     getPlatformIndexRows: vi.fn(),
     getResultsBasisAvailability: vi.fn().mockResolvedValue([]),
     getDetailResult: vi.fn().mockResolvedValue(null),
+    getCohortBasisDetails: vi.fn().mockResolvedValue(new Map()),
   };
 });
 
@@ -27,7 +28,11 @@ vi.mock("preact-router", async () => {
   };
 });
 
-import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
+import {
+  getCohortBasisDetails,
+  getResultsBasisAvailability,
+  getPlatformIndexRows,
+} from "@/lib/duckdbQueries";
 import { PlatformIndex } from "@/pages/PlatformIndex";
 
 function makeRow(overrides: Partial<PlatformIndexRowRow> = {}): PlatformIndexRowRow {
@@ -558,6 +563,51 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
   });
 
+  it("renders architecture and cpu family columns and supports sorting", async () => {
+    const hwRows: PlatformIndexRowRow[] = [
+      makeRow({ result_id: "r-arm", short_id: "arm00001", run_date: "2026-04-01", arch: "arm64", cpu_family: "apple_silicon" }),
+      makeRow({ result_id: "r-x86-amd", short_id: "x8600002", run_date: "2026-04-02", arch: "x86_64", cpu_family: "amd_epyc" }),
+      makeRow({ result_id: "r-x86-intel", short_id: "x8600001", run_date: "2026-04-03", arch: "x86_64", cpu_family: "intel_xeon" }),
+      makeRow({ result_id: "r-no-hw", short_id: "nohw0001", run_date: "2026-04-04", arch: null, cpu_family: null }),
+    ];
+    vi.mocked(getPlatformIndexRows).mockResolvedValue(hwRows);
+
+    const { container } = render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    expect(screen.getByText("Apple silicon")).toBeTruthy();
+    expect(screen.getByText("Intel Xeon")).toBeTruthy();
+    expect(screen.getByText("AMD EPYC")).toBeTruthy();
+
+    // Arch sort asc (arm64, then x86_64, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    let order = getRowOrder(container);
+    expect(order[0]).toBe("r-arm");
+    expect(order[3]).toBe("r-no-hw");
+
+    // Arch sort desc (x86_64, then arm64, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    order = getRowOrder(container);
+    expect(order[2]).toBe("r-arm");
+    expect(order[3]).toBe("r-no-hw");
+
+    // CPU sort asc (amd_epyc, apple_silicon, intel_xeon, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    order = getRowOrder(container);
+    expect(order[0]).toBe("r-x86-amd");
+    expect(order[1]).toBe("r-arm");
+    expect(order[2]).toBe("r-x86-intel");
+    expect(order[3]).toBe("r-no-hw");
+
+    // CPU sort desc (intel_xeon, apple_silicon, amd_epyc, null last)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    order = getRowOrder(container);
+    expect(order[0]).toBe("r-x86-intel");
+    expect(order[1]).toBe("r-arm");
+    expect(order[2]).toBe("r-x86-amd");
+    expect(order[3]).toBe("r-no-hw");
+  });
+
   it("restores platform page URL facets for benchmark, cohort, deployment, and cost filters", async () => {
     window.history.replaceState(
       null,
@@ -968,15 +1018,21 @@ describe("platform measurement basis", () => {
     const rows = [makeRow({ result_id: "run-a", benchmark: "tpch", short_id: "aaaaaaaa" }), makeRow({ result_id: "run-b", benchmark: "clickbench", short_id: "bbbbbbbb" })];
     vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
     vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
-    vi.mocked(getDetailResult).mockImplementation(async (id) => ({
-      ...rows.find((row) => row.result_id === id)!,
-      queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
-      display_timings: [],
-      logical_query_count: 1,
-    } as unknown as import("@/types").DetailResult));
+    vi.mocked(getCohortBasisDetails).mockImplementation(async (ids) => {
+      const map = new Map<string, import("@/types").DetailResult>();
+      for (const id of ids) {
+        map.set(id, {
+          ...rows.find((row) => row.result_id === id)!,
+          queries: [{ query_id: id === "run-a" ? "Q1" : "Q99", duration_ms: id === "run-a" ? 4 : 25, status: "pass", run_type: "measurement", iter: 1, stream: null }],
+          display_timings: [],
+          logical_query_count: 1,
+        } as unknown as import("@/types").DetailResult);
+      }
+      return map;
+    });
     render(<PlatformIndex platform="duckdb" />);
     const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
-    expect(getDetailResult).not.toHaveBeenCalled();
+    expect(getCohortBasisDetails).not.toHaveBeenCalled();
     fireEvent.change(selector, { target: { value: "all_warm:min" } });
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
     expect(within(screen.getByTestId("run-b")).getByText("25 ms")).toBeTruthy();
@@ -985,7 +1041,8 @@ describe("platform measurement basis", () => {
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("15 ms")).toBeTruthy());
     fireEvent.change(selector, { target: { value: "all_warm:min" } });
     await waitFor(() => expect(within(screen.getByTestId("run-a")).getByText("4 ms")).toBeTruthy());
-    expect(getDetailResult).toHaveBeenCalledTimes(2);
+    expect(getCohortBasisDetails).toHaveBeenCalledTimes(1);
+    expect(getCohortBasisDetails).toHaveBeenCalledWith(["run-a", "run-b"]);
     expect(getResultsBasisAvailability).toHaveBeenCalledTimes(1);
   });
 });
@@ -999,11 +1056,17 @@ it("updates selection eligibility when warmup availability differs from the publ
   ];
   vi.mocked(getPlatformIndexRows).mockResolvedValue(rows);
   vi.mocked(getResultsBasisAvailability).mockResolvedValue([{ result_id: "warmup-only", available_bases: "default,warmup", has_warmup: true, measurement_pass_count: 0, warmup_status: "available", varying_pass_queries: null }]);
-  vi.mocked(getDetailResult).mockImplementation(async (id) => ({
-    ...rows.find((row) => row.result_id === id)!,
-    queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
-    display_timings: [], logical_query_count: 2,
-  } as unknown as import("@/types").DetailResult));
+  vi.mocked(getCohortBasisDetails).mockImplementation(async (ids) => {
+    const map = new Map<string, import("@/types").DetailResult>();
+    for (const id of ids) {
+      map.set(id, {
+        ...rows.find((row) => row.result_id === id)!,
+        queries: ["Q1", "Q2"].map((query_id) => ({ query_id, duration_ms: 10, status: "pass", run_type: id === "warmup-only" ? "warmup" : "measurement", iter: id === "warmup-only" ? 0 : 1, stream: null })),
+        display_timings: [], logical_query_count: 2,
+      } as unknown as import("@/types").DetailResult);
+    }
+    return map;
+  });
   render(<PlatformIndex platform="duckdb" />);
   const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
   const unavailable = screen.getByTestId("platform-compare-checkbox-no-warmup") as HTMLInputElement;
@@ -1023,7 +1086,7 @@ it("suspends comparison during pass loading and clears selections after a failed
   vi.mocked(getPlatformIndexRows).mockResolvedValue([makeRow({ result_id: "first" }), makeRow({ result_id: "second" })]);
   vi.mocked(getResultsBasisAvailability).mockResolvedValue([]);
   let reject!: (error: Error) => void;
-  vi.mocked(getDetailResult).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
+  vi.mocked(getCohortBasisDetails).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
   render(<PlatformIndex platform="duckdb" />);
   const selector = await screen.findByRole("combobox", { name: "Measurement basis" });
   fireEvent.click(screen.getByTestId("platform-compare-checkbox-first"));
