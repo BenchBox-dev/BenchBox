@@ -89,10 +89,6 @@ def _snapshot(states: dict[str, str] | None = None, deps: dict[str, list[str]] |
     return {"states": states, "deps": deps}
 
 
-def _envelope(items: list[dict], item_deps: list[dict]) -> str:
-    return json.dumps({"tables": {"items": items, "item_deps": item_deps}})
-
-
 def _prefixed_argv(monkeypatch) -> None:
     import sys
 
@@ -160,73 +156,24 @@ def test_authority_is_not_a_hardcoded_tracker_list() -> None:
     assert not hasattr(reconciliation, "REQUIRED_TRACKER_IDS")
 
 
-# --- export envelope parsing ------------------------------------------------
+def test_load_tracker_snapshot_returns_none_when_clone_fails(monkeypatch) -> None:
+    def fail_clone(*args, **kwargs):
+        raise reconciliation.subprocess.CalledProcessError(1, args[0])
 
-
-def test_parse_envelope_builds_state_and_dep_maps() -> None:
-    raw = _envelope(
-        items=[
-            {"id": "independent-publication-a0-baseline-and-freeze", "state": "done"},
-            {"id": "independent-publication-a1-authority-and-threat-contract", "state": "active"},
-        ],
-        item_deps=[
-            {
-                "item_id": "independent-publication-a1-authority-and-threat-contract",
-                "needs_item": "independent-publication-a0-baseline-and-freeze",
-            },
-        ],
-    )
-
-    snapshot = reconciliation.parse_envelope(raw)
-
-    assert snapshot == {
-        "states": {
-            "independent-publication-a0-baseline-and-freeze": "done",
-            "independent-publication-a1-authority-and-threat-contract": "active",
-        },
-        "deps": {
-            "independent-publication-a0-baseline-and-freeze": [],
-            "independent-publication-a1-authority-and-threat-contract": [
-                "independent-publication-a0-baseline-and-freeze"
-            ],
-        },
-    }
-
-
-def test_parse_envelope_returns_none_on_malformed_json() -> None:
-    assert reconciliation.parse_envelope("not json") is None
-
-
-def test_parse_envelope_returns_none_on_truncated_envelope() -> None:
-    raw = _envelope(items=[{"id": "x", "state": "active"}], item_deps=[])
-    assert reconciliation.parse_envelope(raw[: len(raw) // 2]) is None
-
-
-def test_parse_envelope_returns_none_on_missing_tables() -> None:
-    assert reconciliation.parse_envelope(json.dumps({"events": []})) is None
-    assert reconciliation.parse_envelope(json.dumps({"tables": {"items": []}})) is None
-
-
-def test_parse_envelope_returns_none_when_item_row_lacks_id() -> None:
-    assert (
-        reconciliation.parse_envelope(json.dumps({"tables": {"items": [{"state": "active"}], "item_deps": []}})) is None
-    )
-
-
-def test_load_tracker_snapshot_returns_none_when_export_fails(monkeypatch) -> None:
-    monkeypatch.setattr(reconciliation, "_run_export", lambda output_path: False)
+    monkeypatch.setattr(reconciliation.subprocess, "run", fail_clone)
 
     assert reconciliation.load_tracker_snapshot() is None
 
 
-def test_load_tracker_snapshot_parses_written_envelope(monkeypatch) -> None:
-    raw = _envelope(items=[{"id": "x", "state": "active"}], item_deps=[{"item_id": "x", "needs_item": "y"}])
+def test_load_tracker_snapshot_parses_git_state_index(monkeypatch) -> None:
+    index = {"items": {"x": {"status": "active", "needs": ["y"]}}}
 
-    def fake_run_export(output_path: Path) -> bool:
-        output_path.write_text(raw, encoding="utf-8")
-        return True
+    def fake_clone(command: list[str], **kwargs) -> None:
+        checkout = Path(command[-1])
+        checkout.mkdir()
+        (checkout / "index.json").write_text(json.dumps(index), encoding="utf-8")
 
-    monkeypatch.setattr(reconciliation, "_run_export", fake_run_export)
+    monkeypatch.setattr(reconciliation.subprocess, "run", fake_clone)
 
     assert reconciliation.load_tracker_snapshot() == {
         "states": {"x": "active"},
@@ -239,7 +186,7 @@ def test_load_tracker_snapshot_parses_written_envelope(monkeypatch) -> None:
 
 def test_main_fails_closed_when_snapshot_unavailable(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: None)
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: None)
 
     assert reconciliation.main() == 1
 
@@ -249,14 +196,14 @@ def test_main_fails_closed_when_dependency_row_absent(monkeypatch) -> None:
     states = dict.fromkeys(LIVE_A0_A11, "active")
     deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
     deps.pop("independent-publication-a5-noop-deploy-and-automatic-rollback")
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states, deps))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states, deps))
 
     assert reconciliation.main() == 1
 
 
 def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot())
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot())
 
     assert reconciliation.main() == 0
 
@@ -267,7 +214,7 @@ def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
         "independent-publication-a0-baseline-and-freeze": "active",
         "independent-publication-a1-authority-and-threat-contract": "active",
     }
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
 
     assert reconciliation.main() == 1
 
@@ -276,7 +223,7 @@ def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
     deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
     deps["independent-publication-a1-authority-and-threat-contract"] = []
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(deps=deps))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(deps=deps))
 
     assert reconciliation.main() == 1
 
@@ -288,7 +235,7 @@ def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
         "independent-publication-a2-corpus-trust-isolation",
         "independent-publication-a4-hermetic-build-and-shadow-assembly",
     ]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(deps=deps))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(deps=deps))
 
     assert reconciliation.main() == 1
 
@@ -297,7 +244,7 @@ def test_main_fails_when_required_phase_is_dropped(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
     states = dict.fromkeys(LIVE_A0_A11, "done")
     states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
 
     assert reconciliation.main() == 1
 
@@ -307,7 +254,7 @@ def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> Non
     states = dict.fromkeys(LIVE_A0_A11, "done")
     states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
     omitted = [item_id for item_id in LIVE_A0_A11 if item_id != LIVE_A0_A11[5]]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
     monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
 
     assert reconciliation.main() == 1
@@ -316,7 +263,7 @@ def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> Non
 def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
     omitted = LIVE_A0_A11[:-1]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot())
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot())
     monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
 
     assert reconciliation.main() == 1
@@ -325,7 +272,7 @@ def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
 def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
     _prefixed_argv(monkeypatch)
     states = dict.fromkeys(LIVE_A0_A11[:-1], "done")
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda: _snapshot(states))
+    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
 
     assert reconciliation.main() == 1
 

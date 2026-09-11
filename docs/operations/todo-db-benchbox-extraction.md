@@ -1,4 +1,10 @@
-# BenchBox todo-db extraction: staged integration and acceptance handoff
+# BenchBox todo-db extraction: historical SQLite handoff
+
+> This document records the former SQLite/libSQL extraction and is retained for
+> audit history. The current tracker is JSON/Git on the `todo-state` branch;
+> use `.todo-db/config.json`, the `todo` skill, and the scheduled state
+> validation workflow for current operations. The database commands below are
+> not a supported migration or operating path.
 
 Status: historical 0.4.2 migration and compatibility evidence complete. This
 handoff records the 0.4.2 rollout as evidence; the current locked runtime is the

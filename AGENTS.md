@@ -78,7 +78,7 @@ For long output, write `/tmp/<slug>.log` (report status + short tail). UAT/stres
 
 ## Verification and close-out
 
-`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a snapshot (the weekly `todo-db export` workflow, `_project/todo-db-export/`) dates a past state, never a current one. A validator pass is not a `submit` pass.
+`[EVIDENCE-FRESHNESS-001]` Assert tracker state, timings, and gate outcomes from a live read; a scheduled validation of the `todo-state` branch dates a past state, never a current one. A validator pass is not a `submit` pass.
 
 Before creating a batch ledger under `.todo-batch/`, add that directory to the
 checkout's `.git/info/exclude` and confirm the ledger path with `git check-ignore`.

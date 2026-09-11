@@ -41,10 +41,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate TODO schema migration contract
+      - name: Validate TODO JSON/Git state contract
         # Bare python is intentional: this static guard is stdlib-only and
         # must run for every PR without tracker credentials or dependencies.
-        run: python _project/scripts/todo_schema_migration_check.py
+        run: python _project/scripts/todo_state_contract_check.py
 
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
@@ -1289,18 +1289,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run publication plan reconciliation (live tracker)
-        env:
-          TODO_DB_URL: ${{ secrets.TODO_DB_URL }}
-          TODO_DB_RO_AUTH_TOKEN: ${{ secrets.TODO_DB_RO_AUTH_TOKEN }}
-          # Required by the 0.6.0 floor CLI; a hosted call without it returns a
-          # legacy-safe exit 2 and the reconciliation gate then fails closed.
-          TODO_DB_AUTH_CONTRACT: v2
+      - name: Run publication plan reconciliation (live Git state)
         run: |
-          if [ -z "${TODO_DB_URL:-}" ] || [ -z "${TODO_DB_RO_AUTH_TOKEN:-}" ]; then
-            echo "::error::Missing tracker credentials (TODO_DB_URL/RO_AUTH_TOKEN); cannot verify live publication reconciliation without live evidence."
-            exit 1
-          fi
           uv run python scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-
 
   audit-sha:
