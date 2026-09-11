@@ -790,6 +790,7 @@ const FACET_LABELS: Record<ExplorerFacetKey, string> = {
   platform_version: "Platform version",
   arch: "Architecture",
   cpu_family: "CPU family",
+  memory_gb: "Memory",
 };
 
 function ActiveLeaderboardSummary({

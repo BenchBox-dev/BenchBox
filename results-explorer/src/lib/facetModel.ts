@@ -24,6 +24,7 @@ export const HARDWARE_FACET_KEYS = [
   "platform_version",
   "arch",
   "cpu_family",
+  "memory_gb",
 ] as const;
 
 export const FACET_KEYS = CORE_FACET_KEYS;
@@ -85,6 +86,8 @@ export interface FacetState {
   platform_version: string[];
   arch: string[];
   cpu_family: string[];
+  /** Stringified GB values (result_environment.memory_gb), same encoding as scale_factor. */
+  memory_gb: string[];
 }
 
 export type PartialFacetState = Partial<{
@@ -122,6 +125,7 @@ export const DEFAULT_FACETS: FacetState = {
   platform_version: [],
   arch: [],
   cpu_family: [],
+  memory_gb: [],
 };
 
 export const FACET_URL_KEYS: Record<ExplorerFacetKey, string> = {
@@ -143,6 +147,7 @@ export const FACET_URL_KEYS: Record<ExplorerFacetKey, string> = {
   platform_version: "version",
   arch: "arch",
   cpu_family: "cpu_family",
+  memory_gb: "memory",
 };
 
 export const FACET_URL_ALIASES: Partial<Record<ExplorerFacetKey, readonly string[]>> = {
@@ -157,6 +162,7 @@ export const FACET_URL_ALIASES: Partial<Record<ExplorerFacetKey, readonly string
   platform_version: ["platform_version", "engine_version"],
   arch: ["architecture"],
   cpu_family: ["cpu", "cpu_model"],
+  memory_gb: ["memory_gb"],
 };
 
 const DATE_WINDOWS = new Set<DateWindowFacet>(["all", "30d", "90d", "365d"]);
@@ -204,6 +210,7 @@ export const FACET_URL_SERDES = {
   platform_version: multiValueSerde,
   arch: multiValueSerde,
   cpu_family: multiValueSerde,
+  memory_gb: multiValueSerde,
 } satisfies { [K in ExplorerFacetKey]: UrlSerde<FacetState[K]> };
 
 export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
@@ -240,6 +247,7 @@ export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
     ),
     arch: normalizeFacetList("arch", input.arch ?? DEFAULT_FACETS.arch),
     cpu_family: normalizeFacetList("cpu_family", input.cpu_family ?? DEFAULT_FACETS.cpu_family),
+    memory_gb: normalizeFacetList("memory_gb", input.memory_gb ?? DEFAULT_FACETS.memory_gb),
   };
 }
 
@@ -313,6 +321,7 @@ export function useFacetState(): UseFacetStateResult {
   const [platformVersion, setPlatformVersion] = useFacetUrlState("platform_version");
   const [arch, setArch] = useFacetUrlState("arch");
   const [cpuFamily, setCpuFamily] = useFacetUrlState("cpu_family");
+  const [memoryGb, setMemoryGb] = useFacetUrlState("memory_gb");
 
   const facets = useMemo<FacetState>(
     () => ({
@@ -334,6 +343,7 @@ export function useFacetState(): UseFacetStateResult {
       platform_version: platformVersion,
       arch,
       cpu_family: cpuFamily,
+      memory_gb: memoryGb,
     }),
     [
       arch,
@@ -346,6 +356,7 @@ export function useFacetState(): UseFacetStateResult {
       deploymentClass,
       executionMode,
       instanceOrWarehouse,
+      memoryGb,
       phase,
       platform,
       platformVersion,
@@ -378,6 +389,7 @@ export function useFacetState(): UseFacetStateResult {
       platform_version: setPlatformVersion,
       arch: setArch,
       cpu_family: setCpuFamily,
+      memory_gb: setMemoryGb,
     } satisfies { [Facet in ExplorerFacetKey]: (next: FacetState[Facet]) => void };
     (setters[key] as (next: FacetState[K]) => void)(value);
   }
@@ -433,6 +445,15 @@ export function facetsToWhereClause(
         "))",
     );
     params.push(...facets.cpu_family);
+  }
+  const memoryValues = facets.memory_gb.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  if (memoryValues.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE memory_gb IN (" +
+        memoryValues.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...memoryValues);
   }
 
   const cutoff = dateWindowCutoffIso(facets.date_window, options.now);

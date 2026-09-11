@@ -205,6 +205,7 @@ export interface PlatformRow extends CostDeploymentFields {
   timing_eligibility: Record<string, Pick<QueryDisplayTiming, "is_valid_display_timing" | "timing_exclusion_reason">>;
   arch?: string | null;
   cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface BenchmarkSummary {

@@ -20,6 +20,7 @@ import {
   preserveUniqueAfterTruncation,
   type RunIdentitySource,
 } from "@/lib/runIdentity";
+import { resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
 
 export { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
@@ -119,7 +120,13 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
                     class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
                     style={{ backgroundColor: paletteColor(i) }}
                   />
-                  {truncated}
+                  <a
+                    href={resultReceiptHref(p)}
+                    aria-label={resultIdentityAriaLabel(p, "receipt")}
+                    class="text-[var(--bb-data-fg-primary)] no-underline hover:text-[var(--bb-accent-hover)] hover:underline"
+                  >
+                    {truncated}
+                  </a>
                   {exclusion && (
                     <span
                       class="ml-1 text-[var(--bb-data-fg-subtle)]"

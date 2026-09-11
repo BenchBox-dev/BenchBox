@@ -11,6 +11,7 @@ import {
   getResultDetailMetrics,
   getQueryDisplayTimings,
   getQueryExecutions,
+  getCohortBasisDetails,
   getDetailResult,
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
@@ -55,7 +56,7 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     mockedQueryRows.mockResolvedValueOnce([]);
     await listResults({ sql: "WHERE arch IN (?)", params: ["arm64"] });
     const [sql] = mockedQueryRows.mock.calls[0]!;
-    expect(sql).toContain("FROM (SELECT r.*, d.arch, d.cpu_family FROM bench.results r");
+    expect(sql).toContain("FROM (SELECT r.*, d.arch, d.cpu_family, d.memory_gb FROM bench.results r");
     expect(sql).toContain("LEFT JOIN bench.result_detail_metrics d USING (result_id)");
     expect(sql).toContain("is_ranking_eligible");
   });
@@ -133,6 +134,158 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     expect(sql).toMatch(/CASE WHEN iter IS NULL THEN 0 ELSE iter END/);
     expect(sql).not.toMatch(/COALESCE/);
     expect(params).toEqual(["r1"]);
+  });
+
+  it("getQueryDisplayTimings accepts an array of result IDs and queries them in one IN clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    const emptyResult = await getQueryDisplayTimings([]);
+    expect(emptyResult).toEqual([]);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+
+    await getQueryDisplayTimings(["r1", "r2"]);
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_display_timings/);
+    expect(sql).toContain("WHERE result_id IN (?,?)");
+    expect(sql).toMatch(/ORDER BY query_id/);
+    expect(params).toEqual(["r1", "r2"]);
+  });
+
+  it("getQueryExecutions accepts an array of result IDs and queries them in one IN clause", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]);
+    const emptyResult = await getQueryExecutions([]);
+    expect(emptyResult).toEqual([]);
+    expect(mockedQueryRows).not.toHaveBeenCalled();
+
+    await getQueryExecutions(["r1", "r2"]);
+    const [sql, params] = mockedQueryRows.mock.calls[0]!;
+    expect(sql).toMatch(/FROM bench\.query_executions/);
+    expect(sql).toContain("WHERE result_id IN (?,?)");
+    expect(sql).toMatch(/CASE WHEN stream IS NULL THEN 0 ELSE stream END/);
+    expect(params).toEqual(["r1", "r2"]);
+  });
+
+  describe("getCohortBasisDetails - bulk cohort executions accessor", () => {
+    it("returns empty map immediately without querying when given empty IDs", async () => {
+      const result = await getCohortBasisDetails([]);
+      expect(result.size).toBe(0);
+      expect(mockedQueryRows).not.toHaveBeenCalled();
+    });
+
+    function makeCohortWideRow(overrides: Partial<ResultDetailMetricsRow>): ResultDetailMetricsRow {
+      return {
+        result_id: "r1",
+        benchmark: "tpch",
+        scale_factor: 0.1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        driver_version: null,
+        run_date: "2026-04-01",
+        power_score: null,
+        total_duration_s: 60,
+        geomean_ms: 10,
+        display_geomean_ms: 10,
+        query_count: 2,
+        has_display_timing: true,
+        valid_query_count: 2,
+        missing_query_count: 0,
+        zero_timing_count: 0,
+        display_exclusion_reason: null,
+        comparison_exclusion_reason: null,
+        ranking_exclusion_reason: null,
+        trust_label: "maintainer-run",
+        funding: "unspecified",
+        visibility: "public-curated",
+        platform_version: null,
+        execution_mode: "sql",
+        tuning_mode: "tuned",
+        tuning_hash: null,
+        test_type: "power",
+        validation_status: "exact",
+        cost_usd: null,
+        compliance_class: null,
+        has_plans: false,
+        plans_published: false,
+        has_tuning: true,
+        bundle_download_url: "",
+        os: null,
+        arch: null,
+        cpu_count: null,
+        memory_gb: null,
+        python: null,
+        cpu_model: null,
+        cpu_family: null,
+        cpu_identity_provenance: null,
+        client_region: null,
+        client_cloud: null,
+        statement_overhead_min_ms: null,
+        statement_overhead_median_ms: null,
+        link_status: null,
+        physical_mechanisms: null,
+        ...overrides,
+      };
+    }
+
+    it("fetches wide rows, display timings, and executions for all cohort IDs in one query each and groups them into DetailResult objects", async () => {
+      // getCohortBasisDetails Promise.all()s the wide-row query,
+      // getQueryDisplayTimings, and getQueryExecutions, in that order.
+      mockedQueryRows.mockResolvedValueOnce([
+        makeCohortWideRow({ result_id: "r1" }),
+        makeCohortWideRow({
+          result_id: "r2",
+          // Visibility/compliance exclusions are the kind of business-rule
+          // reason that must survive the bulk read path -- a hidden or
+          // non-compliant result must stay excluded from comparison even
+          // after a user switches measurement basis.
+          comparison_exclusion_reason: "hidden_result",
+          ranking_exclusion_reason: "hidden_result",
+          visibility: "hidden",
+        }),
+      ]);
+      mockedQueryRows.mockResolvedValueOnce([
+        { result_id: "r1", query_id: "Q1", display_ms: 9, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ]);
+      mockedQueryRows.mockResolvedValueOnce([
+        { result_id: "r1", query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { result_id: "r1", query_id: "Q2", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { result_id: "r2", query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+
+      const map = await getCohortBasisDetails(["r1", "r2"]);
+      expect(mockedQueryRows).toHaveBeenCalledTimes(3);
+      const [wideSql, wideParams] = mockedQueryRows.mock.calls[0]!;
+      expect(wideSql).toContain("FROM bench.result_detail_metrics");
+      expect(wideSql).toContain("WHERE result_id IN (?,?)");
+      expect(wideParams).toEqual(["r1", "r2"]);
+
+      expect(map.size).toBe(2);
+      const r1 = map.get("r1");
+      const r2 = map.get("r2");
+      expect(r1).toBeDefined();
+      expect(r2).toBeDefined();
+      expect(r1?.result_id).toBe("r1");
+      expect(r1?.queries).toEqual([
+        { query_id: "Q1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1, stream: null },
+        { query_id: "Q2", duration_ms: 20, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+      expect(r1?.display_timings).toEqual([
+        { query_id: "Q1", display_ms: 9, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+      ]);
+      expect(r1?.comparison_exclusion_reason).toBeNull();
+      expect(r1?.trust_label).toBe("maintainer-run");
+
+      expect(r2?.result_id).toBe("r2");
+      expect(r2?.queries).toEqual([
+        { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
+      ]);
+      // Regression: a bulk accessor that reimplements DetailResult shape
+      // independently of getDetailResult (rather than sharing its mapping)
+      // can silently hardcode these to null, which lets a hidden/excluded
+      // result reappear as comparable/rankable once a non-default basis is
+      // selected. See platformMeasurementBasis.ts / measurementBasis.ts.
+      expect(r2?.comparison_exclusion_reason).toBe("hidden_result");
+      expect(r2?.ranking_exclusion_reason).toBe("hidden_result");
+      expect(r2?.visibility).toBe("hidden");
+    });
   });
 
   describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {

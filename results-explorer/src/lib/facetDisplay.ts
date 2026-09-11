@@ -64,6 +64,10 @@ export function formatFacetDisplayValue(
     return trimmed;
   }
 
+  if (key === "memory_gb") {
+    return `${trimmed} GB`;
+  }
+
   if (key === "date_window") {
     return trimmed === "all" ? "All time" : `Last ${trimmed}`;
   }

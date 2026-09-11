@@ -42,6 +42,7 @@ export interface FacetMatchRow {
   platform_version?: string | null;
   arch?: string | null;
   cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface FacetMatchOptions {
@@ -138,6 +139,8 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: ExplorerFa
       return matchesOptional(row.arch, facets.arch);
     case "cpu_family":
       return matchesOptional(row.cpu_family, facets.cpu_family);
+    case "memory_gb":
+      return matchesOptional(row.memory_gb == null ? null : String(row.memory_gb), facets.memory_gb);
   }
 }
 

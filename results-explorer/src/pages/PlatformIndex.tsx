@@ -7,11 +7,14 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
-import { getDetailResult, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
+import { getCohortBasisDetails, getResultsBasisAvailability, getPlatformIndexRows } from "@/lib/duckdbQueries";
 import { useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue, toDateWindowFacet } from "@/lib/facetMatching";
 import {
+  formatArchitecture,
   formatBenchmarkLabel,
+  formatCpuFamily,
+  formatMemoryGb,
   formatTrustLabel,
   formatValidationStatus,
   isValidationNotClean,
@@ -66,7 +69,7 @@ interface PlatformIndexProps extends RoutableProps {
   platform?: string;
 }
 
-type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms";
+type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms" | "arch" | "cpu_family" | "memory_gb";
 type TrendMetric = "power_score" | "display_geomean_ms";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
@@ -82,6 +85,9 @@ const PLATFORM_TABLE_COLUMNS = [
   "power_score",
   "geomean",
   "source",
+  "arch",
+  "cpu_family",
+  "memory_gb",
 ] as const;
 type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
@@ -223,7 +229,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const resultsScrollerRef = useRef<HTMLDivElement>(null);
   const [rows, setRows] = useState<PlatformIndexRowRow[] | null>(null);
   const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
-  const detailCache = useRef(new Map<string, Promise<DetailResult | null>>());
+  const basisCache = useRef(new Map<string, DetailResult>());
   const [basisDetails, setBasisDetails] = useState<Map<string, DetailResult>>(new Map());
   const [basisOptions, setBasisOptions] = useState([DEFAULT_BASIS, { ...DEFAULT_BASIS, statistic: "min" as const }]);
   const [basisLoading, setBasisLoading] = useState(false);
@@ -252,26 +258,27 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       return;
     }
     setBasisLoading(true);
-    const loadDetails = async () => {
-      const details: DetailResult[] = [];
-      let next = 0;
-      await Promise.all(Array.from({ length: Math.min(4, requestedRows.length) }, async () => {
-        while (next < requestedRows.length && !cancelled) {
-          const row = requestedRows[next++]!;
-          let pending = detailCache.current.get(row.result_id);
-          if (!pending) {
-            pending = getDetailResult(row.result_id).catch((error: unknown) => { detailCache.current.delete(row.result_id); throw error; });
-            detailCache.current.set(row.result_id, pending);
-          }
-          const detail = await pending;
-          if (detail) details.push(detail);
+    const uncachedIds = requestedRows
+      .map((row) => row.result_id)
+      .filter((id) => !basisCache.current.has(id));
+
+    const loadBasisData = async () => {
+      if (uncachedIds.length > 0) {
+        const fetched = await getCohortBasisDetails(uncachedIds);
+        for (const [id, detail] of fetched) {
+          basisCache.current.set(id, detail);
         }
-      }));
-      return details;
+      }
+      const byId = new Map<string, DetailResult>();
+      for (const row of requestedRows) {
+        const detail = basisCache.current.get(row.result_id);
+        if (detail) byId.set(row.result_id, detail);
+      }
+      return byId;
     };
-    void loadDetails().then((details) => {
+
+    void loadBasisData().then((byId) => {
       if (cancelled) return;
-      const byId = new Map(details.map((detail) => [detail.result_id, detail]));
       setBasisDetails(byId);
       const eligibleIds = new Set(platformRowsForBasis(requestedRows, byId, basis).filter((row) => !row.comparison_exclusion_reason).map((row) => row.result_id));
       setSelected((current) => new Set([...current].filter((id) => eligibleIds.has(id))));
@@ -506,6 +513,24 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     if (sort.key === "run_date") {
       if (a.run_date === b.run_date) return a.result_id.localeCompare(b.result_id);
       return dir * (a.run_date < b.run_date ? -1 : 1);
+    }
+    if (sort.key === "arch" || sort.key === "cpu_family") {
+      const av = a[sort.key] ?? "";
+      const bv = b[sort.key] ?? "";
+      if (!av && !bv) return 0;
+      if (!av) return 1;
+      if (!bv) return -1;
+      const comparison = dir * av.localeCompare(bv);
+      return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
+    }
+    if (sort.key === "memory_gb") {
+      const av = a.memory_gb ?? null;
+      const bv = b.memory_gb ?? null;
+      if (av === null && bv === null) return 0;
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      const comparison = dir * (av - bv);
+      return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
     }
     const av = a[sort.key];
     const bv = b[sort.key];
@@ -1047,6 +1072,51 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   </button>
                 </th>
                 <th class="table-th" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>Labels</th>
+                <th
+                  class="p-0"
+                  scope="col"
+                  aria-sort={ariaSort("arch")}
+                  aria-colindex={platformTableColumnIndex("arch", showMetricContract)}
+                >
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("arch")}
+                  >
+                    Arch{sortArrow("arch")}
+                    {ariaSortAnnouncement("arch")}
+                  </button>
+                </th>
+                <th
+                  class="p-0"
+                  scope="col"
+                  aria-sort={ariaSort("cpu_family")}
+                  aria-colindex={platformTableColumnIndex("cpu_family", showMetricContract)}
+                >
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("cpu_family")}
+                  >
+                    CPU family{sortArrow("cpu_family")}
+                    {ariaSortAnnouncement("cpu_family")}
+                  </button>
+                </th>
+                <th
+                  class="p-0"
+                  scope="col"
+                  aria-sort={ariaSort("memory_gb")}
+                  aria-colindex={platformTableColumnIndex("memory_gb", showMetricContract)}
+                >
+                  <button
+                    type="button"
+                    class="table-th block w-full text-left cursor-pointer select-none bg-transparent border-0"
+                    onClick={() => toggleSort("memory_gb")}
+                  >
+                    Memory{sortArrow("memory_gb")}
+                    {ariaSortAnnouncement("memory_gb")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
@@ -1323,6 +1393,15 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
             />
           )}
         </div>
+      </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("arch", showMetricContract)}>
+        {entry.arch ? formatArchitecture(entry.arch) : "—"}
+      </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("cpu_family", showMetricContract)}>
+        {entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}
+      </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("memory_gb", showMetricContract)}>
+        {entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}
       </td>
     </tr>
   );
