@@ -270,16 +270,25 @@ jobs:
 
               deleted_dir="${deleted_bundle%/*}"
               deleted_name="${deleted_bundle##*/}"
-              legacy_manifest=$(git ls-tree -rz --name-only "$EFFECTIVE_MERGE" -- "$deleted_dir" \
-                | awk -v RS='\0' -v dir="$deleted_dir" \
-                  'tolower($0) == tolower(dir "/submission-manifest.json") { if (!found) { print; found=1 } }')
-              if [ -n "$legacy_manifest" ]; then
+              # Check every case variant, not just the first. Git orders an uppercase
+              # variant ahead of the authoritative lowercase file, so stopping at the
+              # first match lets an unrelated uppercase manifest hide the dangling
+              # lowercase reference. The grep prefilter keeps the shell comparison
+              # cheap in directories with many entries, and comparing paths in the
+              # shell rather than awk avoids depending on how each awk handles a NUL
+              # record separator.
+              expected_manifest_lower=$(printf '%s' "$deleted_dir/submission-manifest.json" | tr 'A-Z' 'a-z')
+              while IFS= read -r -d '' legacy_manifest; do
+                if [ "$(printf '%s' "$legacy_manifest" | tr 'A-Z' 'a-z')" != "$expected_manifest_lower" ]; then
+                  continue
+                fi
                 referenced_bundle=$(git cat-file -p "$EFFECTIVE_MERGE:${legacy_manifest}" | python3 -c "import json, sys; data = json.load(sys.stdin); print(data.get('bundle_file', '') if isinstance(data, dict) else '')" 2>/dev/null || true)
                 if [ "$referenced_bundle" = "$deleted_name" ]; then
                   echo "::error file=${legacy_manifest}::Deleting ${deleted_bundle} also requires deleting its referencing legacy manifest"
                   exit 1
                 fi
-              fi
+              done < <(git ls-tree -rz --name-only "$EFFECTIVE_MERGE" -- "$deleted_dir" \
+                | grep -zi 'submission-manifest\.json$' || true)
           done < <(git diff --no-renames --name-only -z --diff-filter=D \
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
