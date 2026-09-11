@@ -51,7 +51,7 @@ from flag drift. Do not run those checks proactively.
   - Known-good models: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `gemini-3.7-flash-tiered`, `muse-spark-1.2-contributor`
 - **goose**
   - Worker (Write): `(cd "$WORKSPACE" && goose run --text "$PROMPT" --no-session --provider "$PROVIDER" --model "$MODEL")`
-  - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && goose review --prompt "$CRITERIA_FILE" --model "$MODEL")`
+  - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && goose review --prompt "$CRITERIA_FILE" --model "$MODEL")`
 - **prime-agent**
   - Worker (Write): `prime-agent -p --cwd "$WORKSPACE" --provider "$PROVIDER" --model "$MODEL" --thinking "$EFFORT" "$PROMPT"`
   - Reviewer (Hard Read-Only): `prime-agent -p --tools read,grep,find,ls --cwd "$WORKSPACE" --provider "$PROVIDER" --model "$MODEL" --thinking "$EFFORT" "$PROMPT"`
@@ -64,4 +64,110 @@ from flag drift. Do not run those checks proactively.
   - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && hermes chat -q --tools read,search "$PROMPT")`
 - **aider**
   - Worker (Write): `(cd "$WORKSPACE" && aider --model "$MODEL" --message "$PROMPT" --yes-always --no-auto-commits)`
-  - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && aider --model "$MODEL" --message "$PROMPT" --chat-mode ask)`
+  - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && aider --model "$MODEL" --message "$PROMPT" --chat-mode ask)`
+
+## Reviewer panels
+
+A panel is several Reviewer dispatches over one revision, used when the user
+asks for independent cross-model critique or when one harness is rate-limited.
+Each panel member follows the Reviewer rules above; the panel adds isolation,
+diversity, and delivery requirements.
+
+### Isolation
+
+Classify each member before dispatch:
+
+| Classification | Harnesses | Workspace |
+|---|---|---|
+| Hard Read-Only | `codex --sandbox read-only`, `claude --tools Read,Grep,Glob`, `muse --disable-write --disable-shell`, `pi --tools read,...`, `jcode --tools read`, `prime-agent --tools read,...`, `hermes --tools read,search` | The reviewed worktree is acceptable. |
+| Soft Read-Only | `agy --mode plan`, `grok --permission-mode plan`, `opencode --agent plan`, `goose review`, `aider --chat-mode ask` | A dedicated detached worktree at the reviewed revision. |
+
+A Soft Read-Only mode is an instruction, not an enforced sandbox. Never run
+two Soft Read-Only members, or a Soft Read-Only member and any writer, in the
+same worktree at the same time. Create the isolation worktree from the exact
+revision under review and remove it after the panel reports:
+
+```bash
+# Create isolation worktree outside the repository to prevent nesting and collisions:
+REVIEW_WT=$(mktemp -d "${TMPDIR:-/tmp}/review-wt.XXXXXX")
+git -C "$WORKSPACE" worktree add --detach "$REVIEW_WT" "$REVISION"
+
+# Dispatch Soft Read-Only member in background in its own process group:
+set -m
+(cd "$REVIEW_WT" && ...) &
+REVIEW_PID=$!
+set +m
+
+# Wait with timeout or handle termination:
+# wait "$REVIEW_PID" || true
+
+# Terminate entire process tree before worktree removal to prevent file descriptor races:
+if [ -n "$REVIEW_PID" ] && kill -0 "$REVIEW_PID" 2>/dev/null; then
+    PGID=$(ps -o pgid= -p "$REVIEW_PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$PGID" ]; then
+        kill -TERM "-$PGID" 2>/dev/null || true
+        for _ in $(seq 1 5); do
+            kill -0 "-$PGID" 2>/dev/null || break
+            sleep 1
+        done
+        kill -KILL "-$PGID" 2>/dev/null || true
+    fi
+    wait "$REVIEW_PID" 2>/dev/null || true
+fi
+
+# Verify the reviewer respected read-only boundaries before cleanup:
+if [ -n "$(git -C "$REVIEW_WT" status --porcelain 2>/dev/null)" ]; then
+    echo "Warning: Soft Read-Only member modified files in $REVIEW_WT; dropping its findings."
+fi
+
+git -C "$WORKSPACE" worktree remove --force "$REVIEW_WT"
+```
+
+Members must confine their working directory and tool writes to the worktree
+they were given; read-only inputs (brief path, diff patch) may reside outside
+the worktree. A member that cannot be constrained to findings-only output or
+that writes files to the worktree is dropped from the panel rather than
+re-dispatched with weaker boundaries.
+
+### Diversity
+
+Exclude models from the authoring agent's own family, because self-review does
+not add an independent viewpoint. When the author is a Claude model, review with
+`codex`, `grok`, `muse`, or `agy`. Keep the tier the work needs: Tier 1 for a
+final adversarial gate, Tier 2 for routine review. A user-named reviewer or a
+user-set effort overrides this default.
+
+### Brief delivery
+
+An external harness cannot read the dispatching agent's memory or an unsaved
+chat plan. Serialize what the member must judge to an atomically created,
+private file and pass the path:
+
+```bash
+BRIEF=$(mktemp "${TMPDIR:-/tmp}/review-brief.XXXXXX")
+chmod 0600 "$BRIEF"
+# write brief content to "$BRIEF"
+# pass "$BRIEF" to reviewer commands
+# clean up when panel concludes:
+rm -f "$BRIEF"
+```
+
+The brief states the requested outcome, the exact revisions or paths under
+review, the constraints that bind the work, and the output contract (severity
+table with `file:line` evidence, per the adversarial-review reference in
+`shared-review-protocol`). It does not contain the author's preferred
+conclusions.
+
+### Failure and quorum
+
+Dispatch members in parallel and bound each with a timeout. A member that
+fails, crashes, times out, or is excluded for safety is reported as absent.
+A member that completes its review and reports no defects (verdict Ship, empty
+severity table) is a clean pass, not an absent reviewer. State which members
+reported and which did not. When the user asked for a specific named reviewer
+who is absent, report this missing reviewer as a gate blocker. Do not silently
+substitute another model; offer the substitution to the user, and report
+findings from the remaining reviewers who responded.
+
+Attribution, consensus, and dissent handling for the merged report are owned by
+`shared-review-protocol/references/adversarial-review.md`.

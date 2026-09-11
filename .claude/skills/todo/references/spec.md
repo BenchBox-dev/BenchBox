@@ -7,12 +7,12 @@ tracker via `create_item`.
 
 A complete specification defines:
 
-1. **Objective**: A clear statement of what the change accomplishes.
-2. **Prior art**:
-   Examine existing patterns in the codebase by file path. State whether this
-   work extends an existing pattern, supersedes it, or introduces a new pattern.
-3. **Item breakdown**:
-   Define fields matching the `create_item` schema:
+1. **Objective**: A clear statement of what the change accomplishes, plus the
+   assumptions it rests on and the success criteria that close it.
+2. **Prior art**: Examine existing patterns in the codebase by file path. State
+   whether this work extends an existing pattern, supersedes it, or introduces
+   a new one. For new infrastructure this section is required.
+3. **Item breakdown**: Define fields matching the `create_item` schema:
    - `id`: Kebab-case identifier (for example, `mcp-logging-refactor`).
    - `title`: Short imperative sentence, 1–200 characters.
    - `priority`: `critical`, `high`, `medium-high`, `medium`, or `low`.
@@ -24,3 +24,8 @@ A complete specification defines:
 
 Split work so each item is independently implementable and closable; use
 `needs` for ordering, not a work breakdown inside one item.
+
+## Before finalizing
+
+Apply **L3** of `shared-review-protocol/SKILL.md`. Include a reframe only if it
+changes the specification. Save only after the user confirms.
