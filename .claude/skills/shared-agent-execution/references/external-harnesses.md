@@ -88,27 +88,45 @@ same worktree at the same time. Create the isolation worktree from the exact
 revision under review and remove it after the panel reports:
 
 ```bash
-REVIEW_WT="$WORKSPACE/.wt-review-$(date +%s)"
+# Create isolation worktree outside the repository to prevent nesting and collisions:
+REVIEW_WT=$(mktemp -d "${TMPDIR:-/tmp}/review-wt.XXXXXX")
 git -C "$WORKSPACE" worktree add --detach "$REVIEW_WT" "$REVISION"
 
-# Dispatch Soft Read-Only member in background and capture PID:
-# (cd "$REVIEW_WT" && ...) &
-# REVIEW_PID=$!
+# Dispatch Soft Read-Only member in background in its own process group:
+set -m
+(cd "$REVIEW_WT" && ...) &
+REVIEW_PID=$!
+set +m
+
+# Wait with timeout or handle termination:
 # wait "$REVIEW_PID" || true
 
-# Terminate process before worktree removal to prevent file descriptor races:
+# Terminate entire process tree before worktree removal to prevent file descriptor races:
 if [ -n "$REVIEW_PID" ] && kill -0 "$REVIEW_PID" 2>/dev/null; then
-    kill -TERM "$REVIEW_PID" 2>/dev/null
-    sleep 1
-    kill -0 "$REVIEW_PID" 2>/dev/null && kill -KILL "$REVIEW_PID" 2>/dev/null
+    PGID=$(ps -o pgid= -p "$REVIEW_PID" 2>/dev/null | tr -d ' ')
+    if [ -n "$PGID" ]; then
+        kill -TERM "-$PGID" 2>/dev/null || true
+        for _ in $(seq 1 5); do
+            kill -0 "-$PGID" 2>/dev/null || break
+            sleep 1
+        done
+        kill -KILL "-$PGID" 2>/dev/null || true
+    fi
     wait "$REVIEW_PID" 2>/dev/null || true
+fi
+
+# Verify the reviewer respected read-only boundaries before cleanup:
+if [ -n "$(git -C "$REVIEW_WT" status --porcelain 2>/dev/null)" ]; then
+    echo "Warning: Soft Read-Only member modified files in $REVIEW_WT; dropping its findings."
 fi
 
 git -C "$WORKSPACE" worktree remove --force "$REVIEW_WT"
 ```
 
-Members must stay inside the worktree they were given. A member that cannot be
-constrained to findings-only output is dropped from the panel rather than
+Members must confine their working directory and tool writes to the worktree
+they were given; read-only inputs (brief path, diff patch) may reside outside
+the worktree. A member that cannot be constrained to findings-only output or
+that writes files to the worktree is dropped from the panel rather than
 re-dispatched with weaker boundaries.
 
 ### Diversity
@@ -126,7 +144,7 @@ chat plan. Serialize what the member must judge to an atomically created,
 private file and pass the path:
 
 ```bash
-BRIEF=$(mktemp /tmp/review-brief.XXXXXX.md)
+BRIEF=$(mktemp "${TMPDIR:-/tmp}/review-brief.XXXXXX")
 chmod 0600 "$BRIEF"
 # write brief content to "$BRIEF"
 # pass "$BRIEF" to reviewer commands
@@ -143,11 +161,13 @@ conclusions.
 ### Failure and quorum
 
 Dispatch members in parallel and bound each with a timeout. A member that
-fails, times out, or returns no findings is reported as absent, not as
-agreeing. State which members reported and which did not. When the user asked
-for a specific reviewer, a missing member is a blocker to report rather than a
-reason to substitute a different model silently; offer the substitution and
-continue with the members that reported.
+fails, crashes, times out, or is excluded for safety is reported as absent.
+A member that completes its review and reports no defects (verdict Ship, empty
+severity table) is a clean pass, not an absent reviewer. State which members
+reported and which did not. When the user asked for a specific named reviewer
+who is absent, report this missing reviewer as a gate blocker. Do not silently
+substitute another model; offer the substitution to the user, and report
+findings from the remaining reviewers who responded.
 
 Attribution, consensus, and dissent handling for the merged report are owned by
 `shared-review-protocol/references/adversarial-review.md`.

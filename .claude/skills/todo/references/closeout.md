@@ -39,7 +39,9 @@ a verification item, not a dismissal.
    commits, and PRs.
 3. Re-run the checks that prove each fix. This is implementation verification,
    not a new review scope.
-4. Turn unfixed Nit or Consider items into documented skips, or into follow-up
+4. Turn unfixed Nit or Consider items into documented skips (classified as
+   `DEFER` with a tracking reference or `REBUT` with rationale per
+   `shared-review-protocol/references/review-response.md`), or into follow-up
    items with `create_item(needs=[<batch item>])` rather than widening scope.
 
 ## Phase 3 — close tracker state

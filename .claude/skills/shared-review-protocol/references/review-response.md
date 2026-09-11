@@ -28,9 +28,9 @@ requires; uncertainty is not evidence.
 | Disposition | Use when | Required evidence |
 |---|---|---|
 | `ACCEPT` | The finding is correct and in scope. | A remediation item naming the target file or artifact, and the check that will prove the fix. |
-| `NARROW` | The concern is valid but the proposed remedy exceeds what the requirement needs. | The smaller remedy actually applied, plus re-homing of the removed scope per `[REVIEW-NARROWING-001]`. |
-| `ALREADY_FIXED` | The current revision already enforces the behavior. | `file:line`, or the commit SHA merged on the integration branch, that demonstrates it. |
-| `DEFER` | The finding is correct but blocked, too large, outside this change, or an unverified concern needing investigation. | A tracker item or captured finding per `[REVIEW-CAPTURE-001]`, an upstream reference, or a verification action item per `[REVIEW-DEFECT-001]`. |
+| `NARROW` | The concern is valid but the proposed remedy exceeds what the requirement needs. | The smaller remedy planned or applied, what was excluded, and why the full scope was rejected per `[REVIEW-NARROWING-001]`. |
+| `ALREADY_FIXED` | The revision under review or integration baseline already enforces the behavior. | `file:line`, or the commit SHA merged on the integration branch, that demonstrates it. |
+| `DEFER` | The finding is correct but blocked/out-of-scope (`DEFER-blocked`), or an unverified concern needing investigation (`DEFER-unverified`). | For `DEFER-blocked`: a tracker item or captured finding per `[REVIEW-CAPTURE-001]`. For `DEFER-unverified`: the concrete verification probe or test per `[REVIEW-DEFECT-001]`. |
 | `REBUT` | The finding is factually wrong, refuted by a requirement, or rests on a false premise. | Concrete counter-evidence: the requirement, source, test, or a reproduction that does not fail. |
 
 Rules that apply across the table:
@@ -42,8 +42,9 @@ Rules that apply across the table:
 - `DEFER` and `NARROW` must name where the deferred or removed scope now
   lives. "Removed from scope" alone is not a valid disposition
   (`[REVIEW-NARROWING-001]`).
-- `ALREADY_FIXED` requires the proof to be in the revision under review. A fix
-  on an unmerged branch is `DEFER` with that branch named.
+- `ALREADY_FIXED` requires proof that the revision under review or integration
+  baseline already satisfies the finding. A fix on an unmerged branch is `DEFER`
+  with that branch named.
 - A finding you cannot confirm or refute immediately is not `REBUT`. An
   unverified finding must never be dismissed without evidence. If investigation
   cannot settle it during the current turn, record it as `DEFER` with the
@@ -78,8 +79,9 @@ evidence and the remediation land.
 5. Re-run the checks that prove each applied fix. This is verification of
    authorized work, not a new review scope.
 6. Record `DEFER` items in the tracker or capture location the project
-   binding names. Report them when no such binding exists rather than
-   inventing one.
+   binding names when write authorization is granted. In read-only
+   adjudication sessions, record them in the review response report without
+   attempting external tracker writes.
 
 ## Report
 
@@ -100,8 +102,8 @@ A domain wrapper may keep its own disposition labels and its own storage
 bindings. It must map them onto these five and must not weaken the evidence
 requirements. Existing bindings:
 
-- `code/references/pr-sweep.md` maps `fix`, `already-fixed`, `defer`, and
-  `reject` onto `ACCEPT`, `ALREADY_FIXED`, `DEFER`, and `REBUT`, and keeps
-  GitHub thread collection, reply, and resolution rules.
+- `code/references/pr-sweep.md` maps `fix`, `narrow`, `already-fixed`, `defer`,
+  and `reject` onto `ACCEPT`, `NARROW`, `ALREADY_FIXED`, `DEFER`, and `REBUT`,
+  and keeps GitHub thread collection, reply, and resolution rules.
 - `todo/references/closeout.md` reports `TODO | finding | disposition |
   evidence | PR` for a named batch and keeps the tracker claim rules.

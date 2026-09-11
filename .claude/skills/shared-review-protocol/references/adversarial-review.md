@@ -40,7 +40,8 @@ with evidence about value, complexity, maintenance cost, and alternatives.
 
 When several reviewers cover the same revision, keep their outputs separable
 through synthesis. Dispatch, isolation, and quorum rules are owned by
-`shared-agent-execution/references/external-harnesses.md` (Reviewer panels).
+`shared-agent-execution/references/external-harnesses.md` (Reviewer panels,
+when the `shared-agent-execution` skill is installed).
 
 - Preserve attribution. Every finding names the reviewer that produced it, so
   `[grok]`, `[claude]`, or `[muse]` stays attached through the merged report.

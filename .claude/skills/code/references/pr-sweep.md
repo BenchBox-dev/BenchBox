@@ -63,19 +63,20 @@ labels as its GitHub-thread binding:
 |---|---|---|
 | `fix` | `ACCEPT` | The finding is correct and fits the authorized sweep |
 | `narrow` | `NARROW` | The concern is valid; apply the narrower remedy and re-home removed scope |
-| `already-fixed` | `ALREADY_FIXED` | The integration branch contains a verified fix |
+| `already-fixed` | `ALREADY_FIXED` | The revision under review or integration baseline contains a verified fix |
 | `defer` | `DEFER` | The finding is correct but too large, blocked, or outside scope |
-| `reject` | `REBUT` | The finding is wrong, stale, or outside the repository contract |
+| `reject` | `REBUT` | The finding is wrong, refuted by a requirement, or outside the repository contract |
 
 Record evidence for every disposition:
-- For `already-fixed`, cite the specific commit SHA merged on the integration
-  branch that resolved the defect.
+- For `already-fixed`, cite `file:line` in the revision under review or the
+  specific commit SHA merged on the integration baseline that resolved the defect.
 - For `narrow`, cite the narrower remedy applied and the tracking item for
   re-homed scope per `shared-review-protocol/SKILL.md` §9 `[REVIEW-NARROWING-001]`.
 - For `defer` on external/upstream dependencies, cite the upstream tracking
   issue or repository reference.
 - For `reject`, cite the requirement, source, or reproduction that refutes the
-  finding. Disagreement is not a refutation.
+  finding. When a finding is stale against an older commit, cite the current
+  source lines showing the condition is absent. Disagreement is not a refutation.
 - Uncertainty is not evidence; investigate or defer it.
 
 ### 4. Act and verify
