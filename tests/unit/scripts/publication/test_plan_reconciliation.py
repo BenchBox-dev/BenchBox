@@ -156,11 +156,11 @@ def test_authority_is_not_a_hardcoded_tracker_list() -> None:
     assert not hasattr(reconciliation, "REQUIRED_TRACKER_IDS")
 
 
-def test_load_tracker_snapshot_returns_none_when_clone_fails(monkeypatch) -> None:
-    def fail_clone(*args, **kwargs):
+def test_load_tracker_snapshot_returns_none_when_fetch_fails(monkeypatch) -> None:
+    def fail_fetch(*args, **kwargs):
         raise reconciliation.subprocess.CalledProcessError(1, args[0])
 
-    monkeypatch.setattr(reconciliation.subprocess, "run", fail_clone)
+    monkeypatch.setattr(reconciliation.subprocess, "run", fail_fetch)
 
     assert reconciliation.load_tracker_snapshot() is None
 
@@ -168,12 +168,16 @@ def test_load_tracker_snapshot_returns_none_when_clone_fails(monkeypatch) -> Non
 def test_load_tracker_snapshot_parses_git_state_index(monkeypatch) -> None:
     index = {"items": {"x": {"status": "active", "needs": ["y"]}}}
 
-    def fake_clone(command: list[str], **kwargs) -> None:
-        checkout = Path(command[-1])
-        checkout.mkdir()
-        (checkout / "index.json").write_text(json.dumps(index), encoding="utf-8")
+    def fake_git(command: list[str], **kwargs):
+        if command[:4] == ["git", "config", "--get", "remote.origin.url"]:
+            return reconciliation.subprocess.CompletedProcess(
+                command, 0, stdout="https://github.com/BenchBox-dev/BenchBox.git\n"
+            )
+        if command[:2] == ["git", "show"]:
+            return reconciliation.subprocess.CompletedProcess(command, 0, stdout=json.dumps(index))
+        return reconciliation.subprocess.CompletedProcess(command, 0, stdout="")
 
-    monkeypatch.setattr(reconciliation.subprocess, "run", fake_clone)
+    monkeypatch.setattr(reconciliation.subprocess, "run", fake_git)
 
     assert reconciliation.load_tracker_snapshot() == {
         "states": {"x": "active"},

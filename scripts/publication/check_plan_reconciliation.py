@@ -14,7 +14,6 @@ import json
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -203,39 +202,43 @@ def load_tracker_snapshot(prefix: str | None = None) -> dict | None:
         branch = config["state_branch"]
     except (KeyError, OSError, TypeError, json.JSONDecodeError):
         return None
-    with tempfile.TemporaryDirectory() as tmp:
-        checkout = Path(tmp) / "todo-state"
-        try:
-            subprocess.run(
-                [
-                    "git",
-                    "clone",
-                    "--quiet",
-                    "--depth",
-                    "1",
-                    "--branch",
-                    branch,
-                    "--single-branch",
-                    remote,
-                    str(checkout),
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=120,
-                cwd=ROOT,
-            )
-            index = json.loads((checkout / "index.json").read_text(encoding="utf-8"))
-            entries = index["items"]
-            if not isinstance(entries, dict):
-                return None
-            states = {str(item_id): str(entry["status"]) for item_id, entry in entries.items()}
-            deps = {
-                str(item_id): sorted(str(value) for value in entry.get("needs", []))
-                for item_id, entry in entries.items()
-            }
-        except (KeyError, OSError, TypeError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    try:
+        origin = subprocess.run(
+            ["git", "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+            cwd=ROOT,
+        ).stdout.strip()
+        if origin.rstrip("/").removesuffix(".git") != remote.rstrip("/").removesuffix(".git"):
             return None
+        subprocess.run(
+            ["git", "fetch", "--quiet", "--no-tags", "--depth", "1", "origin", f"refs/heads/{branch}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=120,
+            cwd=ROOT,
+        )
+        raw_index = subprocess.run(
+            ["git", "show", "FETCH_HEAD:index.json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+            cwd=ROOT,
+        ).stdout
+        index = json.loads(raw_index)
+        entries = index["items"]
+        if not isinstance(entries, dict):
+            return None
+        states = {str(item_id): str(entry["status"]) for item_id, entry in entries.items()}
+        deps = {
+            str(item_id): sorted(str(value) for value in entry.get("needs", [])) for item_id, entry in entries.items()
+        }
+    except (KeyError, OSError, TypeError, ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
     return {"states": states, "deps": deps}
 
 
