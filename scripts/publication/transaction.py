@@ -521,6 +521,63 @@ def _handle_recovery_required(
             "reason": payload.get("reason", "Marked terminal due to unresolvable ambiguity"),
         }
         return Transaction(**data), Effect(action="terminal_stop", data=data["failure"])
+
+    if event_type == EVENT_VERIFY_SUCCESS:
+        # Forward reconciliation of a post-send failure whose provider write
+        # provably landed: the deployment reached the provider's terminal-success
+        # state and the live routes serve the approved candidate. Only a
+        # promotion whose failure was recorded at the post-send stage qualifies;
+        # a pre-send or verification failure has no landed write to reconcile.
+        # Allowlist promotions rather than denylist rollbacks: this handler also
+        # serves legacy_recovery, whose journal states exclude externally-verified,
+        # so reconciling one forward would corrupt the journal on reload.
+        if current.kind != KIND_PROMOTION:
+            raise TransactionError(f"Recovery reconciliation applies only to promotions, not kind {current.kind!r}")
+        failure = current.failure or {}
+        if failure.get("stage") != "post_send":
+            raise TransactionError("Recovery reconciliation requires a post-send failure with a landed provider write")
+        obs_digest = payload.get("observation_digest")
+        if not obs_digest:
+            raise TransactionError("observation_digest is required for recovery reconciliation")
+
+        # The provider status must be bound to *this* transaction's deployment.
+        # The deploy step sends `pages_build_version: github.sha`, which the
+        # provider resolves to the controller's workflow SHA, so that SHA is the
+        # provider-side identity of this transaction's write. It is a journal
+        # field, so it cannot be altered without a CAS-protected journal write.
+        # Requiring the caller to name that same identity makes an unrelated or
+        # stale deployment's success unable to reconcile this transaction.
+        expected_deployment_id = (current.controller or {}).get("workflow_sha")
+        pages_deployment_id = payload.get("pages_deployment_id")
+        if not expected_deployment_id:
+            raise TransactionError("Recovery reconciliation requires the transaction's controller workflow SHA")
+        if pages_deployment_id != expected_deployment_id:
+            raise TransactionError(
+                "Recovery reconciliation requires Pages deployment evidence bound to this transaction's "
+                f"controller SHA {expected_deployment_id!r}, got: {pages_deployment_id!r}"
+            )
+
+        pages_status = str(payload.get("pages_deployment_status") or "").lower()
+        if pages_status != "succeed":
+            raise TransactionError(
+                "Recovery reconciliation requires a Pages deployment status of 'succeed', "
+                f"got: {payload.get('pages_deployment_status')!r}"
+            )
+        attestation = validate_live_receipt(current, payload)
+        data["state"] = STATE_EXTERNALLY_VERIFIED
+        data["verification"] = {
+            "challenge": payload.get("challenge"),
+            "verifier_sha": payload.get("verifier_sha"),
+            "observation_digest": obs_digest,
+            "pages_deployment_id": pages_deployment_id,
+            "pages_deployment_status": pages_status,
+            "reconciled_from": STATE_RECOVERY_REQUIRED,
+            "verified_at": ev["timestamp"],
+        }
+        data["attestation"] = attestation
+        tx = Transaction(**data)
+        return tx, Effect(action="commit_durable", data={"transaction_id": tx.transaction_id})
+
     raise TransactionError(f"Invalid transition: event '{event_type}' from state '{current.state}'")
 
 

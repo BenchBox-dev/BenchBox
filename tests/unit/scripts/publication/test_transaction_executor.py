@@ -6,6 +6,8 @@ import argparse
 import hashlib
 import json
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +36,13 @@ from scripts.publication.transaction_executor import (
     cmd_authenticate_approval,
     cmd_finalize,
     cmd_prepare,
+    cmd_reconcile,
     cmd_record_failure,
     cmd_record_prepared,
     cmd_record_verification,
     cmd_resume,
     cmd_start_write,
+    fetch_pages_deployment_status,
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -806,6 +810,9 @@ def test_cmd_start_write_with_explicit_pages_build_version(
             candidate_manifest_digest=candidate_digest,
             candidate_artifact_id="111",
             candidate_archive_sha256=candidate_digest,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
             restore_transaction_id=None,
             failed_transaction_id=None,
             barrier_evidence=None,
@@ -864,7 +871,6 @@ def test_cmd_start_write_with_explicit_pages_build_version(
             output_tx=str(tx_path),
         )
     )
-
     tx = journal.read_transaction(test_repo, tx_id, ref="publication")
     assert tx.state == STATE_WRITE_STARTED
     assert tx.write["pages_build_version"] == wire_sha
@@ -875,3 +881,451 @@ def test_cmd_start_write_with_explicit_pages_build_version(
     output_text = github_output.read_text(encoding="utf-8")
     assert f"pages_build_version={wire_sha}" in output_text
     assert f"intent_commit_oid={tx.write['intent_commit_oid']}" in output_text
+
+
+def test_fetch_pages_deployment_status_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    class MockResponse:
+        def __init__(self, data: dict[str, Any]) -> None:
+            self._raw = json.dumps(data).encode("utf-8")
+
+        def read(self) -> bytes:
+            return self._raw
+
+        def __enter__(self) -> MockResponse:
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+    recorded_requests: list[urllib.request.Request] = []
+
+    def mock_urlopen(req: urllib.request.Request) -> MockResponse:
+        recorded_requests.append(req)
+        return MockResponse({"status": "succeed"})
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
+    status = fetch_pages_deployment_status(
+        repo="BenchBox-dev/BenchBox",
+        deployment_id="sha-1234",
+        token="ghp_secret",
+    )
+    assert status == "succeed"
+    assert len(recorded_requests) == 1
+    req = recorded_requests[0]
+    assert req.full_url == "https://api.github.com/repos/BenchBox-dev/BenchBox/pages/deployments/sha-1234"
+    assert req.headers["Authorization"] == "Bearer ghp_secret"
+    assert req.headers["Accept"] == "application/vnd.github+json"
+    assert req.headers["User-agent"] == "benchbox-publication-transaction"
+
+
+def test_fetch_pages_deployment_status_missing_token() -> None:
+    with pytest.raises(TransactionError, match="GitHub token is required"):
+        fetch_pages_deployment_status(
+            repo="BenchBox-dev/BenchBox",
+            deployment_id="sha-1234",
+            token=None,
+        )
+
+
+def test_fetch_pages_deployment_status_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def mock_urlopen_err(req: urllib.request.Request) -> Any:
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_err)
+    with pytest.raises(TransactionError, match="Failed to fetch Pages deployment status"):
+        fetch_pages_deployment_status(
+            repo="BenchBox-dev/BenchBox",
+            deployment_id="sha-1234",
+            token="ghp_secret",
+        )
+
+
+def test_cmd_reconcile_happy_path(test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    permit_path = tmp_path / "permit.json"
+    tx_path = tmp_path / "tx.json"
+    approval_path = tmp_path / "approval.json"
+    tx_id = "tx-rec-1"
+
+    cmd_prepare(
+        argparse.Namespace(
+            kind=KIND_PROMOTION,
+            target_repo="BenchBox-dev/BenchBox",
+            target_env="github-pages",
+            target_url="https://benchbox.dev",
+            develop_sha="d" * 40,
+            published_results_sha="p" * 40,
+            candidate_manifest_digest="m" * 64,
+            candidate_artifact_id="101",
+            candidate_archive_sha256="a" * 64,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
+            restore_transaction_id=None,
+            failed_transaction_id=None,
+            barrier_evidence=None,
+            transaction_id=tx_id,
+            workflow_path=".github/workflows/publication-transaction.yml",
+            workflow_sha="w" * 40,
+            writer_run_id="501",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_authenticate_approval(
+        argparse.Namespace(
+            permit=str(permit_path),
+            run_id="501",
+            run_attempt=1,
+            repo="BenchBox-dev/BenchBox",
+            github_token=None,
+            simulated_approval=str(
+                _write_temp_json(
+                    tmp_path / "sim.json",
+                    {
+                        "environments": [{"name": "github-pages"}],
+                        "state": "approved",
+                        "user": {"id": 1, "login": "test"},
+                    },
+                )
+            ),
+            output_approval=str(approval_path),
+        )
+    )
+    cmd_record_prepared(
+        argparse.Namespace(
+            permit=str(permit_path),
+            approval=str(approval_path),
+            tx=str(tx_path),
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_start_write(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_record_failure(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            code="POST_SEND_FAILURE",
+            stage="post_send",
+            reason="Poll timeout",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+
+    github_output = tmp_path / "github_output.txt"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(github_output))
+    rec_tx_path = tmp_path / "rec_tx.json"
+
+    rc = cmd_reconcile(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(rec_tx_path),
+        )
+    )
+    assert rc == 0
+    assert rec_tx_path.is_file()
+    out_tx = json.loads(rec_tx_path.read_text(encoding="utf-8"))
+    assert out_tx["state"] == STATE_RECOVERY_REQUIRED
+    assert out_tx["failure"]["stage"] == "post_send"
+
+    lines = github_output.read_text(encoding="utf-8").strip().splitlines()
+    assert f"transaction_id={tx_id}" in lines
+    assert "kind=promotion" in lines
+    assert "candidate_artifact_id=101" in lines
+    assert f"controller_sha={'w' * 40}" in lines
+
+
+def test_cmd_reconcile_rejects_invalid(test_repo: Path) -> None:
+    with pytest.raises(TransactionError, match="Only a promotion transaction in recovery-required"):
+        cmd_reconcile(
+            argparse.Namespace(
+                transaction_id="genesis-tx-0001",
+                ref="publication",
+                repo_path=str(test_repo),
+                output_tx=None,
+            )
+        )
+
+
+def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    permit_path = tmp_path / "permit.json"
+    tx_path = tmp_path / "tx.json"
+    approval_path = tmp_path / "approval.json"
+    tx_id = "tx-verif-live"
+
+    cmd_prepare(
+        argparse.Namespace(
+            kind=KIND_PROMOTION,
+            target_repo="BenchBox-dev/BenchBox",
+            target_env="github-pages",
+            target_url="https://benchbox.dev",
+            develop_sha="d" * 40,
+            published_results_sha="p" * 40,
+            candidate_manifest_digest="m" * 64,
+            candidate_artifact_id="102",
+            candidate_archive_sha256="a" * 64,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
+            restore_transaction_id=None,
+            failed_transaction_id=None,
+            barrier_evidence=None,
+            transaction_id=tx_id,
+            workflow_path=".github/workflows/publication-transaction.yml",
+            workflow_sha="c" * 40,
+            writer_run_id="502",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_authenticate_approval(
+        argparse.Namespace(
+            permit=str(permit_path),
+            run_id="502",
+            run_attempt=1,
+            repo="BenchBox-dev/BenchBox",
+            github_token=None,
+            simulated_approval=str(
+                _write_temp_json(
+                    tmp_path / "sim.json",
+                    {
+                        "environments": [{"name": "github-pages"}],
+                        "state": "approved",
+                        "user": {"id": 1, "login": "test"},
+                    },
+                )
+            ),
+            output_approval=str(approval_path),
+        )
+    )
+    cmd_record_prepared(
+        argparse.Namespace(
+            permit=str(permit_path),
+            approval=str(approval_path),
+            tx=str(tx_path),
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_start_write(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_record_failure(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            code="POST_SEND_FAILURE",
+            stage="post_send",
+            reason="Poll timeout",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+
+    probe_path = tmp_path / "probe.json"
+    _write_temp_json(probe_path, {"ok": True, "probes": [{"path": "/", "ok": True}]})
+
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    with pytest.raises(TransactionError, match="GitHub token is required"):
+        cmd_record_verification(
+            argparse.Namespace(
+                transaction_id=tx_id,
+                probe_report=str(probe_path),
+                attestation=None,
+                challenge="challenge",
+                verifier_sha="v" * 40,
+                repo=None,
+                github_token=None,
+                ref="publication",
+                repo_path=str(test_repo),
+                output_tx=str(tx_path),
+            )
+        )
+
+    class MockResponse:
+        def __init__(self, data: dict[str, Any]) -> None:
+            self._raw = json.dumps(data).encode("utf-8")
+
+        def read(self) -> bytes:
+            return self._raw
+
+        def __enter__(self) -> MockResponse:
+            return self
+
+        def __exit__(self, *args: Any) -> None:
+            pass
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req: MockResponse({"status": "failed"}))
+    with pytest.raises(TransactionError, match="Pages deployment status of 'succeed'"):
+        cmd_record_verification(
+            argparse.Namespace(
+                transaction_id=tx_id,
+                probe_report=str(probe_path),
+                attestation=None,
+                challenge="challenge",
+                verifier_sha="v" * 40,
+                repo=None,
+                github_token="fake-token",
+                ref="publication",
+                repo_path=str(test_repo),
+                output_tx=str(tx_path),
+            )
+        )
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req: MockResponse({"status": "succeed"}))
+    rc = cmd_record_verification(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            probe_report=str(probe_path),
+            attestation=None,
+            challenge="challenge",
+            verifier_sha="v" * 40,
+            repo=None,
+            github_token="fake-token",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    assert rc == 0
+    updated = journal.read_transaction(test_repo, tx_id, ref="publication")
+    assert updated.state == STATE_EXTERNALLY_VERIFIED
+    assert updated.verification["pages_deployment_id"] == "c" * 40
+    assert updated.verification["pages_deployment_status"] == "succeed"
+    assert updated.verification["reconciled_from"] == STATE_RECOVERY_REQUIRED
+
+
+def test_cmd_record_verification_requires_live_lookup_not_caller_status(
+    test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recovery reconciliation must query the provider live; no CLI flag may inject status."""
+    permit_path = tmp_path / "permit.json"
+    tx_path = tmp_path / "tx.json"
+    approval_path = tmp_path / "approval.json"
+    tx_id = "tx-verif-no-inject"
+
+    cmd_prepare(
+        argparse.Namespace(
+            kind=KIND_PROMOTION,
+            target_repo="BenchBox-dev/BenchBox",
+            target_env="github-pages",
+            target_url="https://benchbox.dev",
+            develop_sha="d" * 40,
+            published_results_sha="p" * 40,
+            candidate_manifest_digest="m" * 64,
+            candidate_artifact_id="103",
+            candidate_archive_sha256="a" * 64,
+            candidate_site_tree_sha256="s" * 64,
+            candidate_parent_sha="",
+            candidate_parent_generation="",
+            restore_transaction_id=None,
+            failed_transaction_id=None,
+            barrier_evidence=None,
+            transaction_id=tx_id,
+            workflow_path=".github/workflows/publication-transaction.yml",
+            workflow_sha="e" * 40,
+            writer_run_id="503",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_permit=str(permit_path),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_authenticate_approval(
+        argparse.Namespace(
+            permit=str(permit_path),
+            run_id="503",
+            run_attempt=1,
+            repo="BenchBox-dev/BenchBox",
+            github_token=None,
+            simulated_approval=str(
+                _write_temp_json(
+                    tmp_path / "sim.json",
+                    {
+                        "environments": [{"name": "github-pages"}],
+                        "state": "approved",
+                        "user": {"id": 1, "login": "test"},
+                    },
+                )
+            ),
+            output_approval=str(approval_path),
+        )
+    )
+    cmd_record_prepared(
+        argparse.Namespace(
+            permit=str(permit_path),
+            approval=str(approval_path),
+            tx=str(tx_path),
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_start_write(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+    cmd_record_failure(
+        argparse.Namespace(
+            transaction_id=tx_id,
+            code="POST_SEND_FAILURE",
+            stage="post_send",
+            reason="Poll timeout",
+            ref="publication",
+            repo_path=str(test_repo),
+            output_tx=str(tx_path),
+        )
+    )
+
+    probe_path = tmp_path / "probe.json"
+    _write_temp_json(probe_path, {"ok": True, "probes": [{"path": "/", "ok": True}]})
+
+    # The parser no longer offers a status-injection flag: even a crafted
+    # namespace carrying one must not bypass the live provider lookup, which
+    # fails closed without a token.
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    with pytest.raises(TransactionError, match="GitHub token is required"):
+        cmd_record_verification(
+            argparse.Namespace(
+                transaction_id=tx_id,
+                probe_report=str(probe_path),
+                attestation=None,
+                challenge="challenge",
+                verifier_sha="v" * 40,
+                repo=None,
+                github_token=None,
+                pages_deployment_status="succeed",
+                simulated_pages_deployment_status="succeed",
+                ref="publication",
+                repo_path=str(test_repo),
+                output_tx=str(tx_path),
+            )
+        )

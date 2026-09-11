@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from scripts.publication import transaction as tx_mod
@@ -377,6 +379,177 @@ def test_rollback_lifecycle_happy_path(base_context: dict[str, dict[str, str]]) 
     rb_tx, effect = tx_mod.transition(rb_tx, tx_mod.EVENT_COMMIT_ROLLBACK)
     assert rb_tx.state == tx_mod.STATE_ROLLBACK_DURABLE
     assert effect.action == "advance_durable_head"
+
+
+def _recovery_required_promotion(base_context: dict[str, dict[str, str]]) -> tx_mod.Transaction:
+    tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=6,
+        parent_transaction_id="parent-uuid-001",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_START_WRITE, {"intent_commit_oid": "1" * 40})
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "poll loop misreported terminal status"})
+    assert tx.state == tx_mod.STATE_RECOVERY_REQUIRED
+    assert tx.failure["stage"] == "post_send"
+    return tx
+
+
+def test_recovery_required_reconciles_forward_to_durable(base_context: dict[str, dict[str, str]]) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+
+    tx, effect = tx_mod.transition(
+        tx,
+        tx_mod.EVENT_VERIFY_SUCCESS,
+        {
+            "observation_digest": obs_digest,
+            "pages_deployment_id": "a" * 40,
+            "pages_deployment_status": "succeed",
+            "attestation": receipt_for(tx, obs_digest),
+        },
+    )
+    assert tx.state == tx_mod.STATE_EXTERNALLY_VERIFIED
+    assert effect.action == "commit_durable"
+    assert tx.verification["reconciled_from"] == tx_mod.STATE_RECOVERY_REQUIRED
+    assert tx.verification["pages_deployment_id"] == "a" * 40
+    assert tx.verification["pages_deployment_status"] == "succeed"
+    assert tx.failure["stage"] == "post_send"
+
+    tx, effect = tx_mod.transition(tx, tx_mod.EVENT_COMMIT_DURABLE)
+    assert tx.state == tx_mod.STATE_DURABLE
+    assert effect.action == "advance_durable_head"
+
+
+def test_recovery_reconciliation_requires_succeed_status(base_context: dict[str, dict[str, str]]) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="Pages deployment status of 'succeed'"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
+                "pages_deployment_status": "deployment_failed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_rejects_mismatched_deployment_id(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="bound to this transaction's controller SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "b" * 40,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_rejects_missing_deployment_id(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    tx = _recovery_required_promotion(base_context)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="bound to this transaction's controller SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_requires_controller_workflow_sha(
+    base_context: dict[str, dict[str, str]],
+) -> None:
+    ctx = {**base_context, "controller": {**base_context["controller"], "workflow_sha": ""}}
+    tx = _recovery_required_promotion(ctx)
+    obs_digest = "obs" * 20
+    with pytest.raises(tx_mod.TransactionError, match="requires the transaction's controller workflow SHA"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
+
+
+def test_recovery_reconciliation_rejects_pre_send_failure(base_context: dict[str, dict[str, str]]) -> None:
+    tx, _ = tx_mod.prepare_promotion(
+        target=base_context["target"],
+        generation=6,
+        parent_transaction_id="parent-uuid-001",
+        approval=base_context["approval"],
+        controller=base_context["controller"],
+        owner=base_context["owner"],
+        content=base_context["content"],
+        artifact=base_context["artifact"],
+    )
+    tx, _ = tx_mod.transition(tx, tx_mod.EVENT_FAIL_WRITE, {"reason": "OIDC denied before send"})
+    assert tx.state == tx_mod.STATE_RECOVERY_REQUIRED
+    assert tx.failure["stage"] == "pre_send"
+
+    with pytest.raises(tx_mod.TransactionError, match="post-send failure with a landed provider write"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": "obs" * 20,
+                "pages_deployment_id": "a" * 40,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, "obs" * 20),
+            },
+        )
+
+
+def test_recovery_required_still_allows_mark_terminal(base_context: dict[str, dict[str, str]]) -> None:
+    tx = _recovery_required_promotion(base_context)
+    tx, effect = tx_mod.transition(tx, tx_mod.EVENT_MARK_TERMINAL, {"reason": "operator abandoned generation"})
+    assert tx.state == tx_mod.STATE_TERMINAL_FAILURE
+    assert effect.action == "terminal_stop"
+
+
+@pytest.mark.parametrize("kind", [tx_mod.KIND_ROLLBACK, tx_mod.KIND_LEGACY_RECOVERY])
+def test_recovery_reconciliation_is_restricted_to_promotions(
+    base_context: dict[str, dict[str, str]], kind: str
+) -> None:
+    """A non-promotion in recovery-required must not be reconciled forward: neither
+    kind admits externally-verified, so the journal would reject the written state."""
+    tx = dataclasses.replace(_recovery_required_promotion(base_context), kind=kind)
+    obs_digest = "obs" * 20
+
+    with pytest.raises(tx_mod.TransactionError, match="applies only to promotions"):
+        tx_mod.transition(
+            tx,
+            tx_mod.EVENT_VERIFY_SUCCESS,
+            {
+                "observation_digest": obs_digest,
+                "pages_deployment_id": "a" * 40,
+                "pages_deployment_status": "succeed",
+                "attestation": receipt_for(tx, obs_digest),
+            },
+        )
 
 
 def test_invalid_state_transition_raises_error(base_context: dict[str, dict[str, str]]) -> None:

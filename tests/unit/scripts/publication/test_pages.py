@@ -176,6 +176,55 @@ def test_create_response_does_not_fabricate_provider_acknowledgement() -> None:
     assert result["result"]["created_at"] is None
 
 
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [
+        # Terminal success
+        ("succeed", "terminal-success"),
+        ("SUCCEED", "terminal-success"),
+        # Terminal failure
+        ("deployment_failed", "terminal-failure"),
+        ("deployment_content_failed", "terminal-failure"),
+        ("deployment_attempt_error", "terminal-failure"),
+        ("deployment_lost", "terminal-failure"),
+        ("deployment_cancelled", "terminal-failure"),
+        ("payment_required", "terminal-failure"),
+        ("not_found", "terminal-failure"),
+        # Non-terminal
+        ("pending", "pending"),
+        ("deployment_in_progress", "pending"),
+        ("syncing_files", "pending"),
+        ("finished_file_sync", "pending"),
+        ("updating_pages", "pending"),
+        ("purging_cdn", "pending"),
+        # Unrecognized values do not resolve to either outcome
+        ("", "unknown"),
+        ("some_future_status", "unknown"),
+        ("SUCCESS", "unknown"),
+    ],
+)
+def test_classify_deployment_status(status: str, expected: str) -> None:
+    result = run_harness({"action": "classify", "status": status})
+    assert result["success"] is True
+    assert result["result"]["classification"] == expected
+
+
+def test_classify_deployment_status_matches_sanitized_provider_value() -> None:
+    """A live `succeed` deployment is upper-cased by sanitizeStatusResponse to
+    `SUCCEED`; the classifier must recognize that first-poll value as success."""
+    status_result = run_harness(
+        {
+            "action": "status",
+            "options": {"owner": "BenchBox-dev", "repo": "BenchBox", "deployment_id": "d1"},
+            "mock": {"get_response": {"id": "d1", "status": "succeed"}},
+        }
+    )
+    sanitized = status_result["result"]["status"]
+    assert sanitized == "SUCCEED"
+    classify_result = run_harness({"action": "classify", "status": sanitized})
+    assert classify_result["result"]["classification"] == "terminal-success"
+
+
 def test_get_deployment_status_success() -> None:
     payload = {
         "action": "status",
