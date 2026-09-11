@@ -36,6 +36,11 @@ name: Publication Transactions
         required: false
         default: ""
         type: string
+      reconcile_transaction_id:
+        description: "Active promotion transaction in recovery-required to reconcile forward"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -54,7 +59,7 @@ jobs:
       kind: ${{ steps.inputs.outputs.kind }}
       develop_sha: ${{ steps.candidate.outputs.develop_sha }}
       published_results_sha: ${{ steps.candidate.outputs.published_results_sha }}
-      candidate_artifact_id: ${{ steps.candidate.outputs.artifact_id }}
+      candidate_artifact_id: ${{ steps.candidate.outputs.artifact_id || steps.prepare_tx.outputs.candidate_artifact_id }}
       candidate_site_tree_sha256: ${{ steps.prepare_tx.outputs.candidate_site_tree_sha256 }}
       candidate_archive_sha256: ${{ steps.prepare_tx.outputs.candidate_archive_sha256 }}
       candidate_parent_sha: ${{ steps.candidate.outputs.expected_parent_sha }}
@@ -90,7 +95,7 @@ jobs:
           fi
           KIND="${{ inputs.kind }}"
           case "$KIND" in promotion|rollback) ;; *) echo "::error::unsupported transaction kind: $KIND"; exit 1 ;; esac
-          if [ "$KIND" = "promotion" ]; then
+          if [ -z "${{ inputs.reconcile_transaction_id }}" ] && [ "$KIND" = "promotion" ]; then
             printf '%s' "${{ inputs.candidate_artifact_id }}" | grep -qE '^[1-9][0-9]*$' || {
               echo "::error::promotion requires one immutable candidate_artifact_id"
               exit 1
@@ -103,7 +108,7 @@ jobs:
 
       - name: Resolve and validate selected candidate before approval
         id: candidate
-        if: steps.inputs.outputs.kind == 'promotion'
+        if: steps.inputs.outputs.kind == 'promotion' && inputs.reconcile_transaction_id == ''
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_ARTIFACT_ID: ${{ steps.inputs.outputs.candidate_artifact_id }}
@@ -163,6 +168,11 @@ jobs:
               --ref "publication" --repo-path "." \
               --output-permit transaction-artifacts/permit.json \
               --output-tx transaction-artifacts/tx.json
+          elif [ -n "${{ inputs.reconcile_transaction_id }}" ]; then
+            uv run python scripts/publication/transaction_executor.py reconcile \
+              --transaction-id "${{ inputs.reconcile_transaction_id }}" \
+              --ref "publication" --repo-path "." \
+              --output-tx transaction-artifacts/tx.json
           else
             uv run python scripts/publication/transaction_executor.py prepare \
             --kind "${{ steps.inputs.outputs.kind }}" \
@@ -190,6 +200,7 @@ jobs:
           fi
 
       - name: Upload transaction permit artifact
+        if: inputs.reconcile_transaction_id == ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: publication-permit-${{ steps.prepare_tx.outputs.transaction_id }}
@@ -199,6 +210,7 @@ jobs:
   deploy:
     name: Execute publication transaction write
     needs: prepare
+    if: inputs.reconcile_transaction_id == ''
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -349,7 +361,7 @@ jobs:
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           script: |
-            const { createDeployment, getDeploymentStatus } = require('./scripts/publication/pages.cjs');
+            const { createDeployment, getDeploymentStatus, classifyDeploymentStatus } = require('./scripts/publication/pages.cjs');
             const deployedArtifactId = ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }};
             const result = await createDeployment({
               github,
@@ -372,20 +384,27 @@ jobs:
             let terminal = false;
             let statusUrl = result.status_url || '';
             let pageUrl = result.page_url || 'https://benchbox.dev';
+            let lastObserved = 'none';
             if (result.id) {
-              for (let i = 0; i < 12; i++) {
+              // 60 x 10s = 10 minutes. GitHub Pages deployments normally reach a
+              // terminal state in seconds, but CDN purge and file sync can lag.
+              const maxPolls = 60;
+              for (let i = 0; i < maxPolls; i++) {
                 try {
                   const s = await getDeploymentStatus({
                     github,
                     context,
                     options: { owner: context.repo.owner, repo: context.repo.repo, deployment_id: result.id }
                   });
-                  if (s.status === 'SUCCESS' || s.status === 'ACTIVE') {
+                  lastObserved = s.status;
+                  const cls = classifyDeploymentStatus(s.status);
+                  core.info(`Pages deployment poll ${i + 1}/${maxPolls}: provider status=${s.status} class=${cls}`);
+                  if (cls === 'terminal-success') {
                     status = 'SUCCESS';
                     terminal = true;
                     if (s.page_url) pageUrl = s.page_url;
                     break;
-                  } else if (s.status === 'FAILED' || s.status === 'FAILURE') {
+                  } else if (cls === 'terminal-failure') {
                     status = 'FAILED';
                     terminal = true;
                     break;
@@ -393,12 +412,12 @@ jobs:
                 } catch (e) {
                   core.warning(`Status check warning: ${e.message}`);
                 }
-                await new Promise(r => setTimeout(r, 5000));
+                await new Promise(r => setTimeout(r, 10000));
               }
             }
             if (!terminal) {
               status = 'FAILED';
-              throw new Error(`Pages deployment did not reach a terminal successful state for ${deploymentId}`);
+              throw new Error(`Pages deployment ${deploymentId} did not reach a terminal state within the poll budget (last observed provider status: ${lastObserved})`);
             }
             core.setOutput('deployment_id', deploymentId);
             core.setOutput('status_url', statusUrl);
@@ -406,7 +425,7 @@ jobs:
             core.setOutput('deployed_artifact_id', deployedArtifactId);
             core.setOutput('status', status);
             if (status === 'FAILED') {
-              throw new Error(`Pages deployment failed for ${deploymentId}`);
+              throw new Error(`Pages deployment failed for ${deploymentId} (last observed provider status: ${lastObserved})`);
             }
 
       - name: Record write acknowledgement in journal CAS
@@ -446,6 +465,15 @@ jobs:
   verify:
     name: Verify live publication endpoints
     needs: [prepare, deploy]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      !cancelled() &&
+      (
+        needs.deploy.result == 'success' ||
+        (inputs.reconcile_transaction_id != '' && needs.deploy.result == 'skipped') ||
+        (needs.deploy.result == 'failure' && needs.prepare.outputs.kind == 'promotion')
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -472,6 +500,7 @@ jobs:
 
       - name: Download candidate receipts
         if: needs.prepare.outputs.kind == 'promotion'
+        continue-on-error: true
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           name: publication-candidate-receipts-${{ needs.prepare.outputs.transaction_id }}
@@ -482,10 +511,20 @@ jobs:
         env:
           TRANSACTION_ID: ${{ needs.prepare.outputs.transaction_id }}
           KIND: ${{ needs.prepare.outputs.kind }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p transaction-artifacts
           if [ "$KIND" = "promotion" ]; then
+            if [ ! -s candidate-receipts/desired-manifest.json ]; then
+              mkdir -p candidate-receipts
+              ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=publication-candidate-receipts-$TRANSACTION_ID" --jq '.artifacts[0].id // empty')
+              if [ -n "$ARTIFACT_ID" ]; then
+                gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > candidate-receipts/receipts.zip
+                unzip -q -o candidate-receipts/receipts.zip -d candidate-receipts/
+                rm -f candidate-receipts/receipts.zip
+              fi
+            fi
             test -s candidate-receipts/desired-manifest.json || {
               echo "::error::candidate desired manifest missing in verify job"; exit 1;
             }
@@ -526,7 +565,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TARGET_URL="${{ needs.deploy.outputs.page_url }}"
+          TARGET_URL="${{ needs.deploy.outputs.page_url || 'https://benchbox.dev' }}"
           uv run python scripts/publication/verify_live.py \
             --base-url "$TARGET_URL" \
             --manifest transaction-artifacts/verification-manifest.json \
@@ -608,6 +647,8 @@ jobs:
           PY
 
       - name: Record verification success in journal CAS
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -617,6 +658,7 @@ jobs:
             --attestation transaction-artifacts/live-receipt.json \
             --challenge "challenge-${{ github.run_id }}" \
             --verifier-sha "${{ github.sha }}" \
+            --github-token "$GH_TOKEN" \
             --ref "publication" \
             --repo-path "." \
             --output-tx transaction-artifacts/tx_verified.json
@@ -645,6 +687,11 @@ jobs:
   finalize:
     name: Finalize durable publication transaction
     needs: [prepare, deploy, verify]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      needs.verify.result == 'success' &&
+      !cancelled()
     runs-on: ubuntu-latest
     permissions:
       contents: write

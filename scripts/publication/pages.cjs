@@ -165,6 +165,48 @@ function sanitizeStatusResponse(data) {
   };
 }
 
+// GitHub Pages deployment status enum, grouped by lifecycle class. The provider
+// emits lowercase values; sanitizeStatusResponse upper-cases them, so
+// classification normalizes to the upper-cased form and tolerates either.
+const PAGES_STATUS_TERMINAL_SUCCESS = new Set(['SUCCEED']);
+const PAGES_STATUS_TERMINAL_FAILURE = new Set([
+  'DEPLOYMENT_FAILED',
+  'DEPLOYMENT_CONTENT_FAILED',
+  'DEPLOYMENT_ATTEMPT_ERROR',
+  'DEPLOYMENT_LOST',
+  'DEPLOYMENT_CANCELLED',
+  'PAYMENT_REQUIRED',
+  'NOT_FOUND',
+]);
+const PAGES_STATUS_PENDING = new Set([
+  'PENDING',
+  'DEPLOYMENT_IN_PROGRESS',
+  'SYNCING_FILES',
+  'FINISHED_FILE_SYNC',
+  'UPDATING_PAGES',
+  'PURGING_CDN',
+]);
+
+/**
+ * Classify a GitHub Pages deployment status value into a lifecycle class:
+ * 'terminal-success', 'terminal-failure', 'pending', or 'unknown'. An
+ * unrecognized value is 'unknown' so callers can keep polling rather than
+ * treat it as either outcome.
+ */
+function classifyDeploymentStatus(status) {
+  const normalized = (status == null ? '' : String(status)).toUpperCase().trim();
+  if (PAGES_STATUS_TERMINAL_SUCCESS.has(normalized)) {
+    return 'terminal-success';
+  }
+  if (PAGES_STATUS_TERMINAL_FAILURE.has(normalized)) {
+    return 'terminal-failure';
+  }
+  if (PAGES_STATUS_PENDING.has(normalized)) {
+    return 'pending';
+  }
+  return 'unknown';
+}
+
 async function createDeployment({ github, core, context, effect, options = {} }) {
   const mergedInputs = {
     owner: effect?.owner !== undefined ? effect.owner : (options.owner || context?.repo?.owner),
@@ -280,6 +322,7 @@ async function cancelDeployment({ github, context, options = {} }) {
 
 module.exports = {
   AdapterError,
+  classifyDeploymentStatus,
   createDeployment,
   getDeploymentStatus,
   cancelDeployment,
