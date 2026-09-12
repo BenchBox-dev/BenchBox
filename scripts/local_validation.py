@@ -89,6 +89,26 @@ MEMBER_IDENTITY_FIELDS = frozenset(
     {"id", "source_base", "source_head", "accepted_head", "scope_hash", "config_hash", "changed_paths"}
 )
 MEMBER_IDENTITY_HASH_FIELDS = ("scope_hash", "config_hash")
+ACCOUNTING_STATUSES = frozenset({"executed", "reused", "failed", "cancelled", "skipped", "ordered_success"})
+ACCOUNTING_FIELDS = frozenset(
+    {
+        "schema",
+        "event_kind",
+        "event_id",
+        "status",
+        "gate",
+        "identity_key",
+        "batch",
+        "started_at",
+        "completed_at",
+        "duration_seconds",
+        "command_executions",
+        "executed_count",
+        "reused_count",
+        "exit_code",
+        "hosted_required_certification",
+    }
+)
 
 
 class IdentityUnknown(Exception):
@@ -501,6 +521,8 @@ def _validate_member_batch(repo: Path, batch: dict) -> tuple[bool, str]:
     if missing:
         return False, f"member batch metadata missing: {', '.join(missing)}"
     try:
+        if _git(repo, "status", "--porcelain=v1", "--untracked-files=all").strip():
+            return False, "member batch evidence requires a clean checkout"
         changed_paths = _canonical_paths(batch["changed_paths"])
         head = _git(repo, "rev-parse", "HEAD").strip()
         base = _git(repo, "rev-parse", "origin/develop").strip()
@@ -531,6 +553,8 @@ def _validate_integrator_batch(repo: Path, batch: dict) -> tuple[bool, str]:
     if missing:
         return False, f"integrator batch metadata missing: {', '.join(missing)}"
     try:
+        if _git(repo, "status", "--porcelain=v1", "--untracked-files=all").strip():
+            return False, "integrator batch evidence requires a clean checkout"
         head = _git(repo, "rev-parse", "HEAD").strip()
         tree = _git(repo, "rev-parse", "HEAD^{tree}").strip()
         predecessor = _git(repo, "rev-parse", f"{batch['predecessor_head']}^{{commit}}").strip()
@@ -660,6 +684,124 @@ def _identity_key(gate: str, identity: dict | None, batch: dict | None) -> str |
     return hashlib.sha256(payload).hexdigest()
 
 
+def _event_batch(batch: dict | None) -> dict | None:
+    """Return only validated delivery identity; never persist caller input."""
+    if batch is None:
+        return None
+    role = batch.get("role") if isinstance(batch, dict) else None
+    fields = MEMBER_BATCH_FIELDS if role == "member" else INTEGRATOR_BATCH_FIELDS if role == "integrator" else ()
+    if not fields or set(batch) != set(fields):
+        return None
+    result = {field: batch[field] for field in fields if field != "member_identity"}
+    if role == "integrator":
+        members = batch.get("member_identity")
+        if not isinstance(members, list) or any(not isinstance(member, dict) for member in members):
+            return None
+        member_fields = sorted(MEMBER_IDENTITY_FIELDS)
+        if any(set(member) != set(member_fields) for member in members):
+            return None
+        result["member_identity"] = [
+            {field: member[field] for field in member_fields} for member in sorted(members, key=lambda item: item["id"])
+        ]
+    return result
+
+
+def _valid_event_batch(batch: object) -> bool:
+    if batch is None:
+        return True
+    if not isinstance(batch, dict) or batch.get("role") not in {"member", "integrator"}:
+        return False
+    fields = MEMBER_BATCH_FIELDS if batch["role"] == "member" else INTEGRATOR_BATCH_FIELDS
+    if set(batch) != set(fields) or not isinstance(batch.get("batch_id"), str) or not batch["batch_id"]:
+        return False
+    if batch["role"] == "integrator":
+        members = batch.get("member_identity")
+        return (
+            isinstance(members, list)
+            and bool(members)
+            and all(isinstance(member, dict) and set(member) == MEMBER_IDENTITY_FIELDS for member in members)
+        )
+    return isinstance(batch.get("member"), str) and bool(batch["member"])
+
+
+def _valid_event(event: object) -> bool:
+    if not isinstance(event, dict) or set(event) - ACCOUNTING_FIELDS - {"stages"}:
+        return False
+    if event.get("schema") != 2 or event.get("status") not in ACCOUNTING_STATUSES:
+        return False
+    kind = event.get("event_kind")
+    expected = ACCOUNTING_FIELDS | ({"stages"} if kind == "ordered" else set())
+    if kind not in {"gate", "ordered"} or set(event) != expected:
+        return False
+    if kind == "gate" and event["status"] == "ordered_success":
+        return False
+    if kind == "ordered" and event["status"] != "ordered_success":
+        return False
+    if not isinstance(event.get("event_id"), str) or not event["event_id"]:
+        return False
+    if not isinstance(event.get("gate"), str) or not event["gate"]:
+        return False
+    identity_key = event.get("identity_key")
+    if identity_key is not None and (not isinstance(identity_key, str) or len(identity_key) != 64):
+        return False
+    if not _valid_event_batch(event.get("batch")):
+        return False
+    if not all(isinstance(event.get(field), str) and event[field] for field in ("started_at", "completed_at")):
+        return False
+    duration = event.get("duration_seconds")
+    if isinstance(duration, bool) or not isinstance(duration, (int, float)) or duration < 0:
+        return False
+    counts = (event.get("command_executions"), event.get("executed_count"), event.get("reused_count"))
+    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts):
+        return False
+    if event.get("hosted_required_certification") is not False:
+        return False
+    if event["event_kind"] == "gate":
+        expected_counts = (1, 0) if event["status"] == "executed" else (0, 1) if event["status"] == "reused" else (0, 0)
+        if (event["executed_count"], event["reused_count"]) != expected_counts:
+            return False
+        expected_commands = {
+            "executed": {1},
+            "reused": {0},
+            "failed": {1},
+            "cancelled": {0, 1},
+            "skipped": {0},
+        }[event["status"]]
+        return event["command_executions"] in expected_commands
+    stages = event.get("stages")
+    if not isinstance(stages, list) or len(stages) != 2:
+        return False
+    stage_fields = {"gate", "status", "identity_key", "argv", "tool_versions", "command_executions"}
+    if any(
+        not isinstance(stage, dict)
+        or set(stage) != stage_fields
+        or stage["status"] not in {"executed", "reused"}
+        or not isinstance(stage["gate"], str)
+        or not isinstance(stage["identity_key"], str)
+        or len(stage["identity_key"]) != 64
+        or not isinstance(stage["argv"], list)
+        or not all(isinstance(part, str) for part in stage["argv"])
+        or not isinstance(stage["tool_versions"], dict)
+        or not all(
+            isinstance(value, dict)
+            and set(value) == {"path", "version"}
+            and all(isinstance(item, str) and item for item in value.values())
+            for value in stage["tool_versions"].values()
+        )
+        or isinstance(stage["command_executions"], bool)
+        or not isinstance(stage["command_executions"], int)
+        or stage["command_executions"] < 0
+        or stage["command_executions"] != (1 if stage["status"] == "executed" else 0)
+        for stage in stages
+    ):
+        return False
+    return (
+        event["command_executions"] == sum(stage["command_executions"] for stage in stages)
+        and event["executed_count"] == sum(stage["status"] == "executed" for stage in stages)
+        and event["reused_count"] == sum(stage["status"] == "reused" for stage in stages)
+    )
+
+
 def _append_accounting_event(
     store: Path,
     *,
@@ -676,22 +818,26 @@ def _append_accounting_event(
     lock_wait_seconds: float = 5.0,
 ) -> None:
     """Append one immutable local accounting event; accounting never gates execution."""
+    safe_batch = _event_batch(batch)
     event = {
-        "schema": 1,
+        "schema": 2,
+        "event_kind": "gate",
         "event_id": f"{os.getpid()}-{time.time_ns()}",
         "status": status,
         "gate": gate,
         "identity_key": _identity_key(gate, identity, batch),
-        "role": (batch or {}).get("role") if isinstance(batch, dict) else None,
+        "batch": safe_batch,
         "started_at": started_at,
         "completed_at": completed_at,
         "duration_seconds": round(max(0.0, duration_seconds), 6),
         "command_executions": command_executions,
+        "executed_count": 1 if status == "executed" else 0,
+        "reused_count": 1 if status == "reused" else 0,
         "exit_code": exit_code,
         "hosted_required_certification": False,
     }
-    if reason:
-        event["reason"] = reason
+    if not _valid_event(event):
+        return
     lock_fd: int | None = None
     try:
         store.mkdir(parents=True, exist_ok=True)
@@ -701,6 +847,66 @@ def _append_accounting_event(
         fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
         try:
             os.write(fd, line)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except (OSError, TimeoutError):
+        return
+    finally:
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+
+def _append_ordered_event(
+    store: Path,
+    transaction: dict,
+    focused: dict,
+    required: dict,
+    started_at: str,
+    duration_seconds: float,
+    lock_wait_seconds: float,
+) -> None:
+    stages = []
+    for result, name in ((focused, "focused"), (required, "required")):
+        identity = transaction[name]
+        stages.append(
+            {
+                "gate": transaction[f"{name}_gate"],
+                "status": result["status"],
+                "identity_key": _identity_key(transaction[f"{name}_gate"], identity, transaction["batch"]),
+                "argv": identity["argv"],
+                "tool_versions": identity["tool_versions"],
+                "command_executions": result["commands"],
+            }
+        )
+    payload = json.dumps({"batch": transaction["batch"], "stages": stages}, sort_keys=True, separators=(",", ":"))
+    event = {
+        "schema": 2,
+        "event_kind": "ordered",
+        "event_id": f"{os.getpid()}-{time.time_ns()}",
+        "status": "ordered_success",
+        "gate": "ordered",
+        "identity_key": hashlib.sha256(payload.encode()).hexdigest(),
+        "batch": _event_batch(transaction["batch"]),
+        "started_at": started_at,
+        "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "duration_seconds": round(max(0.0, duration_seconds), 6),
+        "command_executions": sum(item["commands"] for item in (focused, required)),
+        "executed_count": sum(item["status"] == "executed" for item in (focused, required)),
+        "reused_count": sum(item["status"] == "reused" for item in (focused, required)),
+        "exit_code": 0,
+        "hosted_required_certification": False,
+        "stages": stages,
+    }
+    if not _valid_event(event):
+        return
+    lock_fd: int | None = None
+    try:
+        store.mkdir(parents=True, exist_ok=True)
+        lock_fd = wait_for_lock(store / "events.lock", lock_wait_seconds)
+        fd = os.open(str(store / "events.jsonl"), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
+        try:
+            os.write(fd, (json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n").encode())
             os.fsync(fd)
         finally:
             os.close(fd)
@@ -725,19 +931,35 @@ def _accounting_report(store: Path, gate: str | None = None) -> dict:
         except ValueError:
             invalid_records += 1
             continue
-        if not isinstance(event, dict) or event.get("schema") != 1:
+        if not _valid_event(event):
             invalid_records += 1
             continue
         if gate is None or event.get("gate") == gate:
             events.append(event)
     counts: dict[str, int] = {}
+    groups: dict[str, dict] = {}
     for event in events:
         status = str(event.get("status", "unknown"))
         counts[status] = counts.get(status, 0) + 1
+        batch = event["batch"]
+        group_key = (
+            "unbatched"
+            if batch is None
+            else hashlib.sha256(json.dumps(batch, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        )
+        group = groups.setdefault(
+            group_key,
+            {"batch": batch, "events": 0, "executed": 0, "reused": 0, "statuses": {}},
+        )
+        group["events"] += 1
+        group["executed"] += event["executed_count"]
+        group["reused"] += event["reused_count"]
+        group["statuses"][status] = group["statuses"].get(status, 0) + 1
     return {
-        "schema": 1,
+        "schema": 2,
         "hosted_required_certification": False,
         "counts": counts,
+        "groups": groups,
         "invalid_records": invalid_records,
         "events": events,
     }
@@ -746,6 +968,17 @@ def _accounting_report(store: Path, gate: str | None = None) -> dict:
 def _record_skip(gate: str, batch: dict | None, repo: Path, store: Path) -> int:
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     started = time.monotonic()
+    safe_batch = None
+    if batch is not None:
+        prepared, reason = _prepare_batch(repo, batch)
+        if reason:
+            print(f"[local-validation] invalid batch metadata; skip refused: {reason}", file=sys.stderr)
+            return 2
+        valid, reason = _validate_prepared_batch(repo, prepared)
+        if not valid or reason:
+            print(f"[local-validation] invalid batch metadata; skip refused: {reason}", file=sys.stderr)
+            return 2
+        safe_batch = prepared
     identity: dict | None
     try:
         identity = content_identity(repo, [])
@@ -756,7 +989,7 @@ def _record_skip(gate: str, batch: dict | None, repo: Path, store: Path) -> int:
         status="skipped",
         gate=gate,
         identity=identity,
-        batch=batch,
+        batch=safe_batch,
         started_at=started_at,
         completed_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         duration_seconds=time.monotonic() - started,
@@ -768,7 +1001,111 @@ def _record_skip(gate: str, batch: dict | None, repo: Path, store: Path) -> int:
     return 0
 
 
-def run_gate(  # noqa: C901
+def _finish_gate(
+    *,
+    store: Path,
+    gate: str,
+    status: str,
+    exit_code: int | None,
+    identity: dict | None,
+    batch: dict | None,
+    started_at: str,
+    started: float,
+    command_executions: int,
+    lock_wait_seconds: float,
+) -> int:
+    _append_accounting_event(
+        store,
+        status=status,
+        gate=gate,
+        identity=identity,
+        batch=batch,
+        started_at=started_at,
+        completed_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        duration_seconds=time.monotonic() - started,
+        command_executions=command_executions,
+        exit_code=exit_code,
+        lock_wait_seconds=min(lock_wait_seconds, 5.0),
+    )
+    return 1 if exit_code is None else exit_code
+
+
+def _execute_without_receipt(
+    *,
+    gate: str,
+    argv: list[str],
+    repo: Path,
+    store: Path,
+    identity: dict | None,
+    batch: dict | None,
+    started_at: str,
+    started: float,
+    lock_wait_seconds: float,
+) -> int:
+    try:
+        proc = subprocess.run(list(argv), cwd=repo, check=False)
+    except KeyboardInterrupt:
+        _finish_gate(
+            store=store,
+            gate=gate,
+            status="cancelled",
+            exit_code=130,
+            identity=identity,
+            batch=batch,
+            started_at=started_at,
+            started=started,
+            command_executions=1,
+            lock_wait_seconds=lock_wait_seconds,
+        )
+        raise
+    return _finish_gate(
+        store=store,
+        gate=gate,
+        status="executed" if proc.returncode == 0 else "failed",
+        exit_code=proc.returncode,
+        identity=identity,
+        batch=batch,
+        started_at=started_at,
+        started=started,
+        command_executions=1,
+        lock_wait_seconds=lock_wait_seconds,
+    )
+
+
+def _write_receipt(path: Path, gate: str, identity: dict, batch: dict) -> None:
+    temporary = path.with_suffix(f".{os.getpid()}.tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "schema": 2,
+                "gate": gate,
+                "identity": identity,
+                "batch": batch,
+                "delivery": {
+                    "member_preparation_is_not_integration_certification": True,
+                    "role": (batch or {}).get("role"),
+                    "integration_identity": batch,
+                },
+                "exit": 0,
+                "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def _validated_batch(repo: Path, batch: dict | None) -> tuple[dict | None, str]:
+    prepared, reason = _prepare_batch(repo, batch)
+    if reason:
+        return None, reason
+    valid, reason = _validate_prepared_batch(repo, prepared)
+    return (prepared, "") if valid and not reason else (None, reason or "batch metadata is invalid")
+
+
+def run_gate(
     gate: str,
     argv: list[str],
     batch: dict | None,
@@ -777,67 +1114,70 @@ def run_gate(  # noqa: C901
     store: Path,
 ) -> int:
     """Run *argv* under the singleflight receipt contract. Returns its exit code."""
-    requested_batch = batch
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     started = time.monotonic()
 
-    def finish(
-        status: str,
-        exit_code: int | None,
-        identity: dict | None,
-        event_batch: dict | None,
-        reason: str | None = None,
-        command_executions: int = 0,
-    ) -> int:
-        _append_accounting_event(
-            store,
-            status=status,
-            gate=gate,
-            identity=identity,
-            batch=event_batch,
-            started_at=started_at,
-            completed_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            duration_seconds=time.monotonic() - started,
-            command_executions=command_executions,
-            exit_code=exit_code,
-            reason=reason,
-            lock_wait_seconds=min(lock_wait_seconds, 5.0),
-        )
-        return 1 if exit_code is None else exit_code
-
-    def execute_without_receipt(identity: dict | None, event_batch: dict | None, reason: str) -> int:
-        try:
-            proc = subprocess.run(list(argv), cwd=repo, check=False)
-        except KeyboardInterrupt:
-            finish("cancelled", 130, identity, event_batch, "command cancelled", 1)
-            raise
-        return finish(
-            "executed" if proc.returncode == 0 else "failed", proc.returncode, identity, event_batch, reason, 1
-        )
-
-    batch, prepare_reason = _prepare_batch(repo, batch)
-    if prepare_reason:
-        print(f"[local-validation] batch identity unknown ({prepare_reason}); executing without receipt")
-        return execute_without_receipt(None, requested_batch, prepare_reason)
-    valid_batch, batch_reason = _validate_prepared_batch(repo, batch)
-    if not valid_batch or batch_reason:
+    batch, batch_reason = _validated_batch(repo, batch)
+    if batch_reason:
         print(f"[local-validation] batch identity unknown ({batch_reason}); executing without receipt")
-        return execute_without_receipt(None, requested_batch, batch_reason)
+        return _execute_without_receipt(
+            gate=gate,
+            argv=argv,
+            repo=repo,
+            store=store,
+            identity=None,
+            batch=None,
+            started_at=started_at,
+            started=started,
+            lock_wait_seconds=lock_wait_seconds,
+        )
     try:
         identity = content_identity(repo, list(argv))
     except IdentityUnknown as exc:
         print(f"[local-validation] identity unknown ({exc}); executing without receipt")
-        return execute_without_receipt(None, batch, str(exc))
+        return _execute_without_receipt(
+            gate=gate,
+            argv=argv,
+            repo=repo,
+            store=store,
+            identity=None,
+            batch=batch,
+            started_at=started_at,
+            started=started,
+            lock_wait_seconds=lock_wait_seconds,
+        )
     for attempt in range(MAX_IDENTITY_RETRIES):
         receipt = receipt_path(store, gate, identity, batch)
         lock_path = receipt.with_name(receipt.stem + ".lock")
         try:
             lock_fd = wait_for_lock(lock_path, lock_wait_seconds)
         except KeyboardInterrupt:
-            finish("cancelled", 130, identity, batch, "lock wait cancelled")
+            _finish_gate(
+                store=store,
+                gate=gate,
+                status="cancelled",
+                exit_code=130,
+                identity=identity,
+                batch=batch,
+                started_at=started_at,
+                started=started,
+                command_executions=0,
+                lock_wait_seconds=lock_wait_seconds,
+            )
             raise
         except TimeoutError:
-            finish("cancelled", 1, identity, batch, "lock wait timed out")
+            _finish_gate(
+                store=store,
+                gate=gate,
+                status="cancelled",
+                exit_code=1,
+                identity=identity,
+                batch=batch,
+                started_at=started_at,
+                started=started,
+                command_executions=0,
+                lock_wait_seconds=lock_wait_seconds,
+            )
             raise
         try:
             # The tree may have changed while waiting.  Never reuse a receipt
@@ -850,11 +1190,8 @@ def run_gate(  # noqa: C901
                 print(f"[local-validation] identity changed to unknown ({exc}); executing without receipt")
                 current = None
                 current_unknown = True
-            current_batch, current_batch_reason = _prepare_batch(repo, batch)
-            if not current_batch_reason:
-                current_batch_valid, current_batch_reason = _validate_prepared_batch(repo, current_batch)
-            else:
-                current_batch_valid = False
+            current_batch, current_batch_reason = _validated_batch(repo, batch)
+            current_batch_valid = not current_batch_reason
             if not current_batch_valid:
                 print(
                     f"[local-validation] batch identity changed to unknown ({current_batch_reason}); "
@@ -874,13 +1211,35 @@ def run_gate(  # noqa: C901
                     f"[local-validation] REUSED {gate} receipt "
                     f"(head {identity['head'][:12]}, recorded {hit.get('recorded_at', '?')})"
                 )
-                return finish("reused", 0, identity, batch)
+                return _finish_gate(
+                    store=store,
+                    gate=gate,
+                    status="reused",
+                    exit_code=0,
+                    identity=identity,
+                    batch=batch,
+                    started_at=started_at,
+                    started=started,
+                    command_executions=0,
+                    lock_wait_seconds=lock_wait_seconds,
+                )
             write_holder(lock_fd, lock_path, phase="executing", gate=gate)
             print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
             try:
                 proc = subprocess.run(list(argv), cwd=repo, check=False)
             except KeyboardInterrupt:
-                finish("cancelled", 130, identity, batch, "command cancelled", 1)
+                _finish_gate(
+                    store=store,
+                    gate=gate,
+                    status="cancelled",
+                    exit_code=130,
+                    identity=identity,
+                    batch=batch,
+                    started_at=started_at,
+                    started=started,
+                    command_executions=1,
+                    lock_wait_seconds=lock_wait_seconds,
+                )
                 raise
             if proc.returncode == 0:
                 try:
@@ -888,54 +1247,44 @@ def run_gate(  # noqa: C901
                 except IdentityUnknown as exc:
                     final_identity = None
                     print(f"[local-validation] identity became unknown ({exc}); no receipt stored")
-                final_batch, final_batch_reason = _prepare_batch(repo, batch)
-                if not final_batch_reason:
-                    final_batch_valid, final_batch_reason = _validate_prepared_batch(repo, final_batch)
-                else:
-                    final_batch_valid = False
+                final_batch, final_batch_reason = _validated_batch(repo, batch)
+                final_batch_valid = not final_batch_reason
                 if not final_batch_valid:
                     print(f"[local-validation] batch identity became unknown ({final_batch_reason}); no receipt stored")
                 if not current_unknown and final_identity == identity and final_batch_valid and final_batch == batch:
-                    tmp = receipt.with_suffix(f".{os.getpid()}.tmp")
-                    tmp.write_text(
-                        json.dumps(
-                            {
-                                "schema": 2,
-                                "gate": gate,
-                                "identity": identity,
-                                "batch": batch,
-                                "delivery": {
-                                    "member_preparation_is_not_integration_certification": True,
-                                    "role": (batch or {}).get("role") if batch else None,
-                                    "integration_identity": batch,
-                                },
-                                "exit": 0,
-                                "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                            },
-                            indent=2,
-                        )
-                        + "\n",
-                        encoding="utf-8",
-                    )
-                    tmp.replace(receipt)
+                    _write_receipt(receipt, gate, identity, batch)
                 else:
                     print("[local-validation] inputs changed during execution; no receipt stored")
             else:
                 print(f"[local-validation] {gate} failed (exit {proc.returncode}); no receipt stored")
-            return finish(
-                "executed" if proc.returncode == 0 else "failed",
-                proc.returncode,
-                identity,
-                batch,
-                "completed local command" if proc.returncode == 0 else f"command exited {proc.returncode}",
-                1,
+            return _finish_gate(
+                store=store,
+                gate=gate,
+                status="executed" if proc.returncode == 0 else "failed",
+                exit_code=proc.returncode,
+                identity=identity,
+                batch=batch,
+                started_at=started_at,
+                started=started,
+                command_executions=1,
+                lock_wait_seconds=lock_wait_seconds,
             )
         finally:
             os.close(lock_fd)
     # A continuously changing tree cannot safely produce reusable evidence.
     # Execute once without a receipt instead of spinning or reusing stale data.
     print("[local-validation] inputs changed repeatedly; executing without receipt")
-    return execute_without_receipt(identity, batch, "inputs changed repeatedly")
+    return _execute_without_receipt(
+        gate=gate,
+        argv=argv,
+        repo=repo,
+        store=store,
+        identity=identity,
+        batch=batch,
+        started_at=started_at,
+        started=started,
+        lock_wait_seconds=lock_wait_seconds,
+    )
 
 
 def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list[str] | None = None) -> int:
@@ -976,46 +1325,96 @@ def run_ordered_path(
     never stand in for the focused check, and a failed focused gate prevents
     the required path from being reported as complete.
     """
+    started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    started = time.monotonic()
     for attempt in range(MAX_ORDERED_RETRIES):
         try:
-            before = ordered_identity(repo, batch)
+            before = ordered_identity(repo, batch, focused_gate, focused_command, preflight_gate, preflight_command)
         except IdentityUnknown as exc:
             print(f"[local-validation] ordered input identity unknown: {exc}", file=sys.stderr)
             return 1
+        focused_receipt = receipt_path(store, focused_gate, before["focused"], before["batch"])
+        focused_reused = (
+            read_receipt(focused_receipt, gate=focused_gate, identity=before["focused"], batch=before["batch"])
+            is not None
+        )
         focused_status = run_gate(focused_gate, focused_command, batch, lock_wait_seconds, repo, store)
         if focused_status != 0:
             return focused_status
         try:
-            after_focused = ordered_identity(repo, batch)
+            after_focused = ordered_identity(
+                repo, batch, focused_gate, focused_command, preflight_gate, preflight_command
+            )
         except IdentityUnknown as exc:
             print(f"[local-validation] ordered input changed after focused stage: {exc}", file=sys.stderr)
             continue
-        if after_focused != before:
+        focused_ready = (
+            read_receipt(focused_receipt, gate=focused_gate, identity=before["focused"], batch=before["batch"])
+            is not None
+        )
+        if after_focused != before or not focused_ready:
             print("[local-validation] ordered input changed between stages; restarting focused stage")
             continue
+        required_receipt = receipt_path(store, preflight_gate, before["required"], before["batch"])
+        required_reused = (
+            read_receipt(required_receipt, gate=preflight_gate, identity=before["required"], batch=before["batch"])
+            is not None
+        )
         preflight_status = run_gate(preflight_gate, preflight_command, batch, lock_wait_seconds, repo, store)
         if preflight_status != 0:
             return preflight_status
         try:
-            after_preflight = ordered_identity(repo, batch)
+            after_preflight = ordered_identity(
+                repo, batch, focused_gate, focused_command, preflight_gate, preflight_command
+            )
         except IdentityUnknown as exc:
             print(f"[local-validation] ordered input changed after required stage: {exc}", file=sys.stderr)
             continue
-        if after_preflight == before:
+        required_ready = (
+            read_receipt(required_receipt, gate=preflight_gate, identity=before["required"], batch=before["batch"])
+            is not None
+        )
+        if after_preflight == before and required_ready:
+            _append_ordered_event(
+                store,
+                before,
+                {"status": "reused" if focused_reused else "executed", "commands": 0 if focused_reused else 1},
+                {"status": "reused" if required_reused else "executed", "commands": 0 if required_reused else 1},
+                started_at,
+                time.monotonic() - started,
+                lock_wait_seconds,
+            )
             return 0
         print("[local-validation] ordered input changed during required stage; restarting focused stage")
     print("[local-validation] ordered input did not stabilize; no combined certification", file=sys.stderr)
     return 1
 
 
-def ordered_identity(repo: Path, batch: dict | None) -> dict:
+def ordered_identity(
+    repo: Path,
+    batch: dict | None,
+    focused_gate: str | None = None,
+    focused_command: list[str] | None = None,
+    required_gate: str | None = None,
+    required_command: list[str] | None = None,
+) -> dict:
     normalized, reason = _prepare_batch(repo, batch)
     if reason:
         raise IdentityUnknown(reason)
     valid, reason = _validate_prepared_batch(repo, normalized)
     if not valid or reason:
         raise IdentityUnknown(reason)
-    return {"content": content_identity(repo, []), "batch": normalized}
+    if focused_command is None or required_command is None:
+        return {"content": content_identity(repo, []), "batch": normalized}
+    focused = content_identity(repo, focused_command)
+    required = content_identity(repo, required_command)
+    return {
+        "batch": normalized,
+        "focused_gate": focused_gate,
+        "focused": focused,
+        "required_gate": required_gate,
+        "required": required,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:

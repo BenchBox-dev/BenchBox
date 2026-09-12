@@ -202,6 +202,10 @@ Gate authors avoid duplicate invocations against identical trees with
   reused, failed, cancelled, and skipped gates, records the exact identity key,
   role, command execution count, and monotonic duration, and explicitly never
   claims hosted required-check certification.
+- Ordered local validation records one strict transaction event containing the
+  exact focused and required commands and tool identities. Accounting rejects
+  malformed records, groups only by the canonical batch/member identity, and
+  refuses invalid skip metadata; it never claims hosted required-check status.
 
 ## Queue-aware publication and resumable follow-up
 

@@ -429,6 +429,65 @@ def test_cancelled_command_is_accounted(repo: Path, tmp_path: Path, monkeypatch:
     assert report["events"][0]["exit_code"] == 130
 
 
+def test_accounting_rejects_corrupt_records_and_groups_exact_batch(repo: Path, tmp_path: Path) -> None:
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", _counter_gate(tmp_path / "count.txt"), None, 5.0, repo, store) == 0
+    events = store / "events.jsonl"
+    valid = json.loads(events.read_text(encoding="utf-8").splitlines()[0])
+    events.write_text(
+        events.read_text(encoding="utf-8")
+        + "not-json\n"
+        + json.dumps({**valid, "batch": {"batch_id": "caller-secret"}})
+        + "\n",
+        encoding="utf-8",
+    )
+    report = lv._accounting_report(store)
+    assert report["counts"] == {"executed": 1}
+    assert report["invalid_records"] == 2
+    assert "caller-secret" not in json.dumps(report)
+    assert "unbatched" in report["groups"]
+
+
+def test_skip_rejects_invalid_batch_without_persisting_caller_data(repo: Path) -> None:
+    secret = "caller-secret"
+    assert lv._record_skip("skipped", {"role": "member", "batch_id": secret}, repo, lv.store_dir(repo)) == 2
+    report = lv._accounting_report(lv.store_dir(repo))
+    assert report["events"] == []
+    assert secret not in json.dumps(report)
+
+
+def test_batch_receipt_requires_clean_checkout(repo: Path, tmp_path: Path) -> None:
+    batch = _valid_member_batch(repo)
+    (repo / "untracked.txt").write_text("dirty", encoding="utf-8")
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_ordered_success_records_exact_stage_commands_and_tools(repo: Path) -> None:
+    command = [sys.executable, "-c", "pass"]
+    assert (
+        lv.run_ordered_path(
+            focused_gate="focused",
+            focused_command=command,
+            preflight_gate="required",
+            preflight_command=command + ["#required"],
+            batch=None,
+            lock_wait_seconds=5.0,
+            repo=repo,
+            store=lv.store_dir(repo),
+        )
+        == 0
+    )
+    event = next(
+        event for event in lv._accounting_report(lv.store_dir(repo))["events"] if event["event_kind"] == "ordered"
+    )
+    assert [stage["argv"] for stage in event["stages"]] == [command, command + ["#required"]]
+    assert all(stage["tool_versions"] for stage in event["stages"])
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -733,18 +792,29 @@ def test_wait_for_lock_closes_fd_when_cancelled(tmp_path: Path, monkeypatch: pyt
 
 def test_ordered_path_runs_focused_before_required_preflight(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
+    focused = {"head": "a" * 40, "argv": ["focused"], "tool_versions": {}}
+    required = {"head": "b" * 40, "argv": ["required"], "tool_versions": {}}
+    identity = {
+        "batch": None,
+        "focused_gate": "focused",
+        "focused": focused,
+        "required_gate": "required-preflight",
+        "required": required,
+    }
 
     def fake_run_gate(gate: str, *args, **kwargs) -> int:
         calls.append(gate)
         return 0
 
     monkeypatch.setattr(lv, "run_gate", fake_run_gate)
+    monkeypatch.setattr(lv, "ordered_identity", lambda *args: identity)
+    monkeypatch.setattr(lv, "read_receipt", lambda *args, **kwargs: {})
     assert (
         lv.run_ordered_path(
             focused_gate="focused",
-            focused_command=["focused-command"],
+            focused_command=["focused"],
             preflight_gate="required-preflight",
-            preflight_command=["preflight-command"],
+            preflight_command=["required"],
             batch=None,
             lock_wait_seconds=1.0,
             repo=repo,
@@ -759,13 +829,23 @@ def test_ordered_path_restarts_when_tree_or_batch_changes_between_stages(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[str] = []
+
+    def transaction(token: str) -> dict:
+        return {
+            "batch": None,
+            "focused_gate": "focused",
+            "focused": {"head": token * 40, "argv": ["focused"], "tool_versions": {}},
+            "required_gate": "required-preflight",
+            "required": {"head": token * 40, "argv": ["required"], "tool_versions": {}},
+        }
+
     identities = iter(
         [
-            {"content": {"head": "one"}, "batch": {"integration_tree": "tree-one"}},
-            {"content": {"head": "two"}, "batch": {"integration_tree": "tree-two"}},
-            {"content": {"head": "two"}, "batch": {"integration_tree": "tree-two"}},
-            {"content": {"head": "two"}, "batch": {"integration_tree": "tree-two"}},
-            {"content": {"head": "two"}, "batch": {"integration_tree": "tree-two"}},
+            transaction("a"),
+            transaction("b"),
+            transaction("b"),
+            transaction("b"),
+            transaction("b"),
         ]
     )
 
@@ -776,6 +856,7 @@ def test_ordered_path_restarts_when_tree_or_batch_changes_between_stages(
         return 0
 
     monkeypatch.setattr(lv, "run_gate", fake_run_gate)
+    monkeypatch.setattr(lv, "read_receipt", lambda *args, **kwargs: {})
     assert (
         lv.run_ordered_path(
             focused_gate="focused",
