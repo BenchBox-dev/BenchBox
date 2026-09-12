@@ -228,6 +228,48 @@ def test_tree_change_while_waiting_invalidates_old_receipt(repo: Path, tmp_path:
     assert _count(marker) == 2
 
 
+def test_batch_change_while_waiting_cannot_reuse_stale_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    batch = _valid_member_batch(repo)
+    assert lv.run_gate("g", gate, batch, 5.0, repo, store) == 0
+    identity = lv.content_identity(repo, gate)
+    receipt = lv.receipt_path(store, "g", identity, batch)
+    holder_fd = lv.wait_for_lock(receipt.with_name(receipt.stem + ".lock"), 5.0)
+    result: list[int] = []
+    thread = threading.Thread(target=lambda: result.append(lv.run_gate("g", gate, batch, 30.0, repo, store)))
+    thread.start()
+    time.sleep(0.4)
+    _commit_file(repo, "batch-change.txt", "changed")
+    os.close(holder_fd)
+    thread.join(timeout=60)
+    assert result == [0]
+    assert _count(marker) == 2
+
+
+def test_batch_change_after_success_does_not_store_receipt(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    batch = _valid_member_batch(repo)
+    original = lv._validate_prepared_batch
+    calls = 0
+
+    def batch_that_changes(path: Path, prepared: dict | None) -> tuple[bool, str]:
+        nonlocal calls
+        calls += 1
+        valid, reason = original(path, prepared)
+        if calls >= 3 and valid:
+            return False, "batch changed after execution"
+        return valid, reason
+
+    monkeypatch.setattr(lv, "_validate_prepared_batch", batch_that_changes)
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert list(lv.store_dir(repo).rglob("*.json")) == []
+
+
 def test_show_reports_receipt_status(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     gate = _counter_gate(tmp_path / "count.txt")
     assert lv.show_gate("g", None, repo, lv.store_dir(repo), gate) == 0
@@ -364,6 +406,24 @@ def test_changed_environment_invalidates_receipt(repo: Path, tmp_path: Path, mon
     assert _count(marker) == 2
 
 
+def test_unlisted_behavior_environment_invalidates_without_persisting_value(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    secret = "do-not-persist-this-value"
+    monkeypatch.setenv("BENCHBOX_GATE_MODE", secret)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    receipts = list(store.rglob("*.json"))
+    assert len(receipts) == 1
+    receipt_text = receipts[0].read_text(encoding="utf-8")
+    assert secret not in receipt_text
+    monkeypatch.setenv("BENCHBOX_GATE_MODE", "changed")
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
+
+
 def test_changed_tool_identity_invalidates_receipt(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     marker = tmp_path / "count.txt"
     gate = _counter_gate(marker)
@@ -462,49 +522,107 @@ def test_changed_validation_config_invalidates(repo: Path, tmp_path: Path) -> No
     assert _count(marker) == 2
 
 
-def test_batch_integration_identity_invalidates_member_receipt(repo: Path, tmp_path: Path) -> None:
-    marker = tmp_path / "count.txt"
-    gate = _counter_gate(marker)
-    batch = {
-        "batch_id": "batch-1",
-        "member": "member-a",
-        "role": "member",
-        "accepted_head": "abc",
-        "scope_hash": "scope-1",
-        "config_hash": "config-1",
-        "integration_head": "integrated-1",
-        "integration_tree": "tree-1",
-    }
-    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
-    batch["integration_tree"] = "tree-2"
-    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
-    assert _count(marker) == 2
+def _commit_file(repo: Path, name: str, content: str) -> str:
+    (repo / name).write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", name], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", f"add {name}"], cwd=repo, check=True, capture_output=True)
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
 
 
-def test_integrator_metadata_binds_predecessor_and_combined_tree(repo: Path, tmp_path: Path) -> None:
-    marker = tmp_path / "count.txt"
-    gate = _counter_gate(marker)
+def _tree(repo: Path, revision: str = "HEAD") -> str:
+    return subprocess.run(
+        ["git", "rev-parse", f"{revision}^{{tree}}"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _valid_integrator_batch(repo: Path, predecessor_head: str, member_identity: list[dict]) -> dict[str, object]:
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
-    tree = subprocess.run(
-        ["git", "rev-parse", "HEAD^{tree}"], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-    batch = {
+    return {
         "batch_id": "batch-1",
         "role": "integrator",
         "integration_head": head,
-        "integration_tree": tree,
-        "predecessor_head": head,
-        "predecessor_tree": tree,
+        "integration_tree": _tree(repo),
+        "predecessor_head": predecessor_head,
+        "predecessor_tree": _tree(repo, predecessor_head),
+        "member_identity": member_identity,
+    }
+
+
+def test_batch_contracts_separate_roles_and_bind_combined_tree_predecessor_member(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    member_batch = _valid_member_batch(repo)
+    assert lv.run_gate("g", gate, member_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, member_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 1
+
+    member_one = _commit_file(repo, "member-one.txt", "one")
+    member_two = _commit_file(repo, "member-two.txt", "two")
+    integration_head = _commit_file(repo, "integration.txt", "combined")
+    member_identity = [
+        {
+            "id": "member-a",
+            "source_head": member_one,
+            "accepted_head": member_one,
+            "scope_hash": "1" * 64,
+            "config_hash": "2" * 64,
+        }
+    ]
+    integrator_batch = _valid_integrator_batch(repo, member_two, member_identity)
+    assert integrator_batch["integration_head"] == integration_head
+    assert lv.run_gate("g", gate, integrator_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, integrator_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+    integrator_batch["integration_tree"] = "0" * 40
+    assert lv.run_gate("g", gate, integrator_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 3
+    integrator_batch["integration_tree"] = _tree(repo)
+    integrator_batch["predecessor_head"] = member_one
+    integrator_batch["predecessor_tree"] = _tree(repo, member_one)
+    assert lv.run_gate("g", gate, integrator_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 4
+    integrator_batch["member_identity"] = [dict(member_identity[0], scope_hash="3" * 64)]
+    assert lv.run_gate("g", gate, integrator_batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 5
+
+
+def test_integrator_rejects_arbitrary_member_identity_and_same_predecessor(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    predecessor = _commit_file(repo, "prior.txt", "prior")
+    current = _commit_file(repo, "current.txt", "current")
+    batch = {
+        "batch_id": "batch-1",
+        "role": "integrator",
+        "integration_head": current,
+        "integration_tree": _tree(repo),
+        "predecessor_head": predecessor,
+        "predecessor_tree": _tree(repo, predecessor),
         "member_identity": "member-a@accepted-head",
     }
     assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
     assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
-    assert _count(marker) == 1
-    batch["integration_tree"] = "0" * 40
-    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
+    batch["member_identity"] = [
+        {
+            "id": "member-a",
+            "accepted_head": predecessor,
+            "scope_hash": "1" * 64,
+            "config_hash": "2" * 64,
+        }
+    ]
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 3
+    batch["predecessor_head"] = current
+    batch["predecessor_tree"] = _tree(repo)
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 4
 
 
 def test_wait_for_lock_closes_fd_when_cancelled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

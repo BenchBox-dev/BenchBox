@@ -171,16 +171,28 @@ Gate authors avoid duplicate invocations against identical trees with
   priors, and different gates always execute. A tree change while waiting or
   while the command runs prevents reuse and prevents writing a receipt.
   Receipts are local-only evidence and never satisfy hosted required checks.
+- Gate-relevant `BENCHBOX_`, `PYTEST_`, `PYTHON*`, `UV_`, and `PRE_COMMIT*`
+  variables plus `CI`, `GITHUB_ACTIONS`, `PATH`, and `VIRTUAL_ENV` are hashed
+  into the identity; raw values are never written to receipts. The receipt
+  store selector is excluded because it changes evidence location, not gate
+  behavior.
 - Batch members pass `--batch-id/--batch-member/--batch-role` plus the
   accepted member head, scope/config hashes, and integration head/tree when
   available. Member preparation evidence never certifies the later integrated
   tree because the integration identity is part of the frozen record. Pre-PR
   effort stays counted: receipts record executions, they do not erase them
   from delivery accounting.
+- Integrator evidence requires a canonical JSON member list with immutable
+  member id, source or accepted head, scope hash, and config hash. Each member
+  head must be ancestral to a distinct integration head; the predecessor must
+  be a real prior tree. Batch facts are rechecked under the receipt lock and
+  after successful execution before evidence is stored.
 - `make pr-preflight` is the canonical ordered path and records both stage
-  receipts. The optional pre-push hook runs only the focused stage, so it can
-  reuse the focused receipt from a prior manual preflight without broadening
-  the hook into a second full preflight.
+  receipts. The focused stage runs the classifier-selected fast checks; the
+  required stage owns the content guard and remaining checks, so each actual
+  gate runs once. The optional pre-push hook runs only the focused stage, so it
+  can reuse the focused receipt from a prior manual preflight without
+  broadening the hook into a second full preflight.
 
 ## Queue-aware publication and resumable follow-up
 

@@ -1269,7 +1269,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups-list pr-review-followups dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups-list pr-review-followups dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1296,7 +1296,7 @@ pr-preflight-uncached:
 pr-preflight:
 	@git fetch origin develop --quiet
 	uv run -- python scripts/local_validation.py ordered \
-		--focused-gate "local-focused-check" --focused-cmd 'make pr-preflight-fast-tests' \
+		--focused-gate "local-focused-check" --focused-cmd 'make pr-preflight-focused-tests' \
 		--preflight-gate "required-pr-preflight" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \
 		$(BATCH_ARGS)
 
@@ -1330,12 +1330,14 @@ pr-preflight:
 		fi; \
 	fi
 
-# Always runs pr-content-guard for the historical full-preflight path. The
-# needs-code-ci decision gates only the fast-test run below. Pure approved
-# skill-integrity diffs do not enter this target; their focused lane carries
-# its own artifact, provenance, mirror, instruction, and identity controls.
-# Direct invocation (the opt-in pre-push hook) creates classifier artifacts
-# when the parent preflight did not already supply them.
+# The historical full-preflight target runs pr-content-guard unless the
+# receipt-bound focused wrapper explicitly defers it to the required stage.
+# The needs-code-ci decision gates only the fast-test run below. Direct
+# invocation creates classifier artifacts when the parent preflight did not
+# already supply them.
+pr-preflight-focused-tests:
+	@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1
+
 pr-preflight-fast-tests:
 	@set -eu; \
 	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
@@ -1350,7 +1352,11 @@ pr-preflight-fast-tests:
 		git fetch origin develop --quiet; \
 		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	fi; \
-	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+	if [ "$(SKIP_CONTENT_GUARD)" = "1" ]; then \
+		echo "Focused checks defer content guard to required preflight."; \
+	else \
+		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+	fi; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \

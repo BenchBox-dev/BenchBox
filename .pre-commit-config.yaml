@@ -64,7 +64,7 @@ repos:
       # plus the fast test lane.
       - id: pr-preflight-fast-tests
         name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make local-validation GATE=local-focused-check CMD="make pr-preflight-fast-tests"; else echo "SKIPPED (focused preflight is pre-push only)"; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make local-validation GATE=local-focused-check CMD="make pr-preflight-focused-tests"; else echo "SKIPPED (focused preflight is pre-push only)"; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
