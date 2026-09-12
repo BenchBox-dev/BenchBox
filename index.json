@@ -2227,15 +2227,10 @@
       "title": "Example Scripts for Cloud Platforms"
     },
     "cloud-setup-script-plugin-activation": {
-      "claim": {
-        "expires_at": "2026-09-13T17:49:28Z",
-        "generation": "12c2ff35c1ff4595b3f693bcda2b043b",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Activate committed Claude Code plugins in cloud via setup script"
     },
     "cloud-spark-adapter-consolidation": {
