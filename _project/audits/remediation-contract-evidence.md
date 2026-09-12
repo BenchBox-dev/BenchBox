@@ -51,3 +51,32 @@ three-query set alone would report success on deleted input.
   `tests/unit/scripts/publication/test_journal.py`): 97 passed.
 - The SCD2 dimension is the persistence; validation queries are the
   contract; the checks above exercise the write-to-validation seam per op.
+
+## Publication live-head receipt identity
+
+The publication deployer accepts signed live receipts from both authorized
+writers and compares their common receipt identity before a Pages write.
+
+### Enumerated instances
+
+- `Publication Control Plane Deployment`: the legacy writer's signed
+  `receipt_id` is accepted when it matches the candidate's recorded parent.
+- `Publication Transactions`: the transaction writer's signed `receipt_id` is
+  accepted when it matches the candidate's recorded parent.
+
+The contract is exercised by
+`tests/unit/workflows/test_publication_rollback.py::test_deploy_revalidates_signed_receipt_identity_across_both_live_receipt_writers`.
+The same test rejects the previous artifact-ID comparison and requires the
+candidate-derived parent receipt output, so an empty dispatch input cannot
+bypass the identity check.
+
+### Seam trace (producer to persistence to consumer)
+
+- Producers: the legacy deploy workflow and the publication transaction
+  workflow create signed live receipts.
+- Persistence: the publication journal stores the durable transaction's
+  signed attestation, while candidate receipts retain its `receipt_id` as the
+  parent identity.
+- Consumer: the deploy-time `Revalidate authoritative live head` step selects
+  a valid receipt from either producer and refuses the Pages write unless its
+  signed `receipt_id` matches the candidate's recorded parent.

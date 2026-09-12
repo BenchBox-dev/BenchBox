@@ -72,6 +72,7 @@ jobs:
       parent_sha: ${{ steps.lineage.outputs.parent_sha || steps.approved.outputs.parent_sha }}
       parent_generation: ${{ steps.lineage.outputs.parent_generation || steps.approved.outputs.parent_generation }}
       parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id || steps.approved.outputs.parent_artifact_id }}
+      parent_receipt_id: ${{ steps.lineage.outputs.parent_receipt_id || steps.approved.outputs.parent_receipt_id }}
       candidate_artifact_id: ${{ steps.upload_candidate.outputs.artifact-id }}
     steps:
       - name: Checkout control-plane source
@@ -259,6 +260,7 @@ jobs:
                 echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
                 echo "parent_generation=$PARENT_GENERATION" >> "$GITHUB_OUTPUT"
                 echo "parent_artifact_id=$PARENT_ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+                echo "parent_receipt_id=$PRIOR_LIVE_RECEIPT_ID" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -334,6 +336,7 @@ jobs:
               echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
               echo "parent_generation=$RECEIPT_GENERATION" >> "$GITHUB_OUTPUT"
               echo "parent_artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+              echo "parent_receipt_id=$RECEIPT_ID" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done < prior-candidates.txt
@@ -341,6 +344,7 @@ jobs:
             echo "parent_sha=" >> "$GITHUB_OUTPUT"
             echo "parent_generation=" >> "$GITHUB_OUTPUT"
             echo "parent_artifact_id=" >> "$GITHUB_OUTPUT"
+            echo "parent_receipt_id=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "::error::no authoritative attested live head is available for generation $GENERATION"
@@ -432,6 +436,7 @@ jobs:
               output.write(f"parent_sha={desired.get('parent_sha') or ''}\n")
               output.write(f"parent_generation={desired.get('parent_generation') or ''}\n")
               output.write(f"parent_artifact_id={assembly.get('parent_artifact_id') or ''}\n")
+              output.write(f"parent_receipt_id={desired.get('prior_live_receipt_id') or ''}\n")
           PY
 
       - name: Set up Node.js
@@ -509,7 +514,7 @@ jobs:
       - name: Write desired and assembly receipts
         id: receipt
         env:
-          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          PRIOR_LIVE_RECEIPT_ID: ${{ steps.lineage.outputs.parent_receipt_id || inputs.prior_live_receipt_id }}
           BUILD_GENERATION: ${{ steps.inputs.outputs.generation }}
           BUILD_DEVELOP_SHA: ${{ steps.inputs.outputs.develop_sha }}
           BUILD_PUBLISHED_RESULTS_SHA: ${{ steps.inputs.outputs.published_results_sha }}
@@ -819,7 +824,7 @@ jobs:
       - name: Revalidate authoritative live head
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_PARENT_ARTIFACT_ID: ${{ needs.build.outputs.parent_artifact_id }}
+          EXPECTED_PARENT_RECEIPT_ID: ${{ needs.build.outputs.parent_receipt_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -831,13 +836,14 @@ jobs:
             [ -n "${ARTIFACT_ID:-}" ] || continue
             RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
             IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
-            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" && "$RUN_NAME" != "Publication Transactions" ]] || \
+               [[ "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
               continue
             fi
             rm -rf current-candidate && mkdir current-candidate
             gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > current-candidate.zip
             unzip -q current-candidate.zip -d current-candidate
-            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
+            if CURRENT_RECEIPT_ID=$(EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
           import json
           import os
           import re
@@ -860,13 +866,17 @@ jobs:
               raise SystemExit(1)
           if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
               raise SystemExit(1)
+          receipt_id = str(receipt.get("receipt_id", ""))
+          if not receipt_id:
+              raise SystemExit(1)
+          print(receipt_id)
           PY
-            then
-              CURRENT="$ARTIFACT_ID"
+            ); then
+              CURRENT="$CURRENT_RECEIPT_ID"
               break
             fi
           done < current-candidates.txt
-          [ "$CURRENT" = "$EXPECTED_PARENT_ARTIFACT_ID" ] || {
+          [ "$CURRENT" = "$EXPECTED_PARENT_RECEIPT_ID" ] || {
             echo "::error::publication live head changed after build; refusing stale deployment"
             exit 1
           }
