@@ -15104,6 +15104,15 @@
       "status": "open",
       "title": "Freeze leakage-resistant development and test splits"
     },
+    "sql-translation-ml-trainer": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-models"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Implement resumable bounded local CodeT5 fine-tuning"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
