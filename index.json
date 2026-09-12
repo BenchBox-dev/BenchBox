@@ -1095,12 +1095,17 @@
       "title": "Correct PR-1642 batch provenance: push commits, open real PR, fix completed_pr, record missing audit event"
     },
     "batch-feature-branch-integration": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T21:09:28Z",
+        "generation": "99db836bbf2e4b93b5bbb3ddc8c5dab2",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
+      },
       "needs": [
         "batch-prepared-delivery-tracker-and-skill"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Integrate verified batch commits through one owned feature branch"
     },
     "batch-prepared-delivery-tracker-and-skill": {
