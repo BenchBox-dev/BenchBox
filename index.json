@@ -15050,6 +15050,15 @@
       "status": "open",
       "title": "Assemble the validated training corpus and tokenizer audit"
     },
+    "sql-translation-ml-evaluation": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-train-edits"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Evaluate frozen model artifacts on untouched SQL structures"
+    },
     "sql-translation-ml-executor": {
       "claim": null,
       "needs": [

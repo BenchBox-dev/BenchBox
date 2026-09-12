@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Both directional lower bounds >=.99 required for a positive 99% claim; point estimate alone cannot pass.",
+    "Tests of metric code reject 990/1000 as sufficient lower-bound proof, preserve denominator failures, and cluster correlated family members.",
+    "Hash-bound results for all four systems and complete failure inventory exist; incomplete evaluation is never reported as a pass.",
+    "Locked-test feedback is not used to retrain then reuse the same test claim."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement/run evaluate command once final checkpoints/configs are frozen. Evaluate both baselines and both models on the identical locked test cases/five fixtures; original source engine results are oracle. Neither model gets execution retries, gold labels or target outputs. Compute directional whole-query accuracy plus one-sided exact-binomial and family-cluster bootstrap lower bounds per frozen contract; use their minimum for conservative decision. Test-set related fixtures cannot inflate n. Report long-input/unsupported counts separately, feature/composition/length breakdowns, silent mismatches and repair/regression matrix. Benchmark cold start, median/p95 inference latency and peak memory on same Mac; use mono_time/elapsed_seconds.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}
