@@ -15016,6 +15016,15 @@
       "status": "done",
       "title": "✅ SQL Query Generation Consistency (TPC-H/TPC-DS)"
     },
+    "sql-translation-ml-comparator": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-fixtures"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Implement a strict SQL result equivalence comparator"
+    },
     "sql-translation-ml-contract": {
       "claim": null,
       "needs": [],

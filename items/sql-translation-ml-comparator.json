@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Positive tests include reordered unordered duplicates and equivalent exact decimals.",
+    "Negative tests reject trailing-space differences, missing duplicates, NULL versus zero/NaN, large integer precision loss, wrong column count and illegal row reorder.",
+    "Tolerance cannot be enabled without a case-level documented rationale; ambiguous ordering is classified before candidate evaluation."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement comparator.py with focused unit tests. Inspect benchbox/core/validation/cross_platform.py for reuse but do not modify it: its whitespace trimming and NaN/NULL canonicalization must not silently define this experiment. Compare shape and exact scalar values with explicit declared numeric tolerance only; preserve trailing whitespace, NULL distinction and duplicate counts. Unordered outputs use multiset comparison; ordered outputs respect the contract, including ties. Non-finite values/type differences need explicit contract handling, not stringification or conversion of every number to float. Return machine-readable mismatch details.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}
