@@ -319,7 +319,28 @@ def test_batch_binding_rejects_current_head_mismatch(tmp_path: Path) -> None:
 def test_stale_base_policy_matrix() -> None:
     assert landing.stale_base_decision(queue_verified=True, conflict=False) == "publish-without-refresh"
     assert landing.stale_base_decision(queue_verified=False, conflict=False) == "require-current"
+    assert landing.stale_base_decision(queue_verified=None, conflict=False) == "require-current"
     assert landing.stale_base_decision(queue_verified=True, conflict=True) == "resolve-conflict-first"
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        None,
+        {},
+        {"status": "ok", "queue_verified": False, "findings": []},
+        {"status": "ok", "queue_verified": True, "findings": ["warning"]},
+        {"status": "ok", "queue_verified": True, "findings": [], "blocking_findings": ["stale base"]},
+        {"status": "override", "queue_verified": False, "findings": []},
+    ],
+)
+def test_queue_report_requires_explicit_clean_verification(report: object) -> None:
+    assert landing.queue_report_verified(report) is False
+
+
+def test_queue_report_clean_verification_allows_stale_publication() -> None:
+    report = {"status": "ok", "queue_verified": True, "findings": [], "blocking_findings": []}
+    assert landing.queue_report_verified(report) is True
 
 
 def test_followup_roundtrip_and_resume(tmp_path: Path) -> None:

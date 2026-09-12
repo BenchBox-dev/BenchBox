@@ -175,8 +175,12 @@ Gate authors avoid duplicate invocations against identical trees with
 ## Queue-aware publication and resumable follow-up
 
 - Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
-  verified queue means publish without an ancestry-only refresh; conflict
-  means resolve first; otherwise the conservative ancestry gate stands.
+  `make pr-open` probes the current base/head merge, then asks
+  `scripts/ruleset_drift_check.py --queue-policy` for a live, complete queue
+  verdict. A verified queue means publish without an ancestry-only refresh;
+  a conflict means resolve first; absent, unreadable, unknown, or drifted
+  queue state leaves the conservative ancestry gate in force. The old
+  `STALE=1` bypass is not accepted for this path.
 - Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
   (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
   explicit owner, session, scope, attempts, due date, and next action from

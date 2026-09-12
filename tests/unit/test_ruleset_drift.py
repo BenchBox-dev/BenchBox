@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from scripts import ruleset_drift_check
-from scripts.ruleset_drift_check import compare_ruleset, environment_protection_findings, parse_expected_rulesets
+from scripts.ruleset_drift_check import (
+    compare_ruleset,
+    environment_protection_findings,
+    parse_expected_rulesets,
+    queue_policy_findings,
+    queue_policy_verified,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -180,7 +186,7 @@ def test_github_api_failure_is_reported_without_traceback(
     rc = ruleset_drift_check.main(["--token", "token", "--output", str(output)])
 
     assert rc == 1
-    assert json.loads(output.read_text()) == {"status": "error", "error": "api unavailable"}
+    assert json.loads(output.read_text()) == {"status": "error", "queue_verified": False, "error": "api unavailable"}
 
 
 def _live_with_queue(params: dict | None) -> dict:
@@ -224,3 +230,99 @@ def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
     findings = ruleset_drift_check.merge_queue_findings({"name": "x", "rules": []}, "develop-squash-only")
     assert len(findings) == 1
     assert ruleset_drift_check.blocking_findings(findings) == []
+
+
+def _verified_develop_queue() -> dict:
+    live = _live_ruleset(
+        "refs/heads/develop",
+        ["ci-required-result", "Results Explorer browser gate", "ruleset-drift"],
+        strict=True,
+    )
+    live["name"] = "develop-squash-only"
+    live["rules"].append(
+        {
+            "type": "pull_request",
+            "parameters": {"require_code_owner_review": True},
+        }
+    )
+    live["rules"].append({"type": "merge_queue", "parameters": dict(ruleset_drift_check.APPROVED_MERGE_QUEUE)})
+    return live
+
+
+def test_queue_policy_requires_all_develop_protections() -> None:
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+        "develop-squash-only"
+    ]
+    live = _verified_develop_queue()
+
+    assert queue_policy_findings(expected, live) == []
+    assert queue_policy_verified(expected, live) is True
+
+
+@pytest.mark.parametrize(
+    "mutate, expected_text",
+    [
+        (lambda live: live["rules"].pop(), "merge_queue"),
+        (lambda live: live["rules"][-1]["parameters"].update(max_entries_to_merge=4), "max_entries_to_merge"),
+        (lambda live: live["rules"].insert(0, {"type": "required_status_checks", "parameters": {}}), "required checks"),
+        (lambda live: live.pop("bypass_actors"), "bypass actors are not visible"),
+    ],
+)
+def test_queue_policy_fails_closed_on_missing_or_drifted_protection(mutate, expected_text: str) -> None:
+    expected = parse_expected_rulesets((REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md").read_text())[
+        "develop-squash-only"
+    ]
+    live = _verified_develop_queue()
+    mutate(live)
+
+    findings = queue_policy_findings(expected, live)
+
+    assert any(expected_text in finding for finding in findings)
+    assert queue_policy_verified(expected, live) is False
+
+
+def test_merge_queue_malformed_parameters_fail_closed() -> None:
+    live = _live_with_queue(None)
+    live["rules"].append({"type": "merge_queue", "parameters": []})
+
+    findings = ruleset_drift_check.merge_queue_findings(live, "develop-squash-only")
+
+    assert any("parameters are malformed" in finding for finding in findings)
+
+
+def test_queue_policy_cli_emits_machine_readable_verified_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        ruleset_drift_check,
+        "_fetch_live_rulesets",
+        lambda _repo, _token: {"develop-squash-only": _verified_develop_queue()},
+    )
+    output = tmp_path / "queue-policy.json"
+
+    rc = ruleset_drift_check.main(["--queue-policy", "--token", "token", "--output", str(output)])
+
+    assert rc == 0
+    payload = json.loads(output.read_text())
+    assert payload["status"] == "ok"
+    assert payload["queue_verified"] is True
+    assert payload["findings"] == []
+
+
+def test_queue_policy_cli_treats_api_failure_as_unverified(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        ruleset_drift_check,
+        "_fetch_live_rulesets",
+        lambda _repo, _token: (_ for _ in ()).throw(RuntimeError("api unavailable")),
+    )
+    output = tmp_path / "queue-policy.json"
+
+    rc = ruleset_drift_check.main(["--queue-policy", "--token", "token", "--output", str(output)])
+
+    assert rc == 1
+    payload = json.loads(output.read_text())
+    assert payload == {"status": "error", "queue_verified": False, "error": "api unavailable"}

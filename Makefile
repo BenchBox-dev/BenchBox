@@ -1461,13 +1461,15 @@ pr-content-guard:
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 #
-# Currency: after fetching origin/develop, refuse unless that tip is an
-# ancestor of HEAD. Run `make pr-refresh` (one stale PR at a time) to absorb
-# develop. Do not merge develop here — pr-fanout would otherwise refresh
-# every worktree at once. STALE=1 is the explicit escape hatch.
+# Currency: after fetching origin/develop, an ancestor-only branch is accepted
+# by the native queue only after the live ruleset checker proves the queue and
+# its required protections. The merge-tree probe still blocks genuine base
+# conflicts. If the queue is absent, unknown, or misconfigured, the existing
+# current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
-	@$(MAKE) -s agent-write-preflight
-	@CURRENT=$$(git branch --show-current); \
+	@set -eu; \
+	$(MAKE) -s agent-write-preflight; \
+	CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
@@ -1475,16 +1477,31 @@ pr-open:
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
 	fi; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	git fetch origin develop --quiet; \
-	if [ "$(STALE)" != "1" ]; then \
-		git merge-base --is-ancestor origin/develop HEAD || { \
-			echo "Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1." >&2; \
+	if ! git merge-base --is-ancestor origin/develop HEAD; then \
+		if ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \
+			echo "Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted." >&2; \
 			exit 1; \
-		}; \
+		fi; \
+		QUEUE_REPORT=$$(mktemp); \
+		trap 'rm -f "$$QUEUE_REPORT"' EXIT; \
+		QUEUE_TOKEN="$${RULESET_DRIFT_TOKEN:-$$(gh auth token 2>/dev/null || true)}"; \
+		if ! uv run -- python scripts/ruleset_drift_check.py --queue-policy \
+			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token "$$QUEUE_TOKEN" \
+			--output "$$QUEUE_REPORT"; then \
+			echo "Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate." >&2; \
+			exit 1; \
+		fi; \
+		if ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report "$$QUEUE_REPORT"); then \
+			echo "Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'." >&2; \
+			exit 1; \
+		fi; \
+		[ "$$DECISION" = "publish-without-refresh" ] || { echo "Refusing to open PR: unexpected stale-base decision $$DECISION." >&2; exit 1; }; \
+		echo "Verified native merge queue: publishing without an author-side base refresh."; \
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
-	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \

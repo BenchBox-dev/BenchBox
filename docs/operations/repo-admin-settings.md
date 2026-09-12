@@ -206,10 +206,13 @@ The soundness gate, as operated:
   `make pr-open READY=1`) does, so a PR cannot merge while a follow-up commit
   is still being written. Arming at creation stranded three commits in one
   session, two of them the fixes for their own review findings.
-- `make pr-open` also refuses when `origin/develop` is not an ancestor of
-  `HEAD` (open-stale). Absorb current develop with `make pr-refresh` (one
-  PR at a time). `STALE=1` is the explicit escape. `pr-open` must not merge
-  `develop` itself; that would turn `pr-fanout` into a refresh storm. See
+- `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
+  live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
+  conflict-free native queue permits publication without an author-side
+  refresh; absent, unknown, or misconfigured queue state keeps the current-base
+  gate and requires `make pr-refresh` (one PR at a time). There is no stale
+  override. `pr-open` must not merge `develop` itself; that would turn
+  `pr-fanout` into a refresh storm. See
   `_project/decisions/behind-pr-occurrence-2026-08-16.md`.
 - `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
   arms on any event (bare `gh pr create` does not auto-arm, and the

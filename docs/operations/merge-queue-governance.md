@@ -70,7 +70,13 @@ make pr-open
 make pr-ready
 ```
 
-- `make pr-open` enforces that `origin/develop` is an ancestor of `HEAD` (fails fast on stale branches).
+- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first. For a
+  conflict-free stale branch it requires a live, complete
+  `ruleset_drift_check.py --queue-policy` result covering the queue
+  parameters, required checks, strict current-base policy, review enforcement,
+  and bypass-actor visibility. Only that verified queue permits publication
+  without a local refresh; absent, unknown, or drifted queue state keeps the
+  current-base gate and requires `make pr-refresh`.
 - `make pr-ready` verifies the PR does not touch soundness paths before arming `gh pr merge --auto --squash`.
 - Once approved and green on initial `pull_request` checks, GitHub automatically adds the PR to the merge queue.
 
