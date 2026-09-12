@@ -15113,6 +15113,15 @@
       "status": "open",
       "title": "Freeze leakage-resistant development and test splits"
     },
+    "sql-translation-ml-train-edits": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-train-full"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Train and select the tiny SQLGlot edit model"
+    },
     "sql-translation-ml-train-full": {
       "claim": null,
       "needs": [

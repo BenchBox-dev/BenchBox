@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Replayable selected artifact and complete config/lineage/development metrics exist.",
+    "Invalid patch and candidate-generation failures count as failures, not disappear into fallback success.",
+    "Repair/regression report separates baseline-correct and baseline-incorrect cohorts.",
+    "Negative outcome closes this experiment honestly; both initial model runs stay within their separate budgets."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Run hybrid span-edit training sequentially after standalone training to avoid competing for 16 GB memory. Start separate pretrained weights with frozen edit targets, same run budget/defaults, and development-based checkpoint selection. Record invalid patch frequency, no-change accuracy, baseline repairs and regressions. Do not route based on true execution outcomes or silently substitute BenchBox gold output. No automatic data growth or scope changes.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}
