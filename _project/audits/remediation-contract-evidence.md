@@ -1,14 +1,14 @@
 ---
-develop_sha: b221e852dba0ec2aa4bce79f15100fb909ff5599
-measured_at_sha: c0b4ce94de3514939338c3e05457816e42356b7e
-checked_sha: c0b4ce94de3514939338c3e05457816e42356b7e
+develop_sha: 810ab03bf80be3331ecdf657ae2ee8da84265d3a
+measured_at_sha: e60ef04fa5d2a77e057ddf6d8ab9ff483fa952dc
+checked_sha: e60ef04fa5d2a77e057ddf6d8ab9ff483fa952dc
 ---
 
 # Remediation contract evidence
 
 Per-instance record for the SCD2 N2 remediation class
-(`docs/agent/pr-review-evidence.md` contract). All outcomes observed on the
-`feat/pr-batch-process-improvements` tree; rerun the cited nodes to re-verify.
+(`docs/agent/pr-review-evidence.md` contract). All outcomes were reverified at
+the `checked_sha`; rerun the cited nodes to re-verify.
 
 ## Enumerated instances
 
@@ -25,7 +25,7 @@ each with success, idempotency, and rejected-case coverage in
   `test_new_keys_only_no_rows_closed_scoped_to_new_keys`,
   `test_failing_validation_reports_validation_failed_not_success` (rejected).
 
-SCD2 selection: 12 passed, 34 deselected
+SCD2 selection: 13 passed
 (`-k 'scd2 or no_change_noop_against_missing_keys or no_change_prior_behavior'`).
 
 ## Load-bearing control (N2)
@@ -48,7 +48,7 @@ three-query set alone would report success on deleted input.
   (`tests/unit/scripts/explorer_pipeline/test_pipeline.py`), publication
   transaction and journal
   (`tests/unit/scripts/publication/test_transaction.py`,
-  `tests/unit/scripts/publication/test_journal.py`): 97 passed.
+  `tests/unit/scripts/publication/test_journal.py`): 108 passed.
 - The SCD2 dimension is the persistence; validation queries are the
   contract; the checks above exercise the write-to-validation seam per op.
 
