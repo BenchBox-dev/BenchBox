@@ -9452,13 +9452,18 @@
       "title": "Multi-Region Performance Testing"
     },
     "native-queue-local-landing": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T21:13:52Z",
+        "generation": "3624a353382244c6a7f493ca81cc85b7",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample",
         "pr-revision-readiness-transaction"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Let native merge queue validate current-base integration without needless branch refreshes"
     },
     "natural-language-to-sql-testing-framework": {
