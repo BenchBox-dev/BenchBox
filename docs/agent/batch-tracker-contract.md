@@ -1,41 +1,61 @@
 # Batch tracker contract (BenchBox side)
 
-How a BenchBox feature batch binds to todo-db items, and what the tracker
-must provide before parallel member preparation is safe.
+BenchBox uses todo-db as the canonical tracker. This document records the
+consumer boundary for serial and prepared feature batches; the implementation
+and API contract live in todo-db, not in BenchBox or its generated skill
+mirrors.
 
-## Binding (works today, serial workflow)
+## Serial workflow
 
-- One batch = one named delivery with a member list recorded in the frozen
-  process baseline (`feature_batch_preregistration`) and in the integration
-  worktree config (`scripts/batch_integration.py start`).
-- Members are implemented serially under one integrator on one shared
-  branch (`docs/agent/batch-feature-delivery.md`): `take` → implement
-  within `only_modify` scope → `check_scope` → commit → `progress` with
-  file+test evidence → `finish`.
-- Claims are exclusive per principal: the integrator holds at most one
-  member claim at a time and never force-releases another owner's claim.
-- Cross-item dependencies stay tracker-managed; the branch provides the
-  shared base, never a shortcut around dependency order.
-- Ledger: `.todo-batch/` entries per the upstream batch reference, verified
-  ignored via `git check-ignore`, never committed.
+- A batch is one named delivery with an ordered member list recorded by the
+  frozen `feature_batch_preregistration` baseline and the integration worktree
+  configuration (`scripts/batch_integration.py start`).
+- The integrator performs `take` → scoped implementation → `check_scope` →
+  commit → `progress` with file and test evidence → `finish` on one shared
+  branch. Claims remain exclusive per principal.
+- Tracker dependencies remain tracker-managed. A shared branch supplies a
+  common base; it never bypasses dependency order.
+- `.todo-batch/` is a local ignored ledger and is never committed.
 
-## Prepared delivery (requires upstream support)
+## Prepared delivery contract
 
-Parallel member worktrees plus canonical claim handoff, multi-member
-delivery records, and dependency-as-delivered transitions need a
-`prepared` batch mechanism in the canonical tracker. Verified absent as
-of todo-db `8fe1cb7` and re-verified at remote HEAD `5e491e3` on
-2026-09-08 (upstream `references/batch.md` specifies the serial loop
-only; no `prepared` state in the MCP surface). Until that lands:
+Prepared delivery is now implemented canonically by todo-db PR #39, merged to
+`main` at `74631c83f74b7f184abbd49001f032943b720774`. The source exposes schema
+3, the `prepared_work_v1` receipt schema, and the MCP verbs `register_batch`,
+`prepare`, `bind_batch_pr`, and `abort_batch`. A prepared receipt records the
+registered batch and member identity, owner generation, exact clean source
+worktree and revision, accepted and integration heads, changed files, scope
+hash, and passed bounded-suite evidence.
 
-- No parallel member worktrees, no canonical claim handoff, no
-  `_project/analysis/batch-source-delivery.json` (a receipt without a
-  canonical delivery is fabrication).
-- The concrete upstream change/review plan: prepared-member states,
-  per-member scope exclusivity enforced at claim time, delivery-scoped
-  evidence binding, and a claim-handoff verb with owner generation — owned
-  by the todo-db repository, reviewed there.
-- When it lands: pin the delivering todo-db SHA in `skill-sync.yaml`,
-  regenerate mirrors with `make skill-sync`, and adopt member worktrees
-  behind `scripts/batch_integration.py verify` (ancestry + single-owner
-  gates already exist).
+Only an explicitly registered same-batch implementation edge may consume a
+valid prepared receipt. Ordinary, cross-repository, review, approval, merge,
+deployment, and soak dependencies remain done-only. Prepared is evidence of
+delivery readiness, not completion: final member verification runs on the
+combined integration tree, one final PR binds all members, and closeout must
+retain exact-tree and attribution evidence. Abort is owner-authorized and
+resumable; it invalidates prepared/final evidence without fabricating done
+members.
+
+The source checkout and behavioral evidence for this consumer are recorded in
+[`batch-source-delivery.json`](../../_project/analysis/batch-source-delivery.json).
+That receipt is a source-integrity record, not a tracker mutation or an
+activation permit.
+
+## Catalog delivery boundary
+
+The corresponding canonical `todo` skill documentation is merged in
+skill-sync-skills PR #80 at `c8473708b5c7809700e8449ecde0dabcdc8e9892`.
+BenchBox currently pins `d55ac93b9c35f63077b948e4183b4ff960012069`; therefore
+the merged catalog change is recorded but not yet adopted here. Pinning that
+revision and regenerating `.claude/skills`/`.agents/skills` require a separate
+authorized skill-sync change. Generated mirrors are never hand-edited.
+
+## Rollback and safety
+
+No prepared mode is activated by this BenchBox receipt. The source rollback is
+an authorized revert of todo-db merge `74631c83f74b7f184abbd49001f032943b720774`.
+If the catalog is later adopted, restore the BenchBox pin to
+`d55ac93b9c35f63077b948e4183b4ff960012069` and regenerate through the normal
+skill-sync workflow. Do not downgrade a live schema-3 state branch in place;
+restore from an accepted snapshot under todo-db's migration and recovery
+contract.
