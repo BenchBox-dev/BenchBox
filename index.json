@@ -4856,12 +4856,17 @@
       "title": "Schedule a checkpoint to evaluate extracting results-data/ to its own repo"
     },
     "exact-refresh-eligibility-penalises-staying-current": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T23:39:55Z",
+        "generation": "8bf90f615ace45f19b5ae0b7b5ed5adc",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Exact-refresh certification is forfeited by refreshing before the prior gate goes green"
     },
     "example-modernization-completed": {
