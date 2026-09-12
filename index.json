@@ -1729,13 +1729,18 @@
       "title": "make ci-lint runs local-only guards on CI runners"
     },
     "ci-local-parity-gaps-inventory-lane-isolation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T23:03:25Z",
+        "generation": "e52289e313564a8a95f934910f7872f3",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [
         "ci-lint-parity-pin-2",
         "guards-fix-regen-target-2"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Close three local/CI parity gaps beyond WS3/WS5: Make inventory in guards-fix, brittle inventory assertion, local lane-isolation check"
     },
     "ci-pipeline-for-docker-based-integration-tests": {
