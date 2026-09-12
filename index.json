@@ -2230,7 +2230,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Activate committed Claude Code plugins in cloud via setup script"
     },
     "cloud-spark-adapter-consolidation": {
