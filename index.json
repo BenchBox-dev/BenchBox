@@ -4209,17 +4209,12 @@
       "title": "Develop post-merge produced no run for six consecutive develop pushes"
     },
     "develop-pr-concurrency-discards-nearly-complete-gates": {
-      "claim": {
-        "expires_at": "2026-09-13T17:16:36Z",
-        "generation": "ee953eb629434c76b28259e3035a152f",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Refreshing a BEHIND develop PR cancels its nearly-complete required gate and restarts it"
     },
     "develop-push-drop-coverage-inventory-20260805": {
