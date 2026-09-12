@@ -17,7 +17,7 @@ function sectionNavigationOffset() {
 function updateCurrentSection() {
     if (!sectionNavSections.length) return;
 
-    const marker = sectionNavigationOffset() + 1;
+    const marker = sectionNavigationOffset() + 16;
     let currentSection = sectionNavSections[0];
     sectionNavSections.forEach(section => {
         if (section.getBoundingClientRect().top <= marker) currentSection = section;

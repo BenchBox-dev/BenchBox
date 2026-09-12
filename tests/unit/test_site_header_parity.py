@@ -138,6 +138,7 @@ def test_landing_section_navigation_links_to_each_major_section_in_order() -> No
     source = _read("landing/index.html")
     expected_links = [
         ("Overview", "#overview", "overview"),
+        ("Public Results", "#results-explorer", "results"),
         ("Benchmarks", "#benchmarks", "benchmarks"),
         ("Platforms", "#platforms", "platforms"),
         ("Table Formats", "#formats", "formats"),
@@ -173,6 +174,20 @@ def test_landing_section_navigation_is_sticky_colored_and_tracks_the_current_sec
     assert "link.setAttribute('aria-current', 'location')" in script
     assert "sectionNavigationOffset()" in script
     assert "sectionNavLinksContainer.scrollTo({ left: centeredLeft" in script
+
+
+def test_landing_introduces_results_explorer_with_public_compare_and_local_workflows() -> None:
+    source = _read("landing/index.html")
+    section_start = source.index('<section id="results-explorer"')
+    section = source[section_start : source.index("</section>", section_start)]
+
+    assert "Explore and Compare Benchmark Results" in section
+    assert 'href="https://benchbox.dev/results/"' in section
+    assert "Find relevant runs" in section
+    assert "Compare like with like" in section
+    assert "Check your own result" in section
+    assert "without uploading it" in section
+    assert source.index('id="features"') < section_start < source.index('id="benchmarks"')
 
 
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:

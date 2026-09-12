@@ -135,6 +135,7 @@ from benchbox import TPCH</code></pre>
                 <a class="section-nav__link section-nav__link--overview" href="#overview" aria-current="location"
                     >Overview</a
                 >
+                <a class="section-nav__link section-nav__link--results" href="#results-explorer">Public Results</a>
                 <a class="section-nav__link section-nav__link--benchmarks" href="#benchmarks">Benchmarks</a>
                 <a class="section-nav__link section-nav__link--platforms" href="#platforms">Platforms</a>
                 <a class="section-nav__link section-nav__link--formats" href="#formats">Table Formats</a>
@@ -187,6 +188,51 @@ from benchbox import TPCH</code></pre>
                         <h3>AI-Powered with MCP</h3>
                         <p>MCP server for Claude Code and AI assistants. Run benchmarks with natural language.</p>
                     </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Explorer Section -->
+        <section id="results-explorer" class="results-explorer">
+            <div class="container">
+                <div class="results-explorer__intro">
+                    <p class="results-explorer__eyebrow">From measurements to answers</p>
+                    <h2>Explore and Compare Benchmark Results</h2>
+                    <p>
+                        The Results Explorer turns BenchBox output into a browsable view of performance. Use the public
+                        corpus to understand how platforms behave on the same workload, or open your own result file in
+                        the browser before you share it.
+                    </p>
+                    <a href="https://benchbox.dev/results/" class="badge results-explorer__cta"
+                        >Open the Results Explorer →</a
+                    >
+                </div>
+
+                <div class="results-explorer__grid">
+                    <article class="results-explorer__card">
+                        <span class="results-explorer__step">1</span>
+                        <h3>Find relevant runs</h3>
+                        <p>
+                            Browse by benchmark or platform, then narrow the public corpus to results that match the
+                            workload and scale you care about.
+                        </p>
+                    </article>
+                    <article class="results-explorer__card">
+                        <span class="results-explorer__step">2</span>
+                        <h3>Compare like with like</h3>
+                        <p>
+                            Compare compatible runs, inspect query-level timings, and see where one platform gains or
+                            loses time instead of relying on a single headline number.
+                        </p>
+                    </article>
+                    <article class="results-explorer__card">
+                        <span class="results-explorer__step">3</span>
+                        <h3>Check your own result</h3>
+                        <p>
+                            Open a BenchBox result JSON file locally in the browser. Review its charts and run receipt
+                            without uploading it or adding it to the public rankings.
+                        </p>
+                    </article>
                 </div>
             </div>
         </section>
