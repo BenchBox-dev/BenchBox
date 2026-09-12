@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Deliberate renamed, constant-changed, reverse-pair and same-family leakage is detected by tests.",
+    "Split reruns reproduce hashes; insufficient unique cases fail clearly, without counting augmentation as novel structure.",
+    "Frozen manifest records feature/length/composition/direction distribution and unsupported/long-input strata.",
+    "Test membership does not depend on baseline success."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement split command. Assign original families/normalized structures to train/dev/test before augmentation; reverse pairs and all aliases/constants share split. Reserve unseen construct combinations and the chosen external workload family. Default prospective pool: 10,000 training pair slots, 2,000 development pair slots and >=1,000 distinct locked test structures per direction; five fixtures are one case, not five samples. Save manifests with hashes and explicit eligibility/counts. Locked test target labels must be inaccessible to training/development paths. This task freezes prospective evaluation inputs before filtering for teacher successes.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}

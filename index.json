@@ -15068,6 +15068,15 @@
       "status": "open",
       "title": "Audit and import external SQL translation evaluation cases"
     },
+    "sql-translation-ml-splits": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-sources"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Freeze leakage-resistant development and test splits"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
