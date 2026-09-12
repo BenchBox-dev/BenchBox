@@ -1113,12 +1113,7 @@
       "title": "Deliver canonical tracker and batch skill support for prepared feature work"
     },
     "batch-skill-pinned-rollout": {
-      "claim": {
-        "expires_at": "2026-09-13T22:46:33Z",
-        "generation": "e7b13d43f9564a2b8578be18c9c40ff4",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
-      },
+      "claim": null,
       "needs": [
         "batch-feature-branch-integration",
         "pr-followup-resumable-ownership",
@@ -1126,7 +1121,7 @@
         "pr-revision-readiness-transaction"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Deploy the branch-delivery batch skill with compatible tracker and BenchBox bindings"
     },
     "behind-pr-occurrence-00-policy": {
