@@ -363,14 +363,14 @@ jobs:
           import os
           import re
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           path = Path("independent-receipt/live-receipt.json")
           if not path.is_file():
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           if str(receipt.get("receipt_run_id", receipt.get("artifact_run_id"))) != os.environ["EXPECTED_RUN_ID"]:
               raise SystemExit(1)
