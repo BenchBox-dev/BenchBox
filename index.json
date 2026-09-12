@@ -15059,6 +15059,15 @@
       "status": "open",
       "title": "Generate type-valid SQL families and held-out compositions"
     },
+    "sql-translation-ml-sources": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-generator"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Audit and import external SQL translation evaluation cases"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
