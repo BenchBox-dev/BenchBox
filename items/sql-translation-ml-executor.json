@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Golden paired queries pass both directions on five fixtures.",
+    "Deliberately wrong DISTINCT, join, predicate, integer-division, NULL-order and exact/approximate aggregate translations fail on witness fixtures.",
+    "Timeout terminates the worker; attempted file access, writes and extra statements are rejected; failure artifacts replay with versions/seeds.",
+    "No production DB, cloud credentials, or broad live suite required."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement validate command combining fixtures and comparator. Run source SQL on the declared source engine and candidate SQL on target using all five fixtures; retain original SQL. Use isolated worker processes with 10-second per-query timeout, local fixture-only access and read-only evaluation connections. Restrict execution to the supported SELECT surface; reject file/network functions and extra statements before executing. Do not trust read-only SELECT alone to prevent external access. Record parse/rejection/timeout/execution/mismatch separately. Source-invalid cases are recorded and excluded before translator scoring; eligible candidate failures stay in denominator.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}

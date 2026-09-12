@@ -15032,6 +15032,15 @@
       "status": "open",
       "title": "Define the tiny SQL translation experiment contract"
     },
+    "sql-translation-ml-executor": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-comparator"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Build bounded source and target execution validation"
+    },
     "sql-translation-ml-fixtures": {
       "claim": null,
       "needs": [
