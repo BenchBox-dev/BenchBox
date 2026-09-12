@@ -20,8 +20,18 @@ Do not run `pre-commit install` inside a linked worktree. Git hooks live in the
 common Git directory and are shared across all linked worktrees. Running `pre-commit install`
 in a worktree captures the shared hook to that worktree's virtual environment, which
 causes hooks to dangle and break across all worktrees when the worktree is deleted.
-`make agent-write-preflight` automatically verifies shared hook health and repairs
-hooks from the primary clone when needed.
+The primary clone owns hook installation. Run it there once for the shared Git
+directory:
+
+```bash
+cd /Users/joe/Developer/BenchBox
+uv run -- pre-commit install
+```
+
+`make agent-write-preflight` verifies that the shared pre-commit hook exists and
+that its `INSTALL_PYTHON` still points to an executable interpreter. It fails
+loudly when either check fails; return to the primary clone to reinstall, then
+rerun preflight in the linked worktree.
 
 The branch must use one of the repository's feature prefixes: `chore/`,
 `fix/`, `feat/`, or `docs/`. The standard base is `origin/develop`.

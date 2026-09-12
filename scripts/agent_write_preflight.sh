@@ -112,39 +112,39 @@ fi
 # interpreter ran it, so installing from a worktree pins the shared hooks to a
 # directory that is later deleted -- and commits then fail in every worktree at
 # once. Presence is therefore not health: check that the recorded interpreter
-# still resolves, and always repair from the primary clone, never from the
-# caller's worktree. Repair is best-effort: CI re-runs the same guards, so a
-# failure to install is a warning rather than a refusal.
+# still resolves. The primary clone owns installation; linked-worktree
+# preflight only verifies the shared hook and fails closed when it is absent or
+# still points at a deleted environment.
 hook_path="$common_abs/hooks/pre-commit"
 
-hooks_usable=no
-hook_reason="no pre-commit hook is installed"
-if [ -e "$hook_path" ]; then
-  hooks_usable=yes
-  for hook_name in pre-commit pre-push commit-msg; do
-    h_path="$common_abs/hooks/$hook_name"
-    if [ -e "$h_path" ]; then
-      hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$h_path" | head -n 1)
-      if [ -n "$hook_interpreter" ] && [ ! -x "$hook_interpreter" ]; then
-        hooks_usable=no
-        hook_reason="$hook_name recorded interpreter is gone ($hook_interpreter)"
-        break
-      fi
-    fi
-  done
+if [ ! -f "$hook_path" ]; then
+  cat >&2 <<EOF
+Refusing BenchBox write preflight: the shared pre-commit hook is missing.
+
+  hook: $hook_path
+  owner: $primary_abs
+
+Install it from the primary clone, then rerun preflight:
+  (cd "$primary_abs" && uv run -- pre-commit install)
+Do not run pre-commit install from a linked worktree.
+EOF
+  exit 1
 fi
 
-if [ "$hooks_usable" != yes ]; then
-  # Hook types come from default_install_hook_types in .pre-commit-config.yaml,
-  # so all configured stages stay in sync.
-  # --frozen keeps the lockfile read-only; the environment must stay syncable so a
-  # cold-start clone (preflight before `uv sync`) can still install pre-commit and
-  # repair hooks pinned to a deleted interpreter.
-  if (cd "$primary_abs" && uv run --frozen -- pre-commit install >/dev/null 2>&1); then
-    printf 'Repaired commit-time hooks from %s (%s).\n' "$primary_abs" "$hook_reason"
-  else
-    echo "note: pre-commit install failed/unavailable; commit-time guards will not run here (CI still enforces them)" >&2
-  fi
+hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$hook_path" | head -n 1)
+if [ -z "$hook_interpreter" ] || [ ! -x "$hook_interpreter" ]; then
+  cat >&2 <<EOF
+Refusing BenchBox write preflight: the shared pre-commit hook is not usable.
+
+  hook:             $hook_path
+  INSTALL_PYTHON:   ${hook_interpreter:-<missing>}
+  primary clone:    $primary_abs
+
+Install it from the primary clone, then rerun preflight:
+  (cd "$primary_abs" && uv run -- pre-commit install)
+Do not run pre-commit install from a linked worktree.
+EOF
+  exit 1
 fi
 
 if [ "$ephemeral" = "yes" ]; then
