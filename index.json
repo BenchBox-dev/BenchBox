@@ -15149,6 +15149,15 @@
       "status": "open",
       "title": "Implement resumable bounded local CodeT5 fine-tuning"
     },
+    "sql-translation-ml-verdict": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-evaluation"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Publish the tiny SQL translation feasibility verdict"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
