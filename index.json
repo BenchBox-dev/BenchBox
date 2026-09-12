@@ -10552,19 +10552,14 @@
       "title": "Clean up three defects introduced by the PR 1644 fix commits"
     },
     "pr-followup-resumable-ownership": {
-      "claim": {
-        "expires_at": "2026-09-13T21:38:52Z",
-        "generation": "6aa44dcba15249759a095afa84592c43",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [
         "batch-feature-branch-integration",
         "native-queue-local-landing",
         "pr-revision-readiness-transaction"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Keep ownership of open PR follow-ups until completion or an actionable blocker"
     },
     "pr-gate-package-and-audit-promotion": {
