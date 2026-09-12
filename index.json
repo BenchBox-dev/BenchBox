@@ -15016,6 +15016,13 @@
       "status": "done",
       "title": "✅ SQL Query Generation Consistency (TPC-H/TPC-DS)"
     },
+    "sql-translation-ml-contract": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Define the tiny SQL translation experiment contract"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
