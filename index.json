@@ -15041,6 +15041,15 @@
       "status": "open",
       "title": "Define the tiny SQL translation experiment contract"
     },
+    "sql-translation-ml-dataset": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-baselines"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Assemble the validated training corpus and tokenizer audit"
+    },
     "sql-translation-ml-executor": {
       "claim": null,
       "needs": [
