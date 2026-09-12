@@ -1104,12 +1104,17 @@
       "title": "Integrate verified batch commits through one owned feature branch"
     },
     "batch-prepared-delivery-tracker-and-skill": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T18:06:00Z",
+        "generation": "a48f1cb3b62e4175ad308d9c3728cf15",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Deliver canonical tracker and batch skill support for prepared feature work"
     },
     "batch-skill-pinned-rollout": {
