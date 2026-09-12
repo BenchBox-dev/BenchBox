@@ -219,14 +219,14 @@ jobs:
               if uv run python - <<'PY'
           import json
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           tx = json.loads(Path("durable-parent.json").read_text())
           receipt = tx.get("attestation")
           if not isinstance(receipt, dict):
               raise SystemExit(1)
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           PY
               then
@@ -281,14 +281,14 @@ jobs:
           import os
           import re
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           path = Path("prior-candidate/live-receipt.json")
           if not path.is_file():
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           if os.environ["RUN_CONCLUSION"] != "success":
               if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
@@ -842,14 +842,14 @@ jobs:
           import os
           import re
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           path = Path("current-candidate/live-receipt.json")
           if not path.is_file():
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           if os.environ["RUN_CONCLUSION"] != "success":
               if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
@@ -1069,12 +1069,12 @@ jobs:
             if RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" uv run python - <<'PY'
           import json, os
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
           p = Path('candidate/live-receipt.json')
           if not p.is_file(): raise SystemExit(1)
           receipt = json.loads(p.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get('target') != 'benchbox.dev': raise SystemExit(1)
+          if not valid or not receipt_targets_benchbox_dev(receipt): raise SystemExit(1)
           if os.environ['RUN_CONCLUSION'] != 'success':
               if not str(receipt.get('receipt_id', '')).startswith('rollback-'): raise SystemExit(1)
               if not receipt.get('routes') or not all(route.get('ok') for route in receipt['routes']): raise SystemExit(1)
