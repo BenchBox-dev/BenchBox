@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Produce measured hardware/software/config/hash report for both probes plus projections clearly labeled estimates.",
+    "Verify at least one saved checkpoint resumes and generates bounded outputs; do not claim model accuracy from the probe.",
+    "If unsupported operations, OOM or insufficient throughput prevent a useful 24-hour run, report precise blocker and block training successors.",
+    "No need to make feasibility positive to report the actual result."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Run the bounded 200-step feasibility probe for each adapter sequentially using validated corpus and trainer. Confirm actual hardware, free memory and MPS support first. Announce commands, maximum runtime, explicit external artifact/log path and stop condition. Measure memory pressure, tokens/sec, step time, finite loss and greedy development output; cap each probe at 60 minutes. Batch 1 already fixes minimum batch; if memory fails enable gradient checkpointing once without changing dataset or sequence contract, then rerun within the same budget. Do not download a larger model or switch to cloud.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}

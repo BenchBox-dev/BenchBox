@@ -15059,6 +15059,15 @@
       "status": "open",
       "title": "Build bounded source and target execution validation"
     },
+    "sql-translation-ml-feasibility": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-trainer"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Measure 200-step training feasibility on the 16 GB M4"
+    },
     "sql-translation-ml-fixtures": {
       "claim": null,
       "needs": [
