@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Both call paths are covered by tests and capture actual versions, settings, status and original source SQL.",
+    "A SQLGlot output that parses but changes results is rejected as a label.",
+    "Baseline failures count in full denominator; unlabeled eligible test cases still evaluate by execution.",
+    "Report baseline coverage, per-direction success, repaired/broken cases and label rejection causes."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement baseline command with SQLGlot-only and current BenchBox translate_sql_query adapters. Run both against frozen development/evaluation inputs; keep all baseline failures. Produce candidate labels for train/dev only, accepting each only if five-fixture validation succeeds. For conflicting valid candidates choose the BenchBox candidate deterministically, retaining provenance for both. Do not use a model judge or BLEU/string equality as semantic acceptance. Native hand-authored gold may repair training labels with recorded evidence; never change locked test membership. Baseline test outputs are retained as benchmark artifacts, not available to the training loop.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}

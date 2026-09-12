@@ -15016,6 +15016,15 @@
       "status": "done",
       "title": "✅ SQL Query Generation Consistency (TPC-H/TPC-DS)"
     },
+    "sql-translation-ml-baselines": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-splits"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Measure SQLGlot and BenchBox baselines and validate labels"
+    },
     "sql-translation-ml-comparator": {
       "claim": null,
       "needs": [
