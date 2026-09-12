@@ -119,6 +119,7 @@ sectionLinks.forEach(link => {
         const targetElement = document.querySelector(targetId);
 
         if (targetElement) {
+            if (window.location.hash !== targetId) window.history.pushState(null, '', targetId);
             const headerOffset = sectionNavigationOffset();
             const elementPosition = targetElement.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;

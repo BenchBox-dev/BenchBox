@@ -174,6 +174,13 @@ def test_landing_section_navigation_is_sticky_colored_and_tracks_the_current_sec
     assert "link.setAttribute('aria-current', 'location')" in script
     assert "sectionNavigationOffset()" in script
     assert "sectionNavLinksContainer.scrollTo({ left: centeredLeft" in script
+    assert "window.history.pushState(null, '', targetId)" in script
+
+    landing = _read("landing/index.html")
+    prompts = _read("landing/prompts/index.html")
+    assert 'href="style.css?v=6"' in landing
+    assert 'src="script.js?v=1"' in landing
+    assert 'href="../style.css?v=6"' in prompts
 
 
 def test_landing_introduces_results_explorer_with_public_compare_and_local_workflows() -> None:
