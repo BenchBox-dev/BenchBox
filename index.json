@@ -10641,18 +10641,13 @@
       "title": "Remediate merged PR review follow-ups for 2026-05-29 through 2026-08-20"
     },
     "pr-revision-readiness-transaction": {
-      "claim": {
-        "expires_at": "2026-09-13T21:08:16Z",
-        "generation": "d1be65948a1a43be8034b1ca0d42332c",
-        "renewals": 2,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [
         "batch-prepared-delivery-tracker-and-skill",
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Bind PR readiness to the reviewed head and withdraw it before revisions"
     },
     "pr-workflows-skip-non-develop-base-branches": {
