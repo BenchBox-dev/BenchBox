@@ -152,6 +152,8 @@ The default is immediate fail-fast with holder info; set
 `BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
 owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
 deletes, or bypasses — a held flock always means a live holder).
+`make test-unlock` removes only an inactive diagnostic path and refuses an
+active kernel lock.
 
 Gate authors avoid duplicate invocations against identical trees with
 `scripts/local_validation.py` (see `make local-validation GATE=... CMD=...`):
@@ -161,16 +163,20 @@ Gate authors avoid duplicate invocations against identical trees with
   then the classifier-selected `make pr-preflight`. One gate name per stage;
   a hook that does no work reports `skipped`, never `tested`/`passed`.
 - `run` executes the command unless a completed receipt binds the identical
-  input identity (HEAD, base ref, status incl. untracked digests, tool
-  versions, gate, batch block). Simultaneous identical requests execute once:
-  waiters re-check under the store lock and reuse the winner's receipt.
-- Changed files/refs/tools, unknown identity, failed priors, and different
-  gates always execute. Receipts are local-only evidence and never satisfy
-  hosted required checks.
-- Batch members pass `--batch-id/--batch-member/--batch-role`; member
-  preparation evidence never certifies the later integrated tree because the
-  integration HEAD differs. Pre-PR effort stays counted: receipts record
-  executions, they do not erase them from delivery accounting.
+  input identity (HEAD, base ref, status incl. untracked digests, validation
+  config, tool versions, gate, batch block). Simultaneous identical requests
+  execute once: waiters re-check the identity under the store lock and reuse
+  the winner's receipt.
+- Changed files/refs/tools/config, unknown identity, failed or cancelled
+  priors, and different gates always execute. A tree change while waiting or
+  while the command runs prevents reuse and prevents writing a receipt.
+  Receipts are local-only evidence and never satisfy hosted required checks.
+- Batch members pass `--batch-id/--batch-member/--batch-role` plus the
+  accepted member head, scope/config hashes, and integration head/tree when
+  available. Member preparation evidence never certifies the later integrated
+  tree because the integration identity is part of the frozen record. Pre-PR
+  effort stays counted: receipts record executions, they do not erase them
+  from delivery accounting.
 
 ## Queue-aware publication and resumable follow-up
 

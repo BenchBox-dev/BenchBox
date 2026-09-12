@@ -259,3 +259,97 @@ def test_different_gates_proceed_in_parallel(repo: Path, tmp_path: Path) -> None
     assert results == [0, 0]
     assert len(marker.read_text(encoding="utf-8")) == 2
     assert elapsed < 3.5
+
+
+def test_tree_change_during_execution_does_not_store_stale_receipt(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    original = lv.content_identity
+    calls = 0
+
+    def identity_that_changes_tree(path: Path, argv: list[str]) -> dict:
+        nonlocal calls
+        calls += 1
+        identity = original(path, argv)
+        if calls == 2:
+            (path / "during-run.txt").write_text("changed", encoding="utf-8")
+        return identity
+
+    monkeypatch.setattr(lv, "content_identity", identity_that_changes_tree)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert list(lv.store_dir(repo).rglob("*.json")) == []
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_changed_validation_config_invalidates(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    (repo / "Makefile").write_text("validation config", encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_batch_integration_identity_invalidates_member_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    batch = {
+        "batch_id": "batch-1",
+        "member": "member-a",
+        "role": "member",
+        "accepted_head": "abc",
+        "scope_hash": "scope-1",
+        "config_hash": "config-1",
+        "integration_head": "integrated-1",
+        "integration_tree": "tree-1",
+    }
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    batch["integration_tree"] = "tree-2"
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_wait_for_lock_closes_fd_when_cancelled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    lock = tmp_path / "cancel.lock"
+    closed: list[int] = []
+    original_close = os.close
+
+    def cancel(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    def record_close(fd: int) -> None:
+        closed.append(fd)
+        original_close(fd)
+
+    monkeypatch.setattr(lv, "wait_on_fd", cancel)
+    monkeypatch.setattr(lv.os, "close", record_close)
+    with pytest.raises(KeyboardInterrupt):
+        lv.wait_for_lock(lock, 5.0)
+    assert closed
+
+
+def test_ordered_path_runs_focused_before_required_preflight(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_run_gate(gate: str, *args, **kwargs) -> int:
+        calls.append(gate)
+        return 0
+
+    monkeypatch.setattr(lv, "run_gate", fake_run_gate)
+    assert (
+        lv.run_ordered_path(
+            focused_gate="focused",
+            focused_command=["focused-command"],
+            preflight_gate="required-preflight",
+            preflight_command=["preflight-command"],
+            batch=None,
+            lock_wait_seconds=1.0,
+            repo=repo,
+            store=lv.store_dir(repo),
+        )
+        == 0
+    )
+    assert calls == ["focused", "required-preflight"]
