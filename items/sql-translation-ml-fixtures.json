@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Same config+seed regenerates identical canonical fixtures and hashes.",
+    "Both engines read back matching intended values, NULLs and duplicates under documented type mappings.",
+    "Empty and boundary fixtures are present, failures identify engine/version/seed, and reruns do not overwrite unrelated paths."
+  ],
+  "context": "Approved research scope: test an under-100M SQL model on DuckDB <-> SQLite analytical SELECT SQL; compare complete generation and SQLGlot plus learned edits, with 99% whole-query execution equivalence as a hypothesis, not a required positive result. Hardware baseline: Apple M4 Mac mini, 16 GB RAM; local-only training, no paid/cloud services. Work only in a linked BenchBox worktree under _project/sql-translation-ml/ and narrowly necessary test/build wiring. Do not modify production translators, supported APIs, default dependencies, compatibility registry behavior, or the SQLGlot ADR's production decision. Use isolated uv tooling. Keep weights, datasets, database files and raw logs outside Git in an explicit run directory; commit small code/configs/docs/manifests only. Read predecessor artifacts; do not infer missing outputs from this chat. Missing/corrupt prerequisites or scope/budget changes mean report/block, not invent defaults or weaken acceptance. Implement only this item's scope, run its focused checks, and follow current repo commit/PR closeout; downstream work must use landed prerequisite code. No tracker claims, training, implementation, merge, or deployment are authorized by the creation of these TODOs alone.",
+  "description": "Implement fixtures.py and focused tests against the contract. Create equivalent schemas/data in disposable local DuckDB and SQLite databases using explicit type mapping. Five seeded fixtures per case minimum, covering NULL, duplicates, empty tables, zero/negative numbers, dates at month/year boundaries, exact strings including trailing spaces and Unicode. Store generated data once as canonical fixture records and load both engines from it. Do not derive fixture data from a model output. Fixture setup may write disposable databases; query evaluation later is SELECT-only. Use explicit run-dir and clean up only task-owned disposable paths.",
+  "links": [
+    "_project/sql-translation-ml/",
+    "benchbox/utils/dialect_utils.py",
+    "benchbox/core/validation/cross_platform.py",
+    "_project/sqlglot-upstream/repros/generator.py",
+    "docs/development/adr/adr-sqlglot-use-and-non-use.md"
+  ]
+}

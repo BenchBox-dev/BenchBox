@@ -15023,6 +15023,15 @@
       "status": "open",
       "title": "Define the tiny SQL translation experiment contract"
     },
+    "sql-translation-ml-fixtures": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-contract"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Build deterministic DuckDB and SQLite fixture creation"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
