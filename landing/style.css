@@ -347,7 +347,9 @@ section h2 {
 
 /* Results Explorer Section */
 .results-explorer {
-    background-color: var(--bg-primary);
+    background-color: var(--bg-secondary);
+    border-top: 2px solid var(--border-primary);
+    border-bottom: 2px solid var(--border-primary);
 }
 
 .results-explorer__intro {
@@ -398,7 +400,7 @@ section h2 {
     min-width: 0;
     padding: var(--space-lg);
     overflow: hidden;
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     box-shadow: var(--card-shadow);
@@ -665,7 +667,7 @@ section h2 {
 
 .results-explorer__card {
     padding: var(--space-xl);
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
 }
@@ -707,6 +709,10 @@ section h2 {
 .section-subheading {
     margin-bottom: var(--space-lg);
     color: var(--text-secondary);
+}
+
+.benchmarks {
+    background-color: var(--bg-primary);
 }
 
 /* Benchmarks Grid */
