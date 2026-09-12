@@ -177,11 +177,13 @@ Gate authors avoid duplicate invocations against identical trees with
   store selector is excluded because it changes evidence location, not gate
   behavior.
 - Batch members pass `--batch-id/--batch-member/--batch-role` plus the
-  accepted member head, scope/config hashes, and integration head/tree when
-  available. Member preparation evidence never certifies the later integrated
-  tree because the integration identity is part of the frozen record. Pre-PR
-  effort stays counted: receipts record executions, they do not erase them
-  from delivery accounting.
+  accepted member head, scope/config hashes, and canonical changed paths.
+  Integrator records additionally bind the current integration head/tree, a
+  real predecessor tree, and a complete canonical member list. Member
+  preparation evidence never certifies the later integrated tree because the
+  integration identity is part of the frozen record. Pre-PR effort stays
+  counted: receipts record executions, they do not erase them from delivery
+  accounting.
 - Integrator evidence requires a canonical JSON member list with immutable
   member id, source or accepted head, scope hash, and config hash. Each member
   head must be ancestral to a distinct integration head; the predecessor must
@@ -190,9 +192,16 @@ Gate authors avoid duplicate invocations against identical trees with
 - `make pr-preflight` is the canonical ordered path and records both stage
   receipts. The focused stage runs the classifier-selected fast checks; the
   required stage owns the content guard and remaining checks, so each actual
-  gate runs once. The optional pre-push hook runs only the focused stage, so it
-  can reuse the focused receipt from a prior manual preflight without
-  broadening the hook into a second full preflight.
+  gate runs once. Both stages classify independently against the same
+  revalidated transaction identity; drift restarts the ordered path. The
+  optional pre-push hook runs only the focused stage, so it can reuse the
+  focused receipt from a prior manual preflight without broadening the hook
+  into a second full preflight.
+- Every invocation appends a lock-protected local event to the same evidence
+  store. `python scripts/local_validation.py report` distinguishes executed,
+  reused, failed, cancelled, and skipped gates, records the exact identity key,
+  role, command execution count, and monotonic duration, and explicitly never
+  claims hosted required-check certification.
 
 ## Queue-aware publication and resumable follow-up
 

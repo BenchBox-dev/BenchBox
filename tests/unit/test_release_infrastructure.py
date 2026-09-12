@@ -1098,6 +1098,7 @@ class TestReleaseInfrastructure:
 
         skipped_env = os.environ.copy()
         skipped_env.pop("BENCHBOX_PREPUSH", None)
+        skipped_env["BENCHBOX_VALIDATION_RECEIPTS_DIR"] = str(tmp_path / "skipped-receipts")
         skipped = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env)
         assert skipped.returncode == 0
         assert "SKIPPED" in skipped.stdout

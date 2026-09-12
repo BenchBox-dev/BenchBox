@@ -1291,8 +1291,9 @@ pr-preflight-uncached:
 	$(MAKE) -s uat-artifact-hygiene
 
 # Canonical local preflight: the focused lane runs once, then the remaining
-# required lanes run against the same classifier decision. Each ordered stage
-# gets its own content-bound receipt; hosted required checks remain separate.
+# required lanes each classify the revalidated transaction input. The ordered
+# wrapper rejects drift between stages, and each stage gets its own
+# content-bound receipt; hosted required checks remain separate.
 pr-preflight:
 	@git fetch origin develop --quiet
 	uv run -- python scripts/local_validation.py ordered \

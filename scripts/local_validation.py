@@ -46,6 +46,8 @@ MAX_UNTRACKED_BYTES = 50 * 1024 * 1024
 LOCK_POLL_SECONDS = 0.25
 DEFAULT_LOCK_WAIT_SECONDS = 3600.0
 MAX_IDENTITY_RETRIES = 3
+MAX_ORDERED_RETRIES = 3
+WAIT_PROGRESS_SECONDS = 5.0
 
 # These files affect local gate behavior even when a gate command does not
 # mention them directly.  Their content is recorded separately from the
@@ -82,6 +84,9 @@ INTEGRATOR_BATCH_FIELDS = (
     "predecessor_head",
     "predecessor_tree",
     "member_identity",
+)
+MEMBER_IDENTITY_FIELDS = frozenset(
+    {"id", "source_base", "source_head", "accepted_head", "scope_hash", "config_hash", "changed_paths"}
 )
 MEMBER_IDENTITY_HASH_FIELDS = ("scope_hash", "config_hash")
 
@@ -130,16 +135,29 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
     import fcntl
 
     deadline = time.monotonic() + max(0.0, timeout_seconds)
+    wait_started = time.monotonic()
+    last_report = 0.0
+    reported_wait = False
     holder = read_holder(lock_path)
     while True:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if reported_wait:
+                elapsed = time.monotonic() - wait_started
+                print(f"[local-validation] acquired lock after waiting {elapsed:.1f}s: {lock_path}", file=sys.stderr)
             return
         except (BlockingIOError, OSError):
             holder = read_holder(lock_path)
-            if time.monotonic() >= deadline:
+            now = time.monotonic()
+            if not reported_wait or now - last_report >= WAIT_PROGRESS_SECONDS:
+                print(
+                    f"[local-validation] waiting for lock {lock_path} (holder: {holder})", file=sys.stderr, flush=True
+                )
+                reported_wait = True
+                last_report = now
+            if now >= deadline:
                 raise TimeoutError(f"timed out waiting for {lock_path} (holder: {holder})") from None
-            time.sleep(min(LOCK_POLL_SECONDS, max(0.0, deadline - time.monotonic())))
+            time.sleep(min(LOCK_POLL_SECONDS, max(0.0, deadline - now)))
 
 
 def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
@@ -152,6 +170,10 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
         wait_on_fd(fd, lock_path, timeout_seconds)
+    except KeyboardInterrupt:
+        print(f"[local-validation] lock wait cancelled: {lock_path}", file=sys.stderr, flush=True)
+        os.close(fd)
+        raise
     except BaseException:
         os.close(fd)
         raise
@@ -328,8 +350,103 @@ def _batch_config_hash(repo: Path) -> str:
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+def _batch_config_hash_at_commit(repo: Path, revision: str) -> str:
+    digests: dict[str, str | None] = {}
+    for name in VALIDATION_CONFIG_FILES:
+        try:
+            payload = subprocess.run(
+                ["git", "show", f"{revision}:{name}"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                timeout=60,
+            ).stdout
+        except subprocess.CalledProcessError:
+            digests[name] = None
+        except subprocess.TimeoutExpired as exc:
+            raise IdentityUnknown(f"cannot read config {name} at {revision}: {exc}") from exc
+        else:
+            digests[name] = hashlib.sha256(payload).hexdigest()
+    canonical = json.dumps(digests, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _git_diff_paths(repo: Path, base: str, head: str) -> list[str]:
+    """Return canonical changed paths, retaining both sides of renames."""
+    try:
+        output = _git(repo, "diff", "--name-status", "-z", "-M", f"{base}...{head}")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise IdentityUnknown(f"cannot derive source scope: {exc}") from exc
+    fields = output.split("\0")
+    paths: list[str] = []
+    index = 0
+    while index < len(fields) - 1:
+        status = fields[index]
+        index += 1
+        if not status:
+            continue
+        path_count = 2 if status[0] in {"R", "C"} else 1
+        paths.extend(fields[index : index + path_count])
+        index += path_count
+    try:
+        return _canonical_paths(paths)
+    except IdentityUnknown as exc:
+        raise IdentityUnknown(f"cannot canonicalize source scope: {exc}") from exc
+
+
 def _is_sha256(value: object) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value.lower())
+
+
+def _canonical_member_record(repo: Path, raw: object, integration_head: str) -> tuple[dict | None, str]:
+    if not isinstance(raw, dict):
+        return None, "integrator member_identity entries must be objects"
+    if set(raw) != MEMBER_IDENTITY_FIELDS:
+        return None, f"integrated member identity fields must be exactly {sorted(MEMBER_IDENTITY_FIELDS)}"
+    member_id = raw.get("id")
+    if not isinstance(member_id, str) or not member_id.strip():
+        return None, "integrated member identity requires a non-empty id"
+    heads: dict[str, str] = {}
+    for field in ("source_base", "source_head", "accepted_head"):
+        ref = raw.get(field)
+        try:
+            resolved = _git(repo, "rev-parse", f"{ref}^{{commit}}").strip()
+            if field != "source_base":
+                _git(repo, "merge-base", "--is-ancestor", resolved, integration_head)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            return None, f"integrated member {member_id} has invalid {field}: {exc}"
+        heads[field] = resolved
+    try:
+        _git(repo, "merge-base", "--is-ancestor", heads["source_base"], heads["source_head"])
+        _git(repo, "merge-base", "--is-ancestor", heads["source_base"], heads["accepted_head"])
+        source_paths = _git_diff_paths(repo, heads["source_base"], heads["source_head"])
+        accepted_paths = _git_diff_paths(repo, heads["source_base"], heads["accepted_head"])
+    except (IdentityUnknown, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        return None, f"integrated member {member_id} has invalid source scope: {exc}"
+    for field in MEMBER_IDENTITY_HASH_FIELDS:
+        if not _is_sha256(raw.get(field)):
+            return None, f"integrated member {member_id} requires a SHA-256 {field}"
+    try:
+        changed_paths = _canonical_paths(raw["changed_paths"])
+    except IdentityUnknown as exc:
+        return None, f"integrated member {member_id} has invalid changed_paths: {exc}"
+    if changed_paths != source_paths or changed_paths != accepted_paths:
+        return None, f"integrated member {member_id} changed_paths do not match source scope"
+    expected_scope = hashlib.sha256(json.dumps(changed_paths, separators=(",", ":")).encode()).hexdigest()
+    if str(raw["scope_hash"]).lower() != expected_scope:
+        return None, f"integrated member {member_id} scope_hash does not match source scope"
+    try:
+        expected_config = _batch_config_hash_at_commit(repo, heads["accepted_head"])
+    except IdentityUnknown as exc:
+        return None, f"integrated member {member_id} config identity is unknown: {exc}"
+    if str(raw["config_hash"]).lower() != expected_config:
+        return None, f"integrated member {member_id} config_hash does not match accepted head"
+    record = dict(raw)
+    record.update(heads)
+    for field in MEMBER_IDENTITY_HASH_FIELDS:
+        record[field] = str(record[field]).lower()
+    record["changed_paths"] = changed_paths
+    return {key: record[key] for key in sorted(record)}, ""
 
 
 def _canonical_member_identity(repo: Path, value: object) -> tuple[list[dict] | None, str]:
@@ -342,43 +459,14 @@ def _canonical_member_identity(repo: Path, value: object) -> tuple[list[dict] | 
     canonical: list[dict] = []
     seen: set[str] = set()
     for raw in value:
-        if not isinstance(raw, dict):
-            return None, "integrator member_identity entries must be objects"
-        member_id = raw.get("id", raw.get("member"))
-        if not isinstance(member_id, str) or not member_id.strip():
-            return None, "integrated member identity requires a non-empty id"
-        if member_id in seen:
-            return None, f"duplicate integrated member id: {member_id}"
-        seen.add(member_id)
-        heads: dict[str, str] = {}
-        for field in ("source_head", "accepted_head"):
-            ref = raw.get(field)
-            if ref in (None, ""):
-                continue
-            try:
-                resolved = _git(repo, "rev-parse", f"{ref}^{{commit}}").strip()
-                _git(repo, "merge-base", "--is-ancestor", resolved, integration_head)
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-                return None, f"integrated member {member_id} has invalid {field}: {exc}"
-            heads[field] = resolved
-        if not heads:
-            return None, f"integrated member {member_id} requires source_head or accepted_head"
-        for field in MEMBER_IDENTITY_HASH_FIELDS:
-            if not _is_sha256(raw.get(field)):
-                return None, f"integrated member {member_id} requires a SHA-256 {field}"
-        try:
-            changed_paths = _canonical_paths(raw["changed_paths"]) if "changed_paths" in raw else None
-        except IdentityUnknown as exc:
-            return None, f"integrated member {member_id} has invalid changed_paths: {exc}"
-        record = dict(raw)
-        record["id"] = member_id
-        record.pop("member", None)
-        record.update(heads)
-        for field in MEMBER_IDENTITY_HASH_FIELDS:
-            record[field] = str(record[field]).lower()
-        if changed_paths is not None:
-            record["changed_paths"] = changed_paths
-        canonical.append({key: record[key] for key in sorted(record)})
+        record, reason = _canonical_member_record(repo, raw, integration_head)
+        if reason:
+            return None, reason
+        assert record is not None
+        if record["id"] in seen:
+            return None, f"duplicate integrated member id: {record['id']}"
+        seen.add(record["id"])
+        canonical.append(record)
     canonical.sort(key=lambda record: record["id"])
     return canonical, ""
 
@@ -416,12 +504,16 @@ def _validate_member_batch(repo: Path, batch: dict) -> tuple[bool, str]:
         changed_paths = _canonical_paths(batch["changed_paths"])
         head = _git(repo, "rev-parse", "HEAD").strip()
         base = _git(repo, "rev-parse", "origin/develop").strip()
+        _git(repo, "merge-base", "--is-ancestor", batch["source_base"], batch["source_head"])
+        actual_paths = _git_diff_paths(repo, batch["source_base"], batch["source_head"])
     except (IdentityUnknown, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
         return False, str(exc)
     if batch["source_head"] != head or batch["accepted_head"] != head:
         return False, "member source/accepted head does not match current HEAD"
     if batch["source_base"] != base:
         return False, "member source base does not match origin/develop"
+    if changed_paths != actual_paths:
+        return False, "member changed_paths do not match source base to head diff"
     expected_scope = hashlib.sha256(json.dumps(changed_paths, separators=(",", ":")).encode()).hexdigest()
     if batch["scope_hash"] != expected_scope:
         return False, "member scope hash does not match canonical changed paths"
@@ -552,12 +644,131 @@ def read_receipt(path: Path, *, gate: str, identity: dict, batch: dict | None) -
     if (
         not isinstance(delivery, dict)
         or delivery.get("member_preparation_is_not_integration_certification") is not True
+        or delivery.get("role") != ((batch or {}).get("role") if batch else None)
+        or delivery.get("integration_identity") != batch
     ):
         return None
     return data
 
 
-def run_gate(
+def _identity_key(gate: str, identity: dict | None, batch: dict | None) -> str | None:
+    if identity is None:
+        return None
+    payload = json.dumps(
+        {"gate": gate, "identity": identity, "batch": batch}, sort_keys=True, separators=(",", ":")
+    ).encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _append_accounting_event(
+    store: Path,
+    *,
+    status: str,
+    gate: str,
+    identity: dict | None,
+    batch: dict | None,
+    started_at: str,
+    completed_at: str,
+    duration_seconds: float,
+    command_executions: int,
+    exit_code: int | None,
+    reason: str | None = None,
+    lock_wait_seconds: float = 5.0,
+) -> None:
+    """Append one immutable local accounting event; accounting never gates execution."""
+    event = {
+        "schema": 1,
+        "event_id": f"{os.getpid()}-{time.time_ns()}",
+        "status": status,
+        "gate": gate,
+        "identity_key": _identity_key(gate, identity, batch),
+        "role": (batch or {}).get("role") if isinstance(batch, dict) else None,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "duration_seconds": round(max(0.0, duration_seconds), 6),
+        "command_executions": command_executions,
+        "exit_code": exit_code,
+        "hosted_required_certification": False,
+    }
+    if reason:
+        event["reason"] = reason
+    lock_fd: int | None = None
+    try:
+        store.mkdir(parents=True, exist_ok=True)
+        lock_fd = wait_for_lock(store / "events.lock", lock_wait_seconds)
+        path = store / "events.jsonl"
+        line = (json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o644)
+        try:
+            os.write(fd, line)
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except (OSError, TimeoutError):
+        return
+    finally:
+        if lock_fd is not None:
+            os.close(lock_fd)
+
+
+def _accounting_report(store: Path, gate: str | None = None) -> dict:
+    events: list[dict] = []
+    invalid_records = 0
+    path = store / "events.jsonl"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except ValueError:
+            invalid_records += 1
+            continue
+        if not isinstance(event, dict) or event.get("schema") != 1:
+            invalid_records += 1
+            continue
+        if gate is None or event.get("gate") == gate:
+            events.append(event)
+    counts: dict[str, int] = {}
+    for event in events:
+        status = str(event.get("status", "unknown"))
+        counts[status] = counts.get(status, 0) + 1
+    return {
+        "schema": 1,
+        "hosted_required_certification": False,
+        "counts": counts,
+        "invalid_records": invalid_records,
+        "events": events,
+    }
+
+
+def _record_skip(gate: str, batch: dict | None, repo: Path, store: Path) -> int:
+    started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    started = time.monotonic()
+    identity: dict | None
+    try:
+        identity = content_identity(repo, [])
+    except IdentityUnknown:
+        identity = None
+    _append_accounting_event(
+        store,
+        status="skipped",
+        gate=gate,
+        identity=identity,
+        batch=batch,
+        started_at=started_at,
+        completed_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        duration_seconds=time.monotonic() - started,
+        command_executions=0,
+        exit_code=0,
+        reason="hook or caller skipped this local gate",
+    )
+    print(f"[local-validation] SKIPPED {gate} (no command executed)")
+    return 0
+
+
+def run_gate(  # noqa: C901
     gate: str,
     argv: list[str],
     batch: dict | None,
@@ -566,23 +777,68 @@ def run_gate(
     store: Path,
 ) -> int:
     """Run *argv* under the singleflight receipt contract. Returns its exit code."""
+    requested_batch = batch
+    started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    started = time.monotonic()
+
+    def finish(
+        status: str,
+        exit_code: int | None,
+        identity: dict | None,
+        event_batch: dict | None,
+        reason: str | None = None,
+        command_executions: int = 0,
+    ) -> int:
+        _append_accounting_event(
+            store,
+            status=status,
+            gate=gate,
+            identity=identity,
+            batch=event_batch,
+            started_at=started_at,
+            completed_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            duration_seconds=time.monotonic() - started,
+            command_executions=command_executions,
+            exit_code=exit_code,
+            reason=reason,
+            lock_wait_seconds=min(lock_wait_seconds, 5.0),
+        )
+        return 1 if exit_code is None else exit_code
+
+    def execute_without_receipt(identity: dict | None, event_batch: dict | None, reason: str) -> int:
+        try:
+            proc = subprocess.run(list(argv), cwd=repo, check=False)
+        except KeyboardInterrupt:
+            finish("cancelled", 130, identity, event_batch, "command cancelled", 1)
+            raise
+        return finish(
+            "executed" if proc.returncode == 0 else "failed", proc.returncode, identity, event_batch, reason, 1
+        )
+
     batch, prepare_reason = _prepare_batch(repo, batch)
     if prepare_reason:
         print(f"[local-validation] batch identity unknown ({prepare_reason}); executing without receipt")
-        return subprocess.run(list(argv), cwd=repo, check=False).returncode
+        return execute_without_receipt(None, requested_batch, prepare_reason)
     valid_batch, batch_reason = _validate_prepared_batch(repo, batch)
     if not valid_batch or batch_reason:
         print(f"[local-validation] batch identity unknown ({batch_reason}); executing without receipt")
-        return subprocess.run(list(argv), cwd=repo, check=False).returncode
+        return execute_without_receipt(None, requested_batch, batch_reason)
     try:
         identity = content_identity(repo, list(argv))
     except IdentityUnknown as exc:
         print(f"[local-validation] identity unknown ({exc}); executing without receipt")
-        return subprocess.run(list(argv), cwd=repo, check=False).returncode
+        return execute_without_receipt(None, batch, str(exc))
     for attempt in range(MAX_IDENTITY_RETRIES):
         receipt = receipt_path(store, gate, identity, batch)
         lock_path = receipt.with_name(receipt.stem + ".lock")
-        lock_fd = wait_for_lock(lock_path, lock_wait_seconds)
+        try:
+            lock_fd = wait_for_lock(lock_path, lock_wait_seconds)
+        except KeyboardInterrupt:
+            finish("cancelled", 130, identity, batch, "lock wait cancelled")
+            raise
+        except TimeoutError:
+            finish("cancelled", 1, identity, batch, "lock wait timed out")
+            raise
         try:
             # The tree may have changed while waiting.  Never reuse a receipt
             # or execute against the old key after that race; move to the new
@@ -618,10 +874,14 @@ def run_gate(
                     f"[local-validation] REUSED {gate} receipt "
                     f"(head {identity['head'][:12]}, recorded {hit.get('recorded_at', '?')})"
                 )
-                return 0
+                return finish("reused", 0, identity, batch)
             write_holder(lock_fd, lock_path, phase="executing", gate=gate)
             print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
-            proc = subprocess.run(list(argv), cwd=repo, check=False)
+            try:
+                proc = subprocess.run(list(argv), cwd=repo, check=False)
+            except KeyboardInterrupt:
+                finish("cancelled", 130, identity, batch, "command cancelled", 1)
+                raise
             if proc.returncode == 0:
                 try:
                     final_identity = content_identity(repo, list(argv))
@@ -647,23 +907,7 @@ def run_gate(
                                 "delivery": {
                                     "member_preparation_is_not_integration_certification": True,
                                     "role": (batch or {}).get("role") if batch else None,
-                                    "integration_identity": {
-                                        key: (batch or {}).get(key)
-                                        for key in (
-                                            "source_base",
-                                            "source_head",
-                                            "integration_head",
-                                            "integration_tree",
-                                            "accepted_head",
-                                            "scope_hash",
-                                            "config_hash",
-                                            "changed_paths",
-                                            "predecessor_head",
-                                            "predecessor_tree",
-                                            "member_identity",
-                                        )
-                                        if batch and (batch or {}).get(key) is not None
-                                    },
+                                    "integration_identity": batch,
                                 },
                                 "exit": 0,
                                 "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -678,13 +922,20 @@ def run_gate(
                     print("[local-validation] inputs changed during execution; no receipt stored")
             else:
                 print(f"[local-validation] {gate} failed (exit {proc.returncode}); no receipt stored")
-            return proc.returncode
+            return finish(
+                "executed" if proc.returncode == 0 else "failed",
+                proc.returncode,
+                identity,
+                batch,
+                "completed local command" if proc.returncode == 0 else f"command exited {proc.returncode}",
+                1,
+            )
         finally:
             os.close(lock_fd)
     # A continuously changing tree cannot safely produce reusable evidence.
     # Execute once without a receipt instead of spinning or reusing stale data.
     print("[local-validation] inputs changed repeatedly; executing without receipt")
-    return subprocess.run(list(argv), cwd=repo, check=False).returncode
+    return execute_without_receipt(identity, batch, "inputs changed repeatedly")
 
 
 def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list[str] | None = None) -> int:
@@ -725,10 +976,46 @@ def run_ordered_path(
     never stand in for the focused check, and a failed focused gate prevents
     the required path from being reported as complete.
     """
-    focused_status = run_gate(focused_gate, focused_command, batch, lock_wait_seconds, repo, store)
-    if focused_status != 0:
-        return focused_status
-    return run_gate(preflight_gate, preflight_command, batch, lock_wait_seconds, repo, store)
+    for attempt in range(MAX_ORDERED_RETRIES):
+        try:
+            before = ordered_identity(repo, batch)
+        except IdentityUnknown as exc:
+            print(f"[local-validation] ordered input identity unknown: {exc}", file=sys.stderr)
+            return 1
+        focused_status = run_gate(focused_gate, focused_command, batch, lock_wait_seconds, repo, store)
+        if focused_status != 0:
+            return focused_status
+        try:
+            after_focused = ordered_identity(repo, batch)
+        except IdentityUnknown as exc:
+            print(f"[local-validation] ordered input changed after focused stage: {exc}", file=sys.stderr)
+            continue
+        if after_focused != before:
+            print("[local-validation] ordered input changed between stages; restarting focused stage")
+            continue
+        preflight_status = run_gate(preflight_gate, preflight_command, batch, lock_wait_seconds, repo, store)
+        if preflight_status != 0:
+            return preflight_status
+        try:
+            after_preflight = ordered_identity(repo, batch)
+        except IdentityUnknown as exc:
+            print(f"[local-validation] ordered input changed after required stage: {exc}", file=sys.stderr)
+            continue
+        if after_preflight == before:
+            return 0
+        print("[local-validation] ordered input changed during required stage; restarting focused stage")
+    print("[local-validation] ordered input did not stabilize; no combined certification", file=sys.stderr)
+    return 1
+
+
+def ordered_identity(repo: Path, batch: dict | None) -> dict:
+    normalized, reason = _prepare_batch(repo, batch)
+    if reason:
+        raise IdentityUnknown(reason)
+    valid, reason = _validate_prepared_batch(repo, normalized)
+    if not valid or reason:
+        raise IdentityUnknown(reason)
+    return {"content": content_identity(repo, []), "batch": normalized}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -775,6 +1062,12 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--batch-predecessor-tree", default=None)
     show.add_argument("--batch-member-identity", default=None)
     show.add_argument("argv", nargs=argparse.REMAINDER, help="gate command after -- (same as run)")
+    skip = sub.add_parser("skip", help="record a local gate that intentionally did no work")
+    skip.add_argument("--gate", required=True)
+    skip.add_argument("--batch-id", default=None)
+    skip.add_argument("--batch-member", default=None)
+    skip.add_argument("--batch-role", default=None, choices=["member", "integrator"])
+    skip.add_argument("--batch-member-identity", default=None)
     ordered = sub.add_parser("ordered", help="run focused checks, then the required preflight")
     ordered.add_argument("--focused-gate", default="local-focused-check")
     ordered.add_argument("--focused-cmd", required=True)
@@ -795,6 +1088,8 @@ def build_parser() -> argparse.ArgumentParser:
     ordered.add_argument("--batch-predecessor-tree", default=None)
     ordered.add_argument("--batch-member-identity", default=None)
     ordered.add_argument("--lock-wait-seconds", type=float, default=DEFAULT_LOCK_WAIT_SECONDS)
+    report = sub.add_parser("report", help="report local validation accounting events")
+    report.add_argument("--gate", default=None)
     clear = sub.add_parser("clear-test-lock", help="clear an inactive shared test lock")
     clear.add_argument("path", type=Path)
     return parser
@@ -839,6 +1134,11 @@ def main(argv: list[str] | None = None) -> int:
     batch = batch_block(args)
     if args.command == "clear-test-lock":
         return clear_inactive_lock(args.path)
+    if args.command == "report":
+        print(json.dumps(_accounting_report(store, args.gate), indent=2, sort_keys=True))
+        return 0
+    if args.command == "skip":
+        return _record_skip(args.gate, batch, repo, store)
     if args.command == "ordered":
         try:
             return run_ordered_path(
