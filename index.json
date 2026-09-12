@@ -10584,12 +10584,17 @@
       "title": "Close PR-gate gap: darwin/windows TPC-H binaries behaviorally validated only on nightly"
     },
     "pr-local-validation-singleflight": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T15:12:46Z",
+        "generation": "581db2cb8058441e82285ffa3b6b703d",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Serialize local validation and report exact gate evidence without duplicate runs"
     },
     "pr-open-auto-merge-partial-stack-race-20260804": {
