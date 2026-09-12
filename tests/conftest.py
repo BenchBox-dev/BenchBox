@@ -198,6 +198,9 @@ def pytest_configure(config) -> None:
                 waiter.wait_on_fd(fd, test_lock_path, wait_seconds)
             except TimeoutError as exc:
                 lock_error = exc
+            except BaseException:
+                os.close(fd)
+                raise
         else:
             try:
                 if sys.platform == "win32":
