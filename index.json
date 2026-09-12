@@ -18238,15 +18238,10 @@
       "title": "Pool FORCE=1 aborts on a dirty tree and omits the discard actions it promises (worktree-release, worktree-pool-reset)"
     },
     "worktree-removal-leaves-dangling-pre-commit-hook": {
-      "claim": {
-        "expires_at": "2026-09-13T23:10:58Z",
-        "generation": "bd5426c4af3745e58c14fa6ea83eaa96",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Shared .git/hooks/pre-commit points at a removed worktree's venv, silently degrading every commit in every worktree"
     },
     "worktree-scoped-git-identity-at-claim": {
