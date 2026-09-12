@@ -312,10 +312,15 @@
       "title": "Add TPC-H Skew Benchmark Implementation"
     },
     "add-work-units-for-additional-refactorables-discovered-durin": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-13T23:53:52Z",
+        "generation": "2f9bdbde4e714649824da06800a4a369",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add work units for additional refactorables discovered during w1 classification"
     },
     "address-cross-adapter-13-pattern-audit-findings": {
