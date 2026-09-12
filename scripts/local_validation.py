@@ -33,10 +33,11 @@ import hashlib
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 # Bounds keep identity computation cheap; exceeding them means "unknown",
 # which forces execution (fail open to running, never to false reuse).
@@ -58,6 +59,39 @@ VALIDATION_CONFIG_FILES = (
     "setup.cfg",
     "tox.ini",
     "uv.lock",
+)
+VALIDATION_ENV_KEYS = (
+    "BENCHBOX_MAX_XDIST_WORKERS",
+    "BENCHBOX_OUTPUT_DIR",
+    "BENCHBOX_PREPUSH",
+    "BENCHBOX_SKIP_TEST_LOCK",
+    "BENCHBOX_TEST_LOCK_DIR",
+    "CI",
+    "GITHUB_ACTIONS",
+    "PATH",
+    "PYTHONPATH",
+    "UV_PROJECT_ENVIRONMENT",
+    "VIRTUAL_ENV",
+)
+MEMBER_BATCH_FIELDS = (
+    "batch_id",
+    "member",
+    "role",
+    "source_base",
+    "source_head",
+    "accepted_head",
+    "scope_hash",
+    "config_hash",
+    "changed_paths",
+)
+INTEGRATOR_BATCH_FIELDS = (
+    "batch_id",
+    "role",
+    "integration_head",
+    "integration_tree",
+    "predecessor_head",
+    "predecessor_tree",
+    "member_identity",
 )
 
 
@@ -134,11 +168,7 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
 
 
 def clear_inactive_lock(lock_path: Path) -> int:
-    """Remove only an inactive diagnostic lock file.
-
-    The non-blocking kernel lock is authoritative; stale text alone never
-    grants permission to remove the path.  Active holders are left untouched.
-    """
+    """Clear inactive diagnostic text without unlinking the lock pathname."""
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
@@ -154,11 +184,8 @@ def clear_inactive_lock(lock_path: Path) -> int:
         except (BlockingIOError, OSError):
             print(f"[local-validation] active lock retained: {lock_path}", file=sys.stderr)
             return 1
-        try:
-            os.unlink(lock_path)
-        except FileNotFoundError:
-            pass
-        print(f"[local-validation] removed inactive lock: {lock_path}")
+        os.ftruncate(fd, 0)
+        print(f"[local-validation] cleared inactive lock: {lock_path}")
         return 0
     finally:
         os.close(fd)
@@ -181,22 +208,26 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _tool_version(executable: str) -> str:
-    """Return a stable version string, or raise when the tool is unavailable."""
+def _tool_identity(executable: str) -> dict[str, str]:
+    """Resolve the exact executable and record its version."""
+    resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
+    if not resolved:
+        raise IdentityUnknown(f"cannot resolve executable: {executable}")
+    resolved = str(Path(resolved).resolve())
     try:
         proc = subprocess.run(
-            [executable, "--version"],
+            [resolved, "--version"],
             check=True,
             text=True,
             capture_output=True,
             timeout=15,
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise IdentityUnknown(f"cannot determine {executable} version: {exc}") from exc
+        raise IdentityUnknown(f"cannot determine {resolved} version: {exc}") from exc
     version = (proc.stdout or proc.stderr).strip().splitlines()
     if not version:
-        raise IdentityUnknown(f"{executable} returned no version")
-    return version[0]
+        raise IdentityUnknown(f"{resolved} returned no version")
+    return {"path": resolved, "version": version[0]}
 
 
 def _command_tools(argv: list[str]) -> list[str]:
@@ -208,9 +239,10 @@ def _command_tools(argv: list[str]) -> list[str]:
     """
     if not argv:
         return []
-    candidates = [Path(argv[0]).name]
-    if candidates[0] in {"uv", "make"}:
-        candidates.append("python3")
+    candidates = [argv[0]]
+    executable = Path(argv[0]).name
+    if executable == "make":
+        candidates.extend(("uv", "pre-commit", "pytest", "ruff"))
     return list(dict.fromkeys(candidates))
 
 
@@ -248,6 +280,113 @@ def tracked_modified(porcelain: list[str]) -> list[str]:
     return sorted(set(names))
 
 
+def _config_digests(repo: Path) -> dict[str, str | None]:
+    digests: dict[str, str | None] = {}
+    for name in VALIDATION_CONFIG_FILES:
+        path = repo / name
+        if path.is_file():
+            try:
+                digests[name] = _sha256_file(path)
+            except OSError as exc:
+                raise IdentityUnknown(f"cannot hash validation config {name}: {exc}") from exc
+        else:
+            digests[name] = None
+    return digests
+
+
+def _canonical_paths(value: object) -> list[str]:
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value) if value.lstrip().startswith("[") else value.split(",")
+        except json.JSONDecodeError as exc:
+            raise IdentityUnknown(f"invalid changed_paths JSON: {exc}") from exc
+    else:
+        parsed = value
+    if not isinstance(parsed, (list, tuple)):
+        raise IdentityUnknown("changed_paths must be a list or comma-separated string")
+    result: set[str] = set()
+    for raw in parsed:
+        if not isinstance(raw, str) or not raw.strip():
+            raise IdentityUnknown("changed_paths entries must be non-empty strings")
+        path = raw.strip().replace("\\", "/")
+        normalized = PurePosixPath(path)
+        if normalized.is_absolute() or ".." in normalized.parts or path == ".":
+            raise IdentityUnknown(f"changed_paths contains unsafe path: {raw!r}")
+        result.add(normalized.as_posix())
+    return sorted(result)
+
+
+def _batch_config_hash(repo: Path) -> str:
+    canonical = json.dumps(_config_digests(repo), sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def _validate_member_batch(repo: Path, batch: dict) -> tuple[bool, str]:
+    missing = [field for field in MEMBER_BATCH_FIELDS if batch.get(field) in (None, "")]
+    if missing:
+        return False, f"member batch metadata missing: {', '.join(missing)}"
+    try:
+        changed_paths = _canonical_paths(batch["changed_paths"])
+        head = _git(repo, "rev-parse", "HEAD").strip()
+        base = _git(repo, "rev-parse", "origin/develop").strip()
+    except (IdentityUnknown, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        return False, str(exc)
+    if batch["source_head"] != head or batch["accepted_head"] != head:
+        return False, "member source/accepted head does not match current HEAD"
+    if batch["source_base"] != base:
+        return False, "member source base does not match origin/develop"
+    expected_scope = hashlib.sha256(json.dumps(changed_paths, separators=(",", ":")).encode()).hexdigest()
+    if batch["scope_hash"] != expected_scope:
+        return False, "member scope hash does not match canonical changed paths"
+    try:
+        expected_config = _batch_config_hash(repo)
+    except IdentityUnknown as exc:
+        return False, str(exc)
+    if batch["config_hash"] != expected_config:
+        return False, "member config hash does not match validation config"
+    return True, ""
+
+
+def _validate_integrator_batch(repo: Path, batch: dict) -> tuple[bool, str]:
+    missing = [field for field in INTEGRATOR_BATCH_FIELDS if batch.get(field) in (None, "")]
+    if missing:
+        return False, f"integrator batch metadata missing: {', '.join(missing)}"
+    try:
+        head = _git(repo, "rev-parse", "HEAD").strip()
+        tree = _git(repo, "rev-parse", "HEAD^{tree}").strip()
+        predecessor = _git(repo, "rev-parse", f"{batch['predecessor_head']}^{{commit}}").strip()
+        predecessor_tree = _git(repo, "rev-parse", f"{predecessor}^{{tree}}").strip()
+        _git(repo, "merge-base", "--is-ancestor", predecessor, head)
+    except subprocess.CalledProcessError as exc:
+        return False, f"invalid integrator revision: {exc}"
+    except (subprocess.TimeoutExpired, IdentityUnknown) as exc:
+        return False, str(exc)
+    if batch["integration_head"] != head:
+        return False, "integrator integration head does not match current HEAD"
+    if batch["integration_tree"] != tree:
+        return False, "integrator integration tree does not match current HEAD tree"
+    if batch["predecessor_tree"] != predecessor_tree:
+        return False, "integrator predecessor tree does not match predecessor head"
+    member_identity = batch["member_identity"]
+    if isinstance(member_identity, str):
+        if not member_identity.strip():
+            return False, "integrator member identity is empty"
+    elif not isinstance(member_identity, (list, tuple, dict)) or not member_identity:
+        return False, "integrator member identity is not a non-empty object"
+    return True, ""
+
+
+def validate_batch(repo: Path, batch: dict | None) -> tuple[bool, str]:
+    """Validate role-specific delivery metadata against the current checkout."""
+    if batch is None:
+        return True, ""
+    if batch.get("role") == "member":
+        return _validate_member_batch(repo, batch)
+    if batch.get("role") == "integrator":
+        return _validate_integrator_batch(repo, batch)
+    return False, "batch role must be member or integrator"
+
+
 def content_identity(repo: Path, argv: list[str]) -> dict:
     """Exact validated-input identity for *repo* and command *argv*.
 
@@ -271,17 +410,9 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
         lock_digest: str | None = _sha256_file(uv_lock) if uv_lock.is_file() else None
     except OSError as exc:
         raise IdentityUnknown(f"cannot hash uv.lock: {exc}") from exc
-    config_digests: dict[str, str | None] = {}
-    for name in VALIDATION_CONFIG_FILES:
-        path = repo / name
-        if path.is_file():
-            try:
-                config_digests[name] = _sha256_file(path)
-            except OSError as exc:
-                raise IdentityUnknown(f"cannot hash validation config {name}: {exc}") from exc
-        else:
-            config_digests[name] = None
-    tool_versions = {tool: _tool_version(tool) for tool in _command_tools(argv)}
+    config_digests = _config_digests(repo)
+    tool_versions = {tool: _tool_identity(tool) for tool in _command_tools(argv)}
+    environment = {key: os.environ.get(key) for key in VALIDATION_ENV_KEYS}
     return {
         "head": head,
         "base": base,
@@ -293,6 +424,7 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
         "uv_lock": lock_digest,
         "validation_config": config_digests,
         "tool_versions": tool_versions,
+        "environment": environment,
     }
 
 
@@ -312,12 +444,24 @@ def receipt_path(store: Path, gate: str, identity: dict, batch: dict | None) -> 
     return store / (hashlib.sha256(canonical.encode()).hexdigest() + ".json")
 
 
-def read_receipt(path: Path) -> dict | None:
+def read_receipt(path: Path, *, gate: str, identity: dict, batch: dict | None) -> dict | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) and data.get("exit") == 0 else None
+    if not isinstance(data, dict):
+        return None
+    if data.get("schema") != 2 or data.get("gate") != gate or data.get("exit") != 0:
+        return None
+    if data.get("identity") != identity or data.get("batch") != batch:
+        return None
+    delivery = data.get("delivery")
+    if (
+        not isinstance(delivery, dict)
+        or delivery.get("member_preparation_is_not_integration_certification") is not True
+    ):
+        return None
+    return data
 
 
 def run_gate(
@@ -329,6 +473,10 @@ def run_gate(
     store: Path,
 ) -> int:
     """Run *argv* under the singleflight receipt contract. Returns its exit code."""
+    valid_batch, batch_reason = validate_batch(repo, batch)
+    if not valid_batch:
+        print(f"[local-validation] batch identity unknown ({batch_reason}); executing without receipt")
+        return subprocess.run(list(argv), cwd=repo, check=False).returncode
     try:
         identity = content_identity(repo, list(argv))
     except IdentityUnknown as exc:
@@ -353,7 +501,7 @@ def run_gate(
                 identity = current
                 continue
             write_holder(lock_fd, lock_path, phase="checking", gate=gate)
-            hit = None if current_unknown else read_receipt(receipt)
+            hit = None if current_unknown else read_receipt(receipt, gate=gate, identity=identity, batch=batch)
             if hit is not None:
                 print(
                     f"[local-validation] REUSED {gate} receipt "
@@ -392,6 +540,9 @@ def run_gate(
                                             "scope_hash",
                                             "config_hash",
                                             "changed_paths",
+                                            "predecessor_head",
+                                            "predecessor_tree",
+                                            "member_identity",
                                         )
                                         if batch and (batch or {}).get(key) is not None
                                     },
@@ -419,13 +570,17 @@ def run_gate(
 
 
 def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list[str] | None = None) -> int:
+    valid_batch, batch_reason = validate_batch(repo, batch)
+    if not valid_batch:
+        print(f"[local-validation] batch identity unknown ({batch_reason})")
+        return 2
     try:
         identity = content_identity(repo, list(argv or []))
     except IdentityUnknown as exc:
         print(f"[local-validation] identity unknown ({exc})")
         return 2
     receipt = receipt_path(store, gate, identity, batch)
-    hit = read_receipt(receipt)
+    hit = read_receipt(receipt, gate=gate, identity=identity, batch=batch)
     print(f"[local-validation] gate={gate} head={identity['head'][:12]} base={identity['base'][:12]}")
     print(f"[local-validation] receipt={'present' if hit is not None else 'absent'} ({receipt.name})")
     return 0
@@ -471,6 +626,9 @@ def build_parser() -> argparse.ArgumentParser:
         parser_arg.add_argument("--batch-scope-hash", default=None)
         parser_arg.add_argument("--batch-config-hash", default=None)
         parser_arg.add_argument("--batch-changed-paths", default=None)
+        parser_arg.add_argument("--batch-predecessor-head", default=None)
+        parser_arg.add_argument("--batch-predecessor-tree", default=None)
+        parser_arg.add_argument("--batch-member-identity", default=None)
     run.add_argument(
         "--lock-wait-seconds",
         type=float,
@@ -491,6 +649,9 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("--batch-scope-hash", default=None)
     show.add_argument("--batch-config-hash", default=None)
     show.add_argument("--batch-changed-paths", default=None)
+    show.add_argument("--batch-predecessor-head", default=None)
+    show.add_argument("--batch-predecessor-tree", default=None)
+    show.add_argument("--batch-member-identity", default=None)
     show.add_argument("argv", nargs=argparse.REMAINDER, help="gate command after -- (same as run)")
     ordered = sub.add_parser("ordered", help="run focused checks, then the required preflight")
     ordered.add_argument("--focused-gate", default="local-focused-check")
@@ -508,6 +669,9 @@ def build_parser() -> argparse.ArgumentParser:
     ordered.add_argument("--batch-scope-hash", default=None)
     ordered.add_argument("--batch-config-hash", default=None)
     ordered.add_argument("--batch-changed-paths", default=None)
+    ordered.add_argument("--batch-predecessor-head", default=None)
+    ordered.add_argument("--batch-predecessor-tree", default=None)
+    ordered.add_argument("--batch-member-identity", default=None)
     ordered.add_argument("--lock-wait-seconds", type=float, default=DEFAULT_LOCK_WAIT_SECONDS)
     clear = sub.add_parser("clear-test-lock", help="remove an inactive shared test lock")
     clear.add_argument("path", type=Path)
@@ -527,6 +691,9 @@ def batch_block(args: argparse.Namespace) -> dict | None:
         "scope_hash": getattr(args, "batch_scope_hash", None),
         "config_hash": getattr(args, "batch_config_hash", None),
         "changed_paths": getattr(args, "batch_changed_paths", None),
+        "predecessor_head": getattr(args, "batch_predecessor_head", None),
+        "predecessor_tree": getattr(args, "batch_predecessor_tree", None),
+        "member_identity": getattr(args, "batch_member_identity", None),
     }
     if not any(value is not None for value in fields.values()):
         return None

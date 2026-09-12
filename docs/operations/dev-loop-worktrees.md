@@ -152,8 +152,8 @@ The default is immediate fail-fast with holder info; set
 `BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
 owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
 deletes, or bypasses — a held flock always means a live holder).
-`make test-unlock` removes only an inactive diagnostic path and refuses an
-active kernel lock.
+`make test-unlock` clears only inactive diagnostic text and refuses an active
+kernel lock; it never removes the lock pathname.
 
 Gate authors avoid duplicate invocations against identical trees with
 `scripts/local_validation.py` (see `make local-validation GATE=... CMD=...`):
@@ -177,6 +177,10 @@ Gate authors avoid duplicate invocations against identical trees with
   tree because the integration identity is part of the frozen record. Pre-PR
   effort stays counted: receipts record executions, they do not erase them
   from delivery accounting.
+- `make pr-preflight` is the canonical ordered path and records both stage
+  receipts. The optional pre-push hook runs only the focused stage, so it can
+  reuse the focused receipt from a prior manual preflight without broadening
+  the hook into a second full preflight.
 
 ## Queue-aware publication and resumable follow-up
 

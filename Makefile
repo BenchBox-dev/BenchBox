@@ -1269,7 +1269,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups-list pr-review-followups dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1279,15 +1279,26 @@ agent-write-preflight:
 # structurally unsafe skill diffs retain the full historical ci-lint + content
 # guard + fast-test contract; only an approved pure skill-integrity diff uses
 # the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
-pr-preflight:
+# The uncached implementation is called by the receipt-bound wrapper below.
+pr-preflight-uncached:
 	@set -eu; \
 	DECISION=$$(mktemp); \
 	LISTS=$$(mktemp -d); \
 	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
-	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS"; \
+	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS" SKIP_FAST_TESTS="$(SKIP_FAST_TESTS)"; \
 	$(MAKE) -s uat-artifact-hygiene
+
+# Canonical local preflight: the focused lane runs once, then the remaining
+# required lanes run against the same classifier decision. Each ordered stage
+# gets its own content-bound receipt; hosted required checks remain separate.
+pr-preflight:
+	@git fetch origin develop --quiet
+	uv run -- python scripts/local_validation.py ordered \
+		--focused-gate "local-focused-check" --focused-cmd 'make pr-preflight-fast-tests' \
+		--preflight-gate "required-pr-preflight" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \
+		$(BATCH_ARGS)
 
 # Consume the classifier decision only; never reimplement path globs here.
 # Mixed skill/product diffs run both lanes. Skill plus safe content stays on
@@ -1311,7 +1322,12 @@ pr-preflight:
 		echo "Selected preflight lanes: $$LANES"; \
 		$(MAKE) ci-lint; \
 		if [ "$$SKILL" = true ]; then $(MAKE) -s skill-integrity-check; fi; \
-		$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+		if [ "$(SKIP_FAST_TESTS)" = "1" ]; then \
+			echo "Focused local gate already completed; skipping duplicate fast tests."; \
+			$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
+		else \
+			$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+		fi; \
 	fi
 
 # Always runs pr-content-guard for the historical full-preflight path. The
@@ -1363,10 +1379,8 @@ local-validation-show:
 FOCUSED_CMD ?= uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q
 PREFLIGHT_CMD ?= make pr-preflight
 local-validation-path:
-	uv run -- python scripts/local_validation.py ordered \
-		--focused-gate "local-focused-check" --focused-cmd '$(FOCUSED_CMD)' \
-		--preflight-gate "required-pr-preflight" --preflight-cmd '$(PREFLIGHT_CMD)' \
-		$(BATCH_ARGS)
+	@echo "Running receipt-bound canonical preflight path (focused then required lanes)."
+	$(MAKE) -s pr-preflight $(BATCH_ARGS)
 
 # Revision/readiness transactions behind one helper (scripts/pr_landing.py).
 # Existing pr-open/pr-ready recipes are unchanged; these stage readiness

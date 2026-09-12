@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -57,6 +58,28 @@ def _counter_gate(marker: Path) -> list[str]:
 
 def _count(marker: Path) -> int:
     return len(marker.read_text(encoding="utf-8")) if marker.exists() else 0
+
+
+def _valid_member_batch(repo: Path) -> dict[str, object]:
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    base = subprocess.run(
+        ["git", "rev-parse", "origin/develop"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    paths = ["tracked.txt"]
+    scope_hash = hashlib.sha256(json.dumps(paths, separators=(",", ":")).encode()).hexdigest()
+    return {
+        "batch_id": "batch-1",
+        "member": "member-a",
+        "role": "member",
+        "source_base": base,
+        "source_head": head,
+        "accepted_head": head,
+        "scope_hash": scope_hash,
+        "config_hash": lv._batch_config_hash(repo),
+        "changed_paths": paths,
+    }
 
 
 def test_identical_request_reuses_receipt(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -120,7 +143,28 @@ def test_batch_block_changes_identity(repo: Path, tmp_path: Path) -> None:
     assert lv.run_gate("g", gate, member, 5.0, repo, lv.store_dir(repo)) == 0
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert lv.run_gate("g", gate, member, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 3
+
+
+def test_partial_batch_metadata_executes_without_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    partial = {"batch_id": "b", "member": "A", "role": "member"}
+    assert lv.run_gate("g", gate, partial, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, partial, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
+    assert list(lv.store_dir(repo).rglob("*.json")) == []
+
+
+def test_false_member_head_executes_without_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    batch = _valid_member_batch(repo)
+    batch["source_head"] = "0" * 40
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+    assert list(lv.store_dir(repo).rglob("*.json")) == []
 
 
 def test_concurrent_identical_requests_execute_once(repo: Path, tmp_path: Path) -> None:
@@ -138,6 +182,50 @@ def test_concurrent_identical_requests_execute_once(repo: Path, tmp_path: Path) 
         thread.join(timeout=60)
     assert results == [0, 0]
     assert len(marker.read_text(encoding="utf-8")) == 1
+
+
+def test_two_worktrees_coalesce_identical_request(repo: Path, tmp_path: Path) -> None:
+    second = tmp_path / "repo-second"
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(second), "HEAD"], cwd=repo, check=True, capture_output=True
+    )
+    try:
+        marker = tmp_path / "worktree-count.txt"
+        gate = [sys.executable, "-c", f"import time; time.sleep(1); open({str(marker)!r}, 'a').write('x')"]
+        results: list[int] = []
+        threads = [
+            threading.Thread(
+                target=lambda path=path: results.append(lv.run_gate("g", gate, None, 30.0, path, lv.store_dir(path)))
+            )
+            for path in (repo, second)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+        assert results == [0, 0]
+        assert _count(marker) == 1
+    finally:
+        subprocess.run(["git", "worktree", "remove", "--force", str(second)], cwd=repo, check=True, capture_output=True)
+
+
+def test_tree_change_while_waiting_invalidates_old_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    identity = lv.content_identity(repo, gate)
+    receipt = lv.receipt_path(store, "g", identity, None)
+    holder_fd = lv.wait_for_lock(receipt.with_name(receipt.stem + ".lock"), 5.0)
+    result: list[int] = []
+    thread = threading.Thread(target=lambda: result.append(lv.run_gate("g", gate, None, 30.0, repo, store)))
+    thread.start()
+    time.sleep(0.4)
+    (repo / "tracked.txt").write_text("changed while waiting", encoding="utf-8")
+    os.close(holder_fd)
+    thread.join(timeout=60)
+    assert result == [0]
+    assert _count(marker) == 2
 
 
 def test_show_reports_receipt_status(repo: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -191,12 +279,70 @@ def test_stale_holder_text_does_not_block_acquire(tmp_path: Path) -> None:
     os.close(fd)
 
 
+def test_clear_inactive_lock_keeps_path_for_competing_openers(tmp_path: Path) -> None:
+    import fcntl
+
+    lock = tmp_path / "test.lock"
+    lock.write_text("stale holder", encoding="utf-8")
+    assert lv.clear_inactive_lock(lock) == 0
+    assert lock.exists()
+    assert lock.read_text(encoding="utf-8") == ""
+
+    holder_fd = os.open(str(lock), os.O_RDWR)
+    try:
+        fcntl.flock(holder_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        contender_fd = os.open(str(lock), os.O_RDWR)
+        try:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(contender_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        finally:
+            os.close(contender_fd)
+    finally:
+        fcntl.flock(holder_fd, fcntl.LOCK_UN)
+        os.close(holder_fd)
+
+
 def test_receipt_file_records_gate_and_exit(repo: Path, tmp_path: Path) -> None:
     assert lv.run_gate("g", _counter_gate(tmp_path / "count.txt"), None, 5.0, repo, lv.store_dir(repo)) == 0
     receipts = list(lv.store_dir(repo).rglob("*.json"))
     assert len(receipts) == 1
     data = json.loads(receipts[0].read_text(encoding="utf-8"))
     assert data["gate"] == "g" and data["exit"] == 0 and data["identity"]["head"]
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("schema", 1),
+        ("gate", "other"),
+        ("exit", 7),
+        ("identity", {}),
+        ("batch", {"wrong": True}),
+        ("delivery", {}),
+    ],
+)
+def test_corrupt_or_mismatched_receipt_executes_again(repo: Path, tmp_path: Path, field: str, value: object) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    receipt = next(store.rglob("*.json"))
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data[field] = value
+    receipt.write_text(json.dumps(data), encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
+
+
+def test_renamed_receipt_is_not_reused(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    receipt = next(store.rglob("*.json"))
+    receipt.rename(store / "legacy-receipt.json")
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
 
 
 def test_changed_command_invalidates_receipt(repo: Path, tmp_path: Path) -> None:
@@ -207,6 +353,29 @@ def test_changed_command_invalidates_receipt(repo: Path, tmp_path: Path) -> None
     assert lv.run_gate("g", gate_a, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert lv.run_gate("g", gate_b, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker_a) == 1 and _count(marker_b) == 1
+
+
+def test_changed_environment_invalidates_receipt(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    monkeypatch.setenv("BENCHBOX_TEST_LOCK_DIR", str(tmp_path / "other-lock"))
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_changed_tool_identity_invalidates_receipt(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    original = lv._tool_identity
+    monkeypatch.setattr(
+        lv,
+        "_tool_identity",
+        lambda executable: {"path": original(executable)["path"], "version": "changed"},
+    )
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
 
 
 def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) -> None:
@@ -308,6 +477,32 @@ def test_batch_integration_identity_invalidates_member_receipt(repo: Path, tmp_p
     }
     assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
     batch["integration_tree"] = "tree-2"
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 2
+
+
+def test_integrator_metadata_binds_predecessor_and_combined_tree(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    tree = subprocess.run(
+        ["git", "rev-parse", "HEAD^{tree}"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = {
+        "batch_id": "batch-1",
+        "role": "integrator",
+        "integration_head": head,
+        "integration_tree": tree,
+        "predecessor_head": head,
+        "predecessor_tree": tree,
+        "member_identity": "member-a@accepted-head",
+    }
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 1
+    batch["integration_tree"] = "0" * 40
     assert lv.run_gate("g", gate, batch, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
 
