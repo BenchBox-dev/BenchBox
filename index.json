@@ -15077,6 +15077,15 @@
       "status": "open",
       "title": "Generate type-valid SQL families and held-out compositions"
     },
+    "sql-translation-ml-models": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-dataset"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Implement independent full-SQL and span-edit model adapters"
+    },
     "sql-translation-ml-sources": {
       "claim": null,
       "needs": [
