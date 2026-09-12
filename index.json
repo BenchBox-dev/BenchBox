@@ -1096,9 +1096,9 @@
     },
     "batch-feature-branch-integration": {
       "claim": {
-        "expires_at": "2026-09-13T21:09:28Z",
-        "generation": "99db836bbf2e4b93b5bbb3ddc8c5dab2",
-        "renewals": 0,
+        "expires_at": "2026-09-13T21:12:27Z",
+        "generation": "2ef0ea3a1c2145fc9fd3406d7675a9d6",
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
       },
       "needs": [
