@@ -15113,6 +15113,15 @@
       "status": "open",
       "title": "Freeze leakage-resistant development and test splits"
     },
+    "sql-translation-ml-train-full": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-feasibility"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Train and select the standalone tiny SQL translator"
+    },
     "sql-translation-ml-trainer": {
       "claim": null,
       "needs": [
