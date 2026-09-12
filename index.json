@@ -15050,6 +15050,15 @@
       "status": "open",
       "title": "Build deterministic DuckDB and SQLite fixture creation"
     },
+    "sql-translation-ml-generator": {
+      "claim": null,
+      "needs": [
+        "sql-translation-ml-executor"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Generate type-valid SQL families and held-out compositions"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],
