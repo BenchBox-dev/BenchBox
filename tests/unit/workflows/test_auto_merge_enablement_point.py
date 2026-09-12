@@ -125,9 +125,10 @@ def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:
     entry points drift until one of them stops checking.
     """
     text = MAKEFILE.read_text(encoding="utf-8")
-    assert text.count(ARM_COMMAND) == 1, (
-        f"{ARM_COMMAND!r} appears more than once; the soundness check can drift between copies"
-    )
+    executable = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(("#", "@#")))
+    assert ARM_COMMAND not in executable, "Makefile contains a second executable arming implementation"
+    body = _target_body("pr-arm-auto-merge")
+    assert "scripts/pr_landing.py" in body and " arm" in body, "Makefile arm target no longer delegates to the helper"
 
 
 def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
@@ -137,11 +138,9 @@ def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
     moving the enablement point would quietly drop the control that keeps
     oracle-adjacent changes from merging hands-free.
     """
-    body = _target_body("pr-arm-auto-merge")
-    assert "auto_merge_soundness_paths.py" in body, "arming path no longer consults the soundness predicate"
-    arm_index = body.index(ARM_COMMAND)
-    check_index = body.index("auto_merge_soundness_paths.py")
-    assert check_index < arm_index, "soundness check runs after arming, so it cannot withhold"
+    helper = (REPO_ROOT / "scripts" / "pr_landing.py").read_text(encoding="utf-8")
+    assert "soundness_paths_changed" in helper, "arming helper no longer consults the soundness predicate"
+    assert "--auto" in helper and "--match-head-commit" in helper, "arming helper lost its guarded merge operation"
 
 
 # ---------------------------------------------------------------------------

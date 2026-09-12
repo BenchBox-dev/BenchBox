@@ -1380,21 +1380,30 @@ local-validation-show:
 	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
 
 # Revision/readiness transactions behind one helper (scripts/pr_landing.py).
-# Existing pr-open/pr-ready recipes are unchanged; these stage readiness
-# explicitly: start records identity, withdraw disarms auto-merge before a
-# revision, ready verifies the exact head and enqueues only with --arm.
+# The live PR targets below use the same exact-checkout arming path: start
+# records identity, withdraw disarms auto-merge before a revision, and ready
+# verifies the exact head and enqueues only after the helper re-reads the PR.
 pr-landing-start:
-	uv run -- python scripts/pr_landing.py --worktree . start
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) start
 
 pr-landing-withdraw:
 	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
-	uv run -- python scripts/pr_landing.py --worktree . withdraw --pr "$(PR)"
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) withdraw --pr "$(PR)" \
+		$(if $(HEAD),--expected-head "$(HEAD)",)
 
 pr-landing-ready:
 	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
 	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
 	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
-	uv run -- python scripts/pr_landing.py --worktree . ready --pr "$(PR)" \
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) ready --pr "$(PR)" \
 		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" $(if $(ARM),--arm,)
 
 pr-followup-record:
@@ -1475,24 +1484,25 @@ pr-open:
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
-	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
 		else \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$CURRENT"); \
 		fi; \
 	else \
 		echo "Reusing existing PR: $$URL"; \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			gh pr edit "$$URL" --body-file "$(PR_BODY_FILE)"; \
+			gh pr edit --repo "$$REPOSITORY" "$$URL" --body-file "$(PR_BODY_FILE)"; \
 		fi; \
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
 		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
 	else \
-		$(MAKE) -s pr-arm-auto-merge URL="$$URL"; \
+		$(MAKE) -s pr-arm-auto-merge REPO="$$REPOSITORY"; \
 	fi
 
 # Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
@@ -1504,24 +1514,20 @@ pr-open:
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
 # _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
-	@URL="$(URL)"; \
-	if [ -z "$$URL" ]; then \
-		CURRENT=$$(git branch --show-current); \
-		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	@set -eu; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	CURRENT=$$(git branch --show-current); \
+	PR_NUMBER="$(PR)"; \
+	if [ -n "$(URL)" ]; then \
+		if [ -n "$$PR_NUMBER" ]; then echo "PR and URL are mutually exclusive" >&2; exit 2; fi; \
+		PR_NUMBER=$$(gh pr view --repo "$$REPOSITORY" "$(URL)" --json number --jq '.number') || { echo "Could not resolve URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
 	fi; \
-	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
-	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
-	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
-		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
-		exit 0; \
-	fi; \
-	git fetch origin develop --quiet; \
-	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
-	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
-		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
-	else \
-		gh pr merge --auto --squash "$$URL"; \
-	fi
+	case "$$PR_NUMBER" in *[!0-9]*) echo "PR must resolve to a positive number" >&2; exit 2 ;; esac; \
+	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" -le 0 ]; then echo "PR must resolve to a positive number" >&2; exit 2; fi; \
+	PR_ARGS=""; \
+	if [ -n "$$PR_NUMBER" ]; then PR_ARGS="--pr $$PR_NUMBER"; fi; \
+	uv run -- python scripts/pr_landing.py --repo "$$REPOSITORY" \
+		--worktree . --branch "$$CURRENT" arm $$PR_ARGS
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
@@ -1534,7 +1540,7 @@ pr-arm-auto-merge:
 # (#1503, #1521, #1531); the last two stranded the very commits that addressed
 # their own review findings.
 pr-ready:
-	@$(MAKE) -s pr-arm-auto-merge
+	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)"
 
 shrink-rollup:
 	@git fetch origin develop --quiet

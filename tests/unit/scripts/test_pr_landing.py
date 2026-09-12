@@ -64,7 +64,13 @@ def _repo(path: Path) -> Path:
 
 def _identity(repo: Path, head: str = HEAD, base: str | None = None) -> landing.GitIdentity:
     return landing.GitIdentity(
-        repo=str(repo), branch="feat/x", worktree=str(repo), head=head, base=base or head, upstream="origin/main"
+        repo=str(repo),
+        repository="o/r",
+        branch="feat/x",
+        worktree=str(repo),
+        head=head,
+        base=base or head,
+        upstream="origin/main",
     )
 
 
@@ -82,7 +88,7 @@ def _green_checks(head: str = HEAD) -> list[dict]:
 
 
 def _evidence(head: str = HEAD, **over: object) -> landing.ReadyEvidence:
-    base = {
+    base: dict[str, object] = {
         "expected_head": head,
         "review_decision": "APPROVED",
         "dispositions_complete": True,
@@ -90,6 +96,78 @@ def _evidence(head: str = HEAD, **over: object) -> landing.ReadyEvidence:
     }
     base.update(over)
     return landing.ReadyEvidence(**base)  # type: ignore[arg-type]
+
+
+def _canonical_batch(repo: Path, head: str) -> dict[str, object]:
+    scope = {"a": ["**"]}
+    receipt = {
+        "schema": landing.PREPARED_RECEIPT_SCHEMA,
+        "batch_id": "b",
+        "member_id": "a",
+        "owner_generation": "1" * 32,
+        "source_worktree": str(repo),
+        "source_revision": head,
+        "source_base": head,
+        "accepted_head": head,
+        "integration_head": head,
+        "scope_hash": landing._scope_digest(scope),
+        "changed_files": [],
+        "verification": {
+            "status": "passed",
+            "revision": head,
+            "clean": True,
+            "suite": "focused",
+            "command": ["pytest", "-q"],
+        },
+    }
+    final_pr = {"number": 1, "node_id": "PR_1", "head": head}
+    return {
+        "batch_id": "b",
+        "project_id": "project",
+        "repository": "o/r",
+        "owner": "worker",
+        "owner_generation": "1" * 32,
+        "integration_branch": "main",
+        "integration_worktree": str(repo),
+        "start_head": head,
+        "members": ["a"],
+        "scope": scope,
+        "scope_hash": landing._scope_digest(scope),
+        "delivery_boundary": "final-pr",
+        "terminal_outcome": "merged",
+        "integration_head": head,
+        "accepted_members": {"a": head},
+        "integrated_members": {"a": {"accepted_head": head, "integration_head": head}},
+        "prepared_receipts": {"a": receipt},
+        "review_dispositions": {
+            "a": {
+                "status": "approved",
+                "current": True,
+                "resolved": True,
+                "member_id": "a",
+                "head": head,
+                "integration_head": head,
+            }
+        },
+        "final_pr": final_pr,
+        "final_evidence": {
+            "status": "passed",
+            "batch_id": "b",
+            "project_id": "project",
+            "repository": "o/r",
+            "tree_worktree": str(repo),
+            "tree_revision": head,
+            "integration_branch": "main",
+            "integration_head": head,
+            "scope_hash": landing._scope_digest(scope),
+            "member_heads": {"a": head},
+            "member_ranges": {"a": {"base": head, "head": head}},
+            "changed_files": [],
+            "final_pr": final_pr,
+            "suite": "combined-tree",
+            "clean": True,
+        },
+    }
 
 
 def test_resolve_pr_refuses_cross_branch_match() -> None:
@@ -203,18 +281,39 @@ def test_batch_binding_requires_ancestors_and_quiescence(tmp_path: Path) -> None
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
-    member = {"id": "A", "head": head}
-    batch = {
-        "batch_id": "b",
-        "members": [member],
-        "owner_generation": 1,
-        "integration_head": head,
-        "active_writers": [],
-    }
+    batch = _canonical_batch(repo, head)
     assert landing.check_batch_binding(repo, batch, head) == []
     assert landing.check_batch_binding(repo, {**batch, "active_writers": ["w"]}, head) != []
-    assert landing.check_batch_binding(repo, {**batch, "members": [{"id": "B", "head": "c" * 40}]}, head) != []
+    assert landing.check_batch_binding(repo, {**batch, "members": ["B"]}, head) != []
     assert landing.check_batch_binding(repo, {**batch, "integration_head": OTHER}, head) != []
+
+
+def test_batch_binding_rejects_dirty_current_integration_checkout(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, head)
+    (repo / "dirty.txt").write_text("uncommitted")
+
+    failures = landing.check_batch_binding(repo, batch, head)
+
+    assert any("current integration checkout is dirty" in failure for failure in failures)
+
+
+def test_batch_binding_rejects_current_head_mismatch(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    declared_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, declared_head)
+    (repo / "later.txt").write_text("later integration commit")
+    subprocess.run(["git", "add", "later.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "later"], cwd=repo, check=True, capture_output=True)
+
+    failures = landing.check_batch_binding(repo, batch, declared_head)
+
+    assert any("current integration checkout HEAD" in failure for failure in failures)
 
 
 def test_stale_base_policy_matrix() -> None:
@@ -451,3 +550,261 @@ def test_verify_evidence_live_prefers_latest_run_over_stale_success() -> None:
     run = FakeRun([(0, payload)])
     with pytest.raises(landing.LandingError, match="live verification"):
         landing.verify_evidence_live(run, "o/r", _live_pr(HEAD), _evidence(HEAD))
+
+
+def test_bound_withdraw_requires_declared_node_and_head() -> None:
+    pr = {
+        "number": 3,
+        "id": "PR_node_3",
+        "headRefName": "feat/x",
+        "headRefOid": HEAD,
+        "state": "OPEN",
+        "autoMergeRequest": {"id": "queue"},
+        "labels": [],
+    }
+    run = FakeRun([(0, [pr])])
+    with pytest.raises(landing.WrongPR, match="node id"):
+        landing.bound_withdraw(run, "o/r", "feat/x", 3, expected_node_id="PR_other", expected_head=HEAD)
+    assert len(run.calls) == 1
+    assert all("disable-auto" not in " ".join(call) for call in run.calls)
+
+
+def test_resolve_pr_rejects_stale_declared_head() -> None:
+    run = FakeRun([(0, [{"number": 3, "id": "PR_node_3", "headRefName": "feat/x", "headRefOid": OTHER}])])
+    with pytest.raises(landing.WrongPR, match="head"):
+        landing.resolve_pr(run, "o/r", "feat/x", expected_number=3, expected_node_id="PR_node_3", expected_head=HEAD)
+
+
+def test_enqueue_bound_path_rechecks_full_pr_identity() -> None:
+    run = FakeRun(
+        [
+            (
+                0,
+                {
+                    "number": 3,
+                    "id": "PR_node_3",
+                    "headRefName": "feat/x",
+                    "headRefOid": HEAD,
+                    "reviewDecision": "APPROVED",
+                },
+            ),
+            (0, ""),
+        ]
+    )
+    assert landing.enqueue_pr(run, "o/r", 3, HEAD, HEAD, expected_branch="feat/x", expected_node_id="PR_node_3")[
+        "enqueued"
+    ]
+    assert "--match-head-commit" in run.calls[1]
+
+
+def test_worktree_binding_rejects_a_reused_checkout_identity(tmp_path: Path) -> None:
+    identity = landing.GitIdentity(
+        repo=str(tmp_path / "repo"),
+        repository="o/r",
+        branch="feat/x",
+        worktree=str(tmp_path / "repo"),
+        head=HEAD,
+        base=HEAD,
+        upstream="origin/feat/x",
+        lifecycle_id="worktree-generation-1",
+    )
+    with pytest.raises(landing.LandingError, match="worktree lifecycle"):
+        landing.check_worktree_binding(identity, worktree_id="worktree-generation-2")
+
+
+def test_batch_binding_rejects_late_member_and_changed_membership(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    base = _canonical_batch(repo, head)
+    late = {**base, "members": ["a", "a"]}
+    failures = landing.check_batch_binding(repo, late, head)
+    assert any("unique" in failure for failure in failures)
+    failures = landing.check_batch_binding(repo, {**base, "members": ["A"]}, head)
+    assert any("canonical" in failure or "members" in failure for failure in failures)
+
+
+def test_batch_binding_rejects_conflict_pending_writer_and_stale_review(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = {
+        **_canonical_batch(repo, head),
+        "pending_writers": ["member-a"],
+        "conflict_resolution": True,
+    }
+    batch["review_dispositions"] = {
+        "a": {
+            "status": "approved",
+            "current": False,
+            "resolved": True,
+            "member_id": "a",
+            "head": head,
+            "integration_head": head,
+        }
+    }
+    failures = landing.check_batch_binding(repo, batch, head)
+    assert any("conflict resolution" in failure for failure in failures)
+    assert any("active or pending" in failure for failure in failures)
+    assert any("stale" in failure for failure in failures)
+
+
+def test_batch_binding_rejects_review_alias_and_unauthorized_final_file(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, head)
+    scope = {"a": ["allowed/**"]}
+    scope_hash = landing._scope_digest(scope)
+    batch["scope"] = scope
+    batch["scope_hash"] = scope_hash
+    batch["prepared_receipts"]["a"]["scope_hash"] = scope_hash
+    batch["final_evidence"]["scope_hash"] = scope_hash
+    batch["review_dispositions"]["a"]["status"] = "accepted"
+    batch["final_evidence"]["changed_files"] = ["outside.txt"]
+    failures = landing.check_batch_binding(repo, batch, head)
+    assert any("not passing" in failure for failure in failures)
+    assert any("exceed the frozen batch scope" in failure for failure in failures)
+
+
+def test_batch_binding_rejects_malformed_receipt_without_crashing(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, head)
+    batch["prepared_receipts"]["a"]["changed_files"] = None
+    failures = landing.check_batch_binding(repo, batch, head)
+    assert any("changed_files" in failure for failure in failures)
+
+
+def test_batch_binding_rejects_member_content_changed_since_receipt(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, head)
+    receipt = batch["prepared_receipts"]["a"]
+    assert isinstance(receipt, dict)
+    receipt["changed_files"] = ["changed.txt"]
+    assert any("changed_files differ" in failure for failure in landing.check_batch_binding(repo, batch, head))
+
+
+def test_batch_binding_rejects_missing_or_placeholder_final_evidence(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    batch = _canonical_batch(repo, head)
+    batch.pop("prepared_receipts")
+    assert any("prepared_receipts" in failure for failure in landing.check_batch_binding(repo, batch, head))
+    batch = _canonical_batch(repo, head)
+    batch["final_evidence"] = True
+    assert any("final evidence" in failure for failure in landing.check_batch_binding(repo, batch, head))
+
+
+def test_github_repository_normalizes_supported_origin_forms() -> None:
+    for origin in (
+        "https://github.com/BenchBox-dev/BenchBox.git",
+        "git@github.com:BenchBox-dev/BenchBox.git",
+        "ssh://git@github.com/BenchBox-dev/BenchBox.git",
+    ):
+        assert landing.github_repository(origin) == "benchbox-dev/benchbox"
+    with pytest.raises(landing.LandingError):
+        landing.github_repository("https://BenchBox-dev.github.com/BenchBox.git")
+    with pytest.raises(landing.LandingError, match="owner/name"):
+        landing.normalize_github_repository("/tmp/checkout")
+
+
+def test_git_identity_and_cli_bind_repo_to_origin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path / "r")
+    subprocess.run(
+        ["git", "remote", "set-url", "origin", "git@github.com:BenchBox-dev/BenchBox.git"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    identity = landing.git_identity(repo)
+    assert identity.repository == "benchbox-dev/benchbox"
+    monkeypatch.setattr(landing, "live_run", lambda _: pytest.fail("foreign repository reached gh"))
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text("{}", encoding="utf-8")
+    for command in (
+        ["start"],
+        ["withdraw", "--pr", "3"],
+        ["ready", "--pr", "3", "--expected-head", "a" * 40, "--evidence-json", str(evidence)],
+    ):
+        assert landing.main(["--repo", "foreign/repository", "--worktree", str(repo), *command]) == 1
+
+
+def test_arm_current_pr_refuses_head_race_before_merge(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    identity = landing.GitIdentity(
+        repo=str(repo),
+        repository="o/r",
+        branch="feat/x",
+        worktree=str(repo),
+        head=head,
+        base=head,
+        upstream="origin/main",
+    )
+    run = FakeRun(
+        [
+            (0, [{"number": 3, "id": "PR_node_3", "headRefName": "feat/x", "headRefOid": head, "labels": []}]),
+            (
+                0,
+                {
+                    "number": 3,
+                    "id": "PR_node_3",
+                    "headRefName": "feat/x",
+                    "headRefOid": OTHER,
+                    "reviewDecision": "APPROVED",
+                },
+            ),
+        ]
+    )
+    with pytest.raises(landing.WrongPR, match="head"):
+        landing.arm_current_pr(run, identity, repo, 3)
+    assert not any("--auto" in " ".join(call) for call in run.calls)
+
+
+def test_arm_current_pr_rejects_dirty_checkout_before_hosted_lookup(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    identity = _identity(repo, head)
+    (repo / "dirty.txt").write_text("review fix not committed")
+    run = FakeRun([])
+
+    with pytest.raises(landing.LandingError, match="unpublished work"):
+        landing.arm_current_pr(run, identity, repo, 3)
+
+    assert run.calls == []
+
+
+def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    for target in ("pr-landing-start", "pr-landing-withdraw", "pr-landing-ready"):
+        body = makefile.split(f"{target}:", 1)[1].split("\n\n", 1)[0]
+        assert "--repo" in body and "--worktree ." in body and "--branch" in body
+    arm = makefile.split("pr-arm-auto-merge:", 1)[1].split("\n\n", 1)[0]
+    ready = makefile.split("pr-ready:", 1)[1].split("\n\n", 1)[0]
+    assert "scripts/pr_landing.py" in arm and "--repo" in arm and "--worktree ." in arm and "--branch" in arm
+    assert "PR_NUMBER" in arm and "gh pr view --repo" in arm and "--pr" in arm
+    assert "URL" in arm and '"$(URL)"' in arm
+    assert "pr-arm-auto-merge" in ready
+    assert "pr-arm-auto-merge" in makefile.split("pr-open:", 1)[1].split("\n\n", 1)[0]
+    open_body = makefile.split("pr-open:", 1)[1].split("\n\n", 1)[0]
+    assert "gh pr list --repo" in open_body
+    assert "gh pr create --repo" in open_body
+    assert "gh pr edit --repo" in open_body
+    assert "pr-arm-auto-merge REPO=" in open_body and 'URL="$$URL"' not in open_body
+    executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
+    assert "gh pr merge --auto --squash" not in executable

@@ -31,13 +31,17 @@ with fake hosted events. The live runner shells out to `gh`.
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import BinaryIO, cast
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -53,6 +57,13 @@ REQUIRED_CONTEXTS: tuple[str, ...] = (
 )
 MAX_RERUNS_PER_JOB = 1
 MAX_REENTRIES_PER_HEAD = 1
+PREPARED_RECEIPT_SCHEMA = "prepared_work_v1"
+FULL_REVISION_RE = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+SCOPE_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+REPOSITORY_PART_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+TODO_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+MAX_TODO_ID_LEN = 128
+VALID_REVIEW_DISPOSITIONS = frozenset({"approved"})
 
 
 class LandingError(RuntimeError):
@@ -71,8 +82,6 @@ def state_dir(repo: Path) -> Path:
     override = os.environ.get("BENCHBOX_PR_LANDING_DIR")
     if override:
         return Path(override).expanduser()
-    import hashlib
-
     slug = hashlib.sha1(str(repo.resolve()).encode()).hexdigest()[:16]
     return Path.home() / ".benchbox" / "pr-landing" / slug
 
@@ -90,6 +99,8 @@ class GitIdentity:
     head: str
     base: str | None
     upstream: str | None
+    repository: str = ""
+    lifecycle_id: str | None = None
 
 
 def git_identity(repo: Path) -> GitIdentity:
@@ -105,13 +116,20 @@ def git_identity(repo: Path) -> GitIdentity:
         base = _git(repo, "rev-parse", "origin/develop")
     except subprocess.CalledProcessError:
         base = None
+    try:
+        lifecycle_id = _git(repo, "config", "--worktree", "--get", "benchbox.worktree.lifecycle-id")
+    except subprocess.CalledProcessError:
+        lifecycle_id = None
+    repository = github_repository(_git(repo, "config", "--get", "remote.origin.url"))
     return GitIdentity(
         repo=str(repo.resolve()),
+        repository=repository,
         branch=branch,
         worktree=_git(repo, "rev-parse", "--show-toplevel"),
         head=_git(repo, "rev-parse", "HEAD"),
         base=base,
         upstream=upstream,
+        lifecycle_id=lifecycle_id,
     )
 
 
@@ -123,8 +141,103 @@ def live_run(cmd: list[str]) -> tuple[int, str]:
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
-def resolve_pr(run: Runner, repo_full: str, branch: str) -> dict | None:
-    """Resolve the open develop PR for *branch*, refusing cross-branch matches."""
+def normalize_github_repository(value: object) -> str:
+    """Normalize a GitHub ``owner/name`` identity, rejecting ambiguous input."""
+    if not isinstance(value, str) or not value or any(ord(char) < 32 for char in value):
+        raise LandingError("repository must be a GitHub owner/name identity")
+    parts = value.split("/")
+    if len(parts) != 2 or not all(REPOSITORY_PART_RE.fullmatch(part) for part in parts):
+        raise LandingError(f"repository must be a GitHub owner/name identity, got {value!r}")
+    return "/".join(part.lower() for part in parts)
+
+
+def github_repository(origin_url: str) -> str:
+    """Derive the exact GitHub repository identity from an origin URL or SSH form."""
+    if not isinstance(origin_url, str) or not origin_url or any(ord(char) < 32 for char in origin_url):
+        raise LandingError("origin remote is missing or malformed; refusing repository binding")
+    match = re.fullmatch(r"git@github\.com:([^/]+)/([^/]+?)(?:\.git)?", origin_url, re.IGNORECASE)
+    if match:
+        return normalize_github_repository(f"{match.group(1)}/{match.group(2)}")
+    match = re.fullmatch(
+        r"(?:https|ssh)://(?:git@)?github\.com/([^/]+)/([^/]+?)(?:\.git)?/?", origin_url, re.IGNORECASE
+    )
+    if match:
+        return normalize_github_repository(f"{match.group(1)}/{match.group(2)}")
+    raise LandingError(f"origin remote is not a supported GitHub URL or SSH form: {origin_url!r}")
+
+
+def _pr_node_id(pr: dict) -> str:
+    """Return the GraphQL node identity used by exact PR bindings."""
+    return str(pr.get("node_id") or pr.get("id") or "")
+
+
+def _check_pr_identity(
+    pr: dict,
+    *,
+    branch: str | None = None,
+    number: int | None = None,
+    node_id: str | None = None,
+    head: str | None = None,
+) -> None:
+    """Reject any PR record that does not match the caller's declared identity."""
+    if branch is not None and pr.get("headRefName") != branch:
+        raise WrongPR(
+            f"resolved PR #{pr.get('number')} points at {pr.get('headRefName')!r}, "
+            f"not declared branch {branch!r}; refusing wrong-PR operation"
+        )
+    if number is not None and pr.get("number") != number:
+        raise WrongPR(f"resolved PR #{pr.get('number')} is not declared PR #{number}")
+    if node_id is not None and _pr_node_id(pr) != node_id:
+        raise WrongPR(f"PR #{pr.get('number')} node id does not match the declared PR identity")
+    if head is not None and pr.get("headRefOid") != head:
+        raise WrongPR(f"PR #{pr.get('number')} head does not match the declared PR identity")
+
+
+def _require_revision(value: object, label: str) -> str:
+    if not isinstance(value, str) or not FULL_REVISION_RE.fullmatch(value):
+        raise LandingError(f"{label} must be a full lowercase commit SHA")
+    return value
+
+
+def _same_path(left: str, right: str) -> bool:
+    try:
+        return Path(left).resolve() == Path(right).resolve()
+    except (OSError, RuntimeError):
+        return os.path.abspath(left) == os.path.abspath(right)
+
+
+def check_worktree_binding(
+    identity: GitIdentity,
+    *,
+    repository: str | None = None,
+    branch: str | None = None,
+    worktree: str | None = None,
+    worktree_id: str | None = None,
+) -> None:
+    """Check the caller's binding against the current checkout identity."""
+    if repository is not None and normalize_github_repository(repository) != identity.repository:
+        raise LandingError(f"repository binding {repository!r} does not match {identity.repository!r}")
+    if branch is not None and branch != identity.branch:
+        raise LandingError(f"branch binding {branch!r} does not match {identity.branch!r}")
+    if worktree is not None and not _same_path(worktree, identity.worktree):
+        raise LandingError(f"worktree binding {worktree!r} does not match {identity.worktree!r}")
+    if worktree_id is not None and worktree_id not in {identity.worktree, identity.lifecycle_id}:
+        raise LandingError("worktree lifecycle identity does not match the current checkout")
+
+
+def resolve_pr(
+    run: Runner,
+    repo_full: str,
+    branch: str,
+    *,
+    expected_number: int | None = None,
+    expected_node_id: str | None = None,
+    expected_head: str | None = None,
+) -> dict | None:
+    """Resolve one PR, then verify every declared identity field."""
+    repo_full = normalize_github_repository(repo_full)
+    if expected_head is not None:
+        _require_revision(expected_head, "expected head")
     rc, out = run(
         [
             "gh",
@@ -139,7 +252,7 @@ def resolve_pr(run: Runner, repo_full: str, branch: str) -> dict | None:
             "--state",
             "open",
             "--json",
-            "number,url,headRefName,headRefOid,labels,reviewDecision",
+            "number,id,url,headRefName,headRefOid,labels,reviewDecision",
         ]
     )
     if rc != 0:
@@ -152,12 +265,16 @@ def resolve_pr(run: Runner, repo_full: str, branch: str) -> dict | None:
         raise LandingError("gh pr list returned a non-list payload; refusing to guess")
     if not matches:
         return None
+    if len(matches) != 1:
+        raise WrongPR(f"branch {branch!r} has {len(matches)} open develop PRs; refusing to guess")
     pr = matches[0]
-    if pr.get("headRefName") != branch:
-        raise WrongPR(
-            f"resolved PR #{pr.get('number')} points at {pr.get('headRefName')!r}, "
-            f"not declared branch {branch!r}; refusing wrong-PR operation"
-        )
+    _check_pr_identity(
+        pr,
+        branch=branch,
+        number=expected_number,
+        node_id=expected_node_id,
+        head=expected_head,
+    )
     return pr
 
 
@@ -178,20 +295,75 @@ def unpublished_work(repo: Path) -> list[str]:
     return problems
 
 
-def withdraw_readiness(run: Runner, repo_full: str, pr_number: int) -> dict:
-    """Disable auto-merge and verify it stays disabled before any revision.
-
-    Never adds or removes hold labels: user/maintainer holds are theirs to
-    manage. If the PR already merged or closed, raises MergedRace so the
-    caller stops modifying and preserves commits for a follow-up.
-    """
-    rc, out = run(["gh", "pr", "view", "--repo", repo_full, str(pr_number), "--json", "state,autoMergeRequest,labels"])
+def view_pr(
+    run: Runner,
+    repo_full: str,
+    pr_number: int,
+    *,
+    expected_branch: str | None = None,
+    expected_node_id: str | None = None,
+    expected_head: str | None = None,
+) -> dict:
+    """Read one PR and verify every identity supplied by the caller."""
+    repo_full = normalize_github_repository(repo_full)
+    if expected_head is not None:
+        _require_revision(expected_head, "expected head")
+    rc, out = run(
+        [
+            "gh",
+            "pr",
+            "view",
+            "--repo",
+            repo_full,
+            str(pr_number),
+            "--json",
+            "number,state,autoMergeRequest,labels,id,headRefName,headRefOid,reviewDecision",
+        ]
+    )
     if rc != 0:
         raise LandingError(f"gh pr view failed for PR #{pr_number}")
     try:
         pr = json.loads(out or "{}")
     except ValueError as exc:
         raise LandingError(f"unparseable gh pr view output: {exc}") from exc
+    if not isinstance(pr, dict):
+        raise LandingError(f"gh pr view returned a non-object payload for PR #{pr_number}")
+    _check_pr_identity(
+        pr,
+        branch=expected_branch,
+        # Keep the historical low-level helper permissive for its compact
+        # re-verification fixture; bound/CLI calls always supply a branch or
+        # head and therefore get the full number check as well.
+        number=pr_number if expected_branch or expected_node_id or expected_head else None,
+        node_id=expected_node_id,
+        head=expected_head,
+    )
+    return pr
+
+
+def withdraw_readiness(
+    run: Runner,
+    repo_full: str,
+    pr_number: int,
+    *,
+    expected_branch: str | None = None,
+    expected_node_id: str | None = None,
+    expected_head: str | None = None,
+) -> dict:
+    """Disable auto-merge and verify it stays disabled before any revision.
+
+    Never adds or removes hold labels: user/maintainer holds are theirs to
+    manage. If the PR already merged or closed, raises MergedRace so the
+    caller stops modifying and preserves commits for a follow-up.
+    """
+    pr = view_pr(
+        run,
+        repo_full,
+        pr_number,
+        expected_branch=expected_branch,
+        expected_node_id=expected_node_id,
+        expected_head=expected_head,
+    )
     if str(pr.get("state", "")).upper() in ("MERGED", "CLOSED"):
         raise MergedRace(
             f"PR #{pr_number} is {pr.get('state')}; merge won the race. "
@@ -201,11 +373,29 @@ def withdraw_readiness(run: Runner, repo_full: str, pr_number: int) -> dict:
         rc, out = run(["gh", "pr", "merge", "--repo", repo_full, "--disable-auto", str(pr_number)])
         if rc != 0:
             raise LandingError(f"could not disable auto-merge on PR #{pr_number}: {out.strip()[:200]}")
-        rc, out = run(["gh", "pr", "view", "--repo", repo_full, str(pr_number), "--json", "autoMergeRequest"])
-        try:
-            reverified = json.loads(out or "{}")
-        except ValueError as exc:
-            raise LandingError(f"unparseable re-verification output: {exc}") from exc
+        bound_node_id = expected_node_id or _pr_node_id(pr) or None
+        if expected_node_id is not None or expected_head is not None:
+            reverified = view_pr(
+                run,
+                repo_full,
+                pr_number,
+                expected_branch=expected_branch,
+                expected_node_id=bound_node_id,
+                expected_head=expected_head,
+            )
+        else:
+            # Preserve the compact historical low-level interface. Bound CLI
+            # calls always provide expected_head and use the strict branch,
+            # node, and head re-read above.
+            rc, out = run(["gh", "pr", "view", "--repo", repo_full, str(pr_number), "--json", "autoMergeRequest"])
+            if rc != 0:
+                raise LandingError(f"could not re-read PR #{pr_number} after disabling auto-merge")
+            try:
+                reverified = json.loads(out or "{}")
+            except ValueError as exc:
+                raise LandingError(f"unparseable re-verification output: {exc}") from exc
+            if not isinstance(reverified, dict):
+                raise LandingError(f"unparseable re-verification output for PR #{pr_number}")
         if reverified.get("autoMergeRequest"):
             raise LandingError(f"auto-merge still armed on PR #{pr_number} after disable; refusing revision")
         return {"pr": pr_number, "withdrew": "auto-merge", "verified": True}
@@ -225,6 +415,12 @@ class ReadyEvidence:
     soundness_paths_changed: bool = False
     maintainer_approved: bool = False
     batch: dict | None = None
+    repository: str | None = None
+    branch: str | None = None
+    worktree: str | None = None
+    worktree_id: str | None = None
+    pr_number: int | None = None
+    pr_node_id: str | None = None
 
 
 def live_check_verdicts(run: Runner, repo_full: str, head: str) -> dict[str, dict]:
@@ -274,6 +470,13 @@ def verify_evidence_live(run: Runner, repo_full: str, pr: dict, evidence: ReadyE
     fabricated evidence and refuses.
     """
     head = evidence.expected_head
+    _check_pr_identity(
+        pr,
+        branch=evidence.branch,
+        number=evidence.pr_number,
+        node_id=evidence.pr_node_id,
+        head=head,
+    )
     verdicts = live_check_verdicts(run, repo_full, head)
     for name in evidence.required:
         live = verdicts.get(name)
@@ -384,31 +587,434 @@ def checks_green_at_head(check_runs: list, required: tuple, head: str) -> list[s
     return failures
 
 
-def check_batch_binding(repo: Path, batch: dict, integration_head: str) -> list[str]:
-    """Batch readiness: members present, writers quiescent, head current."""
+def _canonical_member_ids(value: object) -> list[str] | None:
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(
+            not isinstance(item, str) or not item or len(item) > MAX_TODO_ID_LEN or not TODO_ID_RE.fullmatch(item)
+            for item in value
+        )
+    ):
+        return None
+    member_ids = cast(list[str], value)
+    if len(set(member_ids)) != len(member_ids):
+        return None
+    return member_ids
+
+
+def _canonical_files(value: object) -> list[str] | None:
+    if not isinstance(value, list) or any(not isinstance(path, str) or not path for path in value):
+        return None
+    files = cast(list[str], value)
+    if files != sorted(set(files)):
+        return None
+    return files
+
+
+def _scope_digest(scope: dict[str, list[str]]) -> str:
+    blob = json.dumps(scope, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _check_receipt_verification(member_id: str, receipt: dict) -> list[str]:
+    verification = receipt.get("verification")
+    if not isinstance(verification, dict):
+        return [f"member {member_id} receipt has invalid verification evidence"]
     failures: list[str] = []
-    for key in ("batch_id", "members", "owner_generation"):
-        if not batch.get(key):
-            failures.append(f"batch binding lacks {key}")
+    if verification.get("status") != "passed":
+        failures.append(f"member {member_id} receipt verification did not pass")
+    if verification.get("revision") != receipt.get("source_revision"):
+        failures.append(f"member {member_id} receipt verification has a stale revision")
+    if verification.get("clean") is not True:
+        failures.append(f"member {member_id} receipt verification is not clean")
+    if not isinstance(verification.get("suite"), str) or not verification["suite"].strip():
+        failures.append(f"member {member_id} receipt verification lacks a suite")
+    command = verification.get("command")
+    if not isinstance(command, list) or not command or any(not isinstance(part, str) or not part for part in command):
+        failures.append(f"member {member_id} receipt verification lacks a command")
+    return failures
+
+
+def _check_prepared_receipt(
+    batch: dict, member_id: str, receipt: object, accepted_head: str, integration_head: str
+) -> list[str]:
+    failures: list[str] = []
+    if not isinstance(receipt, dict):
+        return [f"member {member_id} lacks a canonical prepared receipt"]
+    required = (
+        "schema",
+        "batch_id",
+        "member_id",
+        "owner_generation",
+        "source_worktree",
+        "source_revision",
+        "source_base",
+        "accepted_head",
+        "integration_head",
+        "scope_hash",
+        "changed_files",
+        "verification",
+    )
+    failures.extend(f"member {member_id} receipt lacks {key}" for key in required if key not in receipt)
+    if receipt.get("schema") != PREPARED_RECEIPT_SCHEMA:
+        failures.append(f"member {member_id} receipt has an unsupported schema")
+    if receipt.get("batch_id") != batch.get("batch_id"):
+        failures.append(f"member {member_id} receipt is bound to a different batch")
+    if receipt.get("member_id") != member_id:
+        failures.append(f"member {member_id} receipt identifies a different member")
+    generation = receipt.get("owner_generation")
+    if not isinstance(generation, str) or not re.fullmatch(r"[0-9a-f]{32}", generation):
+        failures.append(f"member {member_id} receipt has an invalid owner generation")
+    elif generation != batch.get("owner_generation"):
+        failures.append(f"member {member_id} receipt has a stale owner generation")
+    source_worktree = receipt.get("source_worktree")
+    if not isinstance(source_worktree, str) or not os.path.isabs(source_worktree):
+        failures.append(f"member {member_id} receipt requires an absolute source_worktree")
+    revisions = ("source_revision", "source_base", "accepted_head", "integration_head")
+    for key in revisions:
+        revision = receipt.get(key)
+        if not isinstance(revision, str) or not FULL_REVISION_RE.fullmatch(revision):
+            failures.append(f"member {member_id} receipt has an invalid {key}")
+    if receipt.get("source_revision") != receipt.get("accepted_head"):
+        failures.append(f"member {member_id} receipt does not bind accepted_head to source_revision")
+    if receipt.get("accepted_head") != accepted_head:
+        failures.append(f"member {member_id} receipt is not bound to its accepted head")
+    if receipt.get("integration_head") != integration_head:
+        failures.append(f"member {member_id} receipt is not bound to the integration head")
+    if receipt.get("scope_hash") != batch.get("scope_hash") or not SCOPE_HASH_RE.fullmatch(
+        str(receipt.get("scope_hash"))
+    ):
+        failures.append(f"member {member_id} receipt has a foreign scope_hash")
+    integrated_members = batch.get("integrated_members")
+    integrated = integrated_members.get(member_id) if isinstance(integrated_members, dict) else None
+    if not isinstance(integrated, dict) or receipt.get("integration_head") != integrated.get("integration_head"):
+        failures.append(f"member {member_id} receipt has an unregistered integration head")
+    files = _canonical_files(receipt.get("changed_files"))
+    if files is None:
+        failures.append(f"member {member_id} receipt changed_files are not canonical")
+    failures.extend(_check_receipt_verification(member_id, receipt))
+    return failures
+
+
+def _check_member_disposition(batch: dict, member_id: str, disposition: object, accepted_head: str) -> list[str]:
+    if not isinstance(disposition, dict):
+        return [f"member {member_id} review disposition is missing or not an object"]
+    failures: list[str] = []
+    if disposition.get("status") not in VALID_REVIEW_DISPOSITIONS:
+        failures.append(f"member {member_id} review disposition is not passing")
+    if disposition.get("current") is not True:
+        failures.append(f"member {member_id} review disposition is stale")
+    if disposition.get("resolved") is not True:
+        failures.append(f"member {member_id} review disposition is unresolved")
+    if disposition.get("member_id") != member_id:
+        failures.append(f"member {member_id} review disposition names a different member")
+    if disposition.get("head") != accepted_head:
+        failures.append(f"member {member_id} review disposition has a stale head")
+    if disposition.get("integration_head") != batch.get("integration_head"):
+        failures.append(f"member {member_id} review disposition has a stale integration head")
+    return failures
+
+
+def _check_final_metadata(repo: Path, batch: dict, evidence: dict) -> list[str]:
+    failures: list[str] = []
+    required = (
+        "batch_id",
+        "project_id",
+        "repository",
+        "tree_worktree",
+        "tree_revision",
+        "integration_branch",
+        "integration_head",
+        "scope_hash",
+        "member_heads",
+        "member_ranges",
+        "changed_files",
+        "final_pr",
+        "suite",
+        "clean",
+    )
+    failures.extend(f"final evidence lacks {key}" for key in required if key not in evidence)
+    if evidence.get("batch_id") != batch.get("batch_id"):
+        failures.append("final evidence is bound to a different batch")
+    if evidence.get("project_id") != batch.get("project_id") or evidence.get("repository") != batch.get("repository"):
+        failures.append("final evidence names a different project or repository")
+    if evidence.get("integration_branch") != batch.get("integration_branch"):
+        failures.append("final evidence names a different integration branch")
+    if evidence.get("integration_head") != batch.get("integration_head"):
+        failures.append("final evidence is not at the current integration head")
+    if evidence.get("scope_hash") != batch.get("scope_hash"):
+        failures.append("final evidence has a foreign scope_hash")
+    tree_worktree = evidence.get("tree_worktree")
+    if not isinstance(tree_worktree, str) or not os.path.isabs(tree_worktree):
+        failures.append("final evidence requires an absolute tree_worktree")
+    elif not _same_path(tree_worktree, str(repo)) or not _same_path(
+        tree_worktree, str(batch.get("integration_worktree", ""))
+    ):
+        failures.append("final evidence tree_worktree is not the current integration worktree")
+    for key in ("tree_revision", "integration_head"):
+        if not isinstance(evidence.get(key), str) or not FULL_REVISION_RE.fullmatch(evidence[key]):
+            failures.append(f"final evidence has an invalid {key}")
+    if evidence.get("tree_revision") != evidence.get("integration_head"):
+        failures.append("final evidence tree_revision does not equal integration_head")
+    if not isinstance(evidence.get("suite"), str) or not evidence["suite"].strip():
+        failures.append("final evidence lacks a suite")
+    if evidence.get("clean") is not True:
+        failures.append("final evidence does not certify a clean tree")
+    final_pr = evidence.get("final_pr")
+    if (
+        not isinstance(final_pr, dict)
+        or not isinstance(final_pr.get("number"), int)
+        or isinstance(final_pr.get("number"), bool)
+        or final_pr.get("number") <= 0
+    ):
+        failures.append("final evidence has an invalid final PR number")
+    if not isinstance(final_pr, dict) or not isinstance(final_pr.get("node_id"), str) or not final_pr.get("node_id"):
+        failures.append("final evidence has an invalid final PR node id")
+    if not isinstance(final_pr, dict) or final_pr.get("head") != evidence.get("integration_head"):
+        failures.append("final evidence final PR is not bound to the integration head")
+    if final_pr != batch.get("final_pr"):
+        failures.append("final evidence is not bound to the declared final PR")
+    return failures
+
+
+def _check_final_members(batch: dict, evidence: dict, members: list[str], receipts: dict[str, object]) -> list[str]:
+    failures: list[str] = []
+    heads = evidence.get("member_heads")
+    ranges = evidence.get("member_ranges")
+    if not isinstance(heads, dict) or set(heads) != set(members):
+        failures.append("final evidence member_heads do not exactly match the declared members")
+    if not isinstance(ranges, dict) or set(ranges) != set(members):
+        failures.append("final evidence member_ranges do not exactly match the declared members")
+    expected_files: set[str] = set()
+    accepted_members = batch.get("accepted_members")
+    accepted = accepted_members if isinstance(accepted_members, dict) else {}
+    for member in members:
+        receipt = receipts.get(member)
+        receipt_data = receipt if isinstance(receipt, dict) else {}
+        receipt_files = _canonical_files(receipt_data.get("changed_files"))
+        if receipt_files is not None:
+            expected_files.update(receipt_files)
+        accepted_head = accepted.get(member)
+        if isinstance(heads, dict) and heads.get(member) != accepted_head:
+            failures.append(f"final evidence member {member} is not bound to its accepted head")
+        member_range = ranges.get(member) if isinstance(ranges, dict) else None
+        if (
+            not isinstance(member_range, dict)
+            or member_range.get("base") != receipt_data.get("source_base")
+            or member_range.get("head") != accepted_head
+        ):
+            failures.append(f"final evidence member {member} range is not bound to its prepared receipt")
+    final_files = _canonical_files(evidence.get("changed_files"))
+    if final_files is None:
+        failures.append("final evidence changed_files are not canonical")
+    else:
+        if set(final_files) != expected_files:
+            failures.append("final evidence changed_files differ from the prepared member content")
+        scope = batch.get("scope")
+        allowed = (
+            [pattern for member in members for pattern in scope.get(member, [])] if isinstance(scope, dict) else []
+        )
+        if any(not any(fnmatch.fnmatch(path, pattern) for pattern in allowed) for path in final_files):
+            failures.append("final evidence changed_files exceed the frozen batch scope")
+    return failures
+
+
+def _check_final_evidence(repo: Path, batch: dict, members: list[str], receipts: dict[str, object]) -> list[str]:
+    evidence = batch.get("final_evidence")
+    if not isinstance(evidence, dict) or evidence.get("status") != "passed":
+        return ["batch final evidence is missing or does not have status passed"]
+    failures = _check_final_metadata(repo, batch, evidence)
+    failures.extend(_check_final_members(batch, evidence, members, receipts))
+    if evidence.get("conflict_resolution"):
+        failures.append("final evidence contains conflict-resolution markers")
+    return failures
+
+
+def _check_batch_header(repo: Path, batch: dict, members: list[str], integration_head: str) -> list[str]:
+    failures: list[str] = []
+    batch_id = batch.get("batch_id")
+    if (
+        not isinstance(batch_id, str)
+        or not batch_id
+        or len(batch_id) > MAX_TODO_ID_LEN
+        or not TODO_ID_RE.fullmatch(batch_id)
+    ):
+        failures.append("batch_id must be a canonical todo-db ID")
+    for key in ("project_id", "repository", "owner", "integration_branch", "delivery_boundary", "terminal_outcome"):
+        value = batch.get(key)
+        if not isinstance(value, str) or not value.strip() or any(ord(char) < 32 for char in value):
+            failures.append(f"batch {key} must be a non-empty single-line string")
+    generation = batch.get("owner_generation")
+    if not isinstance(generation, str) or not re.fullmatch(r"[0-9a-f]{32}", generation):
+        failures.append("batch owner_generation must be a 32-hex value")
+    worktree = batch.get("integration_worktree")
+    if not isinstance(worktree, str) or not os.path.isabs(worktree):
+        failures.append("batch integration_worktree must be absolute")
+    elif not _same_path(worktree, str(repo)):
+        failures.append("batch integration_worktree is not the current checkout")
+    for key in ("start_head", "integration_head"):
+        if not isinstance(batch.get(key), str) or not FULL_REVISION_RE.fullmatch(batch[key]):
+            failures.append(f"batch {key} must be a full lowercase commit SHA")
     if batch.get("integration_head") != integration_head:
         failures.append("batch integration head moved since readiness was evaluated")
-    if batch.get("active_writers"):
-        failures.append(f"member writers still active: {batch['active_writers']!r}")
-    for member in batch.get("members") or []:
-        sha = member.get("head")
-        if not sha:
-            failures.append(f"member {member.get('id', '?')} has no prepared head")
-            continue
-        try:
-            subprocess.run(
-                ["git", "merge-base", "--is-ancestor", sha, integration_head],
-                cwd=repo,
-                check=True,
-                capture_output=True,
-                timeout=60,
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            failures.append(f"member {member.get('id', '?')} head {sha[:12]} not in integration head")
+    scope = batch.get("scope")
+    valid_scope = (
+        isinstance(scope, dict)
+        and set(scope) == set(members)
+        and all(
+            isinstance(paths, list) and bool(paths) and all(isinstance(path, str) and path for path in paths)
+            for paths in scope.values()
+        )
+    )
+    if not valid_scope:
+        failures.append("batch scope must cover exactly the declared members")
+    scope_hash = batch.get("scope_hash")
+    if (
+        not isinstance(scope_hash, str)
+        or not SCOPE_HASH_RE.fullmatch(scope_hash)
+        or (isinstance(scope, dict) and scope_hash != _scope_digest(scope))
+    ):
+        failures.append("batch scope_hash does not match the frozen scope")
+    return failures
+
+
+def _check_batch_maps(
+    batch: dict, members: list[str]
+) -> tuple[list[str], dict[str, object], dict[str, object], dict[str, object], dict[str, object]]:
+    failures: list[str] = []
+    member_set = set(members)
+    maps: list[tuple[str, object]] = [
+        ("accepted_members", batch.get("accepted_members")),
+        ("integrated_members", batch.get("integrated_members")),
+        ("prepared_receipts", batch.get("prepared_receipts")),
+        ("review_dispositions", batch.get("review_dispositions")),
+    ]
+    result: list[dict[str, object]] = []
+    for name, value in maps:
+        if not isinstance(value, dict) or set(value) != member_set:
+            failures.append(f"{name} do not exactly match the declared members")
+            result.append({})
+        else:
+            result.append(value)
+    return failures, result[0], result[1], result[2], result[3]
+
+
+def _check_batch_member_maps(
+    repo: Path,
+    batch: dict,
+    members: list[str],
+    accepted: dict[str, object],
+    integrated: dict[str, object],
+    receipts: dict[str, object],
+    dispositions: dict[str, object],
+    integration_head: str,
+) -> list[str]:
+    failures: list[str] = []
+    for member in members:
+        accepted_head = accepted.get(member)
+        if (
+            not isinstance(accepted_head, str)
+            or not FULL_REVISION_RE.fullmatch(accepted_head)
+            or not isinstance(integration_head, str)
+            or not FULL_REVISION_RE.fullmatch(integration_head)
+        ):
+            failures.append(f"accepted head for member {member} is invalid")
+        integration = integrated.get(member)
+        if (
+            not isinstance(integration, dict)
+            or integration.get("accepted_head") != accepted_head
+            or integration.get("integration_head") != integration_head
+        ):
+            failures.append(f"integration evidence for member {member} is stale")
+        failures.extend(
+            _check_prepared_receipt(batch, member, receipts.get(member), accepted_head or "", integration_head)
+        )
+        if not isinstance(accepted_head, str) or not FULL_REVISION_RE.fullmatch(accepted_head):
+            failures.append(f"member {member} accepted head is not in the integration head")
+        else:
+            try:
+                subprocess.run(
+                    ["git", "merge-base", "--is-ancestor", accepted_head, integration_head],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    timeout=60,
+                )
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                failures.append(f"member {member} accepted head is not in the integration head")
+        failures.extend(_check_member_disposition(batch, member, dispositions.get(member), accepted_head or ""))
+    return failures
+
+
+def check_batch_binding(repo: Path, batch: dict, integration_head: str) -> list[str]:
+    """Validate the canonical todo-db batch receipt and final evidence binding."""
+    if not isinstance(batch, dict):
+        return ["batch binding must be an object"]
+    failures: list[str] = []
+    try:
+        current_head = _git(repo, "rev-parse", "HEAD")
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        failures.append("could not read the current integration checkout HEAD")
+    else:
+        if current_head != integration_head:
+            failures.append("current integration checkout HEAD does not match integration_head")
+    try:
+        if _git(repo, "status", "--porcelain"):
+            failures.append("current integration checkout is dirty")
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        failures.append("could not verify that the current integration checkout is clean")
+    required = (
+        "batch_id",
+        "project_id",
+        "repository",
+        "owner",
+        "owner_generation",
+        "integration_branch",
+        "integration_worktree",
+        "start_head",
+        "members",
+        "scope",
+        "scope_hash",
+        "delivery_boundary",
+        "terminal_outcome",
+        "integration_head",
+        "accepted_members",
+        "integrated_members",
+        "prepared_receipts",
+        "review_dispositions",
+        "final_pr",
+        "final_evidence",
+    )
+    failures.extend(f"batch binding lacks {key}" for key in required if key not in batch)
+    members = _canonical_member_ids(batch.get("members"))
+    if members is None:
+        failures.append("batch members must be a unique non-empty ordered list")
+        members = []
+    failures.extend(_check_batch_header(repo, batch, members, integration_head))
+    map_failures, accepted, integrated, receipts, dispositions = _check_batch_maps(batch, members)
+    failures.extend(map_failures)
+    failures.extend(
+        _check_batch_member_maps(repo, batch, members, accepted, integrated, receipts, dispositions, integration_head)
+    )
+    final_pr = batch.get("final_pr")
+    if (
+        not isinstance(final_pr, dict)
+        or not isinstance(final_pr.get("number"), int)
+        or isinstance(final_pr.get("number"), bool)
+        or not isinstance(final_pr.get("node_id"), str)
+        or not final_pr.get("node_id")
+        or not isinstance(final_pr.get("head"), str)
+        or not FULL_REVISION_RE.fullmatch(final_pr["head"])
+        or final_pr.get("number") <= 0
+        or final_pr.get("head") != integration_head
+    ):
+        failures.append("batch final_pr is invalid or stale")
+    if any(batch.get(key) for key in ("active_writers", "pending_writers")):
+        failures.append("batch has active or pending writers or conflict resolution markers")
+    if batch.get("conflict_resolution"):
+        failures.append("batch has active or pending writers or conflict resolution markers")
+    failures.extend(_check_final_evidence(repo, batch, members, receipts))
     return failures
 
 
@@ -420,23 +1026,50 @@ def ready_failures(
 ) -> list[str]:
     """All reasons the PR must not be enqueued yet. Empty means ready."""
     failures: list[str] = []
-    if identity.head != evidence.expected_head:
-        failures.append(f"local head {identity.head[:12]} != expected {evidence.expected_head[:12]}")
-    if remote_head != evidence.expected_head:
-        failures.append(f"remote head {remote_head[:12]} != expected {evidence.expected_head[:12]}")
+    expected_head = evidence.expected_head if isinstance(evidence.expected_head, str) else ""
+    head_valid = bool(FULL_REVISION_RE.fullmatch(expected_head))
+    try:
+        _require_revision(expected_head, "expected head")
+    except LandingError as exc:
+        failures.append(str(exc))
+    for field, declared, actual in (
+        ("repository", evidence.repository, identity.repository),
+        ("branch", evidence.branch, identity.branch),
+        ("worktree", evidence.worktree, identity.worktree),
+    ):
+        if declared is not None and (not _same_path(declared, actual) if field == "worktree" else declared != actual):
+            failures.append(f"{field} binding does not match the current checkout")
+    if evidence.worktree_id is not None and evidence.worktree_id not in {identity.worktree, identity.lifecycle_id}:
+        failures.append("worktree lifecycle identity does not match the current checkout")
+    if evidence.pr_number is not None and evidence.pr_number <= 0:
+        failures.append("PR number binding is invalid")
+    if evidence.pr_node_id is not None and not evidence.pr_node_id:
+        failures.append("PR GraphQL node id binding is empty")
+    if identity.head != expected_head:
+        failures.append(f"local head {identity.head[:12]} != expected {expected_head[:12]}")
+    if remote_head != expected_head:
+        failures.append(f"remote head {remote_head[:12]} != expected {expected_head[:12]}")
     failures.extend(f"unpublished work: {problem}" for problem in unpublished_work(repo))
     if evidence.review_decision != "APPROVED":
         failures.append(f"review decision is {evidence.review_decision!r}, not APPROVED")
     if not evidence.dispositions_complete:
         failures.append("review dispositions incomplete (every top-level finding needs evidence)")
-    failures.extend(checks_green_at_head(evidence.check_runs, evidence.required, evidence.expected_head))
+    failures.extend(checks_green_at_head(evidence.check_runs, evidence.required, expected_head))
     holds = evidence.hold_labels or []
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
-    if soundness_paths_changed(repo, identity.base, evidence.expected_head):
+    if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
-    if evidence.batch is not None:
-        failures.extend(check_batch_binding(repo, evidence.batch, evidence.expected_head))
+    if head_valid and evidence.batch is not None:
+        if evidence.batch.get("repository") != evidence.repository:
+            failures.append("batch repository does not match the current checkout")
+        if evidence.batch.get("integration_branch") != evidence.branch:
+            failures.append("batch integration branch does not match the current checkout")
+        if evidence.batch.get("integration_worktree") and not _same_path(
+            str(evidence.batch["integration_worktree"]), identity.worktree
+        ):
+            failures.append("batch integration worktree does not match the current checkout")
+        failures.extend(check_batch_binding(repo, evidence.batch, expected_head))
     return failures
 
 
@@ -453,7 +1086,16 @@ def soundness_paths_changed(repo: Path, base: str | None, head: str) -> bool:
     return any_soundness_path(paths)
 
 
-def enqueue_pr(run: Runner, repo_full: str, pr_number: int, expected_head: str, remote_head: str) -> dict:
+def enqueue_pr(
+    run: Runner,
+    repo_full: str,
+    pr_number: int,
+    expected_head: str,
+    remote_head: str,
+    *,
+    expected_branch: str | None = None,
+    expected_node_id: str | None = None,
+) -> dict:
     """Arm queue enrollment after a final expected-head check.
 
     The helper re-reads the remote head immediately before arming and refuses
@@ -461,11 +1103,32 @@ def enqueue_pr(run: Runner, repo_full: str, pr_number: int, expected_head: str, 
     atomic compare-and-set on the expected head. A push landing between the
     check and admission is refused server-side rather than armed.
     """
+    repo_full = normalize_github_repository(repo_full)
+    _require_revision(expected_head, "expected head")
     if remote_head != expected_head:
         raise LandingError(
             f"remote head moved to {remote_head[:12]} during enqueue; "
             "readiness is invalid, re-evaluate instead of arming"
         )
+    if expected_branch is not None or expected_node_id is not None:
+        if expected_branch is None or expected_node_id is None:
+            raise LandingError("bound enqueue requires both branch and GraphQL node id")
+        current = view_pr(
+            run,
+            repo_full,
+            pr_number,
+            expected_branch=expected_branch,
+            expected_node_id=expected_node_id,
+            expected_head=expected_head,
+        )
+        if any(
+            str(label.get("name") or "") == HOLD_LABEL
+            for label in current.get("labels") or []
+            if isinstance(label, dict)
+        ):
+            return {"pr": pr_number, "withheld": HOLD_LABEL, "verified": True}
+        if current.get("reviewDecision") != "APPROVED":
+            raise LandingError("PR review disposition changed before enqueue; readiness is invalid")
     rc, out = run(
         [
             "gh",
@@ -534,7 +1197,7 @@ def followup_path(directory: Path, key: str) -> Path:
     return directory / f"{safe}.json"
 
 
-def _followup_locked(directory: Path, key: str) -> object:
+def _followup_locked(directory: Path, key: str) -> BinaryIO:
     """Exclusive per-key lock so check-then-act sequences do not interleave."""
     import fcntl
 
@@ -645,37 +1308,232 @@ def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
     return {**decision, "remaining": True}
 
 
-def bound_withdraw(run: Runner, repo_full: str, branch: str, pr_number: int) -> dict:
+def bound_withdraw(
+    run: Runner,
+    repo_full: str,
+    branch: str,
+    pr_number: int,
+    *,
+    expected_branch: str | None = None,
+    expected_node_id: str | None = None,
+    expected_head: str | None = None,
+) -> dict:
     """Withdraw readiness only for the PR owned by *branch*.
 
     A branch that owns no PR yet (pre-PR assembly) may name an explicit PR;
     a branch that owns one refuses any other number, so a stale or mistaken
     `--pr` can never disarm another PR.
     """
-    owned = resolve_pr(run, repo_full, branch)
+    owned = resolve_pr(
+        run,
+        repo_full,
+        branch,
+        expected_number=pr_number if expected_node_id or expected_head else None,
+        expected_node_id=expected_node_id,
+        expected_head=expected_head,
+    )
     if owned is not None and owned.get("number") != pr_number:
         raise WrongPR(f"branch {branch} owns PR #{owned.get('number')}, not PR #{pr_number}")
-    return withdraw_readiness(run, repo_full, pr_number)
+    bound_node_id = expected_node_id or (_pr_node_id(owned) if owned else None)
+    return withdraw_readiness(
+        run,
+        repo_full,
+        pr_number,
+        expected_branch=expected_branch,
+        expected_node_id=bound_node_id,
+        expected_head=expected_head,
+    )
+
+
+def arm_current_pr(
+    run: Runner,
+    identity: GitIdentity,
+    repo: Path,
+    requested_pr: int | None = None,
+) -> dict:
+    """Arm only the open PR bound to this checkout's exact current identity."""
+    problems = unpublished_work(repo)
+    if problems:
+        raise LandingError(f"unpublished work: {'; '.join(problems)}")
+    pr = resolve_pr(
+        run,
+        identity.repository,
+        identity.branch,
+        expected_number=requested_pr,
+        expected_head=identity.head,
+    )
+    if pr is None:
+        raise WrongPR(f"branch {identity.branch} has no open PR in {identity.repository}")
+    node_id = _pr_node_id(pr)
+    if not node_id:
+        raise WrongPR(f"PR #{pr.get('number')} has no GraphQL node id; refusing to arm")
+    labels = {str(label.get("name") or "") for label in pr.get("labels") or [] if isinstance(label, dict)}
+    if HOLD_LABEL in labels:
+        return {"pr": pr.get("number"), "withheld": HOLD_LABEL, "verified": True}
+    if soundness_paths_changed(repo, identity.base, identity.head):
+        return {"pr": pr.get("number"), "withheld": "soundness-path", "verified": True}
+    return enqueue_pr(
+        run,
+        identity.repository,
+        int(pr["number"]),
+        identity.head,
+        str(pr.get("headRefOid") or ""),
+        expected_branch=identity.branch,
+        expected_node_id=node_id,
+    )
+
+
+def _run_start(args: argparse.Namespace, identity: GitIdentity, branch: str) -> int:
+    pr = resolve_pr(
+        live_run,
+        args.repo,
+        branch,
+        expected_node_id=args.pr_node_id,
+        expected_head=getattr(args, "expected_head", None),
+    )
+    record = {
+        "identity": asdict(identity),
+        "pr": (pr or {}).get("number"),
+        "pr_node_id": _pr_node_id(pr or {}) or None,
+        "remote_head": (pr or {}).get("headRefOid"),
+    }
+    print(json.dumps(record, indent=2))
+    return 0
+
+
+def _run_withdraw(args: argparse.Namespace, identity: GitIdentity, branch: str) -> int:
+    expected_head = args.expected_head or identity.head
+    _require_revision(expected_head, "expected head")
+    result = bound_withdraw(
+        live_run,
+        args.repo,
+        branch,
+        args.pr,
+        expected_branch=branch,
+        expected_node_id=args.pr_node_id,
+        expected_head=expected_head,
+    )
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def _run_arm(args: argparse.Namespace, identity: GitIdentity, repo: Path) -> int:
+    result = arm_current_pr(live_run, identity, repo, args.pr)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def _validate_evidence_identity(data: dict, identity: GitIdentity, branch: str, expected_head: str) -> None:
+    declared = data.get("identity")
+    if declared is None:
+        return
+    if not isinstance(declared, dict):
+        raise LandingError("readiness identity must be a JSON object")
+    for key, actual in (
+        ("repository", identity.repository),
+        ("branch", branch),
+        ("worktree", identity.worktree),
+        ("head", expected_head),
+    ):
+        if key not in declared:
+            continue
+        matches = _same_path(str(declared[key]), actual) if key == "worktree" else declared[key] == actual
+        if not matches:
+            raise LandingError(f"readiness identity field {key!r} does not match current binding")
+
+
+def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, repo: Path) -> int:
+    _require_revision(args.expected_head, "expected head")
+    pr = resolve_pr(
+        live_run,
+        args.repo,
+        branch,
+        expected_number=args.pr,
+        expected_node_id=args.pr_node_id,
+        expected_head=args.expected_head,
+    )
+    if pr is None:
+        raise WrongPR(f"branch {branch} does not own PR #{args.pr}")
+    node_id = args.pr_node_id or _pr_node_id(pr)
+    if not node_id:
+        raise WrongPR(f"PR #{args.pr} has no GraphQL node id; refusing unbound readiness")
+    pr = view_pr(
+        live_run,
+        args.repo,
+        args.pr,
+        expected_branch=branch,
+        expected_node_id=node_id,
+        expected_head=args.expected_head,
+    )
+    try:
+        evidence_data = json.loads(args.evidence_json.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise LandingError(f"unreadable evidence file: {exc}") from exc
+    if not isinstance(evidence_data, dict):
+        raise LandingError("readiness evidence must be a JSON object")
+    _validate_evidence_identity(evidence_data, identity, branch, args.expected_head)
+    evidence = ReadyEvidence(
+        expected_head=args.expected_head,
+        review_decision=evidence_data.get("review_decision", "REVIEW_REQUIRED"),
+        dispositions_complete=bool(evidence_data.get("dispositions_complete")),
+        check_runs=evidence_data.get("check_runs", []),
+        hold_labels=evidence_data.get("hold_labels", []),
+        soundness_paths_changed=bool(evidence_data.get("soundness_paths_changed")),
+        maintainer_approved=bool(evidence_data.get("maintainer_approved")),
+        batch=evidence_data.get("batch"),
+        repository=identity.repository,
+        branch=branch,
+        worktree=identity.worktree,
+        worktree_id=args.worktree_id or identity.lifecycle_id or identity.worktree,
+        pr_number=args.pr,
+        pr_node_id=node_id,
+    )
+    verify_evidence_live(live_run, args.repo, pr, evidence)
+    failures = ready_failures(identity, str(pr.get("headRefOid") or ""), evidence, repo)
+    if failures:
+        print("NOT READY:")
+        for failure in failures:
+            print(f"  - {failure}")
+        return 1
+    if args.arm:
+        result = enqueue_pr(
+            live_run,
+            args.repo,
+            args.pr,
+            args.expected_head,
+            str(pr.get("headRefOid") or ""),
+            expected_branch=branch,
+            expected_node_id=node_id,
+        )
+        print(json.dumps(result, indent=2))
+    else:
+        print(f"READY at {args.expected_head[:12]} (enqueue withheld without --arm)")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--repo", default="BenchBox-dev/BenchBox")
+    parser.add_argument("--repo", default=None)
     parser.add_argument("--worktree", type=Path, default=Path.cwd())
+    parser.add_argument("--branch", default=None)
+    parser.add_argument("--worktree-id", default=None, help="worktree path or lifecycle id")
+    parser.add_argument("--pr-node-id", default=None, help="PR GraphQL node id")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    start = sub.add_parser("start", help="record the start-revision identity")
-    start.add_argument("--branch", default=None)
+    sub.add_parser("start", help="record the start-revision identity")
 
-    sub.add_parser("withdraw", help="withdraw readiness before a revision").add_argument(
-        "--pr", type=int, required=True
-    )
+    withdraw = sub.add_parser("withdraw", help="withdraw readiness before a revision")
+    withdraw.add_argument("--pr", type=int, required=True)
+    withdraw.add_argument("--expected-head", default=None)
 
     ready = sub.add_parser("ready", help="verify readiness and enqueue on success")
     ready.add_argument("--pr", type=int, required=True)
     ready.add_argument("--expected-head", required=True)
     ready.add_argument("--evidence-json", type=Path, required=True)
     ready.add_argument("--arm", action="store_true", help="enqueue when all checks pass")
+
+    arm = sub.add_parser("arm", help="arm the exact current checkout PR")
+    arm.add_argument("--pr", type=int, default=None)
 
     policy = sub.add_parser("queue-policy", help="stale-base publication decision")
     policy.add_argument("--queue-verified", action="store_true")
@@ -696,54 +1554,31 @@ def main(argv: list[str] | None = None) -> int:
 
     repo = args.worktree.resolve()
     try:
-        if args.command == "start":
+        identity = None
+        branch = None
+        if args.command in {"start", "withdraw", "ready", "arm"}:
             identity = git_identity(repo)
-            branch = args.branch or identity.branch
-            pr = resolve_pr(live_run, args.repo, branch)
-            record = {
-                "identity": asdict(identity),
-                "pr": (pr or {}).get("number"),
-                "remote_head": (pr or {}).get("headRefOid"),
-            }
-            print(json.dumps(record, indent=2))
-            return 0
-        if args.command == "withdraw":
-            identity = git_identity(repo)
-            print(json.dumps(bound_withdraw(live_run, args.repo, identity.branch, args.pr), indent=2))
-            return 0
-        if args.command == "ready":
-            identity = git_identity(repo)
-            pr = resolve_pr(live_run, args.repo, identity.branch)
-            if pr is None or pr.get("number") != args.pr:
-                raise WrongPR(f"branch {identity.branch} does not own PR #{args.pr}")
-            evidence_data = json.loads(args.evidence_json.read_text(encoding="utf-8"))
-            evidence = ReadyEvidence(
-                expected_head=args.expected_head,
-                review_decision=evidence_data.get("review_decision", "REVIEW_REQUIRED"),
-                dispositions_complete=bool(evidence_data.get("dispositions_complete")),
-                check_runs=evidence_data.get("check_runs", []),
-                hold_labels=evidence_data.get("hold_labels", []),
-                soundness_paths_changed=bool(evidence_data.get("soundness_paths_changed")),
-                maintainer_approved=bool(evidence_data.get("maintainer_approved")),
-                batch=evidence_data.get("batch"),
+            args.repo = args.repo or identity.repository
+            check_worktree_binding(
+                identity,
+                repository=args.repo,
+                branch=args.branch,
+                worktree=str(repo),
+                worktree_id=args.worktree_id,
             )
-            verify_evidence_live(live_run, args.repo, pr, evidence)
-            failures = ready_failures(identity, str(pr.get("headRefOid") or ""), evidence, repo)
-            if failures:
-                print("NOT READY:")
-                for failure in failures:
-                    print(f"  - {failure}")
-                return 1
-            if args.arm:
-                print(
-                    json.dumps(
-                        enqueue_pr(live_run, args.repo, args.pr, args.expected_head, str(pr.get("headRefOid") or "")),
-                        indent=2,
-                    )
-                )
-            else:
-                print(f"READY at {args.expected_head[:12]} (enqueue withheld without --arm)")
-            return 0
+            branch = args.branch or identity.branch
+        if args.command == "start":
+            assert identity is not None and branch is not None
+            return _run_start(args, identity, branch)
+        if args.command == "withdraw":
+            assert identity is not None and branch is not None
+            return _run_withdraw(args, identity, branch)
+        if args.command == "ready":
+            assert identity is not None and branch is not None
+            return _run_ready(args, identity, branch, repo)
+        if args.command == "arm":
+            assert identity is not None
+            return _run_arm(args, identity, repo)
         if args.command == "queue-policy":
             print(stale_base_decision(queue_verified=args.queue_verified, conflict=args.conflict))
             return 0
