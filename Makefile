@@ -657,6 +657,8 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
+	@echo "-- Makefile public contract inventory --"
+	@uv run -- python make/check_makefile_inventory.py --write
 	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
 	@# Last regen step, contained: a failing skill-sync apply (e.g. an
 	@# unresolvable source rev in a fresh worktree) used to abort guards-fix
@@ -723,6 +725,7 @@ guards-fix:
 # tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
 # a vacuous pass inside the change whose whole purpose is removing vacuous
 # passes. That test now pins the gating instead.
+# The Make contract check is read-only here; guards-fix owns regeneration.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -773,6 +776,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed platform-manifest-check"; \
 	$(MAKE) oracle-coverage-map-check; \
 	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
+	$(MAKE) makefile-inventory-check; \
+	[ $$? -eq 0 ] || failed="$$failed makefile-inventory-check"; \
 	uv run -- python scripts/check_public_contract_drift.py; \
 	[ $$? -eq 0 ] || failed="$$failed public-contract-drift"; \
 	$(MAKE) audit-deps; \
@@ -1271,7 +1276,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1344,6 +1349,22 @@ pr-preflight-fast-tests:
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
+# Publication lane isolation is a diff-vs-base guard. The path classifier has
+# already produced the changed-path list for the PR, so this target consumes
+# that exact artifact instead of reimplementing path classification or asking
+# the working tree to infer a base. Keep it in the content guard, where
+# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
+lane-isolation-check:
+	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
+	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
+	[ -f "$$CHANGED_PATHS" ] || { echo "changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
+	status=0; \
+	for lane in site explorer corpus; do \
+		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
+	done; \
+	exit "$$status"
+
 # Local validation singleflight. Runs CMD once per identical validated input
 # across worktrees; identical repeats reuse the recorded receipt instead of
 # re-executing and colliding on the shared test lock. Receipts never certify
@@ -1387,6 +1408,7 @@ pr-followup-resume:
 
 pr-content-guard:
 	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \

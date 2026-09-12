@@ -506,7 +506,10 @@ def compare_inventory(root: Path) -> list[str]:
         if expected.get(key) != actual.get(key):
             problems.append(f"{key} changed")
     problems.extend(problem for problem in proof_problems if problem not in problems)
-    problems.append("intentional changes require --write and review of the inventory diff")
+    problems.append(
+        "intentional changes require --write and review of the inventory diff "
+        "(run 'make guards-fix' to regenerate mechanical drift-guard artifacts)"
+    )
     return problems
 
 

@@ -277,3 +277,31 @@ hook, creates the classifier JSON and path lists when the parent preflight did
 not already supply them. An approved pure skill diff does not enter this generic
 content target; its focused lane carries the integrity and artifact controls
 listed above. A skill-plus-safe-content diff uses the two narrow lanes instead.
+
+## Hosted merge-gate guard inventory
+
+The command-level lint pin above is the detailed contract for `pr.yml`'s
+`code-lint` job. `tests/system/test_ci_lint_parity.py` also inventories
+guard-shaped steps in the independent publication docs lane and the release
+test workflow. Each such step must name a local equivalent or carry a written
+exception in the test's `MERGE_GATE_EXEMPTIONS` table. This keeps a new
+`--check`, `verify`, drift, or guard step from becoming a silent CI-only
+failure. A strict local superset is acceptable; an unclassified hosted guard
+is not.
+
+### Hosted-only guard inventory
+
+The explicit exceptions cover inputs that only exist in their hosted gate:
+
+- cross-platform binary smoke tests and promoted slow/medium regression nodes;
+- fresh-runner skill-source cloning and PR-base/merge-queue ancestry checks;
+- release-branch curation and release-artifact reports; and
+- the audit-SHA comparison against the immutable PR event base.
+
+These are intentionally named in the parity test with the reason they cannot
+be reproduced from a normal checkout. They are not skipped by local validation
+under another name. The publication docs lane has a local equivalent:
+`make pr-preflight` consumes the classifier's `PATH_LISTS` and invokes
+`make lane-isolation-check`, which runs the existing verifier for site,
+explorer, and corpus against the exact changed-path artifact. The target fails
+closed when that artifact is absent or empty.
