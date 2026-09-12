@@ -92,6 +92,26 @@ Dev PRs target `develop` (or `release` / `published-results`), use squash merge,
 
 Use the `todo` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
 
+### Delivery modes
+
+Serial mode is the default for independent, cross-repository, review-separated,
+approval-separated, or otherwise unrelated work: follow the ordinary claim,
+implementation, verification, review, merge, and deployment boundaries.
+
+Feature delivery mode is opt-in for related items only after its prerequisites
+are already deployed and verified. It requires the active todo-db MCP server to
+advertise the registered-batch capability on a compatible schema; a source PR,
+catalog pin, or local mirror is not an installation. The mode uses one shared
+integration branch and worktree, one integrator, an immutable base, an explicit
+ordered member set, frozen member scopes, explicit member/base/head/final-tree
+evidence, and one final PR. It never creates a feature-base PR, skips CI, or
+bypasses hosted/native review, merge, deployment, or authority controls.
+
+Feature delivery cannot certify or unlock the runtime, source, catalog, or
+workflow changes that make feature delivery possible. If the capability or
+schema is absent, retain serial mode and record the owned blocker and next
+operator step.
+
 ## BenchBox invariants
 
 - Timing durations use `benchbox.utils.clock.mono_time()` and `elapsed_seconds()`; wall clocks are event/audit only.

@@ -59,6 +59,23 @@ their lifecycle.
 Zero deletion authority: No metadata field (including manual release status) authorizes
 automated deletion. Removal remains strictly gated by `make worktree-remove`.
 
+## Batch delivery choice
+
+Use serial mode for independent, cross-repository, review-separated, or
+approval-separated work. Feature delivery mode is available only for related
+items after the active todo-db MCP server has passed the registered-batch
+capability and compatible-schema check. The prerequisite source/runtime,
+catalog pin, and workflow rollout cannot use feature mode to prove their own
+installation; an unavailable capability is an owned blocker and keeps work in
+serial mode.
+
+Feature mode uses one shared integration branch/worktree and one integrator.
+Record the immutable base, member set, per-member scope and dependency, actual
+member/base/head/final-tree evidence, and one final PR. It does not create a
+feature-base PR, skip CI, or weaken hosted/native review, merge, deployment, or
+authority gates. Revalidate after base, member, scope, dependency, head, or
+conflict movement; use only reversible rollback/previews for recovery.
+
 ## Finish a task
 
 Before removing a worktree, you can preview single-target finish eligibility and view the exact proposed commands:

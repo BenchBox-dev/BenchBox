@@ -38,3 +38,31 @@ the newer state.
 upgrades. `E_STATE` explains itself in the message — a malformed request, an
 unknown task, or a rejected transition. `E_CURSOR_STALE` means restart listing
 from the first page.
+
+## Prepared receipt recovery
+
+Prepared mode is unavailable on an older server or schema: stop and use the
+serial claim/finish loop. Do not migrate a legacy per-item receipt into a
+registered batch by assertion.
+
+If a prepared batch is abandoned, release every live member claim and have the
+registered owner call `abort_batch` with the batch owner generation. Abort
+refuses with `E_ACTIVE_CLAIMS` while a claim is live, refuses if any member is
+already `done`, clears prepared/final member evidence, retains an already-bound
+final PR receipt, detaches recoverable non-terminal members from the archived
+batch, and returns them to the ordinary claim/finish lifecycle. Expired active
+claims return to `open`; live claims must be released first. It is safe to retry
+after an unknown publication result. An aborted or completed batch
+cannot be reopened by a member or a stale owner.
+
+If `prepare` rejects the source checkout, inspect the exact recorded revision
+and clean the isolated worktree before retrying with the current claim
+generation. A moved HEAD, dirty checkout, changed member scope, conflict
+resolution, or late member invalidates the receipt; do not reset the baseline
+or mark the member done. Re-take the member and prepare again after the
+integrator records the new exact range. If closeout is interrupted, re-read the
+member and final integration evidence before retrying `finish`; stale
+generations fail closed. A retry must use the registered integration worktree
+and branch, and the tracker rechecks the current tree, every accepted member
+head, the frozen scope union, and the one bound final PR before committing each
+member's terminal transition.
