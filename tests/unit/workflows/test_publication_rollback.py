@@ -185,6 +185,30 @@ def test_build_receipt_enforces_attested_cas_lineage() -> None:
     assert "validate_manifest_dict(manifest)" in text
 
 
+def test_deploy_revalidates_signed_receipt_identity_across_both_live_receipt_writers() -> None:
+    workflow = _workflow()
+    build = workflow["jobs"]["build"]
+    deploy = workflow["jobs"]["deploy"]
+    step = next(item for item in deploy["steps"] if item.get("name") == "Revalidate authoritative live head")
+    run = step["run"]
+
+    assert build["outputs"]["parent_receipt_id"] == (
+        "${{ steps.lineage.outputs.parent_receipt_id || steps.approved.outputs.parent_receipt_id }}"
+    )
+    lineage = next(item for item in build["steps"] if item.get("name") == "Resolve attested publication lineage")
+    assert 'echo "parent_receipt_id=$PRIOR_LIVE_RECEIPT_ID"' in lineage["run"]
+    assert 'echo "parent_receipt_id=$RECEIPT_ID"' in lineage["run"]
+    assert step["env"]["EXPECTED_PARENT_RECEIPT_ID"] == "${{ needs.build.outputs.parent_receipt_id }}"
+    assert '"$RUN_NAME" != "Publication Control Plane Deployment"' in run
+    assert '"$RUN_NAME" != "Publication Transactions"' in run
+    assert 'CURRENT_RECEIPT_ID=$(EXPECTED_RUN_ID="$RUN_ID"' in run
+    assert 'receipt_id = str(receipt.get("receipt_id", ""))' in run
+    assert 'CURRENT="$CURRENT_RECEIPT_ID"' in run
+    assert '[ "$CURRENT" = "$EXPECTED_PARENT_RECEIPT_ID" ]' in run
+    assert "EXPECTED_PARENT_ARTIFACT_ID" not in step["env"]
+    assert 'CURRENT="$ARTIFACT_ID"' not in run
+
+
 def test_production_requires_an_independently_approved_manifest() -> None:
     text = _workflow_text()
 
