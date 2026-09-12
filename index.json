@@ -10642,9 +10642,9 @@
     },
     "pr-revision-readiness-transaction": {
       "claim": {
-        "expires_at": "2026-09-13T18:45:42Z",
-        "generation": "06878aead6014320a6835f888a27c36b",
-        "renewals": 0,
+        "expires_at": "2026-09-13T19:47:47Z",
+        "generation": "5a9ff1d1cc1646419cb734312d2496e0",
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local"
       },
       "needs": [
