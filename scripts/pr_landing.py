@@ -31,6 +31,7 @@ with fake hosted events. The live runner shells out to `gh`.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import fnmatch
 import hashlib
 import json
@@ -39,7 +40,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import BinaryIO, cast
 
@@ -64,6 +65,17 @@ REPOSITORY_PART_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 TODO_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 MAX_TODO_ID_LEN = 128
 VALID_REVIEW_DISPOSITIONS = frozenset({"approved"})
+FOLLOWUP_SCHEMA = "pr_followup_v2"
+FOLLOWUP_PHASES = frozenset(
+    {"prepare", "pre-pr", "merge", "push", "review", "queue", "member-closeout", "post-merge", "blocked"}
+)
+MAX_FOLLOWUP_KEY_LEN = 128
+MAX_FOLLOWUP_TEXT_LEN = 512
+MAX_FOLLOWUP_MEMBERS = 64
+MAX_FOLLOWUP_RECEIPTS = 64
+MAX_FOLLOWUP_PROCESSED = 256
+MAX_FOLLOWUP_RETRY_COUNT = 16
+MAX_FOLLOWUP_BYTES = 64 * 1024
 
 
 class LandingError(RuntimeError):
@@ -1206,9 +1218,22 @@ class FollowupState:
     due_at: str | None = None
     next_action: str = ""
     terminal: str | None = None
+    schema: str = FOLLOWUP_SCHEMA
+    batch_id: str | None = None
+    owner_generation: str | None = None
+    integrator: str | None = None
+    integration_head: str | None = None
+    members: list[str] | None = None
+    pending_worker_heads: dict[str, str] | None = None
+    accepted_receipts: dict[str, dict] | None = None
+    final_pr: dict | None = None
+    claim_expires_at: str | None = None
+    blocked_reason: str | None = None
 
 
 def followup_path(directory: Path, key: str) -> Path:
+    if not isinstance(key, str) or not key or len(key) > MAX_FOLLOWUP_KEY_LEN:
+        raise LandingError("followup key must be a bounded non-empty string")
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)
     return directory / f"{safe}.json"
 
@@ -1223,6 +1248,58 @@ def _followup_locked(directory: Path, key: str) -> BinaryIO:
     return handle
 
 
+def _reject_followup_conflicts(key: str, existing: FollowupState, state: FollowupState) -> None:
+    for field in ("batch_id", "owner_generation", "integrator", "members", "integration_head"):
+        old_value = getattr(existing, field)
+        new_value = getattr(state, field)
+        if old_value is not None and new_value is not None and new_value != old_value:
+            raise LandingError(f"followup {key!r} cannot change immutable {field}")
+    if existing.accepted_receipts is not None and isinstance(state.accepted_receipts, dict):
+        for member, old_receipt in existing.accepted_receipts.items():
+            if member in state.accepted_receipts and state.accepted_receipts[member] != old_receipt:
+                raise LandingError(f"followup {key!r} cannot replace the accepted receipt for {member!r}")
+    if existing.final_pr is not None and state.final_pr is not None and state.final_pr != existing.final_pr:
+        raise LandingError(f"followup {key!r} cannot change its final PR binding")
+    if existing.terminal is not None and state.terminal not in (None, existing.terminal):
+        raise LandingError(f"followup {key!r} cannot regress its terminal outcome")
+
+
+def _merge_accepted_receipts(existing: dict[str, dict] | None, incoming: object) -> object:
+    if existing is None:
+        return incoming
+    if incoming is None:
+        return existing
+    if isinstance(incoming, dict):
+        return {**existing, **incoming}
+    return incoming
+
+
+def _merge_followup_state(existing: FollowupState, state: FollowupState) -> FollowupState:
+    preserved = {
+        field: getattr(existing, field)
+        for field in ("batch_id", "owner_generation", "integrator", "members", "integration_head")
+        if getattr(state, field) is None and getattr(existing, field) is not None
+    }
+    merged = replace(state, **preserved)
+    if existing.pending_worker_heads is not None and merged.pending_worker_heads is None:
+        merged = replace(merged, pending_worker_heads=existing.pending_worker_heads)
+    if existing.accepted_receipts is not None:
+        merged = replace(
+            merged, accepted_receipts=_merge_accepted_receipts(existing.accepted_receipts, merged.accepted_receipts)
+        )
+    if existing.final_pr is not None and merged.final_pr is None:
+        merged = replace(merged, final_pr=existing.final_pr)
+    if existing.terminal is not None and merged.terminal is None:
+        merged = replace(merged, terminal=existing.terminal)
+    attempts = merged.attempts
+    if isinstance(attempts, int) and not isinstance(attempts, bool):
+        attempts = max(attempts, existing.attempts)
+    reentries = merged.reentries
+    if isinstance(reentries, int) and not isinstance(reentries, bool):
+        reentries = max(reentries, existing.reentries)
+    return replace(merged, attempts=attempts, reentries=reentries)
+
+
 def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
     """Atomically persist continuation state (crash-safe via rename).
 
@@ -1230,9 +1307,6 @@ def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
     rotate `session`, but a different `owner` must use its own key. Retry
     counters are monotonic: re-recording state never restores spent budget.
     """
-    for field in ("owner", "session", "scope"):
-        if not getattr(state, field, None):
-            raise LandingError(f"followup state lacks required field {field!r}")
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
     with _followup_locked(directory, key):
@@ -1240,25 +1314,219 @@ def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
         if existing is not None and existing.owner != state.owner:
             raise LandingError(f"followup {key!r} is owned by {existing.owner!r}; refusing cross-owner overwrite")
         if existing is not None:
-            state.attempts = max(state.attempts, existing.attempts)
-            state.reentries = max(state.reentries, existing.reentries)
-        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
-        tmp.replace(path)
+            _reject_followup_conflicts(key, existing, state)
+            merged = _merge_followup_state(existing, state)
+        else:
+            merged = state
+        validate_followup(merged)
+        _write_followup_atomic(path, merged)
     return path
+
+
+def _write_followup_atomic(path: Path, state: FollowupState) -> None:
+    """Write one bounded state record through a same-directory rename."""
+    encoded = json.dumps(asdict(state), indent=2) + "\n"
+    if len(encoded.encode("utf-8")) > MAX_FOLLOWUP_BYTES:
+        raise LandingError("followup state exceeds its size bound")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    with tmp.open("w", encoding="utf-8") as handle:
+        handle.write(encoded)
+        handle.flush()
+        os.fsync(handle.fileno())
+    tmp.replace(path)
+
+
+def _valid_text(value: object, label: str, *, required: bool = False) -> list[str]:
+    if value is None and not required:
+        return []
+    if not isinstance(value, str) or (required and not value.strip()):
+        return [f"followup {label} must be a non-empty string"]
+    if len(value) > MAX_FOLLOWUP_TEXT_LEN or any(ord(char) < 32 for char in value):
+        return [f"followup {label} is too long or contains control characters"]
+    return []
+
+
+def _parse_followup_time(value: object, label: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, str):
+        return [f"followup {label} must be an ISO-8601 timestamp"]
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return [f"followup {label} must be an ISO-8601 timestamp"]
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return [f"followup {label} must include an explicit timezone"]
+    return []
+
+
+def _valid_revision_map(value: object, label: str, members: set[str]) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, dict):
+        return [f"followup {label} must be an object"]
+    if len(value) > MAX_FOLLOWUP_MEMBERS:
+        return [f"followup {label} exceeds the member bound"]
+    failures: list[str] = []
+    for member, head in value.items():
+        if not isinstance(member, str) or member not in members:
+            failures.append(f"followup {label} names an undeclared member")
+        if not isinstance(head, str) or not FULL_REVISION_RE.fullmatch(head):
+            failures.append(f"followup {label} contains an invalid worker head")
+    return failures
+
+
+def _validate_followup_receipts(state: FollowupState, members: set[str]) -> list[str]:
+    receipts = state.accepted_receipts
+    if receipts is None:
+        return []
+    if not isinstance(receipts, dict) or len(receipts) > MAX_FOLLOWUP_RECEIPTS:
+        return ["followup accepted_receipts exceeds its bound"]
+    failures: list[str] = []
+    if receipts and state.integration_head is None:
+        failures.append("followup accepted_receipts require an integration_head")
+    for member, receipt in receipts.items():
+        if member not in members:
+            failures.append("followup accepted_receipts names an undeclared member")
+        try:
+            receipt_size = len(json.dumps(receipt, separators=(",", ":")))
+        except (TypeError, ValueError):
+            receipt_size = MAX_FOLLOWUP_BYTES
+        if not isinstance(receipt, dict) or receipt_size > 8192:
+            failures.append("followup accepted_receipts contains an invalid or oversized receipt")
+            continue
+        if receipt.get("batch_id") != state.batch_id:
+            failures.append(f"followup receipt for {member} has a foreign batch_id")
+        if receipt.get("owner_generation") != state.owner_generation:
+            failures.append(f"followup receipt for {member} has a stale owner generation")
+        if receipt.get("member_id") != member:
+            failures.append(f"followup receipt for {member} identifies a different member")
+        if receipt.get("integration_head") != state.integration_head:
+            failures.append(f"followup receipt for {member} has a stale integration head")
+        accepted_head = receipt.get("accepted_head")
+        if not isinstance(accepted_head, str) or not FULL_REVISION_RE.fullmatch(accepted_head):
+            failures.append(f"followup receipt for {member} has an invalid accepted head")
+    return failures
+
+
+def _validate_followup_final_pr(state: FollowupState) -> list[str]:
+    final_pr = state.final_pr
+    if final_pr is None:
+        return []
+    if (
+        not isinstance(final_pr, dict)
+        or not isinstance(final_pr.get("number"), int)
+        or isinstance(final_pr.get("number"), bool)
+        or final_pr.get("number", 0) <= 0
+        or not isinstance(final_pr.get("node_id"), str)
+        or not final_pr.get("node_id")
+        or not isinstance(final_pr.get("head"), str)
+        or not FULL_REVISION_RE.fullmatch(final_pr["head"])
+        or (state.integration_head is not None and final_pr["head"] != state.integration_head)
+    ):
+        return ["followup final_pr binding is invalid"]
+    return []
+
+
+def _validate_followup_batch(state: FollowupState) -> list[str]:
+    failures: list[str] = []
+    if (
+        not isinstance(state.batch_id, str)
+        or len(state.batch_id) > MAX_TODO_ID_LEN
+        or not TODO_ID_RE.fullmatch(state.batch_id or "")
+    ):
+        failures.append("followup batch_id must be a canonical todo-db ID")
+    if not isinstance(state.owner_generation, str) or not re.fullmatch(r"[0-9a-f]{32}", state.owner_generation):
+        failures.append("followup owner_generation must be a 32-hex value")
+    failures.extend(_valid_text(state.integrator, "integrator", required=True))
+    if state.integration_head is not None and (
+        not isinstance(state.integration_head, str) or not FULL_REVISION_RE.fullmatch(state.integration_head)
+    ):
+        failures.append("followup integration_head must be a full lowercase commit SHA")
+    members = state.members
+    if (
+        not isinstance(members, list)
+        or not members
+        or len(members) > MAX_FOLLOWUP_MEMBERS
+        or any(not isinstance(member, str) or not TODO_ID_RE.fullmatch(member) for member in members)
+        or len(set(members)) != len(members)
+    ):
+        failures.append("followup members must be a unique non-empty ordered list")
+        member_set: set[str] = set()
+    else:
+        member_set = set(members)
+    failures.extend(_valid_revision_map(state.pending_worker_heads, "pending_worker_heads", member_set))
+    failures.extend(_validate_followup_receipts(state, member_set))
+    failures.extend(_validate_followup_final_pr(state))
+    return failures
+
+
+def validate_followup(state: FollowupState) -> None:
+    """Validate the local continuation schema before it can be persisted."""
+    failures: list[str] = []
+    for field in ("owner", "session", "scope"):
+        failures.extend(_valid_text(getattr(state, field, None), field, required=True))
+    if state.schema not in {"", FOLLOWUP_SCHEMA}:
+        failures.append(f"followup schema {state.schema!r} is unsupported")
+    if state.pr is not None and (not isinstance(state.pr, int) or isinstance(state.pr, bool) or state.pr <= 0):
+        failures.append("followup pr must be a positive integer")
+    value = state.head
+    if value is not None and (not isinstance(value, str) or not FULL_REVISION_RE.fullmatch(value)):
+        failures.append("followup head must be a full lowercase commit SHA")
+    if state.phase not in FOLLOWUP_PHASES:
+        failures.append(f"followup phase {state.phase!r} is unsupported")
+    failures.extend(_valid_text(state.next_action, "next_action"))
+    failures.extend(_valid_text(state.blocked_reason, "blocked_reason"))
+    if state.terminal is not None and state.terminal not in TERMINAL_OUTCOMES:
+        failures.append(f"followup terminal outcome {state.terminal!r} is unsupported")
+    for field in ("attempts", "reentries"):
+        count = getattr(state, field)
+        if not isinstance(count, int) or isinstance(count, bool) or not 0 <= count <= MAX_FOLLOWUP_RETRY_COUNT:
+            failures.append(f"followup {field} is outside its bound")
+    if state.processed is not None and (
+        not isinstance(state.processed, list) or len(state.processed) > MAX_FOLLOWUP_PROCESSED
+    ):
+        failures.append("followup processed exceeds its bound")
+    failures.extend(_parse_followup_time(state.due_at, "due_at"))
+    failures.extend(_parse_followup_time(state.claim_expires_at, "claim_expires_at"))
+    batch_fields = (state.batch_id, state.owner_generation, state.integrator, state.integration_head, state.members)
+    has_batch = any(value is not None for value in batch_fields) or any(
+        value is not None for value in (state.pending_worker_heads, state.accepted_receipts, state.final_pr)
+    )
+    if has_batch:
+        failures.extend(_validate_followup_batch(state))
+    if failures:
+        raise LandingError("; ".join(failures))
 
 
 def coerce_followup(data: object) -> FollowupState:
     """Build state from untrusted input, refusing missing required fields."""
     if not isinstance(data, dict):
         raise LandingError("followup state must be an object")
+    aliases = {
+        "batch_identity": "batch_id",
+        "generation": "owner_generation",
+        "declared_members": "members",
+        "accepted_integration_receipts": "accepted_receipts",
+        "final_pr_binding": "final_pr",
+    }
+    normalized: dict[str, object] = {}
+    for key, value in data.items():
+        if not isinstance(key, str):
+            raise LandingError("followup state field names must be strings")
+        normalized_key = aliases.get(key, key)
+        if normalized_key in normalized:
+            raise LandingError(f"followup state duplicates field {normalized_key!r}")
+        normalized[normalized_key] = value
+    fields = set(FollowupState.__dataclass_fields__)
+    unknown = sorted(set(normalized) - fields)
+    if unknown:
+        raise LandingError(f"followup state has unknown fields: {', '.join(unknown[:4])}")
     try:
-        state = FollowupState(**{k: data.get(k) for k in FollowupState.__dataclass_fields__})
+        state = FollowupState(**{k: value for k, value in normalized.items() if k in fields})
     except TypeError as exc:
         raise LandingError(f"followup state has an unexpected shape: {exc}") from exc
-    for field in ("owner", "session", "scope"):
-        if not getattr(state, field, None):
-            raise LandingError(f"followup state lacks required field {field!r}")
+    validate_followup(state)
     return state
 
 
@@ -1276,9 +1544,35 @@ def load_followup(directory: Path, key: str) -> FollowupState | None:
 
 def resume_followup(state: FollowupState) -> dict:
     """Route to the owned next action. Missing/unknown state is never 'done'."""
+    validate_followup(state)
+    if state.claim_expires_at:
+        expires = dt.datetime.fromisoformat(state.claim_expires_at.replace("Z", "+00:00"))
+        if expires <= dt.datetime.now(dt.timezone.utc):
+            return {
+                "status": "claim-expired",
+                "next_action": "renew or explicitly transfer the expired claim before continuing",
+            }
+    if state.blocked_reason:
+        return {
+            "status": "blocked",
+            "reason": state.blocked_reason,
+            "next_action": state.next_action or "resolve the recorded blocker with the owner",
+        }
+    if state.members:
+        accepted = set((state.accepted_receipts or {}).keys())
+        missing = [member for member in state.members if member not in accepted]
+        if state.terminal in {"merged", "closed-merged"} and missing:
+            return {
+                "status": "incomplete",
+                "next_action": f"record accepted integration receipts for {', '.join(missing[:4])}",
+                "missing_members": missing,
+            }
+        if state.terminal in {"merged", "closed-merged"} and state.final_pr is None:
+            return {
+                "status": "incomplete",
+                "next_action": "bind the eventual final PR before declaring the batch merged",
+            }
     if state.terminal is not None:
-        if state.terminal not in TERMINAL_OUTCOMES:
-            return {"status": "invalid-terminal", "next_action": "re-verify terminal evidence with owner"}
         return {"status": state.terminal, "next_action": ""}
     if not state.next_action:
         return {"status": "unknown", "next_action": "re-verify PR/head state; an empty queue is not completion"}
@@ -1317,10 +1611,7 @@ def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
             state.attempts += 1
         else:
             state.reentries += 1
-        path = followup_path(directory, key)
-        tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(asdict(state), indent=2) + "\n", encoding="utf-8")
-        tmp.replace(path)
+        _write_followup_atomic(followup_path(directory, key), state)
     return {**decision, "remaining": True}
 
 

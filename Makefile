@@ -13,6 +13,8 @@ PR_REVIEW_INCLUDE_RESOLVED ?= 0
 PR_REVIEW_FAIL_ON_PENDING ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
+PR_STATUS_LIMIT ?= 20
+PR_STATUS_ALL_OPEN_LIMIT ?= 1000
 DEV_LOOP_METRICS_DAYS ?= 30
 DEV_LOOP_METRICS_LIMIT ?= 100
 AUDIT_SHA_TARGET_REF ?= origin/develop
@@ -1627,7 +1629,13 @@ pr-conflict-scan:
 
 # Show open PRs against develop and their CI + auto-merge state.
 pr-status:
-	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
+	@if [ "$(ALL_OPEN)" = "1" ] || [ "$(ALL_OPEN)" = "true" ] || [ "$(ALL_OPEN)" = "yes" ]; then \
+		echo "All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):"; \
+		LIMIT="$(PR_STATUS_ALL_OPEN_LIMIT)"; \
+	else \
+		LIMIT="$(PR_STATUS_LIMIT)"; \
+	fi; \
+	gh pr list --base develop --state open --limit "$$LIMIT" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.

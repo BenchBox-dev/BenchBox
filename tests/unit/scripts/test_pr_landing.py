@@ -387,6 +387,255 @@ def test_followup_coerce_refuses_missing_owner(tmp_path: Path) -> None:
     assert landing.load_followup(tmp_path, "absent") is None
 
 
+def _batch_followup(**over: object) -> landing.FollowupState:
+    values: dict[str, object] = {
+        "owner": "integrator",
+        "session": "session-1",
+        "scope": "batch",
+        "phase": "member-closeout",
+        "next_action": "record member-b receipt",
+        "batch_id": "batch-1",
+        "owner_generation": "a" * 32,
+        "integrator": "integrator",
+        "integration_head": HEAD,
+        "members": ["member-a", "member-b"],
+        "pending_worker_heads": {"member-b": OTHER},
+        "accepted_receipts": {
+            "member-a": {
+                "receipt_id": "receipt-a",
+                "batch_id": "batch-1",
+                "owner_generation": "a" * 32,
+                "member_id": "member-a",
+                "accepted_head": HEAD,
+                "integration_head": HEAD,
+            }
+        },
+    }
+    values.update(over)
+    return landing.FollowupState(**values)
+
+
+def test_followup_batch_roundtrip_preserves_members_and_final_pr(tmp_path: Path) -> None:
+    state = _batch_followup(
+        final_pr={"number": 41, "node_id": "PR_node_41", "head": HEAD},
+        next_action="watch native merge queue",
+        phase="queue",
+    )
+    landing.record_followup(tmp_path, "batch-1", state)
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    assert loaded.batch_id == "batch-1"
+    assert loaded.members == ["member-a", "member-b"]
+    assert loaded.pending_worker_heads == {"member-b": OTHER}
+    assert set(loaded.accepted_receipts or {}) == {"member-a"}
+    assert landing.resume_followup(loaded) == {"status": "queue", "next_action": "watch native merge queue"}
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        _batch_followup(members=[]),
+        _batch_followup(members=["member-a", "member-a"]),
+        _batch_followup(pending_worker_heads={"unknown": HEAD}),
+        _batch_followup(final_pr={"number": 41, "node_id": "PR_node_41", "head": OTHER}),
+    ],
+)
+def test_followup_batch_rejects_invalid_members_workers_and_final_binding(
+    tmp_path: Path, state: landing.FollowupState
+) -> None:
+    with pytest.raises(landing.LandingError):
+        landing.record_followup(tmp_path, "batch-1", state)
+
+
+def test_followup_rejects_unknown_state_field() -> None:
+    with pytest.raises(landing.LandingError, match="unknown fields"):
+        landing.coerce_followup({"owner": "o", "session": "s", "scope": "pr", "surprise": True})
+
+
+def test_followup_partial_batch_cannot_claim_merged(tmp_path: Path) -> None:
+    state = _batch_followup(terminal="merged", next_action="")
+    landing.record_followup(tmp_path, "batch-1", state)
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    result = landing.resume_followup(loaded)
+    assert result["status"] == "incomplete"
+    assert result["missing_members"] == ["member-b"]
+    assert "member-b" in result["next_action"]
+
+
+def test_followup_rerecord_does_not_lose_accepted_member_or_final_pr(tmp_path: Path) -> None:
+    complete = _batch_followup(
+        accepted_receipts={
+            "member-a": {
+                "receipt_id": "receipt-a",
+                "batch_id": "batch-1",
+                "owner_generation": "a" * 32,
+                "member_id": "member-a",
+                "accepted_head": HEAD,
+                "integration_head": HEAD,
+            },
+            "member-b": {
+                "receipt_id": "receipt-b",
+                "batch_id": "batch-1",
+                "owner_generation": "a" * 32,
+                "member_id": "member-b",
+                "accepted_head": OTHER,
+                "integration_head": HEAD,
+            },
+        },
+        final_pr={"number": 41, "node_id": "PR_node_41", "head": HEAD},
+        terminal="merged",
+        next_action="",
+        phase="queue",
+    )
+    landing.record_followup(tmp_path, "batch-1", complete)
+    landing.record_followup(
+        tmp_path,
+        "batch-1",
+        landing.FollowupState(
+            owner="integrator",
+            session="session-2",
+            scope="batch",
+            phase="queue",
+            next_action="re-verify final PR",
+        ),
+    )
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    assert loaded.owner_generation == "a" * 32
+    assert loaded.integrator == "integrator"
+    assert loaded.integration_head == HEAD
+    assert loaded.members == ["member-a", "member-b"]
+    assert loaded.pending_worker_heads == {"member-b": OTHER}
+    assert set(loaded.accepted_receipts or {}) == {"member-a", "member-b"}
+    assert loaded.final_pr == complete.final_pr
+    assert loaded.terminal == "merged"
+
+
+def test_followup_explicit_pending_map_replaces_and_updates_worker_heads(tmp_path: Path) -> None:
+    landing.record_followup(
+        tmp_path,
+        "batch-1",
+        _batch_followup(pending_worker_heads={"member-a": HEAD, "member-b": OTHER}),
+    )
+    landing.record_followup(
+        tmp_path,
+        "batch-1",
+        _batch_followup(pending_worker_heads={"member-a": OTHER}),
+    )
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    assert loaded.pending_worker_heads == {"member-a": OTHER}
+
+
+def test_followup_partial_update_rejects_integration_head_change(tmp_path: Path) -> None:
+    landing.record_followup(
+        tmp_path,
+        "batch-1",
+        _batch_followup(final_pr={"number": 41, "node_id": "PR_node_41", "head": HEAD}),
+    )
+    with pytest.raises(landing.LandingError, match="immutable integration_head"):
+        landing.record_followup(
+            tmp_path,
+            "batch-1",
+            _batch_followup(
+                integration_head=OTHER,
+                accepted_receipts={
+                    "member-a": {
+                        "receipt_id": "receipt-a-new",
+                        "batch_id": "batch-1",
+                        "owner_generation": "a" * 32,
+                        "member_id": "member-a",
+                        "accepted_head": HEAD,
+                        "integration_head": OTHER,
+                    }
+                },
+            ),
+        )
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    assert loaded.integration_head == HEAD
+    assert loaded.final_pr == {"number": 41, "node_id": "PR_node_41", "head": HEAD}
+
+
+def test_followup_later_binds_an_integration_head(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "batch-1", _batch_followup(integration_head=None, accepted_receipts=None))
+    landing.record_followup(
+        tmp_path,
+        "batch-1",
+        landing.FollowupState(owner="integrator", session="session-2", scope="batch", integration_head=HEAD),
+    )
+    loaded = landing.load_followup(tmp_path, "batch-1")
+    assert loaded is not None
+    assert loaded.integration_head == HEAD
+    assert loaded.members == ["member-a", "member-b"]
+    assert loaded.pending_worker_heads == {"member-b": OTHER}
+
+
+def test_followup_partial_update_rejects_accepted_receipt_replacement(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "batch-1", _batch_followup())
+    with pytest.raises(landing.LandingError, match="cannot replace the accepted receipt"):
+        landing.record_followup(
+            tmp_path,
+            "batch-1",
+            _batch_followup(
+                accepted_receipts={
+                    "member-a": {
+                        "receipt_id": "receipt-a-replaced",
+                        "batch_id": "batch-1",
+                        "owner_generation": "a" * 32,
+                        "member_id": "member-a",
+                        "accepted_head": HEAD,
+                        "integration_head": HEAD,
+                    }
+                }
+            ),
+        )
+
+
+@pytest.mark.parametrize("field", ["due_at", "claim_expires_at"])
+def test_followup_rejects_timezone_naive_persisted_time(field: str) -> None:
+    state = landing.FollowupState(
+        owner="o",
+        session="s",
+        scope="pr",
+        next_action="watch queue",
+        **{field: "2020-01-01T00:00:00"},
+    )
+    with pytest.raises(landing.LandingError, match="explicit timezone"):
+        landing.resume_followup(state)
+
+
+def test_followup_expired_claim_is_explicitly_owned() -> None:
+    state = landing.FollowupState(
+        owner="o",
+        session="s",
+        scope="pr",
+        next_action="watch queue",
+        claim_expires_at="2020-01-01T00:00:00Z",
+    )
+    assert landing.resume_followup(state) == {
+        "status": "claim-expired",
+        "next_action": "renew or explicitly transfer the expired claim before continuing",
+    }
+
+
+def test_followup_blocked_reason_remains_the_owned_next_action() -> None:
+    state = landing.FollowupState(
+        owner="o",
+        session="s",
+        scope="batch",
+        phase="blocked",
+        blocked_reason="conflict-resolution-failed",
+        next_action="preserve the conflict commit and ask the integrator to resolve it",
+    )
+    assert landing.resume_followup(state) == {
+        "status": "blocked",
+        "reason": "conflict-resolution-failed",
+        "next_action": "preserve the conflict commit and ask the integrator to resolve it",
+    }
+
+
 def test_enqueue_arms_with_match_head_commit() -> None:
     run = FakeRun([(0, "")])
     assert landing.enqueue_pr(run, "o/r", 3, HEAD, HEAD)["enqueued"] is True
@@ -829,3 +1078,13 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
     assert "pr-arm-auto-merge REPO=" in open_body and 'URL="$$URL"' not in open_body
     executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert "gh pr merge --auto --squash" not in executable
+
+
+def test_makefile_has_separate_bounded_all_open_status_view() -> None:
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "PR_STATUS_ALL_OPEN_LIMIT ?= 1000" in makefile
+    status = makefile.split("pr-status:", 1)[1].split("\n\n", 1)[0]
+    assert "PR_STATUS_LIMIT" in status
+    assert "ALL_OPEN" in status
+    assert "PR_STATUS_ALL_OPEN_LIMIT" in status
+    assert "All open develop PRs" in status

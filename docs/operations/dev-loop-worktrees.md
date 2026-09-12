@@ -174,6 +174,9 @@ Gate authors avoid duplicate invocations against identical trees with
 
 ## Queue-aware publication and resumable follow-up
 
+- `make pr-status` is a short operator view. Use its separate bounded
+  `make pr-status ALL_OPEN=1` inventory when reconciling every open develop PR;
+  neither an empty PR list nor an empty review queue is a completion signal.
 - Stale-base publication follows `_project/decisions/native-queue-local-landing.md`:
   `make pr-open` probes the current base/head merge, then asks
   `scripts/ruleset_drift_check.py --queue-policy` for a live, complete queue
@@ -183,8 +186,20 @@ Gate authors avoid duplicate invocations against identical trees with
   `STALE=1` bypass is not accepted for this path.
 - Follow-up ownership persists per key under `~/.benchbox/pr-landing/`
   (`make pr-followup-record/resume`, `scripts/pr_landing.py followup-*`):
-  explicit owner, session, scope, attempts, due date, and next action from
-  pre-PR assembly through post-merge. Terminal outcomes are explicit
-  (`merged`, `closed-merged`, `abandoned`, `superseded`); an empty queue or
-  missing state is never completion. Retries are bounded (one rerun per
-  failed job, one re-entry per unchanged head) and only on unchanged heads.
+  explicit owner, session, scope, attempts, due date, claim expiry, and next
+  action from pre-PR assembly through post-merge. A pre-PR batch record also
+  binds its batch ID, owner generation, integrator, ordered member set,
+  pending worker heads, accepted integration receipts, and eventual final-PR
+  identity. Partial member closeout remains visible and cannot become a
+  merged terminal outcome until every declared member and the final PR are
+  bound. Terminal outcomes are explicit (`merged`, `closed-merged`,
+  `abandoned`, `superseded`); an empty queue or missing state is never
+  completion. Missing workers, expired claims, failed conflict resolution,
+  and unavailable platform continuation are recorded as owned next actions.
+  Retries are bounded (one rerun per failed job, one re-entry per unchanged
+  head) and only on unchanged heads.
+- Routine waits may use existing host scheduling/watch support only when that
+  monitoring authority was granted before the wait. The installed follow-up
+  guide must preserve the record and next action; it must not unconditionally
+  stop and make the user reschedule a routine wait. `KEEP_IDLE` and
+  `SHADOW_ONLY` remain explicit no-mutation modes.

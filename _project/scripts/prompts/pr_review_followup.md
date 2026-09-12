@@ -29,6 +29,20 @@ Carry-over patterns from the completed PR-review follow-up TODOs:
 - Cross-check related blind-spots and weakened tests when the finding is about regression coverage.
 - Prefer focused tests over broad rewrites.
 
+Continuation and waiting:
+- Preserve the local follow-up record before any wait or handoff. Its owner,
+  batch identity/generation, declared members, pending worker heads, accepted
+  integration receipts, final-PR binding, and explicit next action are the
+  source of truth for resumption. Never infer completion from an empty PR or
+  review list.
+- Missing branches/workers, expired claims, conflict-resolution failures, and
+  unavailable platform continuation remain explicit owned actions. Resume the
+  recorded action only after re-validating the current head and readiness
+  transaction.
+- Use host scheduling/watch support only when monitoring authority was granted
+  before the wait. Do not unconditionally stop and make the user reschedule a
+  routine wait. Preserve `KEEP_IDLE` and `SHADOW_ONLY` as no-mutation modes.
+
 Useful local references:
 - `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-01.yaml` (historical filename; the routine is now `pr-review-followups`)
 - `_project/DONE/main/active/codex-pr-review-followups-week-2026-05-03.yaml` (historical filename; same)
