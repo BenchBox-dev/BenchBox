@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "03eecdb12457966b4739bd582cd4b8e52665966f0fe369b08fb24dc58a76e7d4",
+  "contract_sha256": "92a8a762178f35808e68868277e34ca121915367bc5922d610f0cdfeb9b2df0e",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1093,8 +1093,8 @@
       },
       {
         "header": "pr-arm-auto-merge:",
-        "recipe": "\t@URL=\"$(URL)\"; \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tCURRENT=$$(git branch --show-current); \\\n\t\tURL=$$(gh pr list --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tfi; \\\n\tif [ -z \"$$URL\" ]; then echo \"No open PR found for this branch.\" >&2; exit 1; fi; \\\n\tLABELS=$$(gh pr view \"$$URL\" --json labels --jq '.labels[].name') || { echo \"Cannot read PR labels \u2014 refusing to arm (fail closed).\" >&2; exit 1; }; \\\n\tif printf '%s\\n' \"$$LABELS\" | grep -qxF 'no-auto-merge'; then \\\n\t\techo \"PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tgit fetch origin develop --quiet; \\\n\tSOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \\\n\tif [ \"$$SOUNDNESS_PATH\" = \"true\" ]; then \\\n\t\techo \"Soundness-critical paths changed; leaving auto-merge disabled pending review.\"; \\\n\telse \\\n\t\tgh pr merge --auto --squash \"$$URL\"; \\\n\tfi",
-        "recipe_sha256": "7684511397fcda0d585c7bab73415a6b28ca6200b4110f54ae3852966c694e43"
+        "recipe": "\t@set -eu; \\\n\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\tCURRENT=$$(git branch --show-current); \\\n\tPR_NUMBER=\"$(PR)\"; \\\n\tif [ -n \"$(URL)\" ]; then \\\n\t\tif [ -n \"$$PR_NUMBER\" ]; then echo \"PR and URL are mutually exclusive\" >&2; exit 2; fi; \\\n\t\tPR_NUMBER=$$(gh pr view --repo \"$$REPOSITORY\" \"$(URL)\" --json number --jq '.number') || { echo \"Could not resolve URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\tfi; \\\n\tcase \"$$PR_NUMBER\" in *[!0-9]*) echo \"PR must resolve to a positive number\" >&2; exit 2 ;; esac; \\\n\tif [ -n \"$$PR_NUMBER\" ] && [ \"$$PR_NUMBER\" -le 0 ]; then echo \"PR must resolve to a positive number\" >&2; exit 2; fi; \\\n\tPR_ARGS=\"\"; \\\n\tif [ -n \"$$PR_NUMBER\" ]; then PR_ARGS=\"--pr $$PR_NUMBER\"; fi; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$$REPOSITORY\" \\\n\t\t--worktree . --branch \"$$CURRENT\" arm $$PR_ARGS",
+        "recipe_sha256": "87ce5bfc0d7667f236224a7581ddfccfaf05956c5f5fcc1d9d2dca6bb97a3699"
       }
     ],
     "pr-conflict-scan": [
@@ -1135,29 +1135,29 @@
     "pr-landing-ready": [
       {
         "header": "pr-landing-ready:",
-        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
-        "recipe_sha256": "9814c9421f8342f8a9dda6320240035691176070388b9ef4cd491d31b54dbb5d"
+        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) \\\n\t\t$(if $(PR_NODE_ID),--pr-node-id \"$(PR_NODE_ID)\",) ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
+        "recipe_sha256": "3ae1ad5ec9f75abadda675ac1ee5cd382850b5466a03ce0d03df898a12b0c3b1"
       }
     ],
     "pr-landing-start": [
       {
         "header": "pr-landing-start:",
-        "recipe": "\tuv run -- python scripts/pr_landing.py --worktree . start",
-        "recipe_sha256": "346369efd3eb54733b40a27c624855e87284bc0d1feb8a435572f3ea596a52dc"
+        "recipe": "\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) start",
+        "recipe_sha256": "0314f0ad83fc1fe9c1c7c993703324956ec77ca06129986ac397d863114b4206"
       }
     ],
     "pr-landing-withdraw": [
       {
         "header": "pr-landing-withdraw:",
-        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . withdraw --pr \"$(PR)\"",
-        "recipe_sha256": "69a33ffb60b4b357cc16af67b7cac96d1a1c78f8ebed443d0531b7ab232612b1"
+        "recipe": "\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) \\\n\t\t$(if $(PR_NODE_ID),--pr-node-id \"$(PR_NODE_ID)\",) withdraw --pr \"$(PR)\" \\\n\t\t$(if $(HEAD),--expected-head \"$(HEAD)\",)",
+        "recipe_sha256": "7729fa7c6f3c11398adc21d991f73aca8655e5a5164bfce01c21bd8b40678133"
       }
     ],
     "pr-open": [
       {
         "header": "pr-open:",
-        "recipe": "\t@$(MAKE) -s agent-write-preflight\n\t@CURRENT=$$(git branch --show-current); \\\n\tcase \"$$CURRENT\" in \\\n\t\tdevelop|main|release) echo \"Refusing to open PR from $$CURRENT \u2014 switch to a feature branch.\"; exit 1 ;; \\\n\tesac; \\\n\tif [ -n \"$(PR_BODY_FILE)\" ] && [ ! -f \"$(PR_BODY_FILE)\" ]; then \\\n\t\techo \"PR_BODY_FILE does not exist: $(PR_BODY_FILE)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tgit fetch origin develop --quiet; \\\n\tif [ \"$(STALE)\" != \"1\" ]; then \\\n\t\tgit merge-base --is-ancestor origin/develop HEAD || { \\\n\t\t\techo \"Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1.\" >&2; \\\n\t\t\texit 1; \\\n\t\t}; \\\n\tfi; \\\n\t$(MAKE) -s pr-conflict-scan BRANCH=\"$$CURRENT\" || true; \\\n\tgit push -u origin \"$$CURRENT\" || { echo \"Push failed for $$CURRENT \u2014 aborting before opening a PR (remote branch may be stale).\" >&2; exit 1; }; \\\n\tURL=$$(gh pr list --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tURL=$$(gh pr create --base develop --fill --head \"$$CURRENT\" --body-file \"$(PR_BODY_FILE)\"); \\\n\t\telse \\\n\t\t\tURL=$$(gh pr create --base develop --fill --head \"$$CURRENT\"); \\\n\t\tfi; \\\n\telse \\\n\t\techo \"Reusing existing PR: $$URL\"; \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tgh pr edit \"$$URL\" --body-file \"$(PR_BODY_FILE)\"; \\\n\t\tfi; \\\n\tfi && \\\n\techo \"$$URL\" && \\\n\tif [ \"$(READY)\" != \"1\" ]; then \\\n\t\techo \"Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm-auto-merge URL=\"$$URL\"; \\\n\tfi",
-        "recipe_sha256": "ba22356c3c1f34c08771774db31ff36214297ab3c7ddbf307ef90bb9295f0792"
+        "recipe": "\t@set -eu; \\\n\t$(MAKE) -s agent-write-preflight; \\\n\tCURRENT=$$(git branch --show-current); \\\n\tcase \"$$CURRENT\" in \\\n\t\tdevelop|main|release) echo \"Refusing to open PR from $$CURRENT \u2014 switch to a feature branch.\"; exit 1 ;; \\\n\tesac; \\\n\tif [ -n \"$(PR_BODY_FILE)\" ] && [ ! -f \"$(PR_BODY_FILE)\" ]; then \\\n\t\techo \"PR_BODY_FILE does not exist: $(PR_BODY_FILE)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\tgit fetch origin develop --quiet; \\\n\tif ! git merge-base --is-ancestor origin/develop HEAD; then \\\n\t\tif ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \\\n\t\t\techo \"Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tQUEUE_REPORT=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$QUEUE_REPORT\"' EXIT; \\\n\t\tQUEUE_TOKEN=\"$${RULESET_DRIFT_TOKEN:-$$(gh auth token 2>/dev/null || true)}\"; \\\n\t\tif ! uv run -- python scripts/ruleset_drift_check.py --queue-policy \\\n\t\t\t--require-bypass-actor-visibility --repo \"$$REPOSITORY\" --token \"$$QUEUE_TOKEN\" \\\n\t\t\t--output \"$$QUEUE_REPORT\"; then \\\n\t\t\techo \"Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tif ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report \"$$QUEUE_REPORT\"); then \\\n\t\t\techo \"Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\t[ \"$$DECISION\" = \"publish-without-refresh\" ] || { echo \"Refusing to open PR: unexpected stale-base decision $$DECISION.\" >&2; exit 1; }; \\\n\t\techo \"Verified native merge queue: publishing without an author-side base refresh.\"; \\\n\tfi; \\\n\t$(MAKE) -s pr-conflict-scan BRANCH=\"$$CURRENT\" || true; \\\n\tgit push -u origin \"$$CURRENT\" || { echo \"Push failed for $$CURRENT \u2014 aborting before opening a PR (remote branch may be stale).\" >&2; exit 1; }; \\\n\tURL=$$(gh pr list --repo \"$$REPOSITORY\" --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$CURRENT\" --body-file \"$(PR_BODY_FILE)\"); \\\n\t\telse \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$CURRENT\"); \\\n\t\tfi; \\\n\telse \\\n\t\techo \"Reusing existing PR: $$URL\"; \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tgh pr edit --repo \"$$REPOSITORY\" \"$$URL\" --body-file \"$(PR_BODY_FILE)\"; \\\n\t\tfi; \\\n\tfi && \\\n\techo \"$$URL\" && \\\n\tif [ \"$(READY)\" != \"1\" ]; then \\\n\t\techo \"Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$$REPOSITORY\"; \\\n\tfi",
+        "recipe_sha256": "51338a889154cd24b2a3e61f571883fc0937f7401f14bb64049517e7227c5857"
       }
     ],
     "pr-preflight": [
@@ -1177,8 +1177,8 @@
     "pr-ready": [
       {
         "header": "pr-ready:",
-        "recipe": "\t@$(MAKE) -s pr-arm-auto-merge",
-        "recipe_sha256": "aafbc7dde980d2e591deaa2496aa6ed85df3a92aa30e03b603899063d6f734b7"
+        "recipe": "\t@$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\"",
+        "recipe_sha256": "402697c8d8b0971adb20ddf44840198a077e268c6c7dd8f721fdc0282370cd67"
       }
     ],
     "pr-refresh": [
@@ -1215,8 +1215,8 @@
     "pr-status": [
       {
         "header": "pr-status:",
-        "recipe": "\t@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \\\n\t\t--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{\"\\n\"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{\"\\n\"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{\"\\n\\n\"}}{{end}}'",
-        "recipe_sha256": "93f0870d6d37bcd4592c21fee7adfa25ad167c67a6040baa10442720c396a053"
+        "recipe": "\t@if [ \"$(ALL_OPEN)\" = \"1\" ] || [ \"$(ALL_OPEN)\" = \"true\" ] || [ \"$(ALL_OPEN)\" = \"yes\" ]; then \\\n\t\techo \"All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):\"; \\\n\t\tLIMIT=\"$(PR_STATUS_ALL_OPEN_LIMIT)\"; \\\n\telse \\\n\t\tLIMIT=\"$(PR_STATUS_LIMIT)\"; \\\n\tfi; \\\n\tgh pr list --base develop --state open --limit \"$$LIMIT\" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \\\n\t\t--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{\"\\n\"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{\"\\n\"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{\"\\n\\n\"}}{{end}}'",
+        "recipe_sha256": "045de3d0b90f8b7f040e782c9d6d733bdcd3e8d5f769a659a21a938d9ac43352"
       }
     ],
     "prompt-quickstarts-check": [
@@ -2058,7 +2058,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "9a9aa2aba0c52e63f25681c0272c660752f1bfb6578a4ffd9946d9df8a477db0",
+  "semantic_sha256": "827c526101c42f6fac8ae4e899cdf91550a1aa323553314be8b2d43873d51e6e",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2113,6 +2113,18 @@
       "kind": "variable",
       "name": "PR_REVIEW_EXECUTOR_APPROVAL",
       "sha256": "2f55f85800424f7b754bbbcc603889327e448ac8a3f673f4f2106703ec88cb50"
+    },
+    {
+      "body": "PR_STATUS_LIMIT ?= 20",
+      "kind": "variable",
+      "name": "PR_STATUS_LIMIT",
+      "sha256": "fbe55c37c08d8bf3199190fd0347db0eff902f9e8e4ada38f83554284fcd75b5"
+    },
+    {
+      "body": "PR_STATUS_ALL_OPEN_LIMIT ?= 1000",
+      "kind": "variable",
+      "name": "PR_STATUS_ALL_OPEN_LIMIT",
+      "sha256": "3fc316e9bc721a682f78e18103cd9f884bea8e54a138b020c9cf2462914578c0"
     },
     {
       "body": "DEV_LOOP_METRICS_DAYS ?= 30",
@@ -3701,25 +3713,25 @@
       ]
     },
     {
-      "body": "pr-landing-start:\n\tuv run -- python scripts/pr_landing.py --worktree . start",
+      "body": "pr-landing-start:\n\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) start",
       "kind": "rule",
-      "sha256": "6f9b45bc776b2d5b6d71cc8c41e135e4318b4a853e98b5a3d46aa643a444893c",
+      "sha256": "fbda5aeef4d61a10f7961a87c50819040aa04bffec75395b28bca73cbff6b3a7",
       "targets": [
         "pr-landing-start"
       ]
     },
     {
-      "body": "pr-landing-withdraw:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . withdraw --pr \"$(PR)\"",
+      "body": "pr-landing-withdraw:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) \\\n\t\t$(if $(PR_NODE_ID),--pr-node-id \"$(PR_NODE_ID)\",) withdraw --pr \"$(PR)\" \\\n\t\t$(if $(HEAD),--expected-head \"$(HEAD)\",)",
       "kind": "rule",
-      "sha256": "832add41e7e63f0681714f7cfd181b2234353914bf68fe5a9b3942f6d9258310",
+      "sha256": "30c0f14fe18b7e835eebe42cbe32392f867a9800b738e204be9ffe4423d624da",
       "targets": [
         "pr-landing-withdraw"
       ]
     },
     {
-      "body": "pr-landing-ready:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --worktree . ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
+      "body": "pr-landing-ready:\n\t@[ -n \"$(PR)\" ] || { echo \"PR is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }; \\\n\t@[ -n \"$(EVIDENCE)\" ] || { echo \"EVIDENCE is required\" >&2; exit 2; }; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \\\n\t\t--worktree . --branch \"$(or $(BRANCH),$(shell git branch --show-current))\" \\\n\t\t$(if $(WORKTREE_ID),--worktree-id \"$(WORKTREE_ID)\",) \\\n\t\t$(if $(PR_NODE_ID),--pr-node-id \"$(PR_NODE_ID)\",) ready --pr \"$(PR)\" \\\n\t\t--expected-head \"$(HEAD)\" --evidence-json \"$(EVIDENCE)\" $(if $(ARM),--arm,)",
       "kind": "rule",
-      "sha256": "2e68cdd77417ead5e0b4e498c5b26229d82af96f6723962094890a273cd628bf",
+      "sha256": "3bb37fce48142d79b9d469c70a49e79d5b03edeedb88439036d38072160581d3",
       "targets": [
         "pr-landing-ready"
       ]
@@ -3749,25 +3761,25 @@
       ]
     },
     {
-      "body": "pr-open:\n\t@$(MAKE) -s agent-write-preflight\n\t@CURRENT=$$(git branch --show-current); \\\n\tcase \"$$CURRENT\" in \\\n\t\tdevelop|main|release) echo \"Refusing to open PR from $$CURRENT \u2014 switch to a feature branch.\"; exit 1 ;; \\\n\tesac; \\\n\tif [ -n \"$(PR_BODY_FILE)\" ] && [ ! -f \"$(PR_BODY_FILE)\" ]; then \\\n\t\techo \"PR_BODY_FILE does not exist: $(PR_BODY_FILE)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tgit fetch origin develop --quiet; \\\n\tif [ \"$(STALE)\" != \"1\" ]; then \\\n\t\tgit merge-base --is-ancestor origin/develop HEAD || { \\\n\t\t\techo \"Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1.\" >&2; \\\n\t\t\texit 1; \\\n\t\t}; \\\n\tfi; \\\n\t$(MAKE) -s pr-conflict-scan BRANCH=\"$$CURRENT\" || true; \\\n\tgit push -u origin \"$$CURRENT\" || { echo \"Push failed for $$CURRENT \u2014 aborting before opening a PR (remote branch may be stale).\" >&2; exit 1; }; \\\n\tURL=$$(gh pr list --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tURL=$$(gh pr create --base develop --fill --head \"$$CURRENT\" --body-file \"$(PR_BODY_FILE)\"); \\\n\t\telse \\\n\t\t\tURL=$$(gh pr create --base develop --fill --head \"$$CURRENT\"); \\\n\t\tfi; \\\n\telse \\\n\t\techo \"Reusing existing PR: $$URL\"; \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tgh pr edit \"$$URL\" --body-file \"$(PR_BODY_FILE)\"; \\\n\t\tfi; \\\n\tfi && \\\n\techo \"$$URL\" && \\\n\tif [ \"$(READY)\" != \"1\" ]; then \\\n\t\techo \"Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm-auto-merge URL=\"$$URL\"; \\\n\tfi",
+      "body": "pr-open:\n\t@set -eu; \\\n\t$(MAKE) -s agent-write-preflight; \\\n\tCURRENT=$$(git branch --show-current); \\\n\tcase \"$$CURRENT\" in \\\n\t\tdevelop|main|release) echo \"Refusing to open PR from $$CURRENT \u2014 switch to a feature branch.\"; exit 1 ;; \\\n\tesac; \\\n\tif [ -n \"$(PR_BODY_FILE)\" ] && [ ! -f \"$(PR_BODY_FILE)\" ]; then \\\n\t\techo \"PR_BODY_FILE does not exist: $(PR_BODY_FILE)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\tgit fetch origin develop --quiet; \\\n\tif ! git merge-base --is-ancestor origin/develop HEAD; then \\\n\t\tif ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \\\n\t\t\techo \"Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tQUEUE_REPORT=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$QUEUE_REPORT\"' EXIT; \\\n\t\tQUEUE_TOKEN=\"$${RULESET_DRIFT_TOKEN:-$$(gh auth token 2>/dev/null || true)}\"; \\\n\t\tif ! uv run -- python scripts/ruleset_drift_check.py --queue-policy \\\n\t\t\t--require-bypass-actor-visibility --repo \"$$REPOSITORY\" --token \"$$QUEUE_TOKEN\" \\\n\t\t\t--output \"$$QUEUE_REPORT\"; then \\\n\t\t\techo \"Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tif ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report \"$$QUEUE_REPORT\"); then \\\n\t\t\techo \"Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\t[ \"$$DECISION\" = \"publish-without-refresh\" ] || { echo \"Refusing to open PR: unexpected stale-base decision $$DECISION.\" >&2; exit 1; }; \\\n\t\techo \"Verified native merge queue: publishing without an author-side base refresh.\"; \\\n\tfi; \\\n\t$(MAKE) -s pr-conflict-scan BRANCH=\"$$CURRENT\" || true; \\\n\tgit push -u origin \"$$CURRENT\" || { echo \"Push failed for $$CURRENT \u2014 aborting before opening a PR (remote branch may be stale).\" >&2; exit 1; }; \\\n\tURL=$$(gh pr list --repo \"$$REPOSITORY\" --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$CURRENT\" --body-file \"$(PR_BODY_FILE)\"); \\\n\t\telse \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$CURRENT\"); \\\n\t\tfi; \\\n\telse \\\n\t\techo \"Reusing existing PR: $$URL\"; \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tgh pr edit --repo \"$$REPOSITORY\" \"$$URL\" --body-file \"$(PR_BODY_FILE)\"; \\\n\t\tfi; \\\n\tfi && \\\n\techo \"$$URL\" && \\\n\tif [ \"$(READY)\" != \"1\" ]; then \\\n\t\techo \"Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$$REPOSITORY\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "c879da733f683992ab8b8483623d123e685dc46cfacf74eef7f6d86445a61172",
+      "sha256": "55033224196ee1dc18614fb834154661dd62cd327961f94c95d5383604b58071",
       "targets": [
         "pr-open"
       ]
     },
     {
-      "body": "pr-arm-auto-merge:\n\t@URL=\"$(URL)\"; \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tCURRENT=$$(git branch --show-current); \\\n\t\tURL=$$(gh pr list --base develop --head \"$$CURRENT\" --state open --json url --jq '.[0].url' 2>/dev/null); \\\n\tfi; \\\n\tif [ -z \"$$URL\" ]; then echo \"No open PR found for this branch.\" >&2; exit 1; fi; \\\n\tLABELS=$$(gh pr view \"$$URL\" --json labels --jq '.labels[].name') || { echo \"Cannot read PR labels \u2014 refusing to arm (fail closed).\" >&2; exit 1; }; \\\n\tif printf '%s\\n' \"$$LABELS\" | grep -qxF 'no-auto-merge'; then \\\n\t\techo \"PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tgit fetch origin develop --quiet; \\\n\tSOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \\\n\tif [ \"$$SOUNDNESS_PATH\" = \"true\" ]; then \\\n\t\techo \"Soundness-critical paths changed; leaving auto-merge disabled pending review.\"; \\\n\telse \\\n\t\tgh pr merge --auto --squash \"$$URL\"; \\\n\tfi",
+      "body": "pr-arm-auto-merge:\n\t@set -eu; \\\n\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\tCURRENT=$$(git branch --show-current); \\\n\tPR_NUMBER=\"$(PR)\"; \\\n\tif [ -n \"$(URL)\" ]; then \\\n\t\tif [ -n \"$$PR_NUMBER\" ]; then echo \"PR and URL are mutually exclusive\" >&2; exit 2; fi; \\\n\t\tPR_NUMBER=$$(gh pr view --repo \"$$REPOSITORY\" \"$(URL)\" --json number --jq '.number') || { echo \"Could not resolve URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\tfi; \\\n\tcase \"$$PR_NUMBER\" in *[!0-9]*) echo \"PR must resolve to a positive number\" >&2; exit 2 ;; esac; \\\n\tif [ -n \"$$PR_NUMBER\" ] && [ \"$$PR_NUMBER\" -le 0 ]; then echo \"PR must resolve to a positive number\" >&2; exit 2; fi; \\\n\tPR_ARGS=\"\"; \\\n\tif [ -n \"$$PR_NUMBER\" ]; then PR_ARGS=\"--pr $$PR_NUMBER\"; fi; \\\n\tuv run -- python scripts/pr_landing.py --repo \"$$REPOSITORY\" \\\n\t\t--worktree . --branch \"$$CURRENT\" arm $$PR_ARGS",
       "kind": "rule",
-      "sha256": "e9d53e686f313b2e67646acc8dee246fb949d473b745d890271ea9a455b47f37",
+      "sha256": "253f6a90865b686c9031a1a5ac262f165f90ffcd5c93cf52ca18457768e1c718",
       "targets": [
         "pr-arm-auto-merge"
       ]
     },
     {
-      "body": "pr-ready:\n\t@$(MAKE) -s pr-arm-auto-merge",
+      "body": "pr-ready:\n\t@$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\"",
       "kind": "rule",
-      "sha256": "7885ebc68f27cb26e44244e540a8d52831cf2a6b9a19db8017b9de13d618f2b9",
+      "sha256": "bef4cd06f95e794319acf467363e31388f16012a2be7071b21258a09a8de6153",
       "targets": [
         "pr-ready"
       ]
@@ -3805,9 +3817,9 @@
       ]
     },
     {
-      "body": "pr-status:\n\t@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \\\n\t\t--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{\"\\n\"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{\"\\n\"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{\"\\n\\n\"}}{{end}}'",
+      "body": "pr-status:\n\t@if [ \"$(ALL_OPEN)\" = \"1\" ] || [ \"$(ALL_OPEN)\" = \"true\" ] || [ \"$(ALL_OPEN)\" = \"yes\" ]; then \\\n\t\techo \"All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):\"; \\\n\t\tLIMIT=\"$(PR_STATUS_ALL_OPEN_LIMIT)\"; \\\n\telse \\\n\t\tLIMIT=\"$(PR_STATUS_LIMIT)\"; \\\n\tfi; \\\n\tgh pr list --base develop --state open --limit \"$$LIMIT\" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \\\n\t\t--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{\"\\n\"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{\"\\n\"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{\"\\n\\n\"}}{{end}}'",
       "kind": "rule",
-      "sha256": "07b3e1071190b6dd3c660d497b9e636a0ca206b679c2caa659d8b680d99839f4",
+      "sha256": "6c00565e6a738d4ea87b7edeb95d0dfef59ee2140378add4838c7d35dfa77ae2",
       "targets": [
         "pr-status"
       ]
@@ -4620,6 +4632,20 @@
     "PR_REVIEW_PR_LIMIT": [
       {
         "body": "PR_REVIEW_PR_LIMIT ?= 1000",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PR_STATUS_ALL_OPEN_LIMIT": [
+      {
+        "body": "PR_STATUS_ALL_OPEN_LIMIT ?= 1000",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PR_STATUS_LIMIT": [
+      {
+        "body": "PR_STATUS_LIMIT ?= 20",
         "directive": "",
         "operator": "?="
       }
