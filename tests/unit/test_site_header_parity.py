@@ -194,6 +194,11 @@ def test_landing_introduces_results_explorer_with_public_compare_and_local_workf
     assert "Compare like with like" in section
     assert "Check your own result" in section
     assert "without uploading it" in section
+    assert "Four DuckDB versions, one comparable cohort" in section
+    assert "281,041" in section
+    assert "Box plots of query latency by DuckDB version" in section
+    assert "Cumulative query latency by DuckDB version" in section
+    assert section.count("compare?ids=6235bd1a,47bdcef5,282a4d75,19b96c85") == 3
     assert source.index('id="features"') < section_start < source.index('id="benchmarks"')
 
 
