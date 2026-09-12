@@ -226,12 +226,78 @@ section {
     padding: var(--space-3xl) 0;
 }
 
+section[id] {
+    scroll-margin-top: 8rem;
+}
+
 section h2 {
     text-align: center;
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: var(--space-2xl);
     color: var(--text-primary);
+}
+
+/* Landing-page section navigation */
+.section-nav {
+    position: sticky;
+    top: 4rem;
+    z-index: 900;
+    background-color: var(--bg-primary);
+    border-top: 1px solid var(--border-primary);
+    border-bottom: 1px solid var(--border-primary);
+    box-shadow: var(--card-shadow);
+}
+
+.section-nav__links {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-xl);
+    overflow-x: auto;
+    padding-top: var(--space-md);
+    padding-bottom: var(--space-md);
+    scrollbar-width: thin;
+}
+
+.section-nav__link {
+    --section-accent: var(--accent-primary);
+
+    flex: 0 0 auto;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 3px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.section-nav__link--platforms {
+    --section-accent: var(--platforms-heading);
+}
+
+.section-nav__link--formats,
+.section-nav__link--install {
+    --section-accent: var(--formats-heading);
+}
+
+.section-nav__link--agents {
+    --section-accent: var(--mcp-heading);
+}
+
+.section-nav__link:hover,
+.section-nav__link[aria-current="location"] {
+    border-bottom-color: var(--section-accent);
+    color: var(--section-accent);
+}
+
+.section-nav__link[aria-current="location"] {
+    background-color: var(--bg-secondary);
+}
+
+.section-nav__link:focus-visible {
+    outline: 2px solid var(--section-accent);
+    outline-offset: 4px;
 }
 
 /* Features Grid */
@@ -714,6 +780,19 @@ section h2 {
 
     .container {
         padding: 0 var(--space-md);
+    }
+
+    .section-nav__links {
+        justify-content: flex-start;
+        gap: var(--space-lg);
+    }
+
+    .section-nav {
+        top: 3.75rem;
+    }
+
+    section[id] {
+        scroll-margin-top: 7.75rem;
     }
 
     /* Code block mobile fixes */
