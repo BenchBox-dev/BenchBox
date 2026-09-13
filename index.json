@@ -10632,7 +10632,8 @@
         "pr-revision-readiness-transaction",
         "publication-ledger-reproducible-inputs",
         "review-remediations-verify-per-instance",
-        "skill-integrity-ci-lane-live-validation"
+        "skill-integrity-ci-lane-live-validation",
+        "todo-db-runtime-schema3-batch-capability"
       ],
       "priority": "high",
       "status": "open",
