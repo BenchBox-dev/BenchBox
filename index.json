@@ -11063,12 +11063,17 @@
       "title": "public_result_id is contractually permanent but has no alias/redirect mechanism"
     },
     "publication-ledger-reproducible-inputs": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-14T00:54:12Z",
+        "generation": "367664704763410a8f713b9aa10f64ba",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Make ledger validation reproducible and reconcile publication-ref drift separately"
     },
     "publication-pages-deploy-nonterminal-and-journal-split-brain": {
