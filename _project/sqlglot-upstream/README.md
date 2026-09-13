@@ -2,9 +2,10 @@
 
 Drafted bug reports and a feature request for the SQLGlot project, plus the
 minimal reproducer harness that pins each defect to a specific SQLGlot
-version. **Nothing here has been filed upstream yet.** The drafts under
-`issues/` are intended for human review before opening on
-https://github.com/tobymao/sqlglot/issues.
+version. SQLite extraction has an
+[upstream follow-up on existing issue #2592](https://github.com/tobymao/sqlglot/issues/2592#issuecomment-5653487646).
+The remaining drafts under `issues/` need the validation described below before
+submission. No SQLGlot fix PR has been submitted from this preparation.
 
 ## Submission readiness
 
