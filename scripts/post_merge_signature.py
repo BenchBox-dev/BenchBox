@@ -384,9 +384,14 @@ def classify_attribution(evidence: dict[str, object]) -> dict[str, object]:
     ownership_match = evidence.get("ownership_match") is True
     rerun = evidence.get("rerun")
     proposed_revert = evidence.get("proposed_revert")
+    comparison_state = str(evidence.get("comparison_state", "")).strip()
+    comparison_failure = str(evidence.get("comparison_failure", "")).strip()
     reasons: list[str] = []
 
-    if not failing_sha or not target_sha:
+    if comparison_state == "unknown" or comparison_failure:
+        classification = "unknown"
+        reasons.append(comparison_failure or "signature comparison did not complete")
+    elif not failing_sha or not target_sha:
         classification = "unknown"
         reasons.append("missing immutable failing or current target SHA")
     elif target_sha != failing_sha:
@@ -455,6 +460,8 @@ def build_incident_artifact(evidence: dict[str, object], attribution: dict[str, 
             "predecessor": evidence.get("predecessor_source_inputs", {}),
         },
         "predecessor_evidence": evidence.get("predecessor_evidence", {}),
+        "comparison_state": evidence.get("comparison_state", ""),
+        "comparison_failure": evidence.get("comparison_failure", ""),
         "ownership_match": evidence.get("ownership_match"),
         "classification": attribution["classification"],
         "action": attribution["action"],

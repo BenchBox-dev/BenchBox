@@ -26,6 +26,7 @@ from post_merge_signature import (  # noqa: E402
     diff_signatures,
     failure_id_test_paths,
     imported_module_paths,
+    incident_key,
     load_signature,
     main,
 )
@@ -67,6 +68,20 @@ JUNIT_NO_FILE_ATTR = """<?xml version="1.0" encoding="utf-8"?>
   </testsuite>
 </testsuites>
 """
+
+# Named replay fixtures for the two historical incidents required by the
+# post-merge attribution contract. The first exercises dotted JUnit
+# normalization plus unrelated ownership; the second exercises external
+# source-ref movement.
+BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS = [
+    "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials"
+]
+LEDGER_2073_EXTERNAL_REF_EVIDENCE = {
+    "failure_ids": ["tests/unit/test_ledger.py::test_seed"],
+    "source_inputs": {"published-results": "source-new"},
+    "predecessor_source_inputs": {"published-results": "source-old"},
+    "ownership_match": False,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +601,85 @@ def test_incident_artifact_captures_immutable_and_ownership_evidence() -> None:
     }
     assert artifact["predecessor_evidence"]["sha"] == "parent-sha"
     assert artifact["owner"] == "maintainer"
+
+
+def test_missing_current_signature_reaches_owned_incident_without_revert() -> None:
+    evidence = _complete_attribution_evidence(
+        failure_ids=[],
+        source_inputs={},
+        predecessor_source_inputs={"published-results": "source-previous"},
+        comparison_state="unknown",
+        comparison_failure="Missing current-run signature artifact(s) for: fast-test",
+    )
+
+    artifact = build_incident_artifact(evidence, classify_attribution(evidence))
+
+    assert artifact["classification"] == "unknown"
+    assert artifact["action"] == "advisory"
+    assert artifact["owner"] == "maintainer"
+    assert artifact["comparison_state"] == "unknown"
+    assert "Missing current-run signature" in artifact["comparison_failure"]
+    assert artifact["incident_key"] == incident_key([])
+
+
+def test_replay_2068_bigquery_dotted_junit_incident_never_reverts() -> None:
+    # Replay of the historical #2068 shape: a dotted JUnit classname is
+    # extractable, but the changed subsystem is unrelated to BigQuery tests.
+    evidence = _complete_attribution_evidence(
+        failure_ids=BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS,
+        changed_paths=["results-data/README.md", ".github/workflows/seed-corpus.yml"],
+        source_inputs={"published-results": "source"},
+        predecessor_source_inputs={"published-results": "source"},
+    )
+
+    result = classify_attribution(evidence)
+
+    assert failure_id_test_paths(BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS) == [
+        "tests/unit/platforms/credentials/test_bigquery_defaults.py"
+    ]
+    assert (
+        attribution_action(
+            BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS,
+            ["results-data/README.md", ".github/workflows/seed-corpus.yml"],
+        )
+        == "advisory"
+    )
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+    assert result["incident_key"] == incident_key(evidence["failure_ids"])
+
+
+def test_replay_2073_ledger_external_ref_incident_never_reverts() -> None:
+    # Replay of the historical #2073 shape: source identity drift is evidence
+    # of an external-input incident, not ownership by the merged code.
+    evidence = _complete_attribution_evidence(
+        **LEDGER_2073_EXTERNAL_REF_EVIDENCE,
+    )
+
+    result = classify_attribution(evidence)
+
+    assert result["classification"] == "external-ref-drift"
+    assert result["action"] == "advisory"
+
+
+def test_owned_regression_is_not_suppressed() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(
+            source_inputs={"published-results": "source"},
+            predecessor_source_inputs={"published-results": "source"},
+            ownership_match=True,
+        )
+    )
+
+    assert result["classification"] == "code-regression"
+    assert result["action"] == "revert"
+
+
+def test_incident_key_is_stable_for_reordered_duplicate_failure_ids() -> None:
+    first = classify_attribution(_complete_attribution_evidence(failure_ids=["b", "a", "a"]))
+    second = classify_attribution(_complete_attribution_evidence(failure_ids=["a", "b"]))
+
+    assert first["incident_key"] == second["incident_key"]
 
 
 # ---------------------------------------------------------------------------

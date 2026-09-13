@@ -595,6 +595,10 @@ jobs:
                 should_revert="false"
                 comparison_state="persistent"
               else
+                # A new signature is necessary but not sufficient for a
+                # revert. Attribution must still provide positive ownership
+                # evidence before the revert step can run.
+                should_revert="true"
                 comparison_state="new"
               fi
             else
@@ -637,6 +641,8 @@ jobs:
         shell: bash
         env:
           NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+          COMPARISON_STATE: ${{ steps.signature-decision.outputs.comparison-state }}
+          COMPARISON_FAILURE: ${{ steps.signature-decision.outputs.fail-open-reason }}
         run: |
           set -euo pipefail
           if [ -z "${NEW_FAILURE_IDS}" ] || [ "${NEW_FAILURE_IDS}" = "null" ]; then
@@ -666,9 +672,25 @@ jobs:
             current_target_sha=""
           fi
           predecessor_sha="$(git rev-parse --verify --quiet "${FAILING_SHA}^1" || true)"
-          previous_signature='{}'
+          # Comparison failures can leave current-combined.json absent or
+          # malformed. Keep this attribution step alive with a safe,
+          # explicit empty signature so the unknown incident is still
+          # recorded; an empty signature can never create ownership evidence.
+          empty_signature='{"failure_ids":[],"jobs":[],"source_inputs":{}}'
+          current_signature="${empty_signature}"
+          if [ -f current-combined.json ]; then
+            if ! current_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' current-combined.json 2>/dev/null)"; then
+              echo "Current combined signature is missing or malformed; using the safe unknown-attribution fallback."
+              current_signature="${empty_signature}"
+            fi
+          fi
+
+          previous_signature="${empty_signature}"
           if [ -f previous-combined.json ]; then
-            previous_signature="$(cat previous-combined.json)"
+            if ! previous_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' previous-combined.json 2>/dev/null)"; then
+              echo "Previous combined signature is malformed; using the safe evidence fallback."
+              previous_signature="${empty_signature}"
+            fi
           fi
 
           jq -n \
@@ -678,9 +700,11 @@ jobs:
             --arg predecessor_sha "${predecessor_sha}" \
             --arg previous_run_url "${{ steps.signature-decision.outputs.previous-run-url }}" \
             --arg owner "${owner}" \
+            --arg comparison_state "${COMPARISON_STATE}" \
+            --arg comparison_failure "${COMPARISON_FAILURE}" \
             --argjson failure_ids "${failure_ids_json}" \
             --argjson failing_pr "${pr_json}" \
-            --argjson current_signature "$(cat current-combined.json)" \
+            --argjson current_signature "${current_signature}" \
             --argjson previous_signature "${previous_signature}" \
             '{
               evidence_version: 2,
@@ -698,6 +722,8 @@ jobs:
                 sha: $predecessor_sha,
                 signature: $previous_signature
               },
+              comparison_state: $comparison_state,
+              comparison_failure: $comparison_failure,
               proposed_revert: {inspected: false}
             }' > attribution-evidence.json
 
@@ -720,10 +746,10 @@ jobs:
         id: revert-outcome
         # Always runs (even when the attribute step above was skipped) so the
         # job output below has a value in every case: the signature-decision
-        # step's revert-suppressed is computed before attribution runs, so it
-        # is still "false" for an advisory run even though this job's
-        # "Open revert PR or conflict issue" step explicitly skips the revert.
-        # Metrics consuming revert-suppressed must see that suppression.
+        # step's initial revert-suppressed value is based on comparison only;
+        # the final value below also accounts for attribution. Metrics must
+        # report a revert as suppressed unless positive ownership evidence
+        # actually reaches the revert step.
         if: always()
         shell: bash
         run: |

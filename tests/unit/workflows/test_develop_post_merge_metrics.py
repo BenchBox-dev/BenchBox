@@ -294,6 +294,32 @@ def test_unproven_attribution_routes_to_owned_incident_without_revert() -> None:
     assert "Fail loudly on unattributable failure classes" not in workflow
 
 
+def test_new_owned_regression_reaches_revert_route() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'should_revert="true"\n                comparison_state="new"' in workflow
+    assert "steps.signature-decision.outputs.should-revert == 'true'" in workflow
+    assert "steps.attribute.outputs.action == 'revert'" in workflow
+    assert 'revert_suppressed="true"' in workflow
+
+
+def test_missing_current_signature_uses_incident_fallback_and_cannot_revert() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    attribute_block = workflow.split("id: attribute", 1)[1].split("- name: Finalize revert-suppressed", 1)[0]
+
+    assert 'empty_signature=\'{"failure_ids":[],"jobs":[],"source_inputs":{}}\'' in attribute_block
+    assert "if [ -f current-combined.json ]; then" in attribute_block
+    assert 'jq -ce \'if type == "object" and' in attribute_block
+    assert 'error("signature object has invalid fields") end\'' in attribute_block
+    assert 'current_signature="${empty_signature}"' in attribute_block
+    assert '--argjson current_signature "$(cat current-combined.json)"' not in attribute_block
+    assert "comparison_state: $comparison_state" in attribute_block
+    assert (
+        "steps.signature-decision.outputs.should-revert == 'false' || steps.attribute.outputs.action == 'advisory'"
+        in workflow
+    )
+
+
 def test_incident_artifact_contains_required_attribution_fields() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
 
