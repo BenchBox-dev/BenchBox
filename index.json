@@ -13874,12 +13874,17 @@
       "title": "Make docs/development/agent-review-protocol.md the single review-protocol authority; audit detects contradictions"
     },
     "review-remediations-verify-per-instance": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-14T01:13:27Z",
+        "generation": "43ffcceb6cb24b7a8890f41672bc2426",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Verify remediation across affected instances and downstream consumers"
     },
     "revisit-extras-naming-topology-e-g-dataframe-pandas-vs-panda": {
