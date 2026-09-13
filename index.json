@@ -15146,7 +15146,7 @@
       "needs": [
         "sql-translation-ml-feasibility"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Train and select the standalone tiny SQL translator"
     },
