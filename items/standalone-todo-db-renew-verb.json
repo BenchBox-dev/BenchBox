@@ -1,5 +1,5 @@
 {
-  "context": "Land the renew subcommand in the standalone todo-db package first (mirroring renew_claim's refusals: foreign lease, unclaimed item, and already-expired lease all rejected, CAS-guarded on the observed lease). Then add 'renew' to COMMANDS in the adapter and pin the routing with a test.",
+  "context": "Resolved and completed: The standalone compat adapter (_project/scripts/todo_db_standalone_compat.py) and bash shim were retired and deleted in PR #2032 (commit 848bc08f2). Upstream todo-db package natively provides the renew verb in 0.7.3.",
   "description": "PR #1374 added a 'renew' verb to BenchBox's _project/scripts/todo_db.py so a live session can re-stamp its own claim lease. The opt-in standalone path did not get it. todo_db_standalone_compat.py's COMMANDS frozenset does not list 'renew', and _command_index returns None for unrecognized verbs, whose fallback forwards argv raw to the standalone todo-db CLI - which has no renew subcommand. So 'todo renew <id>' fails under BENCHBOX_TODO_DB_STANDALONE=1 while working on the default path. Ordering matters: adding 'renew' to COMMANDS before the standalone package implements it converts a fallback failure into a routing failure, so the package change lands first. Default path is unaffected; the adapter is off by default.",
   "legacy": {
     "item_meta": {
