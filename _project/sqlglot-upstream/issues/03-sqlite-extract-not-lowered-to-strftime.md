@@ -1,6 +1,7 @@
 ---
-sqlglot_version: 30.6.0
-status: drafted
+sqlglot_version: 30.18.0
+upstream_sha: 5cfb5997a99010940138670adf3d6b34ac5a0a08
+status: prepared-for-human-review
 type: bug
 target_dialect: sqlite
 benchbox_workaround: benchbox/utils/dialect_utils.py:_fix_sqlite_unsupported_syntax
@@ -16,9 +17,18 @@ SQLite generator does not lower `EXTRACT(... FROM date)` to `STRFTIME` (revisit 
 
 ## Description
 
-`EXTRACT(YEAR FROM d)` is left verbatim when the write dialect is `sqlite`. SQLite has no `EXTRACT` function — the canonical equivalent is `CAST(STRFTIME('%Y', d) AS INTEGER)` (and `'%m'`, `'%d'`, etc. for `MONTH` and `DAY`).
+`EXTRACT(YEAR FROM d)` is left verbatim when the write dialect is `sqlite`.
+SQLite has no EXTRACT function. For a bare projection over ISO date TEXT,
+`CAST(STRFTIME('%Y', d) AS INTEGER)` produces the expected calendar year;
+the semantic limitations below prevent treating it as a universal replacement.
 
-A prior issue (https://github.com/tobymao/sqlglot/issues/2592, 2023) reported the same gap and was closed without a linked fix. This issue re-reports against `sqlglot==30.6.0` with a current minimal reproducer.
+A prior issue [#2592](https://github.com/tobymao/sqlglot/issues/2592) was closed
+as not planned. The maintainer raised a date-representation concern and invited
+a well-crafted PR. [#7152](https://github.com/tobymao/sqlglot/issues/7152) also
+reported the extraction gap; its maintainer response invited contributions for
+remaining cases. Prefer following up on that history rather than filing a
+duplicate report. This preparation reproduces on 30.6.0, 30.18.0 and upstream
+commit `5cfb5997a99010940138670adf3d6b34ac5a0a08`.
 
 ## Reproducer
 
@@ -38,7 +48,7 @@ Something equivalent to:
 SELECT CAST(STRFTIME('%Y', d) AS INTEGER) FROM t
 ```
 
-## Actual output (sqlglot 30.6.0)
+## Actual output (sqlglot 30.18.0)
 
 ```sql
 SELECT EXTRACT(YEAR FROM d) FROM t
@@ -48,13 +58,37 @@ SQLite rejects this with `Parse error: near "FROM"`.
 
 ## Scope
 
-`YEAR`, `MONTH`, `DAY` at minimum. Affects every TPC-H/TPC-DS query that uses `EXTRACT` against a date column when targeting SQLite.
+The bounded reproducer covers YEAR/MONTH/DAY on DATE columns represented as
+ISO date TEXT in SQLite, DATE casts, nested COALESCE, duplicate values, NULLs,
+leap days and century boundaries. The related DuckDB DATE_PART form currently
+parses as Anonymous rather than Extract and needs separate parser work.
+
+## Semantic questions before implementing
+
+The basic STRFTIME replacement is not a complete translation contract:
+
+- A TIMESTAMP cast remains a SQLite numeric-affinity cast. Wrapping
+  `CAST('2020-06-01 12:00:00' AS TIMESTAMP)` in STRFTIME produces year -4707,
+  not 2020. A DATE cast already generates DATE(...) on current main, but that
+  does not solve timestamp casts.
+- Casting the extracted year to INTEGER changes surrounding arithmetic:
+  `CAST(STRFTIME('%Y', DATE('2020-06-01')) AS INTEGER) / 3 > 673` is false in
+  SQLite. PostgreSQL EXTRACT has a numeric result, so the source expression is
+  true. A bare projection test misses this difference.
+- EXTRACT also accepts intervals in source dialects. Timestamp timezone
+  semantics and dates outside SQLite's documented range need explicit limits.
+
+Agree on handling source result types and unsupported input types before
+submitting a generic generator patch. Do not silently change all extraction
+to floating point or hide precision differences in the comparator.
 
 ## Version
 
-- `sqlglot==30.6.0`
-- Python 3.12
-- Reproduced via the harness at https://github.com/joeharris76/BenchBox/blob/develop/_project/sqlglot-upstream/repros/repro_all.py
+- `sqlglot==30.6.0`, `30.18.0`, and the upstream SHA above
+- Standalone execution reproducer: `_project/sqlglot-upstream/repros/sqlite_extract.py`
+- The script executes SQLite with explicit expected results, not PostgreSQL.
+  DuckDB execution independently checked the two surrounding-expression
+  counterexamples; it is not presented as PostgreSQL execution evidence.
 
 ## Notes
 
