@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "Reproduce unsupported identify=True and ORDER BY ALL; propose tested structural solutions without silent fallback.",
+    "Inventory SQLGlot imports, separating translation from AST analysis, DDL and DataFrame use.",
+    "Verify wheel/build support against BenchBox declared Python/OS/architecture matrix. Explain Rust/PyO3 release ownership, pinning, licensing, update burden and rollback."
+  ],
+  "context": "Review found18 source files importing SQLGlot. Polyglot0.9.2 rejects identify=True. Rust custom dialect registration exists; equivalent Python registration was not found in inspected stub. Main inspected44ab8f9473039f143a2907e0e64001606b3c05e4. Source main and release must be reconciled. Engine workarounds remain needed whichever transpiler is chosen.",
+  "description": "Assess the smallest safe adoption boundary using benchbox/utils/dialect_utils.py and existing SQLGlot consumers. Compare quoting, normalization, errors, diagnostics and pre/postprocessors. Research only; no production migration.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2111",
+    "https://github.com/tobilg/polyglot",
+    "https://github.com/tobymao/sqlglot/pull/8352"
+  ]
+}

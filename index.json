@@ -10484,6 +10484,13 @@
       "status": "done",
       "title": "Polars Platform Adapter"
     },
+    "polyglot-benchbox-integration-assessment": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Assess Polyglot API compatibility and native packaging for BenchBox"
+    },
     "polyglot-source-aware-division-spike": {
       "claim": null,
       "needs": [],
