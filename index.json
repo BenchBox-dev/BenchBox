@@ -15155,7 +15155,7 @@
       "needs": [
         "sql-translation-ml-models"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Implement resumable bounded local CodeT5 fine-tuning"
     },
