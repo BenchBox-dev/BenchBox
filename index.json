@@ -15031,7 +15031,7 @@
       "needs": [
         "sql-translation-ml-splits"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Measure SQLGlot and BenchBox baselines and validate labels"
     },
