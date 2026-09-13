@@ -15074,7 +15074,7 @@
       "needs": [
         "sql-translation-ml-comparator"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Build bounded source and target execution validation"
     },
