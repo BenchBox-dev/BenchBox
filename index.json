@@ -15045,15 +15045,10 @@
       "title": "Implement a strict SQL result equivalence comparator"
     },
     "sql-translation-ml-contract": {
-      "claim": {
-        "expires_at": "2026-09-14T21:23:07Z",
-        "generation": "975cc6ccf7b1437f84337923b2081e5a",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Define the tiny SQL translation experiment contract"
     },
     "sql-translation-ml-dataset": {
