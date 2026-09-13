@@ -101,6 +101,13 @@ jobs:
           # in this single-branch clone; a bare `git fetch origin published-results`
           # only populates FETCH_HEAD and leaves origin/published-results missing.
           git fetch origin published-results:refs/remotes/origin/published-results
+          PUBLISHED_BASE_SHA=$(git rev-parse --verify origin/published-results^{commit})
+          if [[ ! "${PUBLISHED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not capture an immutable published-results base SHA."
+            exit 1
+          fi
+          echo "Captured published-results base: ${PUBLISHED_BASE_SHA}"
+          echo "published_base_sha=${PUBLISHED_BASE_SHA}" >> "$GITHUB_OUTPUT"
 
           # Direct two-tree compare (no dots): `published-results` is an
           # orphan branch (W2 of the parent TODO force-pushed it to a fresh
@@ -217,8 +224,14 @@ jobs:
           MIRROR_BRANCH="auto/results-mirror-${GITHUB_SHA::8}"
           echo "mirror_branch=${MIRROR_BRANCH}" >> "$GITHUB_OUTPUT"
 
-          # Start from current published-results
-          git switch --force-create "${MIRROR_BRANCH}" origin/published-results
+          # Start from the exact published-results revision captured during the
+          # drift check. Do not resolve the moving ref again here.
+          PUBLISHED_BASE_SHA="${{ steps.drift.outputs.published_base_sha }}"
+          if [[ ! "${PUBLISHED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Mirror build has no captured published-results base SHA; refusing to publish."
+            exit 1
+          fi
+          git switch --force-create "${MIRROR_BRANCH}" "${PUBLISHED_BASE_SHA}"
 
           # Apply the triggering commit's content for each mirrored path.
           #
@@ -310,7 +323,20 @@ jobs:
           git commit -F "${MSG_FILE}"
           rm -f "${MSG_FILE}"
 
-          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          # Compare and set the publication input before pushing a mirror
+          # proposal. The workflow never writes published-results directly, but
+          # a draft built from an older public tip would be an ambiguous
+          # reconciliation and could hide an intervening accepted submission.
+          # Treat movement as an actionable retry instead of opening a stale PR.
+          git fetch origin published-results:refs/remotes/origin/published-results
+          CURRENT_PUBLISHED_SHA=$(git rev-parse --verify origin/published-results^{commit})
+          if [[ "${CURRENT_PUBLISHED_SHA}" != "${PUBLISHED_BASE_SHA}" ]]; then
+            echo "::error::published-results moved during mirror creation."
+            echo "Captured base: ${PUBLISHED_BASE_SHA}"
+            echo "Current tip:   ${CURRENT_PUBLISHED_SHA}"
+            echo "No mirror PR was opened. Re-run this workflow after the accepted publication settles."
+            exit 1
+          fi
 
           # Push the mirror branch. The branch is auto-named per develop SHA
           # and only ever managed by this workflow, so force is acceptable;
@@ -318,6 +344,13 @@ jobs:
           # catch the unlikely race where two concurrent runs targeting the
           # same SHA collide.
           PRE_COMMIT_ALLOW_NO_CONFIG=1 git push --force-with-lease origin "${MIRROR_BRANCH}"
+
+          # Publish outputs only after the compare-and-set guard and push have
+          # both succeeded. A failed movement check must not satisfy the
+          # always-run status/PR steps below.
+          MIRROR_HEAD_SHA=$(git rev-parse --verify HEAD^{commit})
+          echo "mirror_head_sha=${MIRROR_HEAD_SHA}" >> "$GITHUB_OUTPUT"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
       # w0: which checks genuinely protect a corpus-only branch. `published-results`
       # carries results-data/, a slim results-validation subset of benchbox/, and
@@ -431,6 +464,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MIRROR_BRANCH: ${{ steps.build.outputs.mirror_branch }}
           DIFF_COUNT: ${{ steps.drift.outputs.diff_count }}
+          PUBLISHED_BASE_SHA: ${{ steps.drift.outputs.published_base_sha }}
+          MIRROR_HEAD_SHA: ${{ steps.build.outputs.mirror_head_sha }}
         run: |
           # Reuse an existing PR opened by this workflow against the same
           # mirror branch; otherwise open a new draft PR.
@@ -449,6 +484,10 @@ jobs:
           **${DIFF_COUNT}** path(s) changed. Review the diff and flip the PR
           ready to merge when the develop-side change is ready to surface
           on the public corpus branch. This PR will not auto-merge.
+
+          The mirror was built from published-results@${PUBLISHED_BASE_SHA}
+          and has head ${MIRROR_HEAD_SHA}. If the accepted publication moves,
+          rerun the mirror workflow instead of merging this stale proposal.
 
           See [\`docs/development/adr/adr-published-results-slim-corpus-branch.md\`](https://github.com/${{ github.repository }}/blob/develop/docs/development/adr/adr-published-results-slim-corpus-branch.md)
           for the slim-branch design and

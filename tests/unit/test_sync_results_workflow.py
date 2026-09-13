@@ -72,6 +72,33 @@ def test_sync_results_workflow_sources_triggering_commit() -> None:
     assert "origin/develop" not in workflow
 
 
+def test_sync_workflow_captures_and_compares_publication_revision() -> None:
+    """A mirror proposal must be based on one accepted-publication snapshot.
+
+    The public branch can receive an independent accepted submission while a
+    develop-triggered mirror is running. Reusing the moving ref at build time
+    would produce a proposal whose source is not known; opening that proposal
+    should wait for an explicit retry instead.
+    """
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    build = _build_step_run()
+
+    assert "PUBLISHED_BASE_SHA=$(git rev-parse --verify origin/published-results^{commit})" in workflow
+    assert 'echo "published_base_sha=${PUBLISHED_BASE_SHA}" >> "$GITHUB_OUTPUT"' in workflow
+    assert 'git switch --force-create "${MIRROR_BRANCH}" "${PUBLISHED_BASE_SHA}"' in build
+    assert "CURRENT_PUBLISHED_SHA=$(git rev-parse --verify origin/published-results^{commit})" in build
+    assert '"${CURRENT_PUBLISHED_SHA}" != "${PUBLISHED_BASE_SHA}"' in build
+    assert "No mirror PR was opened" in build
+    assert "Re-run this workflow" in build
+    assert build.rfind('echo "has_changes=true"') > build.index("CURRENT_PUBLISHED_SHA")
+    assert build.rfind('echo "mirror_head_sha=${MIRROR_HEAD_SHA}"') > build.index("CURRENT_PUBLISHED_SHA")
+
+    # The PR body preserves both immutable identities for a later reviewer.
+    assert "published_base_sha" in workflow
+    assert "mirror_head_sha" in workflow
+    assert "built from published-results@${PUBLISHED_BASE_SHA}" in workflow
+
+
 def test_sync_workflow_references_publication_fixed_point_gate() -> None:
     """The mirror must refuse a corpus that re-anonymization would rewrite.
 
