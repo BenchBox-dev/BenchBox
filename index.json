@@ -15047,7 +15047,7 @@
     "sql-translation-ml-contract": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Define the tiny SQL translation experiment contract"
     },
