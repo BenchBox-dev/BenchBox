@@ -15046,10 +15046,10 @@
     },
     "sql-translation-ml-contract": {
       "claim": {
-        "expires_at": "2026-09-13T20:54:34Z",
-        "generation": "30b5094d1ee74bd0899e4a9026d87f42",
+        "expires_at": "2026-09-14T21:23:07Z",
+        "generation": "975cc6ccf7b1437f84337923b2081e5a",
         "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:8857eb42f7d4a99547cacad0"
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
       },
       "needs": [],
       "priority": "medium",
