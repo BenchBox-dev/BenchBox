@@ -15083,7 +15083,7 @@
       "needs": [
         "sql-translation-ml-trainer"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Measure 200-step training feasibility on the 16 GB M4"
     },
