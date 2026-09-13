@@ -15989,10 +15989,15 @@
       "title": "Compat shim cannot route post-extraction verbs; passthrough mints fork DBs"
     },
     "todo-dep-graph-unblocking-sweep": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-14T21:27:42Z",
+        "generation": "0fccd23c18974d40ae852aaf0f267816",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Sweep TODO dep graph after each release batch to surface items whose blockers are now in DONE"
     },
     "todo-done-tree-location-convention": {
