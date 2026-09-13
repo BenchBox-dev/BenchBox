@@ -9816,15 +9816,10 @@
       "title": "Single core statistics implementation for geomean/percentiles/stddev across CLI and MCP"
     },
     "one-engine-unrun-ladders-and-red-presort-rung": {
-      "claim": {
-        "expires_at": "2026-09-14T14:03:03Z",
-        "generation": "1387412df28148beabcace5e6ddbacdc",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "One-engine items completed with verification ladders that were never run, and a keystone rung still red"
     },
     "onehouse-quanton-platform": {
