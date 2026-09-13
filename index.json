@@ -11064,9 +11064,9 @@
     },
     "publication-ledger-reproducible-inputs": {
       "claim": {
-        "expires_at": "2026-09-14T12:41:50Z",
-        "generation": "8edd1c59302e45819ff7d6e3d66b9e17",
-        "renewals": 0,
+        "expires_at": "2026-09-14T16:06:53Z",
+        "generation": "354af0a8e5814460abcada2935f1d611",
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
       },
       "needs": [
