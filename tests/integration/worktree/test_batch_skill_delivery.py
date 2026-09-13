@@ -40,6 +40,12 @@ def test_pin_receipt_and_tracked_mirror_bind_catalog_tip() -> None:
 
 def test_active_agent_materialization_matches_tracked_snapshot() -> None:
     evidence = _evidence()
+    # `.agents/skills` is an ignored local materialization and is absent from a
+    # fresh hosted checkout. `make skill-sync-check` verifies it when present;
+    # this fast contract must remain runnable before that local-only step.
+    active_root = ROOT / ".agents/skills/todo"
+    if not active_root.is_dir():
+        return
     assert evidence["mirrors"]["agents_target"]["materialized"] is True
     for relative in evidence["mirrors"]["tracked_target"]["files"]:
         tracked = ROOT / ".claude/skills/todo" / relative

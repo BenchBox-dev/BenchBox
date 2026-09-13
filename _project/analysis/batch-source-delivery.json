@@ -110,17 +110,17 @@
     "merged_at": "2026-09-12T18:05:15Z",
     "main_tip_checked": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
     "required_check": "Template gate and wrapper cycle: passed",
-    "benchbox_pinned_revision": "d55ac93b9c35f63077b948e4183b4ff960012069",
-    "deployment_status": "merged_upstream_not_pinned_in_benchbox",
-    "mirror_status": "unchanged; generated skill mirrors were not edited under this receipt-only scope"
+    "benchbox_pinned_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
+    "deployment_status": "merged_upstream_pinned_in_benchbox",
+    "mirror_status": "regenerated from the pinned catalog revision; .claude/skills is tracked and .agents/skills is materialized locally"
   },
   "rollback": {
     "todo_db": "Revert merge commit 74631c83f74b7f184abbd49001f032943b720774 through an authorized todo-db PR, restoring pre-merge main b93ab3555f7b6b198383d0903efbc78d9749bf92.",
-    "skill_catalog": "Restore BenchBox's skill-sync revision to d55ac93b9c35f63077b948e4183b4ff960012069 and regenerate mirrors through the repository skill-sync workflow if the catalog change is later adopted.",
+    "skill_catalog": "Restore BenchBox's skill-sync revision to d55ac93b9c35f63077b948e4183b4ff960012069 and regenerate mirrors through the repository skill-sync workflow.",
     "tracker_state": "No BenchBox tracker state, schema branch, or prepared batch was mutated by this receipt."
   },
   "gaps": [
-    "BenchBox skill-sync.conf still pins d55ac93b9c35f63077b948e4183b4ff960012069; adoption of PR #80 requires a separate authorized pin and mirror-delivery change.",
+    "The active todo-db runtime still lacks the registered-batch capability; prepared feature mode remains disabled until the supported dependency and MCP registration are upgraded.",
     "The canonical source PR does not expose a separate upstream TODO identity or link.",
     "The known huge-needs service node remains unproven because it did not terminate during bounded runs."
   ],

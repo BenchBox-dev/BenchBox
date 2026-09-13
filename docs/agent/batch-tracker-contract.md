@@ -44,17 +44,18 @@ activation permit.
 ## Catalog delivery boundary
 
 The corresponding canonical `todo` skill documentation is merged in
-skill-sync-skills PR #80 at `c8473708b5c7809700e8449ecde0dabcdc8e9892`.
-BenchBox currently pins `d55ac93b9c35f63077b948e4183b4ff960012069`; therefore
-the merged catalog change is recorded but not yet adopted here. Pinning that
-revision and regenerating `.claude/skills`/`.agents/skills` require a separate
-authorized skill-sync change. Generated mirrors are never hand-edited.
+skill-sync-skills PR #80 at `c8473708b5c7809700e8449ecde0dabcdc8e9892`, and
+BenchBox pins that revision in `skill-sync.conf`. The tracked `.claude/skills`
+mirror and the ignored `.agents/skills` materialization were regenerated from
+that pin. Generated mirrors are never hand-edited; `make skill-sync-check`
+verifies their parity when the ignored local materialization is present.
 
 ## Rollback and safety
 
-No prepared mode is activated by this BenchBox receipt. The source rollback is
+No prepared mode is activated by this BenchBox receipt because the active
+runtime still lacks the registered-batch capability. The source rollback is
 an authorized revert of todo-db merge `74631c83f74b7f184abbd49001f032943b720774`.
-If the catalog is later adopted, restore the BenchBox pin to
+If the catalog delivery is rolled back, restore the BenchBox pin to
 `d55ac93b9c35f63077b948e4183b4ff960012069` and regenerate through the normal
 skill-sync workflow. Do not downgrade a live schema-3 state branch in place;
 restore from an accepted snapshot under todo-db's migration and recovery

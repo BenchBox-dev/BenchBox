@@ -348,6 +348,21 @@ def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) 
     assert _count(marker) == 2
 
 
+def test_active_ignored_skill_mirror_is_part_of_receipt_identity(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+
+    active = repo / ".agents/skills/todo/SKILL.md"
+    active.parent.mkdir(parents=True)
+    active.write_text("materialized-v1", encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+
+    active.write_text("materialized-v2", encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 3
+
+
 def test_different_gates_proceed_in_parallel(repo: Path, tmp_path: Path) -> None:
     """Per-receipt locks: unrelated gates must not serialize on one lock."""
     marker = tmp_path / "slow.txt"

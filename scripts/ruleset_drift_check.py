@@ -444,6 +444,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
+    parser.add_argument(
+        "--token-stdin",
+        action="store_true",
+        help="read the GitHub token from stdin so it is never exposed in process arguments",
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument(
         "--queue-policy",
@@ -474,25 +479,28 @@ def main(argv: list[str] | None = None) -> int:
             args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"Ruleset drift override active: {reason}")
         return 1 if args.queue_policy else 0
-    if not args.token:
+    token = args.token
+    if args.token_stdin:
+        token = sys.stdin.read().strip()
+    if not token:
         if args.queue_policy and args.output:
             args.output.write_text(
                 json.dumps(
                     {
                         "status": "error",
                         "queue_verified": False,
-                        "error": "ruleset drift check requires RULESET_DRIFT_TOKEN or --token",
+                        "error": "ruleset drift check requires RULESET_DRIFT_TOKEN, --token, or --token-stdin",
                     },
                     indent=2,
                 )
                 + "\n",
                 encoding="utf-8",
             )
-        print("ERROR: ruleset drift check requires RULESET_DRIFT_TOKEN or --token.", file=sys.stderr)
+        print("ERROR: ruleset drift check requires RULESET_DRIFT_TOKEN, --token, or --token-stdin.", file=sys.stderr)
         return 1
 
     try:
-        live_by_name = _fetch_live_rulesets(args.repo, args.token)
+        live_by_name = _fetch_live_rulesets(args.repo, token)
         if args.queue_policy:
             queue_findings = queue_policy_findings(
                 expected["develop-squash-only"], live_by_name.get("develop-squash-only")

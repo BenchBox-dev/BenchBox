@@ -133,12 +133,15 @@ def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
 
-    assert "_project/scripts/auto_merge_soundness_paths.py --stdin" in makefile
-    # --no-renames so a rename out of a protected tree surfaces the deleted
-    # source path (rename detection would report only the destination).
-    assert "git diff --name-only --no-renames origin/develop...HEAD" in makefile
-    assert "Soundness-critical paths changed; leaving auto-merge disabled pending review." in makefile
-    assert 'if [ "$$SOUNDNESS_PATH" = "true" ]' in makefile
+    # All arming entry points delegate to the readiness helper, which owns the
+    # shared predicate check instead of duplicating a shell invocation here.
+    assert "scripts/pr_landing.py" in makefile
+    assert "pr-landing-ready" in makefile
+    assert "delivery_mode as 'serial' or 'batch'" in (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
+    assert "EVIDENCE is required" in makefile
+    helper = (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
+    assert "soundness_paths_changed" in helper
+    assert "auto-enqueue is forbidden" in helper
 
 
 def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:

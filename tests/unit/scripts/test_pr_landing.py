@@ -356,6 +356,17 @@ def test_followup_roundtrip_and_resume(tmp_path: Path) -> None:
     assert landing.load_followup(tmp_path, "missing") is None
 
 
+def test_followup_keys_with_same_safe_name_remain_distinct(tmp_path: Path) -> None:
+    first = landing.FollowupState(owner="o", session="s1", scope="pr", next_action="first")
+    second = landing.FollowupState(owner="o", session="s2", scope="pr", next_action="second")
+    landing.record_followup(tmp_path, "a/b", first)
+    landing.record_followup(tmp_path, "a_b", second)
+
+    assert landing.followup_path(tmp_path, "a/b") != landing.followup_path(tmp_path, "a_b")
+    assert landing.load_followup(tmp_path, "a/b").session == "s1"
+    assert landing.load_followup(tmp_path, "a_b").session == "s2"
+
+
 def test_followup_never_reports_done_from_emptiness() -> None:
     assert landing.resume_followup(landing.FollowupState(owner="o", session="s", scope="pr"))["status"] == "unknown"
     assert landing.resume_followup(landing.FollowupState(owner="o", session="s", scope="pr", terminal="merged")) == {
@@ -793,6 +804,19 @@ def test_rerecord_never_restores_spent_budget(tmp_path: Path) -> None:
     assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is False
 
 
+def test_rerecording_a_new_head_starts_a_fresh_retry_budget(tmp_path: Path) -> None:
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s", scope="pr", head=HEAD))
+    assert landing.consume_retry(tmp_path, "k", "rerun", HEAD)["allowed"] is True
+
+    landing.record_followup(tmp_path, "k", landing.FollowupState(owner="o", session="s2", scope="pr", head=OTHER))
+    refreshed = landing.load_followup(tmp_path, "k")
+    assert refreshed is not None
+    assert refreshed.head == OTHER
+    assert refreshed.attempts == 0
+    assert refreshed.reentries == 0
+    assert landing.consume_retry(tmp_path, "k", "rerun", OTHER)["allowed"] is True
+
+
 def test_live_check_verdicts_uses_get_only_invocation() -> None:
     # gh api sends POST whenever -F/--field/--paginate flags are present, and
     # list endpoints answer GET only: a POST 404s, rc != 0, and every landing
@@ -963,6 +987,97 @@ def test_batch_binding_rejects_member_content_changed_since_receipt(tmp_path: Pa
     assert any("changed_files differ" in failure for failure in landing.check_batch_binding(repo, batch, head))
 
 
+def test_batch_binding_rejects_accepted_content_overwritten_in_final_tree(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    start = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "changed.txt").write_text("accepted", encoding="utf-8")
+    subprocess.run(["git", "add", "changed.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "accepted"], cwd=repo, check=True, capture_output=True)
+    accepted = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "changed.txt").write_text("overwritten", encoding="utf-8")
+    subprocess.run(["git", "add", "changed.txt"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "overwrite"], cwd=repo, check=True, capture_output=True)
+    integrated = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    scope = {"a": ["changed.txt"]}
+    receipt = {
+        "schema": landing.PREPARED_RECEIPT_SCHEMA,
+        "batch_id": "b",
+        "member_id": "a",
+        "owner_generation": "1" * 32,
+        "source_worktree": str(repo),
+        "source_revision": accepted,
+        "source_base": start,
+        "accepted_head": accepted,
+        "integration_head": integrated,
+        "scope_hash": landing._scope_digest(scope),
+        "changed_files": ["changed.txt"],
+        "verification": {
+            "status": "passed",
+            "revision": accepted,
+            "clean": True,
+            "suite": "focused",
+            "command": ["pytest", "-q"],
+        },
+    }
+    final_pr = {"number": 1, "node_id": "PR_1", "head": integrated}
+    batch = {
+        "batch_id": "b",
+        "project_id": "project",
+        "repository": "o/r",
+        "owner": "worker",
+        "owner_generation": "1" * 32,
+        "integration_branch": "main",
+        "integration_worktree": str(repo),
+        "start_head": start,
+        "members": ["a"],
+        "scope": scope,
+        "scope_hash": landing._scope_digest(scope),
+        "delivery_boundary": "final-pr",
+        "terminal_outcome": "merged",
+        "integration_head": integrated,
+        "accepted_members": {"a": accepted},
+        "integrated_members": {"a": {"accepted_head": accepted, "integration_head": integrated}},
+        "prepared_receipts": {"a": receipt},
+        "review_dispositions": {
+            "a": {
+                "status": "approved",
+                "current": True,
+                "resolved": True,
+                "member_id": "a",
+                "head": accepted,
+                "integration_head": integrated,
+            }
+        },
+        "final_pr": final_pr,
+        "final_evidence": {
+            "status": "passed",
+            "batch_id": "b",
+            "project_id": "project",
+            "repository": "o/r",
+            "tree_worktree": str(repo),
+            "tree_revision": integrated,
+            "integration_branch": "main",
+            "integration_head": integrated,
+            "scope_hash": landing._scope_digest(scope),
+            "member_heads": {"a": accepted},
+            "member_ranges": {"a": {"base": start, "head": accepted}},
+            "changed_files": ["changed.txt"],
+            "final_pr": final_pr,
+            "suite": "combined-tree",
+            "clean": True,
+        },
+    }
+    failures = landing.check_batch_binding(repo, batch, integrated)
+    assert any("accepted content was overwritten" in failure for failure in failures)
+
+
 def test_batch_binding_rejects_missing_or_placeholder_final_evidence(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     head = subprocess.run(
@@ -1066,16 +1181,17 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
         assert "--repo" in body and "--worktree ." in body and "--branch" in body
     arm = makefile.split("pr-arm-auto-merge:", 1)[1].split("\n\n", 1)[0]
     ready = makefile.split("pr-ready:", 1)[1].split("\n\n", 1)[0]
-    assert "scripts/pr_landing.py" in arm and "--repo" in arm and "--worktree ." in arm and "--branch" in arm
-    assert "PR_NUMBER" in arm and "gh pr view --repo" in arm and "--pr" in arm
+    assert "pr-landing-ready" in arm and "--repo" in arm and "--worktree ." in makefile
+    assert "PR_NUMBER" in arm and "gh pr view --repo" in arm and 'PR="$$PR_NUMBER"' in arm
+    assert "EVIDENCE is required" in arm and "ARM=1" in arm
     assert "URL" in arm and '"$(URL)"' in arm
     assert "pr-arm-auto-merge" in ready
-    assert "pr-arm-auto-merge" in makefile.split("pr-open:", 1)[1].split("\n\n", 1)[0]
+    assert "pr-ready" in makefile.split("pr-open:", 1)[1].split("\n\n", 1)[0]
     open_body = makefile.split("pr-open:", 1)[1].split("\n\n", 1)[0]
     assert "gh pr list --repo" in open_body
     assert "gh pr create --repo" in open_body
     assert "gh pr edit --repo" in open_body
-    assert "pr-arm-auto-merge REPO=" in open_body and 'URL="$$URL"' not in open_body
+    assert "pr-ready REPO=" in open_body and 'URL="$$URL"' in open_body
     executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert "gh pr merge --auto --squash" not in executable
 

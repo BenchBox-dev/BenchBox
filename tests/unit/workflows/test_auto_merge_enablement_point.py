@@ -128,7 +128,9 @@ def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:
     executable = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert ARM_COMMAND not in executable, "Makefile contains a second executable arming implementation"
     body = _target_body("pr-arm-auto-merge")
-    assert "scripts/pr_landing.py" in body and " arm" in body, "Makefile arm target no longer delegates to the helper"
+    assert "pr-landing-ready" in body and "EVIDENCE is required" in body, (
+        "Makefile arm target no longer delegates to the readiness transaction"
+    )
 
 
 def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:

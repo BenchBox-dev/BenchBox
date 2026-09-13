@@ -105,7 +105,19 @@ MERGE_GATE_NON_GUARD_JOBS = {
     "ci-required-result",
     "release-required-result",
 }
-MERGE_GATE_GUARD_TOKENS = ("guard", "check", "verify", "validate", "drift", "parity", "hygiene", "isolation")
+MERGE_GATE_GUARD_TOKENS = (
+    "guard",
+    "check",
+    "verify",
+    "validate",
+    "drift",
+    "parity",
+    "hygiene",
+    "isolation",
+    "audit",
+    "test",
+    "lint",
+)
 
 # Step keys that have a local proving command. The value is deliberately a
 # substring rather than a workflow-specific command parser: command-level
@@ -213,6 +225,79 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
         "Release parity's Node/npm suite is hosted in this workflow; it is not a "
         "silent omission because the exception names the exact runner surface."
     ),
+    ("pr.yml", "skill-integrity", "Run skill policy and instruction audit contracts"): (
+        "The hosted contract bundle runs the complete policy/audit test set; the "
+        "same tests run as part of the local full preflight rather than a separate "
+        "lightweight Make target."
+    ),
+    ("pr.yml", "code-test", "Run promoted h2odb mutation-catch reproducer (#901)"): (
+        "Promoted slow mutation regression; it is intentionally CI-gated and is "
+        "not silently represented by the fast local lane."
+    ),
+    ("pr.yml", "code-test", "Run promoted plan-capture-phase reproducers (#909)"): (
+        "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
+    ),
+    ("pr.yml", "code-test", "Run DuckLake in-process adapter integration tests"): (
+        "Optional integration dependency is hosted in this lane; the local "
+        "required preflight does not manufacture the DuckLake service."
+    ),
+    ("pr.yml", "code-test", "Run promoted DuckDB FK tuning load-ordering reproducers"): (
+        "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
+    ),
+    ("pr.yml", "code-test", "Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers"): (
+        "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
+    ),
+    ("pr.yml", "code-test", "Run fast tests"): "Covered by the local `test-fast` target.",
+    ("pr.yml", "medium-test", "Run medium speed tier"): "Covered by the local `test-medium` target.",
+    ("pr.yml", "correctness-gate", "Run bounded real-result correctness gate"): (
+        "Covered by the local `test-correctness-gate` target."
+    ),
+    ("pr.yml", "postgres-integration", "Run TPC-Havoc PostgreSQL variant-equivalence sample"): (
+        "Hosted PostgreSQL is an optional service sample; the local required lane "
+        "does not start or substitute that service."
+    ),
+    (
+        "pr.yml",
+        "datafusion-integration",
+        "Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression",
+    ): ("Hosted integration sample with its own dependency/runtime; the local required lane does not substitute it."),
+    ("pr.yml", "clickhouse-integration", "Run TPC-Havoc ClickHouse variant-equivalence sample"): (
+        "Hosted ClickHouse is an optional service sample; the local required lane "
+        "does not start or substitute that service."
+    ),
+    ("pr.yml", "explorer-tokens", "Run explorer token scan"): "Covered by the local `lint-explorer-tokens` target.",
+    (
+        "pr.yml",
+        "site-theme-tokens",
+        "Run public site theme token scan",
+    ): "Covered by the local `lint-site-theme-tokens` target.",
+    ("pr.yml", "package-smoke", "Test package installation"): "Covered by the local `test-package` target.",
+    ("pr.yml", "dependency-audit", "Run security audit"): "Covered by the local `security-audit` target.",
+    ("pr.yml", "explorer-vitest", "Run Explorer Vitest suite"): (
+        "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
+    ),
+    ("pr.yml", "audit-sha", "Fetch PR head for audit ancestry (merge queue only)"): (
+        "Merge-queue-only ref preparation; those ephemeral refs do not exist in a stable local checkout."
+    ),
+    ("test.yml", "test", "Run linting"): "Covered by the local `ci-lint` target.",
+    ("test.yml", "test", "Run type checking"): "Covered by the local `ci-lint` target.",
+    ("test.yml", "test", "Run fast tests"): "Covered by the local `test-fast` target.",
+    ("test.yml", "compat-test", "Run linting"): "Covered by the local `ci-lint` target.",
+    ("test.yml", "compat-test", "Run type checking"): "Covered by the local `ci-lint` target.",
+    ("test.yml", "compat-test", "Run fast tests"): "Covered by the local `test-fast` target.",
+    ("test.yml", "security", "Run security audit"): "Covered by the local `security-audit` target.",
+    ("test.yml", "integration-smoke", "Run integration smoke tests"): (
+        "Covered by the local `test-integration-smoke` target."
+    ),
+    ("test.yml", "integration-table-formats", "Run table-format integration tests"): (
+        "Covered by the local integration test target; the hosted job selects an optional table-format marker."
+    ),
+    ("test.yml", "integration", "Run integration tests"): "Covered by the local `test-integration` target.",
+    ("test.yml", "correctness-gate", "Run bounded real-result correctness gate"): (
+        "Covered by the local `test-correctness-gate` target."
+    ),
+    ("test.yml", "test-package", "Test package installation"): "Covered by the local `test-package` target.",
+    ("test.yml", "pyspark-tests", "Run PySpark tests"): "Covered by the local `test-pyspark` target.",
 }
 
 

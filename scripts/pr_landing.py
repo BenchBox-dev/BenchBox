@@ -427,6 +427,7 @@ class ReadyEvidence:
     soundness_paths_changed: bool = False
     maintainer_approved: bool = False
     batch: dict | None = None
+    require_batch: bool = False
     repository: str | None = None
     branch: str | None = None
     worktree: str | None = None
@@ -616,12 +617,38 @@ def _canonical_member_ids(value: object) -> list[str] | None:
 
 
 def _canonical_files(value: object) -> list[str] | None:
-    if not isinstance(value, list) or any(not isinstance(path, str) or not path for path in value):
+    if not isinstance(value, list) or any(
+        not isinstance(path, str)
+        or not path
+        or os.path.isabs(path)
+        or any(part in {"", ".", ".."} for part in Path(path).parts)
+        or any(ord(char) < 32 for char in path)
+        for path in value
+    ):
         return None
     files = cast(list[str], value)
     if files != sorted(set(files)):
         return None
     return files
+
+
+def _git_changed_files(repo: Path, base: str, head: str) -> set[str]:
+    """Return the exact changed-file set for two revisions."""
+    return set(_git(repo, "diff", "--name-only", "--no-renames", f"{base}..{head}").splitlines())
+
+
+def _git_blob(repo: Path, revision: str, path: str) -> bytes | None:
+    """Return a committed path's bytes, or ``None`` when the path is absent."""
+    proc = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        timeout=60,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout
 
 
 def _scope_digest(scope: dict[str, list[str]]) -> str:
@@ -648,8 +675,22 @@ def _check_receipt_verification(member_id: str, receipt: dict) -> list[str]:
     return failures
 
 
+def _check_receipt_git_scope(repo: Path, member_id: str, receipt: dict, files: list[str]) -> list[str]:
+    source_base = receipt.get("source_base")
+    accepted_head = receipt.get("accepted_head")
+    if not isinstance(source_base, str) or not isinstance(accepted_head, str):
+        return []
+    try:
+        actual_files = _git_changed_files(repo, source_base, accepted_head)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return [f"member {member_id} source changed files could not be read from Git"]
+    if actual_files != set(files):
+        return [f"member {member_id} receipt changed_files differ from the accepted Git diff"]
+    return []
+
+
 def _check_prepared_receipt(
-    batch: dict, member_id: str, receipt: object, accepted_head: str, integration_head: str
+    repo: Path, batch: dict, member_id: str, receipt: object, accepted_head: str, integration_head: str
 ) -> list[str]:
     failures: list[str] = []
     if not isinstance(receipt, dict):
@@ -705,6 +746,8 @@ def _check_prepared_receipt(
     files = _canonical_files(receipt.get("changed_files"))
     if files is None:
         failures.append(f"member {member_id} receipt changed_files are not canonical")
+    else:
+        failures.extend(_check_receipt_git_scope(repo, member_id, receipt, files))
     failures.extend(_check_receipt_verification(member_id, receipt))
     return failures
 
@@ -790,7 +833,9 @@ def _check_final_metadata(repo: Path, batch: dict, evidence: dict) -> list[str]:
     return failures
 
 
-def _check_final_members(batch: dict, evidence: dict, members: list[str], receipts: dict[str, object]) -> list[str]:
+def _check_final_members(
+    repo: Path, batch: dict, evidence: dict, members: list[str], receipts: dict[str, object]
+) -> list[str]:
     failures: list[str] = []
     heads = evidence.get("member_heads")
     ranges = evidence.get("member_ranges")
@@ -817,12 +862,37 @@ def _check_final_members(batch: dict, evidence: dict, members: list[str], receip
             or member_range.get("head") != accepted_head
         ):
             failures.append(f"final evidence member {member} range is not bound to its prepared receipt")
+        if isinstance(accepted_head, str) and FULL_REVISION_RE.fullmatch(accepted_head):
+            for path in receipt_files or []:
+                try:
+                    accepted_blob = _git_blob(repo, accepted_head, path)
+                    final_blob = _git_blob(repo, str(evidence.get("integration_head") or ""), path)
+                except (OSError, subprocess.TimeoutExpired):
+                    failures.append(f"member {member} accepted content could not be read for {path}")
+                    continue
+                if accepted_blob != final_blob:
+                    failures.append(f"member {member} accepted content was overwritten for {path}")
     final_files = _canonical_files(evidence.get("changed_files"))
     if final_files is None:
         failures.append("final evidence changed_files are not canonical")
     else:
         if set(final_files) != expected_files:
             failures.append("final evidence changed_files differ from the prepared member content")
+        start_head = batch.get("start_head")
+        integration_head = evidence.get("integration_head")
+        if (
+            isinstance(start_head, str)
+            and FULL_REVISION_RE.fullmatch(start_head)
+            and isinstance(integration_head, str)
+            and FULL_REVISION_RE.fullmatch(integration_head)
+        ):
+            try:
+                actual_final_files = _git_changed_files(repo, start_head, integration_head)
+            except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                failures.append("final evidence changed files could not be read from Git")
+            else:
+                if actual_final_files != set(final_files):
+                    failures.append("final evidence changed_files differ from the actual integration Git diff")
         scope = batch.get("scope")
         allowed = (
             [pattern for member in members for pattern in scope.get(member, [])] if isinstance(scope, dict) else []
@@ -837,7 +907,7 @@ def _check_final_evidence(repo: Path, batch: dict, members: list[str], receipts:
     if not isinstance(evidence, dict) or evidence.get("status") != "passed":
         return ["batch final evidence is missing or does not have status passed"]
     failures = _check_final_metadata(repo, batch, evidence)
-    failures.extend(_check_final_members(batch, evidence, members, receipts))
+    failures.extend(_check_final_members(repo, batch, evidence, members, receipts))
     if evidence.get("conflict_resolution"):
         failures.append("final evidence contains conflict-resolution markers")
     return failures
@@ -940,7 +1010,7 @@ def _check_batch_member_maps(
         ):
             failures.append(f"integration evidence for member {member} is stale")
         failures.extend(
-            _check_prepared_receipt(batch, member, receipts.get(member), accepted_head or "", integration_head)
+            _check_prepared_receipt(repo, batch, member, receipts.get(member), accepted_head or "", integration_head)
         )
         if not isinstance(accepted_head, str) or not FULL_REVISION_RE.fullmatch(accepted_head):
             failures.append(f"member {member} accepted head is not in the integration head")
@@ -1070,6 +1140,8 @@ def ready_failures(
     holds = evidence.hold_labels or []
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
+    if evidence.require_batch and not isinstance(evidence.batch, dict):
+        failures.append("batch evidence is required for batch-mode readiness")
     if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if head_valid and evidence.batch is not None:
@@ -1234,8 +1306,9 @@ class FollowupState:
 def followup_path(directory: Path, key: str) -> Path:
     if not isinstance(key, str) or not key or len(key) > MAX_FOLLOWUP_KEY_LEN:
         raise LandingError("followup key must be a bounded non-empty string")
-    safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in key)
-    return directory / f"{safe}.json"
+    safe = "".join(c if c.isascii() and (c.isalnum() or c in "-_") else "_" for c in key)
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return directory / f"{safe}-{digest}.json"
 
 
 def _followup_locked(directory: Path, key: str) -> BinaryIO:
@@ -1277,7 +1350,7 @@ def _merge_accepted_receipts(existing: dict[str, dict] | None, incoming: object)
 def _merge_followup_state(existing: FollowupState, state: FollowupState) -> FollowupState:
     preserved = {
         field: getattr(existing, field)
-        for field in ("batch_id", "owner_generation", "integrator", "members", "integration_head")
+        for field in ("batch_id", "owner_generation", "integrator", "members", "integration_head", "head")
         if getattr(state, field) is None and getattr(existing, field) is not None
     }
     merged = replace(state, **preserved)
@@ -1291,12 +1364,18 @@ def _merge_followup_state(existing: FollowupState, state: FollowupState) -> Foll
         merged = replace(merged, final_pr=existing.final_pr)
     if existing.terminal is not None and merged.terminal is None:
         merged = replace(merged, terminal=existing.terminal)
-    attempts = merged.attempts
-    if isinstance(attempts, int) and not isinstance(attempts, bool):
-        attempts = max(attempts, existing.attempts)
-    reentries = merged.reentries
-    if isinstance(reentries, int) and not isinstance(reentries, bool):
-        reentries = max(reentries, existing.reentries)
+    if existing.head != merged.head:
+        # Retry budgets are evidence about one exact head. A new head starts
+        # with a fresh budget and cannot inherit consumption from its parent.
+        attempts = 0
+        reentries = 0
+    else:
+        attempts = merged.attempts
+        if isinstance(attempts, int) and not isinstance(attempts, bool):
+            attempts = max(attempts, existing.attempts)
+        reentries = merged.reentries
+        if isinstance(reentries, int) and not isinstance(reentries, bool):
+            reentries = max(reentries, existing.reentries)
     return replace(merged, attempts=attempts, reentries=reentries)
 
 
@@ -1778,6 +1857,9 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
         raise LandingError(f"unreadable evidence file: {exc}") from exc
     if not isinstance(evidence_data, dict):
         raise LandingError("readiness evidence must be a JSON object")
+    delivery_mode = evidence_data.get("delivery_mode")
+    if not isinstance(delivery_mode, str) or delivery_mode not in {"serial", "batch"}:
+        raise LandingError("readiness evidence must declare delivery_mode as 'serial' or 'batch'")
     _validate_evidence_identity(evidence_data, identity, branch, args.expected_head)
     evidence = ReadyEvidence(
         expected_head=args.expected_head,
@@ -1788,6 +1870,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
         soundness_paths_changed=bool(evidence_data.get("soundness_paths_changed")),
         maintainer_approved=bool(evidence_data.get("maintainer_approved")),
         batch=evidence_data.get("batch"),
+        require_batch=args.require_batch or delivery_mode == "batch",
         repository=identity.repository,
         branch=branch,
         worktree=identity.worktree,
@@ -1838,6 +1921,7 @@ def main(argv: list[str] | None = None) -> int:
     ready.add_argument("--expected-head", required=True)
     ready.add_argument("--evidence-json", type=Path, required=True)
     ready.add_argument("--arm", action="store_true", help="enqueue when all checks pass")
+    ready.add_argument("--require-batch", action="store_true", help="require a complete prepared-batch binding")
 
     arm = sub.add_parser("arm", help="arm the exact current checkout PR")
     arm.add_argument("--pr", type=int, default=None)

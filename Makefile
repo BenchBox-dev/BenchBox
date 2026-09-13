@@ -1406,7 +1406,8 @@ pr-landing-ready:
 		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
 		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
 		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) ready --pr "$(PR)" \
-		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" $(if $(ARM),--arm,)
+		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" \
+		$(if $(ARM),--arm,) $(if $(BATCH),--require-batch,)
 
 pr-followup-record:
 	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
@@ -1469,7 +1470,7 @@ pr-content-guard:
 # conflicts. If the queue is absent, unknown, or misconfigured, the existing
 # current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
-	@set -eu; \
+	@set -euo pipefail; \
 	$(MAKE) -s agent-write-preflight; \
 	CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
@@ -1478,6 +1479,10 @@ pr-open:
 	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
+	fi; \
+	if [ "$(READY)" = "1" ] && [ -z "$(EVIDENCE)" ]; then \
+		echo "EVIDENCE is required when READY=1; use make pr-open without READY=1 to publish a held PR." >&2; \
+		exit 2; \
 	fi; \
 	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	git fetch origin develop --quiet; \
@@ -1488,9 +1493,8 @@ pr-open:
 		fi; \
 		QUEUE_REPORT=$$(mktemp); \
 		trap 'rm -f "$$QUEUE_REPORT"' EXIT; \
-		QUEUE_TOKEN="$${RULESET_DRIFT_TOKEN:-$$(gh auth token 2>/dev/null || true)}"; \
-		if ! uv run -- python scripts/ruleset_drift_check.py --queue-policy \
-			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token "$$QUEUE_TOKEN" \
+		if ! gh auth token 2>/dev/null | uv run -- python scripts/ruleset_drift_check.py --queue-policy \
+			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token-stdin \
 			--output "$$QUEUE_REPORT"; then \
 			echo "Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate." >&2; \
 			exit 1; \
@@ -1521,19 +1525,19 @@ pr-open:
 	if [ "$(READY)" != "1" ]; then \
 		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
 	else \
-		$(MAKE) -s pr-arm-auto-merge REPO="$$REPOSITORY"; \
+		$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
 	fi
 
-# Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
-# pr-open so the soundness check has exactly one implementation and both entry
-# points get it. When a merge queue is active on develop, auto-merge enqueues
-# the PR for speculative combined-tree validation.
+# Runs the readiness transaction for an already-open PR. This compatibility
+# target retains the historical name, but cannot arm without caller-supplied
+# evidence for the exact checkout.
 # Honours the durable `no-auto-merge` hold label: before this check, the label
 # was only durable against paths that never arm (workflow + sweep) while the
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
 # _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
-	@set -eu; \
+	@set -euo pipefail; \
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
 	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	CURRENT=$$(git branch --show-current); \
 	PR_NUMBER="$(PR)"; \
@@ -1543,10 +1547,11 @@ pr-arm-auto-merge:
 	fi; \
 	case "$$PR_NUMBER" in *[!0-9]*) echo "PR must resolve to a positive number" >&2; exit 2 ;; esac; \
 	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" -le 0 ]; then echo "PR must resolve to a positive number" >&2; exit 2; fi; \
-	PR_ARGS=""; \
-	if [ -n "$$PR_NUMBER" ]; then PR_ARGS="--pr $$PR_NUMBER"; fi; \
-	uv run -- python scripts/pr_landing.py --repo "$$REPOSITORY" \
-		--worktree . --branch "$$CURRENT" arm $$PR_ARGS
+	[ -n "$$PR_NUMBER" ] || { echo "PR or URL is required" >&2; exit 2; }; \
+	EXPECTED_HEAD="$(HEAD)"; \
+	if [ -z "$$EXPECTED_HEAD" ]; then EXPECTED_HEAD=$$(git rev-parse HEAD); fi; \
+	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
+		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
@@ -1559,7 +1564,10 @@ pr-arm-auto-merge:
 # (#1503, #1521, #1531); the last two stranded the very commits that addressed
 # their own review findings.
 pr-ready:
-	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)"
+	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
+	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }
+	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"
 
 shrink-rollup:
 	@git fetch origin develop --quiet
