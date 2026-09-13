@@ -15128,7 +15128,7 @@
       "needs": [
         "sql-translation-ml-sources"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Freeze leakage-resistant development and test splits"
     },
