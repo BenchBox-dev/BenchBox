@@ -958,7 +958,7 @@ def _check_platforms_status(s: types.SimpleNamespace) -> None:
         console.print("[green]All enabled platforms are ready![/green]")
 
 
-def _validate_not_removed_platform(s: types.SimpleNamespace) -> None:
+def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
     """Reject selectors for platforms removed from BenchBox."""
     raw_platform = getattr(s, "platform", None)
     for candidate in (raw_platform, getattr(s, "platform_key", None)):
@@ -972,14 +972,16 @@ def _validate_not_removed_platform(s: types.SimpleNamespace) -> None:
                 s.logger.error(str(exc))
             if hasattr(s, "ctx") and s.ctx is not None and hasattr(s.ctx, "exit"):
                 s.ctx.exit(1)
-                return
+                return False
             raise
+    return True
 
 
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     """Validate platform, resolve execution mode, and check availability."""
     s.resolved_mode = None
-    _validate_not_removed_platform(s)
+    if not _validate_not_removed_platform(s):
+        return
     if not s.platform_key:
         return
 
