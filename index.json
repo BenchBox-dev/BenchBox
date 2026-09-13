@@ -15101,7 +15101,7 @@
       "needs": [
         "sql-translation-ml-executor"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Generate type-valid SQL families and held-out compositions"
     },
