@@ -15180,6 +15180,17 @@
       "status": "open",
       "title": "Preserve and refresh SQLGlot versus Polyglot execution evidence"
     },
+    "sql-transpiler-maintenance-decision": {
+      "claim": null,
+      "needs": [
+        "sql-transpiler-comparison-evidence",
+        "polyglot-source-aware-division-spike",
+        "polyglot-benchbox-integration-assessment"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Choose BenchBox SQL transpiler maintenance strategy from execution and patch evidence"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],

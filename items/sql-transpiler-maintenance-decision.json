@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "Choose an option using correctness, measured performance, patch complexity and ongoing ownership; state rejected alternatives.",
+    "Refresh upstream status and disposition all prepared patches: SQLite intervals, PostgreSQL return types, SQLite extraction, SingleStore percentile ordering; explicitly decide QuestDB scope.",
+    "Define migration or retention, release/rollback and workaround-retirement evidence. Require later user approval for production changes or new submissions; reconcile existing auto-retirement-workflow-run-repros-on-every-sqlglot-upgrade item."
+  ],
+  "context": "2026-09-13: issues8347/8349 closed not_planned without explanation; QuestDB8348 explicitly declined. SingleStore8352 still OPEN draft/no review. BenchBox targets mysql for SingleStore, so native patch alone does not change runtime. Interval branch fix/sqlite-date-interval-arithmetic b60935672d3fc52c4982077131d4cb5140a69b72. Pause other upstream submissions; do not resume ML training or expand scope automatically.",
+  "description": "Compare SQLGlot-local extensions, private SQLGlot fork and Polyglot extension/fork. Deliver an evidence-backed recommendation and approval-ready plan, not adoption. Reconcile docs/development/adr/adr-sqlglot-use-and-non-use.md, whose non-goals exclude replacement/forking.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2111",
+    "https://github.com/tobilg/polyglot",
+    "https://github.com/tobymao/sqlglot/pull/8352"
+  ]
+}
