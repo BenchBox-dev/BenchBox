@@ -15040,7 +15040,7 @@
       "needs": [
         "sql-translation-ml-fixtures"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Implement a strict SQL result equivalence comparator"
     },
