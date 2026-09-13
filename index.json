@@ -15942,6 +15942,15 @@
       "status": "done",
       "title": "G5: cut over to the DB-backed TODO tracker (freeze & delete legacy)"
     },
+    "todo-db-runtime-schema3-batch-capability": {
+      "claim": null,
+      "needs": [
+        "batch-skill-pinned-rollout"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Install the schema-3 todo-db runtime used by feature-batch delivery"
+    },
     "todo-db-shim-audit-routing-and-config-refusal": {
       "claim": null,
       "needs": [],

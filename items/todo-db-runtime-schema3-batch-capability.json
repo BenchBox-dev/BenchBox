@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "The _project/scripts locked environment installs the reviewed todo-db 0.7.3 artifact, or an explicitly documented exact artifact built from revision 74631c83f74b7f184abbd49001f032943b720774, from the project-local vendor directory.",
+    "A full initialize, notifications/initialized, and tools/list handshake reports schema 3 and exposes register_batch, prepare, bind_batch_pr, and abort_batch.",
+    "The batch delivery integration test, skill integrity checks, and todo runtime tests pass against the installed project-local runtime.",
+    "The batch rollout evidence is refreshed and no longer reports ACTIVE_RUNTIME_LACKS_REGISTERED_BATCH."
+  ],
+  "context": "Authorized implementation scope: _project/scripts/pyproject.toml, _project/scripts/uv.lock, the exact vendored todo-db wheel, _project/analysis/batch-rollout-evidence.json, and directly relevant tests. Preserve the no-sibling-path and clean-install guarantees.",
+  "description": "BenchBox's project-local todo-db runtime is still pinned to the vendored 0.7.2 wheel and exposes schema 1 with 10 tools. The reviewed compatible source landed in todo-db PR #39 at revision 74631c83f74b7f184abbd49001f032943b720774 as package 0.7.3 with schema 3 and 14 tools, including register_batch, prepare, bind_batch_pr, and abort_batch. Upgrade the project-local vendored package and lock, then prove the installed runtime through a full JSON-RPC handshake. Do not rely on a sibling checkout or source-only evidence.",
+  "links": [
+    "https://github.com/joaomoreno/todo-db/pull/39"
+  ]
+}
