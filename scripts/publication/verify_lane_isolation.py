@@ -76,8 +76,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # bytes to any lane artifact. Lane-owned scripts below this prefix are
     # still classified first by ``verify_lane_isolation``.
     "scripts/publication/",
-    # Agent skill mirrors: consumed by coding agents, not lane builds.
-    ".claude/skills/",
+    # Agent configurations, skills, and settings: consumed by coding agents, not lane builds.
+    ".claude/",
     # CI definitions and repo orchestration.
     ".github/",
     "Makefile",
@@ -99,6 +99,9 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "skill-sync.conf",
     "tools/skill-sync",
     "scripts/skill_sync_ci_policy.py",
+    # Deleted cloud setup script still appears in the changed-paths of the
+    # removal, so it stays classified.
+    "scripts/cloud-claude-setup.sh",
     # CI/dev plumbing never read by lane artifact builds.
     "scripts/check_release_curation.py",
     "scripts/check_untracked_skill_mirrors.sh",
