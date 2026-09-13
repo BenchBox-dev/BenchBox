@@ -1,82 +1,103 @@
 ---
-develop_sha: 810ab03bf80be3331ecdf657ae2ee8da84265d3a
-measured_at_sha: e60ef04fa5d2a77e057ddf6d8ab9ff483fa952dc
-checked_sha: e60ef04fa5d2a77e057ddf6d8ab9ff483fa952dc
+develop_sha: 2eb03f3e67ec8f7f1347738f29696fa39ed5f526
+measured_at_sha: 2eb03f3e67ec8f7f1347738f29696fa39ed5f526
+checked_sha: 2eb03f3e67ec8f7f1347738f29696fa39ed5f526
 ---
 
 # Remediation contract evidence
 
-Per-instance record for the SCD2 N2 remediation class
-(`docs/agent/pr-review-evidence.md` contract). All outcomes were reverified at
-the `checked_sha`; rerun the cited nodes to re-verify.
+This record re-derives the accepted remediation claims from their source
+instances. The exact test nodes and control outcomes below are the evidence;
+the counts are only a replay summary.
 
-## Enumerated instances
+## SCD2 validation
 
-SCD2 operations in `benchbox/core/write_primitives/catalog/operations.yaml`,
-each with success, idempotency, and rejected-case coverage in
+The source of truth is the SCD2 operation set in
+`benchbox/core/write_primitives/catalog/operations.yaml`. Every operation has
+an intended case and a rejected case in
 `tests/integration/test_write_primitives_duckdb.py::TestWritePrimitivesSCD2DuckDB`:
 
-- `merge_scd_type2_basic`: `test_scd2_basic_executes_validates_and_cleans_up`,
-  `test_basic_wrong_insert_count_fails_cardinality_bound` (rejected).
-- `merge_scd_type2_no_change`: `test_scd2_no_change_is_idempotent`,
-  `test_no_change_noop_against_missing_keys_fails_validation` (rejected),
-  `test_no_change_companion_check_is_load_bearing` (control, below).
-- `merge_scd_type2_new_keys_only`: `test_scd2_new_keys_only_inserts_without_closing`,
-  `test_new_keys_only_no_rows_closed_scoped_to_new_keys`,
-  `test_failing_validation_reports_validation_failed_not_success` (rejected).
+- `merge_scd_type2_basic`: `test_scd2_basic_executes_validates_and_cleans_up`
+  succeeds; `test_basic_wrong_insert_count_fails_cardinality_bound` rejects an
+  under-inserted write.
+- `merge_scd_type2_no_change`: `test_scd2_no_change_is_idempotent` succeeds;
+  `test_no_change_noop_against_missing_keys_fails_validation` rejects a no-op
+  with deleted unchanged keys. `test_no_change_companion_check_is_load_bearing`
+  is the vacuity control.
+- `merge_scd_type2_new_keys_only`:
+  `test_scd2_new_keys_only_inserts_without_closing` succeeds;
+  `test_failing_validation_reports_validation_failed_not_success` rejects a
+  duplicate current version. `test_new_keys_only_no_rows_closed_scoped_to_new_keys`
+  is the cross-operation scope control.
 
-SCD2 selection: 13 passed
-(`-k 'scd2 or no_change_noop_against_missing_keys or no_change_prior_behavior'`).
+The isolated N2 control deletes unchanged keys 21-40 and applies the real
+`merge_scd_type2_no_change` write SQL. The three old offending queries return
+zero rows, while `every_unchanged_key_has_current_version_matching_hash`
+returns 20 rows. The old query set therefore passes vacuously; the positive
+companion rejects the missing persistence state. The SCD2 selection replay
+passed 13 tests.
 
-## Load-bearing control (N2)
+Producer-to-persistence-to-consumer trace: the staging tables and operation
+write SQL produce the dimension rows; `scd2_ops_dim_customer` is the
+persistence; validation queries and `OperationResult` consume the rows. The
+successful, rejected, repeatability, and companion-control nodes exercise that
+write-to-validation seam for all three operations.
 
-Isolated fixture (in-memory DuckDB, real catalog SQL, no repo edits):
-deleted dimension keys 21-40, applied the real `no_change` write SQL.
+## Cohort ranking and read-model persistence
 
-- `at_most_one_current_per_business_key`: 0 rows (passes vacuously).
-- `no_rows_closed_by_batch`: 0 rows (passes vacuously).
-- `no_new_versions_inserted`: 0 rows (passes vacuously).
-- `every_unchanged_key_has_current_version_matching_hash`: 20 rows (fires).
+The source of truth is `_build_benchmark_summaries` in
+`_project/scripts/explorer_pipeline/pipeline.py`, with persisted consumers in
+`results`, `benchmark_rankings`, `cohort_metadata`, and
+`result_detail_metrics`:
 
-Repo regression: `test_no_change_companion_check_is_load_bearing` asserts
-exactly this split, so dropping the companion fails the suite. The prior
-three-query set alone would report success on deleted input.
+- `test_mismatched_query_sets_are_not_ranked` rejects a cohort whose three
+  members have query sets of 197, 206, and 220 IDs; the exclusion is persisted
+  as `mismatched_query_set` and every member is ineligible.
+- `test_non_rankable_query_gap_does_not_exclude_rankable_peers` rejects the
+  incomplete member with `missing_primary_metric` while two complete peers
+  remain eligible.
+- `test_partial_query_set_does_not_poison_complete_majority` rejects the
+  partial member with `mismatched_query_set` while the complete majority stays
+  eligible.
+- `test_partial_query_set_exclusion_reaches_every_read_model_consumer` runs
+  the producer through the real pipeline and verifies the partial member's
+  exclusion and ineligibility in all four persisted consumers; the two
+  complete peers remain eligible in `benchmark_rankings`.
 
-## Seam trace (producer to persistence to consumer)
+Producer-to-persistence-to-consumer trace: result bundles produce
+`ManifestEntry` and `DetailResult`; `DuckDBSnapshotBuilder` persists the
+cohort and result rows; the explorer's result, ranking, cohort-metadata, and
+detail views consume those rows. The end-to-end partial fixture is the seam
+control for the prior failure mode where a partial input could leave the
+downstream read model incomplete or poison peer rankings.
 
-- Producer/persistence: explorer pipeline
-  (`tests/unit/scripts/explorer_pipeline/test_pipeline.py`), publication
-  transaction and journal
-  (`tests/unit/scripts/publication/test_transaction.py`,
-  `tests/unit/scripts/publication/test_journal.py`): 108 passed.
-- The SCD2 dimension is the persistence; validation queries are the
-  contract; the checks above exercise the write-to-validation seam per op.
+## Publication receipt and journal reconciliation
 
-## Publication live-head receipt identity
-
-The publication deployer accepts signed live receipts from both authorized
-writers and compares their common receipt identity before a Pages write.
-
-### Enumerated instances
-
-- `Publication Control Plane Deployment`: the legacy writer's signed
-  `receipt_id` is accepted when it matches the candidate's recorded parent.
-- `Publication Transactions`: the transaction writer's signed `receipt_id` is
-  accepted when it matches the candidate's recorded parent.
-
-The contract is exercised by
+The authorized receipt producers are the legacy publication workflow and the
+publication-transaction workflow. Their durable attestation is stored in the
+publication journal; the deploy-time reconciliation consumer compares the
+signed receipt identity with the candidate's recorded parent before a Pages
+write. The cross-writer contract is exercised by
 `tests/unit/workflows/test_publication_rollback.py::test_deploy_revalidates_signed_receipt_identity_across_both_live_receipt_writers`.
-The same test rejects the previous artifact-ID comparison and requires the
-candidate-derived parent receipt output, so an empty dispatch input cannot
-bypass the identity check.
 
-### Seam trace (producer to persistence to consumer)
+The allowed publication seam replay covers both successful and rejected
+paths:
 
-- Producers: the legacy deploy workflow and the publication transaction
-  workflow create signed live receipts.
-- Persistence: the publication journal stores the durable transaction's
-  signed attestation, while candidate receipts retain its `receipt_id` as the
-  parent identity.
-- Consumer: the deploy-time `Revalidate authoritative live head` step selects
-  a valid receipt from either producer and refuses the Pages write unless its
-  signed `receipt_id` matches the candidate's recorded parent.
+- `test_recovery_required_reconciles_forward_to_durable` accepts a successful
+  provider observation and commits the durable transaction.
+- `test_recovery_reconciliation_requires_succeed_status`,
+  `test_recovery_reconciliation_rejects_mismatched_deployment_id`,
+  `test_recovery_reconciliation_rejects_missing_deployment_id`,
+  `test_recovery_reconciliation_requires_controller_workflow_sha`, and
+  `test_recovery_reconciliation_rejects_pre_send_failure` reject mismatched,
+  incomplete, stale, or pre-send evidence.
+- `test_cas_conflict_detection` rejects a writer using an old journal parent;
+  `test_ambiguous_push_failure_reconciles_remote_success` and
+  `test_timeout_resolution` distinguish an unknown push outcome from a
+  confirmed remote journal head; `test_corrupt_journal_fails_closed` rejects
+  missing or invalid persistence state.
+
+The prescribed pipeline and publication seam replay passed 109 tests
+the end-to-end cohort consumer control was added. Re-run the cited nodes after
+any source or consumer change; a passing aggregate count is not acceptance of
+the collective claim.

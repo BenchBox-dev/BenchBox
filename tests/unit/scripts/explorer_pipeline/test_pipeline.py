@@ -8,11 +8,13 @@ import json
 import logging
 import shutil
 from pathlib import Path
+from typing import Any
 
 import duckdb
 import pytest
 
 from _project.scripts.explorer_pipeline import pipeline as pipeline_module
+from _project.scripts.explorer_pipeline.models import DetailResult
 from _project.scripts.explorer_pipeline.pipeline import (
     COMMUNITY_TRUST_LABEL,
     SUBMISSION_MANIFEST_FILENAME,
@@ -210,6 +212,73 @@ def test_partial_query_set_does_not_poison_complete_majority() -> None:
     assert rows[peer_entry.result_id].is_ranking_eligible is True
     assert rows[partial_entry.result_id].is_ranking_eligible is False
     assert rows[partial_entry.result_id].ranking_exclusion_reason == "mismatched_query_set"
+
+
+def test_partial_query_set_exclusion_reaches_every_read_model_consumer(tmp_path: Path) -> None:
+    """A partial producer result stays visible but is excluded in every persisted consumer."""
+
+    class CohortFixtureTransformer(BundleTransformer):
+        def result_id_from_bundle(
+            self,
+            bundle_path: Path,
+            *,
+            data: dict[str, Any] | None = None,
+            raw: bytes | None = None,
+        ) -> str:
+            return f"cohort-fixture-{bundle_path.stem}"
+
+        def to_detail_result(
+            self,
+            bundle_path: Path,
+            result_id: str,
+            *,
+            trust_label: str = "maintainer-run",
+            visibility: str = "public-curated",
+            bundle_download_url: str = "",
+            data: dict[str, Any] | None = None,
+        ) -> DetailResult:
+            detail = super().to_detail_result(
+                bundle_path,
+                result_id,
+                trust_label=trust_label,
+                visibility=visibility,
+                bundle_download_url=bundle_download_url,
+                data=data,
+            )
+            if bundle_path.stem == "partial":
+                detail = detail.model_copy(update={"display_timings": detail.display_timings[:-1]})
+            return detail
+
+    source = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    bundles_dir = tmp_path / "input" / "bundles"
+    bundles_dir.mkdir(parents=True)
+    for name in ("complete-a", "complete-b", "partial"):
+        shutil.copy2(source, bundles_dir / f"{name}.json")
+
+    output = tmp_path / "output"
+    ExplorerPipeline(transformer=CohortFixtureTransformer()).run(tmp_path / "input", output)
+
+    with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
+        for table, columns in (
+            ("results", "is_ranking_eligible, ranking_exclusion_reason"),
+            ("result_detail_metrics", "ranking_exclusion_reason"),
+            ("benchmark_rankings", "is_ranking_eligible, ranking_exclusion_reason"),
+            ("cohort_metadata", "ranking_exclusion_reason"),
+        ):
+            row = con.execute(
+                f"SELECT {columns} FROM {table} WHERE result_id = ?",
+                ["cohort-fixture-partial"],
+            ).fetchone()
+            expected = (
+                (False, "mismatched_query_set") if "is_ranking_eligible" in columns else ("mismatched_query_set",)
+            )
+            assert row == expected, table
+
+        peer_rows = con.execute(
+            "SELECT result_id, is_ranking_eligible FROM benchmark_rankings "
+            "WHERE result_id LIKE 'cohort-fixture-complete-%' ORDER BY result_id"
+        ).fetchall()
+    assert peer_rows == [("cohort-fixture-complete-a", True), ("cohort-fixture-complete-b", True)]
 
 
 def _duckdb_results(output: Path) -> list[dict]:
