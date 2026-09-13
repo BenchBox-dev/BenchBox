@@ -27,7 +27,11 @@ therefore:
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -127,6 +131,67 @@ def test_auto_merge_enablement_point_does_not_treat_creation_as_readiness_failur
     arm_at = body.index('$(MAKE) -s pr-ready REPO="$$REPOSITORY"')
     assert held_at < arm_at
     assert "READY=1 does not arm a newly created PR" in body
+
+
+def _pr_reuse_query() -> str:
+    """Extract the owner-aware jq query used by `pr-open` reuse."""
+    body = _target_body("pr-open")
+    match = re.search(r"--json url,headRepositoryOwner,headRefName\s+\\\n\s*--jq '([^']+)'", body)
+    assert match, "pr-open has no owner-aware JSON reuse query"
+    return match.group(1)
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is required to exercise the gh JSON filter")
+@pytest.mark.parametrize(
+    ("owner", "branch", "expected_url"),
+    [
+        ("BenchBox-dev", "feature/reuse-safe", "https://example.test/same-repo"),
+        ("contributor", "feature/reuse-safe", "https://example.test/fork"),
+    ],
+)
+def test_pr_open_reuse_query_selects_same_repo_and_fork_by_owner_and_branch(
+    owner: str, branch: str, expected_url: str
+) -> None:
+    """Reuse must distinguish repository owner when fork branches share a name."""
+    payload = [
+        {
+            "url": "https://example.test/same-repo",
+            "headRepositoryOwner": {"login": "BenchBox-dev"},
+            "headRefName": "feature/reuse-safe",
+        },
+        {
+            "url": "https://example.test/fork",
+            "headRepositoryOwner": {"login": "contributor"},
+            "headRefName": "feature/reuse-safe",
+        },
+        {
+            "url": "https://example.test/other-branch",
+            "headRepositoryOwner": {"login": owner},
+            "headRefName": "feature/other",
+        },
+    ]
+    result = subprocess.run(
+        ["jq", "-r", _pr_reuse_query()],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "PR_HEAD_OWNER": owner, "PR_HEAD_NAME": branch},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [expected_url]
+
+
+def test_pr_open_preserves_owner_qualified_create_and_avoids_unsupported_list_head() -> None:
+    """Creation may use owner:branch; reuse must use supported JSON fields."""
+    body = _target_body("pr-open")
+    create_commands = re.findall(r"gh pr create .*?--head \"\$\$HEAD_SPEC\"", body)
+
+    assert len(create_commands) == 2
+    assert '--head "$$HEAD_SPEC"' not in body.split("URL=$$(gh pr list", 1)[1].split("if [ -z", 1)[0]
+    assert "--json url,headRepositoryOwner,headRefName" in body
+    assert "env.PR_HEAD_OWNER" in body and "env.PR_HEAD_NAME" in body
 
 
 def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:

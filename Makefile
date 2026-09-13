@@ -1517,6 +1517,9 @@ pr-open:
 	if [ "$$ORIGIN_REPOSITORY_KEY" != "$$TARGET_REPOSITORY_KEY" ]; then \
 		HEAD_SPEC="$$ORIGIN_OWNER:$$CURRENT"; \
 	fi; \
+	PR_HEAD_OWNER="$$ORIGIN_OWNER"; \
+	PR_HEAD_NAME="$$CURRENT"; \
+	export PR_HEAD_OWNER PR_HEAD_NAME; \
 	git fetch origin develop --quiet; \
 	if ! git merge-base --is-ancestor origin/develop HEAD; then \
 		if ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \
@@ -1541,7 +1544,10 @@ pr-open:
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	REUSED_PR=0; \
-	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$HEAD_SPEC" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --state open \
+		--json url,headRepositoryOwner,headRefName \
+		--jq '.[] | select((.headRepositoryOwner.login | ascii_downcase) == (env.PR_HEAD_OWNER | ascii_downcase) and .headRefName == env.PR_HEAD_NAME) | .url' \
+		2>/dev/null | sed -n '1p'); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
 			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC" --body-file "$(PR_BODY_FILE)"); \
