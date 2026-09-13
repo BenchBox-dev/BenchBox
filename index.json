@@ -14734,7 +14734,7 @@
         "skill-integrity-specialized-ci-lane"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Validate skill-only CI routing and derive a measured event-fanout budget"
     },
     "skill-integrity-local-preflight-routing": {
