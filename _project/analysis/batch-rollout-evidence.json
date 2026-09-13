@@ -1,81 +1,55 @@
 {
-  "schema": "benchbox_batch_skill_rollout_evidence_v1",
+  "schema": "benchbox_batch_skill_rollout_evidence_v2",
   "benchbox": {
     "item": "batch-skill-pinned-rollout",
-    "worktree": "/Users/joe/Developer/BenchBox.wt-batch-skill-pinned-rollout-batch",
-    "branch": "feat/batch-skill-pinned-rollout-batch",
-    "integrated_batch_head": "f4bdd580e74b94ee9636cc6aab96aaba83870799",
+    "decision": "feature-delivery-capability-verified",
+    "feature_mode_default": "serial",
     "source_name_override": "todo-db"
   },
   "source": {
     "repository": "https://github.com/joeharris76/todo-db",
     "canonical_branch": "main",
     "merge_revision": "74631c83f74b7f184abbd49001f032943b720774",
-    "main_tip_checked": "74631c83f74b7f184abbd49001f032943b720774",
+    "tree_revision": "68327db0ed50d68a06cabff66eb645f2ff25f47a",
     "merge_contains_source_pr_head": true,
-    "source_worktree": "/Users/joe/Developer/todo-db.wt-batch-source-receipt",
-    "source_worktree_clean": true,
-    "source_receipt": "_project/analysis/batch-source-delivery.json",
-    "pr": {
-      "number": 39,
-      "url": "https://github.com/joeharris76/todo-db/pull/39",
-      "merge_revision": "74631c83f74b7f184abbd49001f032943b720774"
-    }
+    "pr": {"number": 39, "url": "https://github.com/joeharris76/todo-db/pull/39", "merge_revision": "74631c83f74b7f184abbd49001f032943b720774"}
   },
   "catalog": {
     "repository": "https://github.com/joeharris76/skill-sync-skills",
     "canonical_branch": "main",
     "merge_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
-    "main_tip_checked": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
-    "local_ref_checked": "origin/main",
     "parent_revision": "d55ac93b9c35f63077b948e4183b4ff960012069",
     "canonical_path": "skills/todo",
-    "pr": {
-      "number": 80,
-      "url": "https://github.com/joeharris76/skill-sync-skills/pull/80",
-      "merge_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892"
+    "pr": {"number": 80, "url": "https://github.com/joeharris76/skill-sync-skills/pull/80", "merge_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892"}
+  },
+  "artifact": {
+    "filename": "todo_db-0.7.3-py3-none-any.whl",
+    "project_path": "_project/scripts/vendor/todo_db-0.7.3-py3-none-any.whl",
+    "sha256": "d5d411703d571559df60b88445da194c59423c6d6d91f12f2d3177e41ab05ce4",
+    "build": {
+      "source_input": "git archive --format=tar 74631c83f74b7f184abbd49001f032943b720774",
+      "source_date_epoch": 1789236029,
+      "command": "uv build --wheel --out-dir <dist> <git-archive-directory>",
+      "reproducibility": {"independent_builds": 2, "matching_sha256": "d5d411703d571559df60b88445da194c59423c6d6d91f12f2d3177e41ab05ce4"},
+      "sibling_checkout_used_for_install": false
     }
   },
   "runtime": {
-    "compatible_source": {
-      "package_version": "0.7.3",
-      "source_revision": "74631c83f74b7f184abbd49001f032943b720774",
-      "schema_version": 3,
-      "supported_schema_versions": [1, 2, 3],
-      "prepared_receipt_schema": "prepared_work_v1",
-      "tool_names": ["abort_batch", "bind_batch_pr", "create_item", "drop", "finish", "get_instructions", "list_items", "prepare", "register_batch", "release", "renew", "show_item", "take", "update_item"],
-      "registered_batch_tools": ["register_batch", "prepare", "bind_batch_pr", "abort_batch"],
-      "mcp_handshake": {
-        "sequence": ["initialize", "notifications/initialized", "tools/list"],
-        "protocol_version": "2024-11-05",
-        "server_info": {"name": "todo-db", "version": "0.7.3"},
-        "tool_count": 14,
-        "result": "pass",
-        "state_remote": "local throwaway bare Git remote; no hosted state touched"
-      }
-    },
-    "active_benchbox": {
-      "command": "uv run --project _project/scripts --locked -- todo-db-mcp",
-      "dependency_metadata_version": "0.7.2",
-      "reported_tool_version": "0.7.0",
-      "schema_version": 1,
-      "supported_schema_versions": [1],
-      "tool_names": ["create_item", "drop", "finish", "get_instructions", "list_items", "release", "renew", "show_item", "take", "update_item"],
-      "registered_batch_tools": [],
-      "mcp_handshake": {
-        "sequence": ["initialize", "notifications/initialized", "tools/list"],
-        "protocol_version": "2024-11-05",
-        "server_info": {"name": "todo-db", "version": "0.7.0"},
-        "tool_count": 10,
-        "result": "pass-json-rpc-but-incompatible-capability"
-      }
-    },
-    "decision": "serial",
-    "blocker": {
-      "code": "ACTIVE_RUNTIME_LACKS_REGISTERED_BATCH",
-      "owner": "BenchBox runtime/dependency maintainer",
-      "effect": "feature delivery mode is documented but not active in this checkout",
-      "next_step": "Upgrade the supported _project/scripts todo-db dependency and lockfile to a reviewed compatible release, then repeat the handshake and rollout checks."
+    "project_command": "uv run --project _project/scripts --locked -- todo-db-mcp",
+    "dependency_metadata_version": "0.7.3",
+    "reported_tool_version": "0.7.3",
+    "schema_version": 3,
+    "supported_schema_versions": [1, 2, 3],
+    "prepared_receipt_schema": "prepared_work_v1",
+    "tool_count": 14,
+    "registered_batch_tools": ["register_batch", "prepare", "bind_batch_pr", "abort_batch"],
+    "tool_names": ["abort_batch", "bind_batch_pr", "create_item", "drop", "finish", "get_instructions", "list_items", "prepare", "register_batch", "release", "renew", "show_item", "take", "update_item"],
+    "mcp_handshake": {
+      "sequence": ["initialize", "notifications/initialized", "tools/list"],
+      "protocol_version": "2024-11-05",
+      "server_info": {"name": "todo-db", "version": "0.7.3"},
+      "result": "pass",
+      "state_remote": "local throwaway bare Git remote; no hosted state touched"
     }
   },
   "benchbox_pin": {
@@ -99,33 +73,24 @@
     "agents_target": {
       "root": ".agents/skills/todo",
       "materialized": true,
-      "parity_check": "diff -rq .claude/skills/todo .agents/skills/todo passed",
       "receipt_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892"
     }
   },
   "verification": {
-    "source_and_catalog": "pass: local source HEAD and catalog origin/main resolve the recorded merged revisions",
-    "preview": "pass: ./tools/skill-sync preview inspected the exact pin, receipt, manifest, and todo mirror changes",
-    "apply": "pass: ./tools/skill-sync apply completed and wrote the generated mirrors",
-    "local_tests": [
-      {"command": "make skill-integrity-check", "result": "pass", "summary": "2 targets verified; agent-instructions PASS; artifact hygiene passed"},
-      {"command": "uv run -- python -m pytest -n 0 tests/integration/worktree/test_batch_skill_delivery.py -q", "result": "pass", "summary": "4 passed"},
-      {"command": "uv run -- python -m pytest -n 0 tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_todo_state_workflow.py -q", "result": "pass", "summary": "15 passed"},
-      {"command": "./tools/skill-sync check", "result": "pass", "summary": "Already up to date."},
-      {"command": "make skill-sync-check", "result": "pass", "summary": "Already up to date."},
-      {"command": "git diff --check", "result": "pass", "summary": "no whitespace errors"}
-    ],
-    "hosted_publication": "not performed; local sync and tests are not merge, publication, deployment, or activation evidence"
+    "clean_install": "uv sync --project _project/scripts --locked --offline passed",
+    "standalone_metadata": "wheel metadata and entry points identify todo-db 0.7.3",
+    "no_sibling_path": "project source and lock paths resolve only under _project/scripts/vendor",
+    "batch_delivery_integration": "full JSON-RPC handshake passed with schema 3 and 14 tools",
+    "skill_integrity": "make skill-integrity-check passed against the pinned catalog and tracked mirror",
+    "active_runtime_blocker": null,
+    "hosted_publication": "not performed; local verification is not merge or deployment evidence"
   },
   "rollback": {
-    "preview": "Restore skill-sync.conf to the previous pin and run ./tools/skill-sync preview before any apply.",
-    "source": "Any todo-db source rollback requires an authorized upstream revert; no source or hosted state was changed.",
-    "destructive_cleanup": "not performed"
+    "catalog": "Restore skill-sync.conf to the previous pin and preview before applying.",
+    "runtime": "Restore the prior vendored wheel and regenerate the locked project dependency."
   },
   "residual_operator_steps": [
-    "Have the runtime/dependency maintainer upgrade the active BenchBox todo-db MCP package and lockfile through review.",
-    "Repeat initialize, notifications/initialized, and tools/list against the active registration; require schema 3 and all registered-batch tools.",
-    "Only after that live capability check, opt related work into feature delivery mode; keep independent work serial.",
-    "Run the normal hosted review, merge, publication, and deployment gates separately."
+    "Run the normal hosted review, merge, publication, and deployment gates separately.",
+    "Keep prospective cohort and legitimate skill-only sample requirements separate from this local capability proof."
   ]
 }
