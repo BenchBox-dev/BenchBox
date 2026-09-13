@@ -675,10 +675,19 @@ access and let the canary return to green.
 The `develop-post-merge.yml` auto-revert job creates these labels on
 demand if they do not exist:
 
-- `incident:develop-red` — used on the auto-revert PR.
-- `incident:develop-red-revert-conflict` — used on the manual-action
-  issue when the revert path cannot complete (revert conflict, push
-  failure, PR-creation failure).
+- `incident:develop-red` — used on an auto-revert PR or an owned
+  post-merge incident/advisory when attribution is unproven.
+- `incident:develop-red-revert-conflict` — used on the manual-action issue
+  when a proven revert path cannot complete (revert conflict, push failure,
+  PR-creation failure, or target/diff inspection failure).
+
+Attribution incidents include the immutable failing commit and PR, test/job
+identifiers, predecessor and source-input evidence, ownership match,
+classification, owner, next action, and a stable incident key. The workflow
+must not create a revert proposal from temporal adjacency, missing evidence,
+an unmappable job failure, stale target state, external-reference drift, or a
+transient rerun. Those outcomes keep develop red and update the existing
+`incident:develop-red` issue by incident key.
 
 The on-demand `gh label create … || true` in the workflow means a fresh
 clone or transfer does not need the labels pre-created. They will appear

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import hashlib
 import json
 import subprocess
 import sys
@@ -65,7 +66,25 @@ def _node_id(case: ET.Element) -> str:
     return name
 
 
-def build_signature_from_junit(job: str, junit_path: Path) -> dict[str, object]:
+def _with_source_inputs(signature: dict[str, object], source_inputs: dict[str, str] | None) -> dict[str, object]:
+    if source_inputs:
+        signature["source_inputs"] = dict(sorted(source_inputs.items()))
+    return signature
+
+
+def _parse_source_inputs(raw_inputs: list[str]) -> dict[str, str]:
+    source_inputs: dict[str, str] = {}
+    for raw in raw_inputs:
+        name, separator, identity = raw.partition("=")
+        if not separator or not name.strip() or not identity.strip():
+            raise SignatureError(f"source input must be NAME=IDENTITY: {raw!r}")
+        source_inputs[name.strip()] = identity.strip()
+    return source_inputs
+
+
+def build_signature_from_junit(
+    job: str, junit_path: Path, source_inputs: dict[str, str] | None = None
+) -> dict[str, object]:
     """Build a signature from a junit XML report's failed/errored testcases.
 
     Skipped and passing testcases are excluded; a testcase counts as a
@@ -84,14 +103,19 @@ def build_signature_from_junit(job: str, junit_path: Path) -> dict[str, object]:
         if case.find("failure") is not None or case.find("error") is not None:
             failure_ids.append(_node_id(case))
 
-    return {
-        "job": job,
-        "kind": "junit",
-        "failure_ids": sorted(set(failure_ids)),
-    }
+    return _with_source_inputs(
+        {
+            "job": job,
+            "kind": "junit",
+            "failure_ids": sorted(set(failure_ids)),
+        },
+        source_inputs,
+    )
 
 
-def build_signature_from_job_failure(job: str, failed_step: str | None) -> dict[str, object]:
+def build_signature_from_job_failure(
+    job: str, failed_step: str | None, source_inputs: dict[str, str] | None = None
+) -> dict[str, object]:
     """Build a signature from a plain job-name + failed-step descriptor.
 
     Used for gates with no junit output (lint, explorer-tokens). When
@@ -99,16 +123,22 @@ def build_signature_from_job_failure(job: str, failed_step: str | None) -> dict[
     failure IDs.
     """
     if failed_step:
-        return {
+        return _with_source_inputs(
+            {
+                "job": job,
+                "kind": "job-failure",
+                "failure_ids": [f"{job}:{failed_step}"],
+            },
+            source_inputs,
+        )
+    return _with_source_inputs(
+        {
             "job": job,
-            "kind": "job-failure",
-            "failure_ids": [f"{job}:{failed_step}"],
-        }
-    return {
-        "job": job,
-        "kind": "none",
-        "failure_ids": [],
-    }
+            "kind": "none",
+            "failure_ids": [],
+        },
+        source_inputs,
+    )
 
 
 def load_signature(path: Path) -> dict[str, object]:
@@ -277,7 +307,7 @@ def attribution_action(
     changed_paths: list[str],
     repo_root: Path | None = None,
 ) -> str:
-    """Return ``revert``, ``advisory``, or ``escalate`` for a blamed SHA.
+    """Return ``revert`` or ``advisory`` for a blamed SHA.
 
     See :func:`attribution_detail` for the deciding basis.
     """
@@ -291,13 +321,10 @@ def attribution_detail(
 ) -> tuple[str, str]:
     """Return ``(action, basis)`` for a blamed SHA's changed paths.
 
-    Actions: ``revert`` (evidence ties a failure to the SHA), ``advisory``
-    (every extractable failing test path clears the SHA), ``escalate`` (an
-    ID class no classifier understands — a human must classify it before any
-    revert, so the next unknown writer becomes a loud failure instead of a
-    wrong revert). Basis records which signal decided: ``test-path``,
-    ``import``, ``no-extractable-path`` (fail-closed revert; job-level and
-    lint failures stay revert), or ``unrecognized-class``.
+    Actions: ``revert`` (evidence ties a failure to the SHA) or ``advisory``
+    (the evidence does not prove ownership). Basis records which signal
+    decided: ``test-path``, ``import``, ``no-ownership-evidence``, or
+    ``unrecognized-class``.
 
     Checks two owning signals before downgrading to advisory: the test
     path/stem heuristic (``paths_related_to_test``) and real import analysis
@@ -307,10 +334,10 @@ def attribution_detail(
     """
     unrecognized = unrecognized_failure_ids(failure_ids)
     if unrecognized:
-        return "escalate", "unrecognized-class"
+        return "advisory", "unrecognized-class"
     test_paths = failure_id_test_paths(failure_ids)
     if not test_paths:
-        return "revert", "no-extractable-path"
+        return "advisory", "no-ownership-evidence"
     root = repo_root or Path.cwd()
     changed = set(changed_paths)
     changed_names = {Path(path).name for path in changed_paths}
@@ -322,6 +349,119 @@ def attribution_detail(
             if imported in changed:
                 return "revert", "import"
     return "advisory", "cleared"
+
+
+ATTRIBUTION_CLASSES = {
+    "code-regression",
+    "external-ref-drift",
+    "environment/transient-failure",
+    "stale-run",
+    "unknown",
+    "persistent-failure",
+}
+
+
+def incident_key(failure_ids: list[object]) -> str:
+    """Return a stable key for one failure signature, independent of run order."""
+    canonical = json.dumps(sorted({str(failure_id) for failure_id in failure_ids}), separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+
+
+def _source_inputs_changed(evidence: dict[str, object]) -> bool:
+    current = evidence.get("source_inputs")
+    predecessor = evidence.get("predecessor_source_inputs")
+    return isinstance(current, dict) and isinstance(predecessor, dict) and current != predecessor
+
+
+def classify_attribution(evidence: dict[str, object]) -> dict[str, object]:
+    """Classify explicit attribution evidence; chronology alone never owns a failure."""
+    failure_ids = evidence.get("failure_ids", [])
+    if not isinstance(failure_ids, list):
+        failure_ids = []
+    failing_sha = str(evidence.get("failing_sha", "")).strip()
+    target_sha = str(evidence.get("current_target_sha", "")).strip()
+    predecessor = evidence.get("predecessor_evidence")
+    ownership_match = evidence.get("ownership_match") is True
+    rerun = evidence.get("rerun")
+    proposed_revert = evidence.get("proposed_revert")
+    reasons: list[str] = []
+
+    if not failing_sha or not target_sha:
+        classification = "unknown"
+        reasons.append("missing immutable failing or current target SHA")
+    elif target_sha != failing_sha:
+        classification = "stale-run"
+        reasons.append("current develop target moved after the failing run")
+    elif not isinstance(predecessor, dict) or not predecessor.get("run_url"):
+        classification = "unknown"
+        reasons.append("missing predecessor run evidence")
+    elif unrecognized_failure_ids(failure_ids):
+        classification = "unknown"
+        reasons.append("failure identifier is not safely mappable")
+    elif isinstance(rerun, dict) and rerun.get("conclusion") in {"success", "passed"}:
+        classification = "environment/transient-failure"
+        reasons.append("the failure did not reproduce on the exact commit")
+    elif _source_inputs_changed(evidence) and not ownership_match:
+        classification = "external-ref-drift"
+        reasons.append("a relevant external source identity changed across the predecessor")
+    elif ownership_match:
+        classification = "code-regression"
+        reasons.append("the failing test/job has a positive changed-subsystem ownership match")
+    else:
+        classification = "unknown"
+        reasons.append("no positive changed-subsystem ownership evidence")
+
+    if isinstance(proposed_revert, dict) and proposed_revert.get("introduced_failure") is True:
+        classification = "unknown"
+        reasons.append("the proposed revert introduced another failure")
+
+    if classification not in ATTRIBUTION_CLASSES:
+        classification = "unknown"
+    next_actions = {
+        "code-regression": "Inspect the current develop target and proposed inverse diff, then open a reviewable revert PR.",
+        "external-ref-drift": "Reconcile the changed external reference or generated input; do not revert an unrelated commit.",
+        "environment/transient-failure": "Rerun the affected job on the exact failing commit and inspect runner evidence.",
+        "stale-run": "Re-evaluate the failure against the current develop target; do not revert the stale SHA.",
+        "persistent-failure": "Investigate the existing red incident; no new revert is needed.",
+        "unknown": "An owner must classify the evidence and choose fix-forward or a reviewed revert; keep develop red.",
+    }
+    owner = str(evidence.get("owner", "")).strip() or "unassigned"
+    return {
+        "classification": classification,
+        "action": "revert" if classification == "code-regression" else "advisory",
+        "attribution_basis": "owned-subsystem" if classification == "code-regression" else "evidence-required",
+        "reasons": reasons,
+        "next_action": next_actions[classification],
+        "owner": owner,
+        "incident_key": incident_key(failure_ids),
+    }
+
+
+def build_incident_artifact(evidence: dict[str, object], attribution: dict[str, object]) -> dict[str, object]:
+    """Build the durable evidence record used by the idempotent incident flow."""
+    failure_ids = evidence.get("failure_ids", [])
+    if not isinstance(failure_ids, list):
+        failure_ids = []
+    return {
+        "schema_version": 2,
+        "incident_key": attribution["incident_key"],
+        "failing_commit": {"sha": evidence.get("failing_sha", ""), "run_url": evidence.get("run_url", "")},
+        "failing_pr": evidence.get("failing_pr", {}),
+        "failure_ids": failure_ids,
+        "jobs": evidence.get("jobs", []),
+        "test_ids": failure_ids,
+        "source_input_identities": {
+            "current": evidence.get("source_inputs", {}),
+            "predecessor": evidence.get("predecessor_source_inputs", {}),
+        },
+        "predecessor_evidence": evidence.get("predecessor_evidence", {}),
+        "ownership_match": evidence.get("ownership_match"),
+        "classification": attribution["classification"],
+        "action": attribution["action"],
+        "next_action": attribution["next_action"],
+        "owner": attribution["owner"],
+        "reasons": attribution["reasons"],
+    }
 
 
 def diff_signatures(previous: dict[str, object], current: dict[str, object]) -> list[str]:
@@ -341,8 +481,9 @@ def diff_signatures(previous: dict[str, object], current: dict[str, object]) -> 
 
 def _build_command(args: argparse.Namespace) -> int:
     try:
+        source_inputs = _parse_source_inputs(args.source_input)
         if args.junit:
-            signature = build_signature_from_junit(args.job, args.junit)
+            signature = build_signature_from_junit(args.job, args.junit, source_inputs)
             # A gate can fail for a reason junit never records - e.g. pytest-cov's
             # --cov-fail-under gate, which fails the step (and job) while every
             # individual testcase passes, leaving zero <failure>/<error> elements.
@@ -352,9 +493,9 @@ def _build_command(args: argparse.Namespace) -> int:
             # a job that failed WITH real testcase failures keeps its junit
             # signature (more precise than the coarse job-level descriptor).
             if args.job_failed and not signature["failure_ids"]:
-                signature = build_signature_from_job_failure(args.job, args.failed_step)
+                signature = build_signature_from_job_failure(args.job, args.failed_step, source_inputs)
         else:
-            signature = build_signature_from_job_failure(args.job, args.failed_step)
+            signature = build_signature_from_job_failure(args.job, args.failed_step, source_inputs)
     except SignatureError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -410,15 +551,41 @@ def _attribute_command(args: argparse.Namespace) -> int:
     except SignatureError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
-    action, basis = attribution_detail(failure_ids, changed_paths)
-    result = {
-        "action": action,
-        "attribution_basis": basis,
-        "sha": args.sha,
-        "test_paths": failure_id_test_paths(failure_ids),
-        "changed_paths": changed_paths,
-        "unrecognized_ids": unrecognized_failure_ids(failure_ids),
-    }
+    evidence: dict[str, object] = {}
+    if args.evidence:
+        try:
+            evidence_payload = json.loads(args.evidence.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"error: could not read attribution evidence: {exc}", file=sys.stderr)
+            return 1
+        if not isinstance(evidence_payload, dict):
+            print("error: attribution evidence must be a JSON object", file=sys.stderr)
+            return 1
+        evidence = evidence_payload
+
+    legacy_action, legacy_basis = attribution_detail(failure_ids, changed_paths)
+    evidence.update(
+        {
+            "failing_sha": args.sha,
+            "failure_ids": failure_ids,
+            "changed_paths": changed_paths,
+            "test_paths": failure_id_test_paths(failure_ids),
+            "unrecognized_ids": unrecognized_failure_ids(failure_ids),
+            "ownership_match": evidence.get("ownership_match", legacy_action == "revert"),
+            "ownership_basis": evidence.get("ownership_basis", legacy_basis),
+        }
+    )
+    attribution = classify_attribution(evidence)
+    result = build_incident_artifact(evidence, attribution)
+    result.update(
+        {
+            "sha": args.sha,
+            "test_paths": failure_id_test_paths(failure_ids),
+            "changed_paths": changed_paths,
+            "unrecognized_ids": unrecognized_failure_ids(failure_ids),
+            "ownership_basis": evidence["ownership_basis"],
+        }
+    )
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -468,6 +635,12 @@ def main(argv: list[str] | None = None) -> int:
         "for a reason junit never records, e.g. a coverage-threshold gate) and replaced "
         "with a --failed-step job-failure descriptor instead of a false-clean signature.",
     )
+    build_parser.add_argument(
+        "--source-input",
+        action="append",
+        default=[],
+        help="Immutable source identity in NAME=IDENTITY form; may be repeated.",
+    )
     build_parser.add_argument("--out", type=Path, required=True, help="Path to write the signature JSON")
     build_parser.set_defaults(func=_build_command)
 
@@ -487,6 +660,11 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         required=True,
         help="JSON list or {new_failure_ids: [...]} from diff",
+    )
+    attribute_parser.add_argument(
+        "--evidence",
+        type=Path,
+        help="JSON object containing immutable run, predecessor, source, target, and owner evidence.",
     )
     attribute_parser.add_argument("--out", type=Path, help="Path to write the attribution JSON")
     attribute_parser.set_defaults(func=_attribute_command)

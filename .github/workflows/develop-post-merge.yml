@@ -104,9 +104,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ job.status }}" = "failure" ]; then
-            python scripts/post_merge_signature.py build --job lint --failed-step "Run CI lint mirror" --out signature.json
+            python scripts/post_merge_signature.py build --job lint --failed-step "Run CI lint mirror" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job lint --out signature.json
+            python scripts/post_merge_signature.py build --job lint --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload lint signature
@@ -166,10 +166,10 @@ jobs:
           if [ -f fast-test-junit.xml ]; then
             python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml \
               --failed-step "Run CI fast-test mirror (job failed with no testcase-level failures, e.g. coverage threshold)" \
-              $JOB_FAILED_FLAG --out signature.json \
-              || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --out signature.json
+              $JOB_FAILED_FLAG --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json \
+              || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --out signature.json
+            python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload fast-test signature
@@ -215,9 +215,9 @@ jobs:
             failed_step="Run public site theme token scan"
           fi
           if [ -n "${failed_step}" ]; then
-            python scripts/post_merge_signature.py build --job explorer-tokens --failed-step "${failed_step}" --out signature.json
+            python scripts/post_merge_signature.py build --job explorer-tokens --failed-step "${failed_step}" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job explorer-tokens --out signature.json
+            python scripts/post_merge_signature.py build --job explorer-tokens --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload explorer-tokens signature
@@ -308,10 +308,10 @@ jobs:
           if [ -f medium-test-junit.xml ]; then
             python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml \
               --failed-step "Run medium speed tier (job failed with no testcase-level failures)" \
-              $JOB_FAILED_FLAG --out signature.json \
-              || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --out signature.json
+              $JOB_FAILED_FLAG --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json \
+              || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --out signature.json
+            python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload medium-test signature
@@ -494,20 +494,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          should_revert="true"
+          # A revert is a positive-evidence outcome, never the default for a
+          # missing artifact, comparison error, or unmappable failure.
+          should_revert="false"
           # Left empty (not "[]") unless the diff below actually succeeds,
           # so a fail-open run reports new_failure_ids as "no data" (null in
           # the metrics JSON) rather than the misleading "computed zero".
           new_failure_ids_json=""
           fail_open_reason=""
           previous_run_url=""
+          comparison_state="unknown"
 
           # Every external/parse command below is guarded (`if ! ...`) so a
           # failure sets fail_open_reason instead of aborting the step under
-          # `set -e`: an aborted step would leave should-revert unwritten and
-          # skip BOTH downstream steps, silently dropping the revert - the
-          # exact anti-pattern this design forbids. Each stage is skipped
-          # once fail_open_reason is set, and fail-open always reverts.
+          # `set -e`: an aborted step would leave outputs unwritten and skip
+          # the incident path. Each stage is skipped once fail_open_reason is
+          # set, and an incomplete comparison stays red with an incident.
 
           # Merge the four gate jobs' per-job signature artifacts (one
           # subdirectory per artifact, downloaded above) into a single
@@ -527,7 +529,7 @@ jobs:
           done
           if [ "${#missing_signatures[@]}" -gt 0 ]; then
             fail_open_reason="Missing current-run signature artifact(s) for: ${missing_signatures[*]} (gate job crashed, timed out, or was cancelled before its signature could upload)."
-          elif ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+          elif ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort), jobs: map({job, kind, failure_ids}), source_inputs: (map(.source_inputs // {}) | add // {})}' \
             current-signatures/*/signature.json > current-combined.json; then
             fail_open_reason="Could not combine this run's signature artifacts (malformed signature JSON)."
           fi
@@ -567,7 +569,7 @@ jobs:
 
           if [ -z "${fail_open_reason}" ]; then
             if compgen -G "previous-signatures/*/signature.json" > /dev/null; then
-              if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+              if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort), jobs: map({job, kind, failure_ids}), source_inputs: (map(.source_inputs // {}) | add // {})}' \
                 previous-signatures/*/signature.json > previous-combined.json; then
                 fail_open_reason="Could not combine the previous run's signature artifacts (malformed signature JSON)."
               fi
@@ -591,18 +593,22 @@ jobs:
                 # is persistently red for the same reason, not because of
                 # this merge.
                 should_revert="false"
+                comparison_state="persistent"
+              else
+                comparison_state="new"
               fi
             else
               fail_open_reason="scripts/post_merge_signature.py diff exited non-zero comparing this run to ${previous_run_url}."
             fi
           fi
 
-          # Never silently suppress a revert on a comparison error: any
-          # unresolved fail_open_reason forces should_revert back to true
-          # and is surfaced in the revert PR body below.
+          # Never silently suppress the red state on a comparison error. An
+          # unresolved reason routes to an unknown-attribution incident; it
+          # must not manufacture ownership from temporal adjacency.
           if [ -n "${fail_open_reason}" ]; then
-            echo "Failing open: ${fail_open_reason}"
-            should_revert="true"
+            echo "Comparison incomplete: ${fail_open_reason}"
+            should_revert="false"
+            comparison_state="unknown"
           fi
 
           if [ "${should_revert}" = "true" ]; then
@@ -616,6 +622,7 @@ jobs:
             echo "revert-suppressed=${revert_suppressed}"
             echo "fail-open-reason=${fail_open_reason}"
             echo "previous-run-url=${previous_run_url}"
+            echo "comparison-state=${comparison_state}"
           } >> "${GITHUB_OUTPUT}"
 
           {
@@ -626,25 +633,87 @@ jobs:
 
       - name: Attribute new failures to the blamed SHA
         id: attribute
-        if: steps.signature-decision.outputs.should-revert == 'true'
+        if: steps.signature-decision.outputs.comparison-state != 'persistent'
         shell: bash
         env:
           NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
         run: |
           set -euo pipefail
-          # Fail-open comparisons have empty/unusable new IDs: keep revert.
           if [ -z "${NEW_FAILURE_IDS}" ] || [ "${NEW_FAILURE_IDS}" = "null" ]; then
-            echo "action=revert" >> "${GITHUB_OUTPUT}"
-            echo "Attribution skipped (no new-failure-id payload); keeping revert."
-            exit 0
+            failure_ids_json="[]"
+          else
+            failure_ids_json="${NEW_FAILURE_IDS}"
           fi
-          printf '%s\n' "${NEW_FAILURE_IDS}" > new-failure-ids.json
+
+          # Capture the immutable PR association and live target before any
+          # mutation. A missing API result is evidence loss, not permission to
+          # fall back to the most recent merge.
+          pr_json="{}"
+          if ! pr_json="$(gh api graphql \
+            -f owner="${GITHUB_REPOSITORY_OWNER}" \
+            -f repo="${GITHUB_REPOSITORY#*/}" \
+            -f oid="${FAILING_SHA}" \
+            -f query='query($owner: String!, $repo: String!, $oid: GitObjectID!) { repository(owner: $owner, name: $repo) { object(oid: $oid) { ... on Commit { associatedPullRequests(first: 1) { nodes { number title url author { login } } } } } } }' \
+            --jq '.data.repository.object.associatedPullRequests.nodes[0] // {}')"; then
+            echo "Could not resolve the PR associated with ${FAILING_SHA}; recording unknown attribution."
+            pr_json="{}"
+          fi
+          pr_author="$(jq -r '.author.login // empty' <<<"${pr_json}")"
+          owner="${pr_author:-BenchBox-dev}"
+
+          current_target_sha=""
+          if ! current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"; then
+            current_target_sha=""
+          fi
+          predecessor_sha="$(git rev-parse --verify --quiet "${FAILING_SHA}^1" || true)"
+          previous_signature='{}'
+          if [ -f previous-combined.json ]; then
+            previous_signature="$(cat previous-combined.json)"
+          fi
+
+          jq -n \
+            --arg failing_sha "${FAILING_SHA}" \
+            --arg run_url "${RUN_URL}" \
+            --arg current_target_sha "${current_target_sha}" \
+            --arg predecessor_sha "${predecessor_sha}" \
+            --arg previous_run_url "${{ steps.signature-decision.outputs.previous-run-url }}" \
+            --arg owner "${owner}" \
+            --argjson failure_ids "${failure_ids_json}" \
+            --argjson failing_pr "${pr_json}" \
+            --argjson current_signature "$(cat current-combined.json)" \
+            --argjson previous_signature "${previous_signature}" \
+            '{
+              evidence_version: 2,
+              failing_sha: $failing_sha,
+              run_url: $run_url,
+              current_target_sha: $current_target_sha,
+              failure_ids: $failure_ids,
+              jobs: ($current_signature.jobs // []),
+              failing_pr: $failing_pr,
+              owner: $owner,
+              source_inputs: ($current_signature.source_inputs // {}),
+              predecessor_source_inputs: ($previous_signature.source_inputs // {}),
+              predecessor_evidence: {
+                run_url: $previous_run_url,
+                sha: $predecessor_sha,
+                signature: $previous_signature
+              },
+              proposed_revert: {inspected: false}
+            }' > attribution-evidence.json
+
           python3 scripts/post_merge_signature.py attribute \
             --sha "${FAILING_SHA}" \
-            --failure-ids new-failure-ids.json \
+            --failure-ids <(printf '%s\n' "${failure_ids_json}") \
+            --evidence attribution-evidence.json \
             --out attribution.json
           action="$(jq -r '.action' attribution.json)"
           echo "action=${action}" >> "${GITHUB_OUTPUT}"
+          echo "incident-key=$(jq -r '.incident_key' attribution.json)" >> "${GITHUB_OUTPUT}"
+          {
+            echo "incident-artifact<<EOF_ATTRIBUTION"
+            cat attribution.json
+            echo "EOF_ATTRIBUTION"
+          } >> "${GITHUB_OUTPUT}"
           echo "Attribution action: ${action}"
 
       - name: Finalize revert-suppressed for metrics
@@ -660,20 +729,10 @@ jobs:
         run: |
           set -euo pipefail
           revert_suppressed="${{ steps.signature-decision.outputs.revert-suppressed }}"
-          if [ "${{ steps.attribute.outputs.action }}" = "advisory" ]; then
+          if [ "${{ steps.attribute.outputs.action }}" != "revert" ]; then
             revert_suppressed="true"
           fi
           echo "revert-suppressed=${revert_suppressed}" >> "${GITHUB_OUTPUT}"
-
-      - name: Fail loudly on unattributable failure classes
-        id: escalate-attribution
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'escalate'
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "Unrecognized failure-ID class needs human classification before any revert." >&2
-          echo "Classify the IDs, extend scripts/post_merge_signature.py, then re-run." >&2
-          exit 1
 
       - name: Open revert PR or conflict issue
         id: open-revert
@@ -813,7 +872,29 @@ jobs:
           git fetch --no-tags origin "${revert_branch}" || true
           git checkout -B "${revert_branch}" origin/develop
 
-          if git revert --no-edit "${FAILING_SHA}"; then
+          target_sha="$(git rev-parse --verify origin/develop || true)"
+          if [ -z "${target_sha}" ] || [ "${target_sha}" != "${FAILING_SHA}" ]; then
+            open_manual_action_issue \
+              "Auto-revert not attempted for stale develop target ${short_sha}" \
+              "The live develop target changed after attribution was computed (expected ${FAILING_SHA}, found ${target_sha:-missing}). Re-evaluate the failure against the current target; no stale revert was proposed."
+            exit 0
+          fi
+
+          # Prepare the inverse without committing so the target state and the
+          # exact proposed diff are visible before a retry/push/PR mutation.
+          if git revert --no-commit "${FAILING_SHA}"; then
+            proposed_revert_paths="$(git diff --name-only)"
+            if [ -z "${proposed_revert_paths}" ] || ! git diff --check; then
+              git revert --abort || git reset --hard HEAD
+              open_manual_action_issue \
+                "Auto-revert diff inspection failed for ${short_sha}" \
+                "The live target was checked, but the proposed inverse diff was empty or failed git diff --check. No revert PR was opened."
+              exit 0
+            fi
+            echo "Inspected proposed revert diff on develop@${target_sha}:"
+            git diff --stat
+            git diff --name-status
+            git commit -m "Revert ${pr_title} (${pr_label}) - develop went red post-merge"
             remote_lease="$(git rev-parse --verify --quiet "refs/remotes/origin/${revert_branch}" || true)"
             if [ -n "${remote_lease}" ]; then
               push_lease="--force-with-lease=${revert_branch}:${remote_lease}"
@@ -868,58 +949,44 @@ jobs:
               "The automatic \`git revert ${FAILING_SHA}\` conflicted."
           fi
 
-      - name: Comment advisory instead of reverting
-        id: advisory-comment
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'advisory'
-        shell: bash
-        env:
-          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
-        run: |
-          set -euo pipefail
-
-          # Idempotency: if a re-run of this workflow lands on the advisory
-          # path again for the same SHA (workflow re-run, retry), reuse the
-          # existing open issue instead of opening a duplicate. Match by SHA
-          # in the body via the GitHub search index, scoped to this label -
-          # mirrors open_manual_action_issue's search-before-create pattern
-          # above.
-          existing_issue_url="$(gh issue list \
-            --state open \
-            --label incident:develop-red \
-            --search "${FAILING_SHA} in:body" \
-            --json url \
-            --jq '.[0].url // ""')"
-          if [ -n "${existing_issue_url}" ]; then
-            echo "Advisory issue already exists: ${existing_issue_url}"
-            exit 0
-          fi
-
-          body="Post-merge is red with new failure IDs, but blamed SHA \`${FAILING_SHA}\` did not touch the failing test file(s) or a matching code-under-test basename. Skipping auto-revert; fix-forward the latent break.
-
-          Failing run: ${RUN_URL}
-          New failure IDs: ${NEW_FAILURE_IDS}"
-          echo "${body}"
-          gh issue create \
-            --title "Auto-revert advisory: ${FAILING_SHA:0:12} did not own the failing test" \
-            --label incident:develop-red \
-            --body "${body}"
-
       - name: Upsert develop-red incident issue
         id: upsert-incident
-        # Only reached when the signature comparison cleanly determined the
-        # previous run was already red with an identical-or-superset
-        # signature (should-revert=false) - never on the fail-open path,
-        # which always opens a revert PR instead.
-        if: steps.signature-decision.outputs.should-revert == 'false'
+        # Persistent, unknown, stale, external-reference, transient, and
+        # unmappable outcomes all share one owned incident path. Only the
+        # positive code-regression outcome opens a revert PR.
+        if: steps.signature-decision.outputs.should-revert == 'false' || steps.attribute.outputs.action == 'advisory'
         shell: bash
         env:
           PREVIOUS_RUN_URL: ${{ steps.signature-decision.outputs.previous-run-url }}
+          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+          ATTRIBUTION_ACTION: ${{ steps.attribute.outputs.action }}
+          INCIDENT_KEY: ${{ steps.attribute.outputs.incident-key }}
+          ATTRIBUTION_ARTIFACT: ${{ steps.attribute.outputs.incident-artifact }}
         run: |
           set -euo pipefail
 
           gh label create incident:develop-red \
-            --description "Develop post-merge failure with an automatic revert PR" \
+            --description "Develop post-merge failure requiring an owned action" \
             --color B60205 >/dev/null 2>&1 || true
+
+          incident_key="${INCIDENT_KEY}"
+          if [ -z "${incident_key}" ]; then
+            incident_key="$(printf '%s' "${NEW_FAILURE_IDS:-persistent:${FAILING_SHA}}" | sha256sum | cut -c1-16)"
+          fi
+          artifact="${ATTRIBUTION_ARTIFACT}"
+          if [ -z "${artifact}" ]; then
+            artifact="$(jq -n \
+              --arg key "${incident_key}" \
+              --arg sha "${FAILING_SHA}" \
+              --arg run "${RUN_URL}" \
+              --arg prev "${PREVIOUS_RUN_URL}" \
+              --arg ids "${NEW_FAILURE_IDS:-[]}" \
+              '{schema_version: 2, incident_key: $key, failing_commit: {sha: $sha, run_url: $run}, failing_pr: {}, failure_ids: ($ids | fromjson? // []), jobs: [], test_ids: [], source_input_identities: {current: {}, predecessor: {}}, predecessor_evidence: {run_url: $prev}, ownership_match: false, classification: "persistent-failure", action: "advisory", next_action: "Investigate the existing red incident; no new revert is needed.", owner: "BenchBox-dev", reasons: ["signature comparison found no new failure IDs"]}')"
+          fi
+          owner="$(jq -r '.owner // "BenchBox-dev"' <<<"${artifact}")"
+          classification="$(jq -r '.classification // "unknown"' <<<"${artifact}")"
+          next_action="$(jq -r '.next_action // "An owner must classify the evidence and choose fix-forward or a reviewed revert; keep develop red."' <<<"${artifact}")"
+          artifact_summary="$(jq -c . <<<"${artifact}")"
 
           # One open incident issue per persistent-red episode: reuse it
           # across every run that repeats the same failure signature instead
@@ -927,33 +994,48 @@ jobs:
           existing_issue_url="$(gh issue list \
             --state open \
             --label incident:develop-red \
+            --search "${incident_key} in:body" \
             --json url \
             --jq '.[0].url // ""')"
 
-          comment_body="Develop is still red with the same failure signature as the previous run (${PREVIOUS_RUN_URL}).
+          comment_body="Develop post-merge incident update.
 
           Failing SHA: \`${FAILING_SHA}\`
           Failing run: ${RUN_URL}
+          Classification: ${classification}
+          Action: ${ATTRIBUTION_ACTION:-advisory}
+          Owner: @${owner#@}
+          Next action: ${next_action}
 
-          No new revert PR was opened for this run because no new failure IDs were introduced."
+          Incident key: \`${incident_key}\`
+          Evidence artifact: \`${artifact_summary}\`"
 
           if [ -n "${existing_issue_url}" ]; then
             gh issue comment "${existing_issue_url}" --body "${comment_body}"
             echo "incident-issue-url=${existing_issue_url}" >> "${GITHUB_OUTPUT}"
-            echo "Commented on existing incident issue: ${existing_issue_url}"
+            echo "Updated existing incident issue: ${existing_issue_url}"
           else
             body_file="$(mktemp)"
             cat > "${body_file}" <<EOF
-          Develop went red and remains red across develop-post-merge runs with no new failure signature.
+          Develop post-merge attribution requires an owned action.
 
           Failing SHA: \`${FAILING_SHA}\`
           Failing run: ${RUN_URL}
           Previous run: ${PREVIOUS_RUN_URL}
 
-          No revert PR was opened for this run: the failure signature matches (or is a subset of) the previous run's, so reverting this merge would not fix develop. A human needs to investigate the persistent failure.
+          Classification: ${classification}
+          Action: ${ATTRIBUTION_ACTION:-advisory}
+          Owner: @${owner#@}
+          Next action: ${next_action}
+          Incident key: \`${incident_key}\`
+
+          Immutable evidence artifact:
+          \`\`\`json
+          ${artifact}
+          \`\`\`
           EOF
             issue_url="$(gh issue create \
-              --title "Develop is red: persistent post-merge failure" \
+              --title "Develop is red: ${classification} attribution required" \
               --body-file "${body_file}" \
               --label incident:develop-red)"
             echo "incident-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
@@ -989,6 +1071,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"
+          if [ -z "${current_target_sha}" ] || [ "${current_target_sha}" != "${MERGED_SHA}" ]; then
+            echo "Develop moved from ${MERGED_SHA} to ${current_target_sha:-missing}; leaving incidents and revert PRs open."
+            exit 0
+          fi
 
           comment_body="Closing: develop is green again at ${RUN_URL} (\`${MERGED_SHA:0:12}\`)."
 

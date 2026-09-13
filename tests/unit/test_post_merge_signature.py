@@ -19,8 +19,10 @@ if _SCRIPTS_DIR not in sys.path:
 from post_merge_signature import (  # noqa: E402
     SignatureError,
     attribution_action,
+    build_incident_artifact,
     build_signature_from_job_failure,
     build_signature_from_junit,
+    classify_attribution,
     diff_signatures,
     failure_id_test_paths,
     imported_module_paths,
@@ -499,8 +501,91 @@ def test_attribution_reverts_when_blamed_sha_touches_code_under_test() -> None:
     assert attribution_action(failure_ids, changed) == "revert"
 
 
-def test_attribution_reverts_job_level_failures() -> None:
-    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "revert"
+def test_attribution_keeps_unmappable_job_failures_as_advisory() -> None:
+    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "advisory"
+
+
+def _complete_attribution_evidence(**overrides: object) -> dict[str, object]:
+    evidence: dict[str, object] = {
+        "failing_sha": "failing-sha",
+        "current_target_sha": "failing-sha",
+        "failure_ids": ["tests/unit/test_ledger.py::test_seed"],
+        "predecessor_evidence": {"run_url": "https://example.test/runs/previous", "sha": "parent-sha"},
+        "source_inputs": {"published-results": "source-new"},
+        "predecessor_source_inputs": {"published-results": "source-old"},
+        "ownership_match": False,
+        "owner": "maintainer",
+    }
+    evidence.update(overrides)
+    return evidence
+
+
+def test_external_ref_drift_does_not_propose_unrelated_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence())
+
+    assert result["classification"] == "external-ref-drift"
+    assert result["action"] == "advisory"
+    assert "reconcile" in str(result["next_action"]).lower()
+
+
+def test_owned_same_subsystem_regression_still_proposes_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence(ownership_match=True))
+
+    assert result["classification"] == "code-regression"
+    assert result["action"] == "revert"
+
+
+def test_missing_evidence_is_unknown_and_keeps_develop_red() -> None:
+    result = classify_attribution({"failure_ids": ["lint:Run CI lint mirror"], "ownership_match": True})
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+    assert "keep develop red" in result["next_action"]
+
+
+def test_exact_commit_rerun_that_passes_is_transient() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(rerun={"conclusion": "success", "run_url": "https://example.test/rerun"})
+    )
+
+    assert result["classification"] == "environment/transient-failure"
+    assert result["action"] == "advisory"
+
+
+def test_target_moved_since_failure_is_stale_not_a_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence(current_target_sha="later-sha", ownership_match=True))
+
+    assert result["classification"] == "stale-run"
+    assert result["action"] == "advisory"
+
+
+def test_revert_that_introduces_another_failure_is_not_approved() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(ownership_match=True, proposed_revert={"introduced_failure": True})
+    )
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+
+
+def test_incident_artifact_captures_immutable_and_ownership_evidence() -> None:
+    evidence = _complete_attribution_evidence(
+        run_url="https://example.test/runs/current",
+        failing_pr={"number": 2073, "url": "https://example.test/pr/2073"},
+        jobs=[{"job": "fast-test", "failure_ids": ["tests/unit/test_ledger.py::test_seed"]}],
+    )
+    attribution = classify_attribution(evidence)
+    artifact = build_incident_artifact(evidence, attribution)
+
+    assert artifact["failing_commit"] == {"sha": "failing-sha", "run_url": "https://example.test/runs/current"}
+    assert artifact["failing_pr"]["number"] == 2073
+    assert artifact["jobs"][0]["job"] == "fast-test"
+    assert artifact["source_input_identities"] == {
+        "current": {"published-results": "source-new"},
+        "predecessor": {"published-results": "source-old"},
+    }
+    assert artifact["predecessor_evidence"]["sha"] == "parent-sha"
+    assert artifact["owner"] == "maintainer"
 
 
 # ---------------------------------------------------------------------------

@@ -281,3 +281,39 @@ def test_advisory_issue_creation_failure_is_loud() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
 
     assert '--body "${body}" || true' not in workflow
+
+
+def test_unproven_attribution_routes_to_owned_incident_without_revert() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'should_revert="false"' in workflow
+    assert "comparison-state=${comparison_state}" in workflow
+    assert "Classification: ${classification}" in workflow
+    assert "Incident key: \\`${incident_key}\\`" in workflow
+    assert '--search "${incident_key} in:body"' in workflow
+    assert "Fail loudly on unattributable failure classes" not in workflow
+
+
+def test_incident_artifact_contains_required_attribution_fields() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    for field in (
+        "failing_sha",
+        "current_target_sha",
+        "predecessor_source_inputs",
+        "predecessor_evidence",
+        "failing_pr",
+        "owner",
+        "next_action",
+    ):
+        assert field in workflow
+
+
+def test_revert_checks_live_target_and_inverse_diff_before_push() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'target_sha="$(git rev-parse --verify origin/develop || true)"' in workflow
+    assert 'git revert --no-commit "${FAILING_SHA}"' in workflow
+    assert "git diff --check" in workflow
+    assert "git diff --name-status" in workflow
+    assert 'current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"' in workflow
