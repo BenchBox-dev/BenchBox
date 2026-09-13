@@ -138,6 +138,10 @@ def verify(run: Path) -> tuple[dict, Path]:
     for name, expected in contract["inputs"].items():
         if sha(run / name) != expected:
             raise ValueError(f"frozen input changed: {name}")
+    frozen_fixtures = json.loads((run / "fixtures.json").read_text())
+    regenerated = json.loads(json.dumps({str(seed): rows(seed) for seed in SEEDS}))
+    if frozen_fixtures != regenerated:
+        raise ValueError("fixture regeneration drift")
     for name, expected in contract["code"].items():
         if sha(Path(__file__).parent / name) != expected:
             raise ValueError(f"frozen code changed: {name}; use a new run")

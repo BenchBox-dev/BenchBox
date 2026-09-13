@@ -94,6 +94,10 @@ def test_frozen_challenge_rejects_input_drift_and_overwrite(tmp_path, monkeypatc
     run = tmp_path / "challenge"
     runner.prepare(run, tmp_path / "training", 1)
     runner.verify(run)
+    with monkeypatch.context() as scoped:
+        scoped.setattr(runner, "rows", lambda seed: {})
+        with pytest.raises(ValueError, match="fixture regeneration drift"):
+            runner.verify(run)
     original_dependencies = runner.dependency_hashes()
     with monkeypatch.context() as scoped:
         scoped.setattr(runner, "dependency_hashes", lambda: dict(original_dependencies, dialect_utils="changed"))
