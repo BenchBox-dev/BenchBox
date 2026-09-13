@@ -46,7 +46,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "delta-spark": {"delta"},
     "pyspark": {"pyspark"},
     "polars": {"polars"},
-    "modin": {"modin"},
     "dask": {"dask", "distributed"},
     "datafusion": {"datafusion"},
     "pyarrow": {"pyarrow"},

@@ -627,7 +627,7 @@ class DryRunExecutor:
         Args:
             benchmark_config: Benchmark configuration
             benchmark_instance: Instantiated benchmark object
-            platform_type: Platform identifier (e.g., "polars", "pandas", "modin")
+            platform_type: Platform identifier (e.g., "polars", "pandas", "dask")
                           Used to determine which query family to extract.
 
         Returns:

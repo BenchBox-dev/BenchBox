@@ -207,7 +207,6 @@ class TestDataFrameQuery:
 
         # Should support all Pandas family
         assert query.supports_platform("pandas")
-        assert query.supports_platform("modin")
         assert query.supports_platform("cudf")
         assert query.supports_platform("vaex")
         assert query.supports_platform("dask")
@@ -233,7 +232,6 @@ class TestDataFrameQuery:
 
         # Should not support Pandas family (no impl)
         assert not query.supports_platform("pandas")
-        assert not query.supports_platform("modin")
 
     def test_get_impl_for_family(self):
         """Test get_impl_for_family method."""

@@ -46,7 +46,7 @@ dependencies = [
     "numpy>=1.24.0",
     # pandas is intentionally NOT a core dependency. It is an optional
     # engine/DataFrame dep (DataFrame mode, TPC-DI, ClickHouse-local) declared
-    # in the relevant extras (pandas, dataframe-pandas, tpcdi, modin, dask) and
+    # in the relevant extras (pandas, dataframe-pandas, tpcdi, dask) and
     # pulled transitively by chdb. All pandas uses on the import path are lazy;
     # the minimal-import-surface CI gate enforces this. See
     # docs/development/dependency-inventory.md (pandas = DataFrame/Benchmark).
@@ -145,7 +145,6 @@ all = [
     # DataFrame platforms
     "polars>=1.35.2",
     "dask[distributed]>=2024.1.0",
-    "modin[ray]>=0.32.0",
     "pyspark[connect]>=3.5.0",
 ]
 cloud = [
@@ -243,11 +242,6 @@ ai-primitives = [
 # Pandas family - string-based column access, eager evaluation
 pandas = ["pandas>=2.0.0"]
 dataframe-pandas = ["pandas>=2.0.0"]
-modin = ["modin[ray]>=0.32.0", "pandas>=2.0.0"]
-dataframe-modin = [
-    "modin[ray]>=0.32.0",
-    "pandas>=2.0.0",
-]
 dask = ["dask[distributed]>=2024.1.0", "pandas>=2.0.0"]
 dataframe-dask = [
     "dask[distributed]>=2024.1.0",
@@ -282,7 +276,6 @@ dataframe-datafusion = [
 # DataFrame family convenience groups
 dataframe-pandas-family = [
     "pandas>=2.0.0",
-    "modin[ray]>=0.32.0",
     "dask[distributed]>=2024.1.0",
     # cudf not included - requires NVIDIA GPU/CUDA, install separately
 ]
@@ -293,7 +286,6 @@ dataframe-expression-family = [
 ]
 dataframe-all = [
     "pandas>=2.0.0",
-    "modin[ray]>=0.32.0",
     "dask[distributed]>=2024.1.0",
     "polars>=1.35.2",
     "pyspark>=3.5.0",
@@ -779,7 +771,6 @@ ignore_rules = [
         "benchbox/platforms/dataframe/polars_df.py",
         "benchbox/platforms/dataframe/datafusion_df.py",
         "benchbox/platforms/dataframe/cudf_df.py",
-        "benchbox/platforms/dataframe/modin_df.py",
         "benchbox/platforms/dataframe/dask_df.py",
         "benchbox/platforms/dataframe/pyspark_df.py",
     ] },
@@ -844,7 +835,6 @@ ignore_rules = [
         "benchbox/platforms/dataframe/cudf_df.py",
         "benchbox/platforms/dataframe/dask_df.py",
         "benchbox/platforms/dataframe/datafusion_df.py",
-        "benchbox/platforms/dataframe/modin_df.py",
         "benchbox/platforms/dataframe/pandas_df.py",
         "benchbox/platforms/dataframe/polars_df.py",
         "benchbox/platforms/dataframe/expression_family.py",

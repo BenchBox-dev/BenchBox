@@ -245,14 +245,6 @@ class DataFrameTuningLoader:
                 dtype_backend="pyarrow",  # Better Dask integration
             )
 
-        elif platform_lower == "modin":
-            config.execution = ExecutionConfiguration(
-                engine_affinity="ray",  # Recommended backend
-            )
-            config.data_types = DataTypeConfiguration(
-                dtype_backend="numpy_nullable",
-            )
-
         elif platform_lower == "cudf":
             config.gpu = GPUConfiguration(
                 enabled=True,

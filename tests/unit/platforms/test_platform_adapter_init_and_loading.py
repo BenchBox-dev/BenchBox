@@ -61,12 +61,6 @@ class TestDataFrameInit:
         assert isinstance(POLARS_AVAILABLE, bool)
         assert isinstance(PANDAS_AVAILABLE, bool)
 
-    def test_optional_modin_export(self):
-        from benchbox.platforms.dataframe import MODIN_AVAILABLE, ModinDataFrameAdapter
-
-        assert isinstance(MODIN_AVAILABLE, bool)
-        assert ModinDataFrameAdapter is None or callable(ModinDataFrameAdapter)
-
     def test_optional_cudf_export(self):
         from benchbox.platforms.dataframe import CUDF_AVAILABLE, CuDFDataFrameAdapter
 
@@ -106,7 +100,6 @@ class TestDataFrameInit:
     @pytest.mark.parametrize(
         "module_name,flag_name,adapter_name",
         [
-            ("benchbox.platforms.dataframe.modin_df", "MODIN_AVAILABLE", "ModinDataFrameAdapter"),
             ("benchbox.platforms.dataframe.cudf_df", "CUDF_AVAILABLE", "CuDFDataFrameAdapter"),
             ("benchbox.platforms.dataframe.dask_df", "DASK_AVAILABLE", "DaskDataFrameAdapter"),
             ("benchbox.platforms.dataframe.datafusion_df", "DATAFUSION_DF_AVAILABLE", "DataFusionDataFrameAdapter"),

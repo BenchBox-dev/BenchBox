@@ -116,6 +116,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/main.py",
     "benchbox/cli/onboarding.py",
     "benchbox/cli/orchestrator.py",
+    # Removing Modin also removes its readiness alias and package/backend
+    # checks. The remaining readiness checks and Click surface are unchanged.
+    "benchbox/cli/platform_readiness.py",
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",

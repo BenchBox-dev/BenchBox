@@ -130,7 +130,6 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("pyspark-df") == "pyspark"
         assert normalize_platform_name("datafusion-df") == "datafusion"
         assert normalize_platform_name("dask-df") == "dask"
-        assert normalize_platform_name("modin-df") == "modin"
         assert normalize_platform_name("cudf-df") == "cudf"
         assert normalize_platform_name("lakesail-df") == "lakesail"
 

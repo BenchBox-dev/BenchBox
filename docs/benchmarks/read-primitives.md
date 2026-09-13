@@ -529,7 +529,6 @@ The Read Primitives benchmark provides **full DataFrame support** for both expre
 | **PySpark** | Expression | Full support | 149 queries |
 | **DataFusion** | Expression | Full support | 149 queries |
 | **Pandas** | Pandas | Full support | 149 queries |
-| **Modin** | Pandas | Full support | 149 queries |
 | **Dask** | Pandas | Full support | 149 queries |
 | **cuDF** | Pandas | Full support | 149 queries |
 

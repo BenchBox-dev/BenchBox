@@ -34,19 +34,14 @@ PLATFORM_CLI_FLAGS: dict[str, list[str]] = {
 }
 
 # Platform -> uv extra name (`uv run --extra X`).
-# modin[ray] and databend-driver are NOT in the default dev dependency-group
-# (pyproject.toml [dependency-groups] dev) -- only under [project.optional-
-# dependencies] -- so a plain `uv sync` never installs them (see
-# uat-operator-provisioning finding 1). "modin-df" is the matrix/CLI platform
-# key (see UAT_DATAFRAME_PLATFORM_BASES); the pyproject extra is named
-# "modin" (no -df suffix).
+# databend-driver is not in the default dev dependency group. It is only under
+# project optional dependencies, so a plain `uv sync` does not install it.
 PLATFORM_UV_EXTRA: dict[str, str] = {
     "clickhouse-local": "clickhouse-local",
     "clickhouse-server": "clickhouse-server",
     "lakesail": "lakesail",
     "singlestore": "singlestore",
     "influxdb": "influxdb",
-    "modin-df": "modin",
     "databend": "databend",
 }
 
@@ -83,7 +78,6 @@ SLOW_DOCKER_PLATFORMS: tuple[str, ...] = (
 UAT_DATAFRAME_PLATFORM_BASES: tuple[str, ...] = (
     "polars",
     "pandas",
-    "modin",
     "pyspark",
     "dask",
     "datafusion",

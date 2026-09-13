@@ -129,14 +129,14 @@ uv add benchbox --extra databricks
 
 ```bash
 # Check package availability plus local provisioning readiness
-benchbox platforms check clickhouse-server trino lakesail-df modin-df
+benchbox platforms check clickhouse-server trino lakesail-df dask-df
 
 # Inspect one platform, including endpoint/backend readiness notes
 benchbox platforms status lakesail-df
-benchbox platforms status modin-df
+benchbox platforms status dask-df
 ```
 
-`benchbox platforms check` reports local service ports, LakeSail Spark Connect, and Modin backend gaps as
+`benchbox platforms check` reports local service ports and LakeSail Spark Connect gaps as
 environment readiness issues. These checks are bounded probes only; they do not start servers, initialize Ray/Dask,
 or create/drop benchmark databases.
 

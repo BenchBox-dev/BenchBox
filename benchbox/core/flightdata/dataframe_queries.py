@@ -1,7 +1,7 @@
 """FlightData DataFrame queries for Expression and Pandas families.
 
 Implements all 20 FlightData OLAP queries for DataFrame execution on Polars,
-PySpark, DataFusion (expression family) and Pandas, Modin, Dask (pandas family).
+PySpark, DataFusion (expression family) and Pandas and Dask (pandas family).
 
 Queries cover 5 categories:
 - On-time performance (5 queries)
@@ -703,7 +703,7 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 # ===========================================================================
-# Pandas Family (Pandas, Modin, cuDF, Dask)
+# Pandas Family (Pandas, cuDF, Dask)
 # ===========================================================================
 
 

@@ -173,7 +173,6 @@ benchbox/platforms/
     ├── pyspark_df.py      #   PySpark DataFrame adapter
     ├── datafusion_df.py   #   DataFusion DataFrame adapter
     ├── cudf_df.py         #   cuDF DataFrame adapter
-    ├── modin_df.py        #   Modin DataFrame adapter
     ├── dask_df.py         #   Dask DataFrame adapter
     ├── lakesail_df.py     #   LakeSail DataFrame adapter
     ├── shared_loading.py  #   Shared data loading logic

@@ -337,7 +337,6 @@ def generate_database_filename(
         "polars-df": ".polars-df",
         "pandas-df": ".pandas-df",
         "cudf-df": ".cudf-df",
-        "modin-df": ".modin-df",
         "dask-df": ".dask-df",
         # Additional platform-specific entries
         "cudf": ".cudf",
@@ -359,7 +358,7 @@ def generate_database_filename(
 _KNOWN_EXTENSIONS = [
     ".duckdb", ".sqlite", ".chdb", ".datafusion",
     ".polars-df", ".polars", ".pandas-df", ".pandas",
-    ".cudf-df", ".cudf", ".modin-df", ".dask-df", ".spark",
+    ".cudf-df", ".cudf", ".dask-df", ".spark",
 ]  # fmt: skip
 
 _TUNING_KEYWORDS = {"notuning": "notuning", "tuned": "tuned", "custom": "custom"}

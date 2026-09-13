@@ -188,7 +188,7 @@ To add a new benchmark, create a new file in the `benchbox` directory and implem
 
 BenchBox uses a family-based architecture for DataFrame platforms. To add a new platform:
 
-1. **Determine the family**: Expression (Polars, PySpark) or Pandas (Pandas, Modin, cuDF)
+1. **Determine the family**: Expression (Polars, PySpark) or Pandas (Pandas and cuDF)
 2. **Implement DataFrameContext**: Provides table access and family-specific helpers
 3. **Implement platform adapter**: Handles data loading and query execution
 4. **Register the platform**: Add to `DATAFRAME_ADAPTERS` registry

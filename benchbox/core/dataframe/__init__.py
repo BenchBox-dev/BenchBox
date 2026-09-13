@@ -12,7 +12,7 @@ Architecture:
 
 Family-Based Design:
 Python dataframe libraries cluster into 2 syntactic families:
-1. Pandas-like: Pandas, Modin, cuDF, Vaex, Dask
+1. Pandas-like: Pandas, cuDF, Vaex, Dask
    - String-based column access: df['column']
    - Boolean indexing: df[df['col'] > 5]
    - Dict aggregation: .agg({'col': 'sum'})

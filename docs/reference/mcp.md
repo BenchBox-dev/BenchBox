@@ -291,13 +291,6 @@ modes remain available because they do not hold the request for execution.
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
 - Velox `deployment` is not exposed over MCP. Local execution is the only deployment MCP can fully describe; `remote` would require an operator-approved endpoint (`sc://`) and additional packaging/runtime controls that are not part of the MCP allow-list. Both `remote` and `docker` are rejected at admission, so a request can never redirect execution to an endpoint it did not name via a server-owned profile. `docker` is rejected: the `docker/velox/` tree is packaging infrastructure for local development, not a deployment mode with its own lifecycle, endpoint, isolation, and cleanup contract. See the omission ledger below.
-- Modin `engine` accepts only `ray` and `dask` over MCP. The adapter itself also
-  supports `unidist`, which stays documented for CLI and Python-API callers but
-  is deliberately outside the MCP surface while it is experimental. `pandas` is
-  rejected everywhere: it resembles a valid Modin engine name but is not a
-  supported BenchBox backend, and accepting it would create a public contract
-  that fails late. A pre-set `MODIN_ENGINE` still takes precedence, but it is
-  validated against the same reviewed set rather than trusted.
 - DuckDB `threads` is the public option name and maps to the adapter's
   `thread_limit`, which becomes a `SET threads` statement on the connection. The
   public name is unchanged; only the internal mapping is documented here.

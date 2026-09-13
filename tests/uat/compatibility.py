@@ -89,7 +89,7 @@ _DATAFRAME_TRANSACTIONAL_EVIDENCE = (
     "benchbox/platforms/dataframe/pyspark_maintenance.py PySpark Parquet capability profile"
 )
 
-_DATAFRAME_WRITE_MANAGER_UNSUPPORTED = frozenset({"dask-df", "datafusion-df", "modin-df"})
+_DATAFRAME_WRITE_MANAGER_UNSUPPORTED = frozenset({"dask-df", "datafusion-df"})
 _DATAFRAME_WRITE_MANAGER_REASON = (
     "Write primitives DataFrame mode is currently implemented only for Polars, Pandas, and PySpark managers; "
     "this UAT platform has no write manager for the benchmark."

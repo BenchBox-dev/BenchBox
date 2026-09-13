@@ -110,6 +110,16 @@ def _normalize_platform_name(platform: str) -> tuple[str, bool, Optional[str]]:
     return platform_lower, df_mode_implied, deployment_mode
 
 
+def _reject_removed_platform(platform: str) -> None:
+    """Raise a migration error for platform selectors removed from BenchBox."""
+    selector = platform.lower().strip().split(":", 1)[0]
+    if selector in {"modin", "modin-df"}:
+        raise ValueError(
+            "Platform 'modin' has been removed because no compatible Modin release is available. "
+            "Use 'pandas-df' for pandas-compatible execution or 'dask-df' for distributed DataFrames."
+        )
+
+
 def get_adapter(
     platform: str,
     mode: Optional[Literal["sql", "dataframe"]] = None,
@@ -146,6 +156,8 @@ def get_adapter(
         >>> adapter = get_adapter("clickhouse-server")  # Self-hosted ClickHouse
         >>> adapter = get_adapter("polars-df")  # Polars DataFrame mode
     """
+    _reject_removed_platform(platform)
+
     # ClickHouse migration: translate legacy selectors to first-class platform names.
     # Must happen before _normalize_platform_name so colon-suffix parsing is bypassed.
     resolved_platform, migration_warning = _resolve_clickhouse_legacy(platform)

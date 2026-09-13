@@ -94,12 +94,6 @@ class TestDataFramePlatforms:
         info = DATAFRAME_PLATFORMS["polars"]
         assert info.family == DataFrameFamily.EXPRESSION
 
-    def test_modin_registered(self):
-        """Test that Modin is in the registry."""
-        assert "modin" in DATAFRAME_PLATFORMS
-        info = DATAFRAME_PLATFORMS["modin"]
-        assert info.family == DataFrameFamily.PANDAS
-
     def test_dask_registered(self):
         """Test that Dask is in the registry."""
         assert "dask" in DATAFRAME_PLATFORMS

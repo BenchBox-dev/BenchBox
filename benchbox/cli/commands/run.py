@@ -1004,7 +1004,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
                 is_available = s.platform_manager.is_platform_available(s.platform_key)
         else:
             is_available = caps.supports_dataframe
-            if is_available and s.platform_key in ["polars", "pandas", "modin", "cudf", "dask"]:
+            if is_available and s.platform_key in ["polars", "pandas", "cudf", "dask"]:
                 df_platforms = list_available_dataframe_platforms()
                 legacy_key = f"{s.platform_key}-df"
                 is_available = df_platforms.get(legacy_key, df_platforms.get(s.platform_key, False))

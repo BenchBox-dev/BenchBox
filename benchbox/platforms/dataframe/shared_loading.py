@@ -179,18 +179,18 @@ def coerce_empty_string_columns(
 
     Shared coercion step for DataFrame libraries whose column objects share
     Pandas' ``.fillna()`` and per-column assignment semantics (Pandas, cuDF,
-    Dask, Modin). Delegates the empty-vs-null decision to
+    Dask). Delegates the empty-vs-null decision to
     :func:`resolve_empty_string_restore_columns` so all four adapters apply
     the identical guard and the identical restore action instead of each
     carrying its own copy.
 
     Column-by-column assignment (not a single ``df[cols] = ...`` batch
     assignment) is used because multi-column assignment support differs
-    across dask/modin/cudf/pandas; looping is the common denominator that
+    across dask/cudf/pandas; looping is the common denominator that
     behaves identically -- and produces the same final values -- on all four.
 
     Args:
-        df: The loaded DataFrame (Pandas/cuDF/Dask/Modin).
+        df: The loaded DataFrame (Pandas/cuDF/Dask).
         string_columns: Declared string/text columns for this table.
         null_marker: The resolved CSV dialect's null marker.
 

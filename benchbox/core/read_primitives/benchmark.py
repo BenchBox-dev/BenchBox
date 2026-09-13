@@ -634,7 +634,7 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
 
         Returns the QueryRegistry containing DataFrame implementations of
         Read Primitives queries for both expression-family (Polars, PySpark,
-        DataFusion) and pandas-family (Pandas, Modin, Dask) platforms.
+        DataFusion) and pandas-family (Pandas and Dask) platforms.
 
         Note: 13 optimizer queries are SQL-only and not included in the
         DataFrame registry, as they test SQL query planning behavior.

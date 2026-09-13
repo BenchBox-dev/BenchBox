@@ -121,7 +121,7 @@ benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 
 **Options for DataFrame mode:**
 
-- `--platform TEXT`: Target platform (`polars`, `pandas`, `dask`, `modin`, `cudf`)
+- `--platform TEXT`: Target platform (`polars`, `pandas`, `dask`, `cudf`)
 - `--mode [sql|dataframe|auto]`: Tuning mode (default: auto)
 - `--profile [default|optimized|streaming|memory-constrained|gpu]`: Configuration profile
 - `--output TEXT`: Output file path

@@ -184,18 +184,6 @@ class TestDataFusionValidation:
         assert not any(i.level == ValidationLevel.WARNING for i in issues)
 
 
-class TestModinValidation:
-    """Tests for Modin-specific validation."""
-
-    def test_invalid_engine_affinity_error(self):
-        """Test that invalid engine_affinity generates error."""
-        config = DataFrameTuningConfiguration(
-            execution=ExecutionConfiguration(engine_affinity="invalid_engine"),
-        )
-        issues = validate_dataframe_tuning(config, "modin")
-        assert any(i.level == ValidationLevel.ERROR for i in issues)
-
-
 class TestCuDFValidation:
     """Tests for cuDF-specific validation."""
 

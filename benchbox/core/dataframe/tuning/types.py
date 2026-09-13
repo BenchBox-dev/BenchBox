@@ -149,14 +149,6 @@ _PLATFORM_COMPATIBILITY: dict[str, set[DataFrameTuningType]] = {
         DataFrameTuningType.MEMORY_MAP,
         DataFrameTuningType.PRE_BUFFER,
     },
-    "modin": {
-        DataFrameTuningType.THREAD_COUNT,  # MODIN_CPUS
-        DataFrameTuningType.WORKER_COUNT,  # NPartitions
-        DataFrameTuningType.ENGINE_AFFINITY,  # ray/dask
-        DataFrameTuningType.DTYPE_BACKEND,
-        DataFrameTuningType.STRING_CACHE,
-        DataFrameTuningType.MEMORY_MAP,
-    },
     "cudf": {
         DataFrameTuningType.STRING_CACHE,
         DataFrameTuningType.GPU_DEVICE,

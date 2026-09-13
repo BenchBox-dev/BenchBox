@@ -238,62 +238,6 @@ class TestCuDFDataFrameE2E:
 
 
 # ============================================================================
-# Modin DataFrame E2E Tests
-# ============================================================================
-
-
-class TestModinDataFrameE2E:
-    """E2E tests for Modin DataFrame platform."""
-
-    @pytest.mark.e2e
-    @pytest.mark.e2e_dataframe
-    @pytest.mark.slow
-    @pytest.mark.stress
-    def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with Modin DataFrame at SF 0.01."""
-        if not is_dataframe_available("modin-df"):
-            pytest.skip("Modin not available")
-
-        config = {
-            "platform": "modin-df",
-            "benchmark": "tpch",
-            "scale": "0.01",
-        }
-
-        result = run_benchmark(config, timeout=E2E_BENCHMARK_TIMEOUT)
-
-        assert result.returncode == 0, f"CLI failed with:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-
-    @pytest.mark.e2e
-    @pytest.mark.e2e_dataframe
-    @pytest.mark.e2e_quick
-    def test_dry_run_generates_artifacts(self, tmp_path: Path) -> None:
-        """Test dry-run mode generates expected artifacts."""
-        if not is_dataframe_available("modin-df"):
-            pytest.skip("Modin not available")
-
-        output_dir = tmp_path / "dry_run"
-        output_dir.mkdir()
-
-        result = run_cli_command(
-            [
-                "run",
-                "--platform",
-                "modin-df",
-                "--benchmark",
-                "tpch",
-                "--scale",
-                "0.01",
-                "--dry-run",
-                str(output_dir),
-            ]
-        )
-
-        assert result.returncode == 0, f"Dry run failed: {result.stdout}"
-        assert "Dry run completed" in result.stdout
-
-
-# ============================================================================
 # DataFusion DataFrame E2E Tests
 # ============================================================================
 

@@ -166,7 +166,6 @@ class TestDatabaseNameGeneration:
             "polars-df": ".polars-df",
             "pandas-df": ".pandas-df",
             "cudf-df": ".cudf-df",
-            "modin-df": ".modin-df",
             "dask-df": ".dask-df",
             "cudf": ".cudf",
             "spark": ".spark",

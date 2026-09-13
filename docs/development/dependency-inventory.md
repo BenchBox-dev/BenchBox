@@ -157,8 +157,7 @@ or declaration appears unused.
 | `google-cloud-storage` | CS | `benchbox/platforms/base/cloud_spark/staging.py`, `benchbox/platforms/bigquery.py` | 7 | KEEP |
 | `influxdb3-python` | SQL | `benchbox/platforms/influxdb/_dependencies.py` | 1 | KEEP |
 | `mcp` | MCP | `benchbox/mcp/**`, tests | 18 | KEEP |
-| `modin` | DF | `benchbox/platforms/dataframe/modin_df.py` | 2 | KEEP |
-| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP (extras only) - removed from core deps; supplied by `extras:{pandas,dataframe-pandas,tpcdi,modin,dask}` and transitively by `chdb`. See finding F7. |
+| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP (extras only) - removed from core deps; supplied by `extras:{pandas,dataframe-pandas,tpcdi,dask}` and transitively by `chdb`. See finding F7. |
 | `polars` | DF | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, tests | 60 | KEEP |
 | `presto-python-client` | SQL | `benchbox/platforms/presto.py` | 2 | KEEP |
 | `psycopg2-binary` | SQL | `benchbox/platforms/pg_*.py`, `scripts/`, tests | 18 | KEEP |
@@ -314,7 +313,7 @@ or declaration appears unused.
     converted latent top-level pandas imports in `joinorder`, `ssb`, and
     `joinorder_synthetic` dataframe_queries to in-function imports.
   - Removed `pandas>=2.0.0` from core deps. It remains in
-    `extras:{pandas,dataframe-pandas,tpcdi,modin,dask,all}` and is pulled
+    `extras:{pandas,dataframe-pandas,tpcdi,dask,all}` and is pulled
     transitively by `chdb`, so DataFrame mode, TPC-DI, and ClickHouse-local
     runs are unaffected.
 - **Import-surface audit (post-fix):** heavy modules still eagerly imported on
@@ -349,7 +348,6 @@ declaration exists. Each is classified below.
 | `importlib_metadata` | first-party alias | Not a third-party package - `benchbox/utils/format_converters/vortex_converter.py:11` and `benchbox/utils/runtime_env.py:24` use `from importlib import metadata as importlib_metadata` (stdlib aliased). False positive. |
 | `influxdb3` | guarded optional | Alternate InfluxDB client; guarded fallback in `benchbox/platforms/influxdb/_dependencies.py`. |
 | `pysail` | guarded optional | LakeSail Spark distribution; guarded import in `benchbox/platforms/lakesail.py`. |
-| `ray` | extras-included | Pulled in via `modin[ray]`; explicit `import ray` in modin paths is fine. |
 | `sentence_transformers`, `spacy`, `textblob`, `torch` | declared (extras) | NLP / ML stacks for `benchbox/core/ai_primitives/`. All guarded behind `try/except`. Now declared in `extras:ai-primitives` as `sentence-transformers>=2.0.0`, `torch>=2.0.0`, `textblob>=0.17.0`, `spacy>=3.0.0`. |
 | `urllib3` | transitive-reach | Pulled in by `requests`. Safe. |
 | `pygments_cobalt2` | first-party | Lives at `docs/_static/pygments_cobalt2.py`. Not a third-party package. |
@@ -366,7 +364,7 @@ declaration exists. Each is classified below.
 ## Consolidation proposals (no action required by this audit)
 
 1. **`dataframe-*` aliases.** The plain-name extras (`pandas`, `polars`,
-   `modin`, `dask`, `pyspark`, `cudf`) duplicate the `dataframe-*` extras
+   `dask`, `pyspark`, `cudf`) duplicate the `dataframe-*` extras
    one-to-one. Cleanup is a breaking rename and is explicitly *deferred*
    per this TODO's `deferred[]`. Surfacing here for traceability.
 2. **`databricks-connect` extras alias.** Marked deprecated in
