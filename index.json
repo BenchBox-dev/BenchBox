@@ -15159,6 +15159,13 @@
       "status": "open",
       "title": "Publish the tiny SQL translation feasibility verdict"
     },
+    "sql-transpiler-comparison-evidence": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Preserve and refresh SQLGlot versus Polyglot execution evidence"
+    },
     "sqlglot-dialect-translation-code-review-implementation": {
       "claim": null,
       "needs": [],

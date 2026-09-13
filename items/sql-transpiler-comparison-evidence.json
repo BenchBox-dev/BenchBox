@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "Record versions, revisions, commands, fixtures and comparators; reconcile scripts against recovered logs and label historical-only evidence.",
+    "Replay known-good and known-problem queries with actual wrapper read/identify options. Separate errors, silent wrong results, repairs and regressions.",
+    "Measure cold start and warm median/p95 identically; verify compiled import paths. No production changes or raw logs in Git."
+  ],
+  "context": "Historical artifacts: /tmp/sqlglot-polyglot-catalog-verified.log and /tmp/sqlglot-compiled-arm.log. Historical synthetic median ~23us Polyglot versus43us compiled SQLGlot, not fresh measurement. Fresh review used Polyglot0.9.2/SQLGlot30.18.0/DuckDB1.5.5. Both fail binary DATE+INTERVAL to SQLite; Polyglot ORDER BY ALL quotes ALL and can silently misorder SQLite results.",
+  "description": "Recover reproducible research artifacts from the earlier SQLGlot Python, compiled SQLGlot and Polyglot comparison; retain the BenchBox wrapper baseline. Extend _project/sqlglot-upstream/repros rather than create a production service.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2111",
+    "https://github.com/tobilg/polyglot",
+    "https://github.com/tobymao/sqlglot/pull/8352"
+  ]
+}
