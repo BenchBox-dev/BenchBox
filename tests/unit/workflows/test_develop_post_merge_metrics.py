@@ -320,6 +320,20 @@ def test_missing_current_signature_uses_incident_fallback_and_cannot_revert() ->
     )
 
 
+def test_persistent_incident_fallback_uses_current_combined_signature() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    upsert_block = workflow.split("id: upsert-incident", 1)[1].split("green-run-cleanup:", 1)[0]
+
+    assert "current-combined.json" in upsert_block
+    assert 'current_failure_ids_json="$(jq -c' in upsert_block
+    assert 'current_incident_key="$(printf' in upsert_block
+    assert 'COMPARISON_STATE}" = "persistent"' in upsert_block
+    assert "failure_ids: ($signature.failure_ids // [])" in upsert_block
+    assert "jobs: ($signature.jobs // [])" in upsert_block
+    assert "source_input_identities: {current: ($signature.source_inputs // {})" in upsert_block
+    assert "NEW_FAILURE_IDS" not in upsert_block
+
+
 def test_incident_artifact_contains_required_attribution_fields() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
 

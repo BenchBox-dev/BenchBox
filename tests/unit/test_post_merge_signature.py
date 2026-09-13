@@ -543,6 +543,13 @@ def test_external_ref_drift_does_not_propose_unrelated_revert() -> None:
     assert "reconcile" in str(result["next_action"]).lower()
 
 
+def test_missing_predecessor_source_identity_is_unknown_not_external_drift() -> None:
+    result = classify_attribution(_complete_attribution_evidence(predecessor_source_inputs={}))
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+
+
 def test_owned_same_subsystem_regression_still_proposes_revert() -> None:
     result = classify_attribution(_complete_attribution_evidence(ownership_match=True))
 
@@ -680,6 +687,15 @@ def test_incident_key_is_stable_for_reordered_duplicate_failure_ids() -> None:
     second = classify_attribution(_complete_attribution_evidence(failure_ids=["a", "b"]))
 
     assert first["incident_key"] == second["incident_key"]
+
+
+def test_incident_key_reuses_repeated_signature_and_separates_distinct_signature() -> None:
+    first = incident_key(["tests/unit/test_ledger.py::test_seed"])
+    repeated = incident_key(["tests/unit/test_ledger.py::test_seed"])
+    distinct = incident_key(["tests/unit/test_ledger.py::test_other"])
+
+    assert first == repeated
+    assert first != distinct
 
 
 # ---------------------------------------------------------------------------

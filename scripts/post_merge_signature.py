@@ -370,7 +370,10 @@ def incident_key(failure_ids: list[object]) -> str:
 def _source_inputs_changed(evidence: dict[str, object]) -> bool:
     current = evidence.get("source_inputs")
     predecessor = evidence.get("predecessor_source_inputs")
-    return isinstance(current, dict) and isinstance(predecessor, dict) and current != predecessor
+    if not isinstance(current, dict) or not isinstance(predecessor, dict):
+        return False
+    shared_keys = current.keys() & predecessor.keys()
+    return any(current[key] != predecessor[key] for key in shared_keys)
 
 
 def classify_attribution(evidence: dict[str, object]) -> dict[str, object]:

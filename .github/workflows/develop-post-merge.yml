@@ -984,7 +984,7 @@ jobs:
         shell: bash
         env:
           PREVIOUS_RUN_URL: ${{ steps.signature-decision.outputs.previous-run-url }}
-          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+          COMPARISON_STATE: ${{ steps.signature-decision.outputs.comparison-state }}
           ATTRIBUTION_ACTION: ${{ steps.attribute.outputs.action }}
           INCIDENT_KEY: ${{ steps.attribute.outputs.incident-key }}
           ATTRIBUTION_ARTIFACT: ${{ steps.attribute.outputs.incident-artifact }}
@@ -995,9 +995,21 @@ jobs:
             --description "Develop post-merge failure requiring an owned action" \
             --color B60205 >/dev/null 2>&1 || true
 
+          empty_signature='{"failure_ids":[],"jobs":[],"source_inputs":{}}'
+          current_signature="${empty_signature}"
+          if [ -f current-combined.json ]; then
+            if ! current_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' current-combined.json 2>/dev/null)"; then
+              echo "Current combined signature is missing or malformed; using the empty signature for the incident fallback."
+              current_signature="${empty_signature}"
+            fi
+          else
+            echo "Current combined signature is unavailable; using the empty signature for the incident fallback."
+          fi
+          current_failure_ids_json="$(jq -c '[.failure_ids[] | tostring] | unique | sort' <<<"${current_signature}")"
+          current_incident_key="$(printf '%s' "${current_failure_ids_json}" | sha256sum | cut -c1-16)"
           incident_key="${INCIDENT_KEY}"
-          if [ -z "${incident_key}" ]; then
-            incident_key="$(printf '%s' "${NEW_FAILURE_IDS:-persistent:${FAILING_SHA}}" | sha256sum | cut -c1-16)"
+          if [ "${COMPARISON_STATE}" = "persistent" ] || [ -z "${incident_key}" ]; then
+            incident_key="${current_incident_key}"
           fi
           artifact="${ATTRIBUTION_ARTIFACT}"
           if [ -z "${artifact}" ]; then
@@ -1006,8 +1018,8 @@ jobs:
               --arg sha "${FAILING_SHA}" \
               --arg run "${RUN_URL}" \
               --arg prev "${PREVIOUS_RUN_URL}" \
-              --arg ids "${NEW_FAILURE_IDS:-[]}" \
-              '{schema_version: 2, incident_key: $key, failing_commit: {sha: $sha, run_url: $run}, failing_pr: {}, failure_ids: ($ids | fromjson? // []), jobs: [], test_ids: [], source_input_identities: {current: {}, predecessor: {}}, predecessor_evidence: {run_url: $prev}, ownership_match: false, classification: "persistent-failure", action: "advisory", next_action: "Investigate the existing red incident; no new revert is needed.", owner: "BenchBox-dev", reasons: ["signature comparison found no new failure IDs"]}')"
+              --argjson signature "${current_signature}" \
+              '{schema_version: 2, incident_key: $key, failing_commit: {sha: $sha, run_url: $run}, failing_pr: {}, failure_ids: ($signature.failure_ids // []), jobs: ($signature.jobs // []), test_ids: ($signature.failure_ids // []), source_input_identities: {current: ($signature.source_inputs // {}), predecessor: {}}, predecessor_evidence: {run_url: $prev}, ownership_match: false, classification: "persistent-failure", action: "advisory", next_action: "Investigate the existing red incident; no new revert is needed.", owner: "BenchBox-dev", reasons: ["incident fallback uses the current combined failure signature"]}')"
           fi
           owner="$(jq -r '.owner // "BenchBox-dev"' <<<"${artifact}")"
           classification="$(jq -r '.classification // "unknown"' <<<"${artifact}")"
