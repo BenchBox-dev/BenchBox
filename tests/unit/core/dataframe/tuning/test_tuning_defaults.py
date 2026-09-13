@@ -170,14 +170,6 @@ class TestGetSmartDefaults:
         assert config.parallelism.threads_per_worker is not None
         assert config.memory.memory_limit is not None
 
-    def test_modin_defaults(self):
-        """Test Modin-specific defaults."""
-        profile = SystemProfile(cpu_cores=8, available_memory_gb=16.0)
-        config = get_smart_defaults("modin", profile)
-
-        # Should default to ray engine
-        assert config.execution.engine_affinity == "ray"
-
     def test_cudf_defaults(self):
         """Test cuDF-specific defaults."""
         profile = SystemProfile(

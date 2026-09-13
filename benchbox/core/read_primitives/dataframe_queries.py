@@ -2,7 +2,7 @@
 
 This module provides DataFrame implementations of Read Primitives benchmark queries
 that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas, Modin, Dask) platforms.
+Pandas-like (Pandas and Dask) platforms.
 
 Read Primitives is a microbenchmark testing isolated database operations using
 the TPC-H schema. Unlike full TPC-H queries, these focus on single operations
@@ -142,7 +142,7 @@ SKIP_FOR_DATAFRAME = [
 # NOTE: EXPRESSION_FAMILY_ONLY list has been removed.
 #
 # All queries now support both expression-family (Polars, PySpark, DataFusion)
-# and pandas-family (Pandas, Modin, cuDF, Dask) implementations.
+# and pandas-family (Pandas, cuDF, Dask) implementations.
 #
 # Queries previously in this list have valid pandas-family implementations:
 # - QUALIFY queries: Use window + filter pattern (add window col, then filter)
@@ -1038,7 +1038,7 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count fallback for the pandas family.
 
     Dask uses native `nunique_approx()` (HLL) for this single-value
-    query. Pandas, Modin, and cuDF expose only exact `.nunique()` at
+    query. Pandas and cuDF expose only exact `.nunique()` at
     the API surface, so the "approximate" label degrades to exact on
     those platforms.
     """
@@ -1052,7 +1052,7 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
 def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count groupby fallback for the pandas family.
 
-    Pandas, Modin, cuDF, and current Dask expose no groupby approximate
+    Pandas and cuDF, and current Dask expose no groupby approximate
     distinct aggregate matching this query shape. Dask has Series-level
     `nunique_approx()`, but no groupby equivalent in the dask-expr API,
     so this query remains an exact fallback for the pandas family.

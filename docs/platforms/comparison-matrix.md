@@ -11,7 +11,7 @@ BenchBox supports platforms across registry categories and editorial documentati
 
 <!-- benchbox-registry-counts:start -->
 
-Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=17, deprecated=1.
+Platform registry: **50** metadata entries; **46** SQL-capable; **18** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=16, deprecated=1.
 
 <!-- benchbox-registry-counts:end -->
 
@@ -517,13 +517,13 @@ Native DataFrame API libraries for programmatic data manipulation.
 
 ### Pandas Family (Eager/Lazy)
 
-| Feature               | Pandas          | Modin            | Dask         | cuDF             |
-| --------------------- | --------------- | ---------------- | ------------ | ---------------- |
-| **CLI Name**          | `pandas-df`     | `modin-df`       | `dask-df`    | `cudf-df`        |
-| **Execution**         | Eager           | Eager            | Lazy         | Eager            |
-| **Parallelism**       | Single-threaded | Ray/Dask         | Distributed  | GPU              |
-| **API Compatibility** | Reference       | Drop-in          | Near drop-in | Near drop-in     |
-| **Best For**          | Small datasets  | Pandas scale-out | Distributed  | GPU acceleration |
+| Feature               | Pandas          | Dask         | cuDF             |
+| --------------------- | --------------- | ------------ | ---------------- |
+| **CLI Name**          | `pandas-df`     | `dask-df`    | `cudf-df`        |
+| **Execution**         | Eager           | Lazy         | Eager            |
+| **Parallelism**       | Single-threaded | Distributed  | GPU              |
+| **API Compatibility** | Reference       | Near drop-in | Near drop-in     |
+| **Best For**          | Small datasets  | Distributed  | GPU acceleration |
 
 ### Performance Characteristics
 
@@ -536,7 +536,6 @@ Native DataFrame API libraries for programmatic data manipulation.
 | **Snowpark Connect** | Medium        | High       | Snowflake-managed | 1000+  |
 | **LakeSail**         | Low           | Very High  | Efficient         | 100+   |
 | **Pandas**           | Low           | Medium     | High              | 10     |
-| **Modin**            | Low-Medium    | High       | Distributed       | 100    |
 | **Dask**             | Medium        | High       | Distributed       | 1000+  |
 | **cuDF**             | Very Low      | Very High  | GPU VRAM          | 50     |
 
@@ -569,7 +568,6 @@ uv add pyspark pyarrow
 
 # Pandas Family
 uv add pandas                    # Pandas DataFrame
-uv add modin[ray]                # Modin (with Ray backend)
 uv add dask[distributed]         # Dask DataFrame
 
 # cuDF (GPU - requires NVIDIA GPU, Linux only)
@@ -778,7 +776,7 @@ benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 
 ### DataFrame
 - **Expression Family**: Polars (single-node), PySpark (distributed), DataFusion (Arrow-native), Databricks (managed), Snowpark Connect (Snowflake-native), LakeSail (Rust/DataFusion via Spark Connect)
-- **Pandas Family**: Pandas (reference), Modin (parallel), Dask (distributed), cuDF (GPU-accelerated)
+- **Pandas Family**: Pandas (reference), Dask (distributed), cuDF (GPU-accelerated)
 
 ---
 

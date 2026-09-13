@@ -46,7 +46,7 @@ Registry-backed count claims are checked by unit tests so README and platform do
 
 <!-- benchbox-registry-counts:start -->
 
-- Platform registry: **51** metadata entries; **46** SQL-capable; **19** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=17, deprecated=1.
+- Platform registry: **50** metadata entries; **46** SQL-capable; **18** DataFrame-capable; **14** dual-mode; support status counts: stable=5, beta=28, experimental=16, deprecated=1.
 - Benchmark registry: **23** metadata entries; **22** public discovery entries.
 
 <!-- benchbox-registry-counts:end -->
@@ -173,7 +173,7 @@ Same benchmark, same scale factor, different execution paradigm.
 - **DataFrame platforms**: same registry labels. *unproven* has the same corpus meaning as above.
   - **stable**: DataFusion, Polars; *unproven*: Pandas
   - **beta**: PySpark; *unproven*: Dask, Databricks SQL
-  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, AWS Glue, Azure Synapse Analytics Spark, cuDF, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Modin, Onehouse Quanton, Snowpark Connect for Spark
+  - **experimental**: LakeSail Sail; *unproven*: Amazon Athena for Apache Spark, Amazon EMR Serverless, AWS Glue, Azure Synapse Analytics Spark, cuDF, Databricks DataFrame, Google Cloud Dataproc, Google Cloud Dataproc Serverless, Microsoft Fabric Spark, Onehouse Quanton, Snowpark Connect for Spark
 - **Open Table Formats**: Delta Lake, Apache Iceberg, Apache Hudi (via Databricks, Quanton, Trino, Spark platforms)
 - **SQL Translation**: Automatic query conversion between SQL dialects
 - **Self-Contained Python Package**: Core install requires no external database servers or system dependencies; opt-in to extra package installs for cloud platforms when needed.

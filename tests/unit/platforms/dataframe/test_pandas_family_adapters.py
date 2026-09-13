@@ -1,6 +1,6 @@
 """Unit tests for Pandas Family DataFrame adapters.
 
-Tests for Modin, cuDF, and Dask DataFrame adapters that extend PandasFamilyAdapter.
+Tests for cuDF and Dask DataFrame adapters that extend PandasFamilyAdapter.
 These tests focus on platform registration and factory functions since the actual
 adapters require their respective libraries to be installed.
 
@@ -16,7 +16,6 @@ import pytest
 from benchbox.platforms import (
     CUDF_AVAILABLE,
     DASK_AVAILABLE,
-    MODIN_AVAILABLE,
     get_dataframe_requirements,
     is_dataframe_platform,
     list_available_dataframe_platforms,
@@ -36,10 +35,6 @@ pytestmark = [
 class TestPandasFamilyPlatformRegistration:
     """Tests for Pandas family platform registration."""
 
-    def test_modin_df_is_dataframe_platform(self):
-        """Test that modin-df is recognized as a DataFrame platform."""
-        assert is_dataframe_platform("modin-df") is True
-
     def test_cudf_df_is_dataframe_platform(self):
         """Test that cudf-df is recognized as a DataFrame platform."""
         assert is_dataframe_platform("cudf-df") is True
@@ -50,8 +45,6 @@ class TestPandasFamilyPlatformRegistration:
 
     def test_case_insensitive_platform_check(self):
         """Test that platform checks are case-insensitive."""
-        assert is_dataframe_platform("MODIN-DF") is True
-        assert is_dataframe_platform("Modin-Df") is True
         assert is_dataframe_platform("CUDF-DF") is True
         assert is_dataframe_platform("CuDF-Df") is True
         assert is_dataframe_platform("DASK-DF") is True
@@ -60,13 +53,6 @@ class TestPandasFamilyPlatformRegistration:
 
 class TestPandasFamilyPlatformListing:
     """Tests for listing Pandas family platforms."""
-
-    def test_list_includes_modin_df(self):
-        """Test that modin-df is included in platform list."""
-        platforms = list_available_dataframe_platforms()
-
-        assert "modin-df" in platforms
-        assert platforms["modin-df"] == MODIN_AVAILABLE
 
     def test_list_includes_cudf_df(self):
         """Test that cudf-df is included in platform list."""
@@ -90,7 +76,6 @@ class TestPandasFamilyPlatformListing:
         expected = {
             "polars-df",
             "pandas-df",
-            "modin-df",
             "cudf-df",
             "dask-df",
             "datafusion-df",
@@ -102,18 +87,6 @@ class TestPandasFamilyPlatformListing:
 
 class TestPandasFamilyRequirements:
     """Tests for Pandas family platform requirements."""
-
-    def test_modin_df_requirements_contain_modin(self):
-        """Test that modin-df requirements mention modin."""
-        req = get_dataframe_requirements("modin-df")
-
-        assert "modin" in req.lower()
-
-    def test_modin_df_requirements_mention_engine(self):
-        """Test that modin-df requirements mention ray or dask."""
-        req = get_dataframe_requirements("modin-df")
-
-        assert "ray" in req.lower() or "dask" in req.lower()
 
     def test_cudf_df_requirements_contain_cudf(self):
         """Test that cudf-df requirements mention cudf."""
@@ -147,28 +120,6 @@ class TestPandasFamilyRequirements:
 
 class TestPandasFamilyPlatformHooks:
     """Tests for platform hook registration of new adapters."""
-
-    def test_modin_df_engine_option_registered(self):
-        """Test that modin-df engine option is registered."""
-        from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-        if MODIN_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("modin")
-            assert "engine" in specs
-        else:
-            # If modin not available, verify platform exists but may have no options
-            pass
-
-    def test_modin_df_engine_choices(self):
-        """Test that modin-df engine has correct choices."""
-        from benchbox.cli.platform_hooks import PlatformHookRegistry
-
-        if MODIN_AVAILABLE:
-            specs = PlatformHookRegistry.list_option_specs("modin")
-            engine_spec = specs.get("engine")
-            if engine_spec and hasattr(engine_spec, "choices"):
-                assert "ray" in engine_spec.choices
-                assert "dask" in engine_spec.choices
 
     def test_cudf_df_device_id_option_registered(self):
         """Test that cudf-df device_id option is registered."""
@@ -234,19 +185,6 @@ class TestPandasFamilyFactory:
         with pytest.raises(ValueError, match="Unknown DataFrame platform"):
             get_dataframe_adapter("unknown-df")
 
-    def test_modin_df_in_factory_mapping(self):
-        """Test that modin-df is in the factory mapping."""
-        from benchbox.platforms import get_dataframe_adapter
-
-        # If modin is not available, this should raise ImportError
-        if not MODIN_AVAILABLE:
-            with pytest.raises(ImportError, match="[Mm]odin"):
-                get_dataframe_adapter("modin-df")
-        else:
-            # If available, should create adapter successfully
-            adapter = get_dataframe_adapter("modin-df")
-            assert adapter is not None
-
     def test_cudf_df_in_factory_mapping(self):
         """Test that cudf-df is in the factory mapping."""
         from benchbox.platforms import get_dataframe_adapter
@@ -278,12 +216,6 @@ class TestPandasFamilyFactory:
 class TestAdapterModuleAvailability:
     """Tests for adapter module availability flags."""
 
-    def test_modin_available_flag_is_boolean(self):
-        """Test that MODIN_AVAILABLE is a boolean."""
-        from benchbox.platforms.dataframe import MODIN_AVAILABLE as available
-
-        assert isinstance(available, bool)
-
     def test_cudf_available_flag_is_boolean(self):
         """Test that CUDF_AVAILABLE is a boolean."""
         from benchbox.platforms.dataframe import CUDF_AVAILABLE as available
@@ -295,22 +227,6 @@ class TestAdapterModuleAvailability:
         from benchbox.platforms.dataframe import DASK_AVAILABLE as available
 
         assert isinstance(available, bool)
-
-    def test_modin_adapter_class_import(self):
-        """Test that ModinDataFrameAdapter can be imported."""
-        from benchbox.platforms.dataframe import ModinDataFrameAdapter
-
-        # The class is always importable; instantiation requires the library
-        if MODIN_AVAILABLE:
-            assert ModinDataFrameAdapter is not None
-            # Should be able to instantiate
-            adapter = ModinDataFrameAdapter()
-            assert adapter.platform_name == "Modin"
-        else:
-            # Class exists but instantiation fails
-            assert ModinDataFrameAdapter is not None
-            with pytest.raises(ImportError):
-                ModinDataFrameAdapter()
 
     def test_cudf_adapter_class_import(self):
         """Test that CuDFDataFrameAdapter can be imported."""
@@ -349,13 +265,6 @@ class TestAdapterModuleAvailability:
 class TestModuleExports:
     """Tests for module __all__ exports."""
 
-    def test_platforms_init_exports_modin_adapter(self):
-        """Test that platforms __init__ exports ModinDataFrameAdapter."""
-        from benchbox import platforms
-
-        assert hasattr(platforms, "ModinDataFrameAdapter")
-        assert hasattr(platforms, "MODIN_AVAILABLE")
-
     def test_platforms_init_exports_cudf_adapter(self):
         """Test that platforms __init__ exports CuDFDataFrameAdapter."""
         from benchbox import platforms
@@ -369,13 +278,6 @@ class TestModuleExports:
 
         assert hasattr(platforms, "DaskDataFrameAdapter")
         assert hasattr(platforms, "DASK_AVAILABLE")
-
-    def test_dataframe_init_exports_modin_adapter(self):
-        """Test that dataframe __init__ exports ModinDataFrameAdapter."""
-        from benchbox.platforms import dataframe
-
-        assert hasattr(dataframe, "ModinDataFrameAdapter")
-        assert hasattr(dataframe, "MODIN_AVAILABLE")
 
     def test_dataframe_init_exports_cudf_adapter(self):
         """Test that dataframe __init__ exports CuDFDataFrameAdapter."""

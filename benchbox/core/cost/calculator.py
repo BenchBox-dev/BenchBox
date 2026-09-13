@@ -130,8 +130,6 @@ class CostCalculator:
             "pandas-df",
             "cudf",
             "cudf-df",
-            "modin",
-            "modin-df",
             "dask",
             "dask-df",
             "pyspark-df",

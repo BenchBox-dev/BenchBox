@@ -134,13 +134,6 @@ PLATFORM_CAPABILITIES: dict[str, PlatformCapability] = {
         supports_distributed=True,
         memory_notes="Distributed execution, configurable memory management",
     ),
-    "modin-df": PlatformCapability(
-        platform_name="modin-df",
-        family="pandas",
-        category=PlatformCategory.DISTRIBUTED,
-        supports_distributed=True,
-        memory_notes="Pandas API with Ray/Dask backend for multi-core execution",
-    ),
     "cudf-df": PlatformCapability(
         platform_name="cudf-df",
         family="pandas",

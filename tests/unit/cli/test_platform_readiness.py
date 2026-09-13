@@ -14,7 +14,6 @@ pytestmark = [
 
 def test_dataframe_aliases_normalize_to_registry_platforms():
     assert readiness.normalize_readiness_platform("lakesail-df") == "lakesail"
-    assert readiness.normalize_readiness_platform("modin-df") == "modin"
     assert readiness.normalize_readiness_platform("datafusion-df") == "datafusion"
 
 
@@ -147,47 +146,3 @@ def test_lakesail_reachable_endpoint_is_ready(monkeypatch):
     assert all(result.ready for result in results)
     assert results[1].check == "spark_connect_endpoint"
     assert results[1].endpoint == "sc://sail-host:50052"
-
-
-def test_modin_missing_package_is_environment_skip(monkeypatch):
-    monkeypatch.setattr(readiness, "_module_available", lambda name: False)
-
-    result = readiness.check_platform_readiness("modin-df")[0]
-
-    assert result.status == "environment_skip"
-    assert result.check == "modin_package"
-    assert "uv add benchbox --extra modin" in result.remediation
-
-
-def test_modin_missing_selected_backend_is_environment_skip(monkeypatch):
-    monkeypatch.setenv("MODIN_ENGINE", "ray")
-    monkeypatch.setattr(readiness, "_module_available", lambda name: name == "modin")
-
-    results = readiness.check_platform_readiness("modin-df")
-
-    assert results[0].ready is True
-    assert results[1].status == "environment_skip"
-    assert results[1].check == "modin_backend"
-    assert '"modin[ray]"' in results[1].remediation
-    assert "does not import modin.pandas" in results[1].detail
-
-
-def test_modin_dask_backend_ready_when_backend_package_is_importable(monkeypatch):
-    monkeypatch.setenv("MODIN_ENGINE", "dask")
-    monkeypatch.setattr(readiness, "_module_available", lambda name: name in {"modin", "dask"})
-
-    results = readiness.check_platform_readiness("modin")
-
-    assert [result.status for result in results] == ["ready", "ready"]
-    assert "MODIN_ENGINE=dask" in results[1].summary
-
-
-def test_modin_unsupported_backend_is_environment_skip(monkeypatch):
-    monkeypatch.setenv("MODIN_ENGINE", "unsupported")
-    monkeypatch.setattr(readiness, "_module_available", lambda name: name == "modin")
-
-    results = readiness.check_platform_readiness("modin")
-
-    assert results[1].status == "environment_skip"
-    assert "MODIN_ENGINE='unsupported'" in results[1].summary
-    assert "ray, dask, or unidist" in results[1].remediation

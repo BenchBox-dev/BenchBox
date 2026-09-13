@@ -630,7 +630,6 @@ _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
         "sqlite",
         "sqlite3",
         "pandas",
-        "modin",
         "cudf",
         "dask",
         "polars",

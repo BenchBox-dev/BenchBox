@@ -69,15 +69,6 @@ DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
         description="Fast expression-based DataFrame library",
         min_version="1.0.0",
     ),
-    "modin": PlatformInfo(
-        name="Modin",
-        family=DataFrameFamily.PANDAS,
-        import_name="modin",
-        version_attr="__version__",
-        extra_name="modin",
-        description="Distributed Pandas replacement",
-        min_version="0.32.0",
-    ),
     "dask": PlatformInfo(
         name="Dask",
         family=DataFrameFamily.PANDAS,

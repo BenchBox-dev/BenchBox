@@ -62,7 +62,7 @@ def get_install_command(extra: str) -> str:
     """Get the appropriate install command for an extra based on install type.
 
     Args:
-        extra: The extra name or platform name (e.g., 'athena', 'modin', 'cloud')
+        extra: The extra name or platform name (e.g., 'athena', 'dask', 'cloud')
 
     Returns:
         The appropriate install command string

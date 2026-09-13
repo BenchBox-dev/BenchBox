@@ -4,7 +4,7 @@ This module provides the DataFrameQuery dataclass that represents a single
 benchmark query with implementations for both DataFrame families.
 
 Each query can have:
-- A Pandas-family implementation (for Pandas, Modin, cuDF, Vaex, Dask)
+- A Pandas-family implementation (for Pandas, cuDF, Vaex, Dask)
 - An Expression-family implementation (for Polars, PySpark, DataFusion)
 - An optional SQL equivalent for validation
 
@@ -169,7 +169,7 @@ class DataFrameQuery:
             return False
 
         # Check if platform's family has an implementation
-        pandas_family = {"pandas", "modin", "cudf", "vaex", "dask"}
+        pandas_family = {"pandas", "cudf", "vaex", "dask"}
         expression_family = {"polars", "pyspark", "datafusion", "spark"}
 
         platform_lower = platform.lower()

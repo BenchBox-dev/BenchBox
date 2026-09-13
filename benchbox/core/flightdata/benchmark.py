@@ -293,7 +293,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         Returns the QueryRegistry containing DataFrame implementations of all
         20 FlightData queries for both expression-family (Polars, PySpark,
-        DataFusion) and pandas-family (Pandas, Modin, Dask) platforms.
+        DataFusion) and pandas-family (Pandas and Dask) platforms.
 
         Returns:
             QueryRegistry with all 20 FlightData DataFrame queries

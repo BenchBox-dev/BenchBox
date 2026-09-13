@@ -1,7 +1,7 @@
 """Unit tests for UnifiedPandasFrame wrapper.
 
 Tests for the platform-agnostic DataFrame wrapper that handles API differences
-between Pandas, Modin, cuDF, and Dask DataFrames.
+between Pandas, cuDF, and Dask DataFrames.
 
 Copyright 2026 Joe Harris / BenchBox Project
 

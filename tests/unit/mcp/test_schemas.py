@@ -275,8 +275,6 @@ class TestPlatformOptionAdmission:
             validate_platform_options("velox", {"deployment": "remote"})
         with pytest.raises(MCPValidationError):
             validate_platform_options("velox", {"deployment": "local"})
-        with pytest.raises(MCPValidationError):
-            validate_platform_options("modin", {"engine": "pandas"})
 
     def test_velox_remote_cannot_reach_an_unapproved_endpoint(self):
         """MCP cannot produce a Velox adapter aimed at an unapproved endpoint."""

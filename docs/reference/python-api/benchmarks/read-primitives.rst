@@ -695,7 +695,7 @@ Read Primitives provides full DataFrame support for both expression-family and p
 **Platform Support**:
 
 - **Expression Family** (Polars, PySpark, DataFusion): 149 query implementations
-- **Pandas Family** (Pandas, Modin, Dask, cuDF): 149 query implementations
+- **Pandas Family** (Pandas, Dask, cuDF): 149 query implementations
 - **Skipped queries**: Only 3 (correlated subqueries with no DataFrame equivalent)
 
 **DataFrame Query Execution**:
@@ -717,7 +717,7 @@ Read Primitives provides full DataFrame support for both expression-family and p
     polars_adapter.load_tables_from_data_source(ctx, Path("./data"))
     result = aggregation_distinct_expression_impl(ctx)
 
-    # Pandas family (Pandas, Modin, Dask, cuDF)
+    # Pandas family (Pandas, Dask, cuDF)
     pandas_adapter = get_dataframe_adapter("pandas-df", working_dir="./data")
     pandas_ctx = pandas_adapter.create_context()
     pandas_adapter.load_tables_from_data_source(pandas_ctx, Path("./data"))

@@ -487,7 +487,7 @@ class TestDataFrameContextFamily:
     def test_different_platforms_same_family(self):
         """Test different platforms in same family."""
         pandas_ctx = ConcreteContext(platform="pandas", family="pandas")
-        modin_ctx = ConcreteContext(platform="modin", family="pandas")
+        dask_ctx = ConcreteContext(platform="dask", family="pandas")
 
-        assert pandas_ctx.family == modin_ctx.family
-        assert pandas_ctx.platform != modin_ctx.platform
+        assert pandas_ctx.family == dask_ctx.family
+        assert pandas_ctx.platform != dask_ctx.platform

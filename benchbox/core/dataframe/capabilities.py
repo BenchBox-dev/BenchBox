@@ -148,20 +148,6 @@ PLATFORM_CAPABILITIES: dict[str, PlatformCapabilities] = {
             "Memory overhead can be 2-3x raw data size",
         ],
     ),
-    "modin": PlatformCapabilities(
-        platform_name="Modin",
-        max_recommended_sf=50.0,
-        memory_overhead_factor=2.0,
-        execution_model=ExecutionModel.DISTRIBUTED,
-        requires_partitioning=True,
-        recommended_data_format=DataFormat.PARQUET,
-        description="Parallel Pandas replacement using Ray or Dask",
-        notes=[
-            "Distributes computation across CPU cores",
-            "API-compatible with Pandas",
-            "Better scaling than Pandas for medium datasets",
-        ],
-    ),
     "cudf": PlatformCapabilities(
         platform_name="cuDF",
         max_recommended_sf=1.0,  # Limited by GPU VRAM

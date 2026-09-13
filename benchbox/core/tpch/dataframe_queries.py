@@ -2,7 +2,7 @@
 
 This module provides DataFrame implementations of TPC-H benchmark queries
 that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas, Modin, Dask) platforms.
+Pandas-like (Pandas and Dask) platforms.
 
 Each query is implemented using the DataFrameQuery class with separate
 implementations for each family:
@@ -1068,7 +1068,7 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 # =============================================================================
-# Pandas Family Implementations (Pandas, Modin, Dask)
+# Pandas Family Implementations (Pandas and Dask)
 # =============================================================================
 
 

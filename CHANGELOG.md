@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to require Python 3.12 in its first release after Python 3.11 reaches end of
   life in October 2027.
 
+### Removed
+
+- **BREAKING: Modin platform support removed** - The `modin` and `modin-df`
+  platform selectors and the `modin` and `dataframe-modin` install extras are
+  no longer available. Use `pandas-df` for pandas-compatible execution or
+  `dask-df` for distributed DataFrames.
+
 ## [0.4.0] - 2026-08-27
 
 > **Post-publication accounting correction:** This section was reconciled on

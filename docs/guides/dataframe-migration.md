@@ -61,11 +61,11 @@ df.filter(col("amount") > lit(100)).group_by("customer").agg(col("amount").sum()
 Uses string column access and boolean indexing:
 
 ```python
-# Pandas, Modin, Dask, cuDF
+# Pandas, Dask, cuDF
 df[df["amount"] > 100].groupby("customer")["amount"].sum()
 ```
 
-**Platforms:** `pandas-df`, `modin-df`, `dask-df`, `cudf-df`
+**Platforms:** `pandas-df`, `dask-df`, `cudf-df`
 
 ## Data Compatibility
 

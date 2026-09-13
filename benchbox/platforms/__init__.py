@@ -107,7 +107,6 @@ DataFusionAdapter|.datafusion
 PolarsAdapter|.polars_platform
 PolarsDataFrameAdapter|.dataframe
 PandasDataFrameAdapter|.dataframe
-ModinDataFrameAdapter|.dataframe
 CuDFDataFrameAdapter|.dataframe
 DaskDataFrameAdapter|.dataframe
 DataFusionDataFrameAdapter|.dataframe
@@ -120,7 +119,6 @@ _LAZY_ADAPTERS = dict(row.split("|", 1) for row in _LAZY_ADAPTER_ROWS.splitlines
 _LAZY_CONSTANT_ROWS = """\
 POLARS_AVAILABLE|.dataframe
 PANDAS_AVAILABLE|.dataframe
-MODIN_AVAILABLE|.dataframe
 CUDF_AVAILABLE|.dataframe
 DASK_AVAILABLE|.dataframe
 DATAFUSION_DF_AVAILABLE|.dataframe
@@ -281,9 +279,9 @@ ClickHouseAdapter ClickHouseCloudAdapter DatabricksAdapter BigQueryAdapter Redsh
 TrinoAdapter AthenaAdapter SparkAdapter PySparkSQLAdapter FireboltAdapter DatabendAdapter InfluxDBAdapter
 PrestoAdapter PostgreSQLAdapter PgDuckDBAdapter PgMooncakeAdapter CedarDBAdapter QuestDBAdapter AzureSynapseAdapter
 FabricWarehouseAdapter FabricLakehouseAdapter FabricSparkAdapter StarRocksAdapter SingleStoreAdapter QuantonAdapter
-LakeSailAdapter DorisAdapter PolarsDataFrameAdapter PandasDataFrameAdapter ModinDataFrameAdapter CuDFDataFrameAdapter
+LakeSailAdapter DorisAdapter PolarsDataFrameAdapter PandasDataFrameAdapter CuDFDataFrameAdapter
 DaskDataFrameAdapter DataFusionDataFrameAdapter PySparkDataFrameAdapter LakeSailDataFrameAdapter POLARS_AVAILABLE
-PANDAS_AVAILABLE MODIN_AVAILABLE CUDF_AVAILABLE DASK_AVAILABLE DATAFUSION_DF_AVAILABLE PYSPARK_AVAILABLE
+PANDAS_AVAILABLE CUDF_AVAILABLE DASK_AVAILABLE DATAFUSION_DF_AVAILABLE PYSPARK_AVAILABLE
 DataFramePlatformChecker get_adapter is_dataframe_mode get_available_modes get_available_deployments
 get_default_deployment get_platform_adapter get_dataframe_adapter list_available_platforms
 list_available_dataframe_platforms get_platform_requirements get_dataframe_requirements check_platform_connectivity
@@ -480,7 +478,6 @@ def check_platform_connectivity(platform_name: str, **config) -> bool:
 _DATAFRAME_PLATFORM_ROWS = """\
 polars-df|PolarsDataFrameAdapter|POLARS_AVAILABLE|pip install polars (core dependency - should be installed)
 pandas-df|PandasDataFrameAdapter|PANDAS_AVAILABLE|pip install pandas  # standalone\\n  uv add benchbox --extra pandas  # inside a project
-modin-df|ModinDataFrameAdapter|MODIN_AVAILABLE|pip install modin[ray]  # standalone\\n  uv add benchbox --extra modin  # inside a project
 cudf-df|CuDFDataFrameAdapter|CUDF_AVAILABLE|pip install cudf-cu12 (requires NVIDIA GPU with CUDA)
 dask-df|DaskDataFrameAdapter|DASK_AVAILABLE|pip install dask[distributed]  # standalone\\n  uv add benchbox --extra dask  # inside a project
 datafusion-df|DataFusionDataFrameAdapter|DATAFUSION_DF_AVAILABLE|pip install datafusion  # standalone\\n  uv add benchbox --extra datafusion  # inside a project
@@ -808,7 +805,6 @@ polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool
 polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
 polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
 pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
-modin|engine|Modin execution engine|{'choices': ('ray', 'dask'), 'default': 'ray'}
 cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
 cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
 dask|n_workers|Number of worker processes|{'parser': 'int'}
@@ -972,8 +968,6 @@ velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_b
     # Polars DataFrame
 
     # Pandas DataFrame
-
-    # Modin DataFrame
 
     # cuDF DataFrame
 

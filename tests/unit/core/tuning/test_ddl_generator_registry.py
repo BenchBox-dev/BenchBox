@@ -236,7 +236,7 @@ class TestNoOpFallbackWarning:
             for record in caplog.records
         )
 
-    @pytest.mark.parametrize("platform_key", ["sqlite", "sqlite3", "pandas", "modin", "cudf", "dask", "polars"])
+    @pytest.mark.parametrize("platform_key", ["sqlite", "sqlite3", "pandas", "cudf", "dask", "polars"])
     def test_known_tuning_free_platforms_stay_silent(self, platform_key: str, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
             generator = get_ddl_generator(platform_key)

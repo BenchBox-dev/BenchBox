@@ -84,6 +84,7 @@ from benchbox.core.results.status import result_cli_failure_reason, result_non_c
 from benchbox.core.schemas import ExecutionContext
 from benchbox.core.tuning import modes as tuning_modes
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
+from benchbox.platforms.adapter_factory import _reject_removed_platform
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
 from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
@@ -957,9 +958,30 @@ def _check_platforms_status(s: types.SimpleNamespace) -> None:
         console.print("[green]All enabled platforms are ready![/green]")
 
 
+def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
+    """Reject selectors for platforms removed from BenchBox."""
+    raw_platform = getattr(s, "platform", None)
+    for candidate in (raw_platform, getattr(s, "platform_key", None)):
+        if not candidate:
+            continue
+        try:
+            _reject_removed_platform(candidate)
+        except ValueError as exc:
+            console.print(f"[red]❌ {exc}[/red]")
+            if s.logger:
+                s.logger.error(str(exc))
+            if hasattr(s, "ctx") and s.ctx is not None and hasattr(s.ctx, "exit"):
+                s.ctx.exit(1)
+                return False
+            raise
+    return True
+
+
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     """Validate platform, resolve execution mode, and check availability."""
     s.resolved_mode = None
+    if not _validate_not_removed_platform(s):
+        return
     if not s.platform_key:
         return
 
@@ -1004,7 +1026,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
                 is_available = s.platform_manager.is_platform_available(s.platform_key)
         else:
             is_available = caps.supports_dataframe
-            if is_available and s.platform_key in ["polars", "pandas", "modin", "cudf", "dask"]:
+            if is_available and s.platform_key in ["polars", "pandas", "cudf", "dask"]:
                 df_platforms = list_available_dataframe_platforms()
                 legacy_key = f"{s.platform_key}-df"
                 is_available = df_platforms.get(legacy_key, df_platforms.get(s.platform_key, False))

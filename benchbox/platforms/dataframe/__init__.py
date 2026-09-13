@@ -7,7 +7,7 @@ Architecture:
 - ExpressionFamilyAdapter: Base class for expression-based libraries
   (Polars, PySpark, DataFusion)
 - PandasFamilyAdapter: Base class for Pandas-like libraries
-  (Pandas, Modin, cuDF, Vaex, Dask)
+  (Pandas, cuDF, Vaex, Dask)
 
 Each adapter type provides:
 - Data loading (CSV, Parquet)
@@ -64,8 +64,6 @@ _LAZY_EXPORTS = {
     "PandasDataFrameAdapter": ("benchbox.platforms.dataframe.pandas_df", None),
     "POLARS_AVAILABLE": ("benchbox.platforms.dataframe.polars_df", False),
     "PolarsDataFrameAdapter": ("benchbox.platforms.dataframe.polars_df", None),
-    "MODIN_AVAILABLE": ("benchbox.platforms.dataframe.modin_df", False),
-    "ModinDataFrameAdapter": ("benchbox.platforms.dataframe.modin_df", None),
     "CUDF_AVAILABLE": ("benchbox.platforms.dataframe.cudf_df", False),
     "CuDFDataFrameAdapter": ("benchbox.platforms.dataframe.cudf_df", None),
     "DASK_AVAILABLE": ("benchbox.platforms.dataframe.dask_df", False),
@@ -125,9 +123,6 @@ __all__ = [
     # Pandas
     "PandasDataFrameAdapter",
     "PANDAS_AVAILABLE",
-    # Modin
-    "ModinDataFrameAdapter",
-    "MODIN_AVAILABLE",
     # cuDF
     "CuDFDataFrameAdapter",
     "CUDF_AVAILABLE",

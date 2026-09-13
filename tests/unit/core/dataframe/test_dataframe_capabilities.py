@@ -331,7 +331,7 @@ class TestAllPlatformsHaveCapabilities:
 
     @pytest.mark.parametrize(
         "platform",
-        ["polars", "pandas", "modin", "cudf", "dask", "vaex", "pyspark", "datafusion"],
+        ["polars", "pandas", "cudf", "dask", "vaex", "pyspark", "datafusion"],
     )
     def test_platform_has_capabilities(self, platform):
         """Test that platform has capabilities defined."""
@@ -345,7 +345,7 @@ class TestAllPlatformsHaveCapabilities:
 
     @pytest.mark.parametrize(
         "platform",
-        ["polars", "pandas", "modin", "cudf", "dask", "vaex", "pyspark", "datafusion"],
+        ["polars", "pandas", "cudf", "dask", "vaex", "pyspark", "datafusion"],
     )
     def test_platform_has_description(self, platform):
         """Test that platform has description."""
@@ -356,7 +356,7 @@ class TestAllPlatformsHaveCapabilities:
 
     @pytest.mark.parametrize(
         "platform",
-        ["polars", "pandas", "modin", "cudf", "dask", "vaex", "pyspark", "datafusion"],
+        ["polars", "pandas", "cudf", "dask", "vaex", "pyspark", "datafusion"],
     )
     def test_platform_has_notes(self, platform):
         """Test that platform has usage notes."""
