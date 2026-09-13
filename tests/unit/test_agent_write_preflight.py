@@ -102,8 +102,9 @@ def test_preflight_rejects_primary_clone_without_override() -> None:
     )
 
 
-def test_preflight_allows_explicit_primary_clone_override() -> None:
-    result = _run_preflight(primary_clone=Path.cwd(), allow=True)
+def test_preflight_allows_explicit_primary_clone_override(tmp_path: Path) -> None:
+    repo = _init_clone(tmp_path / "BenchBox")
+    result = _run_in_clone(repo, extra_env={"BENCHBOX_ALLOW_MAIN_CLONE_WRITE": "1"})
 
     assert result.returncode == 0
     assert "BenchBox write preflight OK" in result.stdout
