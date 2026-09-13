@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "Preserve PostgreSQL integer division: SELECT 2020 / 3 > 673 is false; preserve numeric EXTRACT division as fractional.",
+    "Cover DATE_PART, explicit integer casts, negatives, NULLs, columns, nested expressions and CTEs with source execution or labeled authoritative expectations.",
+    "Document whether hooks suffice, core/AST/binding changes, patch size, regression results and Python-facing performance. Deliver go/no-go without broadening dialect scope."
+  ],
+  "context": "Polyglot0.9.2 turns PostgreSQL 2020/3 into CAST(2020 AS REAL)/3; SQLite returns true instead of false for >673. SQLGlot30.18.0 preserves it. Compare joeharris76/sqlglot branches fix/postgres-extract-return-types (eb360e1e2962b467ca093b9f6ab1000f9ced1a02) and fix/sqlite-date-extraction (34cd3e9fdb29a4376023f9c6cd32932de07acd3d). Local clone /tmp/sqlglot-extract-ThGa2E/sqlglot. Verify artifacts before reuse.",
+  "description": "Evaluate maintainability by correcting one semantic defect in an isolated research checkout. Try Rust CustomDialectBuilder hooks before core changes. Compare scope against prepared SQLGlot extraction/type patches. No production integration, hosted fork creation or upstream submission.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2111",
+    "https://github.com/tobilg/polyglot",
+    "https://github.com/tobymao/sqlglot/pull/8352"
+  ]
+}

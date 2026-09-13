@@ -10484,6 +10484,13 @@
       "status": "done",
       "title": "Polars Platform Adapter"
     },
+    "polyglot-source-aware-division-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Test source-type-aware SQLite division in a bounded Polyglot extension"
+    },
     "port-the-same-fixes-to-the-sibling-spark-family-adapters-lak": {
       "claim": null,
       "needs": [],
