@@ -15110,7 +15110,7 @@
       "needs": [
         "sql-translation-ml-dataset"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Implement independent full-SQL and span-edit model adapters"
     },
