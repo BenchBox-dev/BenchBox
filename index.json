@@ -10502,9 +10502,9 @@
     },
     "post-merge-attribution-recovery": {
       "claim": {
-        "expires_at": "2026-09-14T16:07:43Z",
+        "expires_at": "2026-09-14T16:17:43Z",
         "generation": "0ec915374d2b4dc68ce42626d7750c65",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
       },
       "needs": [
