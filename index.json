@@ -10515,17 +10515,12 @@
       "title": "Mirror develop corpus to published-results after unread-identifier field drop lands"
     },
     "post-merge-attribution-recovery": {
-      "claim": {
-        "expires_at": "2026-09-14T19:06:48Z",
-        "generation": "88a3a70409c7425d964b2c95644fac2c",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [
         "publication-ledger-reproducible-inputs"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Route post-merge failures to the correct owner before proposing a revert"
     },
     "postgres-extension-benchmarking-infrastructure": {
