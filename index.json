@@ -15056,7 +15056,7 @@
       "needs": [
         "sql-translation-ml-baselines"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Assemble the validated training corpus and tokenizer audit"
     },
