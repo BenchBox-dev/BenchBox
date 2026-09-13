@@ -20,6 +20,7 @@ def test_values_are_not_silently_normalized():
         "SELECT load_extension('x')",
         "SELECT * FROM sqlite_master",
         "SELECT random()",
+        "SELECT APPROX_COUNT_DISTINCT(id) FROM items",
     ],
 )
 def test_candidate_safety(sql):
