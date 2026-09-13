@@ -117,8 +117,13 @@ def test_auto_merge_partial_stack_soundness_revocation_is_unchanged() -> None:
     # Hands-free auto-merge for ordinary PRs lives in the Makefile arm path
     # (`make pr-ready`), not in this revoke-only workflow.
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    assert "gh pr merge --auto --squash" in makefile, (
-        "hands-free auto-merge for ordinary PRs is gone - the common case must stay hands-free"
+    arm_body = makefile.split("pr-arm-auto-merge:", 1)[1].split("\n\n", 1)[0]
+    assert "pr-landing-ready" in arm_body and "EVIDENCE is required" in arm_body, (
+        "the common readiness transaction is no longer mandatory for arming"
+    )
+    executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
+    assert "gh pr merge --auto --squash" not in executable, (
+        "Makefile contains a second executable arming implementation"
     )
 
 

@@ -41,6 +41,7 @@ MAX_UNTRACKED_FILES = 200
 MAX_UNTRACKED_BYTES = 50 * 1024 * 1024
 LOCK_POLL_SECONDS = 0.25
 DEFAULT_LOCK_WAIT_SECONDS = 3600.0
+MAX_RECEIPT_REKEYS = 2
 
 
 class IdentityUnknown(Exception):
@@ -82,13 +83,13 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
     """Open *lock_path* and acquire it via :func:`wait_on_fd`.
 
     Returns the open fd (caller must close it to release). Closes the fd
-    before raising TimeoutError.
+    before raising while waiting for the lock.
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
     try:
         wait_on_fd(fd, lock_path, timeout_seconds)
-    except TimeoutError:
+    except BaseException:
         os.close(fd)
         raise
     return fd
@@ -132,6 +133,20 @@ def _hash_bounded(repo: Path, names: list[str], kind: str, budget: list) -> dict
     return digests
 
 
+def active_skill_mirror_identity(repo: Path, budget: list) -> dict:
+    """Digest the ignored active skill mirror when it is present.
+
+    The mirror is intentionally untracked, so Git porcelain cannot contribute
+    it to receipt identity. A validation run that reads the mirror must not be
+    reused in a checkout where the mirror is absent or has different bytes.
+    """
+    root = repo / ".agents" / "skills"
+    if not root.is_dir():
+        return {"present": False}
+    names = sorted(path.relative_to(repo).as_posix() for path in root.rglob("*") if path.is_file())
+    return {"present": True, "files": _hash_bounded(repo, names, "active skill mirror", budget)}
+
+
 def tracked_modified(porcelain: list[str]) -> list[str]:
     """Worktree-relative paths of tracked files with any staged/unstaged change."""
     names = []
@@ -163,6 +178,7 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
     budget = [0]
     digests = _hash_bounded(repo, untracked, "untracked", budget)
     tracked = _hash_bounded(repo, tracked_modified(porcelain), "tracked-modified", budget)
+    active_mirror = active_skill_mirror_identity(repo, budget)
     uv_lock = repo / "uv.lock"
     try:
         lock_digest: str | None = _sha256_file(uv_lock) if uv_lock.is_file() else None
@@ -174,6 +190,7 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
         "porcelain": sorted(porcelain),
         "untracked_digests": digests,
         "tracked_digests": tracked,
+        "active_skill_mirror": active_mirror,
         "argv": [str(part) for part in argv],
         "python": sys.version.split()[0],
         "uv_lock": lock_digest,
@@ -196,12 +213,24 @@ def receipt_path(store: Path, gate: str, identity: dict, batch: dict | None) -> 
     return store / (hashlib.sha256(canonical.encode()).hexdigest() + ".json")
 
 
-def read_receipt(path: Path) -> dict | None:
+def read_receipt(path: Path, gate: str, identity: dict, batch: dict | None) -> dict | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) and data.get("exit") == 0 else None
+    if not isinstance(data, dict):
+        return None
+    return (
+        data
+        if (
+            data.get("gate") == gate
+            and data.get("identity") == identity
+            and data.get("batch") == batch
+            and type(data.get("exit")) is int
+            and data["exit"] == 0
+        )
+        else None
+    )
 
 
 def run_gate(
@@ -218,40 +247,78 @@ def run_gate(
     except IdentityUnknown as exc:
         print(f"[local-validation] identity unknown ({exc}); executing without receipt")
         return subprocess.run(list(argv), cwd=repo, check=False).returncode
-    receipt = receipt_path(store, gate, identity, batch)
-    lock_fd = wait_for_lock(receipt.with_name(receipt.stem + ".lock"), lock_wait_seconds)
-    try:
-        hit = read_receipt(receipt)
-        if hit is not None:
-            print(
-                f"[local-validation] REUSED {gate} receipt "
-                f"(head {identity['head'][:12]}, recorded {hit.get('recorded_at', '?')})"
-            )
-            return 0
-        print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
-        proc = subprocess.run(list(argv), cwd=repo, check=False)
-        if proc.returncode == 0:
-            tmp = receipt.with_suffix(".tmp")
-            tmp.write_text(
-                json.dumps(
-                    {
-                        "gate": gate,
-                        "identity": identity,
-                        "batch": batch,
-                        "exit": 0,
-                        "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                    },
-                    indent=2,
+    receipt_batch = dict(batch) if batch is not None else None
+    rekeys = 0
+    while True:
+        receipt = receipt_path(store, gate, identity, receipt_batch)
+        lock_fd = wait_for_lock(receipt.with_name(receipt.stem + ".lock"), lock_wait_seconds)
+        execute_without_receipt = False
+        try:
+            try:
+                current_identity = content_identity(repo, list(argv))
+            except IdentityUnknown as exc:
+                current_identity = None
+                execute_without_receipt = True
+                print(f"[local-validation] identity changed or unknown ({exc}); executing without receipt")
+
+            current_batch = dict(batch) if batch is not None else None
+            if not execute_without_receipt and (current_identity != identity or current_batch != receipt_batch):
+                if rekeys >= MAX_RECEIPT_REKEYS:
+                    execute_without_receipt = True
+                    print("[local-validation] inputs kept changing while waiting; executing without receipt")
+                else:
+                    identity = current_identity
+                    receipt_batch = current_batch
+                    rekeys += 1
+                    print("[local-validation] inputs changed while waiting; retrying with a new receipt")
+                    continue
+
+            if execute_without_receipt:
+                break
+
+            hit = read_receipt(receipt, gate, identity, receipt_batch)
+            if hit is not None:
+                print(
+                    f"[local-validation] REUSED {gate} receipt "
+                    f"(head {identity['head'][:12]}, recorded {hit.get('recorded_at', '?')})"
                 )
-                + "\n",
-                encoding="utf-8",
-            )
-            tmp.replace(receipt)
-        else:
-            print(f"[local-validation] {gate} failed (exit {proc.returncode}); no receipt stored")
-        return proc.returncode
-    finally:
-        os.close(lock_fd)
+                return 0
+            print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
+            proc = subprocess.run(list(argv), cwd=repo, check=False)
+            if proc.returncode == 0:
+                try:
+                    final_identity = content_identity(repo, list(argv))
+                except IdentityUnknown as exc:
+                    final_identity = None
+                    print(f"[local-validation] {gate} identity unknown after success ({exc}); no receipt stored")
+                final_batch = dict(batch) if batch is not None else None
+                if current_identity == identity and final_identity == identity and final_batch == receipt_batch:
+                    tmp = receipt.with_suffix(".tmp")
+                    tmp.write_text(
+                        json.dumps(
+                            {
+                                "gate": gate,
+                                "identity": identity,
+                                "batch": receipt_batch,
+                                "exit": 0,
+                                "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                            },
+                            indent=2,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+                    tmp.replace(receipt)
+                elif final_identity != current_identity or final_batch != receipt_batch:
+                    print(f"[local-validation] {gate} inputs drifted during execution; no receipt stored")
+            else:
+                print(f"[local-validation] {gate} failed (exit {proc.returncode}); no receipt stored")
+            return proc.returncode
+        finally:
+            os.close(lock_fd)
+
+    print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
+    return subprocess.run(list(argv), cwd=repo, check=False).returncode
 
 
 def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list[str] | None = None) -> int:
@@ -261,7 +328,7 @@ def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list
         print(f"[local-validation] identity unknown ({exc})")
         return 2
     receipt = receipt_path(store, gate, identity, batch)
-    hit = read_receipt(receipt)
+    hit = read_receipt(receipt, gate, identity, batch)
     print(f"[local-validation] gate={gate} head={identity['head'][:12]} base={identity['base'][:12]}")
     print(f"[local-validation] receipt={'present' if hit is not None else 'absent'} ({receipt.name})")
     return 0

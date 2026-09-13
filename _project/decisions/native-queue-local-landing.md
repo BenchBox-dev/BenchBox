@@ -8,15 +8,19 @@ approved native merge queue guards `refs/heads/develop`.
 When the queue configuration is verified (SQUASH, ALLGREEN, 1/5/5, 60-minute
 timeout, 0 wait, `ci-required-result` + Results Explorer browser gate +
 `ruleset-drift` required; `scripts/ruleset_drift_check.py::merge_queue_findings`
-green), a branch behind `origin/develop` publishes WITHOUT an author-side
-refresh merge. Queue integration tests the speculative merge, so the refresh
-only destroys a nearly-complete gate to no benefit. See
+and the develop protection checks green), a conflict-free branch behind
+`origin/develop` publishes WITHOUT an author-side refresh merge. Queue
+integration tests the speculative merge, so the refresh only destroys a
+nearly-complete gate to no benefit. `make pr-open` obtains this verdict from
+the existing ruleset checker and consumes its explicit machine-readable
+`queue_verified` result; it never treats a warning, override, or API failure
+as verification. See
 `scripts/pr_landing.py::stale_base_decision`.
 
 ## Fallbacks (conservative, unchanged)
 
 - Queue absent, unreadable, unsupported, or misconfigured: `require-current`
-  (existing ancestry gate stands; no behavior removed).
+  (existing ancestry gate stands; no stale override is accepted).
 - Genuine conflict (not mere behindness): `resolve-conflict-first`; no
   refresh merge can fix a conflict and none is attempted.
 - Nearly-complete gates measure from the lifecycle baseline

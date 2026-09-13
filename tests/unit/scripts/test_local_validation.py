@@ -160,6 +160,116 @@ def test_missing_base_forces_execution_without_receipt(repo: Path, tmp_path: Pat
     assert list((tmp_path / "receipts").rglob("*.json")) == []
 
 
+def test_revalidates_inputs_after_waiting_before_reuse(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    original_wait_for_lock = lv.wait_for_lock
+
+    def wait_then_change(lock_path: Path, timeout_seconds: float) -> int:
+        fd = original_wait_for_lock(lock_path, timeout_seconds)
+        (repo / "tracked.txt").write_text("changed while waiting")
+        return fd
+
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    monkeypatch.setattr(lv, "wait_for_lock", wait_then_change)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
+    current_identity = lv.content_identity(repo, gate)
+    assert lv.receipt_path(store, "g", current_identity, None).exists()
+
+
+def test_rekeys_before_execution_under_changed_input_lock(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+
+    old_identity = lv.content_identity(repo, gate)
+    old_lock = lv.receipt_path(store, "g", old_identity, None).with_suffix(".lock")
+    original_wait_for_lock = lv.wait_for_lock
+    new_lock_path: Path | None = None
+    new_lock_waiting = threading.Event()
+    release_new_lock = threading.Event()
+
+    def wait_then_change(lock_path: Path, timeout_seconds: float) -> int:
+        nonlocal new_lock_path
+        if lock_path == new_lock_path:
+            new_lock_waiting.set()
+            assert release_new_lock.wait(5.0)
+            return original_wait_for_lock(lock_path, timeout_seconds)
+        fd = original_wait_for_lock(lock_path, timeout_seconds)
+        if lock_path == old_lock:
+            (repo / "tracked.txt").write_text("changed while waiting")
+            new_identity = lv.content_identity(repo, gate)
+            new_lock_path = lv.receipt_path(store, "g", new_identity, None).with_suffix(".lock")
+        return fd
+
+    monkeypatch.setattr(lv, "wait_for_lock", wait_then_change)
+    results: list[int] = []
+    runner = threading.Thread(target=lambda: results.append(lv.run_gate("g", gate, None, 5.0, repo, store)))
+    runner.start()
+    try:
+        assert new_lock_waiting.wait(5.0)
+        assert _count(marker) == 1
+    finally:
+        release_new_lock.set()
+        runner.join(timeout=10.0)
+
+    assert not runner.is_alive()
+    assert results == [0]
+    assert new_lock_path is not None and new_lock_path != old_lock
+    assert _count(marker) == 2
+    current_identity = lv.content_identity(repo, gate)
+    assert lv.receipt_path(store, "g", current_identity, None).exists()
+
+
+def test_drift_during_successful_run_does_not_write_receipt(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = [
+        sys.executable,
+        "-c",
+        f"open({str(marker)!r}, 'a').write('x'); open({str(repo / 'tracked.txt')!r}, 'w').write('v2')",
+    ]
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert list(store.rglob("*.json")) == []
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
+
+
+def test_mismatched_receipt_is_not_reused(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    receipt = next(store.rglob("*.json"))
+    data = json.loads(receipt.read_text(encoding="utf-8"))
+    data["batch"] = {"batch_id": "wrong", "member": "A", "role": "member"}
+    receipt.write_text(json.dumps(data), encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 2
+
+
+def test_wait_for_lock_closes_fd_on_interrupt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    lock = tmp_path / "test.lock"
+    opened: list[int] = []
+
+    def interrupt(fd: int, lock_path: Path, timeout_seconds: float) -> None:
+        opened.append(fd)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(lv, "wait_on_fd", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        lv.wait_for_lock(lock, 5.0)
+    with pytest.raises(OSError):
+        os.fstat(opened[0])
+
+
 def test_wait_on_fd_timeout_reports_holder(tmp_path: Path) -> None:
     import fcntl
 
@@ -236,6 +346,21 @@ def test_tracked_edit_preserving_status_invalidates(repo: Path, tmp_path: Path) 
     assert after == before
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
+
+
+def test_active_ignored_skill_mirror_is_part_of_receipt_identity(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+
+    active = repo / ".agents/skills/todo/SKILL.md"
+    active.parent.mkdir(parents=True)
+    active.write_text("materialized-v1", encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+
+    active.write_text("materialized-v2", encoding="utf-8")
+    assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
+    assert _count(marker) == 3
 
 
 def test_different_gates_proceed_in_parallel(repo: Path, tmp_path: Path) -> None:

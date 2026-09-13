@@ -281,3 +281,79 @@ def test_advisory_issue_creation_failure_is_loud() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
 
     assert '--body "${body}" || true' not in workflow
+
+
+def test_unproven_attribution_routes_to_owned_incident_without_revert() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'should_revert="false"' in workflow
+    assert "comparison-state=${comparison_state}" in workflow
+    assert "Classification: ${classification}" in workflow
+    assert "Incident key: \\`${incident_key}\\`" in workflow
+    assert '--search "${incident_key} in:body"' in workflow
+    assert "Fail loudly on unattributable failure classes" not in workflow
+
+
+def test_new_owned_regression_reaches_revert_route() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'should_revert="true"\n                comparison_state="new"' in workflow
+    assert "steps.signature-decision.outputs.should-revert == 'true'" in workflow
+    assert "steps.attribute.outputs.action == 'revert'" in workflow
+    assert 'revert_suppressed="true"' in workflow
+
+
+def test_missing_current_signature_uses_incident_fallback_and_cannot_revert() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    attribute_block = workflow.split("id: attribute", 1)[1].split("- name: Finalize revert-suppressed", 1)[0]
+
+    assert 'empty_signature=\'{"failure_ids":[],"jobs":[],"source_inputs":{}}\'' in attribute_block
+    assert "if [ -f current-combined.json ]; then" in attribute_block
+    assert 'jq -ce \'if type == "object" and' in attribute_block
+    assert 'error("signature object has invalid fields") end\'' in attribute_block
+    assert 'current_signature="${empty_signature}"' in attribute_block
+    assert '--argjson current_signature "$(cat current-combined.json)"' not in attribute_block
+    assert "comparison_state: $comparison_state" in attribute_block
+    assert (
+        "steps.signature-decision.outputs.should-revert == 'false' || steps.attribute.outputs.action == 'advisory'"
+        in workflow
+    )
+
+
+def test_persistent_incident_fallback_uses_current_combined_signature() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+    upsert_block = workflow.split("id: upsert-incident", 1)[1].split("green-run-cleanup:", 1)[0]
+
+    assert "current-combined.json" in upsert_block
+    assert 'current_failure_ids_json="$(jq -c' in upsert_block
+    assert 'current_incident_key="$(printf' in upsert_block
+    assert 'COMPARISON_STATE}" = "persistent"' in upsert_block
+    assert "failure_ids: ($signature.failure_ids // [])" in upsert_block
+    assert "jobs: ($signature.jobs // [])" in upsert_block
+    assert "source_input_identities: {current: ($signature.source_inputs // {})" in upsert_block
+    assert "NEW_FAILURE_IDS" not in upsert_block
+
+
+def test_incident_artifact_contains_required_attribution_fields() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    for field in (
+        "failing_sha",
+        "current_target_sha",
+        "predecessor_source_inputs",
+        "predecessor_evidence",
+        "failing_pr",
+        "owner",
+        "next_action",
+    ):
+        assert field in workflow
+
+
+def test_revert_checks_live_target_and_inverse_diff_before_push() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
+
+    assert 'target_sha="$(git rev-parse --verify origin/develop || true)"' in workflow
+    assert 'git revert --no-commit "${FAILING_SHA}"' in workflow
+    assert "git diff --check" in workflow
+    assert "git diff --name-status" in workflow
+    assert 'current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"' in workflow

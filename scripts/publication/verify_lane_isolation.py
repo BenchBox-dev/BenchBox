@@ -88,6 +88,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "_project/",
     # Repo-root agent docs, skill config, and local-tooling config.
     "AGENTS.md",
+    "CONTRIBUTING.md",
     "CLAUDE.md",
     "GEMINI.md",
     "ANTIGRAVITY.md",

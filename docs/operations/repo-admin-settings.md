@@ -203,13 +203,16 @@ The soundness gate, as operated:
   `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
   `.github/workflows/release.yml`).
 - `make pr-open` no longer arms auto-merge at all; `make pr-ready` (or
-  `make pr-open READY=1`) does, so a PR cannot merge while a follow-up commit
-  is still being written. Arming at creation stranded three commits in one
+  `make pr-open READY=1`) runs the exact readiness transaction and then does,
+  so a PR cannot merge while a follow-up commit is still being written. Arming at creation stranded three commits in one
   session, two of them the fixes for their own review findings.
-- `make pr-open` also refuses when `origin/develop` is not an ancestor of
-  `HEAD` (open-stale). Absorb current develop with `make pr-refresh` (one
-  PR at a time). `STALE=1` is the explicit escape. `pr-open` must not merge
-  `develop` itself; that would turn `pr-fanout` into a refresh storm. See
+- `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
+  live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
+  conflict-free native queue permits publication without an author-side
+  refresh; absent, unknown, or misconfigured queue state keeps the current-base
+  gate and requires `make pr-refresh` (one PR at a time). There is no stale
+  override. `pr-open` must not merge `develop` itself; that would turn
+  `pr-fanout` into a refresh storm. See
   `_project/decisions/behind-pr-occurrence-2026-08-16.md`.
 - `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
   arms on any event (bare `gh pr create` does not auto-arm, and the
@@ -675,10 +678,19 @@ access and let the canary return to green.
 The `develop-post-merge.yml` auto-revert job creates these labels on
 demand if they do not exist:
 
-- `incident:develop-red` — used on the auto-revert PR.
-- `incident:develop-red-revert-conflict` — used on the manual-action
-  issue when the revert path cannot complete (revert conflict, push
-  failure, PR-creation failure).
+- `incident:develop-red` — used on an auto-revert PR or an owned
+  post-merge incident/advisory when attribution is unproven.
+- `incident:develop-red-revert-conflict` — used on the manual-action issue
+  when a proven revert path cannot complete (revert conflict, push failure,
+  PR-creation failure, or target/diff inspection failure).
+
+Attribution incidents include the immutable failing commit and PR, test/job
+identifiers, predecessor and source-input evidence, ownership match,
+classification, owner, next action, and a stable incident key. The workflow
+must not create a revert proposal from temporal adjacency, missing evidence,
+an unmappable job failure, stale target state, external-reference drift, or a
+transient rerun. Those outcomes keep develop red and update the existing
+`incident:develop-red` issue by incident key.
 
 The on-demand `gh label create … || true` in the workflow means a fresh
 clone or transfer does not need the labels pre-created. They will appear

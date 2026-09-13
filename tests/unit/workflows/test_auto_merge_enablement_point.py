@@ -19,14 +19,19 @@ are unused; 0 events across 150 PRs), so the arm step was deleted outright
 (auto-merge-policy-consolidation-2026-08-06, D2). The cross-layer policy is
 therefore:
 
-- Local: `pr-open` withholds; `pr-ready` / `READY=1` is the ONLY arm path.
+- Local: `pr-open` withholds; `pr-ready` is the arm path, and `READY=1` is a
+  shortcut only when reusing an already-open, reviewed PR.
 - Workflow: revoke-only (soundness paths + `no-auto-merge` label); it never
   arms on any event. Soundness disable runs on opened/reopened/synchronize.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -107,15 +112,86 @@ def test_auto_merge_enablement_point_is_not_pr_open() -> None:
     )
 
 
-def test_auto_merge_enablement_point_keeps_a_hands_free_path() -> None:
-    """A finished branch must still reach auto-merge without ceremony.
-
-    Withholding by default is only acceptable while arming stays trivial, so
-    pin both the explicit target and the one-command escape hatch.
-    """
+def test_auto_merge_enablement_point_keeps_a_reviewed_reuse_path() -> None:
+    """READY=1 arms only a reused PR; creation remains a successful hold."""
     text = MAKEFILE.read_text(encoding="utf-8")
     assert re.search(r"^pr-ready:", text, re.MULTILINE), "no pr-ready target; withholding would be a dead end"
-    assert "READY" in _target_body("pr-open"), "pr-open has no READY=1 path to open and arm in one step"
+    body = _target_body("pr-open")
+    assert "REUSED_PR=0" in body and "REUSED_PR=1" in body
+    assert 'elif [ "$$REUSED_PR" != "1" ]; then' in body
+    assert "PR created and held" in body
+    assert "Next action after review: make pr-ready" in body
+    assert '$(MAKE) -s pr-ready REPO="$$REPOSITORY"' in body
+
+
+def test_auto_merge_enablement_point_does_not_treat_creation_as_readiness_failure() -> None:
+    """The new-PR READY=1 branch reports the follow-up and skips pr-ready."""
+    body = _target_body("pr-open")
+    held_at = body.index('elif [ "$$REUSED_PR" != "1" ]; then')
+    arm_at = body.index('$(MAKE) -s pr-ready REPO="$$REPOSITORY"')
+    assert held_at < arm_at
+    assert "READY=1 does not arm a newly created PR" in body
+
+
+def _pr_reuse_query() -> str:
+    """Extract the owner-aware jq query used by `pr-open` reuse."""
+    body = _target_body("pr-open")
+    match = re.search(r"--json url,headRepositoryOwner,headRefName\s+\\\n\s*--jq '([^']+)'", body)
+    assert match, "pr-open has no owner-aware JSON reuse query"
+    return match.group(1)
+
+
+@pytest.mark.skipif(shutil.which("jq") is None, reason="jq is required to exercise the gh JSON filter")
+@pytest.mark.parametrize(
+    ("owner", "branch", "expected_url"),
+    [
+        ("BenchBox-dev", "feature/reuse-safe", "https://example.test/same-repo"),
+        ("contributor", "feature/reuse-safe", "https://example.test/fork"),
+    ],
+)
+def test_pr_open_reuse_query_selects_same_repo_and_fork_by_owner_and_branch(
+    owner: str, branch: str, expected_url: str
+) -> None:
+    """Reuse must distinguish repository owner when fork branches share a name."""
+    payload = [
+        {
+            "url": "https://example.test/same-repo",
+            "headRepositoryOwner": {"login": "BenchBox-dev"},
+            "headRefName": "feature/reuse-safe",
+        },
+        {
+            "url": "https://example.test/fork",
+            "headRepositoryOwner": {"login": "contributor"},
+            "headRefName": "feature/reuse-safe",
+        },
+        {
+            "url": "https://example.test/other-branch",
+            "headRepositoryOwner": {"login": owner},
+            "headRefName": "feature/other",
+        },
+    ]
+    result = subprocess.run(
+        ["jq", "-r", _pr_reuse_query()],
+        input=json.dumps(payload),
+        text=True,
+        capture_output=True,
+        check=False,
+        env={**os.environ, "PR_HEAD_OWNER": owner, "PR_HEAD_NAME": branch},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [expected_url]
+
+
+def test_pr_open_preserves_owner_qualified_create_and_avoids_unsupported_list_head() -> None:
+    """Creation may use owner:branch; reuse must use supported JSON fields."""
+    body = _target_body("pr-open")
+    create_commands = re.findall(r"gh pr create .*?--head \"\$\$HEAD_SPEC\"", body)
+
+    assert len(create_commands) == 2
+    assert '--head "$$HEAD_SPEC"' not in body.split("URL=$$(gh pr list", 1)[1].split("if [ -z", 1)[0]
+    assert "--json url,headRepositoryOwner,headRefName" in body
+    assert "env.PR_HEAD_OWNER" in body and "env.PR_HEAD_NAME" in body
 
 
 def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:
@@ -125,8 +201,11 @@ def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:
     entry points drift until one of them stops checking.
     """
     text = MAKEFILE.read_text(encoding="utf-8")
-    assert text.count(ARM_COMMAND) == 1, (
-        f"{ARM_COMMAND!r} appears more than once; the soundness check can drift between copies"
+    executable = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith(("#", "@#")))
+    assert ARM_COMMAND not in executable, "Makefile contains a second executable arming implementation"
+    body = _target_body("pr-arm-auto-merge")
+    assert "pr-landing-ready" in body and "EVIDENCE is required" in body, (
+        "Makefile arm target no longer delegates to the readiness transaction"
     )
 
 
@@ -137,11 +216,9 @@ def test_auto_merge_enablement_point_preserves_soundness_withholding() -> None:
     moving the enablement point would quietly drop the control that keeps
     oracle-adjacent changes from merging hands-free.
     """
-    body = _target_body("pr-arm-auto-merge")
-    assert "auto_merge_soundness_paths.py" in body, "arming path no longer consults the soundness predicate"
-    arm_index = body.index(ARM_COMMAND)
-    check_index = body.index("auto_merge_soundness_paths.py")
-    assert check_index < arm_index, "soundness check runs after arming, so it cannot withhold"
+    helper = (REPO_ROOT / "scripts" / "pr_landing.py").read_text(encoding="utf-8")
+    assert "soundness_paths_changed" in helper, "arming helper no longer consults the soundness predicate"
+    assert "--auto" in helper and "--match-head-commit" in helper, "arming helper lost its guarded merge operation"
 
 
 # ---------------------------------------------------------------------------

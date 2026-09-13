@@ -4,7 +4,8 @@ name: Auto-merge revocation
 #
 # Arming is exclusively local. `make pr-open` withholds auto-merge; the only
 # arm paths are `make pr-ready` / `make pr-arm-auto-merge` (or
-# `make pr-open READY=1`) on a finished branch. This workflow NEVER arms.
+# `make pr-open READY=1` when reusing an already-open, reviewed PR) on a
+# finished branch. A newly created PR stays held. This workflow NEVER arms.
 #
 # History: this file used to arm on `opened` (defeating the #1567 Makefile
 # hold — live proof: #1568/#1569 merged hands-free seconds after creation),

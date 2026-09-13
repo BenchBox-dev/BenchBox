@@ -66,6 +66,80 @@ def make_target(
     )
 
 
+def _fake_uv_for_lifecycle(bin_dir: Path, calls: Path, install_attempt: Path) -> None:
+    """Run lifecycle metadata through Python while detecting forbidden hook installs."""
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    fake = bin_dir / "uv"
+    fake.write_text(
+        "#!/bin/sh\n"
+        f'for arg in "$@"; do printf "%s\\n" "$arg" >> "{calls}"; done\n'
+        f'for arg in "$@"; do case "$arg" in pre-commit|install) touch "{install_attempt}" ;; esac; done\n'
+        'if [ "${1:-}" = run ]; then\n'
+        "  shift 3\n"
+        '  [ "${1:-}" = python ] || exit 1\n'
+        "  shift\n"
+        f'  exec "{sys.executable}" "$@"\n'
+        "fi\n"
+        "exit 1\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+
+
+def test_worktree_create_does_not_install_shared_hooks_from_linked_worktree(tmp_path: Path) -> None:
+    """Lifecycle creation must leave common-hook installation to the primary clone."""
+    repo = init_repo_with_origin(tmp_path / "repo")
+    hooks = repo / ".git" / "hooks"
+    hooks.mkdir(parents=True, exist_ok=True)
+    hook = hooks / "pre-commit"
+    hook.write_text(
+        f"#!/bin/sh\nINSTALL_PYTHON={sys.executable}\n",
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    before = hook.read_text(encoding="utf-8")
+
+    fake_bin = tmp_path / "fake-bin"
+    calls = tmp_path / "uv-calls.txt"
+    install_attempt = tmp_path / "install-attempted"
+    _fake_uv_for_lifecycle(fake_bin, calls, install_attempt)
+    env = {**make_test_env(tmp_path / "home"), "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}"}
+    branch = "fix/test-no-linked-hook"
+    linked = tmp_path / "wt-no-hook"
+
+    result = make_target(
+        repo,
+        "worktree-create",
+        f"BRANCH={branch}",
+        f"WORKTREE_PATH={linked}",
+        env=env,
+    )
+
+    try:
+        assert result.returncode == 0, result.stderr
+        assert not install_attempt.exists()
+        assert "pre-commit" not in calls.read_text(encoding="utf-8")
+        assert "install" not in calls.read_text(encoding="utf-8")
+        assert hook.read_text(encoding="utf-8") == before
+    finally:
+        if linked.exists():
+            cleanup = subprocess.run(
+                ["git", "worktree", "remove", "--force", str(linked)],
+                cwd=repo,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            assert cleanup.returncode == 0, cleanup.stderr
+        subprocess.run(
+            ["git", "branch", "-D", branch],
+            cwd=repo,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+
 def test_worktree_create_publishes_immutable_provenance(tmp_path: Path) -> None:
     repo = init_repo_with_origin(tmp_path / "repo")
     env = make_test_env(tmp_path / "home")

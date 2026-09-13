@@ -13,6 +13,8 @@ PR_REVIEW_INCLUDE_RESOLVED ?= 0
 PR_REVIEW_FAIL_ON_PENDING ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
+PR_STATUS_LIMIT ?= 20
+PR_STATUS_ALL_OPEN_LIMIT ?= 1000
 DEV_LOOP_METRICS_DAYS ?= 30
 DEV_LOOP_METRICS_LIMIT ?= 100
 AUDIT_SHA_TARGET_REF ?= origin/develop
@@ -657,6 +659,8 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
+	@echo "-- Makefile public contract inventory --"
+	@uv run -- python make/check_makefile_inventory.py --write
 	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
 	@# Last regen step, contained: a failing skill-sync apply (e.g. an
 	@# unresolvable source rev in a fresh worktree) used to abort guards-fix
@@ -723,6 +727,7 @@ guards-fix:
 # tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
 # a vacuous pass inside the change whose whole purpose is removing vacuous
 # passes. That test now pins the gating instead.
+# The Make contract check is read-only here; guards-fix owns regeneration.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -773,6 +778,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed platform-manifest-check"; \
 	$(MAKE) oracle-coverage-map-check; \
 	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
+	$(MAKE) makefile-inventory-check; \
+	[ $$? -eq 0 ] || failed="$$failed makefile-inventory-check"; \
 	uv run -- python scripts/check_public_contract_drift.py; \
 	[ $$? -eq 0 ] || failed="$$failed public-contract-drift"; \
 	$(MAKE) audit-deps; \
@@ -1271,7 +1278,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1344,6 +1351,23 @@ pr-preflight-fast-tests:
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
+# Publication lane isolation is a diff-vs-base guard. The path classifier has
+# already produced the changed-path list for the PR, so this target consumes
+# that exact artifact instead of reimplementing path classification or asking
+# the working tree to infer a base. Keep it in the content guard, where
+# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
+lane-isolation-check:
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
+	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
+	[ -s "$$CHANGED_PATHS" ] || { echo "non-empty changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
+	status=0; \
+	for lane in site explorer corpus; do \
+		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
+	done; \
+	exit "$$status"
+
 # Local validation singleflight. Runs CMD once per identical validated input
 # across worktrees; identical repeats reuse the recorded receipt instead of
 # re-executing and colliding on the shared test lock. Receipts never certify
@@ -1351,7 +1375,7 @@ pr-preflight-fast-tests:
 #   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
 local-validation:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
-	@[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
+	[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
 	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
 
 local-validation-show:
@@ -1359,22 +1383,33 @@ local-validation-show:
 	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
 
 # Revision/readiness transactions behind one helper (scripts/pr_landing.py).
-# Existing pr-open/pr-ready recipes are unchanged; these stage readiness
-# explicitly: start records identity, withdraw disarms auto-merge before a
-# revision, ready verifies the exact head and enqueues only with --arm.
+# The live PR targets below use the same exact-checkout arming path: start
+# records identity, withdraw disarms auto-merge before a revision, and ready
+# verifies the exact head and enqueues only after the helper re-reads the PR.
 pr-landing-start:
-	uv run -- python scripts/pr_landing.py --worktree . start
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) start
 
 pr-landing-withdraw:
 	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
-	uv run -- python scripts/pr_landing.py --worktree . withdraw --pr "$(PR)"
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) withdraw --pr "$(PR)" \
+		$(if $(HEAD),--expected-head "$(HEAD)",)
 
 pr-landing-ready:
-	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
-	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
-	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
-	uv run -- python scripts/pr_landing.py --worktree . ready --pr "$(PR)" \
-		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" $(if $(ARM),--arm,)
+	@set -eu; \
+	[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) ready --pr "$(PR)" \
+		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" \
+		$(if $(ARM),--arm,) $(if $(BATCH),--require-batch,)
 
 pr-followup-record:
 	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
@@ -1386,7 +1421,9 @@ pr-followup-resume:
 	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
 
 pr-content-guard:
-	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \
@@ -1416,27 +1453,32 @@ pr-content-guard:
 
 # Push current branch and open a PR against develop. Auto-merge is WITHHELD by
 # default so a follow-up commit cannot race a merge. Arm only when the branch
-# is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
-# step. When a merge queue is enabled on develop, arming auto-merge enqueues
-# the PR for speculative integration once checks pass. Soundness-path diffs are
-# never armed or auto-enqueued (see pr-arm-auto-merge).
+# is final: `make pr-ready`, or `make pr-open READY=1` when reusing an already
+# open, reviewed PR. A newly created PR always remains held so it can receive
+# review before readiness is evaluated. When a merge queue is enabled on
+# develop, arming auto-merge enqueues the PR for speculative integration once
+# checks pass. Soundness-path diffs are never armed or auto-enqueued (see
+# pr-arm-auto-merge).
 # Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
 # Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
-# when the branch is final (or READY=1 here to arm after open/reuse).
+# when the branch is final. READY=1 arms only after reusing an already-open
+# PR; a newly created PR prints the exact pr-ready action and stays held.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 #
-# Currency: after fetching origin/develop, refuse unless that tip is an
-# ancestor of HEAD. Run `make pr-refresh` (one stale PR at a time) to absorb
-# develop. Do not merge develop here — pr-fanout would otherwise refresh
-# every worktree at once. STALE=1 is the explicit escape hatch.
+# Currency: after fetching origin/develop, an ancestor-only branch is accepted
+# by the native queue only after the live ruleset checker proves the queue and
+# its required protections. The merge-tree probe still blocks genuine base
+# conflicts. If the queue is absent, unknown, or misconfigured, the existing
+# current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
-	@$(MAKE) -s agent-write-preflight
-	@CURRENT=$$(git branch --show-current); \
+	@set -eu; \
+	$(MAKE) -s agent-write-preflight; \
+	CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
@@ -1444,62 +1486,115 @@ pr-open:
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
 	fi; \
+	if [ "$(READY)" = "1" ] && [ -z "$(EVIDENCE)" ]; then \
+		echo "EVIDENCE is required when READY=1; use make pr-open without READY=1 to publish a held PR." >&2; \
+		exit 2; \
+	fi; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	case "$$REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+		*/*) ;; \
+		*) echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+	esac; \
+	ORIGIN_URL=$$(git remote get-url --push origin) || { echo "Could not resolve the origin remote" >&2; exit 1; }; \
+	case "$$ORIGIN_URL" in \
+		git@github.com:*) ORIGIN_REPOSITORY="$${ORIGIN_URL#git@github.com:}" ;; \
+		ssh://git@github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#ssh://git@github.com/}" ;; \
+		https://github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#https://github.com/}" ;; \
+		*) echo "origin remote is not a supported GitHub URL or SSH form" >&2; exit 1 ;; \
+	esac; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%.git}"; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%/}"; \
+	ORIGIN_OWNER="$${ORIGIN_REPOSITORY%%/*}"; \
+	case "$$ORIGIN_REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+		*/*) ;; \
+		*) echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+	esac; \
+	HEAD_SPEC="$$CURRENT"; \
+	ORIGIN_REPOSITORY_KEY=$$(printf '%s' "$$ORIGIN_REPOSITORY" | tr 'A-Z' 'a-z'); \
+	TARGET_REPOSITORY_KEY=$$(printf '%s' "$$REPOSITORY" | tr 'A-Z' 'a-z'); \
+	if [ "$$ORIGIN_REPOSITORY_KEY" != "$$TARGET_REPOSITORY_KEY" ]; then \
+		HEAD_SPEC="$$ORIGIN_OWNER:$$CURRENT"; \
+	fi; \
+	PR_HEAD_OWNER="$$ORIGIN_OWNER"; \
+	PR_HEAD_NAME="$$CURRENT"; \
+	export PR_HEAD_OWNER PR_HEAD_NAME; \
 	git fetch origin develop --quiet; \
-	if [ "$(STALE)" != "1" ]; then \
-		git merge-base --is-ancestor origin/develop HEAD || { \
-			echo "Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1." >&2; \
+	if ! git merge-base --is-ancestor origin/develop HEAD; then \
+		if ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \
+			echo "Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted." >&2; \
 			exit 1; \
-		}; \
+		fi; \
+		QUEUE_REPORT=$$(mktemp); \
+		trap 'rm -f "$$QUEUE_REPORT"' EXIT; \
+		if ! gh auth token 2>/dev/null | uv run -- python scripts/ruleset_drift_check.py --queue-policy \
+			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token-stdin \
+			--output "$$QUEUE_REPORT"; then \
+			echo "Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate." >&2; \
+			exit 1; \
+		fi; \
+		if ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report "$$QUEUE_REPORT"); then \
+			echo "Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'." >&2; \
+			exit 1; \
+		fi; \
+		[ "$$DECISION" = "publish-without-refresh" ] || { echo "Refusing to open PR: unexpected stale-base decision $$DECISION." >&2; exit 1; }; \
+		echo "Verified native merge queue: publishing without an author-side base refresh."; \
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
-	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	REUSED_PR=0; \
+	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --state open \
+		--json url,headRepositoryOwner,headRefName \
+		--jq '.[] | select((.headRepositoryOwner.login | ascii_downcase) == (env.PR_HEAD_OWNER | ascii_downcase) and .headRefName == env.PR_HEAD_NAME) | .url' \
+		2>/dev/null | sed -n '1p'); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC" --body-file "$(PR_BODY_FILE)"); \
 		else \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC"); \
 		fi; \
 	else \
+		REUSED_PR=1; \
 		echo "Reusing existing PR: $$URL"; \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			gh pr edit "$$URL" --body-file "$(PR_BODY_FILE)"; \
+			gh pr edit --repo "$$REPOSITORY" "$$URL" --body-file "$(PR_BODY_FILE)"; \
 		fi; \
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
-		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
+		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or rerun 'make pr-open READY=1' to arm a reused reviewed PR."; \
+	elif [ "$$REUSED_PR" != "1" ]; then \
+		echo "PR created and held; READY=1 does not arm a newly created PR."; \
+		echo "Next action after review: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
 	else \
-		$(MAKE) -s pr-arm-auto-merge URL="$$URL"; \
+		$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
 	fi
 
-# Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
-# pr-open so the soundness check has exactly one implementation and both entry
-# points get it. When a merge queue is active on develop, auto-merge enqueues
-# the PR for speculative combined-tree validation.
+# Runs the readiness transaction for an already-open PR. This compatibility
+# target retains the historical name, but cannot arm without caller-supplied
+# evidence for the exact checkout.
 # Honours the durable `no-auto-merge` hold label: before this check, the label
 # was only durable against paths that never arm (workflow + sweep) while the
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
 # _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
-	@URL="$(URL)"; \
-	if [ -z "$$URL" ]; then \
-		CURRENT=$$(git branch --show-current); \
-		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	@set -eu; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	CURRENT=$$(git branch --show-current); \
+	PR_NUMBER="$(PR)"; \
+	if [ -n "$(URL)" ]; then \
+		if [ -n "$$PR_NUMBER" ]; then echo "PR and URL are mutually exclusive" >&2; exit 2; fi; \
+		PR_NUMBER=$$(gh pr view --repo "$$REPOSITORY" "$(URL)" --json number --jq '.number') || { echo "Could not resolve URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
 	fi; \
-	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
-	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
-	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
-		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
-		exit 0; \
-	fi; \
-	git fetch origin develop --quiet; \
-	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
-	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
-		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
-	else \
-		gh pr merge --auto --squash "$$URL"; \
-	fi
+	case "$$PR_NUMBER" in *[!0-9]*) echo "PR must resolve to a positive number" >&2; exit 2 ;; esac; \
+	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" -le 0 ]; then echo "PR must resolve to a positive number" >&2; exit 2; fi; \
+	[ -n "$$PR_NUMBER" ] || { echo "PR or URL is required" >&2; exit 2; }; \
+	EXPECTED_HEAD="$(HEAD)"; \
+	if [ -z "$$EXPECTED_HEAD" ]; then EXPECTED_HEAD=$$(git rev-parse HEAD); fi; \
+	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
+		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
@@ -1512,7 +1607,10 @@ pr-arm-auto-merge:
 # (#1503, #1521, #1531); the last two stranded the very commits that addressed
 # their own review findings.
 pr-ready:
-	@$(MAKE) -s pr-arm-auto-merge
+	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
+	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }
+	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"
 
 shrink-rollup:
 	@git fetch origin develop --quiet
@@ -1542,7 +1640,8 @@ pr-fanout:
 # This is the stale-PR escape hatch when required checks must be current with
 # develop: GitHub can show a PR as CLEAN even though merge is waiting for a
 # branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
-# withholds unless READY=1); run `make pr-ready` when the branch is final.
+# withholds unless READY=1 reuses an already-open reviewed PR); run
+# `make pr-ready` when the branch is final.
 # Run this one stale PR at a time; updating several branches at once can let
 # the first merge stale the others again under strict checks.
 pr-refresh:
@@ -1582,7 +1681,13 @@ pr-conflict-scan:
 
 # Show open PRs against develop and their CI + auto-merge state.
 pr-status:
-	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
+	@if [ "$(ALL_OPEN)" = "1" ] || [ "$(ALL_OPEN)" = "true" ] || [ "$(ALL_OPEN)" = "yes" ]; then \
+		echo "All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):"; \
+		LIMIT="$(PR_STATUS_ALL_OPEN_LIMIT)"; \
+	else \
+		LIMIT="$(PR_STATUS_LIMIT)"; \
+	fi; \
+	gh pr list --base develop --state open --limit "$$LIMIT" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.

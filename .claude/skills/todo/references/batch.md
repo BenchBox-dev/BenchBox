@@ -140,3 +140,51 @@ TODO | tracker state | PR/state | head | verification | blocker | next action
 Include the ledger path and distinguish open, merged, tracker-complete, waiting,
 and blocked work. If anything remains non-terminal, provide the exact resume
 action rather than waiting in the current context.
+
+## Prepared feature delivery
+
+Prepared mode is opt-in and requires a server advertising the compatible
+registered-batch capability and schema version. The integrator first calls
+`register_batch` once with one repository identity, owner generation,
+integration branch/worktree, immutable start head, ordered member IDs, frozen
+per-member scope and its hash, delivery boundary, and intended terminal
+outcome. Duplicate batch IDs, duplicate or foreign member enrollment, and
+late membership fail closed. Each member is then created with matching batch
+metadata and an explicit implementation edge before it is claimed.
+
+For each member, `take` one item, implement in an isolated worktree, and run
+the bounded upstream suite in that clean exact checkout. Call `prepare` with
+the exact source worktree and revision, that member's actual source base,
+accepted member head, current integration head, frozen scope hash,
+implementation edges, and passed evidence. A dependent member normally starts
+from its predecessor's accepted head; do not relabel that range as the batch
+start. Stored verification commands are records for a human to run;
+the tracker does not execute them. `prepare` releases the claim and leaves the
+member `open`; it never marks the member done. Readiness accepts only a
+same-batch implementation edge whose receipt is present at the registered
+integration head and matches repository, base, scope, owner generation, and
+member identity. Review, external dependencies, approvals, merge, deployment,
+and soak gates still require ordinary `done` state.
+
+The integrator owns branch assembly, binds exactly one final PR with
+`bind_batch_pr`, and rechecks the registered clean integration worktree and
+branch on every retry. Final evidence must map every member's accepted head
+and per-member base-to-head range, match the frozen scope union, final PR, repository,
+and current integration head, and match the actual Git tree. Re-take each
+member and call `finish` only after cumulative current-tree evidence exists.
+If work must stop, the registered owner calls `abort_batch` after releasing all
+member claims. Abort is durable and idempotent: it invalidates prepared and
+final member evidence, retains an already-bound final PR as immutable history,
+detaches recoverable members from the archived batch, and returns them to the
+ordinary claim/finish lifecycle. It refuses if any member is already `done`,
+so partial closeout remains resumable and terminal items are never reopened.
+Once every declared member finishes with final evidence, the batch is durably
+`completed`; completed or aborted batches reject later preparation, binding,
+abort, or member edits.
+Interrupted or partial closeout is retryable and cannot create a false done.
+Any member, scope, dependency, conflict, or late-enrollment change invalidates
+affected prepared and final evidence transitively. Scope patterns are not
+treated as a complete static overlap solver: the authority is each real Git
+changed-file check plus accepted-content comparison, which rejects a later
+member that overwrites an earlier accepted path. Serial mode remains the
+default for unrelated, cross-repo, or approval-separated work.

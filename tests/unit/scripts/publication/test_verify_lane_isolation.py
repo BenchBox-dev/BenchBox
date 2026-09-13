@@ -212,6 +212,7 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["benchbox/core/runner.py"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["pyproject.toml"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
+    assert determine_affected_lanes(["CONTRIBUTING.md"]) == set()
 
     # Non-lane inputs affect no lanes
     assert (
