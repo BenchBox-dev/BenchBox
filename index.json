@@ -15137,7 +15137,7 @@
       "needs": [
         "sql-translation-ml-train-full"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Train and select the tiny SQLGlot edit model"
     },
