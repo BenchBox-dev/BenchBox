@@ -15065,7 +15065,7 @@
       "needs": [
         "sql-translation-ml-train-edits"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Evaluate frozen model artifacts on untouched SQL structures"
     },
