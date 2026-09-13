@@ -455,6 +455,7 @@ jobs:
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Open or update draft PR
+        id: pr
         # `always()` for the same reason as the status step above: the mirror PR
         # existing is what keeps develop's Corpus Drift Check actionable, so it
         # must not be collateral damage from a toolchain hiccup in the new
@@ -507,6 +508,75 @@ jobs:
             echo "PR #${EXISTING} already open for ${MIRROR_BRANCH}; updating body."
             gh pr edit "${EXISTING}" --body "${BODY}"
           fi
+
+          # Resolve the PR after create/update so the post-creation freshness
+          # check can inspect the exact proposal that this run left open.
+          PR_NUMBER=$(gh pr list \
+            --base published-results \
+            --head "${MIRROR_BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+          if [[ ! "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Mirror PR was not found after create/update."
+            exit 1
+          fi
+          echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify mirror PR publication freshness
+        # The pre-push comparison prevents most stale proposals, but the
+        # accepted branch can advance while the push, status, or PR creation
+        # is in flight. Revalidate after the PR exists and close a stale
+        # proposal so it cannot be mistaken for a current mirror.
+        if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          MIRROR_BRANCH: ${{ steps.build.outputs.mirror_branch }}
+          PUBLISHED_BASE_SHA: ${{ steps.drift.outputs.published_base_sha }}
+          MIRROR_HEAD_SHA: ${{ steps.build.outputs.mirror_head_sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "${PR_NUMBER}" =~ ^[0-9]+$ ]]; then
+            echo "::error::Cannot verify mirror freshness without a PR number."
+            exit 1
+          fi
+
+          # Read both the live branch tip and the PR's recorded base/head.
+          # Comparing all three identities catches a stale accepted branch as
+          # well as an unexpected PR being selected for the deterministic head.
+          CURRENT_PUBLISHED_SHA=$(gh api \
+            "repos/${{ github.repository }}/git/ref/heads/published-results" \
+            --jq '.object.sha')
+          PR_JSON=$(gh pr view "${PR_NUMBER}" --json state,baseRefName,baseRefOid,headRefName,headRefOid)
+          PR_STATE=$(jq -r '.state' <<<"${PR_JSON}")
+          PR_BASE_REF=$(jq -r '.baseRefName' <<<"${PR_JSON}")
+          PR_BASE_SHA=$(jq -r '.baseRefOid' <<<"${PR_JSON}")
+          PR_HEAD_REF=$(jq -r '.headRefName' <<<"${PR_JSON}")
+          PR_HEAD_SHA=$(jq -r '.headRefOid' <<<"${PR_JSON}")
+
+          STALE_REASON=""
+          if [[ "${CURRENT_PUBLISHED_SHA}" != "${PUBLISHED_BASE_SHA}" ]]; then
+            STALE_REASON="published-results advanced after the mirror was built"
+          elif [[ "${PR_STATE}" != "OPEN" || "${PR_BASE_REF}" != "published-results" ]]; then
+            STALE_REASON="the created proposal no longer targets the expected base"
+          elif [[ "${PR_BASE_SHA}" != "${PUBLISHED_BASE_SHA}" ]]; then
+            STALE_REASON="the proposal base does not match the captured published-results revision"
+          elif [[ "${PR_HEAD_REF}" != "${MIRROR_BRANCH}" || "${PR_HEAD_SHA}" != "${MIRROR_HEAD_SHA}" ]]; then
+            STALE_REASON="the created proposal head does not match the built mirror revision"
+          fi
+
+          if [[ -n "${STALE_REASON}" ]]; then
+            if [[ "${PR_STATE}" == "OPEN" ]]; then
+              gh pr close "${PR_NUMBER}" \
+                --comment "Closing this mirror proposal: ${STALE_REASON}. Re-run the mirror workflow to build from the current published-results tip."
+            fi
+            echo "::error::${STALE_REASON}; mirror PR #${PR_NUMBER} was closed."
+            exit 1
+          fi
+
+          echo "Mirror PR #${PR_NUMBER} is fresh against published-results@${PUBLISHED_BASE_SHA}."
 
       - name: Fail the run if mirrored content failed validation
         # Runs after the PR/status steps above on purpose: the PR must still

@@ -99,6 +99,28 @@ def test_sync_workflow_captures_and_compares_publication_revision() -> None:
     assert "built from published-results@${PUBLISHED_BASE_SHA}" in workflow
 
 
+def test_sync_workflow_revalidates_publication_after_pr_creation() -> None:
+    """A publication move after the build must close the stale mirror PR."""
+    steps = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))["jobs"]["mirror"]["steps"]
+    names = [step.get("name") for step in steps]
+    open_step = next(step for step in steps if step.get("name") == "Open or update draft PR")
+    verify_step = next(step for step in steps if step.get("name") == "Verify mirror PR publication freshness")
+
+    assert open_step["id"] == "pr"
+    assert 'echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"' in open_step["run"]
+    assert names.index("Open or update draft PR") < names.index("Verify mirror PR publication freshness")
+    assert names.index("Verify mirror PR publication freshness") < names.index(
+        "Fail the run if mirrored content failed validation"
+    )
+    assert "git/ref/heads/published-results" in verify_step["run"]
+    assert "baseRefOid" in verify_step["run"]
+    assert '"${CURRENT_PUBLISHED_SHA}" != "${PUBLISHED_BASE_SHA}"' in verify_step["run"]
+    assert 'gh pr close "${PR_NUMBER}"' in verify_step["run"]
+    assert "Re-run the mirror workflow" in verify_step["run"]
+    assert 'echo "::error::${STALE_REASON}' in verify_step["run"]
+    assert "exit 1" in verify_step["run"]
+
+
 def test_sync_workflow_references_publication_fixed_point_gate() -> None:
     """The mirror must refuse a corpus that re-anonymization would rewrite.
 
