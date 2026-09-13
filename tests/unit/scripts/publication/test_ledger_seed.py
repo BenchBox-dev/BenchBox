@@ -22,10 +22,10 @@ IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.j
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
-# The moving accepted ref. Reproducibility checks resolve it once and bind the
-# result to the recorded input with --expect-source, so an advancing mirror
-# cannot turn unchanged code red. Only the freshness path reads the live tip.
-PINNED_SOURCE_REF = "origin/published-results"
+# The moving accepted ref is used only for freshness and provenance assertions.
+# Reproduction checks use RECORDED_SOURCE below, so an advancing mirror cannot
+# turn unchanged code red. Only the freshness path reads the live tip.
+ACCEPTED_REF = "origin/published-results"
 
 
 def _recorded_source() -> str:
@@ -174,7 +174,7 @@ def test_seed_provenance_binds_recorded_snapshot() -> None:
     """w0: the seed persists which ref resolved to the recorded SHA and when."""
     data = _seed()
     assert COMMIT_SHA_RE.match(data["source"])
-    assert data["source_resolved_from"] == data["source_ref"] == PINNED_SOURCE_REF
+    assert data["source_resolved_from"] == data["source_ref"] == ACCEPTED_REF
     assert re.match(r"^\d{4}-\d{2}-\d{2}T", data["source_resolved_at"]), "resolved_at must be a UTC timestamp"
 
 
@@ -182,7 +182,7 @@ def test_seed_source_is_pinned_commit_sha() -> None:
     """M8: `source` is an immutable commit SHA, not a moving branch name."""
     data = _seed()
     assert COMMIT_SHA_RE.match(data["source"]), f"source must be a 40-hex commit SHA, got {data['source']!r}"
-    assert data["source_ref"] == PINNED_SOURCE_REF
+    assert data["source_ref"] == ACCEPTED_REF
 
 
 def test_seed_count_matches_union_length() -> None:
@@ -286,7 +286,7 @@ def test_cli_regenerates_committed_seed_content(tmp_path: Path) -> None:
     switching inputs and turning unchanged code red.
     """
     out = tmp_path / "seed.json"
-    result = _run_cli("--accepted-ref", PINNED_SOURCE_REF, "--expect-source", RECORDED_SOURCE, "--output", str(out))
+    result = _run_cli("--accepted-ref", RECORDED_SOURCE, "--expect-source", RECORDED_SOURCE, "--output", str(out))
     assert result.returncode == 0, result.stderr
     regen = json.loads(out.read_text(encoding="utf-8"))
     committed = _seed()
@@ -330,7 +330,7 @@ def test_cli_rejects_disposition_path_outside_union(tmp_path: Path) -> None:
     out = tmp_path / "seed.json"
     result = _run_cli(
         "--accepted-ref",
-        PINNED_SOURCE_REF if REF_AVAILABLE else "HEAD",
+        RECORDED_SOURCE if REF_AVAILABLE else "HEAD",
         "--output",
         str(out),
         "--published-only",
@@ -407,7 +407,9 @@ def test_cli_materialize_rejects_seed_without_recorded_source(tmp_path: Path) ->
     legacy.write_text(json.dumps(stripped), encoding="utf-8")
     result = _run_cli(
         "--accepted-ref",
-        PINNED_SOURCE_REF,
+        RECORDED_SOURCE,
+        "--expect-source",
+        RECORDED_SOURCE,
         "--ledger-seed",
         str(legacy),
         "--materialize-dest",
@@ -490,7 +492,14 @@ def test_isolated_replay_moved_ref_fails_closed_snapshot_reproduces(tmp_path: Pa
     (Path(repo) / "results-data" / "bundles" / "b.json").unlink()
     dest = tmp_path / "archive"
     result = cli(
-        "--accepted-ref", "published-results", "--ledger-seed", str(seed_path), "--materialize-dest", str(dest)
+        "--accepted-ref",
+        "published-results",
+        "--expect-source",
+        snapshot,
+        "--ledger-seed",
+        str(seed_path),
+        "--materialize-dest",
+        str(dest),
     )
     assert result.returncode == 0, result.stderr
     assert json.loads((dest / "b.json").read_text(encoding="utf-8")) == {"id": "b"}
