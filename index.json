@@ -15092,7 +15092,7 @@
       "needs": [
         "sql-translation-ml-contract"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Build deterministic DuckDB and SQLite fixture creation"
     },
