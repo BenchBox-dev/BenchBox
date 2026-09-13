@@ -15278,15 +15278,10 @@
       "title": "Find and correct durable copies of the stale 'git config user.email noreply@anthropic.com' instruction"
     },
     "standalone-todo-db-renew-verb": {
-      "claim": {
-        "expires_at": "2026-09-14T21:17:58Z",
-        "generation": "6dc5e944bbdb4e5fb54445046e505d1e",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Teach the standalone todo-db CLI and its compat adapter the renew verb"
     },
     "standardize-benchmark-constraint-parameter-apis": {
