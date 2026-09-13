@@ -15119,7 +15119,7 @@
       "needs": [
         "sql-translation-ml-generator"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Audit and import external SQL translation evaluation cases"
     },
