@@ -5,9 +5,10 @@
     "The batch delivery integration test, skill integrity checks, and todo runtime tests pass against the installed project-local runtime.",
     "The batch rollout evidence is refreshed and no longer reports ACTIVE_RUNTIME_LACKS_REGISTERED_BATCH."
   ],
-  "context": "Authorized implementation scope: _project/scripts/pyproject.toml, _project/scripts/uv.lock, the exact vendored todo-db wheel, _project/analysis/batch-rollout-evidence.json, and directly relevant tests. Preserve the no-sibling-path and clean-install guarantees.",
+  "context": "Implemented and published in BenchBox PR #2112 at exact head 1337427498627b23c5870983d66ee9a571fbd1c7. The project-local locked runtime installs reproducible todo-db 0.7.3 wheel sha256 d5d411703d571559df60b88445da194c59423c6d6d91f12f2d3177e41ab05ce4 built from todo-db revision 74631c83f74b7f184abbd49001f032943b720774. Full JSON-RPC initialize/initialized/tools-list reports server 0.7.3, schema 3, 14 tools, and all four batch tools. Focused checks: 8 passed; make skill-integrity-check passed. Rebased full make pr-preflight: 29,734 passed, 19 skipped; artifact hygiene clean. PR merge is still required before tracker completion.",
   "description": "BenchBox's project-local todo-db runtime is still pinned to the vendored 0.7.2 wheel and exposes schema 1 with 10 tools. The reviewed compatible source landed in todo-db PR #39 at revision 74631c83f74b7f184abbd49001f032943b720774 as package 0.7.3 with schema 3 and 14 tools, including register_batch, prepare, bind_batch_pr, and abort_batch. Upgrade the project-local vendored package and lock, then prove the installed runtime through a full JSON-RPC handshake. Do not rely on a sibling checkout or source-only evidence.",
   "links": [
-    "https://github.com/joaomoreno/todo-db/pull/39"
+    "https://github.com/joeharris76/todo-db/pull/39",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2112"
   ]
 }
