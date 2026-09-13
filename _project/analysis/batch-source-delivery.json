@@ -1,0 +1,128 @@
+{
+  "receipt_version": 1,
+  "recorded_at": "2026-09-12T18:16:42Z",
+  "benchbox_item": "batch-prepared-delivery-tracker-and-skill",
+  "source_owner": {
+    "repository": "https://github.com/joeharris76/todo-db",
+    "project": "todo-db",
+    "canonical_branch": "main",
+    "source_tracker": {
+      "system": "BenchBox todo-db MCP",
+      "item_id": "batch-prepared-delivery-tracker-and-skill",
+      "upstream_item_id": null,
+      "upstream_item_link": null,
+      "note": "The merged source PR does not identify a separate upstream tracker item; this receipt binds the BenchBox coordination item to the source PR and merge tip."
+    }
+  },
+  "source_pr": {
+    "repository": "joeharris76/todo-db",
+    "number": 39,
+    "title": "Add registered prepared-batch delivery contracts",
+    "url": "https://github.com/joeharris76/todo-db/pull/39",
+    "head_revision": "0dbd2801a235d91640fa9b42cc7613735779e1a9",
+    "merge_revision": "74631c83f74b7f184abbd49001f032943b720774",
+    "merged_at": "2026-09-12T18:00:29Z",
+    "main_tip_checked": "74631c83f74b7f184abbd49001f032943b720774",
+    "ancestry": "merge_revision is origin/main and contains head_revision"
+  },
+  "source_worktree": "/Users/joe/Developer/todo-db.wt-batch-source-receipt",
+  "source_revision": "74631c83f74b7f184abbd49001f032943b720774",
+  "source_checkout": {
+    "remote": "https://github.com/joeharris76/todo-db.git",
+    "branch": null,
+    "detached": true,
+    "clean": true,
+    "head_matches_source_revision": true,
+    "main_tip_matches_source_revision": true
+  },
+  "capability": {
+    "package_version": "0.7.3",
+    "state_schema_version": 3,
+    "supported_state_schema_versions": [1, 2, 3],
+    "prepared_receipt_schema": "prepared_work_v1",
+    "mcp_tools": ["register_batch", "prepare", "bind_batch_pr", "abort_batch"],
+    "contract": "Registered repository/integration identity, explicit same-batch prepared edges, clean exact source receipts, exact final-tree evidence, final PR binding, and resumable abort/recovery."
+  },
+  "verification": {
+    "local_revision": "74631c83f74b7f184abbd49001f032943b720774",
+    "commands": [
+      {
+        "command": "uv run --extra mcp ruff check src tests",
+        "result": "pass",
+        "summary": "All checks passed."
+      },
+      {
+        "command": "uv run --extra mcp -- python -m pytest tests/test_git_pub.py -q",
+        "result": "pass",
+        "summary": "16 passed in 7.56s",
+        "note": "Git publication, concurrency, conflict, offline, lost-reply, and recovery controls for the current source filename."
+      },
+      {
+        "command": "uv run --extra mcp -- python -m pytest tests/test_batch_delivery.py tests/test_store.py tests/test_mcp_slim.py tests/test_mcp_stdio.py -q",
+        "result": "pass",
+        "summary": "58 passed in 21.78s",
+        "scope": ["tests/test_batch_delivery.py", "tests/test_store.py", "tests/test_mcp_slim.py", "tests/test_mcp_stdio.py"],
+        "note": "The PR description recorded 46 passed; the exact merged checkout currently collects and passes 58 tests."
+      },
+      {
+        "command": "uv run --extra mcp -- python -m pytest tests/test_service.py -k 'not huge_needs and not many_deps' -q",
+        "result": "pass",
+        "summary": "13 passed, 2 deselected in 16.79s",
+        "note": "The two deselected nodes are the known large-needs and many-dependencies cases."
+      },
+      {
+        "command": "uv run --extra mcp -- python -m pytest tests/test_migrate.py -q",
+        "result": "pass",
+        "summary": "10 passed in 0.48s",
+        "note": "Additional migration and legacy-schema negative controls."
+      }
+    ],
+    "prescribed_filename_adaptations": {
+      "tests/test_agent_service.py": "Absent from the exact merged checkout; service coverage is in tests/test_service.py.",
+      "tests/test_agent_git.py": "Absent from the exact merged checkout; Git-publication coverage is in tests/test_git_pub.py.",
+      "tests/test_concurrency.py": "Absent from the exact merged checkout; prepared/concurrency coverage is in tests/test_batch_delivery.py, tests/test_store.py, and tests/test_git_pub.py.",
+      "tests/test_mcp_server.py": "Absent from the exact merged checkout; public MCP coverage is in tests/test_mcp_slim.py and tests/test_mcp_stdio.py.",
+      "tests/test_migrations.py": "Absent from the exact merged checkout; migration coverage is in tests/test_migrate.py."
+    },
+    "excluded": [
+      {
+        "node": "tests/test_service.py::test_take_with_huge_needs_keeps_generation",
+        "reason": "Known non-terminating Git-publication case during bounded local runs; excluded from the passing set and not used as evidence of source behavior."
+      }
+    ],
+    "hosted_pr_39": {
+      "required_checks": [
+        "test (3.10) [34709733054/103596161175]",
+        "test (3.10) [34709736517/103596169848]",
+        "test (3.13) [34709733054/103596161087]",
+        "test (3.13) [34709736517/103596169958]"
+      ],
+      "result": "all passed",
+      "reviews": "no GitHub review records returned by the live PR endpoint"
+    }
+  },
+  "skill_catalog_delivery": {
+    "repository": "https://github.com/joeharris76/skill-sync-skills",
+    "pr": 80,
+    "title": "Document registered prepared-batch delivery",
+    "url": "https://github.com/joeharris76/skill-sync-skills/pull/80",
+    "merge_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
+    "merged_at": "2026-09-12T18:05:15Z",
+    "main_tip_checked": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
+    "required_check": "Template gate and wrapper cycle: passed",
+    "benchbox_pinned_revision": "c8473708b5c7809700e8449ecde0dabcdc8e9892",
+    "deployment_status": "merged_upstream_pinned_in_benchbox",
+    "mirror_status": "regenerated from the pinned catalog revision; .claude/skills is tracked and .agents/skills is materialized locally"
+  },
+  "rollback": {
+    "todo_db": "Revert merge commit 74631c83f74b7f184abbd49001f032943b720774 through an authorized todo-db PR, restoring pre-merge main b93ab3555f7b6b198383d0903efbc78d9749bf92.",
+    "skill_catalog": "Restore BenchBox's skill-sync revision to d55ac93b9c35f63077b948e4183b4ff960012069 and regenerate mirrors through the repository skill-sync workflow.",
+    "tracker_state": "No BenchBox tracker state, schema branch, or prepared batch was mutated by this receipt."
+  },
+  "gaps": [
+    "The active todo-db runtime still lacks the registered-batch capability; prepared feature mode remains disabled until the supported dependency and MCP registration are upgraded.",
+    "The canonical source PR does not expose a separate upstream TODO identity or link.",
+    "The known huge-needs service node remains unproven because it did not terminate during bounded runs."
+  ],
+  "consumer_boundary": "This receipt records merged source and catalog evidence only. It does not activate prepared batch mode, alter BenchBox's tracker, or authorize generated mirror edits."
+}

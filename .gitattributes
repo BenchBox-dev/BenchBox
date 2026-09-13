@@ -20,3 +20,4 @@
 # machinery). Keep the committed `.claude/skills` snapshot byte-stable across
 # checkouts: no CRLF conversion, same as the old managed block.
 /.claude/skills/** -text
+/.agents/skills/** -text

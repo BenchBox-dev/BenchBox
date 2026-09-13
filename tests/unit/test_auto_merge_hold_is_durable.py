@@ -22,6 +22,7 @@ contract across workflow + sweep layers:
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import re
 import sys
@@ -37,6 +38,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 AUTO_MERGE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-merge-on-open.yml"
 NIGHTLY_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "nightly.yml"
 SWEEP_SCRIPT = REPO_ROOT / "_project" / "scripts" / "green_unmerged_sweep.py"
+PR_LANDING_SCRIPT = REPO_ROOT / "scripts" / "pr_landing.py"
 PR_TRIAGE_DOC = REPO_ROOT / "docs" / "operations" / "pr-triage.md"
 
 HOLD_LABEL = "no-auto-merge"
@@ -47,8 +49,6 @@ DISABLE_COMMAND = "gh pr merge --disable-auto"
 # tests/unit/workflows/test_auto_merge_enablement_point.py.
 SOUNDNESS_DISABLE_IF = "steps.soundness.outputs.soundness_path == 'true'"
 HOLD_DISABLE_IF = "steps.hold.outputs.held == 'true'"
-
-MAKEFILE = REPO_ROOT / "Makefile"
 
 
 def _load_yaml(path: Path) -> dict[str, Any]:
@@ -82,12 +82,22 @@ def _revoke_job() -> dict[str, Any]:
     return jobs["revoke"]
 
 
-def _makefile_target_body(name: str) -> str:
-    """Return the recipe lines of a Makefile target."""
-    text = MAKEFILE.read_text(encoding="utf-8")
-    match = re.search(rf"^{re.escape(name)}:.*?\n((?:\t.*\n|\n)*)", text, re.MULTILINE)
-    assert match, f"Makefile has no target {name!r}"
-    return match.group(1)
+def _function_source(path: Path, name: str) -> tuple[str, str]:
+    """Return helper source and one named function's source."""
+    text = path.read_text(encoding="utf-8")
+    tree = ast.parse(text)
+    function = next(
+        (
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
+        ),
+        None,
+    )
+    assert function is not None, f"{path} has no {name}() helper"
+    source = ast.get_source_segment(text, function)
+    assert source is not None
+    return text, source
 
 
 def _load_sweep():
@@ -171,31 +181,36 @@ def test_workflow_skips_drafts_at_job_level() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Makefile: the one live arm path honours the hold label (D3)
+# Helper: the one live arm path honours the hold label (D3)
 # ---------------------------------------------------------------------------
 
 
-def test_makefile_arm_path_refuses_hold_label() -> None:
-    """`make pr-arm-auto-merge` must check the label before arming.
+def test_arm_helper_refuses_hold_label_before_enqueue() -> None:
+    """The executable arm path must preserve the durable hold safety contract.
 
     Before this guard the label was only honoured by layers that never arm
     (workflow revocation + report-only sweep), while the one live arm path
     ignored it: #1626 was armed at 2026-08-06T13:48:46Z, 52s after the label
     was applied. A durable hold the arm path ignores is not a hold.
     """
-    body = _makefile_target_body("pr-arm-auto-merge")
-    assert f"grep -qxF '{HOLD_LABEL}'" in body, "arm path no longer checks the hold label"
-    assert ARM_COMMAND in body
-    label_index = body.index(f"grep -qxF '{HOLD_LABEL}'")
-    arm_index = body.index(ARM_COMMAND)
-    assert label_index < arm_index, "label check runs after arming, so it cannot withhold"
-    # Exact-match semantics stay lockstep with the workflow's grep -qxF.
-    assert "--json labels" in body
-    # Fail closed: an unreadable label list (gh auth/rate-limit failure) must
-    # abort the arm, not fall through as "no label". Without this, a transient
-    # gh error piped into grep reads as label-absent and arms through the hold.
-    assert "refusing to arm (fail closed)" in body, "label read no longer fails closed"
-    assert body.index("refusing to arm (fail closed)") < arm_index
+    helper_text, arm_source = _function_source(PR_LANDING_SCRIPT, "arm_current_pr")
+    _, resolve_source = _function_source(PR_LANDING_SCRIPT, "resolve_pr")
+
+    assert f'HOLD_LABEL = "{HOLD_LABEL}"' in helper_text
+    assert '"--json"' in resolve_source and "labels,reviewDecision" in resolve_source, (
+        "arm path no longer requests hosted labels"
+    )
+    assert 'pr.get("labels")' in arm_source
+    hold_index = arm_source.index("if HOLD_LABEL in labels")
+    enqueue_index = arm_source.index("return enqueue_pr(")
+    assert hold_index < enqueue_index, "hold check runs after enqueue, so it cannot withhold"
+
+    # Hosted read failures and malformed responses must stop the arm path
+    # rather than being treated as an unlabeled PR.
+    assert "if rc != 0:" in resolve_source
+    assert "raise LandingError" in resolve_source
+    assert "except ValueError as exc:" in resolve_source
+    assert "unparseable gh pr list output" in resolve_source
 
 
 def test_soundness_unions_base_ref_and_pr_copy_predicates() -> None:

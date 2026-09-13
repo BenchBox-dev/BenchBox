@@ -111,41 +111,109 @@ fi
 # shares one set. `pre-commit install` records the absolute path of whichever
 # interpreter ran it, so installing from a worktree pins the shared hooks to a
 # directory that is later deleted -- and commits then fail in every worktree at
-# once. Presence is therefore not health: check that the recorded interpreter
-# still resolves, and always repair from the primary clone, never from the
-# caller's worktree. Repair is best-effort: CI re-runs the same guards, so a
-# failure to install is a warning rather than a refusal.
-hook_path="$common_abs/hooks/pre-commit"
-
-hooks_usable=no
-hook_reason="no pre-commit hook is installed"
-if [ -e "$hook_path" ]; then
-  hooks_usable=yes
-  for hook_name in pre-commit pre-push commit-msg; do
-    h_path="$common_abs/hooks/$hook_name"
-    if [ -e "$h_path" ]; then
-      hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$h_path" | head -n 1)
-      if [ -n "$hook_interpreter" ] && [ ! -x "$hook_interpreter" ]; then
-        hooks_usable=no
-        hook_reason="$hook_name recorded interpreter is gone ($hook_interpreter)"
-        break
-      fi
-    fi
-  done
+# once. Presence is therefore not health: check every hook type configured for
+# installation and fail closed when a hook is absent or its recorded
+# interpreter no longer resolves. The primary clone owns installation;
+# linked-worktree preflight never repairs shared hooks.
+hook_config="$top_abs/.pre-commit-config.yaml"
+hook_types=pre-commit
+if [ -f "$hook_config" ]; then
+  configured_hook_types=$(awk '
+    function emit_inline(    cleaned) {
+      cleaned = value
+      sub(/^.*\[/, "", cleaned)
+      sub(/\].*$/, "", cleaned)
+      gsub(/,/, " ", cleaned)
+      gsub(/"/, " ", cleaned)
+      gsub(/\047/, " ", cleaned)
+      print cleaned
+      collecting = 0
+    }
+    /^default_install_hook_types:[[:space:]]*\[/ {
+      value = $0
+      sub(/^[^:]*:[[:space:]]*/, "", value)
+      emit_inline()
+      next
+    }
+    /^default_install_hook_types:[[:space:]]*$/ {
+      collecting = 1
+      next
+    }
+    collecting {
+      if ($0 !~ /^[[:space:]]+/) {
+        collecting = 0
+        next
+      }
+      if ($0 ~ /^[[:space:]]*-[[:space:]]*/) {
+        value = $0
+        sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+        sub(/[[:space:]]+#.*$/, "", value)
+        gsub(/[[:space:]]+$/, "", value)
+        print value
+        next
+      }
+      if (index($0, "[")) {
+        value = $0
+        emit_inline()
+      }
+    }
+  ' "$hook_config")
+  [ -n "$configured_hook_types" ] && hook_types=$configured_hook_types
 fi
 
-if [ "$hooks_usable" != yes ]; then
-  # Hook types come from default_install_hook_types in .pre-commit-config.yaml,
-  # so all configured stages stay in sync.
-  # --frozen keeps the lockfile read-only; the environment must stay syncable so a
-  # cold-start clone (preflight before `uv sync`) can still install pre-commit and
-  # repair hooks pinned to a deleted interpreter.
-  if (cd "$primary_abs" && uv run --frozen -- pre-commit install >/dev/null 2>&1); then
-    printf 'Repaired commit-time hooks from %s (%s).\n' "$primary_abs" "$hook_reason"
-  else
-    echo "note: pre-commit install failed/unavailable; commit-time guards will not run here (CI still enforces them)" >&2
+for hook_name in $hook_types; do
+  case "$hook_name" in
+    *[!A-Za-z0-9_-]*)
+      echo "Refusing BenchBox write preflight: invalid configured hook type: $hook_name" >&2
+      exit 1
+      ;;
+  esac
+
+  hook_path="$common_abs/hooks/$hook_name"
+  if [ ! -f "$hook_path" ]; then
+    cat >&2 <<EOF
+Refusing BenchBox write preflight: the shared $hook_name hook is missing.
+
+  hook: $hook_path
+  owner: $primary_abs
+
+Install it from the primary clone, then rerun preflight:
+  (cd "$primary_abs" && uv run -- pre-commit install)
+Do not run pre-commit install from a linked worktree.
+EOF
+    exit 1
   fi
-fi
+
+  if [ ! -x "$hook_path" ]; then
+    cat >&2 <<EOF
+Refusing BenchBox write preflight: the shared $hook_name hook is not executable.
+
+  hook: $hook_path
+  owner: $primary_abs
+
+Install it from the primary clone, then rerun preflight:
+  (cd "$primary_abs" && uv run -- pre-commit install)
+Do not run pre-commit install from a linked worktree.
+EOF
+    exit 1
+  fi
+
+  hook_interpreter=$(sed -n 's/^INSTALL_PYTHON=//p' "$hook_path" | head -n 1)
+  if [ -n "$hook_interpreter" ] && [ ! -x "$hook_interpreter" ]; then
+    cat >&2 <<EOF
+Refusing BenchBox write preflight: the shared $hook_name hook is not usable.
+
+  hook:             $hook_path
+  INSTALL_PYTHON:   $hook_interpreter
+  primary clone:    $primary_abs
+
+Install it from the primary clone, then rerun preflight:
+  (cd "$primary_abs" && uv run -- pre-commit install)
+Do not run pre-commit install from a linked worktree.
+EOF
+    exit 1
+  fi
+done
 
 if [ "$ephemeral" = "yes" ]; then
   printf 'BenchBox write preflight OK (ephemeral clone): %s\n' "$top_abs"

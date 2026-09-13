@@ -46,6 +46,12 @@ a verification item, not a dismissal.
 
 ## Phase 3 — close tracker state
 
+Prepared feature members remain open until the integrator binds their commits
+to one current final tree and the member's final-tree verification passes.
+Then re-take each member and call `finish` with that evidence. Never close a
+member solely because its prepared receipt exists, its worker branch is an
+ancestor, or its PR is green.
+
 1. If you hold the claim, call `finish(id=..., generation=...)`.
 2. To close externally merged work without a live claim, `take` the item first,
    then `finish`. If someone else holds the claim, tell the human to close it.

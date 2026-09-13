@@ -66,12 +66,19 @@ Developers submit and arm PRs through repository standard Makefile targets:
 # Open PR against develop with currency check
 make pr-open
 
-# When PR is ready for merge, arm auto-enqueue
-make pr-ready
+# When PR is ready for merge, run the exact readiness transaction and arm
+make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` enforces that `origin/develop` is an ancestor of `HEAD` (fails fast on stale branches).
-- `make pr-ready` verifies the PR does not touch soundness paths before arming `gh pr merge --auto --squash`.
+- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first. For a
+  conflict-free stale branch it requires a live, complete
+  `ruleset_drift_check.py --queue-policy` result covering the queue
+  parameters, required checks, strict current-base policy, review enforcement,
+  and bypass-actor visibility. Only that verified queue permits publication
+  without a local refresh; absent, unknown, or drifted queue state keeps the
+  current-base gate and requires `make pr-refresh`.
+- `make pr-ready` verifies the exact checkout, live PR identity, review state,
+  required checks, holds, and readiness evidence before arming the queue.
 - Once approved and green on initial `pull_request` checks, GitHub automatically adds the PR to the merge queue.
 
 ### B. Soundness Path Withholding

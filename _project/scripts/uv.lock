@@ -56,7 +56,7 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.0.0,<2.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "sqlglot", specifier = ">=25.6.0,<31.0.0" },
-    { name = "todo-db", extras = ["mcp"], path = "vendor/todo_db-0.7.2-py3-none-any.whl" },
+    { name = "todo-db", extras = ["mcp"], path = "vendor/todo_db-0.7.3-py3-none-any.whl" },
     { name = "zstandard", specifier = ">=0.20.0" },
 ]
 
@@ -798,10 +798,10 @@ wheels = [
 
 [[package]]
 name = "todo-db"
-version = "0.7.2"
-source = { path = "vendor/todo_db-0.7.2-py3-none-any.whl" }
+version = "0.7.3"
+source = { path = "vendor/todo_db-0.7.3-py3-none-any.whl" }
 wheels = [
-    { filename = "todo_db-0.7.2-py3-none-any.whl", hash = "sha256:daa95669ef882e40897d51a26fc10a2c86e9cf2bff0a5e671f826c14b6022d02" },
+    { filename = "todo_db-0.7.3-py3-none-any.whl", hash = "sha256:d5d411703d571559df60b88445da194c59423c6d6d91f12f2d3177e41ab05ce4" },
 ]
 
 [package.optional-dependencies]

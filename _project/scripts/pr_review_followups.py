@@ -749,7 +749,11 @@ def first_body_line(body: str) -> str:
 
 def print_pending_table(pending: Sequence[PendingComment]) -> None:
     if not pending:
-        print("No pending PR review comments found.")
+        print("No pending PR review comments found; this is not a completion signal.")
+        print(
+            "Reconcile all open PRs with `make pr-status ALL_OPEN=1` and resume state "
+            "with `make pr-followup-resume KEY=...`."
+        )
         return
     print(f"{'PR':>6}  {'Comment':>12}  {'Thread':<24}  {'Resolved':<9}  {'Outdated':<9}  {'Path':<36}  Finding")
     print(f"{'-' * 6}  {'-' * 12}  {'-' * 24}  {'-' * 9}  {'-' * 9}  {'-' * 36}  {'-' * 40}")
