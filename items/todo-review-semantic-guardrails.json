@@ -1,5 +1,5 @@
 {
-  "context": "Separate deterministic checks from reviewer judgement. Add conservative\ntooling where the pattern is structurally detectable, and update review\nguidance where semantic context is required.\n",
+  "context": "Superseded by schema 3 task architecture (which removed legacy YAML work breakdown units and verification command arrays) and existing review guidance in .claude/skills/todo/references/review.md (L2 review checklist, own-edit-target freshness) and docs/agent/todo-review.md.",
   "description": "Follow-up from the PR 719 TODO review L2 audit. The review found defects that\nschema validation did not catch:\n\n- mutually exclusive work units encoded as normal pending work, even though the\n  TODO lifecycle has no skipped/waived work status;\n- verification commands whose shell semantics can produce ambiguous output;\n- missing `prior_art` on TODOs that add new modules, file locations, or\n  conventions;\n- evidence wording that uses one label for different domains, such as local\n  Docker host port vs adapter service/container port.\n\nThese are review-framework blind spots. Capture them as reusable TODO-review\nguardrails so future TODO reviews fail the pattern directly instead of relying\non reviewer memory.\n",
   "legacy": {
     "anti_patterns": [
