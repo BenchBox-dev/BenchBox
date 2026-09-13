@@ -220,6 +220,54 @@ DUCKDB_1_0_JSON_WRAPPED = """{
     ]
 }"""
 
+# DuckDB Python 1.6.0.dev379 / engine v2.0.0-alpha39998 analyzed-plan format.
+DUCKDB_2_0_PREVIEW_JSON_ANALYZED = """{
+    "operator": [
+        {
+            "type": "RESULT_COLLECTOR",
+            "timing": 0.0,
+            "intermediate_rows": 0,
+            "intermediate_size_bytes": 0,
+            "extra_info": {},
+            "children": [
+                {
+                    "type": "EXPLAIN_ANALYZE",
+                    "timing": 0.000001,
+                    "intermediate_rows": 0,
+                    "intermediate_size_bytes": 0,
+                    "extra_info": {},
+                    "children": [
+                        {
+                            "type": "PROJECTION",
+                            "timing": 0.000004,
+                            "intermediate_rows": 1,
+                            "intermediate_size_bytes": 4,
+                            "extra_info": {
+                                "Estimated Cardinality": "1",
+                                "Projections": "test_column"
+                            },
+                            "children": [
+                                {
+                                    "type": "DUMMY_SCAN",
+                                    "timing": 0.000001,
+                                    "intermediate_rows": 1,
+                                    "intermediate_size_bytes": 4,
+                                    "extra_info": {},
+                                    "children": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "query": {
+        "sql": "EXPLAIN (ANALYZE, FORMAT JSON) SELECT 1 AS test_column",
+        "total_time": 0.0002
+    }
+}"""
+
 # =============================================================================
 # Version metadata for parameterized testing
 # =============================================================================
@@ -238,6 +286,7 @@ VERSION_FIXTURES = [
     ("1.0.0", "json", "order_by", DUCKDB_1_0_JSON_ORDER_BY),
     ("1.0.0", "json", "with_timing", DUCKDB_1_0_JSON_WITH_TIMING),
     ("1.0.0", "json", "wrapped", DUCKDB_1_0_JSON_WRAPPED),
+    ("2.0.0-alpha39998", "json", "preview_analyzed", DUCKDB_2_0_PREVIEW_JSON_ANALYZED),
 ]
 
 # Expected operators for each fixture type
@@ -250,4 +299,5 @@ EXPECTED_OPERATORS = {
     "order_by": ["SORT", "SCAN"],
     "with_timing": ["PROJECT", "AGGREGATE", "SCAN"],
     "wrapped": ["PROJECT", "SCAN"],
+    "preview_analyzed": ["PROJECT"],
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DuckDB 2.0 preview compatibility** - BenchBox can parse the analyzed-plan
+  JSON emitted by the DuckDB 2.0 alpha engine. A pinned nightly lane checks the
+  preview package while stable DuckDB remains the default installation.
+
 ### Changed
 
 - **BREAKING: Python 3.11 is now required.** BenchBox has removed Python 3.10
