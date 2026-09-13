@@ -1357,10 +1357,11 @@ pr-preflight-fast-tests:
 # the working tree to infer a base. Keep it in the content guard, where
 # PATH_LISTS is mandatory and the caller has already selected the PR lanes.
 lane-isolation-check:
-	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
 	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
 	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
-	[ -f "$$CHANGED_PATHS" ] || { echo "changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
+	[ -s "$$CHANGED_PATHS" ] || { echo "non-empty changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
 	status=0; \
 	for lane in site explorer corpus; do \
 		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
@@ -1374,7 +1375,7 @@ lane-isolation-check:
 #   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
 local-validation:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
-	@[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
+	[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
 	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
 
 local-validation-show:
@@ -1399,9 +1400,10 @@ pr-landing-withdraw:
 		$(if $(HEAD),--expected-head "$(HEAD)",)
 
 pr-landing-ready:
-	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
-	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
-	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
+	@set -eu; \
+	[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
 	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
 		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
 		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
@@ -1419,7 +1421,8 @@ pr-followup-resume:
 	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
 
 pr-content-guard:
-	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
 	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
@@ -1470,7 +1473,7 @@ pr-content-guard:
 # conflicts. If the queue is absent, unknown, or misconfigured, the existing
 # current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
-	@set -euo pipefail; \
+	@set -eu; \
 	$(MAKE) -s agent-write-preflight; \
 	CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
@@ -1536,8 +1539,8 @@ pr-open:
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
 # _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
-	@set -euo pipefail; \
-	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
+	@set -eu; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
 	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	CURRENT=$$(git branch --show-current); \
 	PR_NUMBER="$(PR)"; \

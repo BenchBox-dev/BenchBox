@@ -119,7 +119,7 @@ hook_config="$top_abs/.pre-commit-config.yaml"
 hook_types=pre-commit
 if [ -f "$hook_config" ]; then
   configured_hook_types=$(awk '
-    function emit(    cleaned) {
+    function emit_inline(    cleaned) {
       cleaned = value
       sub(/^.*\[/, "", cleaned)
       sub(/\].*$/, "", cleaned)
@@ -127,18 +127,35 @@ if [ -f "$hook_config" ]; then
       gsub(/"/, " ", cleaned)
       gsub(/\047/, " ", cleaned)
       print cleaned
-      exit
+      collecting = 0
     }
-    /^default_install_hook_types:[[:space:]]*/ {
-      collecting = 1
+    /^default_install_hook_types:[[:space:]]*\[/ {
       value = $0
       sub(/^[^:]*:[[:space:]]*/, "", value)
-      if (index(value, "]")) emit()
+      emit_inline()
+      next
+    }
+    /^default_install_hook_types:[[:space:]]*$/ {
+      collecting = 1
       next
     }
     collecting {
-      value = value " " $0
-      if (index($0, "]")) emit()
+      if ($0 !~ /^[[:space:]]+/) {
+        collecting = 0
+        next
+      }
+      if ($0 ~ /^[[:space:]]*-[[:space:]]*/) {
+        value = $0
+        sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+        sub(/[[:space:]]+#.*$/, "", value)
+        gsub(/[[:space:]]+$/, "", value)
+        print value
+        next
+      }
+      if (index($0, "[")) {
+        value = $0
+        emit_inline()
+      }
     }
   ' "$hook_config")
   [ -n "$configured_hook_types" ] && hook_types=$configured_hook_types

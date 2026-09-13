@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
@@ -169,6 +170,20 @@ def test_fetch_environment_uses_pypi_endpoint(monkeypatch: pytest.MonkeyPatch) -
 
     assert ruleset_drift_check._fetch_environment("owner/repo", "secret") == _pypi_environment()
     assert seen == [("https://api.github.com/repos/owner/repo/environments/pypi", "secret")]
+
+
+def test_token_stdin_is_forwarded_to_all_github_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+    monkeypatch.setattr(ruleset_drift_check.sys, "stdin", io.StringIO("stdin-token\n"))
+    monkeypatch.setattr(ruleset_drift_check, "_fetch_live_rulesets", lambda _repo, token: seen.append(token) or {})
+    monkeypatch.setattr(
+        ruleset_drift_check,
+        "_fetch_environment",
+        lambda _repo, token: seen.append(token) or _pypi_environment(),
+    )
+
+    assert ruleset_drift_check.main(["--token-stdin"]) == 1
+    assert seen == ["stdin-token", "stdin-token"]
 
 
 def test_github_api_failure_is_reported_without_traceback(

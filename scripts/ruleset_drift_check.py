@@ -521,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
             for finding in queue_findings:
                 print(f"- {finding}", file=sys.stderr)
             return 1
-        live_pypi_environment = _fetch_environment(args.repo, args.token)
+        live_pypi_environment = _fetch_environment(args.repo, token)
     except Exception as exc:
         if args.output:
             args.output.write_text(

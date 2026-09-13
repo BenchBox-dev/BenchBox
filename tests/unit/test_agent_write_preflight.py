@@ -528,6 +528,21 @@ def test_preflight_fails_when_configured_sibling_hook_is_missing(tmp_path: Path,
     assert f"shared {missing_stage} hook is missing" in result.stderr
 
 
+def test_preflight_reads_block_style_configured_hook_types(tmp_path: Path) -> None:
+    """Block-style YAML must enforce every configured shared hook stage."""
+    primary, linked = _linked_worktree(tmp_path)
+    (linked / ".pre-commit-config.yaml").write_text(
+        "default_install_hook_types:\n  - pre-commit\n  - pre-push\n  - commit-msg\n",
+        encoding="utf-8",
+    )
+    for hook_name in ("pre-commit", "pre-push", "commit-msg"):
+        _write_generated_hook(primary, sys.executable, hook_name)
+
+    result = _run_in_clone(linked)
+
+    assert result.returncode == 0, result.stderr
+
+
 def test_worktree_removal_hook_isolation(tmp_path: Path) -> None:
     """Removing one linked worktree leaves hooks functional in other worktrees without manual PATH export."""
     primary = _init_clone(tmp_path / "BenchBox")

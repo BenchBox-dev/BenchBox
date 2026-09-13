@@ -214,6 +214,33 @@ def test_ready_all_green(tmp_path: Path) -> None:
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []
 
 
+def test_batch_ready_requires_active_registered_runtime(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    evidence = _evidence(head, batch=_canonical_batch(repo, head), require_batch=True)
+
+    failures = landing.ready_failures(_identity(repo, head), head, evidence, repo)
+
+    assert any("active todo-db runtime" in failure for failure in failures)
+
+
+def test_start_identity_is_persisted_and_consumed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _repo(tmp_path / "r")
+    identity = _identity(repo, HEAD)
+    monkeypatch.setenv("BENCHBOX_PR_LANDING_DIR", str(tmp_path / "landing-state"))
+    path = landing.record_start_identity(repo, identity.branch, identity, {"number": 3, "id": "PR_3"})
+
+    assert path.is_file()
+    assert landing.require_start_identity(repo, identity, identity.branch, pr_number=3)["schema"] == (
+        landing.START_RECORD_SCHEMA
+    )
+    identity.head = OTHER
+    with pytest.raises(landing.LandingError, match="changed after start"):
+        landing.require_start_identity(repo, identity, identity.branch, pr_number=3, require_unchanged_head=True)
+
+
 def test_ready_rejects_late_review_unpublished_and_stale_checks(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     head = subprocess.run(
@@ -817,6 +844,31 @@ def test_rerecording_a_new_head_starts_a_fresh_retry_budget(tmp_path: Path) -> N
     assert landing.consume_retry(tmp_path, "k", "rerun", OTHER)["allowed"] is True
 
 
+def test_followup_new_head_clears_terminal_result_and_final_pr(tmp_path: Path) -> None:
+    landing.record_followup(
+        tmp_path,
+        "k",
+        _batch_followup(
+            head=HEAD,
+            terminal="merged",
+            next_action="",
+            final_pr={"number": 3, "node_id": "PR_3", "head": HEAD},
+        ),
+    )
+    landing.record_followup(
+        tmp_path,
+        "k",
+        _batch_followup(head=OTHER, session="s2", phase="review"),
+    )
+
+    refreshed = landing.load_followup(tmp_path, "k")
+    assert refreshed is not None
+    assert refreshed.head == OTHER
+    assert refreshed.terminal is None
+    assert refreshed.final_pr is None
+    assert landing.resume_followup(refreshed)["status"] == "review"
+
+
 def test_live_check_verdicts_uses_get_only_invocation() -> None:
     # gh api sends POST whenever -F/--field/--paginate flags are present, and
     # list endpoints answer GET only: a POST 404s, rc != 0, and every landing
@@ -879,16 +931,39 @@ def test_enqueue_bound_path_rechecks_full_pr_identity() -> None:
                     "id": "PR_node_3",
                     "headRefName": "feat/x",
                     "headRefOid": HEAD,
+                    "state": "OPEN",
                     "reviewDecision": "APPROVED",
                 },
             ),
+            (0, _live_threads()),
             (0, ""),
         ]
     )
     assert landing.enqueue_pr(run, "o/r", 3, HEAD, HEAD, expected_branch="feat/x", expected_node_id="PR_node_3")[
         "enqueued"
     ]
-    assert "--match-head-commit" in run.calls[1]
+    assert "--match-head-commit" in run.calls[2]
+
+
+def test_enqueue_bound_path_rejects_new_unresolved_thread() -> None:
+    run = FakeRun(
+        [
+            (
+                0,
+                {
+                    "number": 3,
+                    "id": "PR_node_3",
+                    "headRefName": "feat/x",
+                    "headRefOid": HEAD,
+                    "state": "OPEN",
+                    "reviewDecision": "APPROVED",
+                },
+            ),
+            (0, _live_threads([{"isResolved": False, "isOutdated": False}])),
+        ]
+    )
+    with pytest.raises(landing.LandingError, match="unresolved"):
+        landing.enqueue_pr(run, "o/r", 3, HEAD, HEAD, expected_branch="feat/x", expected_node_id="PR_node_3")
 
 
 def test_worktree_binding_rejects_a_reused_checkout_identity(tmp_path: Path) -> None:
@@ -1194,6 +1269,10 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
     assert "pr-ready REPO=" in open_body and 'URL="$$URL"' in open_body
     executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert "gh pr merge --auto --squash" not in executable
+    for target in ("pr-landing-ready", "pr-open", "pr-arm-auto-merge"):
+        body = makefile.split(f"{target}:", 1)[1].split("\n\n", 1)[0]
+        assert "\\\n\t@[" not in body
+        assert "set -euo pipefail" not in body
 
 
 def test_makefile_has_separate_bounded_all_open_status_view() -> None:
@@ -1204,3 +1283,19 @@ def test_makefile_has_separate_bounded_all_open_status_view() -> None:
     assert "ALL_OPEN" in status
     assert "PR_STATUS_ALL_OPEN_LIMIT" in status
     assert "All open develop PRs" in status
+
+
+def test_lane_isolation_make_target_rejects_empty_changed_paths(tmp_path: Path) -> None:
+    lists = tmp_path / "lists"
+    lists.mkdir()
+    (lists / "changed.txt").write_text("", encoding="utf-8")
+    result = subprocess.run(
+        ["make", "-s", "lane-isolation-check", f"PATH_LISTS={lists}"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "non-empty changed paths artifact is required" in result.stderr

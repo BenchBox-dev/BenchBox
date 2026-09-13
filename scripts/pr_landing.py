@@ -56,6 +56,7 @@ REQUIRED_CONTEXTS: tuple[str, ...] = (
     "Results Explorer browser gate",
     "ruleset-drift",
 )
+REQUIRED_BATCH_TOOLS = frozenset({"register_batch", "prepare", "bind_batch_pr", "abort_batch"})
 MAX_RERUNS_PER_JOB = 1
 MAX_REENTRIES_PER_HEAD = 1
 PREPARED_RECEIPT_SCHEMA = "prepared_work_v1"
@@ -66,6 +67,7 @@ TODO_ID_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
 MAX_TODO_ID_LEN = 128
 VALID_REVIEW_DISPOSITIONS = frozenset({"approved"})
 FOLLOWUP_SCHEMA = "pr_followup_v2"
+START_RECORD_SCHEMA = "pr_landing_start_v1"
 FOLLOWUP_PHASES = frozenset(
     {"prepare", "pre-pr", "merge", "push", "review", "queue", "member-closeout", "post-merge", "blocked"}
 )
@@ -96,6 +98,129 @@ def state_dir(repo: Path) -> Path:
         return Path(override).expanduser()
     slug = hashlib.sha1(str(repo.resolve()).encode()).hexdigest()[:16]
     return Path.home() / ".benchbox" / "pr-landing" / slug
+
+
+def start_record_path(repo: Path, branch: str) -> Path:
+    """Return the per-worktree, per-branch start-identity record path."""
+    if not branch or len(branch) > 512 or any(ord(char) < 32 for char in branch):
+        raise LandingError("branch is invalid for a start-identity record")
+    digest = hashlib.sha256(branch.encode("utf-8")).hexdigest()[:32]
+    return state_dir(repo) / f"start-{digest}.json"
+
+
+def _write_json_atomic(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = json.dumps(data, indent=2) + "\n"
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    with tmp.open("w", encoding="utf-8") as handle:
+        handle.write(encoded)
+        handle.flush()
+        os.fsync(handle.fileno())
+    tmp.replace(path)
+
+
+def record_start_identity(repo: Path, branch: str, identity: GitIdentity, pr: dict | None) -> Path:
+    """Persist the exact start identity used by later withdraw/ready steps."""
+    path = start_record_path(repo, branch)
+    record = {
+        "schema": START_RECORD_SCHEMA,
+        "identity": asdict(identity),
+        "pr": (pr or {}).get("number"),
+        "pr_node_id": _pr_node_id(pr or {}) or None,
+        "remote_head": (pr or {}).get("headRefOid"),
+    }
+    _write_json_atomic(path, record)
+    return path
+
+
+def load_start_identity(repo: Path, branch: str) -> dict | None:
+    """Load a persisted start identity; malformed state is never trusted."""
+    path = start_record_path(repo, branch)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and data.get("schema") == START_RECORD_SCHEMA else None
+
+
+def require_start_identity(
+    repo: Path,
+    identity: GitIdentity,
+    branch: str,
+    *,
+    pr_number: int | None = None,
+    pr_node_id: str | None = None,
+    require_unchanged_head: bool = False,
+) -> dict:
+    """Require and consume the persisted start identity for a transition."""
+    record = load_start_identity(repo, branch)
+    if record is None or not isinstance(record.get("identity"), dict):
+        raise LandingError("start identity is missing; run pr-landing-start before this transition")
+    declared = record["identity"]
+    for key, actual in (
+        ("repository", identity.repository),
+        ("branch", branch),
+        ("worktree", identity.worktree),
+        ("base", identity.base),
+    ):
+        if declared.get(key) != actual:
+            raise LandingError(f"persisted start identity field {key!r} does not match the current checkout")
+    recorded_lifecycle = declared.get("lifecycle_id")
+    if recorded_lifecycle is not None and recorded_lifecycle != identity.lifecycle_id:
+        raise LandingError("persisted start identity lifecycle does not match the current checkout")
+    if require_unchanged_head and declared.get("head") != identity.head:
+        raise LandingError("the checkout changed after start; withdraw must run before the first edit")
+    recorded_pr = record.get("pr")
+    if recorded_pr is not None and recorded_pr != pr_number:
+        raise WrongPR(f"persisted start identity binds PR #{recorded_pr}, not declared PR #{pr_number}")
+    recorded_node = record.get("pr_node_id")
+    if pr_node_id is not None and recorded_node is not None and recorded_node != pr_node_id:
+        raise WrongPR("persisted start identity PR node id does not match the declared PR identity")
+    return record
+
+
+def batch_runtime_capability_available(repo: Path) -> bool:
+    """Return whether the checked-in active-runtime proof enables feature mode."""
+    evidence_path = repo / "_project" / "analysis" / "batch-rollout-evidence.json"
+    try:
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(evidence, dict):
+        return False
+    runtime = evidence.get("runtime")
+    active = runtime.get("active_benchbox") if isinstance(runtime, dict) else None
+    if not isinstance(active, dict):
+        return False
+    schema_version = active.get("schema_version")
+    supported = active.get("supported_schema_versions")
+    tools = active.get("registered_batch_tools")
+    handshake = active.get("mcp_handshake")
+    return (
+        isinstance(schema_version, int)
+        and not isinstance(schema_version, bool)
+        and schema_version >= 3
+        and isinstance(supported, list)
+        and 3 in supported
+        and isinstance(tools, list)
+        and REQUIRED_BATCH_TOOLS.issubset(tools)
+        and isinstance(handshake, dict)
+        and handshake.get("result") == "pass"
+    )
+
+
+def batch_mode_failures(evidence: ReadyEvidence, repo: Path) -> list[str]:
+    """Return readiness failures specific to feature delivery mode."""
+    if not evidence.require_batch:
+        return []
+    failures: list[str] = []
+    if not isinstance(evidence.batch, dict):
+        failures.append("batch evidence is required for batch-mode readiness")
+    if not batch_runtime_capability_available(repo):
+        failures.append(
+            "batch delivery requires the active todo-db runtime to advertise schema 3 and registered-batch tools"
+        )
+    return failures
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -1140,8 +1265,7 @@ def ready_failures(
     holds = evidence.hold_labels or []
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
-    if evidence.require_batch and not isinstance(evidence.batch, dict):
-        failures.append("batch evidence is required for batch-mode readiness")
+    failures.extend(batch_mode_failures(evidence, repo))
     if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if head_valid and evidence.batch is not None:
@@ -1211,8 +1335,18 @@ def enqueue_pr(
             if isinstance(label, dict)
         ):
             return {"pr": pr_number, "withheld": HOLD_LABEL, "verified": True}
+        state = str(current.get("state") or "").upper()
+        if state in {"MERGED", "CLOSED"}:
+            raise MergedRace(
+                f"PR #{pr_number} is {state}; merge won the race. "
+                "Readiness is invalid and no enqueue will be attempted."
+            )
+        if state != "OPEN":
+            raise LandingError(f"PR #{pr_number} state {state!r} is not OPEN; readiness is invalid")
         if current.get("reviewDecision") != "APPROVED":
             raise LandingError("PR review disposition changed before enqueue; readiness is invalid")
+        if unresolved_review_threads(run, repo_full, pr_number):
+            raise LandingError("PR review threads changed before enqueue; unresolved, non-outdated threads remain")
     rc, out = run(
         [
             "gh",
@@ -1348,6 +1482,7 @@ def _merge_accepted_receipts(existing: dict[str, dict] | None, incoming: object)
 
 
 def _merge_followup_state(existing: FollowupState, state: FollowupState) -> FollowupState:
+    head_changed = existing.head is not None and state.head is not None and existing.head != state.head
     preserved = {
         field: getattr(existing, field)
         for field in ("batch_id", "owner_generation", "integrator", "members", "integration_head", "head")
@@ -1360,11 +1495,15 @@ def _merge_followup_state(existing: FollowupState, state: FollowupState) -> Foll
         merged = replace(
             merged, accepted_receipts=_merge_accepted_receipts(existing.accepted_receipts, merged.accepted_receipts)
         )
-    if existing.final_pr is not None and merged.final_pr is None:
+    if not head_changed and existing.final_pr is not None and merged.final_pr is None:
         merged = replace(merged, final_pr=existing.final_pr)
-    if existing.terminal is not None and merged.terminal is None:
+    if not head_changed and existing.terminal is not None and merged.terminal is None:
         merged = replace(merged, terminal=existing.terminal)
-    if existing.head != merged.head:
+    if head_changed:
+        # A terminal result and final PR binding certify one exact head. A new
+        # head starts a fresh continuation and must be re-evaluated.
+        merged = replace(merged, final_pr=None, terminal=None)
+    if head_changed:
         # Retry budgets are evidence about one exact head. A new head starts
         # with a fresh budget and cannot inherit consumption from its parent.
         attempts = 0
@@ -1777,12 +1916,9 @@ def _run_start(args: argparse.Namespace, identity: GitIdentity, branch: str) -> 
         expected_node_id=args.pr_node_id,
         expected_head=getattr(args, "expected_head", None),
     )
-    record = {
-        "identity": asdict(identity),
-        "pr": (pr or {}).get("number"),
-        "pr_node_id": _pr_node_id(pr or {}) or None,
-        "remote_head": (pr or {}).get("headRefOid"),
-    }
+    path = record_start_identity(Path(identity.repo), branch, identity, pr)
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["start_record"] = str(path)
     print(json.dumps(record, indent=2))
     return 0
 
@@ -1790,6 +1926,16 @@ def _run_start(args: argparse.Namespace, identity: GitIdentity, branch: str) -> 
 def _run_withdraw(args: argparse.Namespace, identity: GitIdentity, branch: str) -> int:
     expected_head = args.expected_head or identity.head
     _require_revision(expected_head, "expected head")
+    require_start_identity(
+        Path(identity.repo),
+        identity,
+        branch,
+        pr_number=args.pr,
+        pr_node_id=args.pr_node_id,
+        require_unchanged_head=True,
+    )
+    if expected_head != identity.head:
+        raise LandingError("withdraw expected head does not match the current checkout")
     result = bound_withdraw(
         live_run,
         args.repo,
@@ -1804,9 +1950,7 @@ def _run_withdraw(args: argparse.Namespace, identity: GitIdentity, branch: str) 
 
 
 def _run_arm(args: argparse.Namespace, identity: GitIdentity, repo: Path) -> int:
-    result = arm_current_pr(live_run, identity, repo, args.pr)
-    print(json.dumps(result, indent=2))
-    return 0
+    raise LandingError("direct arm is disabled; use the evidence-backed ready transition")
 
 
 def _validate_evidence_identity(data: dict, identity: GitIdentity, branch: str, expected_head: str) -> None:
@@ -1830,6 +1974,7 @@ def _validate_evidence_identity(data: dict, identity: GitIdentity, branch: str, 
 
 def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, repo: Path) -> int:
     _require_revision(args.expected_head, "expected head")
+    start_record = require_start_identity(repo, identity, branch, pr_number=args.pr, pr_node_id=args.pr_node_id)
     pr = resolve_pr(
         live_run,
         args.repo,
@@ -1843,6 +1988,9 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
     node_id = args.pr_node_id or _pr_node_id(pr)
     if not node_id:
         raise WrongPR(f"PR #{args.pr} has no GraphQL node id; refusing unbound readiness")
+    recorded_node_id = start_record.get("pr_node_id")
+    if recorded_node_id is not None and recorded_node_id != node_id:
+        raise WrongPR("persisted start identity PR node id does not match the live PR")
     pr = view_pr(
         live_run,
         args.repo,
