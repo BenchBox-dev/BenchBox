@@ -48,15 +48,11 @@ or verify the data files. That's manager.py's job.
 from __future__ import annotations
 
 import hashlib
+import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
-    import tomli as tomllib  # type: ignore[no-redef]
 
 from .errors import ManifestValidationError
 from .logical_hash import LOGICAL_CONTENT_VERSION, update_sized_hash_part

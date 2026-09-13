@@ -5,7 +5,7 @@
 ```{tags} beginner, quickstart, cli, duckdb
 ```
 
-Follow these steps to install BenchBox, verify your environment, and run a reproducible benchmark. Everything below works on macOS, Linux, and Windows with Python 3.10+.
+Follow these steps to install BenchBox, verify your environment, and run a reproducible benchmark. Everything below works on macOS, Linux, and Windows with Python 3.11+.
 
 ## Step 0 - Prerequisites
 

@@ -150,16 +150,3 @@ class TestMCPPublicContract:
             "platform_tuning",
             "troubleshoot_failure",
         }
-
-
-class TestPythonVersionCheck:
-    """Tests for Python version compatibility."""
-
-    def test_import_fails_on_python39(self, monkeypatch):
-        """Test that import raises error on Python < 3.10."""
-        # This test runs on Python 3.10+ but simulates version check
-        import benchbox.mcp as mcp_module
-
-        # The version check happens at import time, so the module
-        # either imported successfully (we're on 3.10+) or not
-        assert mcp_module is not None

@@ -29,10 +29,6 @@ class TestCLITestExecution:
         """Set up test environment."""
         self.runner = CliRunner()
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_power_phase_validation(self, cli_benchmark_mocks):
         """Test that power phase works correctly."""
         result = self.runner.invoke(
@@ -54,10 +50,6 @@ class TestCLITestExecution:
         assert result.exit_code == 0
         assert "running tpch on duckdb" in result.output.lower() or "power test execution" in result.output.lower()
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_throughput_phase_validation(self, cli_benchmark_mocks):
         """Test that throughput phase works correctly."""
         result = self.runner.invoke(
@@ -79,10 +71,6 @@ class TestCLITestExecution:
         assert result.exit_code == 0
         assert "running tpch on duckdb" in result.output.lower() or "throughput test execution" in result.output.lower()
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_maintenance_phase_validation(self, cli_benchmark_mocks):
         """Test that maintenance phase works correctly."""
         result = self.runner.invoke(
@@ -106,10 +94,6 @@ class TestCLITestExecution:
             "running tpch on duckdb" in result.output.lower() or "maintenance test execution" in result.output.lower()
         )
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_combined_phases_validation(self, cli_benchmark_mocks):
         """Test that combined phases work correctly."""
         result = self.runner.invoke(
@@ -159,10 +143,6 @@ class TestCLITestExecution:
         config = BenchmarkConfig(name="tpch", display_name="TPC-H")
         assert config.test_execution_type == "standard"
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_no_tuning_disables_constraints(self, cli_benchmark_mocks):
         """Test that `--tuning notuning` properly disables constraints."""
         result = self.runner.invoke(

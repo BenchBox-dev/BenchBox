@@ -133,7 +133,7 @@ or declaration appears unused.
 | `rich` | CL | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**` | 146 | KEEP |
 | `sqlglot` | C | `benchbox/base.py`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**`, tests | 16 | KEEP |
 | `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP — retained by ADR follow-up; removing it would break supported ASCII shims and monitoring imports |
-| `tomli` | C | `benchbox/utils/dependency_validation.py`, `benchbox/utils/version.py`, `scripts/`, tests | 9 | KEEP - guarded by `python_version < '3.11'`; stdlib `tomllib` covers 3.11+ |
+| `tomli` | — | — | 0 | REMOVED - Python 3.11's standard-library `tomllib` is now the minimum runtime |
 | `zstandard` | C | `benchbox/core/primitives/**`, `benchbox/utils/**`, tests | 9 | KEEP |
 | `azure-identity` | CSP | `benchbox/platforms/azure/**` | 9 | KEEP |
 | `azure-storage-file-datalake` | CSP | `benchbox/platforms/azure/**`, `benchbox/platforms/base/cloud_spark/staging.py` | 3 | KEEP |

@@ -195,6 +195,10 @@ class TestDuckLakeLiveConnection:
             rows = conn.execute("SELECT * FROM ducklake_smoke ORDER BY id").fetchall()
             assert rows == [(1, "a"), (2, "b")]
 
+            # DuckLake may inline small writes in its metadata catalog. Force a
+            # checkpoint so this test can verify the configured DATA_PATH too.
+            conn.execute("CHECKPOINT")
+
             current_catalog = conn.execute("SELECT current_catalog()").fetchone()[0]
             assert current_catalog == "lake"
         finally:
@@ -215,6 +219,9 @@ class TestDuckLakeLiveConnection:
         try:
             conn1.execute("CREATE TABLE t (id INTEGER)")
             conn1.execute("INSERT INTO t VALUES (1)")
+            # Materialize the small write in DATA_PATH instead of leaving it
+            # inlined in DuckLake's metadata catalog.
+            conn1.execute("CHECKPOINT")
         finally:
             conn1.close()
         assert metadata_path.exists()
@@ -301,6 +308,10 @@ class TestDuckLakeLiveConnection:
             conn.execute("INSERT INTO sqlite_smoke VALUES (1, 'a'), (2, 'b')")
             rows = conn.execute("SELECT * FROM sqlite_smoke ORDER BY id").fetchall()
             assert rows == [(1, "a"), (2, "b")]
+
+            # DuckLake may inline small writes in its metadata catalog. Force a
+            # checkpoint so this test can verify the configured DATA_PATH too.
+            conn.execute("CHECKPOINT")
 
             # Regression: a fresh cursor must still resolve the unqualified
             # table via the _DuckLakeCursorConnection wrapper's USE lake.

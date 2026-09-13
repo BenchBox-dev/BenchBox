@@ -29,15 +29,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib  # type: ignore[import-not-found, no-redef]
 
 duckdb = pytest.importorskip("duckdb", reason="DuckDB not installed")
 

@@ -103,6 +103,17 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/check_untracked_skill_mirrors.sh",
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",
+    # Repository guidance and release notes are linked from the site but are
+    # not read while assembling any publication artifact.
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "examples/features/README.md",
+    # Developer checks and source-generation helpers are exercised by CI or
+    # invoked manually; publication builds do not execute them.
+    "scripts/_compose_joinorder_hero.py",
+    "scripts/check_dependency_bounds.py",
+    "scripts/check_duplicate_code.py",
+    "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
     "scripts/set_worktree_identity.sh",

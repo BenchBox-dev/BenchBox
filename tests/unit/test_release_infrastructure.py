@@ -62,10 +62,7 @@ def _workflow(workflow_name: str) -> dict:
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib  # type: ignore[import-not-found]
+import tomllib
 
 
 class TestReleaseInfrastructure:
@@ -105,6 +102,16 @@ class TestReleaseInfrastructure:
         for url in urls.values():
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
+
+    def test_supported_python_range_matches_release_policy(self):
+        """Package metadata must expose the reviewed minimum and upper bound."""
+        with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+            project = tomllib.load(handle)["project"]
+
+        assert project["requires-python"] == ">=3.11,<3.15"
+        assert "Programming Language :: Python :: 3.10" not in project["classifiers"]
+        for version in ("3.11", "3.12", "3.13", "3.14"):
+            assert f"Programming Language :: Python :: {version}" in project["classifiers"]
 
     def test_import_benchbox_succeeds_without_pandas(self):
         """`import benchbox` must work on a clean core install even when pandas is absent.

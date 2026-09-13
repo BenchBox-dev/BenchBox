@@ -34,7 +34,7 @@ def _load_script():
 build_joinorder_data = _load_script()
 
 
-def test_utc_now_iso_uses_python310_compatible_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_utc_now_iso_uses_utc_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeDatetime:
         @staticmethod
         def now(tz: dt.tzinfo) -> dt.datetime:
@@ -50,17 +50,12 @@ def test_utc_now_iso_uses_python310_compatible_timezone(monkeypatch: pytest.Monk
     assert build_joinorder_data.utc_now_iso() == "2026-05-11T03:22:11Z"
 
 
-def test_tomllib_import_has_python310_fallback() -> None:
-    """#1076 review: this script requires-python >=3.10 (repo-wide), but
-    stdlib tomllib is 3.11+. An unconditional `import tomllib` raises
-    ModuleNotFoundError on 3.10; it must fall back to the tomli backport
-    (already a declared dependency; python_version < '3.11'), matching the
-    pattern used by benchbox/core/data_fetch/manifest.py and friends."""
+def test_tomllib_uses_python311_standard_library() -> None:
+    """The repository-wide Python 3.11 floor makes the backport unnecessary."""
     script_path = REPO_ROOT / "_project" / "scripts" / "build_joinorder_data.py"
     text = script_path.read_text(encoding="utf-8")
-    assert "import tomli as tomllib" in text, (
-        "build_joinorder_data.py must fall back to tomli on Python 3.10 (stdlib tomllib is 3.11+)"
-    )
+    assert "import tomllib" in text
+    assert "import tomli" not in text
 
 
 def test_container_cli_defaults_to_docker(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -26,9 +26,6 @@ pytestmark = [
 ]
 
 
-# Python 3.11+ required for Click command mock.patch attribute access
-PYTHON_311_PLUS = sys.version_info >= (3, 11)
-
 # Skip all tests if CLI modules are unavailable
 try:
     from benchbox.cli.main import cli
@@ -42,10 +39,6 @@ except ImportError as e:
 
 
 @pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
-@pytest.mark.skipif(
-    not PYTHON_311_PLUS,
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestCLIParameterConsistency:
     """Test new CLI parameter behavior."""
 
@@ -407,10 +400,6 @@ class TestPhaseValidationLogic:
 
 
 @pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
-@pytest.mark.skipif(
-    not PYTHON_311_PLUS,
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestGlobalCacheCLIFlag:
     """Tests for --global-cache flag wiring through the CLI."""
 

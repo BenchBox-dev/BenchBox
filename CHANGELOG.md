@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING: Python 3.11 is now required.** BenchBox has removed Python 3.10
+  support ahead of CPython's end-of-life date in October 2026. BenchBox plans
+  to require Python 3.12 in its first release after Python 3.11 reaches end of
+  life in October 2027.
+
 ## [0.4.0] - 2026-08-27
 
 > **Post-publication accounting correction:** This section was reconciled on
