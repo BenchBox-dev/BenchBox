@@ -6,6 +6,36 @@ version. **Nothing here has been filed upstream yet.** The drafts under
 `issues/` are intended for human review before opening on
 https://github.com/tobymao/sqlglot/issues.
 
+## Submission readiness
+
+The historical tier table below is not a filing queue or an execution-equivalence
+gate. First reproduce on a pinned current upstream revision and distinguish
+source-dialect selection, syntax support and result semantics.
+
+The extraction report now includes a standalone SQLite execution reproducer:
+
+```bash
+uv run --no-project --with sqlglot==30.18.0 -- python _project/sqlglot-upstream/repros/sqlite_extract.py
+```
+
+It returns 1 for observed translation failures and 2 for infrastructure errors.
+It uses explicit expected calendar results and rejects two naive-lowering
+counterexamples. No PostgreSQL engine is run. Keep the DATE-to-TEXT fixture
+contract visible; these bounded witnesses do not prove universal equivalence.
+
+On 30.6.0, 30.18.0 and upstream `5cfb5997a99010940138670adf3d6b34ac5a0a08`,
+all 12 extraction cases still fail SQLite execution. DuckDB DATE_PART has a
+separate parser gap. Read draft 03's timestamp-cast and integer-division
+counterexamples before implementing a STRFTIME replacement. Upstream #2592
+and #7152 are closed as not planned with invitations to contribute; that is
+not a rejection of a properly scoped fix or proof of resolution.
+
+Draft 02 needs DATE/TIMESTAMP and calendar-semantic validation. Draft 05 needs
+native SingleStore validation rather than a MySQL-wide claim. Draft 06 requires
+engine revalidation, preservation of CTE column names, a maintenance decision,
+and fixture licensing checks. None should be filed unchanged from its earlier
+version. Human review precedes upstream publication.
+
 ## Layout
 
 | Path | What it is |
@@ -23,8 +53,9 @@ https://github.com/tobymao/sqlglot/issues.
 uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.py
 ```
 
-Exit code is zero only if every defect has been resolved upstream; any
-remaining `FAIL` lines indicate the workaround in BenchBox is still load-bearing.
+Exit code is zero only if all syntax/capability observations pass. A PASS is
+not a semantic retirement gate, and a FAIL does not necessarily identify an
+upstream defect. The proxy-source and native-source cases must be distinguished.
 
 ## Generated-case known-failure policy
 
@@ -142,12 +173,16 @@ Verdicts after the 2026-05-06 sweep (TODO
 
 1. Re-run the harness to confirm `FAIL` lines still reproduce on the latest published `sqlglot` version. Update the `sqlglot_version` frontmatter in each draft to match the version you reproduce against.
 2. Skim each draft for tone — they are written in a neutral, evidence-led voice; no advocacy, no project promotion beyond a single offer line.
-3. File one issue per draft. The drafts already include the harness URL so maintainers can run our repro against any version.
+3. Check existing issues and PRs, correct the draft's semantic claims, and get
+   human review. Follow up on an existing report when appropriate; otherwise
+   submit one bounded report with a standalone reproducer.
 4. After filing, set `filed: true` and add a `tracker_url:` line to each draft's frontmatter.
 
-## Follow-up TODOs (not part of this prep)
+## Remaining preparation
 
-- Extend `repros/repro_all.py` to also exercise `read="postgres", write="duckdb"` for the `GROUP/ORDER BY ALL` case. The current single-dialect repro mis-classified item #1 as fully fixed by PR #3756; a cross-dialect probe would have flagged the narrower remaining gap. Until the harness covers BenchBox's actual call shape, retirement decisions for this row should be made by hand against `dialect_utils.translate_sql_query`, not the harness alone.
+- The ALL reproducer already exercises both native DuckDB and PostgreSQL proxy
+  declarations. Preserve both during retirement checks, but first correct the
+  source declaration when the input actually uses DuckDB-only syntax.
 - If maintainers accept the QuestDB dialect contribution offer, the
   rewriter in `benchbox/platforms/questdb_rewriter.py` becomes the natural
   starting point.
