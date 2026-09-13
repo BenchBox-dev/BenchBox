@@ -29,16 +29,11 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10
-    import tomli as tomllib  # type: ignore[no-redef]
-
 
 # ---------------------------------------------------------------------------
 # Data structures

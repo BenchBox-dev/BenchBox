@@ -10,7 +10,7 @@ This document provides guidelines and instructions for contributing.
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Git
 - [uv](https://docs.astral.sh/uv/) (fast Python package manager)
 - [GitHub CLI](https://cli.github.com/) (`gh`) — required for the one-shot PR flow below

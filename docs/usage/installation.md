@@ -3,7 +3,10 @@
 ```{tags} beginner, quickstart
 ```
 
-BenchBox targets Python 3.10+ and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+BenchBox requires Python 3.11 or newer and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+
+BenchBox plans to require Python 3.12 in its first release after Python 3.11
+reaches end of life in October 2027.
 
 ## 1. Install BenchBox
 

@@ -30,17 +30,13 @@ import subprocess
 import sys
 import tarfile
 import time
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
-    import tomli as tomllib  # type: ignore[no-redef]
 
 # Shared, single-source-of-truth logical-hash algorithm. The build script runs
 # under the repo-root uv environment, so it imports the same primitives the

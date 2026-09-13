@@ -501,10 +501,6 @@ class TestDirectHandleResult:
 # ===================================================================
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestDescribePlatformOptions:
     def test_no_options(self):
         from benchbox.cli.commands.run import _describe_platform_options
@@ -909,10 +905,6 @@ class TestRunCommandBranchCoverage:
         assert result.exit_code == 1
         assert "Platform options require a --platform selection" in result.output
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_platform_option_parse_error_logs_and_exits(self):
         from benchbox.cli.commands.run import PlatformOptionError, run
 

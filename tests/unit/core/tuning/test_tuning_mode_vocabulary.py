@@ -193,10 +193,6 @@ class TestCanonicalModeMapsResolutionsOntoTheSharedVocabulary:
                 assert tuning_modes.is_canonical_mode(resolution.canonical_mode)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestFallbackLabelingEndToEnd:
     """ADR-2 §1 end-to-end: a `--tuning tuned` run that finds no template is
     recorded with the distinct `tuned-fallback` mode, and `--official` refuses

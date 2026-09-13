@@ -38,13 +38,6 @@ pytestmark = [
 ]
 
 
-# Skip marker for tests that use mock.patch on CLI module attributes (Python 3.10 incompatible)
-skip_py310_cli_mock = pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="CLI mock.patch requires Python 3.11+ for module attribute access",
-)
-
-
 class TestDatagenCommand:
     """Test the datagen CLI command."""
 
@@ -212,7 +205,6 @@ class TestShellCommand:
             assert result.exit_code == 0
             assert "tpch" in result.output.lower() or "Available" in result.output
 
-    @skip_py310_cli_mock
     def test_shell_direct_database_path(self):
         """Test shell with direct database path."""
         runner = CliRunner()
@@ -230,7 +222,6 @@ class TestShellCommand:
                 # Should have called _launch_duckdb_shell
                 mock_launch.assert_called_once()
 
-    @skip_py310_cli_mock
     def test_shell_platform_autodetect(self):
         """Test shell auto-detects platform from file extension."""
         runner = CliRunner()
@@ -247,7 +238,6 @@ class TestShellCommand:
                 # Should have auto-detected and called DuckDB shell
                 mock_launch.assert_called_once()
 
-    @skip_py310_cli_mock
     def test_shell_sqlite_autodetect(self):
         """Test shell auto-detects SQLite from .sqlite extension."""
         runner = CliRunner()

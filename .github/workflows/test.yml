@@ -69,15 +69,17 @@ jobs:
         # validation is covered by nightly/manual workflows.
         include:
           - os: ubuntu-latest
-            python-version: '3.10'
+            python-version: '3.11'
           - os: ubuntu-latest
             python-version: '3.13'
+          - os: ubuntu-latest
+            python-version: '3.14'
           - os: macos-latest
             python-version: '3.12'
           - os: windows-latest
             python-version: '3.12'
           - os: windows-latest
-            python-version: '3.10'
+            python-version: '3.11'
 
     steps:
       - name: Checkout code

@@ -225,7 +225,7 @@ Key Concepts:
 
 - Complete [getting_started](../getting_started/) examples first
 - Understand basic BenchBox concepts
-- Python 3.10+ installed
+- Python 3.11+ installed
 - BenchBox installed: `uv add benchbox`
 
 ## Next Steps

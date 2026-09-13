@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import importlib
+import tomllib
 from importlib.metadata import version
 from pathlib import Path
 
 import pytest
 from packaging.requirements import Requirement
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility.
-    import tomli as tomllib
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

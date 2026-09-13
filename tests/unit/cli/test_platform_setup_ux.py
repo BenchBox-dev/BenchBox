@@ -24,13 +24,6 @@ pytestmark = [
 ]
 
 
-# Skip marker for tests that use mock.patch on CLI module attributes (Python 3.10 incompatible)
-skip_py310_cli_mock = pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="CLI mock.patch requires Python 3.11+ for module attribute access",
-)
-
-
 class TestNumberedSelectPrompt:
     """Tests for NumberedSelectPrompt class."""
 
@@ -156,7 +149,6 @@ class TestNumberedSelectPrompt:
         assert prompt._number_to_value[3] == "done"
 
 
-@skip_py310_cli_mock
 class TestNumberedPlatformSelect:
     """Tests for numbered_platform_select function."""
 
@@ -324,7 +316,6 @@ class TestNumberedPlatformSelect:
         assert "Missing" in print_output
 
 
-@skip_py310_cli_mock
 class TestSetupWizardIntegration:
     """Integration tests for the setup wizard with numbered selection."""
 

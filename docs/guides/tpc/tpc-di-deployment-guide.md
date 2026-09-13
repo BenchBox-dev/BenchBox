@@ -30,7 +30,7 @@ The TPC-DI (Transaction Processing Performance Council - Data Integration) bench
 
 ### Recommended Requirements
 
-- **Python**: 3.10 or higher
+- **Python**: 3.11 or higher
 - **Memory**: 8 GB RAM (for scale factor 1.0)
 - **Storage**: 50 GB available disk space (for larger scale factors)
 - **CPU**: 4+ cores (parallel execution)
@@ -38,7 +38,7 @@ The TPC-DI (Transaction Processing Performance Council - Data Integration) bench
 
 ### Production Requirements
 
-- **Python**: 3.10 or higher
+- **Python**: 3.11 or higher
 - **Memory**: 16+ GB RAM (for scale factor 10+)
 - **Storage**: 500+ GB available disk space
 - **CPU**: 8+ cores with high clock speed
@@ -85,7 +85,7 @@ python -c "from benchbox import TPCDI; print('TPC-DI installation successful')"
 
 ```bash
 # Create conda environment
-conda create -n benchbox python=3.10
+conda create -n benchbox python=3.11
 conda activate benchbox
 
 # Install dependencies
@@ -132,7 +132,7 @@ docker run -it --rm \
 
 ```dockerfile
 # Dockerfile
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 

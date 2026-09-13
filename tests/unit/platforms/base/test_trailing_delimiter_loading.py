@@ -386,10 +386,6 @@ class TestCLIExitCodeOnFailure:
         result = runner.invoke(run, ["--platform", "nonexistent_platform", "--benchmark", "tpch", "--non-interactive"])
         assert result.exit_code != 0
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_run_command_exits_nonzero_on_failed_validation_status(self):
         """The run CLI must call ctx.exit(1) when result.validation_status is FAILED.
 

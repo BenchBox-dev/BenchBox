@@ -14,7 +14,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -23,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Testing :: Acceptance",
     "Topic :: System :: Benchmark",
 ]
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 dependencies = [
     "textcharts>=0.1.0",
     # sqlglot ships majors ~quarterly with dialect-translation breakage; cap to next major to catch
@@ -42,8 +41,6 @@ dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "pyyaml>=6.0.0",
     "packaging>=24.0",
-    # Python 3.10 compatibility (tomllib is stdlib in 3.11+)
-    "tomli>=2.0.0; python_version < '3.11'",
     # pyarrow: ABI-sensitive (bundled C++); wide cap to <25 to give runway while catching jumps.
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
@@ -357,7 +354,7 @@ cloud-spark = [
 ]
 
 # MCP (Model Context Protocol) server for AI agent integration
-# Note: mcp requires Python 3.10+, so this extra only works on 3.10+
+# The MCP SDK supports BenchBox's Python 3.11+ runtime.
 # Includes visualization deps since MCP server exposes chart generation tools
 mcp = [
     # MCP SDK 2 migration is complete; keep future majors behind explicit review.
@@ -501,6 +498,7 @@ tests_dir = ["tests/unit/"]
 
 [tool.ruff]
 line-length = 120
+target-version = "py311"
 exclude = [
     "migrations",
     "venv",
@@ -568,7 +566,9 @@ ignore = [
     "PIE810", # multiple-starts-ends-with
     # Upgrade rules - require newer Python versions
     "UP006",  # non-pep585-annotation (use dict instead of Dict - requires Python 3.9+)
-    "UP007",  # non-pep604-annotation-union (use X | Y - requires Python 3.10+)
+    "UP007",  # non-pep604-annotation-union (use X | Y)
+    "UP017",  # datetime.UTC migration is a separate repository-wide cleanup
+    "UP042",  # StrEnum migration changes public enum inheritance; review separately
     "UP035",  # deprecated-import (typing.Dict etc - requires Python 3.9+)
     "UP045",  # non-pep604-annotation-optional
     # Naming conventions - often intentional in specific contexts

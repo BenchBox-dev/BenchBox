@@ -11,13 +11,9 @@ from __future__ import annotations
 
 import argparse
 import sys
+import tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-
-try:  # Python 3.11+
-    import tomllib  # type: ignore[attr-defined]
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
-    import tomli as tomllib  # type: ignore
 
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name

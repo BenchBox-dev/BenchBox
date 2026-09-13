@@ -17,7 +17,7 @@ Step-by-step tutorials for common BenchBox tasks. Each tutorial takes 5-15 minut
 ## Prerequisites
 
 - BenchBox installed (`pip install benchbox` or `uv add benchbox`)
-- Python 3.10+
+- Python 3.11+
 - No database servers required (DuckDB is embedded)
 
 ## Related Resources
