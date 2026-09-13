@@ -1266,6 +1266,8 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
     assert "gh pr list --repo" in open_body
     assert "gh pr create --repo" in open_body
     assert "gh pr edit --repo" in open_body
+    assert "git remote get-url --push origin" in open_body
+    assert "HEAD_SPEC" in open_body and '--head "$$HEAD_SPEC"' in open_body
     assert "pr-ready REPO=" in open_body and 'URL="$$URL"' in open_body
     executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert "gh pr merge --auto --squash" not in executable

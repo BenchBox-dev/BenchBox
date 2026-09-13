@@ -1488,6 +1488,32 @@ pr-open:
 		exit 2; \
 	fi; \
 	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	case "$$REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+		*/*) ;; \
+		*) echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+	esac; \
+	ORIGIN_URL=$$(git remote get-url --push origin) || { echo "Could not resolve the origin remote" >&2; exit 1; }; \
+	case "$$ORIGIN_URL" in \
+		git@github.com:*) ORIGIN_REPOSITORY="$${ORIGIN_URL#git@github.com:}" ;; \
+		ssh://git@github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#ssh://git@github.com/}" ;; \
+		https://github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#https://github.com/}" ;; \
+		*) echo "origin remote is not a supported GitHub URL or SSH form" >&2; exit 1 ;; \
+	esac; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%.git}"; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%/}"; \
+	ORIGIN_OWNER="$${ORIGIN_REPOSITORY%%/*}"; \
+	case "$$ORIGIN_REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+		*/*) ;; \
+		*) echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+	esac; \
+	HEAD_SPEC="$$CURRENT"; \
+	ORIGIN_REPOSITORY_KEY=$$(printf '%s' "$$ORIGIN_REPOSITORY" | tr 'A-Z' 'a-z'); \
+	TARGET_REPOSITORY_KEY=$$(printf '%s' "$$REPOSITORY" | tr 'A-Z' 'a-z'); \
+	if [ "$$ORIGIN_REPOSITORY_KEY" != "$$TARGET_REPOSITORY_KEY" ]; then \
+		HEAD_SPEC="$$ORIGIN_OWNER:$$CURRENT"; \
+	fi; \
 	git fetch origin develop --quiet; \
 	if ! git merge-base --is-ancestor origin/develop HEAD; then \
 		if ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \
@@ -1511,12 +1537,12 @@ pr-open:
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
-	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$HEAD_SPEC" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC" --body-file "$(PR_BODY_FILE)"); \
 		else \
-			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$CURRENT"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC"); \
 		fi; \
 	else \
 		echo "Reusing existing PR: $$URL"; \
