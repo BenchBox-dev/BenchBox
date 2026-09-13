@@ -15164,7 +15164,7 @@
       "needs": [
         "sql-translation-ml-evaluation"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Publish the tiny SQL translation feasibility verdict"
     },
