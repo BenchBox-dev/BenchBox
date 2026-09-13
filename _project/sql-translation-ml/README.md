@@ -34,7 +34,9 @@ uv run --locked python evaluate.py --run-dir /absolute/outside/checkout/run
 Train the two models sequentially. Each feasibility run stops at 200 optimizer
 steps. Resuming continues from its optimizer, random state, and data cursor,
 with the same cumulative 24-hour training budget. A run stops after three epochs;
-development execution accuracy selects the checkpoint. SIGINT/SIGTERM request
+development execution accuracy selects the checkpoint. Training ends early at
+100% development accuracy because no later checkpoint can strictly improve the
+selection score. SIGINT/SIGTERM request
 a stop at the next optimizer boundary. A timeout or interrupted run retains its
 resume checkpoint and does not produce a successful training summary. Resume
 rejects changed input artifacts. Only load checkpoints produced by this local

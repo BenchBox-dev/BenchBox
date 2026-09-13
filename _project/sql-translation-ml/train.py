@@ -115,7 +115,9 @@ def train(run: Path, mode: str, feasibility: bool, resume: bool) -> None:
         torch.mps.set_rng_state(saved["mps_rng"])
     start = mono_time()
     deadline = start + max(0, 86400 - state["elapsed"])
-    peak_rss, peak_mps = state.get("peak_rss", 0), state.get("peak_mps", 0)
+    prior_progress = json.loads((output / "progress.json").read_text(encoding="utf-8")) if resume else {}
+    peak_rss = max(state.get("peak_rss", 0), prior_progress.get("peak_rss", 0))
+    peak_mps = max(state.get("peak_mps", 0), prior_progress.get("peak_mps", 0))
     sources = {r["case_id"]: r for r in load_lines(run / "source.jsonl")}
     order = []
     for epoch in range(3):
@@ -153,7 +155,9 @@ def train(run: Path, mode: str, feasibility: bool, resume: bool) -> None:
         )
 
     try:
-        while state["cursor"] < len(order) and (not feasibility or state["step"] < 200):
+        while (
+            state["cursor"] < len(order) and (not feasibility or state["step"] < 200) and state["best_accuracy"] < 1.0
+        ):
             if stopping:
                 raise InterruptedError("stopped at an optimizer boundary; checkpoint saved")
             if mono_time() >= deadline:
