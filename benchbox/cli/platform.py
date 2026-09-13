@@ -27,9 +27,19 @@ from benchbox.cli.platform_readiness import (
 from benchbox.core.platform_manifest import DefaultMode, get_platform_alias_modes, get_platform_aliases
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.schemas import LibraryInfo, PlatformInfo
+from benchbox.platforms.adapter_factory import _reject_removed_platform
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console
+
+
+def _check_removed_platform(platform: str) -> None:
+    try:
+        _reject_removed_platform(platform)
+    except ValueError as exc:
+        console.print(f"[red]❌ {exc}[/red]")
+        sys.exit(1)
+
 
 # CLI spellings are a scoped platform-manifest projection. DataFrame ``-df``
 # aliases carry explicit mode semantics in the manifest; ``benchbox run``
@@ -751,6 +761,8 @@ def platform_status(platform: Optional[str]):
         platforms_info = manager.detect_platforms()
 
         if platform not in platforms_info:
+            _check_removed_platform(requested_platform)
+            _check_removed_platform(platform)
             console.print(f"[red]❌ Unknown platform: {platform}[/red]")
             available = list(platforms_info.keys())
             console.print(f"Available platforms: {', '.join(available)}")
@@ -811,6 +823,7 @@ def enable_platform(platform: str, force: bool):
     platforms_info = manager.detect_platforms()
 
     if platform not in platforms_info:
+        _check_removed_platform(platform)
         console.print(f"[red]❌ Unknown platform: {platform}[/red]")
         available = list(platforms_info.keys())
         console.print(f"Available platforms: {', '.join(available)}")
@@ -852,6 +865,7 @@ def disable_platform(platform: str):
     platforms_info = manager.detect_platforms()
 
     if platform not in platforms_info:
+        _check_removed_platform(platform)
         console.print(f"[red]❌ Unknown platform: {platform}[/red]")
         available = list(platforms_info.keys())
         console.print(f"Available platforms: {', '.join(available)}")
@@ -888,6 +902,7 @@ def install_platform(platform: str, dry_run: bool):
     guide = manager.get_installation_guide(platform)
 
     if not guide:
+        _check_removed_platform(platform)
         console.print(f"[red]❌ Unknown platform: {platform}[/red]")
         platforms_info = manager.detect_platforms()
         available = list(platforms_info.keys())

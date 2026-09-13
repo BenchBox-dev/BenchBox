@@ -110,7 +110,7 @@ def _normalize_platform_name(platform: str) -> tuple[str, bool, Optional[str]]:
     return platform_lower, df_mode_implied, deployment_mode
 
 
-def _reject_removed_platform(platform: str) -> None:
+def reject_removed_platform(platform: str) -> None:
     """Raise a migration error for platform selectors removed from BenchBox."""
     selector = platform.lower().strip().split(":", 1)[0]
     if selector in {"modin", "modin-df"}:
@@ -118,6 +118,9 @@ def _reject_removed_platform(platform: str) -> None:
             "Platform 'modin' has been removed because no compatible Modin release is available. "
             "Use 'pandas-df' for pandas-compatible execution or 'dask-df' for distributed DataFrames."
         )
+
+
+_reject_removed_platform = reject_removed_platform
 
 
 def get_adapter(
