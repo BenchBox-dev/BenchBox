@@ -16112,15 +16112,10 @@
       "title": "TODO review guardrails: catch conditional work, weak shell checks, and domain-confused evidence"
     },
     "todo-schema-require-id-field": {
-      "claim": {
-        "expires_at": "2026-09-14T21:18:29Z",
-        "generation": "e1208bbe651949bbbd67197cde385919",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add id to TODO_SCHEMA.yaml required fields so missing IDs are caught at validation time"
     },
     "todo-shim-resolves-code-via-cwd-git-toplevel": {
