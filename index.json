@@ -16100,15 +16100,10 @@
       "title": "TODO review must re-read spec/goal files the item itself edits"
     },
     "todo-review-semantic-guardrails": {
-      "claim": {
-        "expires_at": "2026-09-14T21:25:30Z",
-        "generation": "5c1c6d9a746049fb84876c69d1a76026",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "TODO review guardrails: catch conditional work, weak shell checks, and domain-confused evidence"
     },
     "todo-schema-require-id-field": {
