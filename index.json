@@ -14728,13 +14728,18 @@
       "title": "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
     },
     "skill-integrity-ci-lane-live-validation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-14T01:32:01Z",
+        "generation": "a4f5661c1ce541eca8fd966bae2bc269",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c756aa692435da858011d726"
+      },
       "needs": [
         "ci-baseline-representative-remeasure-sample",
         "skill-integrity-specialized-ci-lane"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Validate skill-only CI routing and derive a measured event-fanout budget"
     },
     "skill-integrity-local-preflight-routing": {
