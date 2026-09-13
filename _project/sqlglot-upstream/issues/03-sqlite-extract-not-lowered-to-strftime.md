@@ -1,11 +1,12 @@
 ---
 sqlglot_version: 30.18.0
 upstream_sha: 5cfb5997a99010940138670adf3d6b34ac5a0a08
-status: prepared-for-human-review
+status: upstream-followup-posted
 type: bug
 target_dialect: sqlite
 benchbox_workaround: benchbox/utils/dialect_utils.py:_fix_sqlite_unsupported_syntax
-filed: false
+filed: true
+tracker_url: https://github.com/tobymao/sqlglot/issues/2592#issuecomment-5653487646
 prior_issue: https://github.com/tobymao/sqlglot/issues/2592
 ---
 
