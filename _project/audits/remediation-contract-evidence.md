@@ -97,7 +97,7 @@ paths:
   confirmed remote journal head; `test_corrupt_journal_fails_closed` rejects
   missing or invalid persistence state.
 
-The prescribed pipeline and publication seam replay passed 109 tests
+The prescribed pipeline and publication seam replay passed 109 tests after
 the end-to-end cohort consumer control was added. Re-run the cited nodes after
 any source or consumer change; a passing aggregate count is not acceptance of
 the collective claim.
