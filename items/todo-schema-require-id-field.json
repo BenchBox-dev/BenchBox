@@ -1,4 +1,5 @@
 {
+  "context": "Resolved and completed: Legacy YAML schema (_project/TODO_SCHEMA.yaml) and validate_todo.py were retired in PR #1232 (commit 6fde4cd36) and superseded by the todo-db JSON Git state tracker (PR #2102). In todo-db schema 3, items are stored as items/<id>.json where id is intrinsic and enforced by schema validation.",
   "description": "The `id` field is the stable cross-reference key used in `deps.needs`,\n`todo_cli.py show`, and index generation. It must match the filename slug\nexactly. Yet `id` is NOT in the `required:` list in `TODO_SCHEMA.yaml` —\nit is only defined under `properties:` with a regex pattern.\n\nConsequence: `validate_todo.py` silently accepts a TODO file with no `id`\nfield. Any `deps.needs` reference to that item then silently fails at\ndep-graph resolution time rather than at validation time, making the graph\ncheck unreliable as a quality gate.\n\nAdd `id` to the `required:` list. This is a one-line schema change but\nrequires confirming all existing TODO/DONE files already carry the field\nbefore the gate goes live.\n",
   "legacy": {
     "item_meta": {
