@@ -43,7 +43,8 @@ def safe_query(sql: str, dialect: str) -> exp.Expression:
             if node.name.lower() not in {"julianday", "strftime", "date", "datetime"}:
                 raise ValueError("unknown function")
         if isinstance(node, exp.Func) and any(
-            word in node.sql_name().lower() for word in ("read_", "scan", "rand", "current", "uuid", "write", "load")
+            word in node.sql_name().lower()
+            for word in ("read_", "scan", "rand", "current", "uuid", "write", "load", "approx")
         ):
             raise ValueError("external or nondeterministic function")
     return tree
