@@ -105,9 +105,10 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/pr_refresh_certification.py",
     # Repository guidance and release notes are linked from the site but are
     # not read while assembling any publication artifact.
+    "README.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
-    "examples/features/README.md",
+    "examples/",
     # Developer checks and source-generation helpers are exercised by CI or
     # invoked manually; publication builds do not execute them.
     "scripts/_compose_joinorder_hero.py",
