@@ -44,6 +44,13 @@ After the develop PR merges, confirm the mirror draft against
 `published-results` and merge it. `corpus-drift-check.yml` remains the
 loud canary if a push-triggered mirror is dropped.
 
+The mirror workflow captures the accepted `published-results` commit before it
+builds its union overlay and compares that ref again before pushing the draft
+branch. If the accepted branch moved during the run, the workflow reports both
+SHAs, opens no stale mirror PR, and must be rerun after the accepted
+publication settles. This is a freshness/reconciliation check; it does not
+change the immutable snapshot used to reproduce an existing ledger seed.
+
 ## Freshness ownership
 
 Freshness — whether the accepted corpus moved and when the ledger seed
