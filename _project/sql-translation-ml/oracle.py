@@ -8,6 +8,7 @@ import random
 import sqlite3
 import threading
 from collections import Counter
+from decimal import Decimal
 from typing import Any
 
 import duckdb
@@ -21,7 +22,7 @@ SCHEMA = {
 SETTINGS = {"timezone": "UTC", "collation": "BINARY", "numeric_tolerance": 0}
 
 
-def safe_query(sql: str, dialect: str) -> exp.Expression:
+def safe_query(sql: str, dialect: str, schema: dict | None = None) -> exp.Expression:
     """Restrict generated candidates to read-only expressions over fixture tables."""
     statements = sqlglot.parse(sql, read=dialect)
     if len(statements) != 1 or not isinstance(statements[0], (exp.Select, exp.SetOperation)):
@@ -35,12 +36,18 @@ def safe_query(sql: str, dialect: str) -> exp.Expression:
         if isinstance(node, forbidden):
             raise ValueError("non-read construct")
         if isinstance(node, exp.Table):
-            if not isinstance(node.this, exp.Identifier) or node.name not in {*SCHEMA, *aliases}:
+            if not isinstance(node.this, exp.Identifier) or node.name not in {
+                *(SCHEMA if schema is None else schema),
+                *aliases,
+            }:
                 raise ValueError("unknown table or table function")
             if node.db or node.catalog:
                 raise ValueError("qualified external table")
         if isinstance(node, exp.Anonymous):
-            if node.name.lower() not in {"julianday", "strftime", "date", "datetime"}:
+            allowed = {"julianday", "strftime", "date", "datetime"}
+            if schema is not None:
+                allowed.add("date_part")
+            if node.name.lower() not in allowed:
                 raise ValueError("unknown function")
         if isinstance(node, exp.Func) and any(
             word in node.sql_name().lower()
@@ -104,8 +111,10 @@ def connection(dialect: str, seed: int) -> Any:
     return conn
 
 
-def execute(conn: Any, sql: str, dialect: str, timeout: float = 2.0) -> tuple[int, list[tuple[Any, ...]]]:
-    safe_query(sql, dialect)
+def execute(
+    conn: Any, sql: str, dialect: str, timeout: float = 2.0, schema: dict | None = None
+) -> tuple[int, list[tuple[Any, ...]]]:
+    safe_query(sql, dialect, schema)
     timer = threading.Timer(timeout, conn.interrupt)
     timer.start()
     try:
@@ -125,7 +134,9 @@ def cell(value: Any) -> tuple[str, Any]:
         return ("text", value.isoformat(sep=" "))
     if isinstance(value, dt.date):
         return ("text", value.isoformat())
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, Decimal)):
+        if isinstance(value, Decimal) and not value.is_finite():
+            raise ValueError("nonfinite result")
         if isinstance(value, float) and not math.isfinite(value):
             raise ValueError("nonfinite result")
         return ("number", value)
