@@ -383,6 +383,95 @@ def test_followup_roundtrip_and_resume(tmp_path: Path) -> None:
     assert landing.load_followup(tmp_path, "missing") is None
 
 
+def test_followup_legacy_record_migrates_once_and_loads_idempotently(tmp_path: Path) -> None:
+    state = landing.FollowupState(
+        owner="owner",
+        session="legacy-session",
+        scope="pr",
+        head=HEAD,
+        attempts=1,
+        reentries=1,
+        phase="queue",
+        next_action="watch queue",
+    )
+    legacy_path = landing._legacy_followup_path(tmp_path, "legacy/key")
+    legacy_path.write_text(json.dumps(landing.asdict(state)), encoding="utf-8")
+    canonical_path = landing.followup_path(tmp_path, "legacy/key")
+
+    loaded = landing.load_followup(tmp_path, "legacy/key")
+    assert loaded == state
+    assert canonical_path.is_file()
+    assert not legacy_path.exists()
+    migrated_bytes = canonical_path.read_bytes()
+
+    assert landing.load_followup(tmp_path, "legacy/key") == state
+    assert canonical_path.read_bytes() == migrated_bytes
+    assert list(tmp_path.glob("*.json")) == [canonical_path]
+
+
+def test_followup_legacy_migration_preserves_budget_and_state_on_rerecord(tmp_path: Path) -> None:
+    legacy_state = landing.FollowupState(
+        owner="owner",
+        session="legacy-session",
+        scope="pr",
+        attempts=1,
+        reentries=1,
+        phase="queue",
+        next_action="watch queue",
+    )
+    legacy_path = landing._legacy_followup_path(tmp_path, "legacy-key")
+    legacy_path.write_text(json.dumps(landing.asdict(legacy_state)), encoding="utf-8")
+
+    path = landing.record_followup(
+        tmp_path,
+        "legacy-key",
+        landing.FollowupState(
+            owner="owner",
+            session="new-session",
+            scope="pr",
+            attempts=1,
+            reentries=1,
+            phase="queue",
+            next_action="renew claim",
+        ),
+    )
+    loaded = landing.load_followup(tmp_path, "legacy-key")
+    assert path == landing.followup_path(tmp_path, "legacy-key")
+    assert loaded is not None
+    assert loaded.owner == "owner"
+    assert loaded.attempts == 1
+    assert loaded.reentries == 1
+    assert loaded.phase == "queue"
+    assert loaded.next_action == "renew claim"
+    assert not legacy_path.exists()
+
+
+def test_followup_legacy_migration_consumes_safe_name_collision_without_duplicate(tmp_path: Path) -> None:
+    state = landing.FollowupState(owner="owner", session="s1", scope="pr", next_action="first")
+    legacy_path = landing._legacy_followup_path(tmp_path, "a/b")
+    legacy_path.write_text(json.dumps(landing.asdict(state)), encoding="utf-8")
+
+    landing.load_followup(tmp_path, "a/b")
+    assert landing.load_followup(tmp_path, "a_b") is None
+
+    landing.record_followup(tmp_path, "a_b", landing.FollowupState(owner="owner", session="s2", scope="pr"))
+    assert landing.followup_path(tmp_path, "a/b") != landing.followup_path(tmp_path, "a_b")
+    assert len(list(tmp_path.glob("*.json"))) == 2
+
+
+def test_consume_retry_migrates_legacy_budget_to_canonical_path(tmp_path: Path) -> None:
+    state = landing.FollowupState(owner="owner", session="s", scope="pr", head=HEAD)
+    legacy_path = landing._legacy_followup_path(tmp_path, "retry-key")
+    legacy_path.write_text(json.dumps(landing.asdict(state)), encoding="utf-8")
+
+    assert landing.consume_retry(tmp_path, "retry-key", "rerun", HEAD)["allowed"] is True
+    loaded = landing.load_followup(tmp_path, "retry-key")
+    assert loaded is not None
+    assert loaded.attempts == 1
+    assert landing.followup_path(tmp_path, "retry-key").is_file()
+    assert not legacy_path.exists()
+
+
 def test_followup_keys_with_same_safe_name_remain_distinct(tmp_path: Path) -> None:
     first = landing.FollowupState(owner="o", session="s1", scope="pr", next_action="first")
     second = landing.FollowupState(owner="o", session="s2", scope="pr", next_action="second")

@@ -1453,15 +1453,18 @@ pr-content-guard:
 
 # Push current branch and open a PR against develop. Auto-merge is WITHHELD by
 # default so a follow-up commit cannot race a merge. Arm only when the branch
-# is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
-# step. When a merge queue is enabled on develop, arming auto-merge enqueues
-# the PR for speculative integration once checks pass. Soundness-path diffs are
-# never armed or auto-enqueued (see pr-arm-auto-merge).
+# is final: `make pr-ready`, or `make pr-open READY=1` when reusing an already
+# open, reviewed PR. A newly created PR always remains held so it can receive
+# review before readiness is evaluated. When a merge queue is enabled on
+# develop, arming auto-merge enqueues the PR for speculative integration once
+# checks pass. Soundness-path diffs are never armed or auto-enqueued (see
+# pr-arm-auto-merge).
 # Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
 # Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
-# when the branch is final (or READY=1 here to arm after open/reuse).
+# when the branch is final. READY=1 arms only after reusing an already-open
+# PR; a newly created PR prints the exact pr-ready action and stays held.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
@@ -1537,6 +1540,7 @@ pr-open:
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
+	REUSED_PR=0; \
 	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --head "$$HEAD_SPEC" --state open --json url --jq '.[0].url' 2>/dev/null); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
@@ -1545,6 +1549,7 @@ pr-open:
 			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC"); \
 		fi; \
 	else \
+		REUSED_PR=1; \
 		echo "Reusing existing PR: $$URL"; \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
 			gh pr edit --repo "$$REPOSITORY" "$$URL" --body-file "$(PR_BODY_FILE)"; \
@@ -1552,7 +1557,10 @@ pr-open:
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
-		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
+		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or rerun 'make pr-open READY=1' to arm a reused reviewed PR."; \
+	elif [ "$$REUSED_PR" != "1" ]; then \
+		echo "PR created and held; READY=1 does not arm a newly created PR."; \
+		echo "Next action after review: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
 	else \
 		$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
 	fi
@@ -1626,7 +1634,8 @@ pr-fanout:
 # This is the stale-PR escape hatch when required checks must be current with
 # develop: GitHub can show a PR as CLEAN even though merge is waiting for a
 # branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
-# withholds unless READY=1); run `make pr-ready` when the branch is final.
+# withholds unless READY=1 reuses an already-open reviewed PR); run
+# `make pr-ready` when the branch is final.
 # Run this one stale PR at a time; updating several branches at once can let
 # the first merge stale the others again under strict checks.
 pr-refresh:

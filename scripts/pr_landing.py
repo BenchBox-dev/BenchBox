@@ -1445,12 +1445,25 @@ def followup_path(directory: Path, key: str) -> Path:
     return directory / f"{safe}-{digest}.json"
 
 
+def _legacy_followup_path(directory: Path, key: str) -> Path:
+    """Return the pre-digest path used by older follow-up records."""
+    if not isinstance(key, str) or not key or len(key) > MAX_FOLLOWUP_KEY_LEN:
+        raise LandingError("followup key must be a bounded non-empty string")
+    safe = "".join(c if c.isascii() and (c.isalnum() or c in "-_") else "_" for c in key)
+    return directory / f"{safe}.json"
+
+
 def _followup_locked(directory: Path, key: str) -> BinaryIO:
-    """Exclusive per-key lock so check-then-act sequences do not interleave."""
+    """Exclusive safe-key lock so migration and check-then-act do not interleave.
+
+    The lock retains the legacy safe-key name deliberately. That serializes
+    keys which collided under the old naming scheme and coordinates migration
+    with older callers that still lock the legacy path.
+    """
     import fcntl
 
     directory.mkdir(parents=True, exist_ok=True)
-    handle = open(followup_path(directory, key).with_suffix(".lock"), "a+b")  # noqa: PTH123
+    handle = open(_legacy_followup_path(directory, key).with_suffix(".lock"), "a+b")  # noqa: PTH123
     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
     return handle
 
@@ -1528,7 +1541,7 @@ def record_followup(directory: Path, key: str, state: FollowupState) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     path = followup_path(directory, key)
     with _followup_locked(directory, key):
-        existing = load_followup(directory, key)
+        existing = _load_followup_unlocked(directory, key)
         if existing is not None and existing.owner != state.owner:
             raise LandingError(f"followup {key!r} is owned by {existing.owner!r}; refusing cross-owner overwrite")
         if existing is not None:
@@ -1749,15 +1762,49 @@ def coerce_followup(data: object) -> FollowupState:
 
 
 def load_followup(directory: Path, key: str) -> FollowupState | None:
-    path = followup_path(directory, key)
+    with _followup_locked(directory, key):
+        return _load_followup_unlocked(directory, key)
+
+
+def _read_followup(path: Path) -> tuple[bool, FollowupState | None]:
+    """Read one candidate, distinguishing absent from malformed state."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return False, None
     except (OSError, ValueError):
-        return None
+        return True, None
     try:
-        return coerce_followup(data)
+        return True, coerce_followup(data)
     except LandingError:
+        return True, None
+
+
+def _load_followup_unlocked(directory: Path, key: str) -> FollowupState | None:
+    """Load the canonical record, migrating one valid legacy record in place."""
+    path = followup_path(directory, key)
+    present, state = _read_followup(path)
+    if present:
+        return state
+
+    legacy_path = _legacy_followup_path(directory, key)
+    legacy_present, legacy_state = _read_followup(legacy_path)
+    if not legacy_present or legacy_state is None:
         return None
+
+    # Move, rather than copy, so a successful migration leaves one record. The
+    # safe-key lock also serializes colliding legacy keys. If a canonical file
+    # appeared while inspecting the candidates, prefer it and never overwrite
+    # that newer record.
+    if path.exists():
+        return _read_followup(path)[1]
+    try:
+        legacy_path.replace(path)
+    except FileNotFoundError:
+        return _read_followup(path)[1]
+    except OSError as exc:
+        raise LandingError(f"could not migrate legacy followup {key!r}: {exc}") from exc
+    return legacy_state
 
 
 def resume_followup(state: FollowupState) -> dict:
@@ -1819,7 +1866,7 @@ def consume_retry(directory: Path, key: str, kind: str, head: str) -> dict:
     here makes the second identical call observe the spent budget.
     """
     with _followup_locked(directory, key):
-        state = load_followup(directory, key)
+        state = _load_followup_unlocked(directory, key)
         if state is None:
             raise LandingError(f"no followup {key!r} recorded; record state before retrying")
         decision = allow_retry(state, kind, head)

@@ -48,7 +48,7 @@ Required CI on `develop` reports through `ci-required-result`. The umbrella uses
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready` (or open already-final work with `make pr-open READY=1`); then walk away — don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready`; `make pr-open READY=1` may arm only when it reuses an already-open, reviewed PR. A newly created PR remains held until review; then walk away — don't poll.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -91,14 +91,14 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
 
    ```bash
    make pr-ready PR=123 HEAD=$(git rev-parse HEAD) EVIDENCE=/tmp/readiness.json
-   # Or open and arm in one step when you already know the branch is done:
+   # Or reuse an already-open, reviewed PR and arm it in one step:
    # make pr-open READY=1 EVIDENCE=/tmp/readiness.json
    ```
 
    The evidence file must declare `delivery_mode` (`serial` or `batch`); batch
    mode must include the complete prepared-batch binding. `make pr-ready` (or
-   `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and
-   never arms. Once the exact readiness transaction passes, the PR
+   `READY=1` while reusing an already-open, reviewed PR) is the only arm path:
+   `auto-merge-on-open.yml` is revoke-only and never arms. Once the exact readiness transaction passes, the PR
    squash-merges when required checks turn green — don't poll.
    Soundness-critical paths and the `no-auto-merge` hold label stay withheld
    pending review (see `docs/operations/repo-admin-settings.md`).

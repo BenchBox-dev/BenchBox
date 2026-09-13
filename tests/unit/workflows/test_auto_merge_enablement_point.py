@@ -19,7 +19,8 @@ are unused; 0 events across 150 PRs), so the arm step was deleted outright
 (auto-merge-policy-consolidation-2026-08-06, D2). The cross-layer policy is
 therefore:
 
-- Local: `pr-open` withholds; `pr-ready` / `READY=1` is the ONLY arm path.
+- Local: `pr-open` withholds; `pr-ready` is the arm path, and `READY=1` is a
+  shortcut only when reusing an already-open, reviewed PR.
 - Workflow: revoke-only (soundness paths + `no-auto-merge` label); it never
   arms on any event. Soundness disable runs on opened/reopened/synchronize.
 """
@@ -107,15 +108,25 @@ def test_auto_merge_enablement_point_is_not_pr_open() -> None:
     )
 
 
-def test_auto_merge_enablement_point_keeps_a_hands_free_path() -> None:
-    """A finished branch must still reach auto-merge without ceremony.
-
-    Withholding by default is only acceptable while arming stays trivial, so
-    pin both the explicit target and the one-command escape hatch.
-    """
+def test_auto_merge_enablement_point_keeps_a_reviewed_reuse_path() -> None:
+    """READY=1 arms only a reused PR; creation remains a successful hold."""
     text = MAKEFILE.read_text(encoding="utf-8")
     assert re.search(r"^pr-ready:", text, re.MULTILINE), "no pr-ready target; withholding would be a dead end"
-    assert "READY" in _target_body("pr-open"), "pr-open has no READY=1 path to open and arm in one step"
+    body = _target_body("pr-open")
+    assert "REUSED_PR=0" in body and "REUSED_PR=1" in body
+    assert 'elif [ "$$REUSED_PR" != "1" ]; then' in body
+    assert "PR created and held" in body
+    assert "Next action after review: make pr-ready" in body
+    assert '$(MAKE) -s pr-ready REPO="$$REPOSITORY"' in body
+
+
+def test_auto_merge_enablement_point_does_not_treat_creation_as_readiness_failure() -> None:
+    """The new-PR READY=1 branch reports the follow-up and skips pr-ready."""
+    body = _target_body("pr-open")
+    held_at = body.index('elif [ "$$REUSED_PR" != "1" ]; then')
+    arm_at = body.index('$(MAKE) -s pr-ready REPO="$$REPOSITORY"')
+    assert held_at < arm_at
+    assert "READY=1 does not arm a newly created PR" in body
 
 
 def test_auto_merge_enablement_point_has_one_arming_implementation() -> None:
