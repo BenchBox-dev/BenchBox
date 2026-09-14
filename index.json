@@ -14502,10 +14502,15 @@
       "title": "Ship discoverable templates with the installed package (package resources) so --tuning tuned works outside a repo checkout"
     },
     "shipping-the-normalize-plan-literals-cli-flag-and-surfacing": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T01:16:15Z",
+        "generation": "a16c2b8adb6343889213504f476730d0",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Shipping the --normalize-plan-literals CLI flag and surfacing the normalized fingerprint in the bundle"
     },
     "shrink-followup-catalog-schema-validation": {
