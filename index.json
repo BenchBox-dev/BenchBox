@@ -7309,13 +7309,18 @@
       "title": "Include TPC Metrics (Power@Size, Throughput@Size, QphH/QphDS@Size) in All Result Outputs"
     },
     "independent-production-deployer-and-retirement": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T00:59:48Z",
+        "generation": "ec245242c0204d43888f789f40ea1577",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
+      },
       "needs": [
         "publication-ledger-reproducible-inputs",
         "publication-pages-deploy-nonterminal-and-journal-split-brain"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Build a replacement production deployer for benchbox.dev, then execute publication retirement"
     },
     "independent-publication-a0-a1-tracker-record-correction": {
