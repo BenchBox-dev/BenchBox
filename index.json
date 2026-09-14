@@ -83,15 +83,10 @@
       "title": "Add Azure Synapse Adapter"
     },
     "add-benchmark-option-shell-completion": {
-      "claim": {
-        "expires_at": "2026-09-15T01:25:01Z",
-        "generation": "9e2e4b86bb644cdb88a37b35e63985dd",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Add benchmark-option shell completion"
     },
     "add-blog-with-ablog": {
