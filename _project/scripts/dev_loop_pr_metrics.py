@@ -1392,7 +1392,7 @@ def _commit_timestamp(commit: str) -> int | None:
 def _commit_diff_names(base: str, commit: str) -> list[str] | None:
     try:
         proc = subprocess.run(
-            ["git", "diff", "--name-only", base, commit, "--"],
+            ["git", "diff", "--name-only", "-z", base, commit, "--"],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
@@ -1403,7 +1403,7 @@ def _commit_diff_names(base: str, commit: str) -> list[str] | None:
         return None
     if proc.returncode != 0:
         return None
-    return [line for line in proc.stdout.splitlines() if line.strip()]
+    return [entry for entry in proc.stdout.split("\0") if entry]
 
 
 def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:

@@ -1118,6 +1118,18 @@ def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.Mo
     assert captured["process_relpath"] == "_project/analysis/pr-process-acceptance-baseline.json"
 
 
+def test_commit_diff_names_parses_nul_delimited_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """NUL-delimited diff names survive non-ASCII pathnames unquoted."""
+    assert metrics._commit_diff_names("0" * 40, "0" * 40) is None
+
+    class _Proc:
+        returncode = 0
+        stdout = "custom/\u00e9.json\x00plain.json\x00"
+
+    monkeypatch.setattr(metrics.subprocess, "run", lambda *args, **kwargs: _Proc())
+    assert metrics._commit_diff_names("base", "commit") == ["custom/\u00e9.json", "plain.json"]
+
+
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy
     import json as _json
