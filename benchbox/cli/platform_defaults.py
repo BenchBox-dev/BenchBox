@@ -343,6 +343,44 @@ def _register_driver_version_options() -> None:
 
 _register_driver_version_options()
 
+
+def _register_plan_capture_options() -> None:
+    """Register plan-capture knobs as `--platform-option` keys on every platform.
+
+    ``plan_max_depth`` and ``plan_capture_timeout_seconds`` are adapter-level
+    settings (see ``benchbox/platforms/base/adapter.py``), so they are accepted
+    for every platform exactly like the ``driver_version`` well-known keys
+    above. Defaults stay ``None`` so unset keys are omitted from parsed options
+    and the adapter falls back to its own defaults.
+    """
+    metadata = PlatformRegistry.get_all_platform_metadata()
+    max_depth_spec = PlatformOptionSpec(
+        name="plan_max_depth",
+        parser=_parse_int,
+        default=None,
+        help="Maximum query-plan tree depth persisted to the plans companion "
+        "and used for the capture-time size estimate.",
+    )
+    timeout_spec = PlatformOptionSpec(
+        name="plan_capture_timeout_seconds",
+        parser=_parse_int,
+        default=None,
+        help="Timeout in seconds for EXPLAIN plan-capture queries.",
+    )
+
+    for platform_name in metadata:
+        existing_specs = PlatformHookRegistry.list_option_specs(platform_name)
+        specs_to_register = []
+        if "plan_max_depth" not in existing_specs:
+            specs_to_register.append(max_depth_spec)
+        if "plan_capture_timeout_seconds" not in existing_specs:
+            specs_to_register.append(timeout_spec)
+        if specs_to_register:
+            PlatformHookRegistry.register_option_specs(platform_name, *specs_to_register)
+
+
+_register_plan_capture_options()
+
 __all__ = [
     "PlatformHookRegistry",
 ]

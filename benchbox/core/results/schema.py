@@ -39,6 +39,7 @@ from benchbox.core.results.query_execution import (
     query_execution_to_compact_v2,
 )
 from benchbox.core.results.query_normalizer import normalize_query_id
+from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH, QueryPlanDAG
 from benchbox.core.results.schema_policy import (
     CURRENT_SCHEMA_VERSION,
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
@@ -1040,7 +1041,27 @@ def compute_plan_capture_stats(
     return plans_captured, len(failed_ids), capture_errors
 
 
-def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
+def _resolve_companion_max_depth(result: Any) -> int:
+    """Effective plan depth for the persisted `.plans.json` companion.
+
+    Reads the run's configured ``plan_max_depth`` platform option (settable via
+    ``--platform-option plan_max_depth=N``) from the stored run config so the
+    companion honors the same bound as the capture-time size estimate.
+    Falls back to ``DEFAULT_PLAN_MAX_DEPTH`` when unset or unparsable.
+    """
+    metadata = getattr(result, "execution_metadata", None)
+    run_cfg = metadata.get("run_config") if isinstance(metadata, Mapping) else None
+    platform_options = run_cfg.get("platform_options") if isinstance(run_cfg, Mapping) else None
+    raw = platform_options.get("plan_max_depth") if isinstance(platform_options, Mapping) else None
+    if raw is None:
+        return DEFAULT_PLAN_MAX_DEPTH
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_PLAN_MAX_DEPTH
+
+
+def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_DEPTH) -> dict[str, Any]:
     """Serialize a single query result's captured plan into a `.plans.json` entry."""
     query_plan = qr.get("query_plan")
     plan_fingerprint = qr.get("plan_fingerprint")
@@ -1064,12 +1085,16 @@ def _build_plan_entry(qr: dict[str, Any]) -> dict[str, Any]:
         plan_entry["capture_time_ms"] = round(capture_time, 1)
 
     # `to_dict()` (when the object defines one) is the intentional serialization:
-    # for QueryPlanDAG it applies depth protection (see DEFAULT_PLAN_MAX_DEPTH)
-    # and omits internal-only fields like fingerprint_integrity. Checking
+    # for QueryPlanDAG it applies depth protection at the run's configured
+    # plan_max_depth (DEFAULT_PLAN_MAX_DEPTH when unset) and omits
+    # internal-only fields like fingerprint_integrity. Checking
     # is_dataclass() first would always win (QueryPlanDAG is a dataclass) and
     # fall through to plain asdict(), bypassing both of those and leaking
-    # fingerprint_integrity into the companion file.
-    if hasattr(query_plan, "to_dict"):
+    # fingerprint_integrity into the companion file. Only QueryPlanDAG takes a
+    # max_depth argument; other duck-typed serializers keep the bare call.
+    if isinstance(query_plan, QueryPlanDAG):
+        plan_entry["plan"] = query_plan.to_dict(max_depth=max_depth)
+    elif hasattr(query_plan, "to_dict"):
         plan_entry["plan"] = query_plan.to_dict()
     elif isinstance(query_plan, dict):
         plan_entry["plan"] = query_plan
@@ -1137,6 +1162,11 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     plans_by_query: dict[str, Any] = {}
     errors_list: list[dict[str, Any]] = []
 
+    # One bound for the whole companion: the run's configured plan_max_depth,
+    # so `--platform-option plan_max_depth=N` shrinks the persisted bundle the
+    # same way it shrinks the capture-time size estimate.
+    max_depth = _resolve_companion_max_depth(result)
+
     for query_id, rows in rows_by_query_id.items():
         multi_stream = len(rows) > 1
         stream_ids = [qr.get("stream_id", 0) for qr in rows]
@@ -1151,7 +1181,7 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
                 key = f"{query_id}#{qr.get('stream_id', 0)}"
             else:
                 key = f"{query_id}#{qr.get('stream_id', 0)}:{qr.get('test_type', '')}"
-            plans_by_query[key] = _build_plan_entry(qr)
+            plans_by_query[key] = _build_plan_entry(qr, max_depth=max_depth)
 
     # Add plan capture errors
     for error in result.plan_capture_errors or []:
