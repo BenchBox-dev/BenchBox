@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -418,14 +419,15 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
 # Platform -> in-container service port the adapter connects to. The host
 # reachability port is whatever the compose `ports:` mapping publishes for this
 # container port. AUTO-GENERATED from adapter defaults -- change the owning
-# adapter's `default_service_port`, never values here.
+# adapter's `default_service_port`, never values here (manifest lookup keeps the global adapter registry cold).
 def _adapter_service_ports() -> dict[str, int]:
-    from benchbox.core.platform_registry import PlatformRegistry
+    from benchbox.core.platform_manifest import get_adapter_imports
 
+    coords = {key.lower(): (module, class_name) for key, module, class_name in get_adapter_imports()}
     ports: dict[str, int] = {}
     for platform in _DOCKER_PLATFORM_SPECS:
-        port = PlatformRegistry.get_adapter_class(platform).default_service_port
-        if port is None:
+        module_path, class_name = coords[platform.lower()]
+        if (port := getattr(importlib.import_module(module_path), class_name).default_service_port) is None:
             raise RuntimeError(f"{platform} adapter declares no default_service_port")
         ports[platform] = port
     return ports
