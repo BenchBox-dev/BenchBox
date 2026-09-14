@@ -690,7 +690,7 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "criteria_version": process["criteria_version"],
         "process_digest": hashlib.sha256(process_raw).hexdigest(),
     }
-    acceptance["registration"] = {"commit": head, "time": "2026-09-08T12:33:43Z"}
+    acceptance["registration"] = {"commit": head, "original_commit": head, "time": "2026-09-08T12:33:43Z"}
     acceptance["incident_replays"] = [{"scenario": name, "status": "pass"} for name in process["incident_scenarios"]]
     acceptance["cohort"]["required"]["min_prs"] = frozen["min_prs"]
     acceptance["cohort"]["required"]["min_days"] = frozen["min_days"]
@@ -706,6 +706,18 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         metrics,
         "_is_ancestor",
         lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
+    )
+    base_freeze = process.get("base_commit_at_freeze")
+    real_commit_parent = metrics._commit_parent
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: base_freeze if commit == head else real_commit_parent(commit),
+    )
+    monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: {head})
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(
+        metrics, "_commit_diff_names", lambda base, commit: ["_project/analysis/pr-process-acceptance-baseline.json"]
     )
     acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
@@ -814,6 +826,308 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: 
     weak_reduction["efficiency"]["observed_avoidable_actions"] = 60
     errors = metrics.validate_process_acceptance(weak_reduction, process, digest)
     assert any("below frozen 50%" in e for e in errors)
+
+
+def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Squash-orphaned freeze evidence stays mechanically checked.
+
+    The durable registration commit satisfies the ancestor gate while
+    original_commit preserves the freeze-only boundary; tampering with
+    either copy must fail.
+    """
+    import json as _json4
+
+    DURABLE = "a" * 40
+    FREEZE = "b" * 40
+    TAMPERED_SHA = "c" * 40
+    BUNDLED = "d" * 40
+    FORGED = "e" * 40
+    BASE_REF = "f" * 40
+    OTHER_PARENT = "09" * 20
+
+    frozen_bytes = b'{"frozen": true}'
+    pinned_bytes = _json4.dumps({"registration": {"commit": DURABLE, "original_commit": FREEZE}}).encode()
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes if path == "_project/analysis/pr-process-acceptance.json" else frozen_bytes,
+    )
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": commit == DURABLE)
+    monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF if commit == FREEZE else None)
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
+
+    base = _acceptance_doc()
+    base["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
+    base["registration"] = {"commit": DURABLE, "time": "2026-09-08T12:33:43Z"}
+    process = _process_doc()
+    process["base_commit_at_freeze"] = BASE_REF
+
+    preserved = dict(base)
+    preserved["registration"] = {
+        "commit": DURABLE,
+        "original_commit": FREEZE,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    assert metrics._check_acceptance_binding(preserved, process, "digest", "baseline.json") == []
+
+    tampered = dict(base)
+    tampered["registration"] = {
+        "commit": DURABLE,
+        "original_commit": TAMPERED_SHA,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes
+        if path == "_project/analysis/pr-process-acceptance.json"
+        else (b'{"tampered": true}' if revision == TAMPERED_SHA else frozen_bytes),
+    )
+    monkeypatch.setattr(
+        metrics,
+        "_sha256_bytes",
+        lambda raw: "tampered-digest" if raw == b'{"tampered": true}' else "digest",
+    )
+    errors = metrics._check_acceptance_binding(tampered, process, "digest", "baseline.json")
+    assert any("original registration commit" in e for e in errors)
+
+    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: None)
+    errors = metrics._check_acceptance_binding(preserved, process, "digest", "baseline.json")
+    assert any("not resolvable" in e for e in errors)
+
+    dropped = dict(base)
+    dropped["registration"] = {"commit": DURABLE, "time": "2026-09-08T12:33:43Z"}
+    errors = metrics._check_acceptance_binding(dropped, process, "digest", "baseline.json")
+    assert any("original_commit" in e for e in errors)
+
+    based_process = dict(process)
+    based_process["base_commit_at_freeze"] = BASE_REF
+    parents = {FREEZE: BASE_REF, BUNDLED: OTHER_PARENT}
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes if path == "_project/analysis/pr-process-acceptance.json" else frozen_bytes,
+    )
+    monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: parents.get(commit))
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
+    assert metrics._check_acceptance_binding(preserved, based_process, "digest", "baseline.json") == []
+
+    bundled = dict(base)
+    bundled["registration"] = {
+        "commit": DURABLE,
+        "original_commit": BUNDLED,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(bundled, based_process, "digest", "baseline.json")
+    assert any("freeze-only child" in e for e in errors)
+
+    self_certified = dict(base)
+    self_certified["registration"] = {
+        "commit": BUNDLED,
+        "original_commit": BUNDLED,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    errors = metrics._check_acceptance_binding(self_certified, based_process, "digest", "baseline.json")
+    assert any("freeze-only child" in e for e in errors)
+
+    import json as _json3
+
+    pinned_record = _json3.dumps({"registration": {"commit": DURABLE, "original_commit": FREEZE}}).encode()
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_record if path == "acceptance.json" else frozen_bytes,
+    )
+    timestamps = {FREEZE: 100, DURABLE: 200, FORGED: 300}
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: timestamps.get(commit))
+    anchored = dict(base)
+    anchored["registration"] = {
+        "commit": DURABLE,
+        "original_commit": FREEZE,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    assert (
+        metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json") == []
+    )
+
+    forged = dict(base)
+    forged["registration"] = {
+        "commit": DURABLE,
+        "original_commit": FORGED,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: BASE_REF if commit in (FREEZE, FORGED) else None,
+    )
+    errors = metrics._check_acceptance_binding(forged, based_process, "digest", "baseline.json", "acceptance.json")
+    assert any("anchored by published history" in e for e in errors)
+    assert any("newer than the durable" in e for e in errors)
+
+    monkeypatch.setattr(
+        metrics, "_git_show_bytes", lambda revision, path: None if path == "acceptance.json" else frozen_bytes
+    )
+    errors = metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json")
+    assert any("pins no registration pointers" in e for e in errors)
+
+    bundled_diff_sha = "cd" * 20
+    monkeypatch.setattr(
+        metrics,
+        "_commit_diff_names",
+        lambda base, commit: ["baseline.json", "scripts/pr_landing.py"]
+        if commit == bundled_diff_sha
+        else ["baseline.json"],
+    )
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF)
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    bundled_diff = dict(base)
+    bundled_diff["registration"] = {
+        "commit": DURABLE,
+        "original_commit": bundled_diff_sha,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(
+        bundled_diff, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("more than the frozen baseline" in e for e in errors)
+
+    same_commit = dict(base)
+    same_commit["registration"] = {
+        "commit": FREEZE,
+        "original_commit": FREEZE,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(same_commit, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
+
+    merge_sha = "ab" * 20
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: commit == merge_sha)
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: BASE_REF if commit in (FREEZE, FORGED, merge_sha) else None,
+    )
+    merge_freeze = dict(base)
+    merge_freeze["registration"] = {
+        "commit": DURABLE,
+        "original_commit": merge_sha,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(
+        merge_freeze, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("merge commit" in e for e in errors)
+
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: None)
+    errors = metrics._check_acceptance_binding(
+        merge_freeze, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("parent count not resolvable" in e for e in errors)
+
+    refname = dict(base)
+    refname["registration"] = {
+        "commit": DURABLE,
+        "original_commit": "freeze-v1",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(refname, based_process, "digest", "baseline.json", "acceptance.json")
+    assert any("full commit SHA" in e for e in errors)
+
+    upper = dict(base)
+    upper["registration"] = {
+        "commit": DURABLE,
+        "original_commit": "B" * 40,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(upper, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors and not any("full commit SHA" in e for e in errors)
+
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_record if path == "acceptance.json" else frozen_bytes,
+    )
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF)
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
+    cased = dict(base)
+    cased["registration"] = {
+        "commit": DURABLE,
+        "original_commit": "B" * 40,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(cased, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
+
+    upper_base = dict(based_process)
+    upper_base["base_commit_at_freeze"] = BASE_REF.upper()
+    errors = metrics._check_acceptance_binding(preserved, upper_base, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
+
+
+def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The CLI entry forwards the selected acceptance path to the history-anchor read."""
+    seen: dict = {}
+    real_binding = metrics._check_acceptance_binding
+
+    def binding_spy(acceptance, process, digest, process_relpath, acceptance_relpath):
+        seen["acceptance_relpath"] = acceptance_relpath
+        seen["process_relpath"] = process_relpath
+        return real_binding(acceptance, process, digest, process_relpath, acceptance_relpath)
+
+    monkeypatch.setattr(metrics, "_check_acceptance_binding", binding_spy)
+    metrics.validate_process_acceptance(
+        _acceptance_doc(),
+        _process_doc(),
+        "digest",
+        process_relpath="custom/base.json",
+        acceptance_relpath="custom/accept.json",
+    )
+    assert seen["acceptance_relpath"] == "custom/accept.json"
+    assert seen["process_relpath"] == "custom/base.json"
+
+    captured: dict = {}
+
+    def validate_spy(acceptance, process, digest, process_relpath=None, acceptance_relpath=None):
+        captured["acceptance_relpath"] = acceptance_relpath
+        captured["process_relpath"] = process_relpath
+        return []
+
+    monkeypatch.setattr(metrics, "validate_process_acceptance", validate_spy)
+    repo_root = Path(metrics.__file__).resolve().parents[2]
+    acceptance_path = repo_root / "_project" / "analysis" / "pr-process-acceptance.json"
+    process_path = repo_root / "_project" / "analysis" / "pr-process-acceptance-baseline.json"
+    assert metrics.run_validate_process_acceptance(str(acceptance_path), str(process_path)) == 0
+    assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
+    assert captured["process_relpath"] == "_project/analysis/pr-process-acceptance-baseline.json"
+
+    outside = tmp_path / "acceptance.json"
+    outside.write_text(acceptance_path.read_text(encoding="utf-8"), encoding="utf-8")
+    outside_base = tmp_path / "baseline.json"
+    outside_base.write_bytes(process_path.read_bytes())
+    assert metrics.run_validate_process_acceptance(str(outside), str(outside_base)) == 0
+    assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
+    assert captured["process_relpath"] == "_project/analysis/pr-process-acceptance-baseline.json"
+
+
+def test_commit_diff_names_parses_nul_delimited_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """NUL-delimited diff names survive non-ASCII pathnames unquoted."""
+    assert metrics._commit_diff_names("0" * 40, "0" * 40) is None
+
+    class _Proc:
+        returncode = 0
+        stdout = "custom/\u00e9.json\x00plain\rname.json\x00".encode()
+
+    monkeypatch.setattr(metrics.subprocess, "run", lambda *args, **kwargs: _Proc())
+    assert metrics._commit_diff_names("base", "commit") == ["custom/\u00e9.json", "plain\rname.json"]
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
