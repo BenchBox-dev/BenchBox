@@ -11406,15 +11406,10 @@
       "title": "Persist DataFrame plan-capture error cause to the bundle; reset capture state per run"
     },
     "qpc-16-plan-max-depth-cli-wiring": {
-      "claim": {
-        "expires_at": "2026-09-15T01:18:14Z",
-        "generation": "94c6d12145a94d0a884af6bf18ab46c4",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Expose plan_max_depth via --platform-option (and bound the persisted companion)"
     },
     "qpc-17-compare-plans-threshold-zero-query-drop": {
