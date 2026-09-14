@@ -175,8 +175,8 @@ def test_loader_omits_parallel_when_constructor_signature_rejects_it(monkeypatch
     ]
 
 
-def test_constructor_accepts_argument_does_not_treat_varkw_as_universal_acceptance() -> None:
-    """A bare **kwargs in benchmark classes should not accept arbitrary arguments."""
+def test_constructor_accepts_argument_keeps_varkw_forwarding() -> None:
+    """Runtime forwarding stays permissive: concrete benchmarks consume options via **kwargs."""
     from unittest.mock import Mock
 
     from benchbox.core.benchmark_loader import constructor_accepts_argument
@@ -188,12 +188,23 @@ def test_constructor_accepts_argument_does_not_treat_varkw_as_universal_acceptan
     assert constructor_accepts_argument(TPCHBenchmark, "force_regenerate") is True
     assert constructor_accepts_argument(TPCDSBenchmark, "official") is True
 
-    # Arguments not explicitly accepted should be rejected despite **kwargs
-    assert constructor_accepts_argument(TPCHBenchmark, "official") is False
-    assert constructor_accepts_argument(TPCHBenchmark, "taxi_types") is False
+    # Options consumed through **kwargs must still be forwarded, not silently dropped
+    assert constructor_accepts_argument(TPCHBenchmark, "quiet") is True
 
     # Mocks retain universal acceptance for test flexibility
     assert constructor_accepts_argument(Mock(), "any_arg") is True
+
+
+def test_instantiate_forwards_kwargs_consumed_options() -> None:
+    """Regression: instantiate_benchmark_class must forward options a class consumes via **kwargs."""
+    from benchbox.core.benchmark_loader import instantiate_benchmark_class
+
+    class KwargsBenchmark:
+        def __init__(self, scale_factor: float = 1.0, **kwargs: object) -> None:
+            self.quiet = bool(kwargs.get("quiet", False))
+
+    instance = instantiate_benchmark_class(KwargsBenchmark, {"scale_factor": 0.01}, {"quiet": True})
+    assert instance.quiet is True
 
 
 def test_loader_forwards_explicit_cli_options(monkeypatch: pytest.MonkeyPatch) -> None:

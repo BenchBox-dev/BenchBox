@@ -122,24 +122,23 @@ def instantiate_benchmark_class(
 
 
 def constructor_accepts_argument(benchmark_class: type[Any], argument_name: str) -> bool:
-    """Return whether a benchmark constructor accepts a named argument."""
+    """Return whether a benchmark constructor accepts a named argument.
+
+    A bare ``**kwargs`` counts as acceptance: several concrete
+    benchmarks intentionally consume documented options (``quiet``,
+    ``parallel``) through ``**kwargs``, so filtering those out would
+    silently drop live CLI options. Spec-level safety belongs to
+    registration-time validation
+    (:meth:`BenchmarkHookRegistry.register_option_specs`), which fails
+    fast on mismatches without changing runtime forwarding.
+    """
     try:
         parameters = inspect.signature(benchmark_class).parameters
     except (TypeError, ValueError):
         return False
-    if argument_name in parameters:
-        return True
-    if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
-        try:
-            from unittest.mock import NonCallableMock
-
-            if isinstance(benchmark_class, NonCallableMock) or (
-                isinstance(benchmark_class, type) and issubclass(benchmark_class, NonCallableMock)
-            ):
-                return True
-        except (ImportError, TypeError):
-            pass
-    return False
+    return argument_name in parameters or any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+    )
 
 
 def get_core_benchmark_class(benchmark_name: str) -> Any:
