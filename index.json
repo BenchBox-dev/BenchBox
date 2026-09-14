@@ -11413,15 +11413,10 @@
       "title": "Expose plan_max_depth via --platform-option (and bound the persisted companion)"
     },
     "qpc-17-compare-plans-threshold-zero-query-drop": {
-      "claim": {
-        "expires_at": "2026-09-15T01:23:42Z",
-        "generation": "fbb5b4f10f5440c8868c35d45d501b5c",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "compare-plans drops an explicitly-requested query at --threshold 0.0"
     },
     "quality-add-cross-platform-result-validation": {
