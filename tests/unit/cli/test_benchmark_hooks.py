@@ -394,3 +394,25 @@ class TestBenchmarkOptionShellCompletion:
     def test_used_keys_omitted(self):
         items = self._completer().shell_complete(self._ctx("tpch_skew", pairs=(("skew_preset", "heavy"),)), None, "")
         assert "skew_preset=" not in [item.value for item in items]
+
+    def test_completion_imports_lazy_benchmark(self, monkeypatch):
+        """A not-yet-imported benchmark resolves via lazy module import."""
+        import sys
+
+        from benchbox.core.hooks.benchmark_hooks import BenchmarkHookRegistry
+
+        module_name = "benchbox.core.tpch_skew.benchmark"
+        assert module_name in sys.modules  # pre-imported by the module fixture
+        monkeypatch.delitem(sys.modules, module_name)
+        monkeypatch.delitem(BenchmarkHookRegistry._option_specs, "tpch_skew")
+        monkeypatch.delitem(BenchmarkHookRegistry._alias_index, "tpch_skew", raising=False)
+
+        assert BenchmarkHookRegistry.list_option_specs("tpch_skew") == {}
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_completion_unknown_benchmark_is_silent(self):
+        items = self._completer().shell_complete(self._ctx("no_such_bench"), None, "")
+
+        assert items == []

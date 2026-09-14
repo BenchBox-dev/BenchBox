@@ -551,9 +551,28 @@ def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
 
     params = getattr(ctx, "params", None) or {}
     benchmark = params.get("benchmark") or ""
-    if not str(benchmark).strip():
+    benchmark = str(benchmark).strip().lower()
+    if not benchmark:
         return {}
-    return BenchmarkHookRegistry.list_option_specs(str(benchmark).strip().lower())
+    _ensure_benchmark_specs(benchmark)
+    return BenchmarkHookRegistry.list_option_specs(benchmark)
+
+
+def _ensure_benchmark_specs(benchmark: str) -> None:
+    """Import the selected benchmark module so its option specs register.
+
+    Benchmark modules load lazily, so in a fresh CLI process only
+    incidentally-imported benchmarks have specs; without this, completion
+    offers nothing for benchmarks like nyctaxi. Mirrors the
+    `--help-topic benchmarks` eager-import path for one id. Unknown ids stay
+    silent — completion simply offers nothing.
+    """
+    try:
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        get_core_benchmark_class(benchmark)
+    except (ValueError, ImportError):
+        pass
 
 
 def _find_benchmark_spec(specs: dict[str, Any], key: str):

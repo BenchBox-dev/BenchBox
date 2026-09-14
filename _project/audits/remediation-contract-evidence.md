@@ -101,3 +101,45 @@ The prescribed pipeline and publication seam replay passed 109 tests after
 the end-to-end cohort consumer control was added. Re-run the cited nodes after
 any source or consumer change; a passing aggregate count is not acceptance of
 the collective claim.
+
+## PR #2122 review follow-ups (Tier 3 CLI batch)
+
+Three Codex inline findings on PR #2122 (all unresolved threads at
+remediation time), each reproduced before fixing. Producer chain for the
+P1 class: `LogicalOperator.to_dict` writes depth-truncation markers,
+`.plans.json` persists them, `QueryPlanDAG.from_dict` rehydrates the
+companion, and `compare_query_plans` consumes the rehydrated DAGs.
+
+- P1 truncated plans indistinguishable after reload: the pre-fix probe
+  (`/tmp/p1_probe.py`, depth-3 chains differing only at the leaf,
+  serialized with `max_depth=1`) reloaded STALE/STALE and compared at
+  1.0 with zero mismatches.
+  `tests/unit/core/query_plans/test_query_plans_comparison.py::TestTruncationCaveat::test_truncated_pair_with_differing_full_fingerprints_is_flagged`
+  succeeds (0.867 overall, one `structure_mismatch` carrying the
+  truncation reason); the same node failed pre-fix via stash, alongside
+  `test_non_truncated_difference_has_no_caveat` failing pre-fix only on
+  the new attribute and passing on behavior both before and after.
+  `test_truncated_identical_pair_compares_clean` rejects the
+  false-positive direction (identically truncated identical plans stay
+  at 1.0 with no caveat).
+- Truncation preservation at the reload seam:
+  `tests/unit/core/results/test_query_plan_models.py::TestTruncationPreservation::test_from_dict_preserves_shallowest_cut`
+  succeeds (cut recorded as 2, integrity STALE);
+  `test_from_dict_full_depth_has_no_truncation` succeeds (no cut,
+  VERIFIED);
+  `test_find_truncation_depth_ignores_non_markers` rejects
+  non-marker/boolean payloads.
+- P2 lazy benchmark import for completion: pre-fix fresh-process probe
+  returned `[]` for nyctaxi/joinorder/vector_search while tpch_skew
+  completed incidentally.
+  `tests/unit/cli/test_benchmark_hooks.py::TestBenchmarkOptionShellCompletion::test_completion_imports_lazy_benchmark`
+  succeeds (registry + module entry wiped, completion re-imports and
+  still offers `skew_preset=`);
+  `test_completion_unknown_benchmark_is_silent` rejects unknown ids
+  with no completions; the fresh-process `BashComplete` probe for
+  `--benchmark nyctaxi --benchmark-option tax...` now yields
+  `taxi_types=`.
+- P2 stale run reference: `docs/reference/cli/run.md` stated plain
+  `run` has no `--streams` flag in two passages; both now document the
+  canonical `--streams` spelling with `--concurrency` as alias, and a
+  docs-wide grep finds no remaining `has no --streams` claim.
