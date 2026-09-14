@@ -1331,6 +1331,21 @@ def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
     return proc.returncode == 0
 
 
+def _commit_parent(commit: str) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", f"{commit}^"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
 def validate_process_acceptance(
     acceptance: dict,
     process: dict,
@@ -1364,7 +1379,10 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     The durable registration commit must be an ancestor of HEAD while
     original_commit preserves the freeze-only boundary (they coincide when
     no squash merge orphaned the freeze); both pinned copies must match
-    the bound digest so dropping either pointer fails closed.
+    the bound digest so dropping either pointer fails closed. The original
+    commit must also be the freeze-only child of the baseline's bound
+    base_commit_at_freeze, so a bundled squash commit cannot stand in as
+    its own freeze proof.
     """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
@@ -1391,8 +1409,20 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     original_frozen = _git_show_bytes(original, process_relpath)
     if original_frozen is None:
         errors.append(f"original registration commit {original[:12]} not resolvable in this tree")
-    elif _sha256_bytes(original_frozen) != process_digest:
+        return errors
+    if _sha256_bytes(original_frozen) != process_digest:
         errors.append("process file at the original registration commit differs from the bound digest")
+        return errors
+    base_freeze = process.get("base_commit_at_freeze")
+    if base_freeze:
+        parent = _commit_parent(original)
+        if parent is None:
+            errors.append(f"original registration commit {original[:12]} parent not resolvable in this tree")
+        elif parent != base_freeze:
+            errors.append(
+                "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
+                " (a bundled squash commit cannot serve as its own freeze proof)"
+            )
     return errors
 
 

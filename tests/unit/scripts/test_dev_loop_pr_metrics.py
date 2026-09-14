@@ -707,6 +707,13 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "_is_ancestor",
         lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
     )
+    base_freeze = process.get("base_commit_at_freeze")
+    real_commit_parent = metrics._commit_parent
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: base_freeze if commit == head else real_commit_parent(commit),
+    )
     acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
@@ -868,6 +875,33 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     dropped["registration"] = {"commit": "durable-commit", "time": "2026-09-08T12:33:43Z"}
     errors = metrics._check_acceptance_binding(dropped, process, "digest", "baseline.json")
     assert any("original_commit" in e for e in errors)
+
+    based_process = dict(process)
+    based_process["base_commit_at_freeze"] = "base-commit"
+    parents = {"freeze-only-commit": "base-commit", "bundled-commit": "other-parent"}
+    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: frozen_bytes)
+    monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: parents.get(commit))
+    assert metrics._check_acceptance_binding(preserved, based_process, "digest", "baseline.json") == []
+
+    bundled = dict(base)
+    bundled["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "bundled-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(bundled, based_process, "digest", "baseline.json")
+    assert any("freeze-only child" in e for e in errors)
+
+    self_certified = dict(base)
+    self_certified["registration"] = {
+        "commit": "bundled-commit",
+        "original_commit": "bundled-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    errors = metrics._check_acceptance_binding(self_certified, based_process, "digest", "baseline.json")
+    assert any("freeze-only child" in e for e in errors)
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
