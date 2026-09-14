@@ -1418,7 +1418,7 @@ def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[s
     registration = record.get("registration")
     if not isinstance(registration, dict):
         return set()
-    return {str(value) for value in (registration.get("commit"), registration.get("original_commit")) if value}
+    return {str(value).lower() for value in (registration.get("commit"), registration.get("original_commit")) if value}
 
 
 def validate_process_acceptance(
@@ -1426,6 +1426,7 @@ def validate_process_acceptance(
     process: dict,
     process_digest: str,
     process_relpath: str = "_project/analysis/pr-process-acceptance-baseline.json",
+    acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
 ) -> list[str]:
     """Check the final acceptance record against the frozen preregistration.
 
@@ -1441,7 +1442,7 @@ def validate_process_acceptance(
         return [f"acceptance record schema must be {PROCESS_ACCEPTANCE_SCHEMA!r}"]
     if not isinstance(process, dict):
         return ["process baseline must be a JSON object"]
-    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath))
+    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath, acceptance_relpath))
     errors.extend(_check_acceptance_cohort(acceptance, process))
     errors.extend(_check_acceptance_replays(acceptance, process))
     errors.extend(_check_acceptance_efficiency(acceptance, process))
@@ -1479,7 +1480,7 @@ def _check_acceptance_binding(
     if binding.get("process_digest") != process_digest:
         errors.append("process baseline content differs from the bound digest (thresholds or scenarios changed)")
     registration = acceptance.get("registration") or {}
-    reg_commit = str(registration.get("commit") or "")
+    reg_commit = str(registration.get("commit") or "").lower()
     if not reg_commit:
         errors.append("acceptance must record its preregistration commit")
         return errors
@@ -1493,7 +1494,7 @@ def _check_acceptance_binding(
         errors.append("process file at the registration commit differs from the bound digest")
     if not _is_ancestor(reg_commit):
         errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
-    original = str(registration.get("original_commit") or "")
+    original = str(registration.get("original_commit") or "").lower()
     if not original:
         errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
         return errors
@@ -1861,7 +1862,13 @@ def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> 
     except (OSError, ValueError) as exc:
         print(f"INCOMPLETE process baseline {process_path}: {exc}")
         return 1
-    errors = validate_process_acceptance(acceptance, process, _sha256_bytes(process_raw))
+    try:
+        acceptance_relpath = str(Path(acceptance_path).resolve().relative_to(REPO_ROOT.resolve()))
+    except (OSError, ValueError):
+        acceptance_relpath = "_project/analysis/pr-process-acceptance.json"
+    errors = validate_process_acceptance(
+        acceptance, process, _sha256_bytes(process_raw), acceptance_relpath=acceptance_relpath
+    )
     if errors:
         print(f"INCOMPLETE acceptance {acceptance_path}:")
         for error in errors:

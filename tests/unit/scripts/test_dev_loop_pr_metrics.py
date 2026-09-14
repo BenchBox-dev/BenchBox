@@ -967,7 +967,9 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     assert any("anchored by published history" in e for e in errors)
     assert any("newer than the durable" in e for e in errors)
 
-    monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: set())
+    monkeypatch.setattr(
+        metrics, "_git_show_bytes", lambda revision, path: None if path == "acceptance.json" else frozen_bytes
+    )
     errors = metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json")
     assert any("pins no registration pointers" in e for e in errors)
 
@@ -1042,6 +1044,59 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     }
     errors = metrics._check_acceptance_binding(upper, based_process, "digest", "baseline.json", "acceptance.json")
     assert errors and not any("full commit SHA" in e for e in errors)
+
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_record if path == "acceptance.json" else frozen_bytes,
+    )
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF)
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
+    cased = dict(base)
+    cased["registration"] = {
+        "commit": DURABLE,
+        "original_commit": "B" * 40,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(cased, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
+
+
+def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The CLI entry forwards the selected acceptance path to the history-anchor read."""
+    seen: dict = {}
+    real_binding = metrics._check_acceptance_binding
+
+    def binding_spy(acceptance, process, digest, process_relpath, acceptance_relpath):
+        seen["acceptance_relpath"] = acceptance_relpath
+        return real_binding(acceptance, process, digest, process_relpath, acceptance_relpath)
+
+    monkeypatch.setattr(metrics, "_check_acceptance_binding", binding_spy)
+    metrics.validate_process_acceptance(
+        _acceptance_doc(), _process_doc(), "digest", acceptance_relpath="custom/accept.json"
+    )
+    assert seen["acceptance_relpath"] == "custom/accept.json"
+
+    captured: dict = {}
+
+    def validate_spy(acceptance, process, digest, process_relpath=None, acceptance_relpath=None):
+        captured["acceptance_relpath"] = acceptance_relpath
+        return []
+
+    monkeypatch.setattr(metrics, "validate_process_acceptance", validate_spy)
+    repo_root = Path(metrics.__file__).resolve().parents[2]
+    acceptance_path = repo_root / "_project" / "analysis" / "pr-process-acceptance.json"
+    process_path = repo_root / "_project" / "analysis" / "pr-process-acceptance-baseline.json"
+    assert metrics.run_validate_process_acceptance(str(acceptance_path), str(process_path)) == 0
+    assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
+
+    outside = tmp_path / "acceptance.json"
+    outside.write_text(acceptance_path.read_text(encoding="utf-8"), encoding="utf-8")
+    assert metrics.run_validate_process_acceptance(str(outside), str(process_path)) == 0
+    assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
