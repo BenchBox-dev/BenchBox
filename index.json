@@ -11117,15 +11117,10 @@
       "title": "published-results carries pre-#1467 bundles that leak private paths on a PUBLIC branch"
     },
     "published-results-deletion-path-undocumented": {
-      "claim": {
-        "expires_at": "2026-09-15T01:04:02Z",
-        "generation": "b88ea43930fe4cecb51604cd510027c2",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "No documented maintainer path for deleting from published-results, and additions by hand are structurally impossible"
     },
     "published-results-has-no-develop-ward-sync-path": {
