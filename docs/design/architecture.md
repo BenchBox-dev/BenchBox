@@ -67,8 +67,9 @@ CLI (run command with --platform *-df)
 
 The **family-based** adapter architecture means adding a new expression-style platform (e.g., Polars-like API) requires only implementing a thin adapter on top of `ExpressionFamilyAdapter`, inheriting query translation, tuning, and execution logic.
 
-`core/runner/dataframe_runner.py` is retained as a deprecated internal
-compatibility runner; it is not the production DataFrame lifecycle path.
+The deprecated internal compatibility runner `core/runner/dataframe_runner.py`
+has been deleted; the adapter mixin path (`platforms/dataframe/benchmark_mixin.py`)
+is the only production DataFrame lifecycle path.
 
 ## Benchmark Layer
 

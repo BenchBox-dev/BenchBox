@@ -714,3 +714,20 @@ class TestStructureDataFramePlan:
         structured = adapter._structure_dataframe_plan(captured, "q1")
 
         assert structured is captured
+
+
+class TestHandleNoQueries:
+    """An empty resolution must not be survivable on the production path."""
+
+    def test_empty_resolution_raises_configuration_error(self):
+        from benchbox.core.exceptions import ConfigurationError
+
+        adapter = DummyAdapter()
+
+        with pytest.raises(ConfigurationError, match="no DataFrame query source"):
+            adapter._handle_no_queries(
+                [],
+                set(),
+                benchmark_id="tpcds_obt",
+                query_filter=None,
+            )

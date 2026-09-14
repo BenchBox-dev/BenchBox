@@ -31,10 +31,9 @@ from types import SimpleNamespace
 import pytest
 
 from benchbox.core.dataframe.query import QueryRegistry
-from benchbox.core.dataframe.query_resolution import registry_dataframe_queries
-from benchbox.core.exceptions import ConfigurationError
-from benchbox.core.runner.dataframe_runner import _get_queries_for_benchmark, no_dataframe_queries_message
+from benchbox.core.dataframe.query_resolution import get_dataframe_queries_for_benchmark, registry_dataframe_queries
 from benchbox.core.schemas import BenchmarkConfig
+from benchbox.platforms.dataframe.benchmark_mixin import no_dataframe_queries_message
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -56,7 +55,7 @@ def test_resolution_reaches_every_shipped_registry(benchmark_id: str, expected_c
     """The fix: these resolve through the production path, not just in the gates."""
     config = BenchmarkConfig(name=benchmark_id, display_name=benchmark_id, scale_factor=0.01)
 
-    queries = _get_queries_for_benchmark(config, None, stream_id=0)
+    queries = get_dataframe_queries_for_benchmark(config, None, stream_id=0)
 
     assert len(queries) == expected_count
     assert all(getattr(query, "query_id", None) for query in queries)
@@ -125,25 +124,3 @@ def test_the_message_distinguishes_a_narrow_filter_from_a_missing_source() -> No
     assert "--queries" not in missing
     assert "no DataFrame query source" in missing
     assert "SQL mode" in missing
-
-
-def test_the_runner_raises_instead_of_returning_an_empty_result_set(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A genuinely empty resolution must not be survivable.
-
-    Patching resolution to empty reproduces the state the seven families used
-    to reach. Before the fix this returned `[]` and the caller went on to mark
-    power_test COMPLETED.
-    """
-    from benchbox.core.runner import dataframe_runner
-
-    monkeypatch.setattr(dataframe_runner, "_get_queries_for_benchmark", lambda *a, **k: [])
-    config = BenchmarkConfig(name="tpcds_obt", display_name="TPC-DS OBT", scale_factor=0.01)
-
-    with pytest.raises(ConfigurationError, match="no DataFrame query source"):
-        dataframe_runner._execute_dataframe_queries(
-            adapter=object(),
-            ctx=object(),
-            benchmark_config=config,
-            benchmark_instance=None,
-            monitor=None,
-        )
