@@ -69,15 +69,10 @@
       "title": "Add a CI check that the UAT charter (or pointer) exists on the release branch"
     },
     "add-a-streams-concurrency-cli-option-to-benchbox-run-itself": {
-      "claim": {
-        "expires_at": "2026-09-15T01:11:25Z",
-        "generation": "6bd64f33d2fb49bfa5bd707aec760318",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add a --streams/--concurrency CLI option to `benchbox run` itself\n(benchbox/cli/commands/run.py) so BenchmarkConfig.concurrency is\nreachable from the canonical (non-deprecated) `run` command, not just"
     },
     "add-azure-synapse-adapter": {
