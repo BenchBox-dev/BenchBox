@@ -1396,14 +1396,13 @@ def _commit_diff_names(base: str, commit: str) -> list[str] | None:
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
-            text=True,
             timeout=60,
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
     if proc.returncode != 0:
         return None
-    return [entry for entry in proc.stdout.split("\0") if entry]
+    return [os.fsdecode(entry) for entry in proc.stdout.split(b"\0") if entry]
 
 
 def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:

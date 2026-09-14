@@ -1124,10 +1124,10 @@ def test_commit_diff_names_parses_nul_delimited_output(monkeypatch: pytest.Monke
 
     class _Proc:
         returncode = 0
-        stdout = "custom/\u00e9.json\x00plain.json\x00"
+        stdout = "custom/\u00e9.json\x00plain\rname.json\x00".encode()
 
     monkeypatch.setattr(metrics.subprocess, "run", lambda *args, **kwargs: _Proc())
-    assert metrics._commit_diff_names("base", "commit") == ["custom/\u00e9.json", "plain.json"]
+    assert metrics._commit_diff_names("base", "commit") == ["custom/\u00e9.json", "plain\rname.json"]
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
