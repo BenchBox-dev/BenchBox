@@ -546,7 +546,9 @@ class TestReleaseInfrastructure:
 
         job = workflow["jobs"]["validate-base"]
         steps = job["steps"]
-        checkout_step = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        checkout_step = next(
+            step for step in steps if re.fullmatch(r"actions/checkout@[0-9a-f]{40}", str(step.get("uses") or ""))
+        )
         assert checkout_step["name"] == "Checkout trusted release policy"
         assert checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
         assert checkout_step["with"]["fetch-depth"] == 0
