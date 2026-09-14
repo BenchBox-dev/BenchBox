@@ -494,3 +494,26 @@ class TestStatisticsPhaseToken:
 
         assert LifecyclePhases().statistics is False
         assert LifecyclePhases(statistics=True).statistics is True
+
+
+@pytest.mark.skipif(not IMPORTS_AVAILABLE, reason=skip_reason or "CLI modules not available")
+class TestStreamsConcurrencyAlias:
+    """Canonical `run` accepts --streams with --concurrency as an alias.
+
+    Both spellings must reach BenchmarkConfig.concurrency through the
+    canonical (non-deprecated) `run` command, not just run-official.
+    """
+
+    @pytest.mark.parametrize("flag", ["--streams", "--concurrency"])
+    def test_both_spellings_parse_to_concurrency(self, flag):
+        from benchbox.cli.commands.run import run
+
+        ctx = run.make_context("run", [flag, "4"])
+        assert ctx.params["concurrency"] == 4
+
+    def test_single_concurrency_param_registers_both_spellings(self):
+        from benchbox.cli.commands.run import run
+
+        matches = [p for p in run.params if getattr(p, "name", None) == "concurrency"]
+        assert len(matches) == 1
+        assert set(matches[0].opts) == {"--streams", "--concurrency"}

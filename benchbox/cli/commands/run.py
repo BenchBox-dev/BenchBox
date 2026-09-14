@@ -2987,11 +2987,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
+    "--streams",
     "--concurrency",
+    "concurrency",
     type=click.IntRange(min=1),
     default=None,
     hidden=True,
-    help="Concurrent streams (hidden; for run-official)",
+    help="Concurrent streams for throughput (canonical; --concurrency accepted as alias for run-official forwarding)",
 )
 @advanced_option(
     "--iterations",
