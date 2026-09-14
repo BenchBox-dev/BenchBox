@@ -119,6 +119,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # Removing Modin also removes its readiness alias and package/backend
     # checks. The remaining readiness checks and Click surface are unchanged.
     "benchbox/cli/platform_readiness.py",
+    # plan-capture knobs (plan_max_depth, plan_capture_timeout_seconds)
+    # registered as --platform-option specs. Registry data only; no @click
+    # decorator, option, or function signature changed, so the guard's
+    # decorator/signature snapshot stays equal.
+    "benchbox/cli/platform_defaults.py",
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
