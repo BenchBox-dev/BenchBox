@@ -904,6 +904,7 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     )
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
     monkeypatch.setattr(metrics, "_commit_parent", lambda commit: parents.get(commit))
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
     assert metrics._check_acceptance_binding(preserved, based_process, "digest", "baseline.json") == []
 
     bundled = dict(base)

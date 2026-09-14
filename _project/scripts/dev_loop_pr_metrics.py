@@ -1331,10 +1331,16 @@ def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
     return proc.returncode == 0
 
 
-def _commit_parent(commit: str) -> str | None:
+def _commit_parents(commit: str) -> list[str] | None:
+    """Parent SHAs for *commit*, or None when the probe itself fails.
+
+    One successful command distinguishes "no such parent" (an empty entry)
+    from a failed probe (indeterminate), so a transient Git failure can
+    never read as a proven single-parent freeze.
+    """
     try:
         proc = subprocess.run(
-            ["git", "rev-parse", f"{commit}^"],
+            ["git", "rev-list", "--parents", "-1", commit],
             cwd=REPO_ROOT,
             check=False,
             capture_output=True,
@@ -1343,22 +1349,24 @@ def _commit_parent(commit: str) -> str | None:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return proc.stdout.strip() if proc.returncode == 0 else None
+    if proc.returncode != 0:
+        return None
+    tokens = proc.stdout.strip().split()
+    if not tokens:
+        return None
+    return tokens[1:]
+
+
+def _commit_parent(commit: str) -> str | None:
+    parents = _commit_parents(commit)
+    return parents[0] if parents else None
 
 
 def _has_second_parent(commit: str) -> bool | None:
-    try:
-        proc = subprocess.run(
-            ["git", "rev-parse", "--verify", f"{commit}^2"],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+    parents = _commit_parents(commit)
+    if parents is None:
         return None
-    return proc.returncode == 0
+    return len(parents) > 1
 
 
 def _commit_timestamp(commit: str) -> int | None:
