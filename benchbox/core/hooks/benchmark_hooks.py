@@ -154,11 +154,13 @@ class BenchmarkHookRegistry:
         When the caller passes its benchmark class, every spec name is
         validated against the constructor signature at registration time,
         so a misspelled or stale option fails fast at import instead of
-        silently never reaching the benchmark. Only explicit constructor
-        parameters count - a bare ``**kwargs`` must not legitimize a
-        misrouted option. Aliases are CLI spellings and are never treated
-        as constructor names. Omitting ``benchmark_class`` (test doubles,
-        non-core namespaces) skips validation.
+        silently never reaching the benchmark. Only keyword-passable
+        constructor parameters count: a bare ``**kwargs`` must not
+        legitimize a misrouted option, and a positional-only parameter
+        can never receive an option forwarded as ``**kwargs``. Aliases
+        are CLI spellings and are never treated as constructor names.
+        Omitting ``benchmark_class`` (test doubles, non-core namespaces)
+        skips validation.
 
         The class is passed explicitly - never resolved through the
         loader here - so registration performs no imports and cannot
@@ -199,17 +201,21 @@ class BenchmarkHookRegistry:
         specs: tuple[BenchmarkOptionSpec, ...],
         benchmark_class: type[Any],
     ) -> None:
-        """Reject spec names that are not explicit constructor parameters."""
+        """Reject spec names that are not keyword-passable constructor parameters."""
         try:
             parameters = inspect.signature(benchmark_class).parameters
-        except (TypeError, ValueError):
-            return
+        except (TypeError, ValueError) as exc:
+            raise BenchmarkOptionError(
+                f"Cannot validate benchmark options for benchmark '{benchmark}': "
+                f"constructor signature of {benchmark_class.__name__} is unavailable. "
+                f"Declare an inspectable constructor instead of relying on "
+                f"unverifiable option forwarding."
+            ) from exc
         explicit = {
             name
             for name, parameter in parameters.items()
             if parameter.kind
             in (
-                inspect.Parameter.POSITIONAL_ONLY,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
                 inspect.Parameter.KEYWORD_ONLY,
             )

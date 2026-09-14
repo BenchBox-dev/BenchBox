@@ -316,8 +316,46 @@ class TestRegistrationTimeConstructorValidation:
         )
         assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
 
+    def test_positional_only_param_rejected(self):
+        class FakeBench:
+            def __init__(self, pos_only, /, ok_param=None):
+                self.pos_only = pos_only
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="does not match any constructor parameter"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="pos_only"),
+                benchmark_class=FakeBench,
+            )
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param"),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+
+    def test_uninspectable_signature_raises(self, monkeypatch):
+        import inspect as inspect_module
+
+        def _no_signature(cls):
+            raise ValueError("no signature found")
+
+        monkeypatch.setattr(inspect_module, "signature", _no_signature)
+
+        class FakeBench:
+            def __init__(self, ok_param=None):
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="signature of FakeBench is unavailable"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="ok_param"),
+                benchmark_class=FakeBench,
+            )
+
     def test_all_registered_specs_match_constructors(self):
-        """Tree-wide invariant: every registered spec names an explicit ctor param."""
+        """Tree-wide invariant: every registered spec names a keyword-passable ctor param."""
         import inspect
 
         from benchbox.core.benchmark_loader import get_core_benchmark_class
@@ -332,7 +370,6 @@ class TestRegistrationTimeConstructorValidation:
                 for name, parameter in inspect.signature(benchmark_class).parameters.items()
                 if parameter.kind
                 in (
-                    inspect.Parameter.POSITIONAL_ONLY,
                     inspect.Parameter.POSITIONAL_OR_KEYWORD,
                     inspect.Parameter.KEYWORD_ONLY,
                 )
