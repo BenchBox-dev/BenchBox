@@ -7342,18 +7342,13 @@
       "title": "A1: Ratify publication authorities, state semantics, and threat model"
     },
     "independent-publication-a10-release-and-mirror-retirement": {
-      "claim": {
-        "expires_at": "2026-09-15T01:01:42Z",
-        "generation": "59d89fcc04e14641a3b0b7d5fe92e195",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
-      },
+      "claim": null,
       "needs": [
         "independent-production-deployer-and-retirement",
         "independent-publication-a9-corpus-production-cutover"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "A10: Remove publication coupling from package releases and retire redundant mirror PRs"
     },
     "independent-publication-a11-operations-canaries-and-closeout": {
