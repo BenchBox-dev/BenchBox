@@ -716,6 +716,9 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
     )
     monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: {head})
     monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(
+        metrics, "_commit_diff_names", lambda base, commit: ["_project/analysis/pr-process-acceptance-baseline.json"]
+    )
     acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
@@ -846,6 +849,7 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": commit == "durable-commit")
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
     monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
 
     base = _acceptance_doc()
     base["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
@@ -961,6 +965,35 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: set())
     errors = metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json")
     assert any("pins no registration pointers" in e for e in errors)
+
+    monkeypatch.setattr(
+        metrics,
+        "_commit_diff_names",
+        lambda base, commit: ["baseline.json", "scripts/pr_landing.py"]
+        if commit == "bundled-diff"
+        else ["baseline.json"],
+    )
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: "base-commit")
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
+    bundled_diff = dict(base)
+    bundled_diff["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "bundled-diff",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(
+        bundled_diff, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("more than the frozen baseline" in e for e in errors)
+
+    same_commit = dict(base)
+    same_commit["registration"] = {
+        "commit": "freeze-only-commit",
+        "original_commit": "freeze-only-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(same_commit, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:

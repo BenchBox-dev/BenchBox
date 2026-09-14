@@ -1366,6 +1366,23 @@ def _commit_timestamp(commit: str) -> int | None:
         return None
 
 
+def _commit_diff_names(base: str, commit: str) -> list[str] | None:
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", base, commit, "--"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [line for line in proc.stdout.splitlines() if line.strip()]
+
+
 def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:
     """Registration SHAs pinned by the acceptance record stored at *commit*."""
     raw = _git_show_bytes(commit, acceptance_relpath)
@@ -1422,11 +1439,14 @@ def _check_acceptance_binding(
     no squash merge orphaned the freeze); both pinned copies must match
     the bound digest so dropping either pointer fails closed. The original
     commit must also be the freeze-only child of the baseline's bound
-    base_commit_at_freeze, so a bundled squash commit cannot stand in as
-    its own freeze proof. Finally the original SHA must be anchored by
-    published history (a pointer pinned in the durable commit's own
-    acceptance record) and must predate the durable commit, so a commit
-    fabricated after observing results cannot serve as the freeze.
+    base_commit_at_freeze and change nothing else, so a bundled squash
+    commit cannot stand in as its own freeze proof. When the pointers
+    differ, the original SHA must additionally be anchored by published
+    history (a pointer pinned in the durable commit's own acceptance
+    record); a same-commit registration needs no indirection proof because
+    its ancestry, content, and diff already establish the freeze. Finally
+    the original must predate the durable commit, so a commit fabricated
+    after observing results cannot serve as the freeze.
     """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
@@ -1450,44 +1470,82 @@ def _check_acceptance_binding(
     if not original:
         errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
         return errors
+    errors.extend(
+        _check_original_freeze(original, reg_commit, process, process_digest, process_relpath, acceptance_relpath)
+    )
+    return errors
+
+
+def _check_original_freeze(
+    original: str,
+    reg_commit: str,
+    process: dict,
+    process_digest: str,
+    process_relpath: str,
+    acceptance_relpath: str,
+) -> list[str]:
+    """Digest, freeze-only, history-anchor, and ordering proof for the original freeze commit."""
+    errors: list[str] = []
     original_frozen = _git_show_bytes(original, process_relpath)
     if original_frozen is None:
-        errors.append(f"original registration commit {original[:12]} not resolvable in this tree")
-        return errors
+        return [f"original registration commit {original[:12]} not resolvable in this tree"]
     if _sha256_bytes(original_frozen) != process_digest:
-        errors.append("process file at the original registration commit differs from the bound digest")
-        return errors
+        return ["process file at the original registration commit differs from the bound digest"]
     base_freeze = process.get("base_commit_at_freeze")
     if base_freeze:
-        parent = _commit_parent(original)
-        if parent is None:
-            errors.append(f"original registration commit {original[:12]} parent not resolvable in this tree")
-        elif parent != base_freeze:
-            errors.append(
-                "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
-                " (a bundled squash commit cannot serve as its own freeze proof)"
-            )
+        errors.extend(_check_freeze_only_child(original, base_freeze, process_relpath))
+    if original != reg_commit:
+        errors.extend(_check_history_anchor(original, reg_commit, acceptance_relpath))
+    errors.extend(_check_freeze_ordering(original, reg_commit))
+    return errors
+
+
+def _check_freeze_only_child(original: str, base_freeze: str, process_relpath: str) -> list[str]:
+    """The original must be the freeze-only child of the bound base: nothing but the baseline changes."""
+    parent = _commit_parent(original)
+    if parent is None:
+        return [f"original registration commit {original[:12]} parent not resolvable in this tree"]
+    if parent != base_freeze:
+        return [
+            "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
+            " (a bundled squash commit cannot serve as its own freeze proof)"
+        ]
+    diff_names = _commit_diff_names(base_freeze, original)
+    if diff_names is None:
+        return [f"original registration commit {original[:12]} diff not resolvable in this tree"]
+    if sorted(diff_names) != [process_relpath]:
+        return ["original registration commit changes more than the frozen baseline (freeze must be baseline-only)"]
+    return []
+
+
+def _check_history_anchor(original: str, reg_commit: str, acceptance_relpath: str) -> list[str]:
+    """A reconciled freeze SHA must be pinned by the durable commit's own acceptance record."""
     pinned = _pinned_registration_pointers(reg_commit, acceptance_relpath)
     if not pinned:
-        errors.append(
+        return [
             "durable registration commit pins no registration pointers in its acceptance record"
             " (freeze SHA must be anchored by published history)"
-        )
-    elif original not in pinned:
-        errors.append(
+        ]
+    if original not in pinned:
+        return [
             "original registration commit matches no registration pointer pinned in the durable"
             " commit's own acceptance record (freeze SHA must be anchored by published history)"
-        )
+        ]
+    return []
+
+
+def _check_freeze_ordering(original: str, reg_commit: str) -> list[str]:
+    """The freeze must predate the durable integration commit."""
     original_ts = _commit_timestamp(original)
     reg_ts = _commit_timestamp(reg_commit)
     if original_ts is None or reg_ts is None:
-        errors.append("cannot establish freeze ordering for the original registration commit")
-    elif original_ts > reg_ts:
-        errors.append(
+        return ["cannot establish freeze ordering for the original registration commit"]
+    if original_ts > reg_ts:
+        return [
             "original registration commit is newer than the durable registration commit"
             " (freeze must precede integration)"
-        )
-    return errors
+        ]
+    return []
 
 
 def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
