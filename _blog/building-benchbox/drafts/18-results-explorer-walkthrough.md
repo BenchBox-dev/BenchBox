@@ -238,16 +238,16 @@ Until now, however, BenchBox was purely a local utility. Every run lived on an i
 
 The release of the **BenchBox Results Explorer** fundamentally changes that relationship.
 
-The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) establishes a public destination where users can explore, compare, and verify benchmarking results produced across the BenchBox ecosystem. Instead of treating benchmark numbers as ephemeral terminal logs, BenchBox now packages runs into **attested run result artifacts**. Each artifact cryptographically and structurally records:
+The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) establishes a public destination where users can explore, compare, and verify benchmarking results produced across the BenchBox ecosystem. Instead of treating benchmark numbers as ephemeral terminal logs, BenchBox now packages runs into **attested run result artifacts**. Each artifact cryptographically and structurally records, where the harness captures it:
 
-1. **The executing system**: CPU architecture (ARM64 vs. x86_64), physical and logical core counts, total RAM, OS kernel version, and client-to-engine locality.
+1. **The executing system**: CPU architecture (ARM64 vs. x86_64), physical and logical core counts, total RAM, OS kernel version, and client-to-engine locality — shown when recorded; the Explorer renders gaps as missing evidence.
 2. **BenchBox runtime version**: Git commit hash and release version of the benchmark harness.
 3. **Platform and engine versions**: Specific database engine releases (e.g., DuckDB v2.0.0-preview vs. v1.5.5, DataFusion 46.0, ClickHouse 24.8).
 4. **Benchmark configuration and tuning companion**: Scale factors, execution phases (power runs, throughput streams, cold cache settings), memory limits, thread pools, and optimizer flags.
 5. **Validation and correctness proof**: Per-query checksums, row counts, and schema validation verifying that every platform returned correct results against standard reference answers.
 6. **Provenance and funding disclosure**: Clear classification of run origin (`maintainer-run`, `vendor-supplied`, or `community-submitted`) alongside funding disclosures (`employer`, `personal`, `free-trial`, `grant`, `vendor-sponsored`).
 
-By capturing this complete execution context, BenchBox turns raw benchmark numbers into verifiable evidence that can be audited, compared, and shared.
+By capturing this execution context where available, BenchBox turns raw benchmark numbers into verifiable evidence that can be audited, compared, and shared.
 
 ---
 
@@ -648,7 +648,7 @@ Here is a live snippet showing DuckDB's version progression on TPC-H SF10:
   </div>
 </div>
 
-This view also supports toggling measurement bases, such as switching between wall-clock elapsed time and cumulative CPU time, allowing teams to analyze both user-perceived speed and server resource efficiency.
+This view also lets you change the measurement basis: which recorded passes are included (all warm passes, the warmup pass, or a named warm pass) and whether they are reduced by median or min. Whole-run wall-clock totals remain contextual; there is no cumulative CPU-time basis.
 
 ---
 
@@ -849,8 +849,6 @@ The **Find a Run** section (`/results/query`) serves two functions: multi-facete
 #### Faceted Search
 Finding a benchmark that matches your specific production environment is challenging when datasets grow. Find a Run offers instant multi-faceted filtering across:
 - **Engine & Version**: DuckDB, DataFusion, ClickHouse, Polars, DuckLake.
-- **Hardware Architecture**: `arm64`, `x86_64`.
-- **System Memory**: 16 GB, 32 GB, 64 GB, 128 GB+.
 - **Scale Factor & Benchmark**: SF 0.01 through SF 1000 across 5 benchmarks.
 - **Trust & Provenance**: Filter strictly for maintainer-run or vendor-supplied runs.
 
@@ -934,7 +932,7 @@ BenchBox allows you to drag-and-drop or select any local BenchBox result JSON fi
 When you load a file:
 - **No data leaves your machine**: The JSON file is parsed locally in your browser memory.
 - **Identical visual treatment**: Your local run is rendered using the exact same rich receipt cards, per-query latency tables, and chart suites as public runs.
-- **Verification preflight**: The interface verifies query checksums, warns if tuning parameters were non-standard, and confirms whether your run is eligible for submission.
+- **Local preview**: The interface checks basic schema shape, derives timings, and shows the bundle's recorded validation status. It does not re-verify query checksums, classify tuning, or decide submission eligibility — run `benchbox submit` for that.
 
 Here is a live view of a local result receipt:
 
@@ -1069,11 +1067,13 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 1
 ```
 
 ### Step 2: Set Machine Salt and Package the Run
-To protect personal privacy while preserving system comparability, BenchBox hashes machine IDs using a local salt. Set `BENCHBOX_MACHINE_ID_SALT` to a private random secret:
+To protect personal privacy while preserving system comparability, BenchBox hashes machine IDs using a local salt. Generate a private random secret once (for example with `openssl rand -hex 16`), store it privately, and reuse the same value for every submission:
 
 ```bash
-export BENCHBOX_MACHINE_ID_SALT="$(openssl rand -hex 16)"
+export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
 ```
+
+Do not generate a fresh value per run — that changes the pseudonymous machine identifiers and breaks comparability across your submissions.
 
 Then package your most recent run into a validated submission bundle:
 
@@ -1081,19 +1081,20 @@ Then package your most recent run into a validated submission bundle:
 uv run -- benchbox submit --last --output ./my-submission
 ```
 
-`benchbox submit` inspects the output, verifies that all queries succeeded, validates query checksums, and creates a bundle directory containing the canonical JSON artifact and a cryptographic SHA-256 manifest.
+`benchbox submit` loads the result, checks its clean/submittable classification (all queries succeeded, validated, and submittable), and creates a bundle directory containing the canonical JSON artifact and a SHA-256 manifest for file integrity — not per-query output correctness.
 
 ### Step 3: Propose via Pull Request
 1. Fork [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox).
 2. Check out the `published-results` branch.
-3. Copy your submission bundle into `results-data/bundles/`.
-4. Regenerate the corpus inventory:
+3. Copy the contents of `my-submission/bundle/` into `results-data/bundles/`.
+4. Copy the generated `my-submission/<result>.manifest.json` alongside the bundle files.
+5. Regenerate the corpus inventory:
    ```bash
    uv run -- python scripts/generate_corpus_inventory.py --write
    ```
-5. Open a pull request against `BenchBox-dev/BenchBox:published-results`.
+6. Open a pull request against `BenchBox-dev/BenchBox:published-results`.
 
-Automated CI runs integrity checks, validates timing sanity, checks manifest hashes, and flags the submission for maintainer review. Once merged, your run is automatically built into the next Results Explorer release.
+Automated CI runs integrity checks, validates timing sanity, checks manifest hashes, and flags the submission for maintainer review. Once approved and merged into `published-results`, the bundle enters the complete Phase 2 archive. It does not automatically enter `develop` or the curated static Explorer snapshot, which is built from a separately reviewed publication candidate via the protected deployment transaction.
 
 ---
 
