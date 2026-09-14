@@ -98,7 +98,7 @@ def test_post_merge_gate_jobs_still_present() -> None:
 def test_post_merge_schedule_checkouts_pin_develop() -> None:
     """Every checkout must pin develop on schedule (count match)."""
     text = POST_MERGE.read_text(encoding="utf-8")
-    checkout_count = len(re.findall(r"uses:\s*actions/checkout@v4", text))
+    checkout_count = len(re.findall(r"uses:\s*actions/checkout@[0-9a-f]{40}", text))
     pin_count = text.count(CHECKOUT_PIN)
     assert checkout_count >= 1
     assert pin_count == checkout_count, (

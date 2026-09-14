@@ -51,17 +51,17 @@ jobs:
       # Default branch is develop, so schedule/dispatch already resolve to the
       # tip workflow + tip SHA. Pin ref explicitly so a future default-branch
       # rename cannot silently re-target this sweep.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -90,7 +90,7 @@ jobs:
         # (or, in principle, a same-key collision) must not fail post-merge.
         if: always()
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: fast-lane-count.txt
           key: fast-lane-count-develop-${{ github.sha }}
@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload lint signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: signature-lint
           path: signature.json
@@ -120,18 +120,18 @@ jobs:
   fast-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload fast-test signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: signature-fast-test
           path: signature.json
@@ -188,7 +188,7 @@ jobs:
     # pre-merge tree. Stdlib-only so no dependency sync is required.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
@@ -222,7 +222,7 @@ jobs:
 
       - name: Upload explorer-tokens signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: signature-explorer-tokens
           path: signature.json
@@ -267,18 +267,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -316,7 +316,7 @@ jobs:
 
       - name: Upload medium-test signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: signature-medium-test
           path: signature.json
@@ -347,7 +347,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       MERGED_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
@@ -473,7 +473,7 @@ jobs:
       FAILING_SHA: ${{ github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
@@ -483,7 +483,7 @@ jobs:
         # crashed before its always()-run signature step) is one of the
         # fail-open triggers handled below, not a hard job failure.
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: signature-*
           path: current-signatures
@@ -1101,7 +1101,7 @@ jobs:
       MERGED_SHA: ${{ github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
@@ -1278,7 +1278,7 @@ jobs:
           cat "dev-loop-metrics/${MERGED_SHA}.json"
 
       - name: Upload metrics artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: metrics
           path: dev-loop-metrics/*.json
