@@ -66,6 +66,18 @@ def duckdb_conn() -> Any:
         conn.close()
 
 
+def _null_normalized_row(frame: pd.DataFrame) -> dict[str, Any]:
+    """Return the single result row with every NULL-like value mapped to None.
+
+    Pandas 3 uses a `str` dtype with NaN as its missing-value sentinel, and
+    `.where(notna, None)` is a no-op on such columns (None round-trips back
+    to NaN). Casting to object first restores the pandas 2 normalization so
+    oracle comparisons treat SQL NULL identically on every frame.
+    """
+    as_object = frame.astype(object)
+    return as_object.where(pd.notna(as_object), None).iloc[0].to_dict()
+
+
 @pytest.fixture(scope="module")
 def polars_ctx() -> Any:
     if not POLARS_AVAILABLE:
@@ -108,10 +120,7 @@ def test_generated_pandas_queries_match_tiny_duckdb_oracle(
 
         assert list(actual.columns) == list(expected.columns), query_id
         assert len(actual) == len(expected) == 1, query_id
-        assert (
-            actual.where(pd.notna(actual), None).iloc[0].to_dict()
-            == expected.where(pd.notna(expected), None).iloc[0].to_dict()
-        ), query_id
+        assert _null_normalized_row(actual) == _null_normalized_row(expected), query_id
 
 
 def test_generated_pandas_query_aggregation_supports_lazy_dask_frame(duckdb_conn: Any) -> None:
@@ -129,8 +138,8 @@ def test_generated_pandas_query_aggregation_supports_lazy_dask_frame(duckdb_conn
 
     assert list(actual.columns) == list(expected.columns)
     assert len(actual) == len(expected) == 1
-    actual_row = actual.where(pd.notna(actual), None).iloc[0].to_dict()
-    expected_row = expected.where(pd.notna(expected), None).iloc[0].to_dict()
+    actual_row = _null_normalized_row(actual)
+    expected_row = _null_normalized_row(expected)
     assert actual_row == expected_row
 
 
@@ -152,7 +161,4 @@ def test_generated_expression_queries_match_tiny_duckdb_oracle(
 
         assert list(actual.columns) == list(expected.columns), query_id
         assert len(actual) == len(expected) == 1, query_id
-        assert (
-            actual.where(pd.notna(actual), None).iloc[0].to_dict()
-            == expected.where(pd.notna(expected), None).iloc[0].to_dict()
-        ), query_id
+        assert _null_normalized_row(actual) == _null_normalized_row(expected), query_id
