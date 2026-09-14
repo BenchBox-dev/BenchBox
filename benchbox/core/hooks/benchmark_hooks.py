@@ -9,6 +9,7 @@ Mirrors the platform_hooks.py pattern for platform-specific options.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -139,18 +140,43 @@ class BenchmarkHookRegistry:
 
     _option_specs: dict[str, dict[str, BenchmarkOptionSpec]] = {}
     _alias_index: dict[str, dict[str, str]] = {}
+    _validated_benchmarks: set[str] = set()
 
     @classmethod
-    def register_option_specs(cls, benchmark: str, *specs: BenchmarkOptionSpec) -> None:
+    def register_option_specs(
+        cls,
+        benchmark: str,
+        *specs: BenchmarkOptionSpec,
+        benchmark_class: type[Any] | None = None,
+    ) -> None:
         """Register option specifications for a benchmark.
+
+        When the caller passes its benchmark class, every spec name is
+        validated against the constructor signature at registration time,
+        so a misspelled or stale option fails fast at import instead of
+        silently never reaching the benchmark. Only explicit constructor
+        parameters count - a bare ``**kwargs`` must not legitimize a
+        misrouted option. Aliases are CLI spellings and are never treated
+        as constructor names. Omitting ``benchmark_class`` (test doubles,
+        non-core namespaces) skips validation.
+
+        The class is passed explicitly - never resolved through the
+        loader here - so registration performs no imports and cannot
+        trigger lazy registry loads on the import-critical path.
 
         Args:
             benchmark: Benchmark identifier (e.g., "nyctaxi")
             specs: Option specifications to register
+            benchmark_class: Benchmark class owning the constructor to
+                validate against
         """
         benchmark = benchmark.lower()
         option_map = cls._option_specs.setdefault(benchmark, {})
         alias_map = cls._alias_index.setdefault(benchmark, {})
+
+        if benchmark_class is not None:
+            cls._validate_specs_against_constructor(benchmark, specs, benchmark_class)
+            cls._validated_benchmarks.add(benchmark)
 
         for spec in specs:
             name = spec.name.lower()
@@ -166,6 +192,37 @@ class BenchmarkHookRegistry:
                         f"Alias '{alias}' already used for option '{alias_map[key]}' on benchmark '{benchmark}'"
                     )
                 alias_map[key] = name
+
+    @staticmethod
+    def _validate_specs_against_constructor(
+        benchmark: str,
+        specs: tuple[BenchmarkOptionSpec, ...],
+        benchmark_class: type[Any],
+    ) -> None:
+        """Reject spec names that are not explicit constructor parameters."""
+        try:
+            parameters = inspect.signature(benchmark_class).parameters
+        except (TypeError, ValueError):
+            return
+        explicit = {
+            name
+            for name, parameter in parameters.items()
+            if parameter.kind
+            in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            )
+        }
+        for spec in specs:
+            if spec.name.lower() not in explicit:
+                raise BenchmarkOptionError(
+                    f"Benchmark option '{spec.name}' for benchmark '{benchmark}' "
+                    f"does not match any constructor parameter of "
+                    f"{benchmark_class.__name__}. Add an explicit constructor "
+                    f"parameter - a bare **kwargs must not silently swallow "
+                    f"misrouted options."
+                )
 
     @classmethod
     def list_option_specs(cls, benchmark: str) -> dict[str, BenchmarkOptionSpec]:

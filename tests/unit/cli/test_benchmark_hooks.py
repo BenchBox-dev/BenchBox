@@ -140,8 +140,13 @@ def _register_real_benchmark_specs():
     them all here, module-scoped (runs before any function-scoped autouse
     fixture), guarantees every snapshot/restore cycle includes their specs.
     """
+    import benchbox.core.datavault.benchmark  # noqa: F401
+    import benchbox.core.flightdata.benchmark  # noqa: F401
     import benchbox.core.joinorder.benchmark  # noqa: F401
+    import benchbox.core.joinorder_synthetic.benchmark  # noqa: F401
     import benchbox.core.nyctaxi.benchmark  # noqa: F401
+    import benchbox.core.tpcdi.benchmark  # noqa: F401
+    import benchbox.core.tpcds_obt.benchmark  # noqa: F401
     import benchbox.core.tpch_skew.benchmark  # noqa: F401
     import benchbox.core.tsbs_devops.benchmark  # noqa: F401
     import benchbox.core.vector_search.benchmark  # noqa: F401
@@ -154,9 +159,11 @@ def _clean_registry():
 
     saved_specs = copy.deepcopy(BenchmarkHookRegistry._option_specs)
     saved_aliases = copy.deepcopy(BenchmarkHookRegistry._alias_index)
+    saved_validated = set(BenchmarkHookRegistry._validated_benchmarks)
     yield
     BenchmarkHookRegistry._option_specs = saved_specs
     BenchmarkHookRegistry._alias_index = saved_aliases
+    BenchmarkHookRegistry._validated_benchmarks = saved_validated
 
 
 class TestBenchmarkHookRegistry:
@@ -254,6 +261,95 @@ class TestBenchmarkHookRegistry:
         )
         assert BenchmarkHookRegistry.has_specs("testbench")
         assert BenchmarkHookRegistry.has_specs("TESTBENCH")
+
+
+# ---------------------------------------------------------------------------
+# Registration-time constructor validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestRegistrationTimeConstructorValidation:
+    def test_omitted_class_skips_validation(self):
+        # "test_bench" doubles never pass a class, so registration must not fail.
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="anything_goes_here"),
+        )
+        assert "anything_goes_here" in BenchmarkHookRegistry.list_option_specs("test_bench")
+        assert "test_bench" not in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_mismatched_spec_rejected(self):
+        class FakeBench:
+            def __init__(self, ok_param=None, **kwargs):
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="does not match any constructor parameter"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="definitely_not_a_ctor_param"),
+                benchmark_class=FakeBench,
+            )
+        assert "test_bench" not in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_matching_spec_accepted_and_recorded(self):
+        class FakeBench:
+            def __init__(self, ok_param=None, **kwargs):
+                self.ok_param = ok_param
+
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param", parser=parse_int),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+        assert "test_bench" in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_alias_is_not_validated_against_constructor(self):
+        class FakeBench:
+            def __init__(self, ok_param=None):
+                self.ok_param = ok_param
+
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param", aliases=("not-a-ctor-param",)),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+
+    def test_all_registered_specs_match_constructors(self):
+        """Tree-wide invariant: every registered spec names an explicit ctor param."""
+        import inspect
+
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        for benchmark, specs in BenchmarkHookRegistry._option_specs.items():
+            try:
+                benchmark_class = get_core_benchmark_class(benchmark)
+            except Exception:
+                continue
+            explicit = {
+                name
+                for name, parameter in inspect.signature(benchmark_class).parameters.items()
+                if parameter.kind
+                in (
+                    inspect.Parameter.POSITIONAL_ONLY,
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+            }
+            for spec_name in specs:
+                assert spec_name in explicit, f"{benchmark}.{spec_name}"
+
+    def test_all_resolvable_benchmarks_validated_at_registration(self):
+        """Every resolvable registered benchmark passed its class at registration."""
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        for benchmark in BenchmarkHookRegistry._option_specs:
+            try:
+                get_core_benchmark_class(benchmark)
+            except Exception:
+                continue
+            assert benchmark in BenchmarkHookRegistry._validated_benchmarks, benchmark
 
 
 # ---------------------------------------------------------------------------

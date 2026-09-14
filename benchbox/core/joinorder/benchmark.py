@@ -397,4 +397,5 @@ BenchmarkHookRegistry.register_option_specs(
         ),
         aliases=("force-regenerate",),
     ),
+    benchmark_class=JoinOrderBenchmark,
 )
