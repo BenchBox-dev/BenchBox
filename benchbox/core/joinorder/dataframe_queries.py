@@ -248,7 +248,10 @@ def _expression_condition(ctx: DataFrameContext, node: exp.Expression) -> Any:
     if isinstance(node, exp.In):
         return _expr_value(ctx, node.this).is_in([_literal_value(value) for value in node.expressions])
     if isinstance(node, exp.Like):
-        return _expr_value(ctx, node.this).str.contains(_like_pattern_to_regex(_literal_value(node.expression)))
+        matched = _expr_value(ctx, node.this).str.contains(_like_pattern_to_regex(_literal_value(node.expression)))
+        # sqlglot 30.18+ parses NOT LIKE as Like(negate=True) instead of
+        # Not(Like(...)); honor the flag so negation is never dropped.
+        return ~matched if node.args.get("negate") else matched
     if isinstance(node, exp.Is):
         expr = _expr_value(ctx, node.this)
         return expr.is_null() if isinstance(node.expression, exp.Null) else expr == _expr_value(ctx, node.expression)
@@ -383,11 +386,15 @@ def _pandas_condition(frame: pd.DataFrame, node: exp.Expression) -> Any:
     if isinstance(node, exp.In):
         return _pandas_value(frame, node.this).isin([_literal_value(value) for value in node.expressions])
     if isinstance(node, exp.Like):
-        return (
+        matched = (
             _pandas_value(frame, node.this)
             .astype("string")
             .str.contains(_like_pattern_to_regex(_literal_value(node.expression)), regex=True, na=pd.NA)
         )
+        # sqlglot 30.18+ parses NOT LIKE as Like(negate=True) instead of
+        # Not(Like(...)); honor the flag so negation is never dropped.
+        # (~ preserves pd.NA, which _filter_pandas maps to False via fillna.)
+        return ~matched if node.args.get("negate") else matched
     if isinstance(node, exp.Is):
         value = _pandas_value(frame, node.this)
         return value.isna() if isinstance(node.expression, exp.Null) else value == _pandas_value(frame, node.expression)
