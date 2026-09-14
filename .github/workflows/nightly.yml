@@ -71,6 +71,61 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  duckdb-preview:
+    name: DuckDB 2.0 preview compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # DuckDB packages the 2.0 alpha engine in the 1.6 Python preview series.
+      DUCKDB_PREVIEW_VERSION: 1.6.0.dev379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install BenchBox and the pinned DuckDB preview
+        run: |
+          uv sync --group dev --extra duckdb
+          uv pip install --upgrade --prerelease=allow "duckdb==${DUCKDB_PREVIEW_VERSION}"
+
+      - name: Verify preview identity
+        run: |
+          uv run --no-sync -- python - <<'PY'
+          import os
+
+          import duckdb
+
+          package_version = duckdb.__version__
+          engine_version = duckdb.connect(":memory:").execute("SELECT version()").fetchone()[0]
+          print(f"DuckDB Python package: {package_version}")
+          print(f"DuckDB engine: {engine_version}")
+          if package_version != os.environ["DUCKDB_PREVIEW_VERSION"] or not engine_version.startswith("v2.0.0-"):
+              raise SystemExit("installed DuckDB preview identity does not match the pinned 2.0 preview")
+          PY
+
+      - name: Run DuckDB compatibility suite
+        run: |
+          uv run --no-sync -- python -m pytest \
+            tests/unit/core/query_plans/parsers/test_duckdb_parser_versions.py \
+            tests/unit/platforms/test_duckdb_adapter.py \
+            tests/unit/platforms/test_duckdb_behavioral.py \
+            tests/unit/platforms/test_duckdb_introspection.py \
+            tests/unit/platforms/test_duckdb_operations.py \
+            tests/unit/platforms/test_duckdb_plan_capture.py \
+            tests/unit/platforms/test_duckdb_real_connection.py \
+            tests/unit/platforms/test_duckdb_sorted_loading.py \
+            tests/unit/platforms/test_ducklake_adapter.py \
+            tests/integration/test_duckdb_integration.py \
+            tests/integration/test_ducklake_integration.py \
+            -m "not live_integration" -n 0 --tb=short
+
   binary-framing:
     # Exercise each bundled TPC-H dbgen binary the runner can natively execute
     # and assert its rows carry no trailing '|' (-DEOL_HANDLING convention, see

@@ -25,6 +25,7 @@ from tests.fixtures.duckdb_plans_by_version import (
     DUCKDB_1_0_JSON_SIMPLE_SCAN,
     DUCKDB_1_0_JSON_WITH_TIMING,
     DUCKDB_1_0_JSON_WRAPPED,
+    DUCKDB_2_0_PREVIEW_JSON_ANALYZED,
     EXPECTED_OPERATORS,
     VERSION_FIXTURES,
 )
@@ -247,6 +248,22 @@ class TestDuckDBJSONFormatVersions:
         assert plan is not None
         # Should unwrap and find the actual projection
         assert plan.logical_root.operator_type == LogicalOperatorType.PROJECT
+
+    def test_2_0_preview_analyzed_json(self) -> None:
+        """Parse the root/operator/type schema introduced by the DuckDB 2.0 preview."""
+        parser = DuckDBQueryPlanParser()
+        plan = parser.parse_explain_output("q08", DUCKDB_2_0_PREVIEW_JSON_ANALYZED)
+
+        assert plan is not None
+        assert plan.logical_root.operator_type == LogicalOperatorType.PROJECT
+        assert plan.logical_root.physical_operator is not None
+        assert plan.logical_root.physical_operator.operator_type == "PROJECTION"
+        assert plan.logical_root.physical_operator.properties["timing"] == 0.000004
+        assert plan.logical_root.physical_operator.properties["cardinality"] == 1
+        assert len(plan.logical_root.children) == 1
+        child_op = plan.logical_root.children[0].physical_operator
+        assert child_op.operator_type == "DUMMY_SCAN"
+        assert child_op.properties["cardinality"] == 1
 
 
 class TestVersionBasedParserSelection:
