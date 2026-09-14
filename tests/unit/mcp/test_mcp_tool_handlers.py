@@ -618,8 +618,8 @@ class TestRunBenchmarkToolSuccess:
         assert result["queries"][0]["id"] == "1"
         assert result["queries"][98]["id"] == "99"
 
-    def test_dataframe_platform_uses_dataframe_runner(self, tool_functions, tmp_path):
-        """DataFrame platforms use the dedicated dataframe runner."""
+    def test_dataframe_platform_uses_dataframe_execution_path(self, tool_functions, tmp_path):
+        """DataFrame platforms use the dedicated DataFrame execution path."""
         fn = tool_functions["run_benchmark"]
         from benchbox.core.runner.runner import LifecyclePhases
 

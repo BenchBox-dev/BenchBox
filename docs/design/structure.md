@@ -60,7 +60,6 @@ benchbox/
 benchbox/core/
 ├── runner/                # Benchmark lifecycle execution
 │   ├── runner.py          #   run_benchmark_lifecycle(), LifecyclePhases
-│   ├── dataframe_runner.py #  run_dataframe_benchmark()
 │   └── conversion.py     #   Format conversion orchestration
 ├── results/               # Result models and serialization
 │   ├── models.py          #   BenchmarkResults, ExecutionPhases, QueryExecution

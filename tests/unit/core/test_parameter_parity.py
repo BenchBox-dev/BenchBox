@@ -6,7 +6,7 @@ Verifies that:
 3. get_tpch_parameters() merges overrides on top of defaults
 4. get_parameters() (TPC-DS) merges overrides on top of defaults
 5. Parameter extractors produce valid output
-6. dataframe_runner wiring sets/clears overrides correctly
+6. Seed-derived overrides take precedence over scaled defaults
 
 Copyright 2026 Joe Harris / BenchBox Project
 """
@@ -18,12 +18,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from benchbox.core.runner.dataframe_runner import (
-    _clear_parameter_overrides,
-    _execute_dataframe_queries,
-    _setup_parameter_overrides,
-    _setup_parameter_overrides_for_stream,
-)
 from benchbox.core.tpcds.dataframe_queries.parameters import (
     TPCDS_DEFAULT_PARAMS,
     get_parameters,
@@ -210,279 +204,6 @@ class TestTPCDSParameterExtractor:
 
 
 # =============================================================================
-# Runner Wiring Tests
-# =============================================================================
-
-
-class TestRunnerParameterWiring:
-    """Tests for the dataframe_runner parameter override wiring."""
-
-    def teardown_method(self):
-        tpch_set_overrides(None)
-        tpcds_set_overrides(None)
-
-    def test_setup_noop_without_seed(self):
-        """_setup_parameter_overrides does nothing when seed is None."""
-        _setup_parameter_overrides("tpch", None, 1.0)
-        _setup_parameter_overrides("tpcds", None, 1.0)
-
-    def test_setup_noop_unknown_benchmark(self):
-        """_setup_parameter_overrides does nothing for unknown benchmarks."""
-        _setup_parameter_overrides("ssb", 42, 1.0)
-
-    def test_clear_tpch(self):
-        """_clear_parameter_overrides clears TPC-H overrides."""
-        tpch_set_overrides({1: {"cutoff_date": date(1998, 8, 17)}})
-        assert get_tpch_parameters(1)["cutoff_date"] == date(1998, 8, 17)
-
-        _clear_parameter_overrides("tpch")
-        assert get_tpch_parameters(1)["cutoff_date"] == date(1998, 9, 2)
-
-    def test_clear_tpcds(self):
-        """_clear_parameter_overrides clears TPC-DS overrides."""
-        tpcds_set_overrides({1: {"year": 2001}})
-        assert get_parameters(1).get("year") == 2001
-
-        _clear_parameter_overrides("tpcds")
-        assert get_parameters(1).get("year") == 2000
-
-    def test_setup_tpch_calls_extractor(self):
-        """_setup_parameter_overrides calls the TPC-H extractor with the correct seed."""
-        mock_overrides = {1: {"cutoff_date": date(1998, 8, 17)}}
-
-        with (
-            patch(
-                "benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters",
-                return_value=mock_overrides,
-            ) as mock_extract,
-            patch("benchbox.core.tpch.dataframe_queries.set_parameter_overrides") as mock_set,
-        ):
-            _setup_parameter_overrides("tpch", 42, 0.01)
-
-            mock_extract.assert_called_once_with(42, 0.01)
-            mock_set.assert_called_once_with(mock_overrides)
-
-    def test_setup_tpcds_calls_extractor(self):
-        """_setup_parameter_overrides calls the TPC-DS extractor with the correct seed."""
-        mock_overrides = {1: {"year": 2001}}
-
-        with (
-            patch(
-                "benchbox.core.tpcds.parameter_extractor.get_tpcds_extracted_parameters",
-                return_value=mock_overrides,
-            ) as mock_extract,
-            patch("benchbox.core.tpcds.dataframe_queries.parameters.set_parameter_overrides") as mock_set,
-        ):
-            _setup_parameter_overrides("tpcds", 42, 1.0)
-
-            mock_extract.assert_called_once_with(42, 1.0, None)
-            mock_set.assert_called_once_with(mock_overrides)
-
-    def test_setup_graceful_on_extractor_failure(self):
-        """_setup_parameter_overrides logs warning and continues if extractor fails."""
-        with patch(
-            "benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters",
-            side_effect=RuntimeError("qgen binary not found"),
-        ):
-            # Should not raise
-            _setup_parameter_overrides("tpch", 42, 0.01)
-
-    def test_setup_noop_when_extractor_returns_empty(self):
-        """_setup_parameter_overrides does not set overrides if extractor returns empty dict."""
-        with (
-            patch(
-                "benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters",
-                return_value={},
-            ),
-            patch("benchbox.core.tpch.dataframe_queries.set_parameter_overrides") as mock_set,
-        ):
-            _setup_parameter_overrides("tpch", 42, 0.01)
-            mock_set.assert_not_called()
-
-    def test_execute_queries_clears_overrides_on_no_query_path(self):
-        """_execute_dataframe_queries clears overrides even when no queries are discovered and ConfigurationError is raised."""
-        from benchbox.core.exceptions import ConfigurationError
-
-        config = MagicMock()
-        config.name = "tpch"
-        config.scale_factor = 0.01
-        config.options = {"seed": 7, "power_warmup_iterations": 0, "power_iterations": 1}
-        config.queries = None
-
-        adapter = MagicMock()
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", return_value=[]),
-            patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides") as mock_clear,
-            pytest.raises(ConfigurationError, match="no DataFrame query source"),
-        ):
-            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        mock_clear.assert_called_once_with("tpch")
-
-    def test_execute_queries_clears_overrides_on_unexpected_exception(self):
-        """_execute_dataframe_queries clears overrides when execution path raises unexpectedly."""
-        config = MagicMock()
-        config.name = "tpcds"
-        config.scale_factor = 1.0
-        config.options = {"seed": 11, "power_warmup_iterations": 0, "power_iterations": 1}
-        config.queries = None
-
-        adapter = MagicMock()
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-        query = MagicMock()
-        query.query_id = "Q1"
-
-        # Initial discovery succeeds; measurement query retrieval fails unexpectedly.
-        side_effect = [[query], RuntimeError("boom")]
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", side_effect=side_effect),
-            patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides") as mock_clear,
-            pytest.raises(RuntimeError, match="boom"),
-        ):
-            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        mock_clear.assert_called_once_with("tpcds")
-
-    def test_execute_queries_clears_overrides_on_unexpected_exception_tpch(self):
-        """TPC-H execution also clears overrides on unexpected exceptions."""
-        config = MagicMock()
-        config.name = "tpch"
-        config.scale_factor = 1.0
-        config.options = {"seed": 11, "power_warmup_iterations": 0, "power_iterations": 1}
-        config.queries = None
-
-        adapter = MagicMock()
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-        query = MagicMock()
-        query.query_id = "Q1"
-
-        side_effect = [[query], RuntimeError("tpch-boom")]
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", side_effect=side_effect),
-            patch("benchbox.core.runner.dataframe_runner._clear_parameter_overrides") as mock_clear,
-            pytest.raises(RuntimeError, match="tpch-boom"),
-        ):
-            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        mock_clear.assert_called_once_with("tpch")
-
-    def test_execute_queries_tpcds_sets_overrides_per_stream(self):
-        """TPC-DS override setup is stream-aware during query execution."""
-        config = MagicMock()
-        config.name = "tpcds"
-        config.scale_factor = 1.0
-        config.options = {"seed": 42, "power_warmup_iterations": 1, "power_iterations": 2}
-        config.queries = None
-
-        adapter = MagicMock()
-        adapter.execute_query.return_value = {"query_id": "Q1", "status": "OK", "execution_time_seconds": 0.1}
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-        query = MagicMock()
-        query.query_id = "Q1"
-
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", return_value=[query]),
-            patch("benchbox.core.runner.dataframe_runner._setup_parameter_overrides") as mock_setup,
-        ):
-            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        # Stream 0 is setup once (initial + warmup deduped), then stream 1 and 2.
-        expected = [
-            (("tpcds", 42, 1.0), {"stream_id": 0}),
-            (("tpcds", 42, 1.0), {"stream_id": 1}),
-            (("tpcds", 42, 1.0), {"stream_id": 2}),
-        ]
-        actual = [(call.args, call.kwargs) for call in mock_setup.call_args_list]
-        assert actual == expected
-
-    def test_execute_queries_tpcds_stream_specific_overrides_flow_to_execution(self):
-        """Mock stream-specific extractor values and assert execution sees per-stream overrides."""
-        config = MagicMock()
-        config.name = "tpcds"
-        config.scale_factor = 1.0
-        config.options = {"seed": 9, "power_warmup_iterations": 1, "power_iterations": 2}
-        config.queries = None
-
-        query = MagicMock()
-        query.query_id = "Q1"
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-
-        def _extract(seed: int, scale_factor: float, stream_id: int | None):
-            assert seed == 9
-            assert scale_factor == 1.0
-            assert stream_id is not None
-            return {1: {"year": 2000 + stream_id}}
-
-        def _execute_query(_ctx, _query):
-            params = get_parameters(1)
-            return {
-                "query_id": "Q1",
-                "status": "OK",
-                "execution_time_seconds": 0.01,
-                "year": params.get("year"),
-            }
-
-        adapter = MagicMock()
-        adapter.execute_query.side_effect = _execute_query
-
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", return_value=[query]),
-            patch("benchbox.core.tpcds.parameter_extractor.get_tpcds_extracted_parameters", side_effect=_extract),
-        ):
-            out = _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        # 1 warmup stream (0) + 2 measurement streams (1,2).
-        years_by_stream = {(row["stream_id"], row["run_type"]): row["year"] for row in out}
-        assert years_by_stream[(0, "warmup")] == 2000
-        assert years_by_stream[(1, "measurement")] == 2001
-        assert years_by_stream[(2, "measurement")] == 2002
-
-    def test_execute_queries_tpcds_stream_inputs_align_for_queries_and_extractor(self):
-        """Stream IDs used for query retrieval align with stream IDs used for override extraction."""
-        config = MagicMock()
-        config.name = "tpcds"
-        config.scale_factor = 0.01
-        config.options = {"seed": 17, "power_warmup_iterations": 1, "power_iterations": 2}
-        config.queries = None
-
-        query = MagicMock()
-        query.query_id = "Q1"
-        ctx = MagicMock()
-        benchmark_instance = MagicMock()
-        adapter = MagicMock()
-        adapter.execute_query.return_value = {"query_id": "Q1", "status": "OK", "execution_time_seconds": 0.01}
-
-        query_stream_calls: list[int] = []
-        extractor_stream_calls: list[int | None] = []
-
-        def _get_queries(_cfg, _instance, stream_id=None):
-            query_stream_calls.append(stream_id)
-            return [query]
-
-        def _extract(_seed: int, _sf: float, stream_id: int | None):
-            extractor_stream_calls.append(stream_id)
-            return {1: {"year": 2000}}
-
-        with (
-            patch("benchbox.core.runner.dataframe_runner._get_queries_for_benchmark", side_effect=_get_queries),
-            patch("benchbox.core.tpcds.parameter_extractor.get_tpcds_extracted_parameters", side_effect=_extract),
-        ):
-            _execute_dataframe_queries(adapter, ctx, config, benchmark_instance, monitor=None)
-
-        # Query discovery + warmup + measurement streams.
-        assert query_stream_calls == [0, 0, 1, 2]
-        # Stream-specific overrides are applied once per unique stream context.
-        assert extractor_stream_calls == [0, 1, 2]
-
-
-# =============================================================================
 # Integration: Query Functions Use Centralized Parameters
 # =============================================================================
 
@@ -561,14 +282,13 @@ class TestQueryFunctionsCentralized:
 # =============================================================================
 
 
-class TestUnseededQ11ScaleFraction:
-    """Unseeded DataFrame runs must render Q11's fraction as 0.0001 / SF.
+class TestSeededOverridePrecedence:
+    """A seed-derived Q11 fraction override wins over the scaled default.
 
-    Canonical TPC-H qgen renders the Q11 value threshold as 0.0001 / SF, and the
-    SQL run path mirrors that via the {q11_fraction} token. Without a seed, the
-    DataFrame surface used to fall back to the static SF=1 value at every scale;
-    these tests pin the scale-aware default so the product run path stays
-    scale-faithful (regression for tpch-dataframe-unseeded-q11-scale-fraction).
+    The legacy runner seam tests retired with benchbox/core/runner/dataframe_runner.py;
+    unseeded scale behavior on the production path is pinned by
+    TestMixinUnseededQ11ScaleFraction below. This keeps the parameter-module
+    precedence contract both remaining override callers rely on.
     """
 
     def setup_method(self):
@@ -579,51 +299,11 @@ class TestUnseededQ11ScaleFraction:
         tpch_set_overrides(None)
         tpch_set_scale_factor(None)
 
-    @pytest.mark.parametrize(
-        "scale_factor, expected_fraction",
-        [(0.1, 0.001), (1.0, 0.0001), (10.0, 0.00001)],
-    )
-    def test_unseeded_runner_setup_scales_q11_fraction(self, scale_factor, expected_fraction):
-        """The unseeded runner seam derives Q11's fraction from the scale factor."""
-        _setup_parameter_overrides_for_stream(
-            benchmark_id="tpch",
-            seed=None,
-            scale_factor=scale_factor,
-            stream_id=0,
-            applied_contexts=set(),
-        )
-        assert get_tpch_parameters(11)["fraction"] == pytest.approx(expected_fraction)
-
-    @pytest.mark.parametrize("benchmark_id", ["tpch", "tpch_skew", "tpchavoc"])
-    def test_tpch_family_unseeded_setup_scales_q11_fraction(self, benchmark_id):
-        """Every TPC-H-family benchmark shares the parameter seam and scales alike.
-
-        TPC-H Skew re-registers the canonical TPC-H DataFrame queries verbatim and
-        TPC-Havoc's variants read the same seam, so all three must derive Q11's
-        fraction from the run's scale factor on the unseeded path.
-        """
-        _setup_parameter_overrides_for_stream(
-            benchmark_id=benchmark_id,
-            seed=None,
-            scale_factor=0.1,
-            stream_id=0,
-            applied_contexts=set(),
-        )
-        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
-
     def test_seeded_override_takes_precedence_over_scaled_default(self):
         """A seed-derived Q11 fraction override wins over the scaled default."""
         tpch_set_scale_factor(0.1)  # scaled default would be 0.001
         tpch_set_overrides({11: {"fraction": 0.00002}})
         assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.00002)
-
-    def test_clear_resets_scale_factor_to_sf1(self):
-        """Clearing overrides resets the Q11 fraction to the SF=1 rendering."""
-        tpch_set_scale_factor(0.1)
-        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.001)
-
-        _clear_parameter_overrides("tpch")
-        assert get_tpch_parameters(11)["fraction"] == pytest.approx(0.0001)
 
 
 # =============================================================================

@@ -38,7 +38,7 @@ the map is unchanged.
 | Adapter subclassing hooks and base mixins | `beta-public` | platform-runtime | Adapter authors can depend on documented `PlatformAdapter` hooks, ABC signatures, and adapter authoring docs. | Adapter refactor map update, migration note, and representative adapter tests. | `tests/unit/platforms/test_abc_conformance.py`, focused adapter tests. | `benchbox/platforms/base/`, `docs/development/adapter-refactor-map.md`, `docs/development/adding-new-platforms.md` |
 | `PlatformAdapter` lifecycle | `beta-public` | platform-runtime | Adapter instances are serial execution objects. One instance may be reused for multiple benchmark runs sequentially; `run_benchmark()` resets run-scoped caches at run start and restores run-config plan-capture overrides at run end. Concurrent calls on one adapter instance are not supported. | A concurrency or service-mode promotion needs a contract-map update and a shared run-context design before claiming support. | `tests/unit/platforms/test_adapter_lifecycle.py`, focused adapter lifecycle tests. | `benchbox/platforms/base/adapter.py`, `benchbox/platforms/base/result_capture.py`, `docs/development/adapter-refactor-map.md` |
 | DataFrame adapter execution path | `beta-public` | dataframe-runtime | Production DataFrame execution routes through `benchbox.core.runner.runner` to `adapter.run_benchmark()`, implemented by `BenchmarkExecutionMixin` for production DataFrame platforms such as `polars-df`, `pandas-df`, `datafusion-df`, and `dask-df`. | Changes need DataFrame mixin tests, result-bundle parity coverage, and same-PR docs. | DataFrame mixin tests plus exported SQL/DataFrame result parity. | `benchbox/core/runner/runner.py`, `benchbox/platforms/dataframe/benchmark_mixin.py`, `tests/unit/core/results/test_result_parity.py` |
-| `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark` | `deprecated` | dataframe-runtime | Deprecated internal compatibility runner retained for old tests and helper imports. It is not the production DataFrame lifecycle path. | Backward-compatibility registry review after one beta cycle; migrate remaining behavior to `BenchmarkExecutionMixin` before removal. | Compatibility tests only. | `benchbox/core/runner/dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner.py`, `tests/unit/core/runner/test_dataframe_runner_lifecycle.py` |
+| `benchbox.core.runner.dataframe_runner.run_dataframe_benchmark` | `removed` | dataframe-runtime | Deleted with delete-benchbox-core-runner-dataframe-runner-py-completely. The two surviving helpers (`dataframe_compliance_class`, `no_dataframe_queries_message`) live in `benchbox/platforms/dataframe/benchmark_mixin.py`; `BenchmarkExecutionMixin` is the production DataFrame lifecycle path. | Removal completed; see the backward-compatibility registry row for the migration record. | Mixin behavior tests, DataFrame execution tests, exported result parity. | `benchbox/platforms/dataframe/benchmark_mixin.py`, `tests/unit/platforms/dataframe/test_benchmark_mixin.py` |
 | Platform registry metadata | `beta-public` | platform-runtime | Registry metadata is the source for platform discovery, capabilities, dependency hints, and platform support status. | Same-PR metadata/docs migration; aliases require compatibility note. | Platform registry tests and docs drift checks. | `benchbox/core/platform_registry.py` |
 | MCP tools | `beta-public` | mcp | Tool schemas and documented parameters are supported as a scoped surface over the shared BenchBox engine: business logic lives in `benchbox.core` below both CLI and MCP, and each surface exposes a deliberately scoped subset. Surface asymmetry is deliberate and ledgered — every CLI control MCP omits carries one ratified tier (security-scoped, interaction-scoped, or not-yet-demanded) in the `docs/reference/mcp.md` omission ledger. MCP result bundles are schema-comparable to CLI bundles, and MCP must not import CLI command internals. | MCP reference update and contract tests; adding an omitted control requires retiring its ledger entry, and a new omission requires a ledger entry with a tier. Changing the tier definitions or the product tier requires an ADR update. | `tests/unit/mcp/test_run_surface_contract.py`, `tests/unit/mcp/`, MCP docs/schema checks. | `benchbox/mcp/`, `docs/reference/mcp.md`, `docs/development/adr/adr-one-engine-scoped-surfaces.md`, `benchbox/base.py` |
 
@@ -261,26 +261,29 @@ Checked for `dataframe-runner-lifecycle-and-bundle-parity` at
 
 Production DataFrame execution is `run_benchmark_lifecycle()` ->
 `adapter.run_benchmark()` -> `BenchmarkExecutionMixin.run_benchmark()`.
-`benchbox.core.runner.dataframe_runner.run_dataframe_benchmark()` is a
-deprecated internal compatibility runner. Its mode predicate now lives in
-`benchbox.core.run_service` beside run-plan resolution; the remaining module
-provides legacy lifecycle/query helpers for compatibility tests. New lifecycle
-behavior belongs in `benchbox/platforms/dataframe/benchmark_mixin.py`.
+`benchbox/core/runner/dataframe_runner.py` (deprecated internal compatibility
+runner) has been deleted: the two surviving helpers,
+`dataframe_compliance_class` and `no_dataframe_queries_message`, moved to
+`benchbox/platforms/dataframe/benchmark_mixin.py` (their only production
+consumer). Its mode predicate lives in `benchbox.core.run_service` beside
+run-plan resolution. New lifecycle behavior belongs in
+`benchbox/platforms/dataframe/benchmark_mixin.py`.
 
 Production behavior tests are the DataFrame mixin and adapter lifecycle tests,
 plus exported result parity in `tests/unit/core/results/test_result_parity.py`.
-`tests/unit/core/runner/test_dataframe_runner.py` and
-`tests/unit/core/runner/test_dataframe_runner_lifecycle.py` are compatibility
-tests for the deprecated standalone runner until the beta review window closes.
+The standalone-runner compatibility tests
+(`tests/unit/core/runner/test_dataframe_runner.py`,
+`tests/unit/core/runner/test_dataframe_runner_lifecycle.py`) were retired with
+the module; empty-resolution coverage moved to the mixin suite
+(`TestHandleNoQueries`).
 
 Evidence rechecked:
 
 | Evidence | Finding |
 |---|---|
 | `benchbox/core/runner/runner.py` | DataFrame adapter branches call `adapter.run_benchmark(..., phases=DataFramePhases, options=DataFrameRunOptions)` for execute and load-only paths. |
-| `benchbox/platforms/dataframe/benchmark_mixin.py` | The mixin owns production DataFrame result construction, phase status, query execution, skip summaries, and plan-capture counters. |
-| `benchbox/core/runner/dataframe_runner.py` | Standalone runner duplicates older result construction and is not called by production lifecycle execution. |
-| `docs/design/architecture.md` | DataFrame architecture now points at the adapter mixin path instead of the deprecated standalone runner. |
+| `benchbox/platforms/dataframe/benchmark_mixin.py` | The mixin owns production DataFrame result construction, phase status, query execution, skip summaries, plan-capture counters, and the two migrated helpers. |
+| `docs/design/architecture.md` | DataFrame architecture points at the adapter mixin path; the standalone runner is deleted. |
 | `tests/unit/core/results/test_result_parity.py` | Exported JSON bundle parity is enforced after writing through `ResultExporter`. |
 
 ## SQL/DataFrame Result Bundle Invariants

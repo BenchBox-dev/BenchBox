@@ -122,7 +122,7 @@ def _dataframe_compliance(*, official: bool, scale_factor: float = OFFICIAL_SCAL
     not the benchmark instance, which is why threading `official` through the
     config in PR #1770 could never reach them.
     """
-    from benchbox.core.runner.dataframe_runner import dataframe_compliance_class
+    from benchbox.platforms.dataframe.benchmark_mixin import dataframe_compliance_class
 
     config = BenchmarkConfig(
         name="tpcds",

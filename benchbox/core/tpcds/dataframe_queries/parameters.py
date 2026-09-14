@@ -48,7 +48,7 @@ def _load_default_params() -> dict[int, dict[str, Any]]:
 
 TPCDS_DEFAULT_PARAMS: dict[int, dict[str, Any]] = _load_default_params()
 
-# Module-level parameter overrides. When set by the dataframe_runner before
+# Module-level parameter overrides. When set by the DataFrame run path before
 # query execution, get_parameters() merges these into the defaults. This avoids
 # changing the call signature that all 99 query functions depend on.
 _parameter_overrides: dict[int, dict[str, Any]] | None = None
