@@ -1468,7 +1468,12 @@ def _check_acceptance_binding(
                 " (a bundled squash commit cannot serve as its own freeze proof)"
             )
     pinned = _pinned_registration_pointers(reg_commit, acceptance_relpath)
-    if pinned and original not in pinned:
+    if not pinned:
+        errors.append(
+            "durable registration commit pins no registration pointers in its acceptance record"
+            " (freeze SHA must be anchored by published history)"
+        )
+    elif original not in pinned:
         errors.append(
             "original registration commit matches no registration pointer pinned in the durable"
             " commit's own acceptance record (freeze SHA must be anchored by published history)"

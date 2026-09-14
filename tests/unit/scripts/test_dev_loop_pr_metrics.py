@@ -832,8 +832,17 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     original_commit preserves the freeze-only boundary; tampering with
     either copy must fail.
     """
+    import json as _json4
+
     frozen_bytes = b'{"frozen": true}'
-    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: frozen_bytes)
+    pinned_bytes = _json4.dumps(
+        {"registration": {"commit": "durable-commit", "original_commit": "freeze-only-commit"}}
+    ).encode()
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes if path == "_project/analysis/pr-process-acceptance.json" else frozen_bytes,
+    )
     monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": commit == "durable-commit")
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
     monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
@@ -860,7 +869,9 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(
         metrics,
         "_git_show_bytes",
-        lambda revision, path: b'{"tampered": true}' if revision == "tampered-freeze" else frozen_bytes,
+        lambda revision, path: pinned_bytes
+        if path == "_project/analysis/pr-process-acceptance.json"
+        else (b'{"tampered": true}' if revision == "tampered-freeze" else frozen_bytes),
     )
     monkeypatch.setattr(
         metrics,
@@ -882,7 +893,11 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     based_process = dict(process)
     based_process["base_commit_at_freeze"] = "base-commit"
     parents = {"freeze-only-commit": "base-commit", "bundled-commit": "other-parent"}
-    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: frozen_bytes)
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes if path == "_project/analysis/pr-process-acceptance.json" else frozen_bytes,
+    )
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
     monkeypatch.setattr(metrics, "_commit_parent", lambda commit: parents.get(commit))
     assert metrics._check_acceptance_binding(preserved, based_process, "digest", "baseline.json") == []
@@ -942,6 +957,10 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     errors = metrics._check_acceptance_binding(forged, based_process, "digest", "baseline.json", "acceptance.json")
     assert any("anchored by published history" in e for e in errors)
     assert any("newer than the durable" in e for e in errors)
+
+    monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: set())
+    errors = metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json")
+    assert any("pins no registration pointers" in e for e in errors)
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
