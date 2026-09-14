@@ -346,3 +346,51 @@ class TestRealBenchmarkSpecs:
         """Benchmarks with no registered specs should not raise on empty parse."""
         # tpch has no registered specs - parsing with no options should be fine
         assert not BenchmarkHookRegistry.has_specs("tpch")
+
+
+class TestBenchmarkOptionShellCompletion:
+    """--benchmark-option completes registered keys and declared choice values."""
+
+    def _ctx(self, benchmark=None, pairs=()):
+        from click import Context
+        from click.core import Command
+
+        ctx = Context(Command("run"))
+        ctx.params = {"benchmark": benchmark, "benchmark_option_pairs": pairs}
+        return ctx
+
+    def _completer(self):
+        from benchbox.cli.commands.run import BenchmarkOptionParamType
+
+        return BenchmarkOptionParamType()
+
+    def test_completes_keys_for_selected_benchmark(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_key_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "sk")
+        values = [item.value for item in items]
+        assert values
+        assert all(value.startswith("sk") for value in values)
+        assert "skew_preset=" in values
+
+    def test_completes_declared_choice_values(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=h")
+        assert [item.value for item in items] == ["heavy"]
+
+    def test_choice_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=")
+        assert {item.value for item in items} == {"none", "light", "moderate", "heavy", "extreme", "realistic"}
+
+    def test_spec_without_choices_completes_no_values(self):
+        items = self._completer().shell_complete(self._ctx("nyctaxi"), None, "year=20")
+        assert items == []
+
+    def test_unknown_or_missing_benchmark_completes_nothing(self):
+        assert self._completer().shell_complete(self._ctx("tpch"), None, "") == []
+        assert self._completer().shell_complete(self._ctx(None), None, "") == []
+
+    def test_used_keys_omitted(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew", pairs=(("skew_preset", "heavy"),)), None, "")
+        assert "skew_preset=" not in [item.value for item in items]

@@ -523,6 +523,75 @@ class BenchmarkOptionParamType(click.ParamType):
             self.fail("Benchmark option key cannot be empty", param, ctx)
         return key, raw.strip()
 
+    def shell_complete(self, ctx, param, incomplete: str):
+        """Complete registered benchmark-option keys and choice values.
+
+        KEYs come from the BenchmarkHookRegistry specs for the selected
+        --benchmark (so it must precede --benchmark-option on the command
+        line); after KEY=, specs declaring choices complete allowed values.
+        Keys already given on the command line are omitted.
+        """
+        from click.shell_completion import CompletionItem
+
+        specs = _benchmark_specs_for_completion(ctx)
+        if "=" in incomplete:
+            key, _, value_prefix = incomplete.partition("=")
+            return _complete_benchmark_option_value(specs, key.strip(), value_prefix)
+        used = _used_benchmark_option_keys(ctx, specs)
+        return [
+            CompletionItem(f"{name}=", help=spec.help or "")
+            for name, spec in sorted(specs.items())
+            if name.startswith(incomplete.strip().lower()) and name not in used
+        ]
+
+
+def _benchmark_specs_for_completion(ctx) -> dict:
+    """Return registry specs for the --benchmark already on the command line."""
+    from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
+
+    params = getattr(ctx, "params", None) or {}
+    benchmark = params.get("benchmark") or ""
+    if not str(benchmark).strip():
+        return {}
+    return BenchmarkHookRegistry.list_option_specs(str(benchmark).strip().lower())
+
+
+def _used_benchmark_option_keys(ctx, specs: dict) -> set:
+    """Canonical benchmark-option keys already present on the command line."""
+    params = getattr(ctx, "params", None) or {}
+    used: set = set()
+    for key, _raw in params.get("benchmark_option_pairs") or ():
+        lowered = str(key).strip().lower()
+        for name, spec in specs.items():
+            if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
+                used.add(name)
+                break
+    return used
+
+
+def _complete_benchmark_option_value(specs: dict, key: str, value_prefix: str):
+    """Complete allowed values after KEY= for specs declaring choices."""
+    from click.shell_completion import CompletionItem
+
+    lowered = key.lower()
+    target = None
+    for name, spec in specs.items():
+        if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
+            target = spec
+            break
+    if target is None or not target.choices:
+        return []
+    if "," in value_prefix:
+        stem, _, tail = value_prefix.rpartition(",")
+        stem += ","
+    else:
+        stem, tail = "", value_prefix
+    return [
+        CompletionItem(f"{stem}{choice}", help=target.help or "")
+        for choice in (str(choice) for choice in target.choices)
+        if choice.startswith(tail)
+    ]
+
 
 def _derive_execution_type(phases: list[str]) -> str:
     """Derive benchmark execution type through the shared core service."""
