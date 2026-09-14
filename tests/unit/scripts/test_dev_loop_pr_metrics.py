@@ -1012,6 +1012,12 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     )
     assert any("merge commit" in e for e in errors)
 
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: None)
+    errors = metrics._check_acceptance_binding(
+        merge_freeze, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("parent count not resolvable" in e for e in errors)
+
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy

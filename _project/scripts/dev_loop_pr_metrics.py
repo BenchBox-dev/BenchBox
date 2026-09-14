@@ -1346,7 +1346,7 @@ def _commit_parent(commit: str) -> str | None:
     return proc.stdout.strip() if proc.returncode == 0 else None
 
 
-def _has_second_parent(commit: str) -> bool:
+def _has_second_parent(commit: str) -> bool | None:
     try:
         proc = subprocess.run(
             ["git", "rev-parse", "--verify", f"{commit}^2"],
@@ -1357,7 +1357,7 @@ def _has_second_parent(commit: str) -> bool:
             timeout=60,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False
+        return None
     return proc.returncode == 0
 
 
@@ -1525,7 +1525,10 @@ def _check_freeze_only_child(original: str, base_freeze: str, process_relpath: s
             "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
             " (a bundled squash commit cannot serve as its own freeze proof)"
         ]
-    if _has_second_parent(original):
+    second_parent = _has_second_parent(original)
+    if second_parent is None:
+        return [f"original registration commit {original[:12]} parent count not resolvable in this tree"]
+    if second_parent:
         return ["original registration commit is a merge commit (freeze must be a single-parent commit)"]
     diff_names = _commit_diff_names(base_freeze, original)
     if diff_names is None:
