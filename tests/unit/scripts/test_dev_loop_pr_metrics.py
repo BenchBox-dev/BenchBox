@@ -995,6 +995,23 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     errors = metrics._check_acceptance_binding(same_commit, based_process, "digest", "baseline.json", "acceptance.json")
     assert errors == []
 
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: commit == "merge-freeze")
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: "base-commit" if commit in ("freeze-only-commit", "forged-commit", "merge-freeze") else None,
+    )
+    merge_freeze = dict(base)
+    merge_freeze["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "merge-freeze",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(
+        merge_freeze, based_process, "digest", "baseline.json", "acceptance.json"
+    )
+    assert any("merge commit" in e for e in errors)
+
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy
