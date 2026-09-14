@@ -7352,12 +7352,17 @@
       "title": "A10: Remove publication coupling from package releases and retire redundant mirror PRs"
     },
     "independent-publication-a11-operations-canaries-and-closeout": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T01:03:11Z",
+        "generation": "7fd1857cbd9847bb89681535fd989f17",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
+      },
       "needs": [
         "independent-publication-a10-release-and-mirror-retirement"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "A11: Operationalize independent publication with canaries, drift detection, and closeout evidence"
     },
     "independent-publication-a2-corpus-trust-isolation": {
