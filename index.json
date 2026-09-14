@@ -11087,10 +11087,15 @@
       "title": "Make ledger validation reproducible and reconcile publication-ref drift separately"
     },
     "publication-pages-deploy-nonterminal-and-journal-split-brain": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T00:59:02Z",
+        "generation": "7ef4481fd1bd45fdb19e8a928e4814e6",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Publication Pages deploy never reaches terminal success; live bytes and durable journal head diverge"
     },
     "published-history-retention-premise-predates-oracle": {
