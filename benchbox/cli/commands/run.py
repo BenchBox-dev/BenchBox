@@ -556,16 +556,23 @@ def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
     return BenchmarkHookRegistry.list_option_specs(str(benchmark).strip().lower())
 
 
+def _find_benchmark_spec(specs: dict[str, Any], key: str):
+    """Return the spec for a key or alias, or None when unknown."""
+    lowered = str(key).strip().lower()
+    for name, spec in specs.items():
+        if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
+            return spec
+    return None
+
+
 def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
     """Canonical benchmark-option keys already present on the command line."""
     params = getattr(ctx, "params", None) or {}
     used: set = set()
     for key, _raw in params.get("benchmark_option_pairs") or ():
-        lowered = str(key).strip().lower()
-        for name, spec in specs.items():
-            if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
-                used.add(name)
-                break
+        spec = _find_benchmark_spec(specs, key)
+        if spec is not None:
+            used.add(spec.name.lower())
     return used
 
 
@@ -573,12 +580,7 @@ def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_pref
     """Complete allowed values after KEY= for specs declaring choices."""
     from click.shell_completion import CompletionItem
 
-    lowered = key.lower()
-    target = None
-    for name, spec in specs.items():
-        if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
-            target = spec
-            break
+    target = _find_benchmark_spec(specs, key)
     if target is None or not target.choices:
         return []
     if "," in value_prefix:
