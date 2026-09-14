@@ -531,20 +531,6 @@ def _derive_execution_type(phases: list[str]) -> str:
     return map_phases_to_execution_type(phases)
 
 
-def _describe_platform_options(platform_names: Iterable[str]) -> None:
-    for name in platform_names:
-        platform_key = name.lower()
-        lines = PlatformHookRegistry.describe_options(platform_key)
-        header = f"[bold cyan]{platform_key} platform options[/bold cyan]"
-        if not lines:
-            console.print(f"{header}: (no platform-specific options registered)")
-            continue
-        console.print(header)
-        for line in lines:
-            console.print(f"  • {line}")
-        console.print()
-
-
 from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -589,16 +575,11 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     s.enable_postgen_manifest_validation = val_config.postgen
     s.enable_postload_validation = val_config.postload
 
-    s.describe_platforms = ()
     s.plan_queries = s.plan_queries_str
 
 
 def _validate_initial_flags(s: types.SimpleNamespace) -> None:
-    """Validate describe_platforms, quiet+verbose, official mode."""
-    if s.describe_platforms:
-        _describe_platform_options(s.describe_platforms)
-        s.ctx.exit(0)
-
+    """Validate quiet+verbose, official mode."""
     if s.quiet and s.verbose:
         console.print("[red]❌ --quiet cannot be used with -v/-vv flags[/red]")
         s.ctx.exit(2)
