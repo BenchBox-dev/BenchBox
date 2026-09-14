@@ -4218,7 +4218,9 @@ def timeseries_trend_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
         avg_order_value=("o_totalprice", "mean"),
     )
     monthly = monthly.sort_values("order_month")
-    monthly["month_epoch"] = monthly["order_month"].astype("int64") // 1_000_000_000
+    # Pandas 3 resolves to_timestamp() to datetime64[us] (was [ns]), so pin the
+    # unit to seconds before the int cast to keep epoch seconds stable.
+    monthly["month_epoch"] = monthly["order_month"].astype("datetime64[s]").astype("int64")
     epoch = monthly["month_epoch"]
     slope = epoch.cov(monthly["monthly_revenue"], ddof=0) / epoch.var(ddof=0)
     monthly["revenue_trend_slope"] = slope
