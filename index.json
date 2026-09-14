@@ -11947,15 +11947,10 @@
       "title": "Re-audit Databend, Firebolt, Starburst, and ClickHouse Cloud for broader config-ownership standardization after the confirmed fixes land"
     },
     "re-tagging-bundles-in-published-results-branch": {
-      "claim": {
-        "expires_at": "2026-09-15T01:04:44Z",
-        "generation": "68fa634d6483456e87036b71371e5659",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:81d94fe2af00439ef28312aa"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Re-tagging bundles in published-results branch"
     },
     "read-primitives-approximate-aggregate-queries": {
