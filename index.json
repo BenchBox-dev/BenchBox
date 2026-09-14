@@ -14439,10 +14439,15 @@
       "title": "Seek formal legal review of IMDb / Dataverse terms"
     },
     "server-adapter-independent-connection-optin": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T11:45:23Z",
+        "generation": "c63b539de81449b9b2f2572a0929876d",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Opt a real server adapter into per-stream INDEPENDENT_CONNECTION so the throughput session seam is used in production"
     },
     "set-a-ci-loc-budget-guard-that-fails-when-uat-exceeds-the-ag": {
