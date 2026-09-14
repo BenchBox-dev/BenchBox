@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from benchbox.cli.config import DirectoryManager
 from benchbox.core.benchmark_loader import (
-    compliance_mode_kwargs,
+    get_benchmark_instance,
     get_core_benchmark_class,
     instantiate_benchmark_class,
 )
@@ -109,24 +109,6 @@ class BenchmarkOrchestrator:
         # Prefer using the class directly so tests can patch class resolution
         benchmark_class = self._get_benchmark_class(config.name)
 
-        cpu_cores = 1
-        if system_profile is not None:
-            cpu_cores = getattr(system_profile, "cpu_cores_logical", 1)
-
-        kwargs = {
-            "scale_factor": getattr(config, "scale_factor", 1.0),
-            "compress_data": getattr(config, "compress_data", False),
-            "compression_type": getattr(config, "compression_type", None),
-            "compression_level": getattr(config, "compression_level", None),
-        }
-
-        kwargs.update(
-            {
-                "verbose": self._verbosity.level,
-                "quiet": self._verbosity.quiet,
-            }
-        )
-
         # Forward benchmark-specific options (--benchmark-option K=V) to constructor kwargs.
         # Also forward seed/force_regenerate from config.options when the benchmark has
         # registered specs for them, so they reach the constructor.
@@ -147,21 +129,23 @@ class BenchmarkOrchestrator:
                 if val is not None:
                     benchmark_options[key] = val
 
-        kwargs.update(benchmark_options)
-
         # Resolve the final datagen root BEFORE construction so nested
         # generators capture it immediately, instead of constructing first and
         # mutating output_dir afterward.
-        optional_kwargs: dict[str, Any] = {"parallel": cpu_cores}
         construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
-        if construction_output_dir is not None:
-            optional_kwargs["output_dir"] = construction_output_dir
-        # This builder is a second construction path alongside
-        # benchmark_loader.get_benchmark_instance; both must carry compliance mode
-        # or the CLI silently produces unsubmittable results.
-        optional_kwargs.update(compliance_mode_kwargs(config))
 
-        benchmark_instance = instantiate_benchmark_class(benchmark_class, kwargs, optional_kwargs)
+        # Delegate construction to the shared builder; compliance_mode_kwargs is applied
+        # within get_benchmark_instance so CLI and runner cannot diverge.
+        benchmark_instance = get_benchmark_instance(
+            config,
+            system_profile,
+            benchmark_class=benchmark_class,
+            output_dir=construction_output_dir,
+            verbose=self._verbosity.level,
+            quiet=self._verbosity.quiet,
+            benchmark_options=benchmark_options,
+            instantiate_fn=instantiate_benchmark_class,
+        )
 
         # Compatibility fallback: benchmarks that declare data sharing only via
         # the get_data_source_benchmark() instance method (no

@@ -173,3 +173,84 @@ def test_loader_omits_parallel_when_constructor_signature_rejects_it(monkeypatch
             "compression_level": None,
         }
     ]
+
+
+def test_constructor_accepts_argument_keeps_varkw_forwarding() -> None:
+    """Runtime forwarding stays permissive: concrete benchmarks consume options via **kwargs."""
+    from unittest.mock import Mock
+
+    from benchbox.core.benchmark_loader import constructor_accepts_argument
+    from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
+    from benchbox.core.tpch.benchmark import TPCHBenchmark
+
+    # Explicit constructor arguments are accepted
+    assert constructor_accepts_argument(TPCHBenchmark, "parallel") is True
+    assert constructor_accepts_argument(TPCHBenchmark, "force_regenerate") is True
+    assert constructor_accepts_argument(TPCDSBenchmark, "official") is True
+
+    # Options consumed through **kwargs must still be forwarded, not silently dropped
+    assert constructor_accepts_argument(TPCHBenchmark, "quiet") is True
+
+    # Mocks retain universal acceptance for test flexibility
+    assert constructor_accepts_argument(Mock(), "any_arg") is True
+
+
+def test_instantiate_forwards_kwargs_consumed_options() -> None:
+    """Regression: instantiate_benchmark_class must forward options a class consumes via **kwargs."""
+    from benchbox.core.benchmark_loader import instantiate_benchmark_class
+
+    class KwargsBenchmark:
+        def __init__(self, scale_factor: float = 1.0, **kwargs: object) -> None:
+            self.quiet = bool(kwargs.get("quiet", False))
+
+    instance = instantiate_benchmark_class(KwargsBenchmark, {"scale_factor": 0.01}, {"quiet": True})
+    assert instance.quiet is True
+
+
+def test_loader_forwards_explicit_cli_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    """get_benchmark_instance should forward output_dir, verbosity, and benchmark options."""
+    captured: dict[str, object] = {}
+
+    class ConfigurableBenchmark:
+        def __init__(
+            self,
+            *,
+            scale_factor: float,
+            compress_data: bool,
+            compression_type: str,
+            compression_level: int | None,
+            output_dir: str | None = None,
+            verbose: int | bool = 0,
+            quiet: bool = False,
+            seed: int | None = None,
+        ) -> None:
+            captured.update(
+                {
+                    "scale_factor": scale_factor,
+                    "output_dir": output_dir,
+                    "verbose": verbose,
+                    "quiet": quiet,
+                    "seed": seed,
+                }
+            )
+
+    monkeypatch.setattr("benchbox.core.benchmark_loader.get_core_benchmark_class", lambda _name: ConfigurableBenchmark)
+    monkeypatch.setattr("benchbox.core.benchmark_loader.validate_scale_factor", lambda _name, _scale: None)
+
+    config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
+    get_benchmark_instance(
+        config,
+        system_profile=None,
+        output_dir="/custom/datagen",
+        verbose=2,
+        quiet=True,
+        benchmark_options={"seed": 42},
+    )
+
+    assert captured == {
+        "scale_factor": 0.01,
+        "output_dir": "/custom/datagen",
+        "verbose": 2,
+        "quiet": True,
+        "seed": 42,
+    }
