@@ -12483,10 +12483,15 @@
       "title": "Remove conflicting personal agent hooks, permissions, trust, and MCP state"
     },
     "remove-describe-platform-options-dead-code": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T01:14:35Z",
+        "generation": "e209cd5f03f341b8ac01a59b4709631b",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d901f3e1a2936ebb25ac46ec"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Remove the unreachable --describe-platform-options code path"
     },
     "remove-excessive-adjective-adverb-usage": {
