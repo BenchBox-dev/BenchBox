@@ -1346,6 +1346,41 @@ def _commit_parent(commit: str) -> str | None:
     return proc.stdout.strip() if proc.returncode == 0 else None
 
 
+def _commit_timestamp(commit: str) -> int | None:
+    try:
+        proc = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", commit],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return None
+
+
+def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:
+    """Registration SHAs pinned by the acceptance record stored at *commit*."""
+    raw = _git_show_bytes(commit, acceptance_relpath)
+    if raw is None:
+        return set()
+    try:
+        record = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return set()
+    registration = record.get("registration")
+    if not isinstance(registration, dict):
+        return set()
+    return {str(value) for value in (registration.get("commit"), registration.get("original_commit")) if value}
+
+
 def validate_process_acceptance(
     acceptance: dict,
     process: dict,
@@ -1373,7 +1408,13 @@ def validate_process_acceptance(
     return errors
 
 
-def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: str, process_relpath: str) -> list[str]:
+def _check_acceptance_binding(
+    acceptance: dict,
+    process: dict,
+    process_digest: str,
+    process_relpath: str,
+    acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
+) -> list[str]:
     """Criteria binding plus freeze-before-implementation proof.
 
     The durable registration commit must be an ancestor of HEAD while
@@ -1382,7 +1423,10 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     the bound digest so dropping either pointer fails closed. The original
     commit must also be the freeze-only child of the baseline's bound
     base_commit_at_freeze, so a bundled squash commit cannot stand in as
-    its own freeze proof.
+    its own freeze proof. Finally the original SHA must be anchored by
+    published history (a pointer pinned in the durable commit's own
+    acceptance record) and must predate the durable commit, so a commit
+    fabricated after observing results cannot serve as the freeze.
     """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
@@ -1423,6 +1467,21 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
                 "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
                 " (a bundled squash commit cannot serve as its own freeze proof)"
             )
+    pinned = _pinned_registration_pointers(reg_commit, acceptance_relpath)
+    if pinned and original not in pinned:
+        errors.append(
+            "original registration commit matches no registration pointer pinned in the durable"
+            " commit's own acceptance record (freeze SHA must be anchored by published history)"
+        )
+    original_ts = _commit_timestamp(original)
+    reg_ts = _commit_timestamp(reg_commit)
+    if original_ts is None or reg_ts is None:
+        errors.append("cannot establish freeze ordering for the original registration commit")
+    elif original_ts > reg_ts:
+        errors.append(
+            "original registration commit is newer than the durable registration commit"
+            " (freeze must precede integration)"
+        )
     return errors
 
 

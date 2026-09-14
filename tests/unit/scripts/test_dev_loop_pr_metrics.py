@@ -714,6 +714,8 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "_commit_parent",
         lambda commit: base_freeze if commit == head else real_commit_parent(commit),
     )
+    monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: {head})
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
     acceptance["cohort"]["observed"]["batch_deliveries"] = copy.deepcopy(receipts)
     acceptance["efficiency"]["observed_avoidable_actions"] = 20
     errors = metrics.validate_process_acceptance(acceptance, process, hashlib.sha256(process_raw).hexdigest())
@@ -834,6 +836,7 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: frozen_bytes)
     monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": commit == "durable-commit")
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
 
     base = _acceptance_doc()
     base["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
@@ -902,6 +905,43 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)
     errors = metrics._check_acceptance_binding(self_certified, based_process, "digest", "baseline.json")
     assert any("freeze-only child" in e for e in errors)
+
+    import json as _json3
+
+    pinned_record = _json3.dumps(
+        {"registration": {"commit": "durable-commit", "original_commit": "freeze-only-commit"}}
+    ).encode()
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_record if path == "acceptance.json" else frozen_bytes,
+    )
+    timestamps = {"freeze-only-commit": 100, "durable-commit": 200, "forged-commit": 300}
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: timestamps.get(commit))
+    anchored = dict(base)
+    anchored["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "freeze-only-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    assert (
+        metrics._check_acceptance_binding(anchored, based_process, "digest", "baseline.json", "acceptance.json") == []
+    )
+
+    forged = dict(base)
+    forged["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "forged-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(
+        metrics,
+        "_commit_parent",
+        lambda commit: "base-commit" if commit in ("freeze-only-commit", "forged-commit") else None,
+    )
+    errors = metrics._check_acceptance_binding(forged, based_process, "digest", "baseline.json", "acceptance.json")
+    assert any("anchored by published history" in e for e in errors)
+    assert any("newer than the durable" in e for e in errors)
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
