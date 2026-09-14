@@ -690,7 +690,7 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "criteria_version": process["criteria_version"],
         "process_digest": hashlib.sha256(process_raw).hexdigest(),
     }
-    acceptance["registration"] = {"commit": head, "time": "2026-09-08T12:33:43Z"}
+    acceptance["registration"] = {"commit": head, "original_commit": head, "time": "2026-09-08T12:33:43Z"}
     acceptance["incident_replays"] = [{"scenario": name, "status": "pass"} for name in process["incident_scenarios"]]
     acceptance["cohort"]["required"]["min_prs"] = frozen["min_prs"]
     acceptance["cohort"]["required"]["min_days"] = frozen["min_days"]
@@ -863,6 +863,11 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: None)
     errors = metrics._check_acceptance_binding(preserved, process, "digest", "baseline.json")
     assert any("not resolvable" in e for e in errors)
+
+    dropped = dict(base)
+    dropped["registration"] = {"commit": "durable-commit", "time": "2026-09-08T12:33:43Z"}
+    errors = metrics._check_acceptance_binding(dropped, process, "digest", "baseline.json")
+    assert any("original_commit" in e for e in errors)
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:

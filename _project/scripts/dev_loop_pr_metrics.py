@@ -1359,7 +1359,13 @@ def validate_process_acceptance(
 
 
 def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: str, process_relpath: str) -> list[str]:
-    """Criteria binding plus freeze-before-implementation proof."""
+    """Criteria binding plus freeze-before-implementation proof.
+
+    The durable registration commit must be an ancestor of HEAD while
+    original_commit preserves the freeze-only boundary (they coincide when
+    no squash merge orphaned the freeze); both pinned copies must match
+    the bound digest so dropping either pointer fails closed.
+    """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
     if binding.get("criteria_version") != process.get("criteria_version"):
@@ -1379,12 +1385,14 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     if not _is_ancestor(reg_commit):
         errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
     original = str(registration.get("original_commit") or "")
-    if original:
-        original_frozen = _git_show_bytes(original, process_relpath)
-        if original_frozen is None:
-            errors.append(f"original registration commit {original[:12]} not resolvable in this tree")
-        elif _sha256_bytes(original_frozen) != process_digest:
-            errors.append("process file at the original registration commit differs from the bound digest")
+    if not original:
+        errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
+        return errors
+    original_frozen = _git_show_bytes(original, process_relpath)
+    if original_frozen is None:
+        errors.append(f"original registration commit {original[:12]} not resolvable in this tree")
+    elif _sha256_bytes(original_frozen) != process_digest:
+        errors.append("process file at the original registration commit differs from the bound digest")
     return errors
 
 
