@@ -1251,9 +1251,15 @@ class QueryConverter:
 
         # Q51: Ambiguous item_sk between web and store CTEs - qualify all references
         if query_id == 51:
-            # Fix the CASE expression that tries to coalesce item_sk from both CTEs
+            # Fix the CASE expression that tries to coalesce item_sk from both CTEs.
+            # sqlglot <=30.6 renders IS NOT NULL as "NOT x IS NULL"; 30.18+
+            # renders it canonically, so handle both serializations.
             sql_text = sql_text.replace(
                 "CASE WHEN NOT item_sk IS NULL THEN item_sk ELSE item_sk END AS item_sk",
+                "COALESCE(web.item_sk, store.item_sk) AS item_sk",
+            )
+            sql_text = sql_text.replace(
+                "CASE WHEN item_sk IS NOT NULL THEN item_sk ELSE item_sk END AS item_sk",
                 "COALESCE(web.item_sk, store.item_sk) AS item_sk",
             )
             # Fix the JOIN ON clause
