@@ -1483,7 +1483,7 @@ def _check_acceptance_binding(
     if not reg_commit:
         errors.append("acceptance must record its preregistration commit")
         return errors
-    if re.fullmatch(r"[0-9a-f]{40}", reg_commit) is None:
+    if re.fullmatch(r"[0-9a-fA-F]{40}", reg_commit) is None:
         errors.append("registration commit must be a full commit SHA (refs are movable)")
         return errors
     frozen = _git_show_bytes(reg_commit, process_relpath)
@@ -1497,7 +1497,7 @@ def _check_acceptance_binding(
     if not original:
         errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
         return errors
-    if re.fullmatch(r"[0-9a-f]{40}", original) is None:
+    if re.fullmatch(r"[0-9a-fA-F]{40}", original) is None:
         errors.append("original registration commit must be a full commit SHA (refs are movable)")
         return errors
     errors.extend(

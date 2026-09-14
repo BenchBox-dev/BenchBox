@@ -1034,6 +1034,15 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     errors = metrics._check_acceptance_binding(refname, based_process, "digest", "baseline.json", "acceptance.json")
     assert any("full commit SHA" in e for e in errors)
 
+    upper = dict(base)
+    upper["registration"] = {
+        "commit": DURABLE,
+        "original_commit": "B" * 40,
+        "time": "2026-09-08T12:33:43Z",
+    }
+    errors = metrics._check_acceptance_binding(upper, based_process, "digest", "baseline.json", "acceptance.json")
+    assert errors and not any("full commit SHA" in e for e in errors)
+
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy
