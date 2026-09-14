@@ -760,3 +760,67 @@ class TestStringOperatorTypeHandling:
         # Self-comparison should work without exceptions
         assert result.plans_identical is True
         assert result.similarity.overall_similarity == 1.0
+
+
+def _leaf_chain(leaf_table: str, depth: int = 3) -> QueryPlanDAG:
+    """Single-chain plan varying only the deepest leaf table."""
+    root = None
+    for level in reversed(range(depth)):
+        leaf = root is None
+        root = LogicalOperator(
+            operator_id=f"op_{level}",
+            operator_type=LogicalOperatorType.SCAN,
+            table_name=leaf_table if leaf else "lineitem",
+            children=[root] if root is not None else [],
+        )
+    assert root is not None
+    return QueryPlanDAG(query_id="q1", platform="duckdb", logical_root=root)
+
+
+def _reload(plan: QueryPlanDAG) -> QueryPlanDAG:
+    return QueryPlanDAG.from_dict(plan.to_dict())
+
+
+def _reload_truncated(plan: QueryPlanDAG, max_depth: int = 1) -> QueryPlanDAG:
+    return QueryPlanDAG.from_dict(plan.to_dict(max_depth=max_depth))
+
+
+def _reasons(result) -> list[str]:
+    return [str(diff.differences.get("reason", "")) for diff in result.operator_diffs]
+
+
+class TestTruncationCaveat:
+    """Below-cut differences must surface instead of scoring a clean 100%."""
+
+    def test_truncated_pair_with_differing_full_fingerprints_is_flagged(self):
+        left = _reload_truncated(_leaf_chain("lineitem"))
+        right = _reload_truncated(_leaf_chain("orders"))
+
+        assert left.truncated_at_depth == 2
+        assert right.truncated_at_depth == 2
+        result = compare_query_plans(left, right)
+
+        assert result.similarity.overall_similarity < 1.0
+        assert result.similarity.structure_mismatches >= 1
+        assert any("depth-truncated" in reason for reason in _reasons(result))
+        assert not result.plans_identical
+        assert not result.fingerprints_match
+
+    def test_truncated_identical_pair_compares_clean(self):
+        left = _reload_truncated(_leaf_chain("lineitem"))
+        right = _reload_truncated(_leaf_chain("lineitem"))
+
+        result = compare_query_plans(left, right)
+
+        assert result.similarity.overall_similarity == 1.0
+        assert result.similarity.structure_mismatches == 0
+        assert not any("depth-truncated" in reason for reason in _reasons(result))
+
+    def test_non_truncated_difference_has_no_caveat(self):
+        left = _reload(_leaf_chain("lineitem"))
+        right = _reload(_leaf_chain("orders"))
+
+        result = compare_query_plans(left, right)
+
+        assert result.similarity.overall_similarity < 1.0
+        assert not any("depth-truncated" in reason for reason in _reasons(result))

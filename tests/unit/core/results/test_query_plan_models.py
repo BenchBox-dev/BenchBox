@@ -25,6 +25,7 @@ from benchbox.core.results.query_plan_models import (
     QueryPlanDAG,
     _normalize_literal_text,
     compute_plan_fingerprint,
+    find_truncation_depth,
 )
 
 pytestmark = [
@@ -173,6 +174,50 @@ class TestFingerprintVersioningAndIntegrity:
         assert restored.fingerprint_version == LEGACY_FINGERPRINT_VERSION
         assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
         assert not restored.is_fingerprint_trusted()
+
+
+def _chain(leaf_table: str, depth: int = 3) -> QueryPlanDAG:
+    """Build a single-chain plan `depth` operators deep, varying the leaf table."""
+    root = None
+    for level in reversed(range(depth)):
+        # The first node built is the deepest leaf; everything above is filler.
+        leaf = root is None
+        root = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN,
+            operator_id=f"op_{level}",
+            table_name=leaf_table if leaf else "lineitem",
+            children=[root] if root is not None else [],
+        )
+    assert root is not None
+    return QueryPlanDAG(query_id="q", platform="duckdb", logical_root=root)
+
+
+class TestTruncationPreservation:
+    """Depth-truncation evidence must survive a serialize/reload round-trip."""
+
+    def test_fresh_plan_has_no_truncation(self) -> None:
+        assert _chain("lineitem").truncated_at_depth is None
+
+    def test_from_dict_preserves_shallowest_cut(self) -> None:
+        data = _chain("lineitem").to_dict(max_depth=1)
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.truncated_at_depth == 2
+        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+
+    def test_from_dict_full_depth_has_no_truncation(self) -> None:
+        plan = _chain("lineitem")
+
+        restored = QueryPlanDAG.from_dict(plan.to_dict())
+
+        assert restored.truncated_at_depth is None
+        assert restored.fingerprint_integrity == FingerprintIntegrity.VERIFIED
+
+    def test_find_truncation_depth_ignores_non_markers(self) -> None:
+        assert find_truncation_depth(None) is None
+        assert find_truncation_depth({"a": [1, {"b": "x"}]}) is None
+        assert find_truncation_depth({"truncated_at_depth": True}) is None
 
 
 class TestPhysicalOperator:

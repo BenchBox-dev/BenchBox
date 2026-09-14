@@ -346,3 +346,73 @@ class TestRealBenchmarkSpecs:
         """Benchmarks with no registered specs should not raise on empty parse."""
         # tpch has no registered specs - parsing with no options should be fine
         assert not BenchmarkHookRegistry.has_specs("tpch")
+
+
+class TestBenchmarkOptionShellCompletion:
+    """--benchmark-option completes registered keys and declared choice values."""
+
+    def _ctx(self, benchmark=None, pairs=()):
+        from click import Context
+        from click.core import Command
+
+        ctx = Context(Command("run"))
+        ctx.params = {"benchmark": benchmark, "benchmark_option_pairs": pairs}
+        return ctx
+
+    def _completer(self):
+        from benchbox.cli.commands.run import BenchmarkOptionParamType
+
+        return BenchmarkOptionParamType()
+
+    def test_completes_keys_for_selected_benchmark(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_key_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "sk")
+        values = [item.value for item in items]
+        assert values
+        assert all(value.startswith("sk") for value in values)
+        assert "skew_preset=" in values
+
+    def test_completes_declared_choice_values(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=h")
+        assert [item.value for item in items] == ["heavy"]
+
+    def test_choice_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=")
+        assert {item.value for item in items} == {"none", "light", "moderate", "heavy", "extreme", "realistic"}
+
+    def test_spec_without_choices_completes_no_values(self):
+        items = self._completer().shell_complete(self._ctx("nyctaxi"), None, "year=20")
+        assert items == []
+
+    def test_unknown_or_missing_benchmark_completes_nothing(self):
+        assert self._completer().shell_complete(self._ctx("tpch"), None, "") == []
+        assert self._completer().shell_complete(self._ctx(None), None, "") == []
+
+    def test_used_keys_omitted(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew", pairs=(("skew_preset", "heavy"),)), None, "")
+        assert "skew_preset=" not in [item.value for item in items]
+
+    def test_completion_imports_lazy_benchmark(self, monkeypatch):
+        """A not-yet-imported benchmark resolves via lazy module import."""
+        import sys
+
+        from benchbox.core.hooks.benchmark_hooks import BenchmarkHookRegistry
+
+        module_name = "benchbox.core.tpch_skew.benchmark"
+        assert module_name in sys.modules  # pre-imported by the module fixture
+        monkeypatch.delitem(sys.modules, module_name)
+        monkeypatch.delitem(BenchmarkHookRegistry._option_specs, "tpch_skew")
+        monkeypatch.delitem(BenchmarkHookRegistry._alias_index, "tpch_skew", raising=False)
+
+        assert BenchmarkHookRegistry.list_option_specs("tpch_skew") == {}
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_completion_unknown_benchmark_is_silent(self):
+        items = self._completer().shell_complete(self._ctx("no_such_bench"), None, "")
+
+        assert items == []

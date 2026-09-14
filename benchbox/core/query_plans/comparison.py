@@ -323,6 +323,49 @@ _OPERATOR_COMPARATORS: dict[str, Callable[[LogicalOperator, LogicalOperator, dic
 }
 
 
+def _truncation_caveat(plan_left: QueryPlanDAG, plan_right: QueryPlanDAG) -> OperatorDiff | None:
+    """Flag a below-truncation difference the persisted trees cannot show.
+
+    Returns a structural mismatch when either plan carries depth-truncation
+    markers yet the stored full-tree fingerprints differ — the full plans then
+    necessarily differed below the cut, and without this record the pair
+    scores 100% with zero mismatches. Returns None when neither plan is
+    truncated, or when the stored prints are absent or agree (identically
+    truncated trees of identical plans compare clean).
+    """
+    cuts = [
+        depth
+        for depth in (
+            getattr(plan_left, "truncated_at_depth", None),
+            getattr(plan_right, "truncated_at_depth", None),
+        )
+        if depth is not None
+    ]
+    if not cuts:
+        return None
+    left_fp = plan_left.plan_fingerprint
+    right_fp = plan_right.plan_fingerprint
+    if not left_fp or not right_fp or left_fp == right_fp:
+        return None
+    return OperatorDiff(
+        operator_id_left=_root_operator_id(plan_left),
+        operator_id_right=_root_operator_id(plan_right),
+        diff_type="structure_mismatch",
+        differences={
+            "reason": (
+                f"persisted plans depth-truncated at depth {min(cuts)} with "
+                "differing full-tree fingerprints: the full plans differed "
+                "below the truncation cut"
+            ),
+        },
+    )
+
+
+def _root_operator_id(plan: QueryPlanDAG) -> str:
+    root = plan.logical_root
+    return root.operator_id if root is not None else "missing"
+
+
 class QueryPlanComparator:
     """Compares query plans and computes similarity scores."""
 
@@ -393,6 +436,18 @@ class QueryPlanComparator:
             plan_left.logical_root,
             plan_right.logical_root,
         )
+
+        # A below-cut difference survives nowhere in truncated trees: their
+        # reloaded fingerprints are STALE, so the stored full-tree prints are
+        # never equality-tested above. When truncation markers are present yet
+        # the stored full-tree fingerprints differ, the full plans necessarily
+        # differed below the cut — record it so the pair scores below 100%
+        # instead of reading as identical. Matching (or absent) stored prints
+        # stay silent: identically truncated trees of identical plans compare
+        # clean.
+        truncation_diff = _truncation_caveat(plan_left, plan_right)
+        if truncation_diff is not None:
+            operator_diffs.append(truncation_diff)
 
         # Calculate similarity score
         similarity = self._calculate_similarity(

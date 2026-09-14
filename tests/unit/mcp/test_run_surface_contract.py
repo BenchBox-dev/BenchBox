@@ -154,6 +154,7 @@ EXPECTED_OMISSION_TIERS = {
     "--analyze-plans": "not-yet-demanded",
     "--stats-reset": "not-yet-demanded",
     "--concurrency": "security-scoped",
+    "--streams": "security-scoped",
     "--strict-translation": "not-yet-demanded",
     "--ignore-memory-warnings": "security-scoped",
     "--funding": "not-yet-demanded",
@@ -652,6 +653,7 @@ class TestMCPDocsContract:
             "--publish-target",
             "--publish-label",
             "--concurrency",
+            "--streams",
             "--ignore-memory-warnings",
         } <= security_scoped
 

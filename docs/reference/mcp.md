@@ -430,6 +430,7 @@ above.
 | `--analyze-plans` | Omitted | not-yet-demanded | Plan-capture detail toggle is a bounded control with no client demand yet; MCP already exposes only `capture_plans`. |
 | `--stats-reset` | Omitted | not-yet-demanded | Statistics rebuild/reset is a bounded measurement control with no client demand yet. |
 | `--concurrency` | Omitted | security-scoped | Concurrent streams are a resource-budget control; MCP must not admit caller-chosen unbounded fan-out. |
+| `--streams` | Omitted | security-scoped | Canonical alias of `--concurrency` on `benchbox run`; same resource-budget control, same omission. |
 | `--ignore-memory-warnings` | Omitted | security-scoped | Skips memory-admission checks. Resource-budget bypasses stay permanently omitted from MCP. |
 | `--funding` | Omitted | not-yet-demanded | Funding metadata is a bounded provenance field with no client demand yet. |
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
