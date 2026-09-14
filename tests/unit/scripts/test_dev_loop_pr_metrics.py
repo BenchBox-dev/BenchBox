@@ -856,11 +856,14 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
     monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
     monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF if commit == FREEZE else None)
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
 
     base = _acceptance_doc()
     base["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
     base["registration"] = {"commit": DURABLE, "time": "2026-09-08T12:33:43Z"}
     process = _process_doc()
+    process["base_commit_at_freeze"] = BASE_REF
 
     preserved = dict(base)
     preserved["registration"] = {
@@ -1077,18 +1080,25 @@ def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.Mo
 
     def binding_spy(acceptance, process, digest, process_relpath, acceptance_relpath):
         seen["acceptance_relpath"] = acceptance_relpath
+        seen["process_relpath"] = process_relpath
         return real_binding(acceptance, process, digest, process_relpath, acceptance_relpath)
 
     monkeypatch.setattr(metrics, "_check_acceptance_binding", binding_spy)
     metrics.validate_process_acceptance(
-        _acceptance_doc(), _process_doc(), "digest", acceptance_relpath="custom/accept.json"
+        _acceptance_doc(),
+        _process_doc(),
+        "digest",
+        process_relpath="custom/base.json",
+        acceptance_relpath="custom/accept.json",
     )
     assert seen["acceptance_relpath"] == "custom/accept.json"
+    assert seen["process_relpath"] == "custom/base.json"
 
     captured: dict = {}
 
     def validate_spy(acceptance, process, digest, process_relpath=None, acceptance_relpath=None):
         captured["acceptance_relpath"] = acceptance_relpath
+        captured["process_relpath"] = process_relpath
         return []
 
     monkeypatch.setattr(metrics, "validate_process_acceptance", validate_spy)
@@ -1097,11 +1107,15 @@ def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.Mo
     process_path = repo_root / "_project" / "analysis" / "pr-process-acceptance-baseline.json"
     assert metrics.run_validate_process_acceptance(str(acceptance_path), str(process_path)) == 0
     assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
+    assert captured["process_relpath"] == "_project/analysis/pr-process-acceptance-baseline.json"
 
     outside = tmp_path / "acceptance.json"
     outside.write_text(acceptance_path.read_text(encoding="utf-8"), encoding="utf-8")
-    assert metrics.run_validate_process_acceptance(str(outside), str(process_path)) == 0
+    outside_base = tmp_path / "baseline.json"
+    outside_base.write_bytes(process_path.read_bytes())
+    assert metrics.run_validate_process_acceptance(str(outside), str(outside_base)) == 0
     assert captured["acceptance_relpath"] == "_project/analysis/pr-process-acceptance.json"
+    assert captured["process_relpath"] == "_project/analysis/pr-process-acceptance-baseline.json"
 
 
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:

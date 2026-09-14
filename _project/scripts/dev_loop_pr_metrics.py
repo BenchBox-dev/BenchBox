@@ -1523,8 +1523,9 @@ def _check_original_freeze(
     if _sha256_bytes(original_frozen) != process_digest:
         return ["process file at the original registration commit differs from the bound digest"]
     base_freeze = str(process.get("base_commit_at_freeze") or "").lower()
-    if base_freeze:
-        errors.extend(_check_freeze_only_child(original, base_freeze, process_relpath))
+    if not base_freeze or re.fullmatch(r"[0-9a-fA-F]{40}", base_freeze) is None:
+        return ["frozen baseline fixes no base_commit_at_freeze (freeze base must be a full commit SHA)"]
+    errors.extend(_check_freeze_only_child(original, base_freeze, process_relpath))
     if original != reg_commit:
         errors.extend(_check_history_anchor(original, reg_commit, acceptance_relpath))
     errors.extend(_check_freeze_ordering(original, reg_commit))
@@ -1866,8 +1867,16 @@ def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> 
         acceptance_relpath = str(Path(acceptance_path).resolve().relative_to(REPO_ROOT.resolve()))
     except (OSError, ValueError):
         acceptance_relpath = "_project/analysis/pr-process-acceptance.json"
+    try:
+        process_relpath = str(Path(process_path).resolve().relative_to(REPO_ROOT.resolve()))
+    except (OSError, ValueError):
+        process_relpath = "_project/analysis/pr-process-acceptance-baseline.json"
     errors = validate_process_acceptance(
-        acceptance, process, _sha256_bytes(process_raw), acceptance_relpath=acceptance_relpath
+        acceptance,
+        process,
+        _sha256_bytes(process_raw),
+        process_relpath=process_relpath,
+        acceptance_relpath=acceptance_relpath,
     )
     if errors:
         print(f"INCOMPLETE acceptance {acceptance_path}:")
