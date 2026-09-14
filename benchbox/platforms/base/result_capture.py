@@ -1589,6 +1589,13 @@ class ResultCaptureMixin:
 
         streams: list[ThroughputStream] = []
         total_queries_executed = 0
+        # Persisted execution_order is the flattened global order across all
+        # streams (matching the standard path and the global ORDER BY
+        # consumer in core.results.database). The stream-local ``position``
+        # slot is operational metadata only: persisting it would store
+        # overlapping values from different streams in one INTEGER NOT NULL
+        # column. A producer-supplied ``execution_order`` still wins.
+        persisted_order = 0
 
         for stream_result in getattr(throughput_result, "stream_results", []) or []:
             start_iso = self._format_timestamp(stream_result.start_time)
@@ -1604,18 +1611,13 @@ class ResultCaptureMixin:
             duration_ms = int(duration_seconds * 1000)
 
             query_executions: list[QueryExecution] = []
-            for idx, query_result in enumerate(stream_result.query_results, start=1):
-                # ``position`` is the stream-local slot. It is deliberately
-                # distinct from the flattened result's global execution order;
-                # preserve an explicit zero instead of using truthiness.
-                position = query_result.get("position")
+            for query_result in stream_result.query_results:
+                persisted_order += 1
                 execution_order_value = query_result.get("execution_order")
-                if position is not None:
-                    execution_order = position
-                elif execution_order_value is not None:
+                if execution_order_value is not None:
                     execution_order = execution_order_value
                 else:
-                    execution_order = idx
+                    execution_order = persisted_order
                 execution_time_seconds = query_result.get("execution_time_seconds")
                 execution_time_ms = None if execution_time_seconds is None else float(execution_time_seconds) * 1000
 
