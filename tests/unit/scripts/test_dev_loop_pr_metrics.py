@@ -1064,6 +1064,11 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     errors = metrics._check_acceptance_binding(cased, based_process, "digest", "baseline.json", "acceptance.json")
     assert errors == []
 
+    upper_base = dict(based_process)
+    upper_base["base_commit_at_freeze"] = BASE_REF.upper()
+    errors = metrics._check_acceptance_binding(preserved, upper_base, "digest", "baseline.json", "acceptance.json")
+    assert errors == []
+
 
 def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The CLI entry forwards the selected acceptance path to the history-anchor read."""

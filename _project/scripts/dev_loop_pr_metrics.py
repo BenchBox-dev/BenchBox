@@ -1522,7 +1522,7 @@ def _check_original_freeze(
         return [f"original registration commit {original[:12]} not resolvable in this tree"]
     if _sha256_bytes(original_frozen) != process_digest:
         return ["process file at the original registration commit differs from the bound digest"]
-    base_freeze = process.get("base_commit_at_freeze")
+    base_freeze = str(process.get("base_commit_at_freeze") or "").lower()
     if base_freeze:
         errors.extend(_check_freeze_only_child(original, base_freeze, process_relpath))
     if original != reg_commit:
