@@ -1459,7 +1459,8 @@ def _check_acceptance_binding(
 
     The durable registration commit must be an ancestor of HEAD while
     original_commit preserves the freeze-only boundary (they coincide when
-    no squash merge orphaned the freeze); both pinned copies must match
+    no squash merge orphaned the freeze); both pointers must be full commit
+    SHAs (refs are movable) and both pinned copies must match
     the bound digest so dropping either pointer fails closed. The original
     commit must also be the freeze-only child of the baseline's bound
     base_commit_at_freeze and change nothing else, so a bundled squash
@@ -1482,6 +1483,9 @@ def _check_acceptance_binding(
     if not reg_commit:
         errors.append("acceptance must record its preregistration commit")
         return errors
+    if re.fullmatch(r"[0-9a-f]{40}", reg_commit) is None:
+        errors.append("registration commit must be a full commit SHA (refs are movable)")
+        return errors
     frozen = _git_show_bytes(reg_commit, process_relpath)
     if frozen is None:
         errors.append(f"registration commit {reg_commit[:12]} not resolvable in this tree")
@@ -1492,6 +1496,9 @@ def _check_acceptance_binding(
     original = str(registration.get("original_commit") or "")
     if not original:
         errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
+        return errors
+    if re.fullmatch(r"[0-9a-f]{40}", original) is None:
+        errors.append("original registration commit must be a full commit SHA (refs are movable)")
         return errors
     errors.extend(
         _check_original_freeze(original, reg_commit, process, process_digest, process_relpath, acceptance_relpath)
