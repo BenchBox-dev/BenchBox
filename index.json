@@ -10559,10 +10559,15 @@
       "title": "Power Run Iterations Configuration ✅ COMPLETED"
     },
     "pr-1644-fix-commit-nits-20260811": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T03:41:04Z",
+        "generation": "c702b8091fe547ee86ba990d546484c6",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Clean up three defects introduced by the PR 1644 fix commits"
     },
     "pr-followup-resumable-ownership": {
