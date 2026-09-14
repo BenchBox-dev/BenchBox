@@ -127,6 +127,10 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # or function signature changed; the guard's decorator/signature snapshot
     # stays equal. File-level allow is required because this test first diffs
     # names under benchbox/cli/ against the allowlist.
+    # pr-1644-fix-commit-nits: live run concurrency validation mirrors the
+    # saved-path check via a private helper; no Click decorator, option, or
+    # command signature changed.
+    "benchbox/cli/run_resolution.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",

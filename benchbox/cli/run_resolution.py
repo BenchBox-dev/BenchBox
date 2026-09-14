@@ -158,6 +158,24 @@ def _saved_non_replayable_options(saved: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(set(raw)))
 
 
+def _live_concurrency(state: types.SimpleNamespace) -> int:
+    """Validate the live CLI concurrency exactly like the saved-path check.
+
+    Only an absent value defaults to the single-stream plan of 1; an
+    explicit zero or a non-integer is rejected rather than coerced.
+    """
+    raw_concurrency = getattr(state, "concurrency", None)
+    if raw_concurrency is None:
+        return 1
+    try:
+        concurrency = int(raw_concurrency)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Live run concurrency must be an integer") from exc
+    if concurrency < 1:
+        raise ValueError("Live run concurrency must be at least one")
+    return concurrency
+
+
 def current_run_request(state: types.SimpleNamespace) -> RunRequest:
     """Capture user intent without including fields derived by the resolver."""
     phases = state.phases if isinstance(state.phases, (list, tuple)) else str(state.phases).split(",")
@@ -178,9 +196,9 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
         compression_level=compression.level,
         iterations=getattr(state, "iterations", None),
         # Click leaves the hidden --concurrency option as None when callers
-        # use the normal CLI surface; the canonical plan treats that as the
-        # single-stream default rather than passing None through int().
-        concurrency=int(getattr(state, "concurrency", None) or 1),
+        # use the normal CLI surface; only that absent value defaults to the
+        # single-stream plan - explicit values go through saved-path validation.
+        concurrency=_live_concurrency(state),
         non_replayable_options=_active_non_replayable_options(state),
     )
 
