@@ -816,6 +816,55 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: 
     assert any("below frozen 50%" in e for e in errors)
 
 
+def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Squash-orphaned freeze evidence stays mechanically checked.
+
+    The durable registration commit satisfies the ancestor gate while
+    original_commit preserves the freeze-only boundary; tampering with
+    either copy must fail.
+    """
+    frozen_bytes = b'{"frozen": true}'
+    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: frozen_bytes)
+    monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": commit == "durable-commit")
+    monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+
+    base = _acceptance_doc()
+    base["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
+    base["registration"] = {"commit": "durable-commit", "time": "2026-09-08T12:33:43Z"}
+    process = _process_doc()
+
+    preserved = dict(base)
+    preserved["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "freeze-only-commit",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    assert metrics._check_acceptance_binding(preserved, process, "digest", "baseline.json") == []
+
+    tampered = dict(base)
+    tampered["registration"] = {
+        "commit": "durable-commit",
+        "original_commit": "tampered-freeze",
+        "time": "2026-09-08T12:33:43Z",
+    }
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: b'{"tampered": true}' if revision == "tampered-freeze" else frozen_bytes,
+    )
+    monkeypatch.setattr(
+        metrics,
+        "_sha256_bytes",
+        lambda raw: "tampered-digest" if raw == b'{"tampered": true}' else "digest",
+    )
+    errors = metrics._check_acceptance_binding(tampered, process, "digest", "baseline.json")
+    assert any("original registration commit" in e for e in errors)
+
+    monkeypatch.setattr(metrics, "_git_show_bytes", lambda revision, path: None)
+    errors = metrics._check_acceptance_binding(preserved, process, "digest", "baseline.json")
+    assert any("not resolvable" in e for e in errors)
+
+
 def test_lifecycle_validator_rejects_unbound_attempts() -> None:
     import copy
     import json as _json

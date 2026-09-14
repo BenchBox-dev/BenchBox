@@ -1378,6 +1378,13 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
         errors.append("process file at the registration commit differs from the bound digest")
     if not _is_ancestor(reg_commit):
         errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
+    original = str(registration.get("original_commit") or "")
+    if original:
+        original_frozen = _git_show_bytes(original, process_relpath)
+        if original_frozen is None:
+            errors.append(f"original registration commit {original[:12]} not resolvable in this tree")
+        elif _sha256_bytes(original_frozen) != process_digest:
+            errors.append("process file at the original registration commit differs from the bound digest")
     return errors
 
 
