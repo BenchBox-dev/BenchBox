@@ -400,10 +400,11 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
 #
 # Host reachability ports are DERIVED from each platform's docker-compose
 # `ports:` mapping (honoring `${VAR:-default}` overrides), keyed by the
-# in-container service port the adapter connects to. This is the one fact a
-# "lightweight user-exercising" layer needs and the one most certain to rot;
-# deriving it means an override like SINGLESTORE_HOST_PORT flows through to both
-# the reachability probe and the adapter `port=` option without editing code.
+# in-container service port each adapter declares via `default_service_port`.
+# This is the one fact a "lightweight user-exercising" layer needs and the one
+# most certain to rot; deriving it means an override like SINGLESTORE_HOST_PORT
+# flows through to both the reachability probe and the adapter `port=` option
+# without editing code.
 #
 # Endpoint roles are modeled explicitly: PLATFORM_SERVICE_PORT is the
 # container/service port (NOT the host port). Do not collapse the two.
@@ -413,27 +414,24 @@ _DOCKER_PLATFORM_SPECS: dict[str, DockerPlatformSpec] = {
 # adapter option consumes; they do not duplicate the values themselves.
 # ---------------------------------------------------------------------------
 
+
 # Platform -> in-container service port the adapter connects to. The host
 # reachability port is whatever the compose `ports:` mapping publishes for this
-# container port.
-PLATFORM_SERVICE_PORT: dict[str, int] = {
-    "clickhouse-server": 9000,
-    "cedardb": 5432,
-    "starrocks": 9030,
-    "postgresql": 5432,
-    "presto": 8080,
-    "trino": 8080,
-    "databend": 8000,
-    "doris": 9030,
-    "influxdb": 8181,
-    "lakesail": 50051,
-    "pg-duckdb": 5432,
-    "pg-mooncake": 5432,
-    "timescaledb": 5432,
-    "questdb": 8812,
-    "singlestore": 3306,
-    "velox": 50051,
-}
+# container port. AUTO-GENERATED from adapter defaults -- change the owning
+# adapter's `default_service_port`, never values here.
+def _adapter_service_ports() -> dict[str, int]:
+    from benchbox.core.platform_registry import PlatformRegistry
+
+    ports: dict[str, int] = {}
+    for platform in _DOCKER_PLATFORM_SPECS:
+        port = PlatformRegistry.get_adapter_class(platform).default_service_port
+        if port is None:
+            raise RuntimeError(f"{platform} adapter declares no default_service_port")
+        ports[platform] = port
+    return ports
+
+
+PLATFORM_SERVICE_PORT: dict[str, int] = _adapter_service_ports()
 
 _PLATFORM_STATIC_OPTS: dict[str, list[str]] = {
     "velox": ["--platform-option", "deployment=remote"],

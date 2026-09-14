@@ -84,6 +84,7 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 50051
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 

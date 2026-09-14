@@ -83,6 +83,7 @@ class DatabendAdapter(PlatformAdapter):
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 8000
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
