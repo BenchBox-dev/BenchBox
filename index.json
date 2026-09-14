@@ -5835,10 +5835,15 @@
       "title": "Extract BenchBox ASCII charting into `textcharts` standalone library with compatibility shims and staged rollout"
     },
     "extract-docker-lifecycle-execute-py-256-427-into-a-platform": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T12:02:45Z",
+        "generation": "071b41e334c14f0ca33d9c136fb35bd2",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "blocked",
+      "status": "active",
       "title": "Extract docker lifecycle (execute.py:256-427) into a platform_lifecycle module beside docker_assets"
     },
     "extract-project-scripts-to-isolated-env": {
