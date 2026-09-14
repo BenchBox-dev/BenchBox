@@ -545,7 +545,7 @@ class BenchmarkOptionParamType(click.ParamType):
         ]
 
 
-def _benchmark_specs_for_completion(ctx) -> dict:
+def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
     """Return registry specs for the --benchmark already on the command line."""
     from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
 
@@ -556,7 +556,7 @@ def _benchmark_specs_for_completion(ctx) -> dict:
     return BenchmarkHookRegistry.list_option_specs(str(benchmark).strip().lower())
 
 
-def _used_benchmark_option_keys(ctx, specs: dict) -> set:
+def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
     """Canonical benchmark-option keys already present on the command line."""
     params = getattr(ctx, "params", None) or {}
     used: set = set()
@@ -569,7 +569,7 @@ def _used_benchmark_option_keys(ctx, specs: dict) -> set:
     return used
 
 
-def _complete_benchmark_option_value(specs: dict, key: str, value_prefix: str):
+def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_prefix: str):
     """Complete allowed values after KEY= for specs declaring choices."""
     from click.shell_completion import CompletionItem
 

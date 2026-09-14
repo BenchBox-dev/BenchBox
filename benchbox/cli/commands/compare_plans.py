@@ -124,7 +124,7 @@ def _build_comparisons(
         # the multi-query sweep, it must not suppress a single-query request
         # (at the default threshold 0.0 the old condition dropped it and the
         # command exited 0 with "No plans available for comparison").
-        if explicit_query_id is not None or comparison.similarity.overall_similarity < threshold or threshold == 0.0:
+        if explicit_query_id or comparison.similarity.overall_similarity < threshold or threshold == 0.0:
             comparisons.append((qid, comparison))
     return comparisons
 

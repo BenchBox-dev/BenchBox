@@ -188,6 +188,16 @@ def test_compare_plans_explicit_query_reported_at_default_threshold(tmp_path: Pa
     assert "No plans available" not in result.output
 
 
+def test_build_comparisons_empty_explicit_behaves_as_sweep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty --query-id is falsy: it must keep sweep semantics, not force inclusion."""
+    monkeypatch.setattr(cp, "compare_query_plans", lambda *_a, **_k: _Cmp(similarity=_Sim(0.99)))
+    results1 = _Results(ids=("q1",))
+    results2 = _Results(ids=("q1",))
+
+    assert cp._build_comparisons(["q1"], results1, results2, 0.95, "") == []
+    assert len(cp._build_comparisons(["q1"], results1, results2, 0.95, "q1")) == 1
+
+
 def test_compare_plans_reports_corrupt_companion_distinctly(tmp_path: Path) -> None:
     """qpc-05 / F4.3: when one run's .plans.json exists but is corrupt,
     compare-plans (explicit --query-id) must say the plans file failed to load,
