@@ -17693,10 +17693,15 @@
       "title": "Validate tpc-tuning.json z-ordering recommendations and integrate or discard"
     },
     "validate-benchmark-options-against-constructor-signature-at": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-15T01:55:53Z",
+        "generation": "3745b6168f4744628a3ad8a43bb39b37",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Validate benchmark options against constructor signature at registration time"
     },
     "validate-isolated-runtime-importability": {
