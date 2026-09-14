@@ -1864,11 +1864,11 @@ def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> 
         print(f"INCOMPLETE process baseline {process_path}: {exc}")
         return 1
     try:
-        acceptance_relpath = str(Path(acceptance_path).resolve().relative_to(REPO_ROOT.resolve()))
+        acceptance_relpath = Path(acceptance_path).resolve().relative_to(REPO_ROOT.resolve()).as_posix()
     except (OSError, ValueError):
         acceptance_relpath = "_project/analysis/pr-process-acceptance.json"
     try:
-        process_relpath = str(Path(process_path).resolve().relative_to(REPO_ROOT.resolve()))
+        process_relpath = Path(process_path).resolve().relative_to(REPO_ROOT.resolve()).as_posix()
     except (OSError, ValueError):
         process_relpath = "_project/analysis/pr-process-acceptance-baseline.json"
     errors = validate_process_acceptance(
