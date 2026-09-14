@@ -269,6 +269,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 9030
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     connection_operation_name = "Doris connection"

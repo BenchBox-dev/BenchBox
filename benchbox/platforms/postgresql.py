@@ -263,6 +263,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
+    default_service_port = 5432
     # psycopg connections do not support true concurrent statement execution
     # across cursors of one connection (server-side session state --
     # transactions, SET, prepared statements -- lives on the connection, and

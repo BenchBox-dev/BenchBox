@@ -126,6 +126,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 8812
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)

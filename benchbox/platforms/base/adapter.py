@@ -145,6 +145,12 @@ class PlatformAdapter(
     # enough, since the base new_stream_connection() raises for that value to
     # fail fast instead of silently falling back to cursor sharing.
     stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
+    # Default in-container service port the adapter connects to in the reference
+    # docker deployment (the container side of the compose `ports:` mapping).
+    # UAT derives its reachability table from these declarations instead of
+    # hardcoding them. None means the platform has no single default (embedded
+    # engines, cloud services with per-deployment endpoints).
+    default_service_port: int | None = None
     # External table mode capability declaration.
     # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False

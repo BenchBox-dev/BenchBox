@@ -34,6 +34,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     default_table_format = "memory"
     table_format_choices = ("memory",)
     target_dialect = ""
+    default_service_port = 8080
     uses_client_source = False
     from_config_optional_fields = (
         "http_scheme",
