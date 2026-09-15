@@ -83,6 +83,31 @@ at least 30 days. No external monitor credential is currently available in the
 repository; activation is a deployment dependency, not evidence that monitoring
 is already active.
 
+## Current status (2026-09-15)
+
+The transaction writer is the active production path. The `publication` journal shows durable
+generation 7 (`live-7-570c2c50-d8c0-48fb-9ee8-d83afc272061`, run `34702300640`, 2026-09-12) with
+`next_generation: 8` and no active transaction. Generation 6 demonstrated quarantine and forward
+reconciliation: a `POST_SEND_FAILURE` entered `recovery-required`, then reconciled forward with a
+signed live receipt before generation 7 promoted.
+
+Cutover evidence state:
+
+- Verified production publication with signed receipt: present (generation 7).
+- Internal availability monitor (`publication-soak-monitor.yml`): running on its five-minute schedule
+  with 30-day observation artifacts, hourly full content checks, and `unknown` (never healthy) status
+  during an active transaction. Recent runs show GitHub scheduling gaps longer than five minutes, so
+  schedule cadence alone is not five-minute coverage.
+- External independent monitor: still missing. No external monitor credential exists in the
+  repository. Activation remains a deployment dependency, not completed evidence.
+- Safe exact-artifact restoration test through the protected rollback path: still pending
+  post-cutover demonstration.
+- Legacy retirement: pending. `.github/workflows/docs.yml` still contains the release-to-Pages job,
+  but it skips while independent publication owns Pages (ownership guard). `develop` and `release`
+  both remain in the `github-pages` deployment-branch policy; `develop` must stay while the
+  transaction workflow requires dispatch from that ref. `sync-results-data-to-published.yml` is a
+  corpus mirror into `published-results`, not a Pages writer, so it stays.
+
 ## Legacy retirement
 
 The historical freeze closure

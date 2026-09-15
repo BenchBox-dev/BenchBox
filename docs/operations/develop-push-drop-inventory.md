@@ -54,7 +54,7 @@ inventory's risk class:
 
 | Workflow | Why excluded |
 | --- | --- |
-| `docs.yml` | Pages deployment occurs only on `release`; the `develop` push is baseline production and is included above |
+| `docs.yml` | Legacy release-to-Pages deploy plus `develop` visual baseline; the legacy deploy is skipped while independent publication owns Pages — normal production writes use the `develop`-dispatched transaction writer |
 | `lint.yml` / `test.yml` | `push.branches: [release]` only |
 | `release.yml` | tag push `v*` only |
 

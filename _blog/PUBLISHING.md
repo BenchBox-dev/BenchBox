@@ -6,7 +6,7 @@
 
 Blog content is developed under `_blog/` in the single `BenchBox-dev/BenchBox` repository. When a post is ready, archive the final source under `_blog/{series}/published/` and place its ABlog copy under `docs/blog/` in the same change.
 
-The release branch excludes `_blog/` but retains `docs/blog/`. A pull request to `develop` validates the post and assembled public site. GitHub Pages deploys only after the content reaches the protected `release` branch through the release flow.
+The release branch excludes `_blog/` but retains `docs/blog/` for versioned artifacts. A pull request to `develop` validates the post and assembled public site. The public site publishes through the independent publication transaction from `develop` (candidate build plus `github-pages`-approved promotion), not through the release flow. The release flow publishes the Python package; its Pages deploy is a legacy fallback that is skipped while independent publication owns Pages. See `docs/operations/publication-deployer-soak-and-retirement.md` for the promotion procedure.
 
 ## Directory Structure
 
@@ -150,23 +150,26 @@ git add _blog/{series}/published/{post}.md \
 git commit -m "docs(blog): publish {title}"
 ```
 
-### 8. Release deploys GitHub Pages
+### 8. Publish through the publication transaction
 
-After the development PR merges, carry `develop` through the version-branch
-release flow in `docs/operations/release-guide.md`:
+After the development PR merges to `develop`, publish with the normal production writer in
+`docs/operations/publication-deployer-soak-and-retirement.md`. Do not use `make release-cut` /
+`make release-finalize` for site publishing; that flow releases the Python package.
 
 ```bash
-make release-cut VERSION=X.Y.Z
-# review and merge the release PR after its required checks
-make release-finalize VERSION=X.Y.Z
+gh workflow run publication-deploy.yml --ref develop -f candidate_only=true
+# wait for success, then select the immutable numeric candidate artifact ID from that run
+gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>
+# approve the protected `github-pages` environment once in the GitHub Actions UI,
+# then watch the run to completion and verify the signed live receipt
 ```
 
-The Documentation workflow builds on `develop` and `release`, but its deploy
-job runs only for a push to `release`. It:
-
-1. Builds Sphinx + ABlog documentation
-2. Assembles the site: landing page at `/`, docs at `/docs/`, blog at `/blog/`
-3. Deploys to GitHub Pages
+The candidate builder resolves the current `develop` and `published-results` commits and the next
+journal generation, builds the site (landing page at `/`, docs at `/docs/`, blog at `/blog/`,
+Explorer at `/results/`), validates privacy and lane inputs, and uploads one retained candidate
+bundle. The transaction workflow validates that exact artifact before and after approval, writes it
+to Pages, probes the required public routes, signs the live receipt, and advances the durable
+journal head only after verification.
 
 The post will appear at `https://benchbox.dev/blog/YYYY-MM-DD-{slug}/` and will automatically be included in:
 
@@ -187,5 +190,5 @@ The post will appear at `https://benchbox.dev/blog/YYYY-MM-DD-{slug}/` and will 
 - [ ] Post copied to `docs/blog/` in the same repository
 - [ ] Post added to `docs/blog/index.rst` toctree
 - [ ] Development PR checks pass against `develop`
-- [ ] Content reaches `release` through the release flow
-- [ ] Verified live at `https://benchbox.dev/blog/`
+- [ ] Site published via candidate build plus `github-pages`-approved transaction
+- [ ] Signed live receipt verified; post checked live at `https://benchbox.dev/blog/`

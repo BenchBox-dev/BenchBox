@@ -17,6 +17,12 @@ That's the entire flow. The two Make targets do the rest. Wheel install,
 release canary, and correctness remain the blocking gates; UAT is a
 non-blocking matrix campaign.
 
+This flow releases the Python package. It does not publish `benchbox.dev` while independent
+publication owns Pages: the site publishes from `develop` through the candidate build plus
+`github-pages`-approved transaction in `docs/operations/publication-deployer-soak-and-retirement.md`.
+The `docs.yml` release-to-Pages job is a legacy fallback that is skipped while independent
+publication is active.
+
 ## Pre-merge release-required contract
 
 Release PRs target `release` and must be opened from branches accepted by

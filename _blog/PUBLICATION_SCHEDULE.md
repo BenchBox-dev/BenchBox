@@ -53,4 +53,4 @@
 
 ## Notes
 
-- **Publication path**: `_blog/{series}/drafts/` → critique → `_blog/{series}/published/` → `docs/blog/` (GitHub Pages)
+- **Publication path**: `_blog/{series}/drafts/` → critique → `_blog/{series}/published/` → `docs/blog/` → publication transaction (see `PUBLISHING.md`)

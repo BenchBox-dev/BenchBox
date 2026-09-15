@@ -37,6 +37,12 @@ committed snapshot without refreshing it.
 
 ## Freeze and incident response
 
+> Superseded note: the A0 freeze closed on 2026-09-04
+> (`publication-freeze-closure-2026-09-04.json`, gates G1-G5 pass, tracker A0-A9 done).
+> The section below is historical. Current production writes use the transaction writer in
+> `publication-deployer-soak-and-retirement.md`; incident recovery uses the protected rollback
+> path there, not a release-branch re-run.
+
 The controlling decision is
 `_project/decisions/independent-publication-a0-freeze-2026-08-31.md`. While the
 freeze is active, preserve the current release deploy and mirror path. If the
