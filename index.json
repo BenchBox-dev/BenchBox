@@ -17548,15 +17548,10 @@
       "title": "Unify DataFrame and SQL default storage locations to project-local benchmark_runs/"
     },
     "unify-duplicate-benchmark-construction-paths": {
-      "claim": {
-        "expires_at": "2026-09-16T13:33:29Z",
-        "generation": "ba5618d226c746adb19035f3a9f0687e",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:85d924eaab5f62e439a9f404"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Two benchmark construction paths must independently remember the same kwargs"
     },
     "unify-platform-label-disambiguator": {
