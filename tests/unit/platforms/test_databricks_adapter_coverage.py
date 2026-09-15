@@ -1315,7 +1315,7 @@ class TestApplyTableTunings:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.CLUSTERING else []
         except ImportError:
             tuning.get_columns_by_type.return_value = [col1]
 
@@ -1349,7 +1349,7 @@ class TestApplyTableTunings:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.CLUSTERING else []
         except ImportError:
             tuning.get_columns_by_type.return_value = [col1]
 
@@ -2100,7 +2100,7 @@ class TestGenerateTuningClause:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col] if t == TuningType.PARTITIONING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col] if t == TuningType.PARTITIONING else []
         except ImportError:
             tuning.get_columns_by_type.side_effect = lambda t: [col] if t.__class__.__name__ == "TuningType" else []
 
@@ -2119,7 +2119,7 @@ class TestGenerateTuningClause:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col] if t == TuningType.CLUSTERING else []
         except ImportError:
             pytest.skip("TuningType not available")
 

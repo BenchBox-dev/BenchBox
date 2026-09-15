@@ -423,9 +423,9 @@ class TestGetAvailablePlatforms:
     def test_sql_only_filter(self, monkeypatch):
         monkeypatch.setattr(
             "benchbox.core.comparison.suite.UnifiedBenchmarkSuite.get_available_platforms",
-            lambda self, platform_type=None: ["duckdb", "sqlite"]
-            if platform_type == PlatformType.SQL
-            else ["duckdb", "sqlite", "polars-df"],
+            lambda self, platform_type=None: (
+                ["duckdb", "sqlite"] if platform_type == PlatformType.SQL else ["duckdb", "sqlite", "polars-df"]
+            ),
         )
         platforms = self.suite.get_available_platforms(PlatformType.SQL)
         # Verify no DataFrame suffix platforms are returned

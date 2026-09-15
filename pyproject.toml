@@ -601,6 +601,9 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+# ruff >= 0.16 formats Python code blocks inside Markdown; docs/blog snippets
+# keep a prose-oriented style, so Markdown stays outside the formatter contract.
+exclude = ["*.md"]
 
 [tool.interrogate]
 # Docstring coverage enforcement

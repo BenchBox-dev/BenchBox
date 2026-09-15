@@ -1596,7 +1596,7 @@ class TestTrinoTuningSupport:
         col1.order = 1
         table_tuning = Mock()
         table_tuning.has_any_tuning.return_value = True
-        table_tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.PARTITIONING else [])
+        table_tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.PARTITIONING else []
 
         result = adapter.generate_tuning_clause(table_tuning)
         assert "PARTITIONED BY" in result
@@ -1613,7 +1613,7 @@ class TestTrinoTuningSupport:
         col1.order = 1
         table_tuning = Mock()
         table_tuning.has_any_tuning.return_value = True
-        table_tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.PARTITIONING else [])
+        table_tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.PARTITIONING else []
 
         result = adapter.generate_tuning_clause(table_tuning)
         assert "WITH" in result

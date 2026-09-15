@@ -648,8 +648,9 @@ def test_tpch_maintenance_helpers_and_integrity(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(
         maint,
         "_generate_rf1_orders_data",
-        lambda pair_id, num_orders: [{"O_ORDERKEY": 200 + pair_id, "O_CUSTKEY": 1, "O_COMMENT": "x"}]
-        * max(1, num_orders),
+        lambda pair_id, num_orders: (
+            [{"O_ORDERKEY": 200 + pair_id, "O_CUSTKEY": 1, "O_COMMENT": "x"}] * max(1, num_orders)
+        ),
     )
     monkeypatch.setattr(
         maint,

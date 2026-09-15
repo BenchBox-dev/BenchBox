@@ -583,8 +583,8 @@ class TestSparkAdapterExecution:
         with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
             mock_tuning_type.PARTITIONING = "partitioning"
             mock_tuning_type.SORTING = "sorting"
-            mock_tuning.get_columns_by_type.side_effect = (
-                lambda t: [mock_col] if t == mock_tuning_type.PARTITIONING else []
+            mock_tuning.get_columns_by_type.side_effect = lambda t: (
+                [mock_col] if t == mock_tuning_type.PARTITIONING else []
             )
 
             clause = adapter.generate_tuning_clause(mock_tuning)
