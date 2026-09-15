@@ -53,7 +53,7 @@ from benchbox import TPCH
 adapter = DataFusionAdapter(
     working_dir="./datafusion_working",
     memory_limit="16G",
-    data_format="parquet"  # Columnar format with compression and predicate pushdown
+    data_format="parquet",  # Columnar format with compression and predicate pushdown
 )
 
 # Run TPC-H benchmark
@@ -138,7 +138,7 @@ adapter = DataFusionAdapter(memory_limit="64G")
 # Memory limit with disk spilling
 adapter = DataFusionAdapter(
     memory_limit="16G",
-    temp_dir="/fast/nvme/temp"  # Fast SSD for spilling
+    temp_dir="/fast/nvme/temp",  # Fast SSD for spilling
 )
 ```
 
@@ -147,6 +147,7 @@ adapter = DataFusionAdapter(
 ```python
 # Match CPU core count (default)
 import os
+
 adapter = DataFusionAdapter(target_partitions=os.cpu_count())
 
 # Conservative for multi-tenant systems
@@ -165,17 +166,11 @@ The `batch_size` parameter controls RecordBatch size for query execution:
 adapter = DataFusionAdapter(batch_size=8192)
 
 # Smaller batches: Lower latency, lower memory
-adapter = DataFusionAdapter(
-    batch_size=4096,
-    memory_limit="4G"
-)
+adapter = DataFusionAdapter(batch_size=4096, memory_limit="4G")
 # Use when: Memory-constrained, interactive queries, lower latency required
 
 # Larger batches: Higher throughput, higher memory
-adapter = DataFusionAdapter(
-    batch_size=16384,
-    memory_limit="32G"
-)
+adapter = DataFusionAdapter(batch_size=16384, memory_limit="32G")
 # Use when: Batch processing, maximum throughput, ample memory available
 ```
 
@@ -196,7 +191,7 @@ adapter = DataFusionAdapter(
 ```python
 adapter = DataFusionAdapter(
     data_format="parquet",
-    working_dir="/fast/ssd/datafusion"  # Fast storage for conversion
+    working_dir="/fast/ssd/datafusion",  # Fast storage for conversion
 )
 ```
 
@@ -209,7 +204,7 @@ adapter = DataFusionAdapter(
 ```python
 adapter = DataFusionAdapter(
     data_format="csv",
-    memory_limit="4G"  # Lower memory requirements
+    memory_limit="4G",  # Lower memory requirements
 )
 ```
 
@@ -226,7 +221,7 @@ config = {
     "memory_limit": "32G",
     "partitions": 16,
     "format": "parquet",
-    "batch_size": 16384
+    "batch_size": 16384,
 }
 
 adapter = DataFusionAdapter.from_config(config)
@@ -289,10 +284,7 @@ Full support for all TPC-H queries at all scale factors:
 from benchbox import TPCH
 
 benchmark = TPCH(scale_factor=10.0)
-adapter = DataFusionAdapter(
-    memory_limit="32G",
-    data_format="parquet"
-)
+adapter = DataFusionAdapter(memory_limit="32G", data_format="parquet")
 
 results = benchmark.run_with_platform(adapter)
 ```
@@ -310,11 +302,7 @@ Good support for most TPC-DS queries (some complex queries may fail due to SQL f
 from benchbox import TPCDS
 
 benchmark = TPCDS(scale_factor=1.0)
-adapter = DataFusionAdapter(
-    memory_limit="32G",
-    data_format="parquet",
-    target_partitions=16
-)
+adapter = DataFusionAdapter(memory_limit="32G", data_format="parquet", target_partitions=16)
 
 results = benchmark.run_with_platform(adapter)
 ```
@@ -343,10 +331,7 @@ For advanced use cases requiring connection reuse or custom query execution:
 from benchbox.platforms.datafusion import DataFusionAdapter
 
 # Create adapter
-adapter = DataFusionAdapter(
-    memory_limit="16G",
-    data_format="parquet"
-)
+adapter = DataFusionAdapter(memory_limit="16G", data_format="parquet")
 
 # Create and manage connection manually
 connection = adapter.create_connection()
@@ -380,7 +365,7 @@ result = adapter.execute_query(
     query_id="custom_query_1",
     benchmark_type="tpch",
     scale_factor=1.0,
-    validate_row_count=True
+    validate_row_count=True,
 )
 
 print(f"Query completed in {result['execution_time']:.3f}s")
@@ -429,6 +414,7 @@ else:
 3. **Match partitions to CPU cores**:
    ```python
    import os
+
    adapter = DataFusionAdapter(target_partitions=os.cpu_count())
    ```
 
@@ -450,27 +436,19 @@ else:
 adapter = DataFusionAdapter(
     memory_limit="4G",
     target_partitions=4,
-    data_format="csv"  # CSV is fine for small datasets
+    data_format="csv",  # CSV is fine for small datasets
 )
 ```
 
 **Medium Scale (SF 1-10)**:
 ```python
-adapter = DataFusionAdapter(
-    memory_limit="16G",
-    target_partitions=8,
-    data_format="parquet"
-)
+adapter = DataFusionAdapter(memory_limit="16G", target_partitions=8, data_format="parquet")
 ```
 
 **Large Scale (SF 10+)**:
 ```python
 adapter = DataFusionAdapter(
-    memory_limit="64G",
-    target_partitions=16,
-    data_format="parquet",
-    temp_dir="/fast/ssd/temp",
-    batch_size=16384
+    memory_limit="64G", target_partitions=16, data_format="parquet", temp_dir="/fast/ssd/temp", batch_size=16384
 )
 ```
 
@@ -524,7 +502,7 @@ adapter = DataFusionAdapter(
 adapter = DataFusionAdapter(
     memory_limit="8G",
     data_format="csv",  # Lower memory footprint
-    temp_dir="/large/disk/temp"
+    temp_dir="/large/disk/temp",
 )
 ```
 
@@ -537,7 +515,7 @@ adapter = DataFusionAdapter(
 # Use Parquet format for better query performance
 adapter = DataFusionAdapter(
     data_format="parquet",
-    working_dir="/fast/ssd/datafusion"  # Use fast storage
+    working_dir="/fast/ssd/datafusion",  # Use fast storage
 )
 ```
 

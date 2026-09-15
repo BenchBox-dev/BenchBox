@@ -76,7 +76,7 @@ xdist's `remote.py` calls `setproctitle()` twice per test execution:
 ```python
 # xdist/remote.py lines 224-230
 worker_title("[pytest-xdist running] %s" % item.nodeid)  # before test
-worker_title("[pytest-xdist idle]")                        # after test
+worker_title("[pytest-xdist idle]")  # after test
 ```
 
 At ~100+ tests/second per worker, this generates ~200+ kernel-level process

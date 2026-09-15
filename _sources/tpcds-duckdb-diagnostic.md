@@ -16,7 +16,8 @@ DuckDB version: `1.2.2 7c039464e4` (Python binding `1.5.1`)
 
 ```python
 import duckdb
-con = duckdb.connect(':memory:')
+
+con = duckdb.connect(":memory:")
 con.execute("INSTALL tpcds; LOAD tpcds;")
 con.execute(f"CALL dsdgen(sf={sf})")
 ```

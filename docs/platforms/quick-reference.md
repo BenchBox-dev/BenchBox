@@ -179,15 +179,11 @@ from benchbox.platforms.datafusion import DataFusionAdapter
 adapter = DataFusionAdapter(
     working_dir="./datafusion_working",
     memory_limit="16G",
-    data_format="parquet"  # or "csv" for lower memory
+    data_format="parquet",  # or "csv" for lower memory
 )
 
 # Memory-constrained configuration
-adapter = DataFusionAdapter(
-    memory_limit="4G",
-    data_format="csv",
-    target_partitions=4
-)
+adapter = DataFusionAdapter(memory_limit="4G", data_format="csv", target_partitions=4)
 ```
 
 ---
@@ -202,13 +198,7 @@ adapter = DataFusionAdapter(
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-adapter = ClickHouseAdapter(
-    host="localhost",
-    port=9000,
-    database="benchmark",
-    username="default",
-    password=""
-)
+adapter = ClickHouseAdapter(host="localhost", port=9000, database="benchmark", username="default", password="")
 ```
 
 ---
@@ -228,7 +218,7 @@ adapter = DatabricksAdapter(
     http_path="/sql/1.0/warehouses/abcd1234efgh5678",
     access_token="dapi1234567890abcdef",
     catalog="hive_metastore",
-    schema="default"
+    schema="default",
 )
 ```
 
@@ -248,7 +238,7 @@ adapter = BigQueryAdapter(
     project_id="my-benchbox-project",
     dataset_id="benchbox_test",
     credentials_path="/path/to/service-account-key.json",
-    location="US"
+    location="US",
 )
 ```
 
@@ -271,7 +261,7 @@ adapter = RedshiftAdapter(
     username="admin",
     password="SecurePassword123",
     is_serverless=True,
-    workgroup_name="benchbox-workgroup"
+    workgroup_name="benchbox-workgroup",
 )
 ```
 
@@ -293,7 +283,7 @@ adapter = SnowflakeAdapter(
     password="secure_password_123",
     warehouse="COMPUTE_WH",
     database="BENCHBOX",
-    schema="PUBLIC"
+    schema="PUBLIC",
 )
 ```
 
@@ -391,6 +381,7 @@ See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) f
 ```python
 # Check file permissions
 import os
+
 os.access("benchmark.duckdb", os.W_OK)
 
 # Use absolute path
@@ -401,8 +392,9 @@ adapter = DuckDBAdapter(database_path="/full/path/to/benchmark.duckdb")
 ```python
 # Verify server is running
 import socket
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-result = sock.connect_ex(('localhost', 9000))
+result = sock.connect_ex(("localhost", 9000))
 if result == 0:
     print("ClickHouse is running")
 
@@ -411,7 +403,7 @@ adapter = ClickHouseAdapter(
     host="localhost",
     port=9000,
     username="default",
-    password=""  # Empty password for default user
+    password="",  # Empty password for default user
 )
 ```
 
@@ -419,11 +411,13 @@ adapter = ClickHouseAdapter(
 ```python
 # Verify environment variables
 import os
+
 print(f"DATABRICKS_TOKEN: {'SET' if os.getenv('DATABRICKS_TOKEN') else 'NOT SET'}")
 print(f"DATABRICKS_HOST: {os.getenv('DATABRICKS_HOST')}")
 
 # Test connection before running benchmark
 from benchbox.platforms.databricks import DatabricksAdapter
+
 adapter = DatabricksAdapter()
 try:
     adapter.test_connection()
@@ -457,11 +451,9 @@ databricks configure --token
 ```python
 # Use key-pair authentication
 from benchbox.platforms.snowflake import SnowflakeAdapter
+
 adapter = SnowflakeAdapter(
-    account="xy12345",
-    username="user",
-    private_key_path="/path/to/rsa_key.p8",
-    private_key_passphrase="passphrase"
+    account="xy12345", username="user", private_key_path="/path/to/rsa_key.p8", private_key_passphrase="passphrase"
 )
 ```
 
@@ -473,10 +465,7 @@ adapter = SnowflakeAdapter(
 adapter = DuckDBAdapter(memory_limit="4GB")
 
 # Use persistent database for large datasets
-adapter = DuckDBAdapter(
-    database_path="large_dataset.duckdb",
-    memory_limit="8GB"
-)
+adapter = DuckDBAdapter(database_path="large_dataset.duckdb", memory_limit="8GB")
 ```
 
 **ClickHouse**:
@@ -486,8 +475,8 @@ adapter = ClickHouseAdapter(
     host="localhost",
     settings={
         "max_memory_usage": "10000000000",  # 10GB
-        "max_bytes_before_external_sort": "5000000000"
-    }
+        "max_bytes_before_external_sort": "5000000000",
+    },
 )
 ```
 
@@ -495,16 +484,18 @@ adapter = ClickHouseAdapter(
 ```python
 # BigQuery: Use query cache
 from benchbox.platforms.bigquery import BigQueryAdapter
+
 adapter = BigQueryAdapter(
     maximum_bytes_billed=10000000000,  # 10GB limit
-    use_query_cache=True
+    use_query_cache=True,
 )
 
 # Snowflake: Increase warehouse size
 from benchbox.platforms.snowflake import SnowflakeAdapter
+
 adapter = SnowflakeAdapter(
     warehouse="LARGE_WH",  # or X-LARGE, 2X-LARGE
-    warehouse_size="LARGE"
+    warehouse_size="LARGE",
 )
 ```
 
@@ -514,6 +505,7 @@ adapter = SnowflakeAdapter(
 ```python
 # Enable verbose logging
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 # Run with profiling
@@ -538,26 +530,19 @@ adapter = DuckDBAdapter(database_path="cached.duckdb")
 ```python
 # Enable query optimizations
 adapter = ClickHouseAdapter(
-    host="localhost",
-    settings={
-        "max_threads": 8,
-        "optimize_read_in_order": 1,
-        "enable_filesystem_cache": 1
-    }
+    host="localhost", settings={"max_threads": 8, "optimize_read_in_order": 1, "enable_filesystem_cache": 1}
 )
 ```
 
 **Cloud Platforms**:
 ```python
 # Databricks SQL: Use larger cluster
-adapter = DatabricksAdapter(
-    http_path="/sql/1.0/warehouses/large-warehouse"
-)
+adapter = DatabricksAdapter(http_path="/sql/1.0/warehouses/large-warehouse")
 
 # BigQuery: Use batch priority for cost savings
 adapter = BigQueryAdapter(
     job_priority="BATCH",  # Slower but cheaper
-    use_legacy_sql=False
+    use_legacy_sql=False,
 )
 ```
 
@@ -614,7 +599,7 @@ adapter = ClickHouseAdapter(
     settings={
         "max_memory_usage": "20000000000",
         "max_bytes_before_external_group_by": "10000000000",
-        "max_bytes_before_external_sort": "10000000000"
+        "max_bytes_before_external_sort": "10000000000",
     }
 )
 ```
@@ -632,9 +617,7 @@ warehouses = adapter.list_warehouses()  # If implemented
 print(f"Available warehouses: {warehouses}")
 
 # Use correct HTTP path format
-adapter = DatabricksAdapter(
-    http_path="/sql/1.0/warehouses/abc123def456"
-)
+adapter = DatabricksAdapter(http_path="/sql/1.0/warehouses/abc123def456")
 ```
 
 #### BigQuery
@@ -648,7 +631,7 @@ adapter = BigQueryAdapter(
     maximum_bytes_billed=5000000000,  # 5GB limit
     job_priority="BATCH",  # Lower cost
     use_query_cache=True,  # Reuse cached results
-    dry_run=True  # Test without execution first
+    dry_run=True,  # Test without execution first
 )
 ```
 
@@ -662,7 +645,7 @@ from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
     warehouse="COMPUTE_WH",
     auto_resume=True,
-    auto_suspend=300  # 5 minutes
+    auto_suspend=300,  # 5 minutes
 )
 ```
 

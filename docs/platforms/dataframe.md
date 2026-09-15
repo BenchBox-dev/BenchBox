@@ -139,11 +139,8 @@ Libraries using string-based column access and imperative style:
 
 ```python
 # Pandas-style syntax
-df = df[df['l_shipdate'] <= cutoff]
-result = df.groupby(['l_returnflag', 'l_linestatus']).agg({
-    'l_quantity': 'sum',
-    'l_extendedprice': 'sum'
-})
+df = df[df["l_shipdate"] <= cutoff]
+result = df.groupby(["l_returnflag", "l_linestatus"]).agg({"l_quantity": "sum", "l_extendedprice": "sum"})
 ```
 
 **Members:** Pandas, cuDF, Dask, Vaex
@@ -155,12 +152,9 @@ Libraries using expression objects and declarative style:
 ```python
 # Expression-style syntax
 result = (
-    df.filter(col('l_shipdate') <= lit(cutoff))
-    .group_by('l_returnflag', 'l_linestatus')
-    .agg(
-        col('l_quantity').sum().alias('sum_qty'),
-        col('l_extendedprice').sum().alias('sum_base_price')
-    )
+    df.filter(col("l_shipdate") <= lit(cutoff))
+    .group_by("l_returnflag", "l_linestatus")
+    .agg(col("l_quantity").sum().alias("sum_qty"), col("l_extendedprice").sum().alias("sum_base_price"))
 )
 ```
 
@@ -286,8 +280,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(
             col("l_quantity").sum().alias("sum_qty"),
             col("l_extendedprice").sum().alias("sum_base_price"),
-            (col("l_extendedprice") * (lit(1) - col("l_discount")))
-                .sum().alias("sum_disc_price"),
+            (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("sum_disc_price"),
         )
         .sort("l_returnflag", "l_linestatus")
     )
@@ -305,12 +298,13 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = lineitem[lineitem["l_shipdate"] <= cutoff]
 
     result = (
-        filtered
-        .groupby(["l_returnflag", "l_linestatus"], as_index=False)
-        .agg({
-            "l_quantity": ["sum", "mean"],
-            "l_extendedprice": ["sum", "mean"],
-        })
+        filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
+        .agg(
+            {
+                "l_quantity": ["sum", "mean"],
+                "l_extendedprice": ["sum", "mean"],
+            }
+        )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
     return result
@@ -668,8 +662,8 @@ from benchbox.core.dataframe import DataFrameContext
 df = ctx.get_table("lineitem")
 
 # Expression builders (expression family)
-col = ctx.col      # Column reference
-lit = ctx.lit      # Literal value
+col = ctx.col  # Column reference
+lit = ctx.lit  # Literal value
 ```
 
 ### DataFrameQuery Class

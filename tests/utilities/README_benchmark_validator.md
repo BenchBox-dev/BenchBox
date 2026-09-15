@@ -93,11 +93,7 @@ from tests.utilities.benchmark_validator import BenchmarkValidator
 validator = BenchmarkValidator(verbose=True)
 
 # Validate single benchmark
-report = validator.validate_benchmark(
-    benchmark_name='tpch',
-    scale_factor=0.01,
-    quick_check=True
-)
+report = validator.validate_benchmark(benchmark_name="tpch", scale_factor=0.01, quick_check=True)
 
 print(f"Valid: {report.is_valid}")
 print(f"Success Rate: {report.success_rate:.1f}%")
@@ -107,13 +103,11 @@ print(f"Success Rate: {report.success_rate:.1f}%")
 ```python
 # Validate multiple benchmarks
 results = validator.validate_all_benchmarks(
-    benchmarks=['tpch', 'tpcds', 'primitives'],
-    scale_factor=0.01,
-    full_validation=True
+    benchmarks=["tpch", "tpcds", "primitives"], scale_factor=0.01, full_validation=True
 )
 
 # Generate report
-report = validator.generate_report(results, 'markdown')
+report = validator.generate_report(results, "markdown")
 print(report)
 ```
 
@@ -121,15 +115,13 @@ print(report)
 ```python
 # Schema validation only
 schema_report = validator.validate_benchmark(
-    benchmark_name='tpch',
-    validate_schema=True,
-    validate_queries=False,
-    validate_data=False
+    benchmark_name="tpch", validate_schema=True, validate_queries=False, validate_data=False
 )
 
 # Query validation with custom DuckDB connection
 import duckdb
-conn = duckdb.connect(':memory:')
+
+conn = duckdb.connect(":memory:")
 validator = BenchmarkValidator(duckdb_connection=conn)
 ```
 

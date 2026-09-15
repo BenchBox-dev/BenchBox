@@ -127,28 +127,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+
 @dataclass(frozen=True)
 class CompatibilityContext:
-    platform: str           # e.g. "starrocks", "clickhouse"
+    platform: str  # e.g. "starrocks", "clickhouse"
     platform_version: str | None  # e.g. "3.2.1"; None if not known
-    benchmark: str          # e.g. "h2odb", "write_primitives"
-    query_id: str | None    # e.g. "Q9"; None for non-query phases
-    phase: Phase            # one of the provisional Phase enum values
+    benchmark: str  # e.g. "h2odb", "write_primitives"
+    query_id: str | None  # e.g. "Q9"; None for non-query phases
+    phase: Phase  # one of the provisional Phase enum values
     mode: Literal["sql", "dataframe"]
-    dialect: str | None     # sqlglot dialect string; None for non-SQL paths
+    dialect: str | None  # sqlglot dialect string; None for non-SQL paths
 ```
 
 ### SupportLevel
 
 ```python
 class SupportLevel(str, Enum):
-    NATIVE              = "NATIVE"               # works without modification
-    TRANSLATED          = "TRANSLATED"           # requires sqlglot translation
-    REWRITTEN           = "REWRITTEN"            # requires additional AST/string rewrite
-    INFORMATIONAL       = "INFORMATIONAL"        # runs; a platform guarantee is not enforced (renamed from DEGRADED)
-    SKIPPED_QUERY       = "SKIPPED_QUERY"        # query omitted from result set
-    SKIPPED_DDL_FRAGMENT = "SKIPPED_DDL_FRAGMENT" # auxiliary DDL suppressed; workload runs
-    BLOCKED             = "BLOCKED"              # platform×benchmark combination unsupported
+    NATIVE = "NATIVE"  # works without modification
+    TRANSLATED = "TRANSLATED"  # requires sqlglot translation
+    REWRITTEN = "REWRITTEN"  # requires additional AST/string rewrite
+    INFORMATIONAL = "INFORMATIONAL"  # runs; a platform guarantee is not enforced (renamed from DEGRADED)
+    SKIPPED_QUERY = "SKIPPED_QUERY"  # query omitted from result set
+    SKIPPED_DDL_FRAGMENT = "SKIPPED_DDL_FRAGMENT"  # auxiliary DDL suppressed; workload runs
+    BLOCKED = "BLOCKED"  # platform×benchmark combination unsupported
 ```
 
 > **Addendum (2026-04-26):** `DEGRADED` was renamed to `INFORMATIONAL` and `SKIPPED` was split
@@ -158,10 +159,10 @@ class SupportLevel(str, Enum):
 
 ```python
 class FailureMode(str, Enum):
-    NONE                 = "NONE"       # no failure expected
-    SYNTAX_ERROR         = "SYNTAX_ERROR"
-    SILENT_CORRUPTION    = "SILENT_CORRUPTION"   # runs, wrong results (e.g. StarRocks PK)
-    UNSUPPORTED_FEATURE  = "UNSUPPORTED_FEATURE"
+    NONE = "NONE"  # no failure expected
+    SYNTAX_ERROR = "SYNTAX_ERROR"
+    SILENT_CORRUPTION = "SILENT_CORRUPTION"  # runs, wrong results (e.g. StarRocks PK)
+    UNSUPPORTED_FEATURE = "UNSUPPORTED_FEATURE"
     PERFORMANCE_REGRESSION = "PERFORMANCE_REGRESSION"
 ```
 
@@ -177,39 +178,47 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Union
 
+
 @dataclass(frozen=True)
 class BlockBenchmarkPayload:
     reason: str
+
 
 @dataclass(frozen=True)
 class SkipQueryPayload:
     reason: str
     query_id: str
 
+
 @dataclass(frozen=True)
 class SelectVariantPayload:
-    variant_key: str   # key into the benchmark's variant dict (e.g. "clickhouse")
-    variant_sql: str   # the actual SQL text already in the target dialect
+    variant_key: str  # key into the benchmark's variant dict (e.g. "clickhouse")
+    variant_sql: str  # the actual SQL text already in the target dialect
+
 
 @dataclass(frozen=True)
 class RewriteQueryPayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str  # registry key → Callable[[str], str] at runtime
     description: str
+
 
 @dataclass(frozen=True)
 class RewriteDDLPayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str  # registry key → Callable[[str], str] at runtime
     description: str
+
 
 @dataclass(frozen=True)
 class SetSessionPolicyPayload:
-    settings: tuple[tuple[str, str], ...]   # key-value pairs emitted before query
-    issue_url: str | None                   # link documenting why AST rewrite is not viable
+    settings: tuple[tuple[str, str], ...]  # key-value pairs emitted before query
+    issue_url: str | None  # link documenting why AST rewrite is not viable
+
 
 @dataclass(frozen=True)
 class PostTranslatePayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str  # registry key → Callable[[str], str] at runtime
     description: str
+
 
 # NATIVE action carries no payload - use None
 CompatPayload = Union[
@@ -229,12 +238,12 @@ CompatPayload = Union[
 ```python
 @dataclass(frozen=True)
 class CompatibilityDecision:
-    rule_id: str              # "{phase}.{platform}.{scope}.{slug}"
+    rule_id: str  # "{phase}.{platform}.{scope}.{slug}"
     action: CompatAction
     support_level: SupportLevel
     failure_mode: FailureMode
-    payload: CompatPayload    # typed per action; None for NATIVE
-    reason: str               # human-readable rationale
+    payload: CompatPayload  # typed per action; None for NATIVE
+    reason: str  # human-readable rationale
 ```
 
 ### Structured Capability Example - StarRocks PK
@@ -521,12 +530,15 @@ plan without re-querying the registry.
 from __future__ import annotations
 from dataclasses import dataclass, field
 
+
 @dataclass(frozen=True)
 class PhasedDecision:
     """One resolved decision keyed by (query_id | None, Phase)."""
+
     query_id: str | None
     phase: Phase
     decision: CompatibilityDecision
+
 
 @dataclass
 class CompilationPlan:

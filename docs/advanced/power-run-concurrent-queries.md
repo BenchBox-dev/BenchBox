@@ -66,8 +66,8 @@ from benchbox import TPCH
 # Configure power run settings
 config_helper = ExecutionConfigHelper()
 config_helper.enable_power_run_iterations(
-    iterations=5,           # 5 test iterations
-    warm_up_iterations=2    # 2 warm-up iterations
+    iterations=5,  # 5 test iterations
+    warm_up_iterations=2,  # 2 warm-up iterations
 )
 
 # Create benchmark
@@ -76,13 +76,12 @@ tpch = TPCH(scale_factor=0.1)
 # Execute power runs
 power_executor = PowerRunExecutor()
 
+
 def create_power_test():
     from benchbox.core.tpch.power_test import TPCHPowerTest
-    return TPCHPowerTest(
-        benchmark=tpch,
-        connection_string="duckdb:test.db",
-        scale_factor=0.1
-    )
+
+    return TPCHPowerTest(benchmark=tpch, connection_string="duckdb:test.db", scale_factor=0.1)
+
 
 result = power_executor.execute_power_runs(create_power_test)
 
@@ -107,12 +106,7 @@ degrees_freedom = len(power_values) - 1
 sample_mean = np.mean(power_values)
 sample_standard_error = stats.sem(power_values)
 
-confidence_interval = stats.t.interval(
-    confidence_level,
-    degrees_freedom,
-    sample_mean,
-    sample_standard_error
-)
+confidence_interval = stats.t.interval(confidence_level, degrees_freedom, sample_mean, sample_standard_error)
 
 print(f"95% Confidence Interval: {confidence_interval[0]:.2f} - {confidence_interval[1]:.2f}")
 print(f"Coefficient of Variation: {(result.power_at_size_stdev / result.avg_power_at_size) * 100:.1f}%")
@@ -203,14 +197,17 @@ tpch = TPCH(scale_factor=0.1)
 # Execute concurrent queries
 concurrent_executor = ConcurrentQueryExecutor()
 
+
 def create_throughput_test(stream_id):
     from benchbox.core.tpch.throughput_test import TPCHThroughputTest
+
     return TPCHThroughputTest(
         benchmark=tpch,
         connection_string=f"duckdb:stream_{stream_id}.db",
         num_streams=1,  # Each executor handles one stream
-        verbose=False
+        verbose=False,
     )
+
 
 result = concurrent_executor.execute_concurrent_queries(create_throughput_test)
 
@@ -231,15 +228,12 @@ for level in concurrency_levels:
     print(f"\nTesting with {level} concurrent streams...")
 
     config_helper.get_concurrent_queries_settings().max_concurrent = level
-    result = concurrent_executor.execute_concurrent_queries(
-        create_throughput_test,
-        num_streams=level
-    )
+    result = concurrent_executor.execute_concurrent_queries(create_throughput_test, num_streams=level)
 
     throughput_results[level] = {
-        'throughput': result.throughput_queries_per_second,
-        'success_rate': result.queries_successful / result.queries_executed,
-        'avg_duration': result.total_duration / level
+        "throughput": result.throughput_queries_per_second,
+        "success_rate": result.queries_successful / result.queries_executed,
+        "avg_duration": result.total_duration / level,
     }
 
 # Analyze scalability
@@ -247,11 +241,10 @@ print(f"\n Scalability Analysis:")
 print(f"{'Streams':<8} {'Throughput':<12} {'Success Rate':<12} {'Scalability':<12}")
 print("-" * 50)
 
-base_throughput = throughput_results[1]['throughput']
+base_throughput = throughput_results[1]["throughput"]
 for level, metrics in throughput_results.items():
-    scalability = metrics['throughput'] / base_throughput
-    print(f"{level:<8} {metrics['throughput']:<12.2f} "
-          f"{metrics['success_rate']:<12.1%} {scalability:<12.2f}x")
+    scalability = metrics["throughput"] / base_throughput
+    print(f"{level:<8} {metrics['throughput']:<12.2f} {metrics['success_rate']:<12.1%} {scalability:<12.2f}x")
 ```
 
 ## System Optimization
@@ -306,13 +299,11 @@ from benchbox.utils import ExecutionConfigHelper, PowerRunExecutor, ConcurrentQu
 
 # 1. System Analysis and Optimization
 config_helper = ExecutionConfigHelper()
-config_helper.apply_performance_profile('thorough')  # Comprehensive testing
+config_helper.apply_performance_profile("thorough")  # Comprehensive testing
 
 import psutil
-config_helper.optimize_for_system(
-    cpu_cores=psutil.cpu_count(),
-    memory_gb=psutil.virtual_memory().total / (1024**3)
-)
+
+config_helper.optimize_for_system(cpu_cores=psutil.cpu_count(), memory_gb=psutil.virtual_memory().total / (1024**3))
 
 # 2. Benchmark Setup
 tpch = TPCH(scale_factor=1.0)  # Production scale
@@ -321,15 +312,14 @@ tpch = TPCH(scale_factor=1.0)  # Production scale
 print("Phase 1: Power Run Analysis")
 power_executor = PowerRunExecutor(config_helper.config_manager)
 
+
 def create_power_test():
     from benchbox.core.tpch.power_test import TPCHPowerTest
+
     return TPCHPowerTest(
-        benchmark=tpch,
-        connection_string="duckdb:production_test.db",
-        scale_factor=1.0,
-        warm_up=True,
-        validation=True
+        benchmark=tpch, connection_string="duckdb:production_test.db", scale_factor=1.0, warm_up=True, validation=True
     )
+
 
 power_result = power_executor.execute_power_runs(create_power_test)
 
@@ -342,14 +332,14 @@ print(f"  Range: {power_result.min_power_at_size:.2f} - {power_result.max_power_
 print("\nPhase 2: Concurrent Throughput Analysis")
 concurrent_executor = ConcurrentQueryExecutor(config_helper.config_manager)
 
+
 def create_throughput_test(stream_id):
     from benchbox.core.tpch.throughput_test import TPCHThroughputTest
+
     return TPCHThroughputTest(
-        benchmark=tpch,
-        connection_string=f"duckdb:throughput_stream_{stream_id}.db",
-        num_streams=1,
-        verbose=False
+        benchmark=tpch, connection_string=f"duckdb:throughput_stream_{stream_id}.db", num_streams=1, verbose=False
     )
+
 
 concurrent_result = concurrent_executor.execute_concurrent_queries(create_throughput_test)
 
@@ -471,9 +461,9 @@ config.max_concurrent = 4  # Each stream gets different permutation (0, 1, 2, 3)
 Check result compliance:
 ```python
 # Verify first query in TPC-H power test uses stream permutation
-assert result.query_results[0]['query_id'] == 14  # Stream 0 starts with query 14
-assert result.query_results[0]['stream_id'] == 0   # Stream ID recorded
-assert result.query_results[0]['position'] == 1    # Position in permutation
+assert result.query_results[0]["query_id"] == 14  # Stream 0 starts with query 14
+assert result.query_results[0]["stream_id"] == 0  # Stream ID recorded
+assert result.query_results[0]["position"] == 1  # Position in permutation
 ```
 
 For detailed compliance documentation, see:

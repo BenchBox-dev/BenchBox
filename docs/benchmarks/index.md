@@ -365,7 +365,7 @@ from benchbox import TPCH, TPCDS, JoinOrder
 benchmarks = {
     "tpch": TPCH(scale_factor=1.0),
     "tpcds": TPCDS(scale_factor=1.0),
-    "joinorder": JoinOrder(scale_factor=1.0)
+    "joinorder": JoinOrder(scale_factor=1.0),
 }
 
 # Run full suite
@@ -380,12 +380,7 @@ from benchbox import ReadPrimitives
 
 # Focused regression detection
 read_primitives = ReadPrimitives(scale_factor=0.001)  # Fast execution
-regression_queries = [
-    "aggregation_basic",
-    "join_inner_simple",
-    "filter_selective",
-    "sort_large_result"
-]
+regression_queries = ["aggregation_basic", "join_inner_simple", "filter_selective", "sort_large_result"]
 
 # Compare against baseline
 for query_id in regression_queries:

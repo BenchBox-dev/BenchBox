@@ -95,7 +95,7 @@ from benchbox import TPCH
 adapter = FabricWarehouseAdapter(
     workspace="your-workspace-guid",
     warehouse="your_warehouse_name",
-    auth_method="default_credential"  # Uses Azure CLI or managed identity
+    auth_method="default_credential",  # Uses Azure CLI or managed identity
 )
 
 # Initialize benchmark
@@ -119,9 +119,7 @@ Uses Azure CLI, managed identity, or environment variables:
 
 ```python
 adapter = FabricWarehouseAdapter(
-    workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
-    auth_method="default_credential"
+    workspace="your-workspace-guid", warehouse="your_warehouse_name", auth_method="default_credential"
 )
 ```
 
@@ -144,7 +142,7 @@ adapter = FabricWarehouseAdapter(
     auth_method="service_principal",
     tenant_id="your-tenant-id",
     client_id="your-client-id",
-    client_secret="your-client-secret"
+    client_secret="your-client-secret",
 )
 ```
 
@@ -158,9 +156,7 @@ For development/testing:
 
 ```python
 adapter = FabricWarehouseAdapter(
-    workspace="your-workspace-guid",
-    warehouse="your_warehouse_name",
-    auth_method="interactive"
+    workspace="your-workspace-guid", warehouse="your_warehouse_name", auth_method="interactive"
 )
 ```
 
@@ -250,18 +246,14 @@ By default, BenchBox disables Fabric's result cache for accurate benchmarking:
 adapter = FabricWarehouseAdapter(
     workspace="...",
     warehouse="...",
-    disable_result_cache=True  # Default
+    disable_result_cache=True,  # Default
 )
 ```
 
 To enable (for production-like testing):
 
 ```python
-adapter = FabricWarehouseAdapter(
-    workspace="...",
-    warehouse="...",
-    disable_result_cache=False
-)
+adapter = FabricWarehouseAdapter(workspace="...", warehouse="...", disable_result_cache=False)
 ```
 
 ### Capacity Considerations

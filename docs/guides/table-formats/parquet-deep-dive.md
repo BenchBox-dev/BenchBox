@@ -120,7 +120,7 @@ BenchBox enables dictionary encoding by default (`use_dictionary=True`). For fin
 
 ```python
 DataFrameWriteConfiguration(
-    dictionary_columns=["l_returnflag", "l_shipmode"],    # Force dictionary
+    dictionary_columns=["l_returnflag", "l_shipmode"],  # Force dictionary
     skip_dictionary_columns=["l_comment", "l_orderkey"],  # Skip dictionary
 )
 ```

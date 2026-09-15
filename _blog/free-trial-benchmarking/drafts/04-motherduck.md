@@ -101,7 +101,7 @@ MotherDuck's killer feature is the local+cloud hybrid:
 import duckdb
 
 # Connect to MotherDuck (cloud)
-conn = duckdb.connect('md:my_database')
+conn = duckdb.connect("md:my_database")
 
 # Query cloud data
 conn.execute("SELECT * FROM cloud_table LIMIT 10")

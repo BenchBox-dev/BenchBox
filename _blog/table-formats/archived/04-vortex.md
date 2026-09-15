@@ -155,7 +155,8 @@ For DuckDB, we use the native extension when available (faster). We fall back to
 ```python
 # Python vortex library
 import vortex
-array = vortex.io.read('customer.vortex')
+
+array = vortex.io.read("customer.vortex")
 table = array.to_arrow()
 
 # DuckDB (requires extension)

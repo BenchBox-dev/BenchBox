@@ -689,11 +689,7 @@ class RegressionDetector:
 
         return query_timings
 
-    def compare_queries(
-        self,
-        baseline_timings: Dict[str, float],
-        current_timings: Dict[str, float]
-    ) -> List[dict]:
+    def compare_queries(self, baseline_timings: Dict[str, float], current_timings: Dict[str, float]) -> List[dict]:
         """Compare query-level performance."""
         comparisons = []
 
@@ -709,23 +705,20 @@ class RegressionDetector:
 
             change_pct = ((current_time - baseline_time) / baseline_time) * 100
 
-            comparisons.append({
-                "query_id": query_id,
-                "baseline_time": baseline_time,
-                "current_time": current_time,
-                "change_pct": change_pct,
-                "is_regression": change_pct > self.threshold,
-                "is_improvement": change_pct < -self.threshold
-            })
+            comparisons.append(
+                {
+                    "query_id": query_id,
+                    "baseline_time": baseline_time,
+                    "current_time": current_time,
+                    "change_pct": change_pct,
+                    "is_regression": change_pct > self.threshold,
+                    "is_improvement": change_pct < -self.threshold,
+                }
+            )
 
         return comparisons
 
-    def generate_report(
-        self,
-        baseline: dict,
-        current: dict,
-        comparisons: List[dict]
-    ) -> str:
+    def generate_report(self, baseline: dict, current: dict, comparisons: List[dict]) -> str:
         """Generate detailed regression report."""
         # Overall metrics
         baseline_timing = baseline.get("results", {}).get("timing", {})
@@ -792,11 +785,7 @@ class RegressionDetector:
 
         return report
 
-    def detect_regressions(
-        self,
-        baseline_path: Path,
-        current_path: Path
-    ) -> bool:
+    def detect_regressions(self, baseline_path: Path, current_path: Path) -> bool:
         """Main regression detection logic."""
         baseline = self.load_results(baseline_path)
         current = self.load_results(current_path)
@@ -883,6 +872,7 @@ Send results to Slack:
 import requests
 import json
 
+
 def send_slack_notification(webhook_url: str, results: dict):
     """Send benchmark results to Slack."""
     benchmark_name = results.get("benchmark", {}).get("name", "Unknown")
@@ -894,26 +884,21 @@ def send_slack_notification(webhook_url: str, results: dict):
 
     message = {
         "blocks": [
-            {
-                "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": f"Benchmark Results: {benchmark_name}"
-                }
-            },
+            {"type": "header", "text": {"type": "plain_text", "text": f"Benchmark Results: {benchmark_name}"}},
             {
                 "type": "section",
                 "fields": [
                     {"type": "mrkdwn", "text": f"*Execution ID:*\n{execution_id}"},
                     {"type": "mrkdwn", "text": f"*Total Queries:*\n{total_queries}"},
                     {"type": "mrkdwn", "text": f"*Average Time:*\n{avg_time:.3f}s"},
-                ]
-            }
+                ],
+            },
         ]
     }
 
     response = requests.post(webhook_url, json=message)
     response.raise_for_status()
+
 
 # Usage
 webhook = os.environ.get("SLACK_WEBHOOK_URL")

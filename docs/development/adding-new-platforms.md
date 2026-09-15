@@ -143,6 +143,7 @@ All platform adapters inherit from `PlatformAdapter` in `benchbox/platforms/base
 ```python
 from benchbox.platforms.base import PlatformAdapter
 
+
 class NewDatabaseAdapter(PlatformAdapter):
     """Adapter for NewDatabase platform."""
 
@@ -220,6 +221,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
 class NewDatabaseAdapter(PlatformAdapter):
     """NewDatabase platform adapter with performance optimizations."""
 
@@ -237,15 +239,15 @@ class NewDatabaseAdapter(PlatformAdapter):
             raise ImportError("NewDatabase client not installed. Install with: uv add newdatabase-python")
 
         # Platform-specific configuration
-        self.host = config.get('host', 'localhost')
-        self.port = config.get('port', 5432)  # Default port
-        self.database = config.get('database', 'benchbox')
-        self.username = config.get('username', 'user')
-        self.password = config.get('password', '')
+        self.host = config.get("host", "localhost")
+        self.port = config.get("port", 5432)  # Default port
+        self.database = config.get("database", "benchbox")
+        self.username = config.get("username", "user")
+        self.password = config.get("password", "")
 
         # Performance settings
-        self.connection_pool_size = config.get('connection_pool_size', 5)
-        self.query_timeout = config.get('query_timeout', 300)
+        self.connection_pool_size = config.get("connection_pool_size", 5)
+        self.query_timeout = config.get("query_timeout", 300)
 
     @property
     def platform_name(self) -> str:
@@ -277,21 +279,16 @@ def create_connection(self, **connection_config) -> Any:
     self.handle_existing_database(**connection_config)
 
     # Get connection parameters
-    host = connection_config.get('host', self.host)
-    port = connection_config.get('port', self.port)
-    database = connection_config.get('database', self.database)
-    username = connection_config.get('username', self.username)
-    password = connection_config.get('password', self.password)
+    host = connection_config.get("host", self.host)
+    port = connection_config.get("port", self.port)
+    database = connection_config.get("database", self.database)
+    username = connection_config.get("username", self.username)
+    password = connection_config.get("password", self.password)
 
     try:
         # Create database connection (DB API 2.0 compliant)
         connection = newdatabase.connect(
-            host=host,
-            port=port,
-            database=database,
-            username=username,
-            password=password,
-            timeout=self.query_timeout
+            host=host, port=port, database=database, username=username, password=password, timeout=self.query_timeout
         )
 
         # Test connection using standard DB API 2.0 cursor pattern
@@ -307,18 +304,19 @@ def create_connection(self, **connection_config) -> Any:
         logger.error(f"Failed to connect to NewDatabase: {e}")
         raise
 
+
 def check_server_database_exists(self, **connection_config) -> bool:
     """Check if database exists on NewDatabase server."""
     try:
         # Create admin connection (without specifying database)
         admin_connection = newdatabase.connect(
-            host=connection_config.get('host', self.host),
-            port=connection_config.get('port', self.port),
-            username=connection_config.get('username', self.username),
-            password=connection_config.get('password', self.password)
+            host=connection_config.get("host", self.host),
+            port=connection_config.get("port", self.port),
+            username=connection_config.get("username", self.username),
+            password=connection_config.get("password", self.password),
         )
 
-        database = connection_config.get('database', self.database)
+        database = connection_config.get("database", self.database)
 
         # Check if database exists
         cursor = admin_connection.cursor()
@@ -330,20 +328,21 @@ def check_server_database_exists(self, **connection_config) -> bool:
     except Exception:
         return False
     finally:
-        if 'admin_connection' in locals() and admin_connection:
+        if "admin_connection" in locals() and admin_connection:
             admin_connection.close()
+
 
 def drop_database(self, **connection_config) -> None:
     """Drop database on NewDatabase server."""
     try:
         admin_connection = newdatabase.connect(
-            host=connection_config.get('host', self.host),
-            port=connection_config.get('port', self.port),
-            username=connection_config.get('username', self.username),
-            password=connection_config.get('password', self.password)
+            host=connection_config.get("host", self.host),
+            port=connection_config.get("port", self.port),
+            username=connection_config.get("username", self.username),
+            password=connection_config.get("password", self.password),
         )
 
-        database = connection_config.get('database', self.database)
+        database = connection_config.get("database", self.database)
 
         cursor = admin_connection.cursor()
         cursor.execute(f"DROP DATABASE IF EXISTS {database}")
@@ -352,7 +351,7 @@ def drop_database(self, **connection_config) -> None:
     except Exception as e:
         raise RuntimeError(f"Failed to drop NewDatabase database: {e}")
     finally:
-        if 'admin_connection' in locals() and admin_connection:
+        if "admin_connection" in locals() and admin_connection:
             admin_connection.close()
 ```
 
@@ -360,11 +359,7 @@ def drop_database(self, **connection_config) -> None:
 
 ```python
 def create_schema(
-    self,
-    benchmark,
-    connection: Any,
-    enable_primary_keys: bool = True,
-    enable_foreign_keys: bool = True
+    self, benchmark, connection: Any, enable_primary_keys: bool = True, enable_foreign_keys: bool = True
 ) -> float:
     """Create schema using NewDatabase-optimized table definitions."""
     start_time = time.time()
@@ -372,16 +367,15 @@ def create_schema(
     try:
         # Get base schema SQL with constraint settings
         schema_sql = benchmark.get_create_tables_sql(
-            enable_primary_keys=enable_primary_keys,
-            enable_foreign_keys=enable_foreign_keys
+            enable_primary_keys=enable_primary_keys, enable_foreign_keys=enable_foreign_keys
         )
 
         # Translate to NewDatabase dialect if needed
-        if hasattr(self, 'translate_sql'):
+        if hasattr(self, "translate_sql"):
             schema_sql = self.translate_sql(schema_sql, "duckdb")  # From DuckDB dialect
 
         # Split and execute statements
-        statements = [stmt.strip() for stmt in schema_sql.split(';') if stmt.strip()]
+        statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
         cursor = connection.cursor()
         for statement in statements:
@@ -401,13 +395,14 @@ def create_schema(
 
     return time.time() - start_time
 
+
 def _optimize_table_definition(self, statement: str) -> str:
     """Apply NewDatabase-specific table optimizations."""
-    if not statement.upper().startswith('CREATE TABLE'):
+    if not statement.upper().startswith("CREATE TABLE"):
         return statement
 
     # Example: Add storage engine or other platform-specific options
-    if 'ENGINE' not in statement.upper():
+    if "ENGINE" not in statement.upper():
         statement += " ENGINE=InnoDB"  # Example for MySQL-like databases
 
     return statement
@@ -422,7 +417,7 @@ def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[st
     table_stats = {}
 
     # Get data files from benchmark
-    if hasattr(benchmark, 'tables') and benchmark.tables:
+    if hasattr(benchmark, "tables") and benchmark.tables:
         data_files = benchmark.tables
     else:
         raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
@@ -471,23 +466,26 @@ def load_data(self, benchmark, connection: Any, data_dir: Path) -> Tuple[Dict[st
 
     return table_stats, total_time
 
+
 def _supports_bulk_copy(self) -> bool:
     """Check if platform supports efficient bulk loading."""
     return True  # Implement based on platform capabilities
 
+
 def _build_copy_command(self, table_name: str, file_path: Path) -> str:
     """Build platform-specific COPY command."""
-    delimiter = '|' if file_path.suffix == '.tbl' else ','
+    delimiter = "|" if file_path.suffix == ".tbl" else ","
     return f"""
         COPY {table_name} FROM '{file_path}'
         WITH (FORMAT CSV, DELIMITER '{delimiter}', HEADER FALSE)
     """
 
+
 def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
     """Load data via INSERT statements (fallback method)."""
-    delimiter = '|' if file_path.suffix == '.tbl' else ','
+    delimiter = "|" if file_path.suffix == ".tbl" else ","
 
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         batch = []
         batch_size = 1000
 
@@ -497,7 +495,7 @@ def _load_via_inserts(self, cursor, table_name: str, file_path: Path):
                 line = line[:-1]  # Remove trailing delimiter
 
             values = line.split(delimiter)
-            placeholders = ','.join(['?' for _ in values])
+            placeholders = ",".join(["?" for _ in values])
 
             if not batch:
                 insert_sql = f"INSERT INTO {table_name} VALUES ({placeholders})"
@@ -575,25 +573,26 @@ def execute_query(self, connection: Any, query: str, query_id: str) -> Dict[str,
         cursor.close()
 
         return {
-            'query_id': query_id,
-            'status': 'SUCCESS',
-            'execution_time': execution_time,
-            'rows_returned': len(results),
-            'first_row': results[0] if results else None,
-            'platform_metrics': query_metrics
+            "query_id": query_id,
+            "status": "SUCCESS",
+            "execution_time": execution_time,
+            "rows_returned": len(results),
+            "first_row": results[0] if results else None,
+            "platform_metrics": query_metrics,
         }
 
     except Exception as e:
         execution_time = time.time() - start_time
 
         return {
-            'query_id': query_id,
-            'status': 'FAILED',
-            'execution_time': execution_time,
-            'rows_returned': 0,
-            'error': str(e),
-            'error_type': type(e).__name__
+            "query_id": query_id,
+            "status": "FAILED",
+            "execution_time": execution_time,
+            "rows_returned": 0,
+            "error": str(e),
+            "error_type": type(e).__name__,
         }
+
 
 def _apply_query_optimizations(self, cursor):
     """Apply platform-specific query optimizations."""
@@ -601,26 +600,28 @@ def _apply_query_optimizations(self, cursor):
     cursor.execute("SET query_cache = ON")
     cursor.execute("SET optimizer_mode = 'performance'")
 
+
 def _get_query_metrics(self, cursor) -> Dict[str, Any]:
     """Get platform-specific query execution metrics."""
     try:
         # Example: Get query stats if platform supports it
         cursor.execute("SHOW QUERY STATS")
         stats = cursor.fetchall()
-        return {'query_stats': stats}
+        return {"query_stats": stats}
     except:
         return {}
+
 
 def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
     """Apply platform optimizations based on benchmark type."""
     cursor = connection.cursor()
 
-    if benchmark_type.lower() in ['olap', 'analytics', 'tpch', 'tpcds']:
+    if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
         # OLAP optimizations
         cursor.execute("SET join_algorithm = 'hash'")
         cursor.execute("SET parallel_workers = 8")
         cursor.execute("SET work_mem = '256MB'")
-    elif benchmark_type.lower() in ['oltp', 'transactional']:
+    elif benchmark_type.lower() in ["oltp", "transactional"]:
         # OLTP optimizations
         cursor.execute("SET synchronous_commit = ON")
         cursor.execute("SET random_page_cost = 1.1")
@@ -633,12 +634,7 @@ def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
 ```python
 def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
     """Get platform-specific metadata and system information."""
-    metadata = {
-        "platform": self.platform_name,
-        "host": self.host,
-        "port": self.port,
-        "database": self.database
-    }
+    metadata = {"platform": self.platform_name, "host": self.host, "port": self.port, "database": self.database}
 
     try:
         cursor = connection.cursor()
@@ -666,12 +662,7 @@ def _get_platform_metadata(self, connection: Any) -> Dict[str, Any]:
 
         tables = cursor.fetchall()
         metadata["tables"] = [
-            {
-                "name": table[0],
-                "rows": table[1],
-                "data_size": table[2],
-                "index_size": table[3]
-            } for table in tables
+            {"name": table[0], "rows": table[1], "data_size": table[2], "index_size": table[3]} for table in tables
         ]
 
         cursor.close()
@@ -689,15 +680,17 @@ def supports_tuning_type(self, tuning_type) -> bool:
     """Check if NewDatabase supports a specific tuning type."""
     try:
         from benchbox.core.tuning.interface import TuningType
+
         # Define supported tuning types for this platform
         supported_types = {
-            TuningType.SORTING,      # Supports indexes
-            TuningType.CLUSTERING,   # Supports clustered indexes
-            TuningType.PARTITIONING  # Supports table partitioning
+            TuningType.SORTING,  # Supports indexes
+            TuningType.CLUSTERING,  # Supports clustered indexes
+            TuningType.PARTITIONING,  # Supports table partitioning
         }
         return tuning_type in supported_types
     except ImportError:
         return False
+
 
 def generate_tuning_clause(self, table_tuning) -> str:
     """Generate platform-specific tuning clauses for CREATE TABLE."""
@@ -727,6 +720,7 @@ def generate_tuning_clause(self, table_tuning) -> str:
         pass
 
     return " ".join(clauses)
+
 
 def apply_table_tunings(self, table_tuning, connection: Any) -> None:
     """Apply tuning configurations to a table after creation."""
@@ -766,10 +760,12 @@ def run_power_test(self, benchmark, **kwargs) -> Dict[str, Any]:
     """Run TPC power test measuring single-stream query performance."""
     return self.run_benchmark(benchmark, **kwargs).__dict__
 
+
 def run_throughput_test(self, benchmark, **kwargs) -> Dict[str, Any]:
     """Run TPC throughput test measuring concurrent multi-stream performance."""
     # For now, run as single stream - extend for true multi-stream later
     return self.run_power_test(benchmark, **kwargs)
+
 
 def run_maintenance_test(self, benchmark, **kwargs) -> Dict[str, Any]:
     """Run TPC maintenance test measuring data modification performance."""
@@ -858,19 +854,14 @@ import pytest
 from unittest.mock import Mock, patch, MagicMock
 from benchbox.platforms.newdatabase import NewDatabaseAdapter
 
+
 class TestNewDatabaseAdapter:
     """Test cases for NewDatabase platform adapter."""
 
     @pytest.fixture
     def adapter(self):
         """Create adapter instance for testing."""
-        return NewDatabaseAdapter(
-            host='localhost',
-            port=5432,
-            database='test',
-            username='test',
-            password='test'
-        )
+        return NewDatabaseAdapter(host="localhost", port=5432, database="test", username="test", password="test")
 
     def test_platform_name(self, adapter):
         """Test platform name property."""
@@ -880,7 +871,7 @@ class TestNewDatabaseAdapter:
         """Test SQL dialect identifier."""
         assert adapter.get_target_dialect() == "newdatabase"
 
-    @patch('newdatabase.connect')
+    @patch("newdatabase.connect")
     def test_create_connection_success(self, mock_connect, adapter):
         """Test successful connection creation."""
         mock_connection = Mock()
@@ -894,7 +885,7 @@ class TestNewDatabaseAdapter:
         mock_connect.assert_called_once()
         mock_cursor.execute.assert_called_with("SELECT 1")
 
-    @patch('newdatabase.connect')
+    @patch("newdatabase.connect")
     def test_create_connection_failure(self, mock_connect, adapter):
         """Test connection failure handling."""
         mock_connect.side_effect = Exception("Connection failed")
@@ -934,8 +925,8 @@ class TestNewDatabaseAdapter:
         mock_cursor.fetchone.return_value = (2,)  # Row count
         mock_connection.cursor.return_value = mock_cursor
 
-        with patch.object(adapter, '_supports_bulk_copy', return_value=True):
-            with patch.object(adapter, '_build_copy_command', return_value="COPY test_table FROM 'file'"):
+        with patch.object(adapter, "_supports_bulk_copy", return_value=True):
+            with patch.object(adapter, "_build_copy_command", return_value="COPY test_table FROM 'file'"):
                 table_stats, load_time = adapter.load_data(mock_benchmark, mock_connection, tmp_path)
 
         assert table_stats["TEST_TABLE"] == 2
@@ -945,15 +936,15 @@ class TestNewDatabaseAdapter:
         """Test successful query execution."""
         mock_connection = Mock()
         mock_cursor = Mock()
-        mock_cursor.fetchall.return_value = [(1, 'test'), (2, 'data')]
+        mock_cursor.fetchall.return_value = [(1, "test"), (2, "data")]
         mock_connection.cursor.return_value = mock_cursor
 
         result = adapter.execute_query(mock_connection, "SELECT * FROM test", "Q1")
 
-        assert result['status'] == 'SUCCESS'
-        assert result['query_id'] == 'Q1'
-        assert result['rows_returned'] == 2
-        assert result['execution_time'] > 0
+        assert result["status"] == "SUCCESS"
+        assert result["query_id"] == "Q1"
+        assert result["rows_returned"] == 2
+        assert result["execution_time"] > 0
 
     def test_query_execution_failure(self, adapter):
         """Test query execution error handling."""
@@ -964,10 +955,10 @@ class TestNewDatabaseAdapter:
 
         result = adapter.execute_query(mock_connection, "INVALID SQL", "Q1")
 
-        assert result['status'] == 'FAILED'
-        assert result['query_id'] == 'Q1'
-        assert result['rows_returned'] == 0
-        assert 'SQL error' in result['error']
+        assert result["status"] == "FAILED"
+        assert result["query_id"] == "Q1"
+        assert result["rows_returned"] == 0
+        assert "SQL error" in result["error"]
 
     def test_platform_metadata(self, adapter):
         """Test platform metadata collection."""
@@ -979,9 +970,10 @@ class TestNewDatabaseAdapter:
 
         metadata = adapter._get_platform_metadata(mock_connection)
 
-        assert metadata['platform'] == 'NewDatabase'
-        assert metadata['version'] == 'NewDatabase 1.0'
-        assert 'settings' in metadata
+        assert metadata["platform"] == "NewDatabase"
+        assert metadata["version"] == "NewDatabase 1.0"
+        assert "settings" in metadata
+
 
 # Integration tests
 class TestNewDatabaseIntegration:
@@ -994,11 +986,11 @@ class TestNewDatabaseIntegration:
         pytest.importorskip("newdatabase")
 
         return NewDatabaseAdapter(
-            host=os.getenv('NEWDATABASE_HOST', 'localhost'),
-            port=int(os.getenv('NEWDATABASE_PORT', '5432')),
-            database=os.getenv('NEWDATABASE_DATABASE', 'test'),
-            username=os.getenv('NEWDATABASE_USERNAME', 'test'),
-            password=os.getenv('NEWDATABASE_PASSWORD', 'test')
+            host=os.getenv("NEWDATABASE_HOST", "localhost"),
+            port=int(os.getenv("NEWDATABASE_PORT", "5432")),
+            database=os.getenv("NEWDATABASE_DATABASE", "test"),
+            username=os.getenv("NEWDATABASE_USERNAME", "test"),
+            password=os.getenv("NEWDATABASE_PASSWORD", "test"),
         )
 
     @pytest.mark.integration
@@ -1009,7 +1001,7 @@ class TestNewDatabaseIntegration:
         benchmark = ReadPrimitives(scale_factor=0.001)
         results = integration_adapter.run_benchmark(benchmark)
 
-        assert results.status == 'SUCCESS'
+        assert results.status == "SUCCESS"
         assert results.total_time > 0
         assert len(results.query_results) > 0
 ```
@@ -1073,12 +1065,7 @@ from benchbox.platforms.newdatabase import NewDatabaseAdapter
 
 # Test with minimal benchmark
 benchmark = ReadPrimitives(scale_factor=0.001)
-adapter = NewDatabaseAdapter(
-    host="localhost",
-    database="test",
-    username="test",
-    password="test"
-)
+adapter = NewDatabaseAdapter(host="localhost", database="test", username="test", password="test")
 
 results = adapter.run_benchmark(benchmark)
 print(f"Benchmark completed in {results.total_time:.2f}s")
@@ -1138,11 +1125,11 @@ def _parse_connection_string(self, conn_str: str) -> Dict[str, str]:
         raise ValueError(f"Invalid connection string: {conn_str}")
 
     return {
-        'username': match.group(1) or '',
-        'password': match.group(2) or '',
-        'host': match.group(3),
-        'port': int(match.group(4)),
-        'database': match.group(5)
+        "username": match.group(1) or "",
+        "password": match.group(2) or "",
+        "host": match.group(3),
+        "port": int(match.group(4)),
+        "database": match.group(5),
     }
 ```
 
@@ -1160,7 +1147,7 @@ def _execute_with_retry(self, cursor, query: str, max_retries: int = 3):
             if attempt == max_retries - 1:
                 raise
 
-            wait_time = 2 ** attempt  # Exponential backoff
+            wait_time = 2**attempt  # Exponential backoff
             logger.warning(f"Query failed (attempt {attempt + 1}), retrying in {wait_time}s: {e}")
             time.sleep(wait_time)
 ```
@@ -1169,6 +1156,7 @@ def _execute_with_retry(self, cursor, query: str, max_retries: int = 3):
 
 ```python
 from contextlib import contextmanager
+
 
 @contextmanager
 def managed_connection(self, **config):
@@ -1180,6 +1168,7 @@ def managed_connection(self, **config):
     finally:
         if connection:
             connection.close()
+
 
 @contextmanager
 def managed_cursor(self, connection):
@@ -1204,7 +1193,7 @@ class PooledNewDatabaseAdapter(NewDatabaseAdapter):
     def __init__(self, **config):
         super().__init__(**config)
         self._connection_pool = None
-        self._pool_size = config.get('pool_size', 10)
+        self._pool_size = config.get("pool_size", 10)
 
     def _get_connection_pool(self):
         """Get or create connection pool."""
@@ -1217,7 +1206,7 @@ class PooledNewDatabaseAdapter(NewDatabaseAdapter):
                 database=self.database,
                 username=self.username,
                 password=self.password,
-                max_connections=self._pool_size
+                max_connections=self._pool_size,
             )
 
         return self._connection_pool
@@ -1234,6 +1223,7 @@ class PooledNewDatabaseAdapter(NewDatabaseAdapter):
 import asyncio
 from typing import AsyncGenerator
 
+
 class AsyncNewDatabaseAdapter(NewDatabaseAdapter):
     """Async version of NewDatabase adapter."""
 
@@ -1242,11 +1232,7 @@ class AsyncNewDatabaseAdapter(NewDatabaseAdapter):
         import newdatabase.asyncio as async_newdb
 
         return await async_newdb.connect(
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            username=self.username,
-            password=self.password
+            host=self.host, port=self.port, database=self.database, username=self.username, password=self.password
         )
 
     async def execute_query_async(self, connection, query: str, query_id: str):
@@ -1259,19 +1245,19 @@ class AsyncNewDatabaseAdapter(NewDatabaseAdapter):
             results = await cursor.fetchall()
 
             return {
-                'query_id': query_id,
-                'status': 'SUCCESS',
-                'execution_time': time.time() - start_time,
-                'rows_returned': len(results),
-                'first_row': results[0] if results else None
+                "query_id": query_id,
+                "status": "SUCCESS",
+                "execution_time": time.time() - start_time,
+                "rows_returned": len(results),
+                "first_row": results[0] if results else None,
             }
 
         except Exception as e:
             return {
-                'query_id': query_id,
-                'status': 'FAILED',
-                'execution_time': time.time() - start_time,
-                'error': str(e)
+                "query_id": query_id,
+                "status": "FAILED",
+                "execution_time": time.time() - start_time,
+                "error": str(e),
             }
 ```
 

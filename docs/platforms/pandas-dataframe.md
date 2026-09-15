@@ -138,21 +138,22 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     # Compute derived columns
     filtered = filtered.assign(
         disc_price=filtered["l_extendedprice"] * (1 - filtered["l_discount"]),
-        charge=filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
+        charge=filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"]),
     )
 
     # Aggregate
     result = (
-        filtered
-        .groupby(["l_returnflag", "l_linestatus"], as_index=False)
-        .agg({
-            "l_quantity": ["sum", "mean"],
-            "l_extendedprice": ["sum", "mean"],
-            "disc_price": "sum",
-            "charge": "sum",
-            "l_discount": "mean",
-            "l_orderkey": "count"
-        })
+        filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
+        .agg(
+            {
+                "l_quantity": ["sum", "mean"],
+                "l_extendedprice": ["sum", "mean"],
+                "disc_price": "sum",
+                "charge": "sum",
+                "l_discount": "mean",
+                "l_orderkey": "count",
+            }
+        )
         .sort_values(["l_returnflag", "l_linestatus"])
     )
 
@@ -206,10 +207,7 @@ These are safe to ignore or suppress with `--quiet`.
 from benchbox.platforms.dataframe import PandasDataFrameAdapter
 
 # Create adapter with custom configuration
-adapter = PandasDataFrameAdapter(
-    working_dir="./benchmark_data",
-    dtype_backend="pyarrow"
-)
+adapter = PandasDataFrameAdapter(working_dir="./benchmark_data", dtype_backend="pyarrow")
 
 # Create context and load tables
 ctx = adapter.create_context()
@@ -217,6 +215,7 @@ adapter.load_tables(ctx, data_dir="./tpch_data")
 
 # Execute query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
+
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)

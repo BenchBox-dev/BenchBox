@@ -151,6 +151,7 @@ When debugging is enabled (verbose mode), version information is automatically i
 ```python
 from benchbox.utils.verbosity import VerbosityMixin
 
+
 class MyClass(VerbosityMixin):
     def debug_operation(self):
         self.log_debug_info("Operation Context")
@@ -186,11 +187,9 @@ Platform adapters can access version information:
 import benchbox
 from benchbox.utils.version import format_version_report
 
+
 def report_platform_info():
-    return {
-        "benchbox_version": benchbox.__version__,
-        "version_report": format_version_report()
-    }
+    return {"benchbox_version": benchbox.__version__, "version_report": format_version_report()}
 ```
 
 ### Error Handling
@@ -203,7 +202,7 @@ from benchbox.cli.exceptions import ErrorContext, BenchboxCLIError
 context = ErrorContext(
     operation="benchmark_execution",
     stage="data_loading",
-    include_version_info=True  # Automatic version inclusion
+    include_version_info=True,  # Automatic version inclusion
 )
 ```
 

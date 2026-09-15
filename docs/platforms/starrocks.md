@@ -180,14 +180,9 @@ At runtime, BenchBox captures platform metadata:
     "platform_type": "starrocks",
     "platform_name": "StarRocks",
     "deployment_mode": "self-hosted",
-    "configuration": {
-        "host": "localhost",
-        "port": 9030,
-        "database": "benchbox_tpch_sf1",
-        "http_port": 8040
-    },
+    "configuration": {"host": "localhost", "port": 9030, "database": "benchbox_tpch_sf1", "http_port": 8040},
     "platform_version": "3.x.x",
-    "client_library_version": "1.x.x"
+    "client_library_version": "1.x.x",
 }
 ```
 

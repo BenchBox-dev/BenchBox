@@ -321,6 +321,7 @@ PySpark queries use expression-based operations:
 ```python
 from pyspark.sql import functions as F
 
+
 # TPC-H Q6: Forecasting Revenue Change
 def q6_pyspark_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
@@ -331,15 +332,12 @@ def q6_pyspark_impl(ctx: DataFrameContext) -> Any:
 
     # Apply filters
     result = (
-        lineitem
-        .filter(ctx.col("l_shipdate") >= start_date)
+        lineitem.filter(ctx.col("l_shipdate") >= start_date)
         .filter(ctx.col("l_shipdate") < end_date)
         .filter(ctx.col("l_discount") >= ctx.lit(0.05))
         .filter(ctx.col("l_discount") <= ctx.lit(0.07))
         .filter(ctx.col("l_quantity") < ctx.lit(24))
-        .select(
-            (ctx.col("l_extendedprice") * ctx.col("l_discount")).alias("revenue")
-        )
+        .select((ctx.col("l_extendedprice") * ctx.col("l_discount")).alias("revenue"))
         .agg(F.sum("revenue").alias("revenue"))
     )
 
@@ -366,20 +364,13 @@ from benchbox.platforms.dataframe import PySparkDataFrameAdapter
 adapter = PySparkDataFrameAdapter(master="local[4]")
 
 # Create window expressions
-row_num = adapter.window_row_number(
-    order_by=[("sale_date", True)],
-    partition_by=["category"]
-)
+row_num = adapter.window_row_number(order_by=[("sale_date", True)], partition_by=["category"])
 
-running_total = adapter.window_sum(
-    column="amount",
-    partition_by=["category"],
-    order_by=[("sale_date", True)]
-)
+running_total = adapter.window_sum(column="amount", partition_by=["category"], order_by=[("sale_date", True)])
 
 rank = adapter.window_rank(
     order_by=[("revenue", False)],  # Descending
-    partition_by=["region"]
+    partition_by=["region"],
 )
 ```
 
@@ -416,7 +407,7 @@ If you see port binding errors:
 adapter = PySparkDataFrameAdapter(
     master="local[*]",
     # Configure different ports
-    **{"spark.ui.port": "4050"}
+    **{"spark.ui.port": "4050"},
 )
 ```
 
@@ -461,6 +452,7 @@ result = adapter.collect(df)
 
 # Execute DataFrame query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
+
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)

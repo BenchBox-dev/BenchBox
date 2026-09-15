@@ -31,6 +31,7 @@ The single coupling point that made extraction impossible:
 sf = self.metadata.get("scale_factor")
 if sf is not None:
     from benchbox.utils.scale_factor import format_scale_factor  # <-- BLOCKED EXTRACTION
+
     parts.append(f"SF={format_scale_factor(sf)}")
 ```
 
@@ -111,8 +112,13 @@ from benchbox.core.visualization.ascii.diverging_bar import ASCIIDivergingBar, D
 **After** (single facade import):
 ```python
 from benchbox.core.visualization.ascii_api import (
-    BarChart, BarData, BoxPlot, ChartOptions,
-    Histogram, HistogramBar, ComparisonBar,
+    BarChart,
+    BarData,
+    BoxPlot,
+    ChartOptions,
+    Histogram,
+    HistogramBar,
+    ComparisonBar,
     # ... all from one module
 )
 ```
@@ -147,9 +153,7 @@ def _render_query_histogram(results, options, subtitle):
     #         -> textcharts domain (label, value)
     for (platform, query_id), timings in query_timings.items():
         mean_latency = sum(timings) / len(timings)
-        histogram_data.append(
-            HistogramBar(label=query_id, value=mean_latency, platform=platform)
-        )
+        histogram_data.append(HistogramBar(label=query_id, value=mean_latency, platform=platform))
 ```
 
 Previously the chart classes directly consumed benchmark-shaped data via field names. Now the mapping is explicit, testable, and documented.
@@ -186,6 +190,7 @@ __all__ = list(_textcharts_all)
 GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "golden" / "ascii"
 OPTS = ChartOptions(use_color=False, use_unicode=True, width=80)
 
+
 def _bar_chart() -> tuple[str, str]:
     data = [
         BarData(label="DuckDB", value=1234.5, is_best=True),
@@ -194,6 +199,7 @@ def _bar_chart() -> tuple[str, str]:
     ]
     chart = BarChart(data=data, title="Total Runtime", metric_label="ms", options=OPTS)
     return "bar_chart", chart.render()
+
 
 @pytest.mark.parametrize("name,rendered", [_bar_chart(), _histogram(), ...])
 def test_golden_output(name, rendered, update_golden):

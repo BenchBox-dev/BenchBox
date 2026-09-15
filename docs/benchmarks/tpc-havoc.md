@@ -100,6 +100,7 @@ benchmark.generate_data()
 
 # Load to database
 import duckdb
+
 conn = duckdb.connect(":memory:")
 benchmark.load_data_to_database(conn)
 
@@ -173,11 +174,7 @@ from benchbox import TPCHavoc
 benchmark = TPCHavoc(scale_factor=0.1)
 benchmark.generate_data()
 
-databases = {
-    "DuckDB": duckdb_connection,
-    "ClickHouse": clickhouse_connection,
-    "Snowflake": snowflake_connection
-}
+databases = {"DuckDB": duckdb_connection, "ClickHouse": clickhouse_connection, "Snowflake": snowflake_connection}
 
 # Run same variants on different databases
 for db_name, conn in databases.items():

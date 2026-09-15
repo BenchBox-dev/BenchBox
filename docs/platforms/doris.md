@@ -266,10 +266,10 @@ At runtime, BenchBox captures platform metadata:
         "port": 9030,
         "database": "benchbox_tpch_sf1",
         "http_port": 8030,
-        "stream_load_available": True
+        "stream_load_available": True,
     },
     "platform_version": "4.0.x",
-    "client_library_version": "1.x.x"
+    "client_library_version": "1.x.x",
 }
 ```
 

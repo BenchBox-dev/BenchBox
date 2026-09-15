@@ -186,11 +186,7 @@ for table_name in tpcds.get_available_tables():
 tpcds = TPCDS(scale_factor=1.0, output_dir="tpcds_data")
 
 # Generate multiple concurrent streams
-streams = tpcds.generate_streams(
-    num_streams=4,
-    rng_seed=42,
-    streams_output_dir="streams"
-)
+streams = tpcds.generate_streams(num_streams=4, rng_seed=42, streams_output_dir="streams")
 
 # Each stream contains a random permutation of queries
 for i, stream_info in enumerate(tpcds.get_all_streams_info()):
@@ -216,30 +212,30 @@ conn.execute(schema_sql)
 
 # Load data from DAT files
 table_mappings = {
-    'call_center': 'call_center.dat',
-    'catalog_page': 'catalog_page.dat',
-    'catalog_returns': 'catalog_returns.dat',
-    'catalog_sales': 'catalog_sales.dat',
-    'customer': 'customer.dat',
-    'customer_address': 'customer_address.dat',
-    'customer_demographics': 'customer_demographics.dat',
-    'date_dim': 'date_dim.dat',
-    'household_demographics': 'household_demographics.dat',
-    'income_band': 'income_band.dat',
-    'inventory': 'inventory.dat',
-    'item': 'item.dat',
-    'promotion': 'promotion.dat',
-    'reason': 'reason.dat',
-    'ship_mode': 'ship_mode.dat',
-    'store': 'store.dat',
-    'store_returns': 'store_returns.dat',
-    'store_sales': 'store_sales.dat',
-    'time_dim': 'time_dim.dat',
-    'warehouse': 'warehouse.dat',
-    'web_page': 'web_page.dat',
-    'web_returns': 'web_returns.dat',
-    'web_sales': 'web_sales.dat',
-    'web_site': 'web_site.dat'
+    "call_center": "call_center.dat",
+    "catalog_page": "catalog_page.dat",
+    "catalog_returns": "catalog_returns.dat",
+    "catalog_sales": "catalog_sales.dat",
+    "customer": "customer.dat",
+    "customer_address": "customer_address.dat",
+    "customer_demographics": "customer_demographics.dat",
+    "date_dim": "date_dim.dat",
+    "household_demographics": "household_demographics.dat",
+    "income_band": "income_band.dat",
+    "inventory": "inventory.dat",
+    "item": "item.dat",
+    "promotion": "promotion.dat",
+    "reason": "reason.dat",
+    "ship_mode": "ship_mode.dat",
+    "store": "store.dat",
+    "store_returns": "store_returns.dat",
+    "store_sales": "store_sales.dat",
+    "time_dim": "time_dim.dat",
+    "warehouse": "warehouse.dat",
+    "web_page": "web_page.dat",
+    "web_returns": "web_returns.dat",
+    "web_sales": "web_sales.dat",
+    "web_site": "web_site.dat",
 }
 
 for table_name, file_name in table_mappings.items():
@@ -273,14 +269,10 @@ for query_id in sample_queries:
 query_reproducible = tpcds.get_query(42, seed=12345)
 
 # Scale-aware parameter generation
-query_large = tpcds.get_query(42,
-                              seed=12345,
-                              scale_factor=100.0)
+query_large = tpcds.get_query(42, seed=12345, scale_factor=100.0)
 
 # Stream-based parameter generation
-query_stream = tpcds.get_query(42,
-                               seed=12345,
-                               stream_id=0)
+query_stream = tpcds.get_query(42, seed=12345, stream_id=0)
 ```
 
 ## Query Characteristics
@@ -419,14 +411,14 @@ allowed by default, but remain unofficial and are not compliance-valid.
 tpcds = TPCDS(
     scale_factor=1.0,
     output_dir="tpcds_data",
-    verbose=True,          # Enable detailed logging
-    parallel=8,            # Parallel data generation
-    use_c_tools=True       # Use official TPC-DS C tools
+    verbose=True,  # Enable detailed logging
+    parallel=8,  # Parallel data generation
+    use_c_tools=True,  # Use official TPC-DS C tools
 )
 
 # Access to internal components
-c_tools = tpcds.c_tools           # Direct C tool access
-query_manager = tpcds.queries     # Query management
+c_tools = tpcds.c_tools  # Direct C tool access
+query_manager = tpcds.queries  # Query management
 data_generator = tpcds.generator  # Data generation
 ```
 
@@ -467,13 +459,13 @@ import time
 from statistics import mean, median
 from typing import Dict, List
 
+
 class TPCDSBenchmark:
     def __init__(self, tpcds: TPCDS, connection):
         self.tpcds = tpcds
         self.connection = connection
 
-    def benchmark_query_set(self, query_ids: List[int],
-                           iterations: int = 3) -> Dict:
+    def benchmark_query_set(self, query_ids: List[int], iterations: int = 3) -> Dict:
         """Benchmark a set of TPC-DS queries."""
         results = {}
 
@@ -482,53 +474,40 @@ class TPCDSBenchmark:
             query_results = []
 
             for iteration in range(iterations):
-                query_sql = self.tpcds.get_query(query_id,
-                                                seed=42 + iteration,
-                                                dialect="duckdb")
+                query_sql = self.tpcds.get_query(query_id, seed=42 + iteration, dialect="duckdb")
 
                 start_time = time.time()
                 try:
                     result = self.connection.execute(query_sql).fetchall()
                     execution_time = time.time() - start_time
 
-                    query_results.append({
-                        'iteration': iteration,
-                        'time': execution_time,
-                        'rows': len(result),
-                        'status': 'success'
-                    })
+                    query_results.append(
+                        {"iteration": iteration, "time": execution_time, "rows": len(result), "status": "success"}
+                    )
                 except Exception as e:
                     execution_time = time.time() - start_time
-                    query_results.append({
-                        'iteration': iteration,
-                        'time': execution_time,
-                        'rows': 0,
-                        'status': 'error',
-                        'error': str(e)
-                    })
+                    query_results.append(
+                        {"iteration": iteration, "time": execution_time, "rows": 0, "status": "error", "error": str(e)}
+                    )
 
             # Calculate statistics
-            successful_runs = [r for r in query_results if r['status'] == 'success']
+            successful_runs = [r for r in query_results if r["status"] == "success"]
             if successful_runs:
-                times = [r['time'] for r in successful_runs]
+                times = [r["time"] for r in successful_runs]
                 results[query_id] = {
-                    'mean_time': mean(times),
-                    'median_time': median(times),
-                    'min_time': min(times),
-                    'max_time': max(times),
-                    'success_rate': len(successful_runs) / len(query_results),
-                    'avg_rows': mean([r['rows'] for r in successful_runs]),
-                    'runs': query_results
+                    "mean_time": mean(times),
+                    "median_time": median(times),
+                    "min_time": min(times),
+                    "max_time": max(times),
+                    "success_rate": len(successful_runs) / len(query_results),
+                    "avg_rows": mean([r["rows"] for r in successful_runs]),
+                    "runs": query_results,
                 }
             else:
-                results[query_id] = {
-                    'mean_time': 0,
-                    'median_time': 0,
-                    'success_rate': 0,
-                    'runs': query_results
-                }
+                results[query_id] = {"mean_time": 0, "median_time": 0, "success_rate": 0, "runs": query_results}
 
         return results
+
 
 # Usage
 benchmark = TPCDSBenchmark(tpcds, conn)
@@ -636,6 +615,7 @@ import subprocess
 import gzip
 from pathlib import Path
 
+
 def generate_table_compressed(table_name: str, scale: int, output_path: Path):
     """Generate TPC-DS table directly to compressed file."""
     dsdgen = Path("_binaries/tpc-ds/darwin-arm64/dsdgen")
@@ -643,15 +623,27 @@ def generate_table_compressed(table_name: str, scale: int, output_path: Path):
 
     with gzip.open(output_path, "wt") as f:
         proc = subprocess.Popen(
-            [str(dsdgen), "-TABLE", table_name, "-SCALE", str(scale),
-             "-FILTER", "Y", "-RNGSEED", "1", "-TERMINATE", "N"],
+            [
+                str(dsdgen),
+                "-TABLE",
+                table_name,
+                "-SCALE",
+                str(scale),
+                "-FILTER",
+                "Y",
+                "-RNGSEED",
+                "1",
+                "-TERMINATE",
+                "N",
+            ],
             cwd=tools_dir,
             stdout=subprocess.PIPE,
-            text=True
+            text=True,
         )
         for line in proc.stdout:
             f.write(line)
         proc.wait()
+
 
 # Generate compressed data
 generate_table_compressed("ship_mode", 1, Path("ship_mode.dat.gz"))

@@ -57,13 +57,8 @@ ORDER BY l_returnflag, l_linestatus
 
 **DataFrame (Polars):**
 ```python
-lineitem.filter(
-    pl.col("l_shipdate") <= date(1998, 9, 2)
-).group_by(
-    "l_returnflag", "l_linestatus"
-).agg(
-    pl.col("l_quantity").sum(),
-    pl.col("l_extendedprice").sum()
+lineitem.filter(pl.col("l_shipdate") <= date(1998, 9, 2)).group_by("l_returnflag", "l_linestatus").agg(
+    pl.col("l_quantity").sum(), pl.col("l_extendedprice").sum()
 ).sort("l_returnflag", "l_linestatus")
 ```
 

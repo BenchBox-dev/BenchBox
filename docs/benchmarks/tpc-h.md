@@ -230,11 +230,7 @@ for query_id in range(1, 23):
 
 ```python
 # Generate query streams for throughput testing
-stream_files = tpch.generate_streams(
-    num_streams=4,
-    rng_seed=42,
-    streams_output_dir="streams"
-)
+stream_files = tpch.generate_streams(num_streams=4, rng_seed=42, streams_output_dir="streams")
 
 # Get stream information
 for i, stream_info in enumerate(tpch.get_all_streams_info()):
@@ -318,16 +314,16 @@ for i, stream_info in enumerate(tpch.get_all_streams_info()):
 tpch = TPCH(
     scale_factor=1.0,
     output_dir="tpch_data",
-    verbose=True,          # Enable detailed logging
-    parallel=4             # Parallel data generation
+    verbose=True,  # Enable detailed logging
+    parallel=4,  # Parallel data generation
 )
 
 # Custom query parameters
 query = tpch.get_query(
     query_id=1,
-    seed=42,               # Reproducible parameters
-    scale_factor=1.0,      # Override scale factor
-    dialect="duckdb"       # Target dialect
+    seed=42,  # Reproducible parameters
+    scale_factor=1.0,  # Override scale factor
+    dialect="duckdb",  # Target dialect
 )
 ```
 
@@ -368,6 +364,7 @@ for query_id in range(1, 23):
 import time
 from statistics import mean, median
 
+
 def benchmark_queries(tpch, connection, query_list=None):
     """Run TPC-H performance benchmark."""
     if query_list is None:
@@ -388,14 +385,10 @@ def benchmark_queries(tpch, connection, query_list=None):
 
             times.append(execution_time)
 
-        results[query_id] = {
-            'times': times,
-            'mean': mean(times),
-            'median': median(times),
-            'rows': len(result)
-        }
+        results[query_id] = {"times": times, "mean": mean(times), "median": median(times), "rows": len(result)}
 
     return results
+
 
 # Usage
 results = benchmark_queries(tpch, conn)

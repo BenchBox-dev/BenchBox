@@ -121,10 +121,11 @@ Run the two queries directly and record the maximum absolute difference:
 
 ```python
 import duckdb, datafusion
+
 # ... set up connections (see test_cross_platform.py fixtures for reference) ...
 duck_val = float(duck_rows[0][0])
-df_val   = float(df_rows[0][0])
-print(abs(duck_val - df_val))   # e.g. 6.2e-07
+df_val = float(df_rows[0][0])
+print(abs(duck_val - df_val))  # e.g. 6.2e-07
 ```
 
 Round the epsilon up to the nearest power of ten that comfortably covers
@@ -149,8 +150,8 @@ register_query_tolerance(
     Tolerance(
         epsilon=1e-4,
         rationale="TPC-H §2.6.4: percentage aggregate floating-point epsilon; "
-                  "CASE SUM ratio differs in last 4-5 decimal places between "
-                  "DuckDB float64 and DataFusion Decimal result.",
+        "CASE SUM ratio differs in last 4-5 decimal places between "
+        "DuckDB float64 and DataFusion Decimal result.",
     ),
 )
 ```
