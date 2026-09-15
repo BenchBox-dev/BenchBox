@@ -89,39 +89,39 @@ Overview (`/results/`) answers the first question anyone asks: what's here, and 
 
 ### 2. Platforms
 
-![DuckDB platform page: 80 published runs across 16 benchmarks, with filters for benchmark, scale, phase, tuning, platform version, hardware, and run date, plus the Measurement basis selector.](../images/results_explorer_platform_duckdb.png)
+![DuckDB platform page filtered to TPC-H SF 10: seven releases from v1.0.0 to v1.6.0.dev365 (the 2.0.0 alpha), each with power score, geomean, query count, and labels.](../images/results_explorer_platform_duckdb_tpch_sf10.png)
 
-Platforms (`/results/platforms/` and `/results/p/:platform/`) follows one engine across every workload it has run. It's also where version history lives: did a release get faster, or did it regress? DuckDB has the longest record so far, with 80 runs spanning seven versions from 1.0.0 to a 2.0.0 alpha. Architecture, CPU family, and memory filters let you line up versions on similar hardware, when the runs record it.
+Platforms (`/results/platforms/` and `/results/p/:platform/`) follows one engine across every workload it has run. It's also where version history lives: did a release get faster, or did it regress? The screenshot filters DuckDB to TPC-H at SF 10, where seven releases ran on Apple silicon on the same day, with no tuning. Power score (higher is better) climbs from 173,508 on 1.0.0 to 281,041 on the 2.0.0 alpha, which the table lists under its driver build, v1.6.0.dev365. The climb isn't steady: 1.3.2 scored 198,175, below 1.2.2's 228,201. Architecture, CPU family, and memory filters let you line up versions on similar hardware, when the runs record it.
 
 The measurement basis decides which timings you see. Choose all warm passes, the warmup pass alone, or a single named warm pass, then reduce each query's timings by median or min. Whole-run wall-clock totals appear for context only, and there is no CPU-time basis.
 
 ### 3. Benchmarks
 
-![TPC-H Results at SF 1, power phase: 12 published runs with power score, geomean, query count, trust and validation badges, architecture, and CPU family.](../images/results_explorer_benchmark_tpch_sf1.png)
+![TPC-H Results at SF 10, power phase: seven DuckDB releases ranked by power score, from 281,041 (the 2.0.0 alpha) down to 173,508 (1.0.0), with trust, validation, and tuning badges.](../images/results_explorer_benchmark_tpch_sf10.png)
 
-Benchmarks (`/results/benchmarks/` and `/results/:benchmark/`) organizes results by workload, because performance depends on the queries, the schema, and the data size. Every ranking holds one scale factor and one test phase. Scale factor (SF) sets the data size; for TPC-H, SF 1 is about 1 GB. That rule keeps an SF 1 run from ever ranking against an SF 10 run. Badges on each row show trust tier, validation status, and tuning. Tick two or more rows to open them in Compare, or open the per-query matrix to see whether a lead holds across queries or rests on one outlier.
+Benchmarks (`/results/benchmarks/` and `/results/:benchmark/`) organizes results by workload, because performance depends on the queries, the schema, and the data size. Every ranking holds one scale factor and one test phase. Scale factor (SF) sets the data size; for TPC-H, SF 10 is about 10 GB. That rule keeps an SF 1 run from ever ranking against an SF 10 run. At TPC-H SF 10, all seven DuckDB releases share one ranking, so their scores sit in a single sortable table. Badges on each row show trust tier, validation status, and tuning. Tick two or more rows to open them in Compare, or open the per-query matrix to see whether a lead holds across queries or rests on one outlier.
 
 ### 4. Compare
 
-![Compare page for DuckDB 1.3.2 vs DataFusion 53.0.0 on TPC-H SF 1: Before you compare lists 3 warnings, and the Comparison summary shows a 1.30x power score ratio, 17 of 22 query wins, and p50/p90/p99 latency.](../images/results_explorer_compare_tpch_sf1.png)
+![Compare page for DuckDB 1.4.4 vs 1.5.5 on TPC-H SF 10: Before you compare lists 2 warnings, and the Comparison summary shows a 1.11x power score ratio, 20 of 22 query wins for 1.5.5, and p50/p90/p99 latency.](../images/results_explorer_compare_duckdb_tpch_sf10.png)
 
-Compare (`/results/compare?ids=...`) puts up to four runs side by side. The screenshot above shows [DuckDB 1.3.2 and DataFusion 53.0.0 on TPC-H SF 1](https://benchbox.dev/results/compare?ids=103f8e02,15e9b720). Before it shows any numbers, a "Before you compare" panel confirms the runs share a benchmark, scale factor, and phase, then lists every other difference as a warning. This pair carries three: date window, platform version, and driver version.
+Compare (`/results/compare?ids=...`) puts up to four runs side by side. The screenshot above asks an upgrade question: [DuckDB 1.4.4 against 1.5.5 on TPC-H SF 10](https://benchbox.dev/results/compare?ids=282a4d75,47bdcef5). Before it shows any numbers, a "Before you compare" panel confirms the runs share a benchmark, scale factor, and phase, then lists every other difference as a warning. This pair carries two, platform version and driver version, which are exactly the differences we want to measure.
 
-The Comparison summary comes next. In these runs, DuckDB's power score (higher is better) was 1.30x the lower run's, and DuckDB was faster on 17 of 22 queries. The summary also shows p50, p90, and p99 latency, and a Platform and hardware panel marks which details differ and which were never recorded. When runs don't share a scale factor, Compare still shows the evidence but won't name a winner:
+The Comparison summary comes next. In these runs, 1.5.5's power score was 1.11x that of 1.4.4, and 1.5.5 was faster on 20 of 22 queries. The summary also shows p50, p90, and p99 latency, and a Platform and hardware panel marks which details differ and which were never recorded. When runs don't share a scale factor, Compare still shows the evidence but won't name a winner. Here is DuckDB 1.3.2 at SF 1 against the same release at SF 10:
 
-![Compare page for DuckDB TPC-DS SF 1 vs SF 10: guardrails suppress the winner claim because scale factors differ.](../images/compare_scale_mismatch.png)
+![Compare page for DuckDB 1.3.2 at TPC-H SF 1 vs SF 10: the summary names no winner because scale factors differ.](../images/results_explorer_compare_duckdb_scale_mismatch.png)
 
 ### 5. Find runs
 
-![Find runs page with Advanced SQL open, running a DuckDB-WASM query over bench.results in the browser.](../images/results_explorer_find_runs_sql.png)
+![Find runs with Advanced SQL open: a query over bench.results lists each DuckDB release at TPC-H SF 10 with its power score and geomean.](../images/results_explorer_find_runs_sql_duckdb_sf10.png)
 
-Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
+Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. The query in the screenshot lists every DuckDB release at TPC-H SF 10 with its power score and geomean. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
 
 ### 6. Open local result
 
-![Local preview of a TPC-H SF 1 DuckDB result: the banner says the file has not been uploaded, reviewed, or added to the public rankings.](../images/results_explorer_local_result.png)
+![Local preview of the DuckDB 1.5.5 TPC-H SF 10 bundle: the banner says the file has not been uploaded, reviewed, or added to the public rankings, and the power score reads 236,191.](../images/results_explorer_local_result_duckdb_sf10.png)
 
-Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
+Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. The screenshot shows the published DuckDB 1.5.5 SF 10 bundle opened this way. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
 
 It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` does that, and the Submit for public review button links to the guide that walks you through it.
 
