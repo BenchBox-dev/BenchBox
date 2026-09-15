@@ -29,29 +29,47 @@ Geekbench allows you to benchmark the performance of your own computer and share
 
 * [Geekbench Browser: iOS benchmarks](https://browser.geekbench.com/ios-benchmarks)
 
-![Geekbench Browser single-core chart for iOS devices, led by iPad Pro 13-inch (M5) at 3558.](../images/geekbench_browser_ipad_single_core.png)
+<details class="bb-figure">
+<summary><img src="../images/geekbench_browser_ipad_single_core.png" alt="Geekbench Browser single-core chart for iOS devices, led by iPad Pro 13-inch (M5) at 3558."></summary>
+<img src="../images/geekbench_browser_ipad_single_core.png" alt="Geekbench Browser single-core chart for iOS devices, led by iPad Pro 13-inch (M5) at 3558.">
+</details>
 
 * [Tom's Hardware: Apple's A20 Pro shatters Geekbench 7 single-core record](https://www.tomshardware.com/pc-components/cpus/apples-a20-pro-shatters-geekbench-7-single-core-record-2nm-chip-beats-desktop-intel-core-i9-and-amd-ryzen-9-by-up-to-32-percent)
 
-![Tom's Hardware table of Geekbench scores by Apple A-series generation, from A16 Bionic to A20 Pro, with single-thread and multi-thread improvement percentages.](../images/tomshardware_apple_a_series_geekbench.png)
+<details class="bb-figure">
+<summary><img src="../images/tomshardware_apple_a_series_geekbench.png" alt="Tom's Hardware table of Geekbench scores by Apple A-series generation, from A16 Bionic to A20 Pro, with single-thread and multi-thread improvement percentages."></summary>
+<img src="../images/tomshardware_apple_a_series_geekbench.png" alt="Tom's Hardware table of Geekbench scores by Apple A-series generation, from A16 Bionic to A20 Pro, with single-thread and multi-thread improvement percentages.">
+</details>
 
 AI/LLM leaderboards have become a ubiquitous feature of the AI arms race. These leaderboards synthesize LLM performance across diverse benchmarks to provide a holistic view of highly variable performance (sound familiar?). There are a number of these leaderboards, but a few good examples are:
 
 * [Terminal-Bench leaderboard](https://hub.harborframework.com/datasets/terminal-bench/terminal-bench/latest?tab=leaderboard&leaderboard=4-0-0)
 
-![Terminal-Bench 4.0 leaderboard listing agent, model, effort, accuracy, release date, tokens, and cost for each entry.](../images/terminal_bench_leaderboard.png)
+<details class="bb-figure">
+<summary><img src="../images/terminal_bench_leaderboard.png" alt="Terminal-Bench 4.0 leaderboard listing agent, model, effort, accuracy, release date, tokens, and cost for each entry."></summary>
+<img src="../images/terminal_bench_leaderboard.png" alt="Terminal-Bench 4.0 leaderboard listing agent, model, effort, accuracy, release date, tokens, and cost for each entry.">
+</details>
 
 * [Arena text leaderboard: Pareto frontier](https://arena.ai/leaderboard/text/pareto)
 
-![Arena Pareto frontier chart plotting model Arena score against price, with Pareto-optimal models listed on the right.](../images/arena_pareto_frontier.png)
+<details class="bb-figure">
+<summary><img src="../images/arena_pareto_frontier.png" alt="Arena Pareto frontier chart plotting model Arena score against price, with Pareto-optimal models listed on the right."></summary>
+<img src="../images/arena_pareto_frontier.png" alt="Arena Pareto frontier chart plotting model Arena score against price, with Pareto-optimal models listed on the right.">
+</details>
 
 * [LLM Stats](https://llm-stats.com/)
 
-![LLM Stats Performance Index for reasoning, listing composite scores alongside blended price per million tokens.](../images/llm_stats_performance_index.png)
+<details class="bb-figure">
+<summary><img src="../images/llm_stats_performance_index.png" alt="LLM Stats Performance Index for reasoning, listing composite scores alongside blended price per million tokens."></summary>
+<img src="../images/llm_stats_performance_index.png" alt="LLM Stats Performance Index for reasoning, listing composite scores alongside blended price per million tokens.">
+</details>
 
 * [Scale Labs agentic leaderboards](https://labs.scale.com/leaderboard?category=agentic)
 
-![Scale Labs leaderboard cards for several agentic benchmarks, each ranking models with scores and error bars.](../images/scale_labs_leaderboards.png)
+<details class="bb-figure">
+<summary><img src="../images/scale_labs_leaderboards.png" alt="Scale Labs leaderboard cards for several agentic benchmarks, each ranking models with scores and error bars."></summary>
+<img src="../images/scale_labs_leaderboards.png" alt="Scale Labs leaderboard cards for several agentic benchmarks, each ranking models with scores and error bars.">
+</details>
 
 ---
 
@@ -85,7 +103,10 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ### 1. Overview
 
-![Results Explorer Overview: 22 supported benchmarks (16 with public results), 244 published runs, 13 platforms with public results, 37 rankings, and a Recent results table.](../images/results_explorer_overview.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_overview.png" alt="Results Explorer Overview: 22 supported benchmarks (16 with public results), 244 published runs, 13 platforms with public results, 37 rankings, and a Recent results table."></summary>
+<img src="../images/results_explorer_overview.png" alt="Results Explorer Overview: 22 supported benchmarks (16 with public results), 244 published runs, 13 platforms with public results, 37 rankings, and a Recent results table.">
+</details>
 
 - Path: `/results/`
 - Question: what's in the corpus, and what's new?
@@ -96,7 +117,10 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ### 2. Platforms
 
-![DuckDB platform page: 80 published runs across 16 benchmarks, with filters for benchmark, scale, phase, tuning, platform version, hardware, and run date, plus the Measurement basis selector.](../images/results_explorer_platform_duckdb.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_platform_duckdb.png" alt="DuckDB platform page: 80 published runs across 16 benchmarks, with filters for benchmark, scale, phase, tuning, platform version, hardware, and run date, plus the Measurement basis selector."></summary>
+<img src="../images/results_explorer_platform_duckdb.png" alt="DuckDB platform page: 80 published runs across 16 benchmarks, with filters for benchmark, scale, phase, tuning, platform version, hardware, and run date, plus the Measurement basis selector.">
+</details>
 
 - Paths: `/results/platforms/`, `/results/p/:platform/`
 - Organized by engine
@@ -112,7 +136,10 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ### 3. Benchmarks
 
-![TPC-H Results at SF 1, power phase: 12 published runs with power score, geomean, query count, trust and validation badges, architecture, and CPU family.](../images/results_explorer_benchmark_tpch_sf1.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_benchmark_tpch_sf1.png" alt="TPC-H Results at SF 1, power phase: 12 published runs with power score, geomean, query count, trust and validation badges, architecture, and CPU family."></summary>
+<img src="../images/results_explorer_benchmark_tpch_sf1.png" alt="TPC-H Results at SF 1, power phase: 12 published runs with power score, geomean, query count, trust and validation badges, architecture, and CPU family.">
+</details>
 
 - Paths: `/results/benchmarks/`, `/results/:benchmark/`
 - Organized by workload
@@ -125,7 +152,10 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ### 4. Compare
 
-![Compare page for DuckDB 1.3.2 vs DataFusion 53.0.0 on TPC-H SF 1: Before you compare lists 3 warnings, and the Comparison summary shows a 1.30x power score ratio, 17 of 22 query wins, and p50/p90/p99 latency.](../images/results_explorer_compare_tpch_sf1.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_compare_tpch_sf1.png" alt="Compare page for DuckDB 1.3.2 vs DataFusion 53.0.0 on TPC-H SF 1: Before you compare lists 3 warnings, and the Comparison summary shows a 1.30x power score ratio, 17 of 22 query wins, and p50/p90/p99 latency."></summary>
+<img src="../images/results_explorer_compare_tpch_sf1.png" alt="Compare page for DuckDB 1.3.2 vs DataFusion 53.0.0 on TPC-H SF 1: Before you compare lists 3 warnings, and the Comparison summary shows a 1.30x power score ratio, 17 of 22 query wins, and p50/p90/p99 latency.">
+</details>
 
 - Path: `/results/compare?ids=...`
 - Head-to-head, up to four runs
@@ -141,11 +171,17 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 - Platform and hardware: which axes differ, which are not recorded
 - Scale mismatch: winner not claimed
 
-![Compare page for DuckDB TPC-DS SF 1 vs SF 10: guardrails suppress the winner claim because scale factors differ.](../images/compare_scale_mismatch.png)
+<details class="bb-figure">
+<summary><img src="../images/compare_scale_mismatch.png" alt="Compare page for DuckDB TPC-DS SF 1 vs SF 10: guardrails suppress the winner claim because scale factors differ."></summary>
+<img src="../images/compare_scale_mismatch.png" alt="Compare page for DuckDB TPC-DS SF 1 vs SF 10: guardrails suppress the winner claim because scale factors differ.">
+</details>
 
 ### 5. Find runs
 
-![Find runs page with Advanced SQL open, running a DuckDB-WASM query over bench.results in the browser.](../images/results_explorer_find_runs_sql.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_find_runs_sql.png" alt="Find runs page with Advanced SQL open, running a DuckDB-WASM query over bench.results in the browser."></summary>
+<img src="../images/results_explorer_find_runs_sql.png" alt="Find runs page with Advanced SQL open, running a DuckDB-WASM query over bench.results in the browser.">
+</details>
 
 - Path: `/results/query`
 - Two jobs: search and SQL
@@ -160,7 +196,10 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ### 6. Open local result
 
-![Local preview of a TPC-H SF 1 DuckDB result: the banner says the file has not been uploaded, reviewed, or added to the public rankings.](../images/results_explorer_local_result.png)
+<details class="bb-figure">
+<summary><img src="../images/results_explorer_local_result.png" alt="Local preview of a TPC-H SF 1 DuckDB result: the banner says the file has not been uploaded, reviewed, or added to the public rankings."></summary>
+<img src="../images/results_explorer_local_result.png" alt="Local preview of a TPC-H SF 1 DuckDB result: the banner says the file has not been uploaded, reviewed, or added to the public rankings.">
+</details>
 
 - Path: `/results/local`
 - Question: how do I check my own run before sharing it?

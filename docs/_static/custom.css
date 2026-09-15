@@ -662,3 +662,42 @@ footer > .benchbox-site-footer-theme {
     align-self: center;
     margin-bottom: 1rem;
 }
+
+/* ============================================================================
+   Expandable blog figures (details/summary thumbnails)
+   Posts with many screenshots show a constrained thumbnail preview that
+   expands to the full-width image on click. No JavaScript required.
+   ============================================================================ */
+details.bb-figure {
+    margin: 1.25rem 0;
+}
+details.bb-figure > summary {
+    list-style: none;
+    cursor: zoom-in;
+}
+details.bb-figure > summary::-webkit-details-marker,
+details.bb-figure > summary::marker {
+    display: none;
+    content: "";
+}
+details.bb-figure > summary img {
+    max-height: 240px;
+    width: auto;
+    max-width: 100%;
+    border-radius: 6px;
+}
+details.bb-figure[open] > summary {
+    cursor: zoom-out;
+}
+details.bb-figure[open] > summary img {
+    display: none;
+}
+details.bb-figure[open] > summary::after {
+    content: "Collapse screenshot";
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+details.bb-figure > img {
+    width: 100%;
+    border-radius: 6px;
+}
