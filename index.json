@@ -919,15 +919,10 @@
       "title": "Auto-expire or auto-archive generated rerun shards"
     },
     "auto-generate-compose-port-mappings-from-adapter-defaults": {
-      "claim": {
-        "expires_at": "2026-09-16T00:33:43Z",
-        "generation": "b5d8d640912a4a9c8ea24ee28cb74ca2",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Auto-generate compose port mappings from adapter defaults"
     },
     "auto-merge-explicit-hold-is-not-durable": {
