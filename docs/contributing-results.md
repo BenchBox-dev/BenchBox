@@ -178,11 +178,12 @@ publish-only workflow labels through `benchbox publish run --label`. These label
 are not derived from `result_source` and are not part of the canonical Explorer
 trust-label vocabulary above.
 
-Community submissions are labeled "Community" in the explorer to distinguish
-them from maintainer-curated results. **Vendor Supplied** (`vendor-supplied`)
-results appear in
-ranked tables (unlike community submissions) but always carry the distinct
-vendor badge, because the platform vendor has a direct interest in the outcome.
+Community submissions are labeled "Community submission" in the explorer to
+distinguish them from maintainer-curated results, and are currently excluded
+from ranked tables. We will re-evaluate their inclusion over the coming months.
+**Vendor Supplied** (`vendor-supplied`) results appear in ranked tables but
+always carry the distinct vendor badge, because the platform vendor has a direct
+interest in the outcome.
 The `vendor-supplied` label is maintainer-applied and never self-declared on a
 submission. You cannot self-apply the vendor label through a community PR. The
 label is derived from a bundle living under `results-data/bundles/vendor/`, and the
