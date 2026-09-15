@@ -97,9 +97,7 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ## Walkthrough
 
-- Six sections
-- Each answers one question
-- Tabs: Overview, Benchmarks, Platforms, Compare, Find runs, Open local result
+The Explorer has six tabs: Overview, Benchmarks, Platforms, Compare, Find runs, and Open local result. Each one answers a single question.
 
 ### 1. Overview
 
@@ -108,12 +106,7 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_overview.png" alt="Results Explorer Overview: 22 supported benchmarks (16 with public results), 244 published runs, 13 platforms with public results, 37 rankings, and a Recent results table.">
 </details>
 
-- Path: `/results/`
-- Question: what's in the corpus, and what's new?
-- No filters needed to start
-- Top stats: benchmarks, published runs, platforms, rankings
-- Recent results feed
-- Shortcuts: run a benchmark, compare your result, submit a bundle
+Overview (`/results/`) answers the first question anyone asks: what's here, and what's new? You don't need to set a filter. Four counts sit at the top: supported benchmarks, published runs, platforms, and rankings. As of this post, that's 244 published runs across 13 platforms. Below the counts, Recent results lists the latest arrivals, and three numbered shortcuts take you from running a benchmark to comparing your result to submitting a bundle.
 
 ### 2. Platforms
 
@@ -122,17 +115,9 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_platform_duckdb.png" alt="DuckDB platform page: 80 published runs across 16 benchmarks, with filters for benchmark, scale, phase, tuning, platform version, hardware, and run date, plus the Measurement basis selector.">
 </details>
 
-- Paths: `/results/platforms/`, `/results/p/:platform/`
-- Organized by engine
-- One engine across workloads
-- Version history: did releases get faster or regress?
-- DuckDB today: 7 versions, 1.0.0 through a 2.0.0 alpha
-- Hardware filters: architecture, CPU family, memory
-- Pick the measurement basis:
-  - Passes: all warm, warmup only, or one named warm pass
-  - Reduce by median or min
-- Whole-run wall-clock totals: context only
-- No CPU-time basis
+Platforms (`/results/platforms/` and `/results/p/:platform/`) follows one engine across every workload it has run. It's also where version history lives: did a release get faster, or did it regress? DuckDB has the longest record so far, with 80 runs spanning seven versions from 1.0.0 to a 2.0.0 alpha. Architecture, CPU family, and memory filters let you line up versions on similar hardware, when the runs record it.
+
+The measurement basis decides which timings you see. Choose all warm passes, the warmup pass alone, or a single named warm pass, then reduce each query's timings by median or min. Whole-run wall-clock totals appear for context only, and there is no CPU-time basis.
 
 ### 3. Benchmarks
 
@@ -141,14 +126,7 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_benchmark_tpch_sf1.png" alt="TPC-H Results at SF 1, power phase: 12 published runs with power score, geomean, query count, trust and validation badges, architecture, and CPU family.">
 </details>
 
-- Paths: `/results/benchmarks/`, `/results/:benchmark/`
-- Organized by workload
-- Performance depends on queries, schema, and scale
-- One ranking per scale factor and phase
-- No apples-to-oranges: SF 1 never ranks against SF 10
-- Badges: trust tier, validation, tuning
-- Tick two or more rows to open Compare
-- Drill into the per-query matrix: is the lead broad, or one outlier query?
+Benchmarks (`/results/benchmarks/` and `/results/:benchmark/`) organizes results by workload, because performance depends on the queries, the schema, and the data size. Every ranking holds one scale factor and one test phase. Scale factor (SF) sets the data size; for TPC-H, SF 1 is about 1 GB. That rule keeps an SF 1 run from ever ranking against an SF 10 run. Badges on each row show trust tier, validation status, and tuning. Tick two or more rows to open them in Compare, or open the per-query matrix to see whether a lead holds across queries or rests on one outlier.
 
 ### 4. Compare
 
@@ -157,19 +135,9 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_compare_tpch_sf1.png" alt="Compare page for DuckDB 1.3.2 vs DataFusion 53.0.0 on TPC-H SF 1: Before you compare lists 3 warnings, and the Comparison summary shows a 1.30x power score ratio, 17 of 22 query wins, and p50/p90/p99 latency.">
 </details>
 
-- Path: `/results/compare?ids=...`
-- Head-to-head, up to four runs
-- Example: [DuckDB vs DataFusion, TPC-H SF 1](https://benchbox.dev/results/compare?ids=103f8e02,15e9b720)
-- "Before you compare":
-  - Checks benchmark, scale, and phase match
-  - Lists other differences as warnings
-  - Here: date window, platform version, driver version
-- Comparison summary:
-  - Leading run and power score ratio
-  - Per-query wins
-  - Latency profile: p50, p90, p99
-- Platform and hardware: which axes differ, which are not recorded
-- Scale mismatch: winner not claimed
+Compare (`/results/compare?ids=...`) puts up to four runs side by side. The screenshot above shows [DuckDB 1.3.2 and DataFusion 53.0.0 on TPC-H SF 1](https://benchbox.dev/results/compare?ids=103f8e02,15e9b720). Before it shows any numbers, a "Before you compare" panel confirms the runs share a benchmark, scale factor, and phase, then lists every other difference as a warning. This pair carries three: date window, platform version, and driver version.
+
+The Comparison summary comes next. In these runs, DuckDB's power score (higher is better) was 1.30x the lower run's, and DuckDB was faster on 17 of 22 queries. The summary also shows p50, p90, and p99 latency, and a Platform and hardware panel marks which details differ and which were never recorded. When runs don't share a scale factor, Compare still shows the evidence but won't name a winner:
 
 <details class="bb-figure">
 <summary><img src="../images/compare_scale_mismatch.png" alt="Compare page for DuckDB TPC-DS SF 1 vs SF 10: guardrails suppress the winner claim because scale factors differ."></summary>
@@ -183,16 +151,7 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_find_runs_sql.png" alt="Find runs page with Advanced SQL open, running a DuckDB-WASM query over bench.results in the browser.">
 </details>
 
-- Path: `/results/query`
-- Two jobs: search and SQL
-- Search: find runs that match your environment
-- Filters: platform and version, benchmark and scale factor, provenance
-- Advanced SQL: questions the built-in views don't answer
-- DuckDB-WASM, entirely in the browser
-- Queries a static `results.duckdb` file
-- No backend
-- Start from starter queries, or build SQL from filters
-- Download CSV or JSON
+Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
 
 ### 6. Open local result
 
@@ -201,18 +160,9 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 <img src="../images/results_explorer_local_result.png" alt="Local preview of a TPC-H SF 1 DuckDB result: the banner says the file has not been uploaded, reviewed, or added to the public rankings.">
 </details>
 
-- Path: `/results/local`
-- Question: how do I check my own run before sharing it?
-- "Open local result": pick a result JSON
-- Parsed in the browser; nothing uploaded
-- Same cards, tables, and charts as public runs
-- Preview only:
-  - Checks schema shape
-  - Derives timings
-  - Shows the recorded validation status
-- Does not re-verify checksums, classify tuning, or decide eligibility
-- `benchbox submit` does that
-- "Submit for public review" links to the contribution guide
+Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
+
+It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` does that, and the Submit for public review button links to the guide that walks you through it.
 
 ---
 
