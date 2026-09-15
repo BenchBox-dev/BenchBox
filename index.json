@@ -17549,10 +17549,10 @@
     },
     "unify-duplicate-benchmark-construction-paths": {
       "claim": {
-        "expires_at": "2026-09-15T01:07:45Z",
-        "generation": "e8a127e54c104988a5ce11f5e6ebb01d",
+        "expires_at": "2026-09-16T13:33:29Z",
+        "generation": "ba5618d226c746adb19035f3a9f0687e",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:d6fbc19f5d9c24f78d0d3139"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:85d924eaab5f62e439a9f404"
       },
       "needs": [],
       "priority": "medium-high",
