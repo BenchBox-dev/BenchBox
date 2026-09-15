@@ -222,14 +222,13 @@ operation API. Full script:
 ```python
 import duckdb
 from benchbox import WritePrimitives
-
 con = duckdb.connect(":memory:")
 con.execute("INSTALL tpch; LOAD tpch; CALL dbgen(sf=0.01);")  # real TPC-H customer/orders/lineitem
 wp = WritePrimitives(scale_factor=0.01, quiet=True)
-wp.setup(con, force=True)  # seeds scd2_ops_dim_customer + change batch
+wp.setup(con, force=True)                                      # seeds scd2_ops_dim_customer + change batch
 for _ in range(30):
-    wp.reset(con)  # restore dimension to seed state
-    r = wp.execute_operation("merge_scd_type2_basic", con)  # write + validate + cleanup
+    wp.reset(con)                                             # restore dimension to seed state
+    r = wp.execute_operation("merge_scd_type2_basic", con)   # write + validate + cleanup
     # r.write_duration_ms, r.validation_passed
 ```
 

@@ -142,7 +142,7 @@ print(f"Auto-compile enabled: {report['auto_compile_enabled']}")
 print(f"TPC-H source: {report['tpc_h_source']}")
 print(f"TPC-DS source: {report['tpc_ds_source']}")
 
-for binary, info in report["binaries"].items():
+for binary, info in report['binaries'].items():
     print(f"{binary}: exists={info['exists']}, needs_compilation={info['needs_compilation']}")
 ```
 
@@ -441,7 +441,6 @@ Get TPC compiler instance with specified configuration.
 # In your benchmark code
 from benchbox.utils.tpc_compilation import ensure_tpc_binaries
 
-
 def initialize_tpc_h():
     # Ensure TPC-H binaries are available
     results = ensure_tpc_binaries(["dbgen", "qgen"])
@@ -456,7 +455,6 @@ def initialize_tpc_h():
 ### Status Check Example
 ```python
 from benchbox.utils.tpc_compilation import get_tpc_compiler
-
 
 def check_tpc_status():
     compiler = get_tpc_compiler()

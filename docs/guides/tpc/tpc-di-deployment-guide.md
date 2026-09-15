@@ -345,7 +345,7 @@ from benchbox.core.tpcdi.config import TPCDIConfig
 # Unified configuration with parallel processing enabled
 config = TPCDIConfig(
     scale_factor=1.0,
-    output_dir=Path("/data/tpcdi"),
+    output_dir=Path('/data/tpcdi'),
     enable_parallel=True,
     max_workers=4,
 )
@@ -374,8 +374,7 @@ print(f"Generated {len(data_paths)} data files in {temp_dir}")
 
 # Test with SQLite in-memory database
 import sqlite3
-
-with sqlite3.connect(":memory:") as conn:
+with sqlite3.connect(':memory:') as conn:
     benchmark.load_data_to_database(conn)
     result = benchmark.run_benchmark(conn, iterations=1)
     print(f"Benchmark completed: {len(result['queries'])} queries executed")
@@ -392,7 +391,7 @@ from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
 # Configure for testing environment
-test_dir = Path(os.getenv("TEST_DATA_DIR", "/tmp/tpcdi_test"))
+test_dir = Path(os.getenv('TEST_DATA_DIR', '/tmp/tpcdi_test'))
 test_dir.mkdir(exist_ok=True)
 
 # Test configuration with moderate scale
@@ -405,7 +404,6 @@ config = TPCDIConfig(
 
 benchmark = TPCDIBenchmark(config=config)
 
-
 # Run systematic test suite
 def run_test_suite():
     # Test data generation
@@ -416,19 +414,18 @@ def run_test_suite():
     # Test ETL pipeline
     print("Testing ETL pipeline...")
     import duckdb
-
-    with duckdb.connect(":memory:") as conn:
+    with duckdb.connect(':memory:') as conn:
         etl_result = benchmark.run_etl_pipeline(conn, validate_data=True)
-        assert etl_result["success"], f"ETL failed: {etl_result.get('error')}"
+        assert etl_result['success'], f"ETL failed: {etl_result.get('error')}"
 
         # Test query execution
         print("Testing query execution...")
         query_result = benchmark.run_benchmark(conn, iterations=2)
-        successful_queries = sum(1 for q in query_result["queries"].values() if q.get("avg_time", 0) > 0)
+        successful_queries = sum(1 for q in query_result['queries'].values()
+                               if q.get('avg_time', 0) > 0)
         assert successful_queries > 0, "No queries executed successfully"
 
     print("All tests passed!")
-
 
 if __name__ == "__main__":
     run_test_suite()
@@ -448,18 +445,21 @@ from benchbox.core.tpcdi.config import TPCDIConfig
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("/var/log/tpcdi_staging.log"), logging.StreamHandler()],
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('/var/log/tpcdi_staging.log'),
+        logging.StreamHandler()
+    ]
 )
 
 # Staging configuration
-staging_dir = Path(os.getenv("STAGING_DATA_DIR", "/data/staging/tpcdi"))
+staging_dir = Path(os.getenv('STAGING_DATA_DIR', '/data/staging/tpcdi'))
 staging_dir.mkdir(parents=True, exist_ok=True)
 
 config = TPCDIConfig(
-    scale_factor=float(os.getenv("TPCDI_SCALE_FACTOR", "0.5")),
+    scale_factor=float(os.getenv('TPCDI_SCALE_FACTOR', '0.5')),
     output_dir=staging_dir,
-    max_workers=int(os.getenv("TPCDI_WORKERS", "4")),
+    max_workers=int(os.getenv('TPCDI_WORKERS', '4')),
     enable_parallel=True,
 )
 
@@ -469,17 +469,15 @@ benchmark = TPCDIBenchmark(config=config)
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-
 def get_database_connection():
     return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", "5432")),
-        database=os.getenv("DB_NAME", "tpcdi_staging"),
-        user=os.getenv("DB_USER", "tpcdi"),
-        password=os.getenv("DB_PASSWORD"),
-        cursor_factory=RealDictCursor,
+        host=os.getenv('DB_HOST', 'localhost'),
+        port=int(os.getenv('DB_PORT', '5432')),
+        database=os.getenv('DB_NAME', 'tpcdi_staging'),
+        user=os.getenv('DB_USER', 'tpcdi'),
+        password=os.getenv('DB_PASSWORD'),
+        cursor_factory=RealDictCursor
     )
-
 
 def run_staging_benchmark():
     logger = logging.getLogger(__name__)
@@ -494,9 +492,11 @@ def run_staging_benchmark():
         # Run ETL pipeline
         with get_database_connection() as conn:
             logger.info("Running ETL pipeline...")
-            etl_result = benchmark.run_etl_pipeline(conn, batch_type="historical", validate_data=True)
+            etl_result = benchmark.run_etl_pipeline(
+                conn, batch_type='historical', validate_data=True
+            )
 
-            if etl_result["success"]:
+            if etl_result['success']:
                 logger.info(f"ETL completed in {etl_result['total_duration']:.2f}s")
                 logger.info(f"Data quality score: {etl_result['validation_results'].get('data_quality_score', 'N/A')}")
             else:
@@ -507,7 +507,8 @@ def run_staging_benchmark():
             logger.info("Running benchmark queries...")
             query_result = benchmark.run_benchmark(conn, iterations=3)
 
-            successful_queries = sum(1 for q in query_result["queries"].values() if q.get("avg_time", 0) > 0)
+            successful_queries = sum(1 for q in query_result['queries'].values()
+                                   if q.get('avg_time', 0) > 0)
             logger.info(f"Executed {successful_queries} queries successfully")
 
             return True
@@ -515,7 +516,6 @@ def run_staging_benchmark():
     except Exception as e:
         logger.error(f"Staging benchmark failed: {e}")
         return False
-
 
 if __name__ == "__main__":
     success = run_staging_benchmark()
@@ -537,15 +537,17 @@ from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
 # Production logging configuration
-log_dir = Path("/var/log/tpcdi")
+log_dir = Path('/var/log/tpcdi')
 log_dir.mkdir(exist_ok=True)
 
 logging.basicConfig(
-    level=getattr(logging, os.getenv("LOG_LEVEL", "INFO")),
-    format="%(asctime)s - %(name)s - %(levelname)s - [%(process)d] - %(message)s",
-    handlers=[logging.FileHandler(log_dir / "tpcdi_production.log"), logging.StreamHandler()],
+    level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO')),
+    format='%(asctime)s - %(name)s - %(levelname)s - [%(process)d] - %(message)s',
+    handlers=[
+        logging.FileHandler(log_dir / 'tpcdi_production.log'),
+        logging.StreamHandler()
+    ]
 )
-
 
 class ProductionTPCDI:
     def __init__(self):
@@ -565,13 +567,13 @@ class ProductionTPCDI:
 
     def setup_benchmark(self):
         # Production configuration
-        data_dir = Path(os.getenv("TPCDI_DATA_DIR", "/data/tpcdi"))
+        data_dir = Path(os.getenv('TPCDI_DATA_DIR', '/data/tpcdi'))
         data_dir.mkdir(parents=True, exist_ok=True)
 
         config = TPCDIConfig(
-            scale_factor=float(os.getenv("TPCDI_SCALE_FACTOR", "10.0")),
+            scale_factor=float(os.getenv('TPCDI_SCALE_FACTOR', '10.0')),
             output_dir=data_dir,
-            max_workers=int(os.getenv("TPCDI_WORKERS", "8")),
+            max_workers=int(os.getenv('TPCDI_WORKERS', '8')),
             enable_parallel=True,
             chunk_size=20000,
             optimize_memory=True,
@@ -583,24 +585,25 @@ class ProductionTPCDI:
 
     def get_database_connection(self):
         """Get production database connection with connection pooling."""
-        db_url = os.getenv("DATABASE_URL")
+        db_url = os.getenv('DATABASE_URL')
         if not db_url:
             raise ValueError("DATABASE_URL environment variable not set")
 
-        if db_url.startswith("postgresql://"):
+        if db_url.startswith('postgresql://'):
             import psycopg2
             from psycopg2 import pool
 
             # Create connection pool
             connection_pool = psycopg2.pool.ThreadedConnectionPool(
-                minconn=1, maxconn=int(os.getenv("DB_POOL_SIZE", "10")), dsn=db_url
+                minconn=1,
+                maxconn=int(os.getenv('DB_POOL_SIZE', '10')),
+                dsn=db_url
             )
             return connection_pool.getconn()
 
-        elif db_url.startswith("duckdb://"):
+        elif db_url.startswith('duckdb://'):
             import duckdb
-
-            db_path = db_url.replace("duckdb://", "")
+            db_path = db_url.replace('duckdb://', '')
             return duckdb.connect(db_path)
 
         else:
@@ -611,15 +614,15 @@ class ProductionTPCDI:
         self.logger.info("Starting production TPC-DI benchmark")
 
         results = {
-            "start_time": datetime.now().isoformat(),
-            "scale_factor": self.benchmark.scale_factor,
-            "configuration": {
-                "workers": self.benchmark.max_workers,
-                "parallel_enabled": self.benchmark.enable_parallel,
+            'start_time': datetime.now().isoformat(),
+            'scale_factor': self.benchmark.scale_factor,
+            'configuration': {
+                'workers': self.benchmark.max_workers,
+                'parallel_enabled': self.benchmark.enable_parallel,
             },
-            "phases": {},
-            "metrics": {},
-            "success": False,
+            'phases': {},
+            'metrics': {},
+            'success': False
         }
 
         try:
@@ -632,7 +635,10 @@ class ProductionTPCDI:
             data_paths = self.benchmark.generate_data()
             gen_time = (datetime.now() - gen_start).total_seconds()
 
-            results["phases"]["data_generation"] = {"duration": gen_time, "files_generated": len(data_paths)}
+            results['phases']['data_generation'] = {
+                'duration': gen_time,
+                'files_generated': len(data_paths)
+            }
             self.logger.info(f"Data generation completed in {gen_time:.2f}s")
 
             # Phase 2: ETL Pipeline
@@ -643,16 +649,18 @@ class ProductionTPCDI:
                 self.logger.info("Phase 2: Running ETL pipeline")
                 etl_start = datetime.now()
 
-                etl_result = self.benchmark.run_etl_pipeline(conn, batch_type="historical", validate_data=True)
+                etl_result = self.benchmark.run_etl_pipeline(
+                    conn, batch_type='historical', validate_data=True
+                )
 
                 etl_time = (datetime.now() - etl_start).total_seconds()
-                results["phases"]["etl"] = {
-                    "duration": etl_time,
-                    "success": etl_result["success"],
-                    "data_quality_score": etl_result.get("validation_results", {}).get("data_quality_score", 0),
+                results['phases']['etl'] = {
+                    'duration': etl_time,
+                    'success': etl_result['success'],
+                    'data_quality_score': etl_result.get('validation_results', {}).get('data_quality_score', 0)
                 }
 
-                if not etl_result["success"]:
+                if not etl_result['success']:
                     self.logger.error(f"ETL pipeline failed: {etl_result.get('error')}")
                     return results
 
@@ -665,52 +673,53 @@ class ProductionTPCDI:
                 self.logger.info("Phase 3: Running query benchmark")
                 query_start = datetime.now()
 
-                query_result = self.benchmark.run_benchmark(conn, iterations=int(os.getenv("TPCDI_ITERATIONS", "5")))
+                query_result = self.benchmark.run_benchmark(
+                    conn, iterations=int(os.getenv('TPCDI_ITERATIONS', '5'))
+                )
 
                 query_time = (datetime.now() - query_start).total_seconds()
-                results["phases"]["queries"] = {
-                    "duration": query_time,
-                    "queries_executed": len(query_result["queries"]),
-                    "successful_queries": sum(1 for q in query_result["queries"].values() if q.get("avg_time", 0) > 0),
+                results['phases']['queries'] = {
+                    'duration': query_time,
+                    'queries_executed': len(query_result['queries']),
+                    'successful_queries': sum(1 for q in query_result['queries'].values()
+                                            if q.get('avg_time', 0) > 0)
                 }
 
                 self.logger.info(f"Query benchmark completed in {query_time:.2f}s")
 
                 # Collect final metrics
-                results["metrics"] = self.benchmark.get_enhanced_etl_status()
-                results["success"] = True
-                results["end_time"] = datetime.now().isoformat()
+                results['metrics'] = self.benchmark.get_enhanced_etl_status()
+                results['success'] = True
+                results['end_time'] = datetime.now().isoformat()
 
                 total_time = gen_time + etl_time + query_time
-                results["total_duration"] = total_time
+                results['total_duration'] = total_time
 
                 self.logger.info(f"Production benchmark completed successfully in {total_time:.2f}s")
 
         except Exception as e:
             self.logger.error(f"Production benchmark failed: {e}", exc_info=True)
-            results["error"] = str(e)
-            results["end_time"] = datetime.now().isoformat()
+            results['error'] = str(e)
+            results['end_time'] = datetime.now().isoformat()
 
         # Save results
-        results_file = Path("/var/log/tpcdi") / f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(results_file, "w") as f:
+        results_file = Path('/var/log/tpcdi') / f"benchmark_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(results_file, 'w') as f:
             json.dump(results, f, indent=2)
 
         self.logger.info(f"Results saved to {results_file}")
         return results
 
-
 def main():
     production_benchmark = ProductionTPCDI()
     results = production_benchmark.run_production_benchmark()
 
-    if results["success"]:
+    if results['success']:
         print("Production benchmark completed successfully")
         sys.exit(0)
     else:
         print("Production benchmark failed")
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()
@@ -724,7 +733,6 @@ if __name__ == "__main__":
 # memory_tuning.py
 import os
 import psutil
-
 
 def get_appropriate_memory_config():
     """Calculate appropriate memory configuration based on system resources."""
@@ -751,11 +759,10 @@ def get_appropriate_memory_config():
         memory_limit = max(usable_mb, 2048)  # Minimum 2GB
 
     return {
-        "memory_limit_mb": memory_limit,
-        "batch_size": batch_size,
-        "recommended_scale_factor": min(10.0, usable_gb / 2),
+        'memory_limit_mb': memory_limit,
+        'batch_size': batch_size,
+        'recommended_scale_factor': min(10.0, usable_gb / 2)
     }
-
 
 # Apply memory optimization
 memory_config = get_appropriate_memory_config()
@@ -770,7 +777,6 @@ import multiprocessing
 import os
 
 from benchbox.core.tpcdi.config import TPCDIConfig
-
 
 def get_appropriate_cpu_config():
     """Calculate appropriate CPU configuration."""
@@ -791,7 +797,6 @@ def get_appropriate_cpu_config():
         max_workers=workers,
     )
 
-
 # Apply CPU optimization
 cpu_config = get_appropriate_cpu_config()
 print(f"Recommended parallel config: {cpu_config}")
@@ -805,18 +810,17 @@ import shutil
 import os
 from pathlib import Path
 
-
 def optimize_storage_layout(base_dir: Path):
     """Optimize storage layout for TPC-DI workloads."""
 
     # Create configured directory structure
     directories = {
-        "source": base_dir / "source",
-        "staging": base_dir / "staging",
-        "warehouse": base_dir / "warehouse",
-        "temp": base_dir / "temp",
-        "logs": base_dir / "logs",
-        "metrics": base_dir / "metrics",
+        'source': base_dir / 'source',
+        'staging': base_dir / 'staging',
+        'warehouse': base_dir / 'warehouse',
+        'temp': base_dir / 'temp',
+        'logs': base_dir / 'logs',
+        'metrics': base_dir / 'metrics'
     }
 
     for name, path in directories.items():
@@ -836,14 +840,13 @@ def optimize_storage_layout(base_dir: Path):
 
     return directories
 
-
 # Storage optimization settings
 storage_settings = {
-    "csv_buffer_size": 8192,  # 8KB buffer for CSV operations
-    "xml_buffer_size": 16384,  # 16KB buffer for XML operations
-    "compression": "gzip",  # Compress intermediate files
-    "temp_cleanup": True,  # Clean up temporary files
-    "batch_write_size": 10000,  # Write in batches for better I/O performance
+    'csv_buffer_size': 8192,  # 8KB buffer for CSV operations
+    'xml_buffer_size': 16384,  # 16KB buffer for XML operations
+    'compression': 'gzip',  # Compress intermediate files
+    'temp_cleanup': True,  # Clean up temporary files
+    'batch_write_size': 10000  # Write in batches for better I/O performance
 }
 ```
 
@@ -911,16 +914,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any
 
-
 class TPCDIMonitor:
-    def __init__(self, log_dir: Path = Path("/var/log/tpcdi")):
+    def __init__(self, log_dir: Path = Path('/var/log/tpcdi')):
         self.log_dir = log_dir
         self.log_dir.mkdir(exist_ok=True)
 
         # Setup logging
-        self.logger = logging.getLogger("tpcdi_monitor")
-        handler = logging.FileHandler(log_dir / "monitor.log")
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+        self.logger = logging.getLogger('tpcdi_monitor')
+        handler = logging.FileHandler(log_dir / 'monitor.log')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.INFO)
@@ -937,32 +939,36 @@ class TPCDIMonitor:
         swap = psutil.swap_memory()
 
         # Disk metrics
-        disk_usage = psutil.disk_usage("/")
+        disk_usage = psutil.disk_usage('/')
         disk_io = psutil.disk_io_counters()
 
         # Network metrics
         network_io = psutil.net_io_counters()
 
         return {
-            "timestamp": datetime.now().isoformat(),
-            "cpu": {"percent": cpu_percent, "count": cpu_count, "load_avg": list(load_avg)},
-            "memory": {
-                "total_gb": memory.total / (1024**3),
-                "available_gb": memory.available / (1024**3),
-                "percent": memory.percent,
-                "swap_percent": swap.percent,
+            'timestamp': datetime.now().isoformat(),
+            'cpu': {
+                'percent': cpu_percent,
+                'count': cpu_count,
+                'load_avg': list(load_avg)
             },
-            "disk": {
-                "total_gb": disk_usage.total / (1024**3),
-                "free_gb": disk_usage.free / (1024**3),
-                "percent": (disk_usage.used / disk_usage.total) * 100,
-                "read_mb": disk_io.read_bytes / (1024**2) if disk_io else 0,
-                "write_mb": disk_io.write_bytes / (1024**2) if disk_io else 0,
+            'memory': {
+                'total_gb': memory.total / (1024**3),
+                'available_gb': memory.available / (1024**3),
+                'percent': memory.percent,
+                'swap_percent': swap.percent
             },
-            "network": {
-                "bytes_sent_mb": network_io.bytes_sent / (1024**2),
-                "bytes_recv_mb": network_io.bytes_recv / (1024**2),
+            'disk': {
+                'total_gb': disk_usage.total / (1024**3),
+                'free_gb': disk_usage.free / (1024**3),
+                'percent': (disk_usage.used / disk_usage.total) * 100,
+                'read_mb': disk_io.read_bytes / (1024**2) if disk_io else 0,
+                'write_mb': disk_io.write_bytes / (1024**2) if disk_io else 0
             },
+            'network': {
+                'bytes_sent_mb': network_io.bytes_sent / (1024**2),
+                'bytes_recv_mb': network_io.bytes_recv / (1024**2)
+            }
         }
 
     def monitor_benchmark(self, benchmark, duration_minutes: int = 60):
@@ -981,7 +987,11 @@ class TPCDIMonitor:
                 benchmark_metrics = benchmark.get_enhanced_etl_status()
                 etl_metrics = benchmark.get_etl_status()
 
-                combined_metrics = {"system": system_metrics, "benchmark": benchmark_metrics, "etl": etl_metrics}
+                combined_metrics = {
+                    'system': system_metrics,
+                    'benchmark': benchmark_metrics,
+                    'etl': etl_metrics
+                }
 
                 metrics_log.append(combined_metrics)
 
@@ -996,7 +1006,7 @@ class TPCDIMonitor:
 
         # Save metrics to file
         metrics_file = self.log_dir / f"metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        with open(metrics_file, "w") as f:
+        with open(metrics_file, 'w') as f:
             json.dump(metrics_log, f, indent=2)
 
         self.logger.info(f"Monitoring completed. Metrics saved to {metrics_file}")
@@ -1004,23 +1014,22 @@ class TPCDIMonitor:
     def check_alerts(self, metrics: Dict[str, Any]):
         """Check for alert conditions."""
         # CPU alert
-        if metrics["cpu"]["percent"] > 90:
+        if metrics['cpu']['percent'] > 90:
             self.logger.warning(f"High CPU usage: {metrics['cpu']['percent']:.1f}%")
 
         # Memory alert
-        if metrics["memory"]["percent"] > 85:
+        if metrics['memory']['percent'] > 85:
             self.logger.warning(f"High memory usage: {metrics['memory']['percent']:.1f}%")
 
         # Disk alert
-        if metrics["disk"]["percent"] > 80:
+        if metrics['disk']['percent'] > 80:
             self.logger.warning(f"High disk usage: {metrics['disk']['percent']:.1f}%")
 
         # Load average alert
-        cpu_count = metrics["cpu"]["count"]
-        load_5min = metrics["cpu"]["load_avg"][1]
+        cpu_count = metrics['cpu']['count']
+        load_5min = metrics['cpu']['load_avg'][1]
         if load_5min > cpu_count * 2:
             self.logger.warning(f"High load average: {load_5min:.2f} (cores: {cpu_count})")
-
 
 # Usage example
 if __name__ == "__main__":
@@ -1080,7 +1089,6 @@ import tempfile
 from pathlib import Path
 from benchbox import TPCDI
 
-
 def health_check() -> bool:
     """Perform basic health check of TPC-DI installation."""
     try:
@@ -1113,8 +1121,7 @@ def health_check() -> bool:
 
             # Test 6: Database operations
             import sqlite3
-
-            with sqlite3.connect(":memory:") as conn:
+            with sqlite3.connect(':memory:') as conn:
                 benchmark.load_data_to_database(conn)
 
                 # Test a simple query
@@ -1129,7 +1136,6 @@ def health_check() -> bool:
     except Exception as e:
         print(f"❌ Health check failed: {e}")
         return False
-
 
 if __name__ == "__main__":
     success = health_check()
@@ -1214,14 +1220,12 @@ psycopg2.OperationalError: could not connect to server
 ```python
 # Verify connection string
 import os
-
-os.environ["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/tpcdi"
+os.environ['DATABASE_URL'] = 'postgresql://user:pass@localhost:5432/tpcdi'
 
 # Test connection separately
 import psycopg2
-
 try:
-    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
     print("Connection successful")
     conn.close()
 except Exception as e:
@@ -1229,8 +1233,7 @@ except Exception as e:
 
 # Use connection pooling for production
 from psycopg2 import pool
-
-connection_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, os.environ["DATABASE_URL"])
+connection_pool = psycopg2.pool.ThreadedConnectionPool(1, 10, os.environ['DATABASE_URL'])
 ```
 
 #### 5. Query Execution Errors
@@ -1243,12 +1246,11 @@ ProgrammingError: syntax error at or near "LIMIT"
 **Solutions**:
 ```python
 # Use correct SQL dialect
-translated_query = benchmark.translate_query(query_id, dialect="postgres")
+translated_query = benchmark.translate_query(query_id, dialect='postgres')
 
 # Check database-specific syntax
 # Enable query debugging
 import logging
-
 logging.basicConfig(level=logging.DEBUG)
 ```
 
@@ -1261,17 +1263,20 @@ import os
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 
 # Enable debug logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 # Create debug benchmark
 benchmark = TPCDIBenchmark(
     scale_factor=0.01,  # Small scale for debugging
-    output_dir=Path("/tmp/tpcdi_debug"),
+    output_dir=Path('/tmp/tpcdi_debug')
 )
 
 # Enable all debug features
-os.environ["TPCDI_DEBUG"] = "true"
-os.environ["TPCDI_VERBOSE"] = "true"
+os.environ['TPCDI_DEBUG'] = 'true'
+os.environ['TPCDI_VERBOSE'] = 'true'
 
 # Run with detailed error reporting
 try:
@@ -1291,7 +1296,6 @@ import subprocess
 import importlib
 from pathlib import Path
 
-
 def run_diagnostics():
     """Run systematic diagnostics."""
     print("TPC-DI Diagnostic Report")
@@ -1302,20 +1306,19 @@ def run_diagnostics():
     print(f"Python executable: {sys.executable}")
 
     # Required packages
-    packages = ["benchbox", "numpy", "sqlglot", "pytest"]
+    packages = ['benchbox', 'numpy', 'sqlglot', 'pytest']
     for package in packages:
         try:
             module = importlib.import_module(package)
-            version = getattr(module, "__version__", "unknown")
+            version = getattr(module, '__version__', 'unknown')
             print(f"✅ {package}: {version}")
         except ImportError:
             print(f"❌ {package}: not installed")
 
     # System resources
     import psutil
-
     memory = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage('/')
 
     print(f"\nSystem Resources:")
     print(f"CPU cores: {psutil.cpu_count()}")
@@ -1326,22 +1329,20 @@ def run_diagnostics():
     print(f"\nDatabase Connectivity:")
     try:
         import sqlite3
-
-        sqlite3.connect(":memory:").close()
+        sqlite3.connect(':memory:').close()
         print("✅ SQLite: available")
     except Exception as e:
         print(f"❌ SQLite: {e}")
 
     try:
         import duckdb
-
-        duckdb.connect(":memory:").close()
+        duckdb.connect(':memory:').close()
         print("✅ DuckDB: available")
     except Exception as e:
         print(f"❌ DuckDB: {e}")
 
     # Permission checks
-    test_dirs = ["/tmp", "/var/log", "/data"]
+    test_dirs = ['/tmp', '/var/log', '/data']
     print(f"\nDirectory Permissions:")
     for test_dir in test_dirs:
         path = Path(test_dir)
@@ -1352,7 +1353,6 @@ def run_diagnostics():
                 print(f"⚠️ {test_dir}: not writable")
         else:
             print(f"- {test_dir}: does not exist")
-
 
 if __name__ == "__main__":
     run_diagnostics()
@@ -1368,59 +1368,56 @@ import os
 import stat
 from pathlib import Path
 
-
 def secure_directory_setup(base_dir: Path):
     """Set up secure directory permissions."""
 
     # Create directories with secure permissions
     directories = {
-        "data": base_dir / "data",
-        "logs": base_dir / "logs",
-        "temp": base_dir / "temp",
-        "config": base_dir / "config",
+        'data': base_dir / 'data',
+        'logs': base_dir / 'logs',
+        'temp': base_dir / 'temp',
+        'config': base_dir / 'config'
     }
 
     for name, path in directories.items():
         path.mkdir(parents=True, exist_ok=True)
 
-        if name == "config":
+        if name == 'config':
             # Config directory: owner read/write only
             os.chmod(path, stat.S_IRWXU)  # 700
-        elif name == "logs":
+        elif name == 'logs':
             # Log directory: owner read/write, group read
             os.chmod(path, stat.S_IRWXU | stat.S_IRGRP)  # 740
         else:
             # Data/temp directories: owner read/write, group read
             os.chmod(path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP)  # 750
 
-
 def validate_database_connection(connection_string: str) -> bool:
     """Validate database connection security."""
 
     # Check for secure connection
-    if connection_string.startswith("postgresql://"):
+    if connection_string.startswith('postgresql://'):
         # Ensure SSL is used in production
-        if "sslmode=require" not in connection_string:
+        if 'sslmode=require' not in connection_string:
             print("WARNING: PostgreSQL connection should use SSL in production")
             return False
 
     # Check for embedded credentials
-    if "@" in connection_string:
+    if '@' in connection_string:
         # Connection string contains credentials
-        parts = connection_string.split("@")
+        parts = connection_string.split('@')
         if len(parts) > 1:
             print("WARNING: Credentials in connection string. Use environment variables.")
             return False
 
     return True
 
-
 # Environment variable validation
 def validate_environment():
     """Validate security-related environment variables."""
 
-    required_vars = ["DATABASE_URL", "TPCDI_DATA_DIR"]
-    optional_vars = ["TPCDI_LOG_LEVEL", "TPCDI_WORKERS"]
+    required_vars = ['DATABASE_URL', 'TPCDI_DATA_DIR']
+    optional_vars = ['TPCDI_LOG_LEVEL', 'TPCDI_WORKERS']
 
     for var in required_vars:
         if not os.getenv(var):
@@ -1428,7 +1425,7 @@ def validate_environment():
             return False
 
     # Validate database URL security
-    db_url = os.getenv("DATABASE_URL")
+    db_url = os.getenv('DATABASE_URL')
     if not validate_database_connection(db_url):
         return False
 
@@ -1444,7 +1441,6 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 
-
 class DataProtection:
     def __init__(self, encryption_key: str = None):
         self.encryption_key = encryption_key
@@ -1458,7 +1454,10 @@ class DataProtection:
         sanitized = log_data.copy()
 
         # Fields to sanitize
-        sensitive_fields = ["password", "secret", "key", "token", "credential", "DATABASE_URL", "connection_string"]
+        sensitive_fields = [
+            'password', 'secret', 'key', 'token', 'credential',
+            'DATABASE_URL', 'connection_string'
+        ]
 
         def sanitize_dict(d):
             if isinstance(d, dict):
@@ -1478,7 +1477,7 @@ class DataProtection:
         """Write files with secure permissions."""
 
         # Write data
-        with open(file_path, "w") as f:
+        with open(file_path, 'w') as f:
             if isinstance(data, dict):
                 json.dump(data, f, indent=2)
             else:

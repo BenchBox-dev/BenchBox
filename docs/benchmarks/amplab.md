@@ -227,7 +227,9 @@ queries = amplab.get_queries()
 print(f"Generated {len(queries)} AMPLab queries")
 
 # Get specific query with parameters
-scan_query = amplab.get_query("1", params={"pagerank_threshold": 1000})
+scan_query = amplab.get_query("1", params={
+    'pagerank_threshold': 1000
+})
 print(scan_query)
 ```
 
@@ -261,7 +263,11 @@ schema_sql = amplab.get_create_tables_sql()
 conn.execute(schema_sql)
 
 # Load AMPLab tables
-table_mappings = {"rankings": "rankings.csv", "uservisits": "uservisits.csv", "documents": "documents.csv"}
+table_mappings = {
+    'rankings': 'rankings.csv',
+    'uservisits': 'uservisits.csv',
+    'documents': 'documents.csv'
+}
 
 for table_name, file_name in table_mappings.items():
     file_path = amplab.output_dir / file_name
@@ -276,12 +282,12 @@ for table_name, file_name in table_mappings.items():
 
 # Run AMPLab benchmark queries
 query_params = {
-    "pagerank_threshold": 1000,
-    "start_date": "1980-01-01",
-    "end_date": "1980-04-01",
-    "limit_rows": 100,
-    "search_term": "google",
-    "min_visits": 10,
+    'pagerank_threshold': 1000,
+    'start_date': '1980-01-01',
+    'end_date': '1980-04-01',
+    'limit_rows': 100,
+    'search_term': 'google',
+    'min_visits': 10
 }
 
 # Query 1: Scan performance
@@ -307,39 +313,41 @@ from pyspark.sql import SparkSession
 from benchbox import AMPLab
 
 # Initialize Spark for big data processing
-spark = (
-    SparkSession.builder.appName("AMPLab-Benchmark")
-    .config("spark.sql.adaptive.enabled", "true")
-    .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+spark = SparkSession.builder \
+    .appName("AMPLab-Benchmark") \
+    .config("spark.sql.adaptive.enabled", "true") \
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
     .getOrCreate()
-)
 
 # Generate large-scale data
 amplab = AMPLab(scale_factor=100, output_dir="/data/amplab_sf100")
 data_files = amplab.generate_data()
 
 # Load data into Spark DataFrames with optimizations
-rankings_df = spark.read.csv("/data/amplab_sf100/rankings.csv", header=True, inferSchema=True)
+rankings_df = spark.read.csv("/data/amplab_sf100/rankings.csv",
+                            header=True, inferSchema=True)
 rankings_df = rankings_df.repartition(200, "pageRank")  # Partition by pageRank
 rankings_df.cache()
 rankings_df.createOrReplaceTempView("rankings")
 
-uservisits_df = spark.read.csv("/data/amplab_sf100/uservisits.csv", header=True, inferSchema=True)
+uservisits_df = spark.read.csv("/data/amplab_sf100/uservisits.csv",
+                              header=True, inferSchema=True)
 uservisits_df = uservisits_df.repartition(400, "visitDate")  # Partition by date
 uservisits_df.cache()
 uservisits_df.createOrReplaceTempView("uservisits")
 
-documents_df = spark.read.csv("/data/amplab_sf100/documents.csv", header=True, inferSchema=True)
+documents_df = spark.read.csv("/data/amplab_sf100/documents.csv",
+                             header=True, inferSchema=True)
 documents_df.createOrReplaceTempView("documents")
 
 # Run benchmark queries with Spark SQL
 query_params = {
-    "pagerank_threshold": 1000,
-    "start_date": "1980-01-01",
-    "end_date": "1980-04-01",
-    "limit_rows": 1000,
-    "search_term": "google",
-    "min_visits": 10,
+    'pagerank_threshold': 1000,
+    'start_date': '1980-01-01',
+    'end_date': '1980-04-01',
+    'limit_rows': 1000,
+    'search_term': 'google',
+    'min_visits': 10
 }
 
 # Scan Query - Test columnar scanning
@@ -373,7 +381,6 @@ import time
 from typing import Dict, List
 from statistics import mean, median
 
-
 class AMPLabPerformanceTester:
     def __init__(self, amplab: AMPLab, connection):
         self.amplab = amplab
@@ -381,7 +388,11 @@ class AMPLabPerformanceTester:
 
     def benchmark_query_type(self, query_type: str, iterations: int = 3) -> Dict:
         """Benchmark specific AMPLab query type."""
-        query_mappings = {"scan": ["1", "1a"], "join": ["2", "2a"], "analytics": ["3", "3a"]}
+        query_mappings = {
+            'scan': ['1', '1a'],
+            'join': ['2', '2a'],
+            'analytics': ['3', '3a']
+        }
 
         if query_type not in query_mappings:
             raise ValueError(f"Invalid query type: {query_type}")
@@ -391,12 +402,12 @@ class AMPLabPerformanceTester:
 
         # Standard parameters for reproducible testing
         params = {
-            "pagerank_threshold": 1000,
-            "start_date": "1980-01-01",
-            "end_date": "1980-04-01",
-            "limit_rows": 100,
-            "search_term": "google",
-            "min_visits": 10,
+            'pagerank_threshold': 1000,
+            'start_date': '1980-01-01',
+            'end_date': '1980-04-01',
+            'limit_rows': 100,
+            'search_term': 'google',
+            'min_visits': 10
         }
 
         for query_id in query_ids:
@@ -414,13 +425,13 @@ class AMPLabPerformanceTester:
                 print(f"  Iteration {iteration + 1}: {execution_time:.3f}s")
 
             results[query_id] = {
-                "type": query_type,
-                "avg_time": mean(times),
-                "median_time": median(times),
-                "min_time": min(times),
-                "max_time": max(times),
-                "rows_returned": len(result),
-                "times": times,
+                'type': query_type,
+                'avg_time': mean(times),
+                'median_time': median(times),
+                'min_time': min(times),
+                'max_time': max(times),
+                'rows_returned': len(result),
+                'times': times
             }
 
         return results
@@ -430,7 +441,7 @@ class AMPLabPerformanceTester:
         complete_results = {}
 
         # Test each query type
-        for query_type in ["scan", "join", "analytics"]:
+        for query_type in ['scan', 'join', 'analytics']:
             print(f"\\nRunning {query_type.upper()} queries...")
             type_results = self.benchmark_query_type(query_type)
             complete_results[query_type] = type_results
@@ -439,16 +450,14 @@ class AMPLabPerformanceTester:
         all_times = []
         for type_data in complete_results.values():
             for query_data in type_data.values():
-                all_times.extend(query_data["times"])
+                all_times.extend(query_data['times'])
 
-        complete_results["summary"] = {
-            "total_queries": sum(
-                len(type_data) for type_data in complete_results.values() if isinstance(type_data, dict)
-            ),
-            "total_avg_time": mean(all_times),
-            "total_median_time": median(all_times),
-            "total_min_time": min(all_times),
-            "total_max_time": max(all_times),
+        complete_results['summary'] = {
+            'total_queries': sum(len(type_data) for type_data in complete_results.values() if isinstance(type_data, dict)),
+            'total_avg_time': mean(all_times),
+            'total_median_time': median(all_times),
+            'total_min_time': min(all_times),
+            'total_max_time': max(all_times)
         }
 
         return complete_results
@@ -461,7 +470,10 @@ class AMPLabPerformanceTester:
             print(f"\\nTesting scale factor {scale_factor}...")
 
             # Generate data at this scale
-            test_amplab = AMPLab(scale_factor=scale_factor, output_dir=f"amplab_sf{scale_factor}")
+            test_amplab = AMPLab(
+                scale_factor=scale_factor,
+                output_dir=f"amplab_sf{scale_factor}"
+            )
             test_amplab.generate_data()
 
             # Load data (simplified - would need actual loading logic)
@@ -473,14 +485,13 @@ class AMPLabPerformanceTester:
 
         return scalability_results
 
-
 # Usage
 performance_tester = AMPLabPerformanceTester(amplab, conn)
 
 # Test individual query types
-scan_results = performance_tester.benchmark_query_type("scan")
-join_results = performance_tester.benchmark_query_type("join")
-analytics_results = performance_tester.benchmark_query_type("analytics")
+scan_results = performance_tester.benchmark_query_type('scan')
+join_results = performance_tester.benchmark_query_type('join')
+analytics_results = performance_tester.benchmark_query_type('analytics')
 
 print("\\nQuery Type Performance Summary:")
 print(f"Scan Queries: {scan_results}")
@@ -542,13 +553,13 @@ amplab = AMPLab(
     scale_factor=1.0,
     output_dir="amplab_data",
     # Data generation options
-    date_range_days=90,  # Range of visit dates
-    pagerank_max=1000,  # Maximum page rank value
+    date_range_days=90,      # Range of visit dates
+    pagerank_max=1000,       # Maximum page rank value
     generate_documents=True,  # Include document content
-    text_length_avg=2000,  # Average document length
+    text_length_avg=2000,    # Average document length
     # Performance options
     partition_by_date=True,  # Partition uservisits by date
-    compress_output=True,  # Compress generated files
+    compress_output=True     # Compress generated files
 )
 ```
 
@@ -561,7 +572,7 @@ import clickhouse_connect
 from benchbox import AMPLab
 
 # Initialize ClickHouse for analytics workloads
-client = clickhouse_connect.get_client(host="localhost", port=8123)
+client = clickhouse_connect.get_client(host='localhost', port=8123)
 amplab = AMPLab(scale_factor=1.0, output_dir="amplab_data")
 
 # Generate data
@@ -603,20 +614,20 @@ ORDER BY url;
 client.execute(create_tables_sql)
 
 # Load data using ClickHouse CSV import
-for table_name in ["rankings", "uservisits", "documents"]:
+for table_name in ['rankings', 'uservisits', 'documents']:
     file_path = amplab.output_dir / f"{table_name}.csv"
 
-    with open(file_path, "rb") as f:
-        client.insert_file(table_name, f, fmt="CSV")
+    with open(file_path, 'rb') as f:
+        client.insert_file(table_name, f, fmt='CSV')
 
 # Run configured AMPLab queries
 query_params = {
-    "pagerank_threshold": 1000,
-    "start_date": "1980-01-01",
-    "end_date": "1980-04-01",
-    "limit_rows": 100,
-    "search_term": "google",
-    "min_visits": 10,
+    'pagerank_threshold': 1000,
+    'start_date': '1980-01-01',
+    'end_date': '1980-04-01',
+    'limit_rows': 100,
+    'search_term': 'google',
+    'min_visits': 10
 }
 
 # Scan query with ClickHouse optimizations
@@ -795,7 +806,7 @@ amplab = AMPLab(
     scale_factor=100.0,
     output_dir="/data/amplab_large",
     streaming_generation=True,  # Generate in chunks
-    chunk_size=10000000,  # 10M rows per chunk
+    chunk_size=10000000         # 10M rows per chunk
 )
 ```
 

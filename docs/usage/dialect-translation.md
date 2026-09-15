@@ -137,7 +137,11 @@ benchmark = TPCH(scale_factor=0.01)
 benchmark.generate_data()
 
 # Your MySQL connection
-mysql_conn = mysql.connector.connect(host="localhost", user="root", database="benchbox")
+mysql_conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    database="benchbox"
+)
 
 # Get MySQL-translated queries
 for query_id in range(1, 23):
@@ -187,9 +191,11 @@ for query_id in range(1, 23):
     target_query = benchmark.translate_query(query_id, target_dialect)
 
     if source_query != target_query:
-        differences.append(
-            {"query_id": query_id, "source_length": len(source_query), "target_length": len(target_query)}
-        )
+        differences.append({
+            "query_id": query_id,
+            "source_length": len(source_query),
+            "target_length": len(target_query)
+        })
 
 print(f"Found {len(differences)} queries with dialect differences")
 ```
@@ -279,7 +285,11 @@ except Exception as e:
 All benchmark classes inherit from `BaseBenchmark` and provide:
 
 ```python
-def translate_query(self, query_id: Union[int, str], dialect: str) -> str:
+def translate_query(
+    self,
+    query_id: Union[int, str],
+    dialect: str
+) -> str:
     """Translate query to target SQL dialect.
 
     Args:

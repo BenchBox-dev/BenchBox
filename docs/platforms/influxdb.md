@@ -49,7 +49,6 @@ This installs:
 
 ```python
 from benchbox.platforms.influxdb import InfluxDBAdapter, INFLUXDB_AVAILABLE
-
 print(f"InfluxDB support available: {INFLUXDB_AVAILABLE}")
 ```
 
@@ -239,7 +238,6 @@ else:
 
 ```python
 import logging
-
 logging.getLogger("benchbox.platforms.influxdb").setLevel(logging.DEBUG)
 ```
 

@@ -52,8 +52,8 @@ identical (lines 30-117 in each file).
 
 ```python
 class OperationsRegistryBase(Generic[OperationT]):
-    def __init__(self, version: int, operations: dict[str, OperationT]) -> None: ...
-
+    def __init__(self, version: int, operations: dict[str, OperationT]) -> None:
+        ...
 
 # Subclass:
 class TransactionOperationsManager(OperationsRegistryBase[WriteOperation]):
@@ -89,10 +89,8 @@ auto-setup):
 
 ```python
 # Both files lines 823-842 / 968-988 (identical logic):
-if not connection:
-    raise ValueError(...)
-if not hasattr(connection, "execute"):
-    raise ValueError(...)
+if not connection: raise ValueError(...)
+if not hasattr(connection, "execute"): raise ValueError(...)
 platform_key = kwargs.get("platform_key")
 sql_override = kwargs.get("sql_override")
 operation = self.operations_manager.get_operation(operation_id)

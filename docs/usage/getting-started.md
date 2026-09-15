@@ -131,7 +131,9 @@ benchmark.generate_data()
 conn.execute(benchmark.get_create_tables_sql())
 
 for table, path in benchmark.tables.items():
-    conn.execute(f"COPY {table} FROM '{path}' (DELIMITER '|' NULL '' HEADER FALSE);")
+    conn.execute(
+        f"COPY {table} FROM '{path}' (DELIMITER '|' NULL '' HEADER FALSE);"
+    )
 
 rows = conn.execute(benchmark.get_query(1)).fetchall()
 print(f"Query 1 returned {len(rows)} rows")

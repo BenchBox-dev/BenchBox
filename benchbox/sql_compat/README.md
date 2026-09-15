@@ -57,10 +57,7 @@ Decision rules:
    from benchbox.sql_compat.registry import REGISTRY
    from benchbox.sql_compat.context import Phase
    from benchbox.sql_compat.decision import (
-       CompatibilityDecision,
-       CompatAction,
-       SupportLevel,
-       FailureMode,
+       CompatibilityDecision, CompatAction, SupportLevel, FailureMode,
        RewriteDDLPayload,
    )
 
@@ -89,7 +86,6 @@ Decision rules:
    from typing import ClassVar
    from benchbox.platforms.base.ddl_helpers import strip_foreign_keys
    from benchbox.platforms.base.ddl_optimizer import BaseDdlOptimizer
-
 
    class MyPlatformAdapter(BaseDdlOptimizer, PlatformAdapter):
        _platform_key: ClassVar[str] = "myplatform"

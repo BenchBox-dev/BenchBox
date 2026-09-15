@@ -234,20 +234,14 @@ Agent picks up `motherduck-platform-adapter`. YAML has `w3` ready and
 
 ```python
 # Agent creates TodoWrite tasks:
-TodoWrite(
-    [
-        {
-            "content": "Handle md: connection string syntax (w3)",
-            "activeForm": "Implementing md: connection string handling",
-            "status": "in_progress",
-        },
-        {
-            "content": "Unit tests with mocked connection (w4)",
-            "activeForm": "Writing unit tests for MotherDuck adapter",
-            "status": "pending",
-        },
-    ]
-)
+TodoWrite([
+    {"content": "Handle md: connection string syntax (w3)",
+     "activeForm": "Implementing md: connection string handling",
+     "status": "in_progress"},
+    {"content": "Unit tests with mocked connection (w4)",
+     "activeForm": "Writing unit tests for MotherDuck adapter",
+     "status": "pending"},
+])
 ```
 
 Agent completes w3, updates YAML (`w3.status: done`), marks w3 completed

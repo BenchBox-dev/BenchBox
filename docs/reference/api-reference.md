@@ -16,7 +16,6 @@ Base abstract class that all benchmarks inherit from.
 ```python
 from benchbox.base import BaseBenchmark
 
-
 class BaseBenchmark(ABC):
     def __init__(self, scale_factor: float = 1.0, output_dir: Optional[Path] = None):
         """Initialize benchmark with scale factor and output directory."""
@@ -95,7 +94,6 @@ Get DDL statements to create benchmark tables.
 ddl = tpch.get_create_tables_sql()
 # Use with DuckDB (recommended)
 import duckdb
-
 conn = duckdb.connect(":memory:")
 conn.execute(ddl)
 ```
@@ -110,7 +108,7 @@ Get benchmark schema information.
 schema = tpch.get_schema()
 for table in schema:
     print(f"Table: {table['name']}")
-    for column in table["columns"]:
+    for column in table['columns']:
         print(f"  {column['name']}: {column['type']}")
 ```
 
@@ -257,10 +255,16 @@ from pathlib import Path
 from benchbox import TPCH
 
 # Development configuration
-tpch_dev = TPCH(scale_factor=0.01, output_dir=Path("./benchmark_data"))
+tpch_dev = TPCH(
+    scale_factor=0.01,
+    output_dir=Path("./benchmark_data")
+)
 
 # Production configuration
-tpch_prod = TPCH(scale_factor=1.0, output_dir=Path("/var/lib/benchbox"))
+tpch_prod = TPCH(
+    scale_factor=1.0,
+    output_dir=Path("/var/lib/benchbox")
+)
 ```
 
 ---

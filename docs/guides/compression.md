@@ -41,7 +41,11 @@ from benchbox.core.ssb.benchmark import SSBBenchmark
 
 # Create benchmark with compression
 benchmark = SSBBenchmark(
-    scale_factor=1.0, output_dir="./data", compress_data=True, compression_type="zstd", compression_level=5
+    scale_factor=1.0,
+    output_dir="./data",
+    compress_data=True,
+    compression_type='zstd',
+    compression_level=5
 )
 
 # Generate compressed data
@@ -142,7 +146,6 @@ To add compression support to a custom data generator:
 ```python
 from benchbox.utils.compression_mixin import CompressionMixin
 
-
 class MyDataGenerator(CompressionMixin):
     def __init__(self, scale_factor=1.0, output_dir=None, **kwargs):
         # Initialize compression mixin
@@ -183,9 +186,9 @@ class MyBenchmark(BaseBenchmark):
         self.data_generator = MyDataGenerator(
             scale_factor=scale_factor,
             output_dir=self.output_dir,
-            compress_data=config.get("compress_data", False),
-            compression_type=config.get("compression_type", "zstd"),
-            compression_level=config.get("compression_level", None),
+            compress_data=config.get('compress_data', False),
+            compression_type=config.get('compression_type', 'zstd'),
+            compression_level=config.get('compression_level', None)
         )
 ```
 
@@ -328,7 +331,7 @@ compressor = manager.get_compressor(compression_type)
 
 # Test decompression
 try:
-    with compressor.open_for_read(Path("data.csv.gz"), "rt") as f:
+    with compressor.open_for_read(Path("data.csv.gz"), 'rt') as f:
         content = f.read(100)  # Read first 100 characters
     print("File is valid")
 except Exception as e:
@@ -348,7 +351,7 @@ manager = CompressionManager()
 compressors = manager.get_available_compressors()
 
 # Get specific compressor
-compressor = manager.get_compressor("zstd", level=5)
+compressor = manager.get_compressor('zstd', level=5)
 
 # Detect compression type
 compression_type = manager.detect_compression(Path("file.csv.gz"))

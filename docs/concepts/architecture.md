@@ -134,9 +134,16 @@ See: [Platform Selection Guide](../platforms/platform-selection-guide.md)
     "execution_id": "tpch_1234567890",
     "timestamp": "2025-10-12T10:30:00Z",
     "total_execution_time": 45.2,
-    "query_results": [{"query_id": "q1", "execution_time": 2.1, "status": "SUCCESS", "row_count": 4}],
-    "execution_phases": {...},
-    "validation_status": "PASSED",
+    "query_results": [
+        {
+            "query_id": "q1",
+            "execution_time": 2.1,
+            "status": "SUCCESS",
+            "row_count": 4
+        }
+    ],
+    "execution_phases": { ... },
+    "validation_status": "PASSED"
 }
 ```
 

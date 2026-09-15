@@ -66,7 +66,6 @@ BenchBox defines formal protocol interfaces matching PEP 249 in `benchbox/core/c
 ```python
 class DBCursor(Protocol):
     """DB-API 2.0 compliant cursor protocol."""
-
     def execute(self, query: str, parameters: Optional[Any] = None) -> Any: ...
     def executemany(self, query: str, parameters: list[Any]) -> Any: ...
     def fetchone(self) -> Optional[tuple[Any, ...]]: ...
@@ -76,10 +75,8 @@ class DBCursor(Protocol):
     def __enter__(self) -> "DBCursor": ...
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None: ...
 
-
 class DBConnection(Protocol):
     """DB-API 2.0 compliant connection protocol."""
-
     def cursor(self) -> DBCursor: ...
     def commit(self) -> None: ...
     def rollback(self) -> None: ...
@@ -149,7 +146,8 @@ The wrapper supports multiple parameter types as allowed by DB API 2.0:
 execute("SELECT * FROM users WHERE id = ? AND status = ?", [1, "active"])
 
 # Dict parameters (named)
-execute("SELECT * FROM users WHERE id = :id AND status = :status", {"id": 1, "status": "active"})
+execute("SELECT * FROM users WHERE id = :id AND status = :status",
+        {"id": 1, "status": "active"})
 
 # Tuple parameters (positional)
 execute("SELECT * FROM users WHERE id = ? AND status = ?", (1, "active"))
@@ -180,14 +178,14 @@ def _get_parameter_placeholder(self, connection: Any) -> str:
     """Detect SQL parameter placeholder style for platform."""
     connection_type = type(connection).__name__.lower()
 
-    if "sqlite" in connection_type or "duckdb" in connection_type:
-        return "?"  # qmark style - PEP 249 standard
-    elif "psycopg" in connection_type or "postgres" in connection_type:
-        return "%s"  # format style - PEP 249 standard
-    elif "mysql" in connection_type:
-        return "%s"  # format style
+    if 'sqlite' in connection_type or 'duckdb' in connection_type:
+        return '?'  # qmark style - PEP 249 standard
+    elif 'psycopg' in connection_type or 'postgres' in connection_type:
+        return '%s'  # format style - PEP 249 standard
+    elif 'mysql' in connection_type:
+        return '%s'  # format style
     else:
-        return "?"  # Default to DB-API 2.0 qmark style
+        return '?'  # Default to DB-API 2.0 qmark style
 ```
 
 **Location**:
@@ -461,7 +459,10 @@ BenchBox validates that all connections support at least one DB API 2.0 pattern:
 
 ```python
 if not hasattr(connection, "cursor") and not hasattr(connection, "execute"):
-    raise ValueError("Connection object must have either 'cursor' or 'execute' method to be DB-API compatible")
+    raise ValueError(
+        "Connection object must have either 'cursor' or 'execute' method "
+        "to be DB-API compatible"
+    )
 ```
 
 **Location**: `benchbox/core/connection.py:40-41`

@@ -60,7 +60,6 @@ Back in BenchBox, the original `ascii/` modules became thin compatibility shims,
 
 ```python
 """Compatibility shim, delegates to textcharts.histogram."""
-
 from textcharts.histogram import *  # noqa: F401, F403
 ```
 
@@ -86,7 +85,9 @@ Each rename forced BenchBox to make its data transformation explicit. Where char
 
 ```python
 # BenchBox domain (query_id, execution_time_ms) -> textcharts (label, value)
-histogram_data.append(HistogramBar(label=query_id, value=mean_latency, platform=platform))
+histogram_data.append(
+    HistogramBar(label=query_id, value=mean_latency, platform=platform)
+)
 ```
 
 That mapping was always happening, but now it's visible, testable, and documented.

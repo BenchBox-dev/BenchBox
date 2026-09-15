@@ -238,7 +238,11 @@ tpcdi = TPCDI(scale_factor=1.0, output_dir="tpcdi_etl")
 source_data = tpcdi.generate_source_data()
 
 # Transform and load data (simplified example)
-transformation_results = tpcdi.run_etl_process(source_data=source_data, batch_id=1, effective_date="2023-01-01")
+transformation_results = tpcdi.run_etl_process(
+    source_data=source_data,
+    batch_id=1,
+    effective_date="2023-01-01"
+)
 
 # Validate ETL results
 validation_results = {}
@@ -265,18 +269,10 @@ conn.execute(schema_sql)
 
 # Load dimension and fact tables
 tables_to_load = [
-    "DimCustomer",
-    "DimAccount",
-    "DimSecurity",
-    "DimCompany",
-    "DimBroker",
-    "DimDate",
-    "DimTime",
-    "FactTrade",
-    "FactCashBalances",
-    "FactHoldings",
-    "FactMarketHistory",
-    "FactWatches",
+    'DimCustomer', 'DimAccount', 'DimSecurity', 'DimCompany',
+    'DimBroker', 'DimDate', 'DimTime',
+    'FactTrade', 'FactCashBalances', 'FactHoldings',
+    'FactMarketHistory', 'FactWatches'
 ]
 
 for table_name in tables_to_load:
@@ -353,7 +349,10 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
         -- New customers
         SELECT CustomerID FROM new_customers
     );
-    """.format(effective_date=effective_date, batch_id=batch_id)
+    """.format(
+        effective_date=effective_date,
+        batch_id=batch_id
+    )
 
     return scd_logic
 ```
@@ -421,11 +420,11 @@ tpcdi = TPCDI(
     scale_factor=1.0,
     output_dir="tpcdi_data",
     # ETL-specific configuration
-    batch_size=10000,  # Records per batch
-    enable_scd=True,  # Enable SCD Type 2 processing
-    validate_data=True,  # Run data quality checks
-    audit_trail=True,  # Enable audit logging
-    parallel_loading=4,  # Parallel load processes
+    batch_size=10000,           # Records per batch
+    enable_scd=True,            # Enable SCD Type 2 processing
+    validate_data=True,         # Run data quality checks
+    audit_trail=True,           # Enable audit logging
+    parallel_loading=4          # Parallel load processes
 )
 ```
 
@@ -439,23 +438,23 @@ from airflow.operators.python import PythonOperator
 from benchbox import TPCDI
 from datetime import datetime, timedelta
 
-
 def extract_source_data(**context):
     """Extract data from source systems."""
     tpcdi = TPCDI(scale_factor=1.0)
     source_data = tpcdi.generate_source_data()
     return source_data
 
-
 def transform_and_load(**context):
     """Transform and load data into warehouse."""
     tpcdi = TPCDI(scale_factor=1.0)
-    batch_id = context["batch_id"]
+    batch_id = context['batch_id']
 
     # Run ETL transformations
-    results = tpcdi.run_etl_process(batch_id=batch_id, effective_date=context["ds"])
+    results = tpcdi.run_etl_process(
+        batch_id=batch_id,
+        effective_date=context['ds']
+    )
     return results
-
 
 def validate_data_quality(**context):
     """Run data quality validation."""
@@ -467,29 +466,40 @@ def validate_data_quality(**context):
 
     return validation_results
 
-
 # Define DAG
 dag = DAG(
-    "tpcdi_etl_pipeline",
+    'tpcdi_etl_pipeline',
     default_args={
-        "owner": "data-team",
-        "depends_on_past": False,
-        "start_date": datetime(2023, 1, 1),
-        "email_on_failure": True,
-        "retries": 1,
-        "retry_delay": timedelta(minutes=5),
+        'owner': 'data-team',
+        'depends_on_past': False,
+        'start_date': datetime(2023, 1, 1),
+        'email_on_failure': True,
+        'retries': 1,
+        'retry_delay': timedelta(minutes=5)
     },
-    description="TPC-DI ETL Pipeline",
-    schedule_interval="@daily",
-    catchup=False,
+    description='TPC-DI ETL Pipeline',
+    schedule_interval='@daily',
+    catchup=False
 )
 
 # Define tasks
-extract_task = PythonOperator(task_id="extract_source_data", python_callable=extract_source_data, dag=dag)
+extract_task = PythonOperator(
+    task_id='extract_source_data',
+    python_callable=extract_source_data,
+    dag=dag
+)
 
-transform_task = PythonOperator(task_id="transform_and_load", python_callable=transform_and_load, dag=dag)
+transform_task = PythonOperator(
+    task_id='transform_and_load',
+    python_callable=transform_and_load,
+    dag=dag
+)
 
-validate_task = PythonOperator(task_id="validate_data_quality", python_callable=validate_data_quality, dag=dag)
+validate_task = PythonOperator(
+    task_id='validate_data_quality',
+    python_callable=validate_data_quality,
+    dag=dag
+)
 
 # Set dependencies
 extract_task >> transform_task >> validate_task
@@ -506,58 +516,49 @@ class TPCDIDataQualityFramework:
     def run_systematic_validation(self) -> dict:
         """Run all data quality checks."""
         results = {
-            "validation_queries": {},
-            "data_quality_checks": {},
-            "referential_integrity": {},
-            "business_rules": {},
+            'validation_queries': {},
+            'data_quality_checks': {},
+            'referential_integrity': {},
+            'business_rules': {}
         }
 
         # Run validation queries
         for query_id in ["V1", "V2", "V3", "V4", "V5"]:
             query_sql = self.tpcdi.get_query(query_id)
             result = self.connection.execute(query_sql).fetchall()
-            results["validation_queries"][query_id] = {
-                "status": "PASSED" if len(result) > 0 else "FAILED",
-                "row_count": len(result),
+            results['validation_queries'][query_id] = {
+                'status': 'PASSED' if len(result) > 0 else 'FAILED',
+                'row_count': len(result)
             }
 
         # Run data quality checks
         dq_checks = {
-            "DQ1": self._check_referential_integrity(),
-            "DQ2": self._check_temporal_consistency(),
-            "DQ3": self._check_business_rules(),
-            "DQ4": self._check_data_completeness(),
-            "DQ5": self._check_duplicate_detection(),
+            'DQ1': self._check_referential_integrity(),
+            'DQ2': self._check_temporal_consistency(),
+            'DQ3': self._check_business_rules(),
+            'DQ4': self._check_data_completeness(),
+            'DQ5': self._check_duplicate_detection()
         }
 
         for check_id, check_result in dq_checks.items():
-            results["data_quality_checks"][check_id] = check_result
+            results['data_quality_checks'][check_id] = check_result
 
         return results
 
     def _check_referential_integrity(self) -> dict:
         """Check foreign key relationships."""
         checks = [
-            (
-                "Customer-Account",
-                "SELECT COUNT(*) FROM DimAccount a LEFT JOIN DimCustomer c ON a.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL",
-            ),
-            (
-                "Trade-Customer",
-                "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimCustomer c ON t.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL",
-            ),
-            (
-                "Trade-Security",
-                "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimSecurity s ON t.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL",
-            ),
+            ("Customer-Account", "SELECT COUNT(*) FROM DimAccount a LEFT JOIN DimCustomer c ON a.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL"),
+            ("Trade-Customer", "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimCustomer c ON t.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL"),
+            ("Trade-Security", "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimSecurity s ON t.SK_SecurityID = s.SK_SecurityID WHERE s.SK_SecurityID IS NULL")
         ]
 
         results = {}
         for check_name, check_sql in checks:
             violation_count = self.connection.execute(check_sql).fetchone()[0]
             results[check_name] = {
-                "violations": violation_count,
-                "status": "PASSED" if violation_count == 0 else "FAILED",
+                'violations': violation_count,
+                'status': 'PASSED' if violation_count == 0 else 'FAILED'
             }
 
         return results
@@ -574,23 +575,26 @@ class TPCDIDataQualityFramework:
         """
 
         overlaps = self.connection.execute(overlap_check).fetchone()[0]
-        return {"overlapping_ranges": overlaps, "status": "PASSED" if overlaps == 0 else "FAILED"}
+        return {
+            'overlapping_ranges': overlaps,
+            'status': 'PASSED' if overlaps == 0 else 'FAILED'
+        }
 
     def _check_business_rules(self) -> dict:
         """Check financial industry business rules."""
         rules = [
             ("Positive Trade Amounts", "SELECT COUNT(*) FROM FactTrade WHERE TradePrice <= 0"),
             ("Valid Customer Tiers", "SELECT COUNT(*) FROM DimCustomer WHERE Tier NOT IN (1,2,3)"),
-            (
-                "Account Status Values",
-                "SELECT COUNT(*) FROM DimAccount WHERE Status NOT IN ('Active','Inactive','Closed')",
-            ),
+            ("Account Status Values", "SELECT COUNT(*) FROM DimAccount WHERE Status NOT IN ('Active','Inactive','Closed')")
         ]
 
         results = {}
         for rule_name, rule_sql in rules:
             violations = self.connection.execute(rule_sql).fetchone()[0]
-            results[rule_name] = {"violations": violations, "status": "PASSED" if violations == 0 else "FAILED"}
+            results[rule_name] = {
+                'violations': violations,
+                'status': 'PASSED' if violations == 0 else 'FAILED'
+            }
 
         return results
 
@@ -599,15 +603,15 @@ class TPCDIDataQualityFramework:
         completeness_checks = [
             ("Customer Names", "SELECT COUNT(*) FROM DimCustomer WHERE LastName IS NULL OR FirstName IS NULL"),
             ("Trade Prices", "SELECT COUNT(*) FROM FactTrade WHERE TradePrice IS NULL"),
-            ("Security Symbols", "SELECT COUNT(*) FROM DimSecurity WHERE Symbol IS NULL"),
+            ("Security Symbols", "SELECT COUNT(*) FROM DimSecurity WHERE Symbol IS NULL")
         ]
 
         results = {}
         for check_name, check_sql in completeness_checks.items():
             missing_count = self.connection.execute(check_sql).fetchone()[0]
             results[check_name] = {
-                "missing_values": missing_count,
-                "status": "PASSED" if missing_count == 0 else "WARNING",
+                'missing_values': missing_count,
+                'status': 'PASSED' if missing_count == 0 else 'WARNING'
             }
 
         return results
@@ -615,37 +619,30 @@ class TPCDIDataQualityFramework:
     def _check_duplicate_detection(self) -> dict:
         """Check for inappropriate duplicates."""
         duplicate_checks = [
-            (
-                "Current Customer Records",
-                """
+            ("Current Customer Records", """
                 SELECT CustomerID, COUNT(*)
                 FROM DimCustomer
                 WHERE IsCurrent = 1
                 GROUP BY CustomerID
                 HAVING COUNT(*) > 1
-            """,
-            ),
-            (
-                "Trade Record Duplicates",
-                """
+            """),
+            ("Trade Record Duplicates", """
                 SELECT TradeID, COUNT(*)
                 FROM FactTrade
                 GROUP BY TradeID
                 HAVING COUNT(*) > 1
-            """,
-            ),
+            """)
         ]
 
         results = {}
         for check_name, check_sql in duplicate_checks:
             duplicates = self.connection.execute(check_sql).fetchall()
             results[check_name] = {
-                "duplicate_groups": len(duplicates),
-                "status": "PASSED" if len(duplicates) == 0 else "FAILED",
+                'duplicate_groups': len(duplicates),
+                'status': 'PASSED' if len(duplicates) == 0 else 'FAILED'
             }
 
         return results
-
 
 # Usage
 dq_framework = TPCDIDataQualityFramework(tpcdi, conn)
@@ -698,8 +695,8 @@ WHEN NOT MATCHED THEN
 # Solution: Use smaller batch sizes and streaming
 tpcdi = TPCDI(
     scale_factor=1.0,
-    batch_size=5000,  # Smaller batches
-    streaming_load=True,  # Stream large files
+    batch_size=5000,      # Smaller batches
+    streaming_load=True   # Stream large files
 )
 ```
 

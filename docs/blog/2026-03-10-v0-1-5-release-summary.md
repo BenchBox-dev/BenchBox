@@ -21,12 +21,12 @@ This post covers what changed in this version: the textcharts extraction, open t
 from textcharts import Histogram, HistogramBar
 
 data = [
-    HistogramBar(label="compile", value=12.3),
-    HistogramBar(label="test", value=45.7),
-    HistogramBar(label="lint", value=3.2),
+    HistogramBar(label="compile",   value=12.3),
+    HistogramBar(label="test",      value=45.7),
+    HistogramBar(label="lint",      value=3.2),
     HistogramBar(label="typecheck", value=8.9),
-    HistogramBar(label="coverage", value=22.1),
-    HistogramBar(label="package", value=6.5),
+    HistogramBar(label="coverage",  value=22.1),
+    HistogramBar(label="package",   value=6.5),
 ]
 print(Histogram(data=data, title="CI Pipeline Stage Duration (seconds)").render())
 ```

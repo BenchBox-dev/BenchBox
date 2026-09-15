@@ -72,26 +72,23 @@ The benchmark works with any database supported by Python. Examples:
 ```python
 # SQLite (for testing)
 import sqlite3
-
-
 def connection_factory():
     return sqlite3.connect("tpch.db")
 
-
 # PostgreSQL
 import psycopg2
-
-
 def connection_factory():
     return psycopg2.connect("host=localhost dbname=tpch user=postgres")
 
-
 # MySQL
 import mysql.connector
-
-
 def connection_factory():
-    return mysql.connector.connect(host="localhost", database="tpch", user="root", password="password")
+    return mysql.connector.connect(
+        host="localhost",
+        database="tpch",
+        user="root",
+        password="password"
+    )
 ```
 
 ## Quick Start
@@ -103,21 +100,26 @@ from benchbox import TPCH
 import sqlite3
 
 # Create benchmark instance
-benchmark = TPCH(scale_factor=1.0, output_dir="./tpch_benchmark", verbose=True)
+benchmark = TPCH(
+    scale_factor=1.0,
+    output_dir="./tpch_benchmark",
+    verbose=True
+)
 
 # Generate data
 benchmark.generate_data()
-
 
 # Setup database connection factory
 def connection_factory():
     conn = sqlite3.connect("tpch.db")
     return conn
 
-
 # Run official benchmark
 result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory, num_streams=2, validate_results=True, audit_trail=True
+    connection_factory=connection_factory,
+    num_streams=2,
+    validate_results=True,
+    audit_trail=True
 )
 
 # Display results
@@ -135,10 +137,10 @@ print(f"Certification Ready: {result.certification_ready}")
 from benchbox import TPCH
 
 benchmark = TPCH(
-    scale_factor=1.0,  # Scale factor (1.0 = ~1GB)
-    output_dir="./output",  # Output directory
-    verbose=True,  # Enable verbose output
-    parallel=4,  # Parallel data generation
+    scale_factor=1.0,           # Scale factor (1.0 = ~1GB)
+    output_dir="./output",      # Output directory
+    verbose=True,               # Enable verbose output
+    parallel=4                  # Parallel data generation
 )
 ```
 
@@ -146,12 +148,12 @@ benchmark = TPCH(
 
 ```python
 result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,  # Database connection factory
-    num_streams=2,  # Number of concurrent streams
-    output_dir="./benchmark_results",  # Results output directory
-    verbose=True,  # Enable verbose logging
-    validate_results=True,  # Enable result validation
-    audit_trail=True,  # Enable audit trail
+    connection_factory=connection_factory,    # Database connection factory
+    num_streams=2,                           # Number of concurrent streams
+    output_dir="./benchmark_results",        # Results output directory
+    verbose=True,                            # Enable verbose logging
+    validate_results=True,                   # Enable result validation
+    audit_trail=True                         # Enable audit trail
 )
 ```
 
@@ -390,7 +392,7 @@ html_report = report_generator.generate_systematic_report(
     result=result,
     report_title="TPC-H Benchmark Report",
     include_detailed_analysis=True,
-    include_certification_info=True,
+    include_certification_info=True
 )
 
 # Generate certification report
@@ -418,14 +420,18 @@ else:
 
 ```python
 # Compare two benchmark results
-comparison = report_generator.compare_results(baseline_result=baseline_result, current_result=current_result)
+comparison = report_generator.compare_results(
+    baseline_result=baseline_result,
+    current_result=current_result
+)
 
 print(f"Performance Change: {comparison.relative_change:+.1%}")
 print(f"Significant Change: {comparison.significant_change}")
 
 # Generate comparison report
 comparison_report = report_generator.generate_comparison_report(
-    baseline_result=baseline_result, current_result=current_result
+    baseline_result=baseline_result,
+    current_result=current_result
 )
 ```
 
@@ -440,7 +446,7 @@ For TPC-H certification, follow these steps:
 benchmark = TPCH(
     scale_factor=100.0,  # Use certified scale factor
     output_dir="./certification_data",
-    verbose=True,
+    verbose=True
 )
 ```
 
@@ -466,7 +472,7 @@ result = benchmark.run_official_benchmark(
     connection_factory=connection_factory,
     num_streams=8,  # Use appropriate number of streams
     validate_results=True,
-    audit_trail=True,
+    audit_trail=True
 )
 ```
 
@@ -566,7 +572,10 @@ Enable verbose logging for detailed debugging:
 ```python
 # Enable verbose output
 benchmark = TPCH(verbose=True)
-result = benchmark.run_official_benchmark(connection_factory=connection_factory, verbose=True)
+result = benchmark.run_official_benchmark(
+    connection_factory=connection_factory,
+    verbose=True
+)
 ```
 
 Check audit trail logs:
@@ -617,7 +626,10 @@ def run_multiple_benchmarks():
 
     for sf in scale_factors:
         benchmark = TPCH(scale_factor=sf)
-        result = benchmark.run_official_benchmark(connection_factory=connection_factory, num_streams=2)
+        result = benchmark.run_official_benchmark(
+            connection_factory=connection_factory,
+            num_streams=2
+        )
         results.append(result)
 
     return results

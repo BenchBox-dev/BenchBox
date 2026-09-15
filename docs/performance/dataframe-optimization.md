@@ -28,8 +28,8 @@ Polars is the default expression-family adapter and excels at single-node perfor
 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
 adapter = PolarsDataFrameAdapter(
-    streaming=True,  # Enable streaming for large datasets
-    rechunk=True,  # Rechunk for better memory layout
+    streaming=True,      # Enable streaming for large datasets
+    rechunk=True,        # Rechunk for better memory layout
 )
 ```
 
@@ -51,8 +51,8 @@ Pandas is the reference Pandas-family implementation.
 from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
 adapter = PandasDataFrameAdapter(
-    copy_on_write=True,  # Enable CoW for Pandas 2.0+
-    dtype_backend="pyarrow",  # Use PyArrow backend
+    copy_on_write=True,              # Enable CoW for Pandas 2.0+
+    dtype_backend="pyarrow",         # Use PyArrow backend
 )
 ```
 
@@ -74,10 +74,10 @@ PySpark excels at distributed processing and large-scale data.
 from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 
 adapter = PySparkDataFrameAdapter(
-    master="local[*]",  # Use all cores locally
-    driver_memory="8g",  # Increase driver memory
-    shuffle_partitions=200,  # Tune for your data size
-    enable_aqe=True,  # Enable Adaptive Query Execution
+    master="local[*]",           # Use all cores locally
+    driver_memory="8g",          # Increase driver memory
+    shuffle_partitions=200,      # Tune for your data size
+    enable_aqe=True,             # Enable Adaptive Query Execution
 )
 ```
 
@@ -99,9 +99,9 @@ DataFusion provides SQL-like optimization with expression-family syntax.
 from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
 
 adapter = DataFusionDataFrameAdapter(
-    repartition_joins=True,  # Enable parallel hash joins
-    parquet_pushdown=True,  # Push predicates to Parquet scan
-    batch_size=8192,  # Row batch size
+    repartition_joins=True,      # Enable parallel hash joins
+    parquet_pushdown=True,       # Push predicates to Parquet scan
+    batch_size=8192,             # Row batch size
 )
 ```
 

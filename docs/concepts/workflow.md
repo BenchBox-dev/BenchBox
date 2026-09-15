@@ -395,7 +395,6 @@ Creating and running a custom benchmark:
 # 1. Define benchmark class
 from benchbox.base import BaseBenchmark
 
-
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):
         # Custom data generation logic
@@ -410,7 +409,6 @@ class MyBenchmark(BaseBenchmark):
     def get_query(self, query_id, params=None):
         queries = self.get_queries()
         return queries[query_id]
-
 
 # 2. Run benchmark
 from benchbox.platforms.duckdb import DuckDBAdapter

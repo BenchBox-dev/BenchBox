@@ -57,7 +57,7 @@ Use these helpers when you need to inspect or persist configuration programmatic
 ```python
 from benchbox.cli.config import ConfigManager
 
-config = ConfigManager()  # auto-detects benchbox.yaml
+config = ConfigManager()             # auto-detects benchbox.yaml
 scale = config.get("benchmarks.default_scale")
 config.set("execution.power_run.iterations", 5)
 config.save_config()

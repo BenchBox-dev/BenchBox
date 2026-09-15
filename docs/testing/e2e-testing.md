@@ -226,7 +226,6 @@ The E2E test suite provides fixtures in `conftest.py`:
 def results_dir(tmp_path):
     """Temporary directory for benchmark results."""
 
-
 @pytest.fixture
 def dry_run_dir(tmp_path):
     """Temporary directory for dry-run output."""
@@ -240,27 +239,22 @@ def dry_run_dir(tmp_path):
 def duckdb_config():
     return {"platform": "duckdb", "benchmark": "tpch", "scale": "0.01"}
 
-
 @pytest.fixture
 def sqlite_config():
     return {"platform": "sqlite", "benchmark": "tpch", "scale": "0.01"}
 
-
 @pytest.fixture
 def datafusion_config():
     return {"platform": "datafusion", "benchmark": "tpch", "scale": "0.01"}
-
 
 # DataFrame platforms
 @pytest.fixture
 def pandas_df_config():
     return {"platform": "pandas-df", "benchmark": "tpch", "scale": "0.01"}
 
-
 @pytest.fixture
 def polars_df_config():
     return {"platform": "polars-df", "benchmark": "tpch", "scale": "0.01"}
-
 
 # Cloud platforms (dry-run)
 @pytest.fixture
@@ -274,14 +268,11 @@ def snowflake_dry_run_config(dry_run_dir):
 def build_cli_args(config, extra_args=None):
     """Build CLI arguments from config dictionary."""
 
-
 def run_benchmark(config, extra_args=None, env=None, timeout=600):
     """Run a benchmark with configuration."""
 
-
 def find_result_files(directory, pattern="*.json"):
     """Find result files in directory."""
-
 
 def find_latest_result(directory, pattern="*.json"):
     """Find the most recent result file."""
@@ -294,7 +285,6 @@ def find_latest_result(directory, pattern="*.json"):
 ```python
 import pytest
 from tests.e2e.conftest import build_cli_args, run_benchmark
-
 
 def test_basic_benchmark(duckdb_config, results_dir):
     """Test basic benchmark execution."""
@@ -324,7 +314,6 @@ def test_invalid_scale_factor():
 ```python
 import json
 from tests.e2e.conftest import find_result_files
-
 
 def test_result_file_schema(duckdb_config, results_dir):
     """Test that result files match expected schema."""
@@ -388,11 +377,9 @@ Tests use decorators from `tests/e2e/utils/platform_detection.py` to skip gracef
 ```python
 from tests.e2e.utils.platform_detection import requires_platform, requires_gpu
 
-
 @requires_platform("datafusion")
 def test_datafusion_execution():
     """Skipped if datafusion not importable."""
-
 
 @requires_gpu()
 def test_cudf_execution():

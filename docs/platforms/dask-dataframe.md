@@ -185,17 +185,16 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered["charge"] = filtered["disc_price"] * (1 + filtered["l_tax"])
 
     result = (
-        filtered.groupby(["l_returnflag", "l_linestatus"], as_index=False)
-        .agg(
-            {
-                "l_quantity": ["sum", "mean"],
-                "l_extendedprice": ["sum", "mean"],
-                "disc_price": "sum",
-                "charge": "sum",
-                "l_discount": "mean",
-                "l_orderkey": "count",
-            }
-        )
+        filtered
+        .groupby(["l_returnflag", "l_linestatus"], as_index=False)
+        .agg({
+            "l_quantity": ["sum", "mean"],
+            "l_extendedprice": ["sum", "mean"],
+            "disc_price": "sum",
+            "charge": "sum",
+            "l_discount": "mean",
+            "l_orderkey": "count"
+        })
         .sort_values(["l_returnflag", "l_linestatus"])
         .compute()  # Trigger computation
     )
@@ -209,11 +208,17 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 from benchbox.platforms.dataframe import DaskDataFrameAdapter
 
 # Create adapter for local execution
-adapter = DaskDataFrameAdapter(working_dir="./benchmark_data", n_workers=4, threads_per_worker=2)
+adapter = DaskDataFrameAdapter(
+    working_dir="./benchmark_data",
+    n_workers=4,
+    threads_per_worker=2
+)
 
 # Or connect to distributed cluster
 adapter = DaskDataFrameAdapter(
-    working_dir="./benchmark_data", use_distributed=True, scheduler_address="tcp://scheduler:8786"
+    working_dir="./benchmark_data",
+    use_distributed=True,
+    scheduler_address="tcp://scheduler:8786"
 )
 
 # Create context and load tables
@@ -222,7 +227,6 @@ adapter.load_tables(ctx, data_dir="./tpch_data")
 
 # Execute query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
-
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)
@@ -236,11 +240,18 @@ print(result)
 from dask.distributed import Client, LocalCluster
 
 # Create local cluster
-cluster = LocalCluster(n_workers=4, threads_per_worker=2, memory_limit="4GB")
+cluster = LocalCluster(
+    n_workers=4,
+    threads_per_worker=2,
+    memory_limit="4GB"
+)
 client = Client(cluster)
 
 # Run benchmark
-adapter = DaskDataFrameAdapter(use_distributed=True, scheduler_address=client.scheduler.address)
+adapter = DaskDataFrameAdapter(
+    use_distributed=True,
+    scheduler_address=client.scheduler.address
+)
 ```
 
 ### Remote Cluster
