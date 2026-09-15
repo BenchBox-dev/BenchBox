@@ -182,6 +182,8 @@ The default is immediate fail-fast with holder info; set
 `BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
 owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
 deletes, or bypasses — a held flock always means a live holder).
+`make test-unlock` clears only inactive diagnostic text and refuses an active
+kernel lock; it never removes the lock pathname.
 
 Gate authors avoid duplicate invocations against identical trees with
 `scripts/local_validation.py` (see `make local-validation GATE=... CMD=...`):
@@ -191,16 +193,49 @@ Gate authors avoid duplicate invocations against identical trees with
   then the classifier-selected `make pr-preflight`. One gate name per stage;
   a hook that does no work reports `skipped`, never `tested`/`passed`.
 - `run` executes the command unless a completed receipt binds the identical
-  input identity (HEAD, base ref, status incl. untracked digests, tool
-  versions, gate, batch block). Simultaneous identical requests execute once:
-  waiters re-check under the store lock and reuse the winner's receipt.
-- Changed files/refs/tools, unknown identity, failed priors, and different
-  gates always execute. Receipts are local-only evidence and never satisfy
-  hosted required checks.
-- Batch members pass `--batch-id/--batch-member/--batch-role`; member
+  input identity (HEAD, base ref, status incl. untracked digests, validation
+  config, tool versions, gate, batch block). Simultaneous identical requests
+  execute once: waiters re-check the identity under the store lock and reuse
+  the winner's receipt.
+- Changed files/refs/tools/config, unknown identity, failed or cancelled
+  priors, and different gates always execute. A tree change while waiting or
+  while the command runs prevents reuse and prevents writing a receipt.
+  Receipts are local-only evidence and never satisfy hosted required checks.
+- Gate-relevant `BENCHBOX_`, `PYTEST_`, `PYTHON*`, `UV_`, and `PRE_COMMIT*`
+  variables plus `CI`, `GITHUB_ACTIONS`, `PATH`, and `VIRTUAL_ENV` are hashed
+  into the identity; raw values are never written to receipts. The receipt
+  store selector is excluded because it changes evidence location, not gate
+  behavior.
+- Batch members pass `--batch-id/--batch-member/--batch-role` plus the
+  accepted member head, scope/config hashes, and canonical changed paths.
+  Integrator records additionally bind the current integration head/tree, a
+  real predecessor tree, and a complete canonical member list. Member
   preparation evidence never certifies the later integrated tree because the
-  integration HEAD differs. Pre-PR effort stays counted: receipts record
-  executions, they do not erase them from delivery accounting.
+  integration identity is part of the frozen record. Pre-PR effort stays
+  counted: receipts record executions, they do not erase them from delivery
+  accounting.
+- Integrator evidence requires a canonical JSON member list with immutable
+  member id, source or accepted head, scope hash, and config hash. Each member
+  head must be ancestral to a distinct integration head; the predecessor must
+  be a real prior tree. Batch facts are rechecked under the receipt lock and
+  after successful execution before evidence is stored.
+- `make pr-preflight` is the canonical ordered path and records both stage
+  receipts. The focused stage runs the classifier-selected fast checks; the
+  required stage owns the content guard and remaining checks, so each actual
+  gate runs once. Both stages classify independently against the same
+  revalidated transaction identity; drift restarts the ordered path. The
+  optional pre-push hook runs only the focused stage, so it can reuse the
+  focused receipt from a prior manual preflight without broadening the hook
+  into a second full preflight.
+- Every invocation appends a lock-protected local event to the same evidence
+  store. `python scripts/local_validation.py report` distinguishes executed,
+  reused, failed, cancelled, and skipped gates, records the exact identity key,
+  role, command execution count, and monotonic duration, and explicitly never
+  claims hosted required-check certification.
+- Ordered local validation records one strict transaction event containing the
+  exact focused and required commands and tool identities. Accounting rejects
+  malformed records, groups only by the canonical batch/member identity, and
+  refuses invalid skip metadata; it never claims hosted required-check status.
 
 ## Queue-aware publication and resumable follow-up
 
