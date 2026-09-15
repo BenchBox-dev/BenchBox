@@ -119,7 +119,9 @@ all = [
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",  # For DataFrame mode
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12,
+    # incompatible with the pandas 3 migration (revisit when 19.x lifts the cap).
+    "databricks-connect>=14.0.0,<19",  # For DataFrame mode
     "datafusion>=50.1.0",  # Updated to match datafusion extra
     "pyarrow>=10.0.0",  # For DataFusion (also in core with higher version)
     "firebolt-sdk>=1.18.0",
@@ -321,7 +323,8 @@ cloud-spark-snowflake = [
 cloud-spark-databricks = [
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12 (see core deps).
+    "databricks-connect>=14.0.0,<19",
     "cloudpathlib>=0.15.0",
 ]
 
