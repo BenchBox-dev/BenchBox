@@ -36,7 +36,7 @@
 
 | Series                  | Posts                                                                                                             | Status      | Notes                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
-| Building BenchBox       | Announcing the BenchBox Results Explorer preview                                                                 | Full draft  | Post 16; editorial review needed   |
+| Building BenchBox       | Introducing the BenchBox Results Explorer                                                                         | Full draft  | Post 16; editorial review needed   |
 | Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Post 17; publication withheld      |
 | Free Trial Benchmarking | 10 posts (Snowflake, Databricks, BigQuery, MotherDuck, Redshift, Starburst, ClickHouse, Fabric, Firebolt, Athena) | Full drafts | Time-sensitive; trial terms change |
 | Cloud Cost Controls     | 6 posts (AWS, GCP, Snowflake, Databricks, Azure, Free Tier)                                                       | Full drafts |                                    |

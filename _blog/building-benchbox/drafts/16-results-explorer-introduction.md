@@ -5,7 +5,7 @@ status: draft
 date: September 15, 2026
 author: Joe Harris
 series: building-benchbox
-post_number: 18
+post_number: 16
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, geekbench, llm-leaderboards, duckdb-wasm, provenance]
 meta_description: "Results Explorer allows BenchBox users to share and compare their own benchmarking results with results shared by the BenchBox community. Anyone can submit a run for publication through a pull request."
@@ -87,7 +87,7 @@ To support public sharing of results, BenchBox v0.4.0 improved the bundle output
 
 ## Walkthrough
 
-The Explorer has six tabs: Overview, Benchmarks, Platforms, Compare, Find runs, and Open local result. Each one answers a single question.
+The Explorer has six tabs: Overview, Benchmarks, Platforms, Compare, Find runs, and Open local result. Each one answers a single question. Wherever a run appears, such as a version on the Platforms page, it links through to that run's own page: timings, validation state, tuning, provenance, and hardware details when recorded. Download bundle on that page takes the canonical JSON with you, for your own analysis or to set up a corroborating run.
 
 ### 1. Overview
 
@@ -180,7 +180,7 @@ That keeps the site cheap to run and the evidence portable: use the pages, query
    - Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
    - Maintainers review the PR
    - Merged runs appear in the Explorer after a later curated publish, not at merge
-   - Community results carry a Community submission label and stay out of ranked tables
+   - Community results carry a Community submission label and are currently excluded from ranked tables. We will re-evaluate their inclusion over the coming months.
 
 Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contributing-results.html)
 
