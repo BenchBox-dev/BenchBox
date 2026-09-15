@@ -41,6 +41,8 @@ Geekbench allows you to benchmark the performance of your own computer and share
 
 ![Tom's Hardware table of Geekbench scores by Apple A-series generation, from A16 Bionic to A20 Pro, with single-thread and multi-thread improvement percentages.](../images/tomshardware_apple_a_series_geekbench.png)
 
+We borrowed Geekbench's path from a local run to a public page others can inspect and compare, not its single headline score: BenchBox ranks runs only within one benchmark, scale factor, and phase.
+
 AI/LLM leaderboards have become a ubiquitous feature of the AI arms race. These leaderboards synthesize LLM performance across diverse benchmarks to provide a holistic view of highly variable performance (sound familiar?). There are a number of these leaderboards, but a few good examples are:
 
 * [Terminal-Bench leaderboard](https://hub.harborframework.com/datasets/terminal-bench/terminal-bench/latest?tab=leaderboard&leaderboard=4-0-0)
@@ -135,10 +137,14 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 
 ## How it works
 
-- No backend
-- Static site on GitHub Pages
-- Queries run in your browser via DuckDB-WASM
-- Fast and cheap; no server to run
+The Explorer has no application server, account system, or server-side database. A static build turns curated result bundles into a DuckDB snapshot and downloadable JSON, GitHub Pages serves both, and DuckDB-WASM runs every query in your browser.
+
+```text
+curated result bundles -> static build -> results.duckdb -> Explorer pages and Find runs
+                                  `-> JSON bundles -> Download bundle
+```
+
+That keeps the site cheap to run and the evidence portable: use the pages, query the snapshot, or leave with the bundle.
 
 ---
 
@@ -147,6 +153,7 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 1. Run a benchmark
 
    ```bash
+   uv add benchbox --extra duckdb
    uv run -- benchbox run --platform duckdb --benchmark tpch --scale 1
    ```
 
@@ -158,6 +165,7 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 
    ```bash
    export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
+   uv run -- benchbox submit --last --dry-run
    uv run -- benchbox submit --last --output ./submission
    ```
 
@@ -172,6 +180,7 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
    - Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
    - Maintainers review the PR
    - Merged runs appear in the Explorer after a later curated publish, not at merge
+   - Community results carry a Community submission label and stay out of ranked tables
 
 Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contributing-results.html)
 
@@ -182,6 +191,7 @@ Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contrib
 - Explore the data: [benchbox.dev/results](https://benchbox.dev/results/)
 - Inspect your own runs: **Open local result**
 - Contribute one back: `benchbox submit`, then a PR
+- Tell us what to cover next: which benchmarks, platforms, and scales? Start a [BenchBox discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
 
 ---
 
