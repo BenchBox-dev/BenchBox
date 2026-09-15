@@ -113,6 +113,7 @@ from pathlib import Path
 # Third-party imports second
 # BenchBox imports last
 
+
 def main():
     """Main entry point with clear steps."""
     # 1. Parse arguments
@@ -120,6 +121,7 @@ def main():
     # 3. Execute benchmark
     # 4. Display results
     pass
+
 
 if __name__ == "__main__":
     try:
@@ -427,6 +429,7 @@ def parse_args():
 ```python
 if args.dry_run:
     from benchbox.cli.dryrun import DryRunExecutor
+
     dry_run = DryRunExecutor(Path(args.dry_run))
     result = dry_run.execute_dry_run(benchmark_config, system_profile, database_config)
     print(f"✅ Dry-run artifacts saved to: {args.dry_run}")
@@ -439,6 +442,7 @@ else:
 
 ```python
 import os
+
 
 def validate_databricks_credentials():
     required = ["DATABRICKS_HOST", "DATABRICKS_TOKEN", "DATABRICKS_HTTP_PATH"]

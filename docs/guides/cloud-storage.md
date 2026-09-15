@@ -195,10 +195,7 @@ from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 # Create benchmark with cloud storage output
-benchmark = TPCH(
-    scale_factor=0.01,
-    output_dir="s3://my-bucket/benchbox/tpch-data"
-)
+benchmark = TPCH(scale_factor=0.01, output_dir="s3://my-bucket/benchbox/tpch-data")
 
 # Execute benchmark - data will be uploaded to S3
 adapter = DuckDBAdapter()

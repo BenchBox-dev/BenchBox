@@ -517,7 +517,7 @@ for i in range(5):
 
     # Run Maintenance test
     result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
-    print(f"Run {i+1}: {result.total_execution_time:.2f}s")
+    print(f"Run {i + 1}: {result.total_execution_time:.2f}s")
 ```
 
 ### "How do I verify my database was modified?"

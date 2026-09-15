@@ -67,18 +67,14 @@ BenchBox uses a family-based architecture for DataFrame support:
 ### Expression Family (Polars, PySpark, DataFusion)
 ```python
 # Declarative style with expression objects
-result = (
-    df.filter(col('shipdate') <= lit(cutoff))
-    .group_by('status')
-    .agg(col('quantity').sum().alias('total_qty'))
-)
+result = df.filter(col("shipdate") <= lit(cutoff)).group_by("status").agg(col("quantity").sum().alias("total_qty"))
 ```
 
 ### Pandas Family (Pandas, cuDF, Dask)
 ```python
 # Imperative style with string-based column access
-filtered = df[df['shipdate'] <= cutoff]
-result = filtered.groupby('status').agg({'quantity': 'sum'})
+filtered = df[df["shipdate"] <= cutoff]
+result = filtered.groupby("status").agg({"quantity": "sum"})
 ```
 
 ## Running with CLI

@@ -45,40 +45,34 @@ Top-level object containing complete benchmark execution information.
 ```python
 {
     # Identification
-    "benchmark_name": str,           # e.g., "TPC-H", "TPC-DS", "ClickBench"
-    "platform": str,                 # e.g., "DuckDB", "Snowflake"
-    "execution_id": str,             # Unique run identifier
-    "timestamp": datetime,           # ISO 8601 timestamp
-
+    "benchmark_name": str,  # e.g., "TPC-H", "TPC-DS", "ClickBench"
+    "platform": str,  # e.g., "DuckDB", "Snowflake"
+    "execution_id": str,  # Unique run identifier
+    "timestamp": datetime,  # ISO 8601 timestamp
     # Configuration
-    "scale_factor": float,           # Data size multiplier
-    "test_execution_type": str,      # "standard", "power", "throughput"
-
+    "scale_factor": float,  # Data size multiplier
+    "test_execution_type": str,  # "standard", "power", "throughput"
     # Timing Summary
-    "duration_seconds": float,       # Total execution time
-    "total_execution_time": float,   # Query execution time only
-    "average_query_time": float,     # Mean query time
-    "data_loading_time": float,      # Time to load data
-    "schema_creation_time": float,   # Time to create schema
-
+    "duration_seconds": float,  # Total execution time
+    "total_execution_time": float,  # Query execution time only
+    "average_query_time": float,  # Mean query time
+    "data_loading_time": float,  # Time to load data
+    "schema_creation_time": float,  # Time to create schema
     # Query Statistics
-    "total_queries": int,            # Number of queries attempted
-    "successful_queries": int,       # Queries that succeeded
-    "failed_queries": int,           # Queries that failed
-
+    "total_queries": int,  # Number of queries attempted
+    "successful_queries": int,  # Queries that succeeded
+    "failed_queries": int,  # Queries that failed
     # Detailed Results
     "query_results": List[QueryResult],
     "query_definitions": Dict[str, QueryDefinition],
     "execution_phases": ExecutionPhases,
-
     # Validation
-    "validation_status": str,        # "PASSED", "FAILED", "SKIPPED"
-    "validation_details": dict,      # Validation check results
-
+    "validation_status": str,  # "PASSED", "FAILED", "SKIPPED"
+    "validation_details": dict,  # Validation check results
     # System Context
-    "system_profile": dict,          # Hardware/software info
-    "platform_info": dict,           # Platform-specific metadata
-    "tunings_applied": dict,         # Performance tuning configuration
+    "system_profile": dict,  # Hardware/software info
+    "platform_info": dict,  # Platform-specific metadata
+    "tunings_applied": dict,  # Performance tuning configuration
 }
 ```
 
@@ -109,17 +103,17 @@ Individual query execution details.
 **Structure**:
 ```python
 {
-    "query_id": str,                 # e.g., "q1", "query15"
-    "stream_id": str,                # "stream_1" (default), "stream_2" (throughput)
-    "execution_time": float,         # Seconds
-    "status": str,                   # "SUCCESS", "FAILED", "SKIPPED"
-    "row_count": int,                # Number of rows returned
-    "data_scanned_bytes": int,       # Bytes scanned (if available)
-    "error_message": str | None,     # Error details if failed
-    "query_text": str,               # Executed SQL
-    "parameters": dict | None,       # Query parameters used
-    "start_time": datetime,          # Query start timestamp
-    "end_time": datetime,            # Query completion timestamp
+    "query_id": str,  # e.g., "q1", "query15"
+    "stream_id": str,  # "stream_1" (default), "stream_2" (throughput)
+    "execution_time": float,  # Seconds
+    "status": str,  # "SUCCESS", "FAILED", "SKIPPED"
+    "row_count": int,  # Number of rows returned
+    "data_scanned_bytes": int,  # Bytes scanned (if available)
+    "error_message": str | None,  # Error details if failed
+    "query_text": str,  # Executed SQL
+    "parameters": dict | None,  # Query parameters used
+    "start_time": datetime,  # Query start timestamp
+    "end_time": datetime,  # Query completion timestamp
 }
 ```
 
@@ -145,8 +139,8 @@ Detailed timing breakdown for benchmark phases.
 **Structure**:
 ```python
 {
-    "setup": SetupPhase,             # Data gen, schema, loading
-    "power_test": PowerTestPhase,    # Single-stream execution
+    "setup": SetupPhase,  # Data gen, schema, loading
+    "power_test": PowerTestPhase,  # Single-stream execution
     "throughput_test": ThroughputTestPhase,  # Multi-stream execution
 }
 ```
@@ -182,7 +176,7 @@ Detailed timing breakdown for benchmark phases.
         "row_count_validation": str,
         "schema_validation": str,
         "data_integrity_checks": str,
-    }
+    },
 }
 ```
 
@@ -193,7 +187,7 @@ Detailed timing breakdown for benchmark phases.
     "query_stream": List[QueryResult],  # Single stream execution
     "start_time": datetime,
     "end_time": datetime,
-    "geometric_mean": float,             # Geomean of query times
+    "geometric_mean": float,  # Geomean of query times
 }
 ```
 
@@ -201,12 +195,12 @@ Detailed timing breakdown for benchmark phases.
 
 ```python
 {
-    "streams": List[QueryStream],        # Multiple concurrent streams
+    "streams": List[QueryStream],  # Multiple concurrent streams
     "refresh_functions": List[RefreshFunction],  # Maintenance operations
     "start_time": datetime,
     "end_time": datetime,
     "measurement_interval_seconds": float,
-    "throughput_qph": float,             # Queries per hour
+    "throughput_qph": float,  # Queries per hour
 }
 ```
 
@@ -217,9 +211,9 @@ SQL query template and parameters.
 **Structure**:
 ```python
 {
-    "sql": str,                      # Query text (may have placeholders)
-    "parameters": dict | None,       # Parameter values for substitution
-    "description": str | None,       # Query purpose/description
+    "sql": str,  # Query text (may have placeholders)
+    "parameters": dict | None,  # Parameter values for substitution
+    "description": str | None,  # Query purpose/description
 }
 ```
 
@@ -240,14 +234,14 @@ Hardware and software context for reproducibility.
 
 ```python
 {
-    "os": str,                       # "Linux", "macOS", "Windows"
-    "os_version": str,               # "Ubuntu 22.04", "macOS 14.1"
-    "python_version": str,           # "3.11.5"
-    "benchbox_version": str,         # "0.1.0"
-    "cpu_model": str,                # "Intel Xeon E5-2686 v4"
-    "cpu_cores": int,                # 8
-    "ram_gb": float,                 # 32.0
-    "anonymous_machine_id": str,     # Hashed machine identifier
+    "os": str,  # "Linux", "macOS", "Windows"
+    "os_version": str,  # "Ubuntu 22.04", "macOS 14.1"
+    "python_version": str,  # "3.11.5"
+    "benchbox_version": str,  # "0.1.0"
+    "cpu_model": str,  # "Intel Xeon E5-2686 v4"
+    "cpu_cores": int,  # 8
+    "ram_gb": float,  # 32.0
+    "anonymous_machine_id": str,  # Hashed machine identifier
 }
 ```
 
@@ -257,12 +251,12 @@ Platform-specific metadata.
 
 ```python
 {
-    "platform_name": str,            # "DuckDB", "Snowflake", etc.
-    "driver_name": str,              # "duckdb", "snowflake-connector-python"
-    "driver_version": str,           # "0.9.2", "3.0.4"
-    "configuration": dict,           # Platform-specific settings
-    "warehouse_size": str | None,    # Cloud warehouse size
-    "cluster_id": str | None,        # Cloud cluster identifier
+    "platform_name": str,  # "DuckDB", "Snowflake", etc.
+    "driver_name": str,  # "duckdb", "snowflake-connector-python"
+    "driver_version": str,  # "0.9.2", "3.0.4"
+    "configuration": dict,  # Platform-specific settings
+    "warehouse_size": str | None,  # Cloud warehouse size
+    "cluster_id": str | None,  # Cloud cluster identifier
 }
 ```
 
@@ -288,27 +282,27 @@ Correctness verification details.
 
 ```python
 {
-    "validation_status": str,        # "PASSED", "FAILED", "SKIPPED"
-    "validation_mode": str,          # "none", "basic", "strict"
+    "validation_status": str,  # "PASSED", "FAILED", "SKIPPED"
+    "validation_mode": str,  # "none", "basic", "strict"
     "checks": {
         "row_count": {
-            "status": str,           # "PASSED", "FAILED"
-            "expected": dict,        # Expected row counts per query
-            "actual": dict,          # Actual row counts
-            "mismatches": list,      # Queries with wrong row counts
+            "status": str,  # "PASSED", "FAILED"
+            "expected": dict,  # Expected row counts per query
+            "actual": dict,  # Actual row counts
+            "mismatches": list,  # Queries with wrong row counts
         },
         "result_checksum": {
             "status": str,
-            "expected": dict,        # Expected checksums
-            "actual": dict,          # Actual checksums
+            "expected": dict,  # Expected checksums
+            "actual": dict,  # Actual checksums
             "mismatches": list,
         },
         "data_integrity": {
             "status": str,
             "checks_performed": list,
             "failures": list,
-        }
-    }
+        },
+    },
 }
 ```
 
@@ -366,11 +360,13 @@ with open("results.json") as f:
 # Extract query results
 query_data = []
 for q in data["results"]["queries"]["details"]:
-    query_data.append({
-        "query_id": q["id"],
-        "execution_time_ms": q["timing"]["execution_ms"],
-        "status": q["status"],
-    })
+    query_data.append(
+        {
+            "query_id": q["id"],
+            "execution_time_ms": q["timing"]["execution_ms"],
+            "status": q["status"],
+        }
+    )
 
 # Convert to DataFrame and save as Parquet
 df = pd.DataFrame(query_data)
@@ -426,8 +422,7 @@ benchbox compare baseline.json current.json
 ```python
 import math
 
-query_times = [qr.execution_time for qr in results.query_results
-               if qr.status == "SUCCESS"]
+query_times = [qr.execution_time for qr in results.query_results if qr.status == "SUCCESS"]
 geomean = math.prod(query_times) ** (1.0 / len(query_times))
 print(f"Geometric mean: {geomean:.3f}s")
 ```
@@ -437,10 +432,8 @@ print(f"Geometric mean: {geomean:.3f}s")
 ```python
 def compare_results(baseline, current, threshold=1.1):
     """Flag queries with >10% regression"""
-    baseline_times = {qr.query_id: qr.execution_time
-                      for qr in baseline.query_results}
-    current_times = {qr.query_id: qr.execution_time
-                     for qr in current.query_results}
+    baseline_times = {qr.query_id: qr.execution_time for qr in baseline.query_results}
+    current_times = {qr.query_id: qr.execution_time for qr in current.query_results}
 
     regressions = []
     for qid in baseline_times:
@@ -458,15 +451,17 @@ def compare_results(baseline, current, threshold=1.1):
 import pandas as pd
 
 # Convert to DataFrame
-df = pd.DataFrame([
-    {
-        "query_id": qr.query_id,
-        "execution_time": qr.execution_time,
-        "status": qr.status,
-        "row_count": qr.row_count,
-    }
-    for qr in results.query_results
-])
+df = pd.DataFrame(
+    [
+        {
+            "query_id": qr.query_id,
+            "execution_time": qr.execution_time,
+            "status": qr.status,
+            "row_count": qr.row_count,
+        }
+        for qr in results.query_results
+    ]
+)
 
 # Analyze
 print(df.describe())

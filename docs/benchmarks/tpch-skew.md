@@ -135,10 +135,7 @@ custom_config = SkewConfiguration(
     temporal_skew_enabled=False,
 )
 
-benchmark = TPCHSkew(
-    scale_factor=1.0,
-    skew_config=custom_config
-)
+benchmark = TPCHSkew(scale_factor=1.0, skew_config=custom_config)
 data_files = benchmark.generate_data()
 ```
 

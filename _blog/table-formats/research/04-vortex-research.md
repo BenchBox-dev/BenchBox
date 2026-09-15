@@ -142,7 +142,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01
 ```python
 # Python vortex library
 import vortex
-array = vortex.io.read('customer.vortex')
+
+array = vortex.io.read("customer.vortex")
 table = array.to_arrow()
 
 # DuckDB (requires extension)

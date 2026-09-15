@@ -112,8 +112,8 @@ class TestTPCDSDryRunValidation:
             mock_tpcds_class.return_value = mock_benchmark
 
             # Use deterministic query generation
-            mock_benchmark.get_query.side_effect = (
-                lambda qid, **kwargs: f"SELECT {qid} FROM table_{qid} WHERE col = {kwargs.get('seed', 1)}"
+            mock_benchmark.get_query.side_effect = lambda qid, **kwargs: (
+                f"SELECT {qid} FROM table_{qid} WHERE col = {kwargs.get('seed', 1)}"
             )
 
             # Mock the query retrieval methods that _extract_standard_queries uses

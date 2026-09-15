@@ -34,7 +34,7 @@ benchmark = TPCH(scale_factor=1.0)
 results = adapter.run_benchmark(benchmark)
 
 # Check validation results in output
-for query_result in results['queries']:
+for query_result in results["queries"]:
     print(f"Query {query_result['query_id']}: {query_result.get('row_count_validation_status', 'N/A')}")
 ```
 
@@ -122,14 +122,14 @@ The validation system handles various query ID formats automatically:
 
 ```python
 # All of these map to Query 1:
-validator.validate_query_result("tpch", 1, actual_row_count=4)        # Integer
-validator.validate_query_result("tpch", "1", actual_row_count=4)      # String
-validator.validate_query_result("tpch", "Q1", actual_row_count=4)     # Q-prefix
-validator.validate_query_result("tpch", "query1", actual_row_count=4) # query-prefix
+validator.validate_query_result("tpch", 1, actual_row_count=4)  # Integer
+validator.validate_query_result("tpch", "1", actual_row_count=4)  # String
+validator.validate_query_result("tpch", "Q1", actual_row_count=4)  # Q-prefix
+validator.validate_query_result("tpch", "query1", actual_row_count=4)  # query-prefix
 
 # Query variants (extract base query number):
-validator.validate_query_result("tpch", "15a", actual_row_count=1)    # Variant → Q15
-validator.validate_query_result("tpch", "Q15b", actual_row_count=1)   # Variant → Q15
+validator.validate_query_result("tpch", "15a", actual_row_count=1)  # Variant → Q15
+validator.validate_query_result("tpch", "Q15b", actual_row_count=1)  # Variant → Q15
 ```
 
 ### Manual Validation
@@ -141,12 +141,7 @@ from benchbox.core.validation.query_validation import QueryValidator
 
 validator = QueryValidator()
 
-result = validator.validate_query_result(
-    benchmark_type="tpch",
-    query_id="1",
-    actual_row_count=4,
-    scale_factor=1.0
-)
+result = validator.validate_query_result(benchmark_type="tpch", query_id="1", actual_row_count=4, scale_factor=1.0)
 
 if result.is_valid:
     print(f"✅ Validation passed: {result.expected_row_count} rows")
@@ -164,7 +159,7 @@ Full validation support with exact expected row counts:
 # SF=1.0: All queries validated
 results = adapter.run_benchmark(
     TPCH(scale_factor=1.0),
-    validate_row_counts=True  # Default
+    validate_row_counts=True,  # Default
 )
 ```
 
@@ -255,7 +250,7 @@ The validation system is thread-safe for concurrent query execution:
 # Safe to run throughput tests with concurrent queries
 results = adapter.run_throughput_test(
     benchmark=benchmark,
-    num_streams=4  # 4 concurrent query streams
+    num_streams=4,  # 4 concurrent query streams
 )
 # Each stream can validate concurrently without conflicts
 ```
@@ -388,6 +383,7 @@ See `.github/workflows/upload-answers.yml` for the expected archive layout.
 ```python
 # Manually trigger provider registration
 from benchbox.core.expected_results import register_all_providers
+
 register_all_providers()
 ```
 
@@ -415,7 +411,7 @@ class ExpectedQueryResult:
     expected_row_count: int | None = None
     expected_row_count_min: int | None = None  # For non-deterministic queries
     expected_row_count_max: int | None = None
-    row_count_formula: str | None = None      # E.g., "SF * 100"
+    row_count_formula: str | None = None  # E.g., "SF * 100"
     validation_mode: ValidationMode = ValidationMode.EXACT
     scale_independent: bool = False
     notes: str | None = None
@@ -451,7 +447,7 @@ For scale-dependent queries, formulas can express expected count:
 ExpectedQueryResult(
     query_id="example",
     row_count_formula="SF * 1000",  # Scales with scale factor
-    scale_independent=False
+    scale_independent=False,
 )
 ```
 
@@ -463,18 +459,15 @@ Currently, only exact row counts are used. Formulas are evaluated using safe AST
 
 ```python
 # Establish correctness at SF=1.0
-correctness_results = adapter.run_benchmark(
-    TPCH(scale_factor=1.0),
-    validate_row_counts=True
-)
+correctness_results = adapter.run_benchmark(TPCH(scale_factor=1.0), validate_row_counts=True)
 
 # All queries should PASS
-assert all(q['row_count_validation_status'] == 'PASSED' for q in correctness_results['queries'])
+assert all(q["row_count_validation_status"] == "PASSED" for q in correctness_results["queries"])
 
 # Then scale up for performance testing
 performance_results = adapter.run_benchmark(
     TPCH(scale_factor=100),
-    validate_row_counts=True  # Scale-independent queries still validate
+    validate_row_counts=True,  # Scale-independent queries still validate
 )
 ```
 
@@ -484,10 +477,7 @@ performance_results = adapter.run_benchmark(
 # In automated tests
 results = adapter.run_benchmark(benchmark)
 
-failed_validations = [
-    q for q in results['queries']
-    if q.get('row_count_validation_status') == 'FAILED'
-]
+failed_validations = [q for q in results["queries"] if q.get("row_count_validation_status") == "FAILED"]
 
 if failed_validations:
     for q in failed_validations:
@@ -508,7 +498,7 @@ print("- Scale-dependent queries: SKIPPED (no SF=10.0 expectations)")
 
 ```python
 # When investigating performance issues, check correctness first
-if query_result['row_count_validation_status'] != 'PASSED':
+if query_result["row_count_validation_status"] != "PASSED":
     print(f"⚠️ Query may be incorrect - investigate before performance tuning")
     print(f"  Expected: {query_result['expected_row_count']} rows")
     print(f"  Actual: {query_result['rows_returned']} rows")

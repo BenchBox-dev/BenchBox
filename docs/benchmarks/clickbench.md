@@ -330,10 +330,10 @@ print(f"Loaded {row_count:,} rows in {load_time:.2f} seconds")
 
 # Run ClickBench query categories
 query_categories = {
-    'basic_agg': ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'],
-    'grouping': ['Q8', 'Q9', 'Q10', 'Q13', 'Q16'],
-    'string_ops': ['Q21', 'Q22', 'Q25', 'Q26'],
-    'complex': ['Q28', 'Q31', 'Q37', 'Q43']
+    "basic_agg": ["Q1", "Q2", "Q3", "Q4", "Q5"],
+    "grouping": ["Q8", "Q9", "Q10", "Q13", "Q16"],
+    "string_ops": ["Q21", "Q22", "Q25", "Q26"],
+    "complex": ["Q28", "Q31", "Q37", "Q43"],
 }
 
 results = {}
@@ -349,16 +349,11 @@ for category, query_ids in query_categories.items():
             result = conn.execute(query_sql).fetchall()
             execution_time = time.time() - start_time
 
-            category_results[query_id] = {
-                'time': execution_time,
-                'rows': len(result)
-            }
+            category_results[query_id] = {"time": execution_time, "rows": len(result)}
             print(f"  {query_id}: {execution_time:.3f}s ({len(result)} rows)")
 
         except Exception as e:
-            category_results[query_id] = {
-                'error': str(e)
-            }
+            category_results[query_id] = {"error": str(e)}
             print(f"  {query_id}: ERROR - {str(e)[:50]}...")
 
     results[category] = category_results
@@ -366,16 +361,8 @@ for category, query_ids in query_categories.items():
 conn.close()
 
 # Print summary
-total_time = sum(
-    r['time'] for cat_results in results.values()
-    for r in cat_results.values()
-    if 'time' in r
-)
-total_queries = sum(
-    1 for cat_results in results.values()
-    for r in cat_results.values()
-    if 'time' in r
-)
+total_time = sum(r["time"] for cat_results in results.values() for r in cat_results.values() if "time" in r)
+total_queries = sum(1 for cat_results in results.values() for r in cat_results.values() if "time" in r)
 print(f"\\nSummary: {total_queries} queries executed in {total_time:.2f}s")
 ```
 
@@ -562,7 +549,7 @@ import clickhouse_connect
 from benchbox import ClickBench
 
 # Initialize ClickHouse for appropriate performance
-client = clickhouse_connect.get_client(host='localhost', port=8123)
+client = clickhouse_connect.get_client(host="localhost", port=8123)
 clickbench = ClickBench(scale_factor=1.0, output_dir="clickbench_data")
 
 # Generate data
@@ -686,8 +673,8 @@ client.execute(create_table_sql)
 
 # Load data using ClickHouse CSV import
 hits_file = clickbench.output_dir / "hits.csv"
-with open(hits_file, 'rb') as f:
-    client.insert_file('hits', f, fmt='CSV')
+with open(hits_file, "rb") as f:
+    client.insert_file("hits", f, fmt="CSV")
 
 # Run all 43 ClickBench queries
 print("Running all 43 ClickBench queries on ClickHouse...")
@@ -703,21 +690,18 @@ for i in range(1, 44):
         result = client.query(query_sql)
         execution_time = time.time() - start_time
 
-        query_results[query_id] = {
-            'time': execution_time,
-            'rows': len(result.result_rows)
-        }
+        query_results[query_id] = {"time": execution_time, "rows": len(result.result_rows)}
 
         print(f"{query_id}: {execution_time:.3f}s ({len(result.result_rows)} rows)")
 
     except Exception as e:
-        query_results[query_id] = {'error': str(e)}
+        query_results[query_id] = {"error": str(e)}
         print(f"{query_id}: ERROR - {str(e)[:50]}...")
 
 # Calculate performance statistics
-successful_queries = [r for r in query_results.values() if 'time' in r]
+successful_queries = [r for r in query_results.values() if "time" in r]
 if successful_queries:
-    total_time = sum(r['time'] for r in successful_queries)
+    total_time = sum(r["time"] for r in successful_queries)
     avg_time = total_time / len(successful_queries)
 
     print(f"\\nClickBench Results Summary:")
@@ -788,13 +772,13 @@ clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
     # Data generation options
-    date_range_days=365,     # Range of event dates
-    user_count=10000000,     # Number of unique users
+    date_range_days=365,  # Range of event dates
+    user_count=10000000,  # Number of unique users
     enable_compression=True,  # Compress output files
     # Performance options
     partition_by_date=True,  # Partition by EventDate
-    create_indices=True,     # Create performance indices
-    optimize_for_analytics=True  # Analytics-configured generation
+    create_indices=True,  # Create performance indices
+    optimize_for_analytics=True,  # Analytics-configured generation
 )
 ```
 
@@ -852,9 +836,9 @@ SELECT * FROM (
 clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
-    compression='gzip',      # Compress for faster I/O
-    batch_size=100000,       # Optimize batch size
-    parallel_loading=True    # Use parallel loading
+    compression="gzip",  # Compress for faster I/O
+    batch_size=100000,  # Optimize batch size
+    parallel_loading=True,  # Use parallel loading
 )
 ```
 

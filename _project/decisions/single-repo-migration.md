@@ -85,7 +85,7 @@ The TODO YAML files in `_project/TODO/main/active/` and `_project/TODO/main/plan
 
 - **Phase 1 (wheel hygiene)** — completed 2026-04-27. Defence-in-depth MANIFEST.in prunes added; wheel + sdist verified clean of maintainer scaffolding.
 - **Phase 2 (continuous CI)** — surface widens to: every push to `develop`, every push to `main`, every push to `v*` release branches, every PR targeting any of those.
-- **Phase 3 (new release flow)** — Makefile `release` target rewires to the new flow: cut `vX.Y.Z` from `develop` → curate (re-using `workflow.py` / `prepare_release.py` outputs) → squash-merge to `main` → tag → rebase `develop`. The release.yml workflow stays the same shape (triggered by tag push, builds, publishes to PyPI).
+- **Phase 3 (new release flow)** — Makefile `release` target rewires to the new flow: cut `vX.Y.Z` from `develop` → curate (reusing `workflow.py` / `prepare_release.py` outputs) → squash-merge to `main` → tag → rebase `develop`. The release.yml workflow stays the same shape (triggered by tag push, builds, publishes to PyPI).
 - **Phase 4 (final sync + history merge + first release)** — restructures: create `develop` from current public `main`, sync the working-tree into `develop`, `_project/**` filter-merge into `develop` (with date filter dropping pre-2026 commits per Phase 0 D2a), cut `v0.3.0` release branch from `develop`, curate, squash-merge to `main`, tag, rebase `develop` onto `main`.
 - **Phase 5 (dev-locus migration + branch protection)** — three rulesets:
   - `main`: squash-merge only, source restricted to `vX.Y.Z` PR sources, status checks required, linear history (post-Phase-4 only).

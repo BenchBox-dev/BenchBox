@@ -403,11 +403,11 @@ from benchbox.core.query_plans.comparison import compare_query_plans
 from benchbox.core.query_plans.visualization import render_plan
 
 # Load results
-with open('results.json') as f:
+with open("results.json") as f:
     results = BenchmarkResults.from_dict(json.load(f))
 
 # Get a query execution
-query_exec = results.phases['power'].queries[0]
+query_exec = results.phases["power"].queries[0]
 plan = query_exec.query_plan
 
 # Render plan
@@ -426,6 +426,7 @@ Traverse plan trees programmatically:
 ```python
 def count_scans(plan):
     """Count total scan operations in plan."""
+
     def count_in_operator(op):
         count = 1 if op.operator_type == LogicalOperatorType.SCAN else 0
         if op.children:
@@ -434,6 +435,7 @@ def count_scans(plan):
         return count
 
     return count_in_operator(plan.logical_root)
+
 
 # Analyze plans
 num_scans = count_scans(query_exec.query_plan)
@@ -674,8 +676,8 @@ constants share a normalized fingerprint.
 The capability is also available programmatically:
 
 ```python
-plan.plan_fingerprint          # literal-sensitive (default)
-plan.normalized_fingerprint    # literal-normalized
+plan.plan_fingerprint  # literal-sensitive (default)
+plan.normalized_fingerprint  # literal-normalized
 plan.compute_plan_fingerprint(normalize_literals=True)
 ```
 

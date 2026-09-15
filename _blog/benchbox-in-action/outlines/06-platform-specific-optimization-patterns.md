@@ -51,7 +51,8 @@ order_wh = df.select(["order_number", "warehouse_sk"]).unique()
 multi_warehouse = (
     order_wh.join(order_wh.rename({"warehouse_sk": "wh2"}), on="order_number")
     .filter(col("warehouse_sk") != col("wh2"))
-    .select("order_number").unique()
+    .select("order_number")
+    .unique()
 )
 
 # Pattern B: n_unique aggregation

@@ -136,6 +136,7 @@ from benchbox import TPCH
 tpch = TPCH(scale_factor=0.1)
 # ... database setup (DuckDB recommended) ...
 
+
 # Measure single query execution
 def time_query(connection, query_sql: str, query_id: str = "") -> dict:
     """Time a single query execution."""
@@ -148,8 +149,9 @@ def time_query(connection, query_sql: str, query_id: str = "") -> dict:
         "query_id": query_id,
         "execution_time_seconds": execution_time,
         "rows_returned": len(result),
-        "execution_time_ms": execution_time * 1000
+        "execution_time_ms": execution_time * 1000,
     }
+
 
 # Example usage
 query_1 = tpch.get_query(1)
@@ -165,6 +167,7 @@ print(f"  Rows returned: {timing_result['rows_returned']}")
 ```python
 import time
 from benchbox import TPCH
+
 
 def time_multiple_queries(connection, benchmark, query_ids: list) -> dict:
     """Time multiple query executions."""
@@ -183,18 +186,15 @@ def time_multiple_queries(connection, benchmark, query_ids: list) -> dict:
         results[query_id] = {
             "execution_time_seconds": execution_time,
             "execution_time_ms": execution_time * 1000,
-            "rows_returned": len(result)
+            "rows_returned": len(result),
         }
 
         print(f"Query {query_id}: {execution_time * 1000:.1f} ms ({len(result)} rows)")
 
     total_time = time.time() - total_start_time
 
-    return {
-        "individual_results": results,
-        "total_execution_time": total_time,
-        "queries_executed": len(query_ids)
-    }
+    return {"individual_results": results, "total_execution_time": total_time, "queries_executed": len(query_ids)}
+
 
 # Example usage with DuckDB
 import duckdb
@@ -209,8 +209,9 @@ tpch = TPCH(scale_factor=0.1)
 # Time first 5 TPC-H queries
 query_results = time_multiple_queries(conn, tpch, list(range(1, 6)))
 
-print(f"\nTotal time for {query_results['queries_executed']} queries: "
-      f"{query_results['total_execution_time']:.2f} seconds")
+print(
+    f"\nTotal time for {query_results['queries_executed']} queries: {query_results['total_execution_time']:.2f} seconds"
+)
 ```
 
 ---
@@ -223,6 +224,7 @@ print(f"\nTotal time for {query_results['queries_executed']} queries: "
 import time
 from benchbox import TPCH
 import duckdb
+
 
 def run_timed_benchmark(benchmark_class, scale_factor: float = 0.1) -> dict:
     """Run complete benchmark with detailed timing."""
@@ -277,16 +279,12 @@ def run_timed_benchmark(benchmark_class, scale_factor: float = 0.1) -> dict:
             query_results[query_id] = {
                 "success": True,
                 "execution_time_ms": execution_time * 1000,
-                "rows_returned": len(result)
+                "rows_returned": len(result),
             }
 
         except Exception as e:
             execution_time = time.time() - start_time
-            query_results[query_id] = {
-                "success": False,
-                "execution_time_ms": execution_time * 1000,
-                "error": str(e)
-            }
+            query_results[query_id] = {"success": False, "execution_time_ms": execution_time * 1000, "error": str(e)}
 
     query_exec_time = time.time() - query_start
     total_time = time.time() - benchmark_start
@@ -295,7 +293,9 @@ def run_timed_benchmark(benchmark_class, scale_factor: float = 0.1) -> dict:
     successful_queries = [q for q in query_results.values() if q["success"]]
     failed_queries = [q for q in query_results.values() if not q["success"]]
 
-    avg_query_time = sum(q["execution_time_ms"] for q in successful_queries) / len(successful_queries) if successful_queries else 0
+    avg_query_time = (
+        sum(q["execution_time_ms"] for q in successful_queries) / len(successful_queries) if successful_queries else 0
+    )
 
     return {
         "benchmark_name": benchmark_class.__name__,
@@ -304,20 +304,18 @@ def run_timed_benchmark(benchmark_class, scale_factor: float = 0.1) -> dict:
             "data_generation_seconds": data_gen_time,
             "database_setup_seconds": setup_time,
             "query_execution_seconds": query_exec_time,
-            "total_seconds": total_time
+            "total_seconds": total_time,
         },
-        "data_stats": {
-            "total_size_mb": total_size_mb,
-            "num_tables": len(data_files)
-        },
+        "data_stats": {"total_size_mb": total_size_mb, "num_tables": len(data_files)},
         "query_stats": {
             "total_queries": len(queries),
             "successful_queries": len(successful_queries),
             "failed_queries": len(failed_queries),
-            "average_query_time_ms": avg_query_time
+            "average_query_time_ms": avg_query_time,
         },
-        "query_results": query_results
+        "query_results": query_results,
     }
+
 
 # Example usage
 benchmark_results = run_timed_benchmark(TPCH, scale_factor=0.1)
@@ -328,7 +326,9 @@ print(f"Database setup: {benchmark_results['timing']['database_setup_seconds']:.
 print(f"Query execution: {benchmark_results['timing']['query_execution_seconds']:.2f}s")
 print(f"Total time: {benchmark_results['timing']['total_seconds']:.2f}s")
 print(f"Average query time: {benchmark_results['query_stats']['average_query_time_ms']:.1f}ms")
-print(f"Success rate: {benchmark_results['query_stats']['successful_queries']}/{benchmark_results['query_stats']['total_queries']}")
+print(
+    f"Success rate: {benchmark_results['query_stats']['successful_queries']}/{benchmark_results['query_stats']['total_queries']}"
+)
 ```
 
 ### Library Overhead Baselines
@@ -362,6 +362,7 @@ import psutil
 import os
 from benchbox import TPCH
 
+
 def profile_benchmark_execution(benchmark_class, scale_factor: float = 0.1):
     """Profile benchmark execution with resource monitoring."""
 
@@ -387,6 +388,7 @@ def profile_benchmark_execution(benchmark_class, scale_factor: float = 0.1):
 
     # Database setup phase
     import duckdb
+
     conn = duckdb.connect(":memory:")
     ddl = benchmark.get_create_tables_sql()
     conn.execute(ddl)
@@ -434,6 +436,7 @@ def profile_benchmark_execution(benchmark_class, scale_factor: float = 0.1):
     print(f"CPU time used: {cpu_usage:.1f}s")
     print(f"Queries executed: {query_count}/{len(queries)}")
 
+
 # Example usage
 profile_benchmark_execution(TPCH, scale_factor=0.1)
 ```
@@ -448,6 +451,7 @@ profile_benchmark_execution(TPCH, scale_factor=0.1)
 import psutil
 import os
 from benchbox import TPCH
+
 
 def monitor_memory_usage():
     """Simple memory usage monitoring during benchmark execution."""
@@ -469,6 +473,7 @@ def monitor_memory_usage():
 
     # Database operations
     import duckdb
+
     conn = duckdb.connect(":memory:")
     ddl = tpch.get_create_tables_sql()
     conn.execute(ddl)
@@ -484,6 +489,7 @@ def monitor_memory_usage():
         """)
         print(f"After loading {table_name}: {get_memory_mb():.1f} MB")
 
+
 monitor_memory_usage()
 ```
 
@@ -493,6 +499,7 @@ monitor_memory_usage()
 from benchbox import TPCH
 import duckdb
 import gc
+
 
 def memory_efficient_benchmark(scale_factor: float = 0.1):
     """Run benchmark with memory-efficient patterns."""
@@ -546,7 +553,9 @@ def memory_efficient_benchmark(scale_factor: float = 0.1):
     # Cleanup temporary files
     if scale_factor > 0.1:
         import os
+
         os.remove("temp_benchmark.duckdb")
+
 
 memory_efficient_benchmark(0.1)
 ```
@@ -560,6 +569,7 @@ memory_efficient_benchmark(0.1)
 ```python
 import duckdb
 from benchbox import TPCH
+
 
 def optimize_duckdb_performance(scale_factor: float = 0.1):
     """Optimize DuckDB for benchmark performance."""
@@ -616,6 +626,7 @@ def optimize_duckdb_performance(scale_factor: float = 0.1):
         conn.execute("PRAGMA enable_profiling='query_tree'")
 
         import time
+
         start_time = time.time()
         result = conn.execute(query_sql).fetchall()
         execution_time = time.time() - start_time
@@ -625,6 +636,7 @@ def optimize_duckdb_performance(scale_factor: float = 0.1):
         # Get query plan (optional)
         # plan = conn.execute("PRAGMA show_tables").fetchall()
 
+
 optimize_duckdb_performance(0.1)
 ```
 
@@ -633,6 +645,7 @@ optimize_duckdb_performance(0.1)
 ```python
 import duckdb
 from benchbox import TPCH
+
 
 def configure_duckdb_for_benchmark(memory_limit_gb: int = 4, num_threads: int = None):
     """Configure DuckDB with specific performance settings."""
@@ -648,6 +661,7 @@ def configure_duckdb_for_benchmark(memory_limit_gb: int = 4, num_threads: int = 
     else:
         # Use all available cores
         import os
+
         conn.execute(f"SET threads={os.cpu_count()}")
 
     # Performance settings
@@ -659,6 +673,7 @@ def configure_duckdb_for_benchmark(memory_limit_gb: int = 4, num_threads: int = 
     conn.execute("SET enable_profiling='query_tree'")
 
     return conn
+
 
 # Example usage
 conn = configure_duckdb_for_benchmark(memory_limit_gb=2, num_threads=4)
@@ -678,6 +693,7 @@ tpch = TPCH(scale_factor=0.1)
 import time
 from benchbox import TPCH
 import duckdb
+
 
 def compare_scale_factors(scale_factors: list = [0.01, 0.1, 0.5]):
     """Compare performance across different scale factors."""
@@ -731,7 +747,7 @@ def compare_scale_factors(scale_factors: list = [0.01, 0.1, 0.5]):
             "data_size_mb": total_size_mb,
             "setup_time": setup_time,
             "avg_query_time": avg_query_time,
-            "total_time": total_time
+            "total_time": total_time,
         }
 
         print(f"  Data size: {total_size_mb:.1f} MB")
@@ -745,12 +761,15 @@ def compare_scale_factors(scale_factors: list = [0.01, 0.1, 0.5]):
     print(f"\n=== Scale Factor Comparison ===")
     print("SF\tData(MB)\tSetup(s)\tAvg Query(ms)\tTotal(s)")
     for sf, metrics in results.items():
-        print(f"{sf}\t{metrics['data_size_mb']:.1f}\t\t"
-              f"{metrics['setup_time']:.1f}\t\t"
-              f"{metrics['avg_query_time'] * 1000:.1f}\t\t"
-              f"{metrics['total_time']:.1f}")
+        print(
+            f"{sf}\t{metrics['data_size_mb']:.1f}\t\t"
+            f"{metrics['setup_time']:.1f}\t\t"
+            f"{metrics['avg_query_time'] * 1000:.1f}\t\t"
+            f"{metrics['total_time']:.1f}"
+        )
 
     return results
+
 
 # Run comparison
 performance_results = compare_scale_factors([0.01, 0.1, 0.5])
@@ -762,6 +781,7 @@ performance_results = compare_scale_factors([0.01, 0.1, 0.5])
 import time
 import duckdb
 from benchbox import TPCH, SSB
+
 
 def compare_benchmarks(scale_factor: float = 0.01):
     """Compare performance across different benchmarks."""
@@ -820,7 +840,7 @@ def compare_benchmarks(scale_factor: float = 0.01):
                 "tested_queries": len(test_queries),
                 "avg_query_time": avg_query_time,
                 "total_time": total_time,
-                "success": True
+                "success": True,
             }
 
             print(f"  Total queries: {len(queries)}")
@@ -834,6 +854,7 @@ def compare_benchmarks(scale_factor: float = 0.01):
             results[name] = {"success": False, "error": str(e)}
 
     return results
+
 
 # Run benchmark comparison
 benchmark_results = compare_benchmarks(0.01)
@@ -850,6 +871,7 @@ benchmark_results = compare_benchmarks(0.01)
 ```python
 import psutil
 from benchbox import TPCH
+
 
 def check_memory_requirements(scale_factor: float):
     """Check if system has enough memory for scale factor."""
@@ -873,6 +895,7 @@ def check_memory_requirements(scale_factor: float):
     else:
         print(f"  OK: Sufficient memory available")
         return True
+
 
 # Check before running benchmark
 if check_memory_requirements(0.5):

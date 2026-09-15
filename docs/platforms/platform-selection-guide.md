@@ -184,10 +184,8 @@ results = adapter.run_benchmark(benchmark)
 
 # Or use DataFusion for PyArrow-based workflows
 from benchbox.platforms.datafusion import DataFusionAdapter
-adapter = DataFusionAdapter(
-    memory_limit="4G",
-    data_format="parquet"
-)
+
+adapter = DataFusionAdapter(memory_limit="4G", data_format="parquet")
 results = adapter.run_benchmark(benchmark)
 ```
 
@@ -203,18 +201,12 @@ results = adapter.run_benchmark(benchmark)
 
 ```python
 # DuckDB with persistent storage
-adapter = DuckDBAdapter(
-    database_path="analytics.duckdb",
-    memory_limit="16GB"
-)
+adapter = DuckDBAdapter(database_path="analytics.duckdb", memory_limit="16GB")
 
 # Or ClickHouse for distributed processing
 from benchbox.platforms.clickhouse import ClickHouseAdapter
-adapter = ClickHouseAdapter(
-    host="clickhouse-cluster",
-    max_memory_usage="32GB",
-    max_threads=16
-)
+
+adapter = ClickHouseAdapter(host="clickhouse-cluster", max_memory_usage="32GB", max_threads=16)
 ```
 
 **Characteristics**:
@@ -228,17 +220,13 @@ adapter = ClickHouseAdapter(
 ```python
 # Cloud platform examples (choose based on your cloud environment)
 from benchbox.platforms.snowflake import SnowflakeAdapter
-adapter = SnowflakeAdapter(
-    warehouse_size="LARGE",
-    database="analytics_benchmarks"
-)
+
+adapter = SnowflakeAdapter(warehouse_size="LARGE", database="analytics_benchmarks")
 
 # Or using BigQuery
 from benchbox.platforms.bigquery import BigQueryAdapter
-adapter = BigQueryAdapter(
-    project_id="analytics-project",
-    dataset_id="large_scale_benchmarks"
-)
+
+adapter = BigQueryAdapter(project_id="analytics-project", dataset_id="large_scale_benchmarks")
 ```
 
 **Characteristics**:
@@ -262,14 +250,15 @@ adapter = BigQueryAdapter(
 # Completely free solution with DuckDB
 adapter = DuckDBAdapter(
     database_path="cost_effective.duckdb",
-    memory_limit="8GB"  # Use available RAM efficiently
+    memory_limit="8GB",  # Use available RAM efficiently
 )
 
 # Or DataFusion for in-memory analytics
 from benchbox.platforms.datafusion import DataFusionAdapter
+
 adapter = DataFusionAdapter(
     memory_limit="8G",
-    data_format="parquet"  # Faster than CSV
+    data_format="parquet",  # Faster than CSV
 )
 ```
 
@@ -286,7 +275,7 @@ adapter = DataFusionAdapter(
 adapter = BigQueryAdapter(
     maximum_bytes_billed=1000000000,  # 1GB limit per query
     job_priority="BATCH",  # Lower cost
-    query_cache=True  # Reuse results
+    query_cache=True,  # Reuse results
 )
 ```
 
@@ -303,7 +292,7 @@ adapter = BigQueryAdapter(
 adapter = SnowflakeAdapter(
     warehouse_size="MEDIUM",
     auto_suspend=60,  # 1 minute
-    auto_resume=True
+    auto_resume=True,
 )
 ```
 
@@ -317,14 +306,14 @@ adapter = SnowflakeAdapter(
 # DuckDB: In-process query execution
 adapter = DuckDBAdapter(
     memory_limit="32GB",  # Keep data in memory
-    thread_limit=None     # Use all CPU cores
+    thread_limit=None,  # Use all CPU cores
 )
 
 # ClickHouse: Column-oriented analytical database
 adapter = ClickHouseAdapter(
     max_threads=32,
     max_memory_usage="64GB",
-    compression=True  # Reduce network I/O
+    compression=True,  # Reduce network I/O
 )
 ```
 
@@ -342,14 +331,14 @@ adapter = ClickHouseAdapter(
 adapter = BigQueryAdapter(
     job_priority="INTERACTIVE",
     query_cache=False,  # Always compute fresh results
-    location="US"       # Multi-region deployment
+    location="US",  # Multi-region deployment
 )
 
 # Snowflake: Multi-cluster scaling
 adapter = SnowflakeAdapter(
     warehouse_size="X-LARGE",
     multi_cluster_warehouse=True,
-    auto_suspend=600  # 10 minutes for sustained workloads
+    auto_suspend=600,  # 10 minutes for sustained workloads
 )
 ```
 
@@ -388,7 +377,7 @@ adapter = BigQueryAdapter(
 adapter = DatabricksAdapter(
     cluster_size="large",
     auto_terminate_minutes=30,  # Cost control
-    runtime_engine="PHOTON"     # Vectorized query engine
+    runtime_engine="PHOTON",  # Vectorized query engine
 )
 ```
 
@@ -516,6 +505,7 @@ result = duckdb.query("SELECT * FROM df WHERE value > 100").to_df()
 
 # Databricks SQL: Spark/Python integration
 from pyspark.sql import SparkSession
+
 spark = SparkSession.builder.appName("BenchBox").getOrCreate()
 ```
 
@@ -592,6 +582,7 @@ adapter = BigQueryAdapter(
 ```python
 # Azure Synapse Analytics
 from benchbox.platforms.azure_synapse import AzureSynapseAdapter
+
 adapter = AzureSynapseAdapter(
     # Dedicated or serverless SQL pools
     # PolyBase staging
@@ -600,6 +591,7 @@ adapter = AzureSynapseAdapter(
 
 # Microsoft Fabric Warehouse
 from benchbox.platforms.fabric_warehouse import FabricWarehouseAdapter
+
 adapter = FabricWarehouseAdapter(
     # T-SQL interface via pyodbc
     # Entra ID authentication
@@ -709,10 +701,7 @@ dev_adapter = DuckDBAdapter()
 test_adapter = DuckDBAdapter(database_path="test.duckdb")
 
 # Production: Scalable, managed
-prod_adapter = SnowflakeAdapter(
-    warehouse_size="LARGE",
-    database="PRODUCTION"
-)
+prod_adapter = SnowflakeAdapter(warehouse_size="LARGE", database="PRODUCTION")
 
 # Use same benchmark code across all environments
 benchmark = TPCH(scale_factor=0.1)  # Small for dev/test
@@ -788,15 +777,12 @@ dev_adapter = DuckDBAdapter()
 migration_config = {"scale_factor": 1}
 cloud_adapter = DatabricksAdapter(
     cluster_size="medium",
-    auto_terminate_minutes=30  # Cost protection
+    auto_terminate_minutes=30,  # Cost protection
 )
 
 # Production deployment
 prod_config = {"scale_factor": 100}
-prod_adapter = DatabricksAdapter(
-    cluster_size="large",
-    runtime_engine="PHOTON"
-)
+prod_adapter = DatabricksAdapter(cluster_size="large", runtime_engine="PHOTON")
 ```
 
 ## Common Anti-Patterns
@@ -842,7 +828,7 @@ prod_adapter = DatabricksAdapter(
    # Always set cost controls
    adapter = BigQueryAdapter(
        maximum_bytes_billed=5_000_000_000,  # 5GB limit
-       job_priority="BATCH"  # Lower cost
+       job_priority="BATCH",  # Lower cost
    )
    ```
 

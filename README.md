@@ -115,12 +115,13 @@ print(f"✅ Generated TPC-H Query 1")
 
 # Run on embedded DuckDB (no setup required)
 import duckdb
+
 conn = duckdb.connect(":memory:")
 
 # Create schema and load data
 conn.execute(tpch.get_create_tables_sql())
 for table_file in data_paths:
-    table_name = table_file.split('/')[-1].replace('.csv', '')
+    table_name = table_file.split("/")[-1].replace(".csv", "")
     conn.execute(f"COPY {table_name} FROM '{table_file}' WITH (DELIMITER '|', HEADER false)")
 
 # Execute the query
@@ -607,7 +608,7 @@ adapter.load_benchmark_data(benchmark)
 run_config = {
     "query_subset": ["1", "6", "17"],  # Note: parameter is 'query_subset'
     "timeout": 60,
-    "verbose": True
+    "verbose": True,
 }
 
 results = adapter.run_standard_queries(benchmark, run_config)
@@ -921,6 +922,7 @@ Python helper:
 
 ```python
 from benchbox.utils.output_path import normalize_output_root
+
 print(normalize_output_root("s3://bucket/prefix", "tpch", 0.01))
 # s3://bucket/prefix/tpch_sf01
 ```
@@ -1029,9 +1031,9 @@ tpch.generate_data()
 
 # Generate query streams for concurrent testing
 stream_files = tpch.generate_streams(
-    num_streams=4,          # 4 concurrent streams
-    rng_seed=42,           # Reproducible parameters
-    streams_output_dir="streams"
+    num_streams=4,  # 4 concurrent streams
+    rng_seed=42,  # Reproducible parameters
+    streams_output_dir="streams",
 )
 
 # Get stream information
@@ -1040,34 +1042,23 @@ for stream in stream_info:
     print(f"Stream {stream['stream_id']}: {len(stream['queries'])} queries")
 
 # Load data directly into a database
-tpch.load_data_to_database(
-    connection_string="duckdb://tpch.db",
-    dialect="duckdb",
-    drop_existing=True
-)
+tpch.load_data_to_database(connection_string="duckdb://tpch.db", dialect="duckdb", drop_existing=True)
 
 # Run individual queries with timing
-result = tpch.run_query(
-    query_id=1,
-    connection_string="duckdb://tpch.db",
-    dialect="duckdb"
-)
+result = tpch.run_query(query_id=1, connection_string="duckdb://tpch.db", dialect="duckdb")
 print(f"Query 1 took {result['execution_time']:.3f}s")
 
 # Run the full benchmark
 benchmark_results = tpch.run_benchmark(
     connection_string="duckdb://tpch.db",
     queries=[1, 2, 3, 4, 5],  # Run specific queries
-    iterations=3,              # Run each query 3 times
-    dialect="duckdb"
+    iterations=3,  # Run each query 3 times
+    dialect="duckdb",
 )
 
 # Run concurrent streams
 stream_results = tpch.run_streams(
-    connection_string="duckdb://tpch.db",
-    stream_files=stream_files,
-    concurrent=True,
-    dialect="duckdb"
+    connection_string="duckdb://tpch.db", stream_files=stream_files, concurrent=True, dialect="duckdb"
 )
 ```
 
@@ -1109,6 +1100,7 @@ print(results)
 
 # You can also run all queries and time them
 import time
+
 for query_id in range(1, 23):  # TPC-H has 22 queries
     query = tpch.get_query(query_id, seed=42)  # Use seed for reproducible parameters
     start_time = time.time()
@@ -1176,6 +1168,7 @@ Add new benchmarks by extending `BaseBenchmark`:
 
 ```python
 from benchbox import BaseBenchmark
+
 
 class MyCustomBenchmark(BaseBenchmark):
     def __init__(self, scale_factor=1.0, **kwargs):

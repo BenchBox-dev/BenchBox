@@ -86,11 +86,7 @@ conn = duckdb.connect(":memory:")
 conn.execute(benchmark.get_create_tables_sql())
 
 # Run benchmark
-result = benchmark.run_benchmark(
-    connection=conn,
-    dialect="duckdb",
-    categories=["schema", "column"]
-)
+result = benchmark.run_benchmark(connection=conn, dialect="duckdb", categories=["schema", "column"])
 
 print(f"Queries: {result.total_queries}")
 print(f"Successful: {result.successful_queries}")
@@ -177,12 +173,7 @@ from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 benchmark = MetadataPrimitivesBenchmark()
 
 # Run with wide tables preset
-result = benchmark.run_complexity_benchmark(
-    connection=conn,
-    dialect="duckdb",
-    config="wide_tables",
-    iterations=3
-)
+result = benchmark.run_complexity_benchmark(connection=conn, dialect="duckdb", config="wide_tables", iterations=3)
 
 print(f"Setup time: {result.setup_time_ms:.1f}ms")
 print(f"Teardown time: {result.teardown_time_ms:.1f}ms")
@@ -200,20 +191,16 @@ from benchbox.core.metadata_primitives.complexity import (
 )
 
 config = MetadataComplexityConfig(
-    width_factor=500,           # 500 columns per table
-    catalog_size=100,           # 100 tables
-    view_depth=5,               # 5 levels of nested views
+    width_factor=500,  # 500 columns per table
+    catalog_size=100,  # 100 tables
+    view_depth=5,  # 5 levels of nested views
     type_complexity=TypeComplexity.NESTED,
     constraint_density=ConstraintDensity.MODERATE,
     acl_role_count=10,
     acl_permission_density=PermissionDensity.DENSE,
 )
 
-result = benchmark.run_complexity_benchmark(
-    connection=conn,
-    dialect="duckdb",
-    config=config
-)
+result = benchmark.run_complexity_benchmark(connection=conn, dialect="duckdb", config=config)
 ```
 
 ## ACL (Access Control) Testing
@@ -234,12 +221,7 @@ The benchmark includes comprehensive access control testing.
 
 ```python
 # Run ACL benchmark measuring GRANT/REVOKE performance
-acl_result = benchmark.run_acl_benchmark(
-    connection=conn,
-    dialect="snowflake",
-    config="acl_dense",
-    iterations=3
-)
+acl_result = benchmark.run_acl_benchmark(connection=conn, dialect="snowflake", config="acl_dense", iterations=3)
 
 print(f"Setup time: {acl_result.setup_time_ms:.1f}ms")
 print(f"GRANTs/second: {acl_result.summary['grants_per_second']:.1f}")
@@ -329,6 +311,7 @@ class MetadataBenchmarkResult:
     acl_mutation_results: list[AclMutationResult] = field(default_factory=list)
     acl_mutation_summary: dict[str, Any] = field(default_factory=dict)
 
+
 @dataclass
 class MetadataQueryResult:
     query_id: str
@@ -347,11 +330,7 @@ Measure how quickly catalogs can scan your database:
 
 ```python
 # Simulate catalog scan pattern
-result = benchmark.run_benchmark(
-    connection=conn,
-    dialect="snowflake",
-    categories=["schema", "column"]
-)
+result = benchmark.run_benchmark(connection=conn, dialect="snowflake", categories=["schema", "column"])
 
 # Check if scan meets SLA (e.g., < 5 seconds)
 assert result.total_time_ms < 5000, "Catalog scan too slow"
@@ -363,11 +342,7 @@ Test autocomplete responsiveness:
 
 ```python
 # Column lookup should be fast for autocomplete
-column_queries = benchmark.run_benchmark(
-    connection=conn,
-    dialect="postgresql",
-    categories=["column"]
-)
+column_queries = benchmark.run_benchmark(connection=conn, dialect="postgresql", categories=["column"])
 
 avg_time = column_queries.category_summary["column"]["avg_time_ms"]
 assert avg_time < 100, f"Column lookup too slow: {avg_time}ms"
@@ -392,9 +367,7 @@ Verify permission introspection:
 
 ```python
 # Run ACL queries
-acl_result = benchmark.run_benchmark(
-    conn, "snowflake", categories=["acl"]
-)
+acl_result = benchmark.run_benchmark(conn, "snowflake", categories=["acl"])
 
 # Check all ACL queries succeed
 assert acl_result.successful_queries == acl_result.total_queries

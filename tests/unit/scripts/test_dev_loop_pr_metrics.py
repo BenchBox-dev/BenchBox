@@ -882,9 +882,11 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(
         metrics,
         "_git_show_bytes",
-        lambda revision, path: pinned_bytes
-        if path == "_project/analysis/pr-process-acceptance.json"
-        else (b'{"tampered": true}' if revision == TAMPERED_SHA else frozen_bytes),
+        lambda revision, path: (
+            pinned_bytes
+            if path == "_project/analysis/pr-process-acceptance.json"
+            else (b'{"tampered": true}' if revision == TAMPERED_SHA else frozen_bytes)
+        ),
     )
     monkeypatch.setattr(
         metrics,
@@ -980,9 +982,9 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     monkeypatch.setattr(
         metrics,
         "_commit_diff_names",
-        lambda base, commit: ["baseline.json", "scripts/pr_landing.py"]
-        if commit == bundled_diff_sha
-        else ["baseline.json"],
+        lambda base, commit: (
+            ["baseline.json", "scripts/pr_landing.py"] if commit == bundled_diff_sha else ["baseline.json"]
+        ),
     )
     monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF)
     monkeypatch.setattr(metrics, "_is_ancestor", lambda commit, head="HEAD": True)

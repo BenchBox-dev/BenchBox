@@ -39,6 +39,7 @@ Use DuckDB with minimal data to test changes quickly without cloud costs or setu
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
+
 def quick_test():
     """Run TPC-H at tiny scale for rapid testing."""
 
@@ -66,6 +67,7 @@ def quick_test():
 
     return success
 
+
 if __name__ == "__main__":
     raise SystemExit(0 if quick_test() else 1)
 ```
@@ -82,11 +84,7 @@ if __name__ == "__main__":
 **Even Faster (2-3 specific queries):**
 ```python
 # Run only queries 1 and 6 for 10-second tests
-results = adapter.run_benchmark(
-    benchmark,
-    test_execution_type="power",
-    query_subset=["1", "6"]
-)
+results = adapter.run_benchmark(benchmark, test_execution_type="power", query_subset=["1", "6"])
 ```
 
 **Persistent Database (for reuse):**
@@ -123,6 +121,7 @@ Preview exactly what will run on cloud platforms without spending credits or req
 from pathlib import Path
 from benchbox.core.config import BenchmarkConfig, DatabaseConfig
 from benchbox.examples import execute_example_dry_run
+
 
 def preview_bigquery_benchmark():
     """Preview TPC-H benchmark on BigQuery without execution."""
@@ -164,6 +163,7 @@ def preview_bigquery_benchmark():
     print("  - Queries: bigquery_tpch_queries_*/*.sql")
     print("  - Schema: bigquery_tpch_schema_*.sql")
     print("\nReview before running for real!")
+
 
 if __name__ == "__main__":
     preview_bigquery_benchmark()
@@ -238,6 +238,7 @@ from datetime import datetime
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
+
 def production_benchmark():
     """Run TPC-H benchmark at production scale with tuning."""
 
@@ -269,39 +270,40 @@ def production_benchmark():
     )
 
     print(f"\nRunning TPC-H power test (22 queries)...")
-    results = adapter.run_benchmark(
-        benchmark,
-        test_execution_type="power"
-    )
+    results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
     # Save detailed results
     results_file = output_dir / "results.json"
-    with open(results_file, 'w') as f:
-        json.dump({
-            "timestamp": timestamp,
-            "benchmark": "TPC-H",
-            "scale_factor": 10.0,
-            "platform": "DuckDB",
-            "tuning": "tuned",
-            "total_queries": results.total_queries,
-            "successful_queries": results.successful_queries,
-            "failed_queries": results.failed_queries,
-            "total_execution_time": results.total_execution_time,
-            "average_query_time": results.average_query_time,
-            "queries": [
-                {
-                    "query_num": q.query_num,
-                    "execution_time": q.execution_time,
-                    "status": q.status,
-                }
-                for q in results.query_results
-            ]
-        }, f, indent=2)
+    with open(results_file, "w") as f:
+        json.dump(
+            {
+                "timestamp": timestamp,
+                "benchmark": "TPC-H",
+                "scale_factor": 10.0,
+                "platform": "DuckDB",
+                "tuning": "tuned",
+                "total_queries": results.total_queries,
+                "successful_queries": results.successful_queries,
+                "failed_queries": results.failed_queries,
+                "total_execution_time": results.total_execution_time,
+                "average_query_time": results.average_query_time,
+                "queries": [
+                    {
+                        "query_num": q.query_num,
+                        "execution_time": q.execution_time,
+                        "status": q.status,
+                    }
+                    for q in results.query_results
+                ],
+            },
+            f,
+            indent=2,
+        )
 
     # Print summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"PRODUCTION BENCHMARK RESULTS")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Benchmark:      TPC-H SF 10.0")
     print(f"Platform:       DuckDB (tuned)")
     print(f"Queries:        {results.successful_queries}/{results.total_queries} succeeded")
@@ -309,9 +311,10 @@ def production_benchmark():
     print(f"Average/Query:  {results.average_query_time:.2f}s")
     print(f"Database:       {db_path}")
     print(f"Results:        {results_file}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     return results.successful_queries == results.total_queries
+
 
 if __name__ == "__main__":
     raise SystemExit(0 if production_benchmark() else 1)
@@ -359,10 +362,12 @@ from pathlib import Path
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
+
 def load_baseline(baseline_file: Path) -> dict:
     """Load baseline performance results."""
     with open(baseline_file) as f:
         return json.load(f)
+
 
 def run_regression_test(baseline_file: Path, threshold: float = 0.10):
     """
@@ -380,7 +385,7 @@ def run_regression_test(baseline_file: Path, threshold: float = 0.10):
     baseline_time = baseline["total_execution_time"]
 
     print(f"Baseline time: {baseline_time:.2f}s")
-    print(f"Regression threshold: {threshold*100:.0f}%")
+    print(f"Regression threshold: {threshold * 100:.0f}%")
     print()
 
     # Run current benchmark (small scale for speed)
@@ -401,16 +406,17 @@ def run_regression_test(baseline_file: Path, threshold: float = 0.10):
     slowdown = (current_time - baseline_time) / baseline_time
 
     print(f"Current time: {current_time:.2f}s")
-    print(f"Change: {slowdown*100:+.1f}%")
+    print(f"Change: {slowdown * 100:+.1f}%")
 
     # Check for regression
     if slowdown > threshold:
-        print(f"\n❌ REGRESSION DETECTED: {slowdown*100:.1f}% slower than baseline!")
-        print(f"   Threshold: {threshold*100:.0f}%")
+        print(f"\n❌ REGRESSION DETECTED: {slowdown * 100:.1f}% slower than baseline!")
+        print(f"   Threshold: {threshold * 100:.0f}%")
         return False
     else:
         print(f"\n✓ No regression detected")
         return True
+
 
 def create_baseline(output_file: Path):
     """Create new baseline results file."""
@@ -432,10 +438,11 @@ def create_baseline(output_file: Path):
     }
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, 'w') as f:
+    with open(output_file, "w") as f:
         json.dump(baseline, f, indent=2)
 
     print(f"✓ Created baseline: {output_file}")
+
 
 if __name__ == "__main__":
     baseline_file = Path(".github/baselines/tpch_sf01.json")
@@ -600,6 +607,7 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
+
 def load_platform_results(base_dir: Path) -> Dict[str, dict]:
     """Load results from all platforms."""
     results = {}
@@ -611,21 +619,18 @@ def load_platform_results(base_dir: Path) -> Dict[str, dict]:
                     results[platform_dir.name] = json.load(f)
     return results
 
+
 def compare_platforms(results: Dict[str, dict]) -> None:
     """Generate comparison analysis."""
 
     # Find fastest platform
     fastest = min(results.items(), key=lambda x: x[1]["total_execution_time"])
 
-    print("\n🏆 WINNER: {} ({:.2f}s total)".format(
-        fastest[0].title(),
-        fastest[1]["total_execution_time"]
-    ))
+    print("\n🏆 WINNER: {} ({:.2f}s total)".format(fastest[0].title(), fastest[1]["total_execution_time"]))
 
     # Compare relative performance
     print("\n📊 RELATIVE PERFORMANCE (vs fastest):")
-    for platform, data in sorted(results.items(),
-                                  key=lambda x: x[1]["total_execution_time"]):
+    for platform, data in sorted(results.items(), key=lambda x: x[1]["total_execution_time"]):
         relative = data["total_execution_time"] / fastest[1]["total_execution_time"]
         print(f"  {platform.title():<15} {relative:.2f}x  ({data['total_execution_time']:.2f}s)")
 
@@ -635,25 +640,19 @@ def compare_platforms(results: Dict[str, dict]) -> None:
     print("-" * (8 + 11 * len(results)))
 
     # Get all query numbers
-    query_nums = sorted(set(
-        q["query_num"]
-        for data in results.values()
-        for q in data.get("queries", [])
-    ))
+    query_nums = sorted(set(q["query_num"] for data in results.values() for q in data.get("queries", [])))
 
     for qnum in query_nums:
         times = [
-            next((q["execution_time"] for q in results[p].get("queries", [])
-                  if q["query_num"] == qnum), None)
+            next((q["execution_time"] for q in results[p].get("queries", []) if q["query_num"] == qnum), None)
             for p in results.keys()
         ]
-        print(f"Q{qnum:<7} " + " ".join(
-            f"{t:.2f}s    " if t else "N/A       "
-            for t in times
-        ))
+        print(f"Q{qnum:<7} " + " ".join(f"{t:.2f}s    " if t else "N/A       " for t in times))
+
 
 if __name__ == "__main__":
     import sys
+
     base_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("./platform_comparison_latest")
     results = load_platform_results(base_dir)
     compare_platforms(results)
@@ -685,19 +684,19 @@ from typing import List
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
+
 @dataclass
 class TuningResult:
     """Results from one tuning configuration."""
+
     name: str
     config_file: str
     total_time: float
     avg_time: float
     successful_queries: int
 
-def run_tuning_experiment(
-    tuning_configs: List[tuple[str, Path]],
-    scale_factor: float = 1.0
-) -> List[TuningResult]:
+
+def run_tuning_experiment(tuning_configs: List[tuple[str, Path]], scale_factor: float = 1.0) -> List[TuningResult]:
     """
     Run benchmark with multiple tuning configurations.
 
@@ -732,10 +731,7 @@ def run_tuning_experiment(
         )
 
         # Run benchmark
-        benchmark_results = adapter.run_benchmark(
-            benchmark,
-            test_execution_type="power"
-        )
+        benchmark_results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
         # Record results
         result = TuningResult(
@@ -753,6 +749,7 @@ def run_tuning_experiment(
 
     return results
 
+
 def analyze_tuning_results(results: List[TuningResult]) -> None:
     """Analyze and display tuning experiment results."""
 
@@ -761,28 +758,29 @@ def analyze_tuning_results(results: List[TuningResult]) -> None:
     baseline = sorted_results[-1]  # Slowest (usually notuning)
     fastest = sorted_results[0]
 
-    print("="*70)
+    print("=" * 70)
     print("TUNING EXPERIMENT RESULTS")
-    print("="*70)
+    print("=" * 70)
     print(f"{'Configuration':<20} {'Total Time':<15} {'Speedup':<15} {'Status'}")
-    print("-"*70)
+    print("-" * 70)
 
     for result in sorted_results:
         speedup = baseline.total_time / result.total_time
         status = "✓" if result.successful_queries == 22 else f"✗ ({result.successful_queries}/22)"
         print(f"{result.name:<20} {result.total_time:<14.2f}s {speedup:<14.2f}x {status}")
 
-    print("="*70)
+    print("=" * 70)
     print(f"\n🏆 Best configuration: {fastest.name}")
     print(f"   Improvement: {baseline.total_time / fastest.total_time:.2f}x faster than baseline")
     print(f"   Time saved: {baseline.total_time - fastest.total_time:.2f}s")
+
 
 if __name__ == "__main__":
     # Define tuning configurations to test
     tuning_configs = [
         ("notuning", Path("examples/tunings/duckdb/tpch_notuning.yaml")),
         ("pk_only", None),  # Would use custom config with only PKs
-        ("pk_fk", None),    # Would use custom config with PKs + FKs
+        ("pk_fk", None),  # Would use custom config with PKs + FKs
         ("full_tuned", Path("examples/tunings/duckdb/tpch_tuned.yaml")),
     ]
 
@@ -826,6 +824,7 @@ Run only specific queries for rapid testing and debugging without full benchmark
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
+
 def test_specific_queries(query_numbers: list[str]):
     """
     Run only specified TPC-H queries.
@@ -868,23 +867,29 @@ def test_specific_queries(query_numbers: list[str]):
 
     return results.successful_queries == len(query_numbers)
 
+
 # Common query subsets for different purposes
+
 
 def smoke_test():
     """Quick smoke test: run 2 fast queries."""
     return test_specific_queries(["1", "6"])
 
+
 def aggregation_test():
     """Test aggregation performance."""
     return test_specific_queries(["1", "3", "5", "6", "12"])
+
 
 def join_test():
     """Test join performance."""
     return test_specific_queries(["2", "3", "4", "7", "8", "9"])
 
+
 def complex_query_test():
     """Test most complex queries."""
     return test_specific_queries(["2", "9", "17", "20", "21"])
+
 
 if __name__ == "__main__":
     import sys
@@ -949,6 +954,7 @@ from benchbox.core.config import BenchmarkConfig, DatabaseConfig
 from benchbox.core.runner.runner import run_benchmark_lifecycle, LifecyclePhases, ValidationOptions
 from benchbox.core.system import SystemProfiler
 from benchbox.platforms.databricks import DatabricksAdapter
+
 
 def cost_optimized_databricks_test():
     """
@@ -1032,6 +1038,7 @@ def cost_optimized_databricks_test():
     print(f"   DROP SCHEMA main.benchbox_tiny_test CASCADE;")
 
     return results.successful_queries == len(benchmark_config.queries)
+
 
 if __name__ == "__main__":
     success = cost_optimized_databricks_test()

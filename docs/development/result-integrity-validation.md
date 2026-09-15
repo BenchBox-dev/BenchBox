@@ -151,13 +151,13 @@ The validator returns an `IntegrityReport` dataclass:
 ```python
 @dataclass
 class IntegrityReport:
-    file: str                           # File path validated
-    benchmark_id: str                   # Benchmark identifier
-    platform: str                       # Platform name
-    scale_factor: float                 # Scale factor
-    overall_status: CheckStatus         # Worst status across all checks
-    checks: list[CheckResult]           # Individual check results
-    summary: dict[str, int]             # Counts by status (PASS, WARN, FAIL)
+    file: str  # File path validated
+    benchmark_id: str  # Benchmark identifier
+    platform: str  # Platform name
+    scale_factor: float  # Scale factor
+    overall_status: CheckStatus  # Worst status across all checks
+    checks: list[CheckResult]  # Individual check results
+    summary: dict[str, int]  # Counts by status (PASS, WARN, FAIL)
 ```
 
 **Helper methods:**
@@ -169,11 +169,11 @@ Each `CheckResult` contains:
 ```python
 @dataclass
 class CheckResult:
-    category: CheckCategory   # STRUCTURAL, COMPLETENESS, or BELIEVABILITY
-    name: str                 # Check identifier (e.g., "query_count_math")
-    status: CheckStatus       # PASS, WARN, or FAIL
-    message: str              # Human-readable description
-    details: dict | None      # Optional structured details
+    category: CheckCategory  # STRUCTURAL, COMPLETENESS, or BELIEVABILITY
+    name: str  # Check identifier (e.g., "query_count_math")
+    status: CheckStatus  # PASS, WARN, or FAIL
+    message: str  # Human-readable description
+    details: dict | None  # Optional structured details
 ```
 
 ## Convenience Functions

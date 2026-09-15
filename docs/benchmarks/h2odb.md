@@ -266,10 +266,7 @@ for query_id in ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"]:
     print(f"{query_id}: {len(result)} result rows")
 
 # Temporal analysis queries
-temporal_params = {
-    'start_date': '2020-01-01',
-    'end_date': '2020-01-31'
-}
+temporal_params = {"start_date": "2020-01-01", "end_date": "2020-01-31"}
 
 for query_id in ["Q7", "Q8"]:
     query_sql = h2odb.get_query(query_id, params=temporal_params)
@@ -287,6 +284,7 @@ import time
 from typing import Dict, List
 from statistics import mean, median
 
+
 class H2ODBPerformanceTester:
     def __init__(self, h2odb: H2ODB, connection):
         self.h2odb = h2odb
@@ -295,10 +293,10 @@ class H2ODBPerformanceTester:
     def benchmark_query_group(self, query_group: str, iterations: int = 3) -> Dict:
         """Benchmark specific H2O DB query groups."""
         query_groups = {
-            'basic': ['Q1', 'Q2'],
-            'grouping': ['Q3', 'Q4', 'Q5', 'Q6'],
-            'temporal': ['Q7', 'Q8'],
-            'advanced': ['Q9', 'Q10']
+            "basic": ["Q1", "Q2"],
+            "grouping": ["Q3", "Q4", "Q5", "Q6"],
+            "temporal": ["Q7", "Q8"],
+            "advanced": ["Q9", "Q10"],
         }
 
         if query_group not in query_groups:
@@ -308,12 +306,7 @@ class H2ODBPerformanceTester:
         results = {}
 
         # Parameters for temporal queries
-        params = {
-            'start_date': '2020-01-01',
-            'end_date': '2020-01-31',
-            'min_fare': 5.0,
-            'max_fare': 100.0
-        }
+        params = {"start_date": "2020-01-01", "end_date": "2020-01-31", "min_fare": 5.0, "max_fare": 100.0}
 
         for query_id in query_ids:
             print(f"Benchmarking {query_id} ({query_group})...")
@@ -330,13 +323,13 @@ class H2ODBPerformanceTester:
                 print(f"  Iteration {iteration + 1}: {execution_time:.3f}s")
 
             results[query_id] = {
-                'group': query_group,
-                'avg_time': mean(times),
-                'median_time': median(times),
-                'min_time': min(times),
-                'max_time': max(times),
-                'rows_returned': len(result),
-                'times': times
+                "group": query_group,
+                "avg_time": mean(times),
+                "median_time": median(times),
+                "min_time": min(times),
+                "max_time": max(times),
+                "rows_returned": len(result),
+                "times": times,
             }
 
         return results
@@ -346,30 +339,30 @@ class H2ODBPerformanceTester:
         complete_results = {}
 
         # Test each query group
-        for group in ['basic', 'grouping', 'temporal', 'advanced']:
+        for group in ["basic", "grouping", "temporal", "advanced"]:
             print(f"\\nRunning {group.upper()} queries...")
             try:
                 group_results = self.benchmark_query_group(group)
                 complete_results[group] = group_results
             except Exception as e:
                 print(f"Error in {group} queries: {e}")
-                complete_results[group] = {'error': str(e)}
+                complete_results[group] = {"error": str(e)}
 
         # Calculate summary statistics
         all_times = []
         for group_data in complete_results.values():
-            if isinstance(group_data, dict) and 'error' not in group_data:
+            if isinstance(group_data, dict) and "error" not in group_data:
                 for query_data in group_data.values():
-                    if isinstance(query_data, dict) and 'times' in query_data:
-                        all_times.extend(query_data['times'])
+                    if isinstance(query_data, dict) and "times" in query_data:
+                        all_times.extend(query_data["times"])
 
         if all_times:
-            complete_results['summary'] = {
-                'total_queries': len(all_times) // 3,  # 3 iterations per query
-                'total_avg_time': mean(all_times),
-                'total_median_time': median(all_times),
-                'total_min_time': min(all_times),
-                'total_max_time': max(all_times)
+            complete_results["summary"] = {
+                "total_queries": len(all_times) // 3,  # 3 iterations per query
+                "total_avg_time": mean(all_times),
+                "total_median_time": median(all_times),
+                "total_min_time": min(all_times),
+                "total_max_time": max(all_times),
             }
 
         return complete_results
@@ -377,10 +370,19 @@ class H2ODBPerformanceTester:
     def analyze_aggregation_performance(self) -> Dict:
         """Analyze aggregation performance across different group sizes."""
         aggregation_tests = [
-            ('single_agg', 'SELECT passenger_count, SUM(fare_amount) FROM trips GROUP BY passenger_count'),
-            ('multi_agg', 'SELECT passenger_count, SUM(fare_amount), AVG(fare_amount), COUNT(*) FROM trips GROUP BY passenger_count'),
-            ('two_col_group', 'SELECT passenger_count, vendor_id, SUM(fare_amount) FROM trips GROUP BY passenger_count, vendor_id'),
-            ('complex_agg', 'SELECT vendor_id, COUNT(*), SUM(fare_amount), AVG(fare_amount), STDDEV(fare_amount) FROM trips GROUP BY vendor_id')
+            ("single_agg", "SELECT passenger_count, SUM(fare_amount) FROM trips GROUP BY passenger_count"),
+            (
+                "multi_agg",
+                "SELECT passenger_count, SUM(fare_amount), AVG(fare_amount), COUNT(*) FROM trips GROUP BY passenger_count",
+            ),
+            (
+                "two_col_group",
+                "SELECT passenger_count, vendor_id, SUM(fare_amount) FROM trips GROUP BY passenger_count, vendor_id",
+            ),
+            (
+                "complex_agg",
+                "SELECT vendor_id, COUNT(*), SUM(fare_amount), AVG(fare_amount), STDDEV(fare_amount) FROM trips GROUP BY vendor_id",
+            ),
         ]
 
         results = {}
@@ -395,20 +397,17 @@ class H2ODBPerformanceTester:
                 execution_time = time.time() - start_time
                 times.append(execution_time)
 
-            results[test_name] = {
-                'avg_time': mean(times),
-                'rows_returned': len(result),
-                'times': times
-            }
+            results[test_name] = {"avg_time": mean(times), "rows_returned": len(result), "times": times}
 
         return results
+
 
 # Usage
 performance_tester = H2ODBPerformanceTester(h2odb, conn)
 
 # Test individual query groups
-basic_results = performance_tester.benchmark_query_group('basic')
-grouping_results = performance_tester.benchmark_query_group('grouping')
+basic_results = performance_tester.benchmark_query_group("basic")
+grouping_results = performance_tester.benchmark_query_group("grouping")
 
 print("\\nQuery Group Performance Summary:")
 print(f"Basic Queries: {basic_results}")
@@ -441,30 +440,37 @@ print("Data Science Operations Performance Test:")
 
 # Feature engineering operations
 start_time = time.time()
-trips_df['hour'] = pd.to_datetime(trips_df['pickup_datetime']).dt.hour
-trips_df['day_of_week'] = pd.to_datetime(trips_df['pickup_datetime']).dt.dayofweek
-trips_df['trip_duration'] = (pd.to_datetime(trips_df['dropoff_datetime']) -
-                            pd.to_datetime(trips_df['pickup_datetime'])).dt.total_seconds()
+trips_df["hour"] = pd.to_datetime(trips_df["pickup_datetime"]).dt.hour
+trips_df["day_of_week"] = pd.to_datetime(trips_df["pickup_datetime"]).dt.dayofweek
+trips_df["trip_duration"] = (
+    pd.to_datetime(trips_df["dropoff_datetime"]) - pd.to_datetime(trips_df["pickup_datetime"])
+).dt.total_seconds()
 feature_eng_time = time.time() - start_time
 print(f"Feature engineering: {feature_eng_time:.3f}s")
 
 # Aggregation operations (similar to H2O DB queries)
 start_time = time.time()
-hourly_stats = trips_df.groupby('hour').agg({
-    'fare_amount': ['sum', 'mean', 'std', 'count'],
-    'trip_distance': ['mean'],
-    'passenger_count': ['mean']
-}).round(2)
+hourly_stats = (
+    trips_df.groupby("hour")
+    .agg({"fare_amount": ["sum", "mean", "std", "count"], "trip_distance": ["mean"], "passenger_count": ["mean"]})
+    .round(2)
+)
 groupby_time = time.time() - start_time
 print(f"GroupBy aggregation: {groupby_time:.3f}s")
 
 # Statistical analysis
 start_time = time.time()
-vendor_stats = trips_df.groupby('vendor_id').agg({
-    'fare_amount': ['count', 'sum', 'mean', 'std', 'min', 'max'],
-    'tip_amount': ['mean', 'std'],
-    'trip_distance': ['mean', 'std']
-}).round(2)
+vendor_stats = (
+    trips_df.groupby("vendor_id")
+    .agg(
+        {
+            "fare_amount": ["count", "sum", "mean", "std", "min", "max"],
+            "tip_amount": ["mean", "std"],
+            "trip_distance": ["mean", "std"],
+        }
+    )
+    .round(2)
+)
 stats_time = time.time() - start_time
 print(f"Statistical analysis: {stats_time:.3f}s")
 
@@ -528,13 +534,13 @@ h2odb = H2ODB(
     scale_factor=1.0,
     output_dir="h2odb_data",
     # Data generation options
-    date_range_days=365,     # Range of trip dates
+    date_range_days=365,  # Range of trip dates
     trip_distance_max=50.0,  # Maximum trip distance
-    fare_amount_max=200.0,   # Maximum fare amount
+    fare_amount_max=200.0,  # Maximum fare amount
     # Performance options
-    enable_indexing=True,    # Create performance indices
+    enable_indexing=True,  # Create performance indices
     partition_by_date=True,  # Partition by pickup date
-    compress_output=True     # Compress generated files
+    compress_output=True,  # Compress generated files
 )
 ```
 
@@ -611,7 +617,7 @@ import clickhouse_connect
 from benchbox import H2ODB
 
 # Initialize ClickHouse for high-performance analytics
-client = clickhouse_connect.get_client(host='localhost', port=8123)
+client = clickhouse_connect.get_client(host="localhost", port=8123)
 h2odb = H2ODB(scale_factor=10.0, output_dir="h2odb_data")
 
 # Generate data
@@ -651,8 +657,8 @@ client.execute(create_table_sql)
 
 # Load data using ClickHouse CSV import
 trips_file = h2odb.output_dir / "trips.csv"
-with open(trips_file, 'rb') as f:
-    client.insert_file('trips', f, fmt='CSV')
+with open(trips_file, "rb") as f:
+    client.insert_file("trips", f, fmt="CSV")
 
 # Run configured H2O DB queries
 print("Running H2O DB queries on ClickHouse...")

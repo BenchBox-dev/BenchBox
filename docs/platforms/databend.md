@@ -224,13 +224,10 @@ At runtime, BenchBox captures platform metadata:
 {
     "platform_type": "databend",
     "platform_name": "Databend",
-    "configuration": {
-        "host": "tenant--warehouse.gw.databend.com",
-        "database": "benchbox_tpch_sf1"
-    },
+    "configuration": {"host": "tenant--warehouse.gw.databend.com", "database": "benchbox_tpch_sf1"},
     "warehouse": "my_warehouse",
     "platform_version": "v1.x.x",
-    "client_library_version": "0.x.x"
+    "client_library_version": "0.x.x",
 }
 ```
 

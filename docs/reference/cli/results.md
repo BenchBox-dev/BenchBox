@@ -316,16 +316,13 @@ from benchbox.core.results.exporter import ResultExporter
 exporter = ResultExporter()
 
 # Compare two result files
-comparison = exporter.compare_results(
-    Path("baseline.json"),
-    Path("current.json")
-)
+comparison = exporter.compare_results(Path("baseline.json"), Path("current.json"))
 
 # Check overall performance
-perf = comparison['performance_changes']['average_query_time']
+perf = comparison["performance_changes"]["average_query_time"]
 print(f"Average query time: {perf['change_percent']:.2f}% change")
 
-if perf['improved']:
+if perf["improved"]:
     print("Performance improved!")
 
 # Export as HTML report

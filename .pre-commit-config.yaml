@@ -154,10 +154,10 @@ repos:
 
   # Code formatting with ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.13
+    rev: v0.16.7
     hooks:
       # Run the linter
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
         stages: [pre-commit]
       # Run the formatter
@@ -166,7 +166,7 @@ repos:
 
   # Spell checking
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.3
     hooks:
       - id: codespell
         args:
@@ -178,7 +178,7 @@ repos:
 
   # YAML validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-yaml
         args: [--unsafe]  # Allow custom YAML tags
@@ -201,7 +201,7 @@ repos:
 
   # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
+    rev: v0.49.1
     hooks:
       - id: markdownlint
         args: [--fix, --disable, MD013, MD033, MD041]  # Disable line-length, HTML, first-line-heading rules

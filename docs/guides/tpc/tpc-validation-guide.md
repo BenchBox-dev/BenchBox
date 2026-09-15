@@ -67,17 +67,11 @@ test_results = {
             "status": "success",
             "execution_time": 5.2,
             "row_count": 100,
-            "results": [{"col1": "value1", "col2": "value2"}]
+            "results": [{"col1": "value1", "col2": "value2"}],
         }
     },
-    "data_generation": {
-        "generation_time": 120.5,
-        "generated_tables": ["customer", "orders", "lineitem"]
-    },
-    "metrics": {
-        "avg_query_time": 5.2,
-        "total_query_time": 5.2
-    }
+    "data_generation": {"generation_time": 120.5, "generated_tables": ["customer", "orders", "lineitem"]},
+    "metrics": {"avg_query_time": 5.2, "total_query_time": 5.2},
 }
 
 # Validate results
@@ -98,18 +92,13 @@ config = {
     "validators": {
         "completeness": {
             "required_queries": {"TPC-H": list(range(1, 23))},
-            "required_tables": ["customer", "orders", "lineitem"]
+            "required_tables": ["customer", "orders", "lineitem"],
         },
-        "timing": {
-            "max_execution_time": 3600,
-            "precision_threshold": 0.001
-        },
+        "timing": {"max_execution_time": 3600, "precision_threshold": 0.001},
         "certification": {
             "required_documentation": ["test_report", "environment_spec"],
-            "performance_thresholds": {
-                "avg_query_time": 30.0
-            }
-        }
+            "performance_thresholds": {"avg_query_time": 30.0},
+        },
     }
 }
 
@@ -124,71 +113,50 @@ The validation system expects test results in the following format:
 test_results = {
     # Required fields
     "benchmark_name": "TPC-H",  # Benchmark name (TPC-H, TPC-DS, TPC-DI)
-    "scale_factor": 1.0,        # Scale factor used
+    "scale_factor": 1.0,  # Scale factor used
     "test_start_time": "2023-01-01T10:00:00Z",  # ISO format timestamp
-    "test_end_time": "2023-01-01T11:00:00Z",    # ISO format timestamp
-
+    "test_end_time": "2023-01-01T11:00:00Z",  # ISO format timestamp
     # Query execution results
     "query_results": {
         "1": {
-            "status": "success",      # success, failed, timeout
-            "execution_time": 5.2,    # Execution time in seconds
-            "row_count": 100,         # Number of rows returned
-            "results": [...],         # Optional: actual query results
-            "error": "..."           # Optional: error message if failed
+            "status": "success",  # success, failed, timeout
+            "execution_time": 5.2,  # Execution time in seconds
+            "row_count": 100,  # Number of rows returned
+            "results": [...],  # Optional: actual query results
+            "error": "...",  # Optional: error message if failed
         }
     },
-
     # Data generation information
     "data_generation": {
-        "generation_time": 120.5,   # Time to generate data in seconds
-        "generated_tables": ["customer", "orders", "lineitem"]
+        "generation_time": 120.5,  # Time to generate data in seconds
+        "generated_tables": ["customer", "orders", "lineitem"],
     },
-
     # Calculated metrics
-    "metrics": {
-        "avg_query_time": 5.2,
-        "total_query_time": 5.2,
-        "queries_per_second": 0.19
-    },
-
+    "metrics": {"avg_query_time": 5.2, "total_query_time": 5.2, "queries_per_second": 0.19},
     # Optional: Maintenance operations (for TPC-DS, TPC-DI)
     "maintenance_operations": {
         "insert_operation": {
             "status": "success",
             "start_time": "2023-01-01T10:30:00Z",
             "end_time": "2023-01-01T10:35:00Z",
-            "records_affected": 5000
+            "records_affected": 5000,
         }
     },
-
     # Optional: ETL operations (for TPC-DI)
     "etl_operations": {
         "extract_customers": {
             "status": "success",
             "start_time": "2023-01-01T09:00:00Z",
             "end_time": "2023-01-01T09:15:00Z",
-            "records_processed": 150000
+            "records_processed": 150000,
         }
     },
-
     # Reproducibility information
-    "reproducibility": {
-        "seed": 12345,
-        "timestamp": "2023-01-01T10:00:00Z",
-        "environment": "test_env"
-    },
-
+    "reproducibility": {"seed": 12345, "timestamp": "2023-01-01T10:00:00Z", "environment": "test_env"},
     # Test isolation
-    "test_isolation": {
-        "isolated": True
-    },
-
+    "test_isolation": {"isolated": True},
     # Documentation
-    "documentation": {
-        "test_report": "path/to/test_report.pdf",
-        "environment_spec": "path/to/env_spec.json"
-    }
+    "documentation": {"test_report": "path/to/test_report.pdf", "environment_spec": "path/to/env_spec.json"},
 }
 ```
 
@@ -321,7 +289,7 @@ config = {
     "validators": {
         "completeness": {
             "required_queries": {"TPC-DS": list(range(1, 100))},
-            "required_maintenance_ops": ["insert_sales", "update_inventory"]
+            "required_maintenance_ops": ["insert_sales", "update_inventory"],
         }
     }
 }
@@ -337,6 +305,7 @@ You can create custom validators for specific requirements:
 ```python
 from benchbox.core.tpc_validation import BaseValidator, ValidationResult
 
+
 class CustomBusinessRuleValidator(BaseValidator):
     def validate(self, test_results, report):
         # Custom validation logic
@@ -347,11 +316,12 @@ class CustomBusinessRuleValidator(BaseValidator):
                 "ERROR",
                 f"Minimum 5 queries required, found {len(query_results)}",
                 {"query_count": len(query_results)},
-                self.name
+                self.name,
             )
             return ValidationResult.FAILED
 
         return ValidationResult.PASSED
+
 
 # Use custom validator
 validator = TPCResultValidator()
@@ -429,9 +399,7 @@ config = {
     "validators": {
         "certification": {
             "required_documentation": ["test_report", "environment_spec"],
-            "performance_thresholds": {
-                "avg_query_time": 30.0
-            }
+            "performance_thresholds": {"avg_query_time": 30.0},
         }
     }
 }
@@ -458,7 +426,7 @@ for benchmark in benchmarks:
 compliance_summary = {
     benchmark: {
         "compliant": len(report.get_issues_by_level("ERROR")) == 0,
-        "score": report.metrics.get("validation_score", 0)
+        "score": report.metrics.get("validation_score", 0),
     }
     for benchmark, report in suite_results.items()
 }
@@ -520,6 +488,7 @@ Enable debug logging for detailed validation information:
 
 ```python
 import logging
+
 logging.basicConfig(level=logging.DEBUG)
 
 validator = TPCResultValidator()

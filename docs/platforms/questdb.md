@@ -210,10 +210,8 @@ At runtime, BenchBox captures platform metadata:
     "pg_port": 8812,
     "http_port": 9000,
     "dialect": "postgres",
-    "configuration": {
-        "database": "qdb"
-    },
-    "version": "7.x.x"
+    "configuration": {"database": "qdb"},
+    "version": "7.x.x",
 }
 ```
 

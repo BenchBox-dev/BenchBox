@@ -64,8 +64,8 @@ from benchbox import TPCDI
 tpcdi = TPCDI(
     scale_factor=1.0,
     output_dir="tpcdi_etl",
-    etl_mode=True,        # Enable ETL capabilities
-    verbose=True          # Enable detailed logging
+    etl_mode=True,  # Enable ETL capabilities
+    verbose=True,  # Enable detailed logging
 )
 
 # Check ETL status
@@ -95,15 +95,14 @@ source_files = tpcdi_etl.generate_source_data()
 
 ```python
 tpcdi = TPCDI(
-    scale_factor=1.0,           # Data volume scale factor
-    output_dir="tpcdi_data",    # Base directory for all artifacts
-    etl_mode=True,              # Enable ETL mode
-    verbose=True,               # Enable detailed logging
-
+    scale_factor=1.0,  # Data volume scale factor
+    output_dir="tpcdi_data",  # Base directory for all artifacts
+    etl_mode=True,  # Enable ETL mode
+    verbose=True,  # Enable detailed logging
     # ETL-specific configuration (future extensions)
-    batch_size=10000,           # Records per batch for loading
-    parallel_workers=4,         # Parallel processing workers
-    validate_on_load=True       # Run validation after each load
+    batch_size=10000,  # Records per batch for loading
+    parallel_workers=4,  # Parallel processing workers
+    validate_on_load=True,  # Run validation after each load
 )
 ```
 
@@ -120,19 +119,14 @@ tpcdi = TPCDI(
 
 ```python
 # Development environment
-tpcdi_dev = TPCDI(
-    scale_factor=0.05,
-    output_dir="dev_etl",
-    etl_mode=True,
-    verbose=True
-)
+tpcdi_dev = TPCDI(scale_factor=0.05, output_dir="dev_etl", etl_mode=True, verbose=True)
 
 # Production-like testing
 tpcdi_prod = TPCDI(
     scale_factor=3.0,
     output_dir="prod_etl",
     etl_mode=True,
-    verbose=False  # Reduce logging in production tests
+    verbose=False,  # Reduce logging in production tests
 )
 ```
 
@@ -149,10 +143,7 @@ The ETL implementation supports multiple source data formats to simulate real-wo
 
 ```python
 # Generate CSV source files
-csv_files = tpcdi.generate_source_data(
-    formats=['csv'],
-    batch_types=['historical', 'incremental']
-)
+csv_files = tpcdi.generate_source_data(formats=["csv"], batch_types=["historical", "incremental"])
 ```
 
 #### 2. XML Format
@@ -162,10 +153,7 @@ csv_files = tpcdi.generate_source_data(
 
 ```python
 # Generate XML source files
-xml_files = tpcdi.generate_source_data(
-    formats=['xml'],
-    batch_types=['historical']
-)
+xml_files = tpcdi.generate_source_data(formats=["xml"], batch_types=["historical"])
 ```
 
 #### 3. Fixed-Width Format
@@ -175,10 +163,7 @@ xml_files = tpcdi.generate_source_data(
 
 ```python
 # Generate fixed-width source files
-fixed_width_files = tpcdi.generate_source_data(
-    formats=['fixed_width'],
-    batch_types=['historical', 'incremental']
-)
+fixed_width_files = tpcdi.generate_source_data(formats=["fixed_width"], batch_types=["historical", "incremental"])
 ```
 
 #### 4. JSON Format
@@ -188,10 +173,7 @@ fixed_width_files = tpcdi.generate_source_data(
 
 ```python
 # Generate JSON source files
-json_files = tpcdi.generate_source_data(
-    formats=['json'],
-    batch_types=['incremental', 'scd']
-)
+json_files = tpcdi.generate_source_data(formats=["json"], batch_types=["incremental", "scd"])
 ```
 
 ### Batch Types
@@ -203,10 +185,7 @@ json_files = tpcdi.generate_source_data(
 
 ```python
 # Generate historical batch data
-historical_files = tpcdi.generate_source_data(
-    formats=['csv', 'xml', 'fixed_width', 'json'],
-    batch_types=['historical']
-)
+historical_files = tpcdi.generate_source_data(formats=["csv", "xml", "fixed_width", "json"], batch_types=["historical"])
 ```
 
 #### Incremental Batch
@@ -216,10 +195,7 @@ historical_files = tpcdi.generate_source_data(
 
 ```python
 # Generate incremental batch data
-incremental_files = tpcdi.generate_source_data(
-    formats=['csv', 'json'],
-    batch_types=['incremental']
-)
+incremental_files = tpcdi.generate_source_data(formats=["csv", "json"], batch_types=["incremental"])
 ```
 
 #### SCD (Slowly Changing Dimension) Batch
@@ -229,10 +205,7 @@ incremental_files = tpcdi.generate_source_data(
 
 ```python
 # Generate SCD batch data
-scd_files = tpcdi.generate_source_data(
-    formats=['csv', 'xml'],
-    batch_types=['scd']
-)
+scd_files = tpcdi.generate_source_data(formats=["csv", "xml"], batch_types=["scd"])
 ```
 
 ### Multi-Format Generation Example
@@ -240,8 +213,7 @@ scd_files = tpcdi.generate_source_data(
 ```python
 # Generate systematic source data set
 all_source_files = tpcdi.generate_source_data(
-    formats=['csv', 'xml', 'fixed_width', 'json'],
-    batch_types=['historical', 'incremental', 'scd']
+    formats=["csv", "xml", "fixed_width", "json"], batch_types=["historical", "incremental", "scd"]
 )
 
 print("Generated source files:")
@@ -271,14 +243,10 @@ schema_sql = tpcdi.get_create_tables_sql()
 conn.executescript(schema_sql)
 
 # Run ETL pipeline
-pipeline_result = tpcdi.run_etl_pipeline(
-    connection=conn,
-    batch_type="historical",
-    validate_data=True
-)
+pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="historical", validate_data=True)
 
 # Check results
-if pipeline_result['success']:
+if pipeline_result["success"]:
     print(f"ETL completed in {pipeline_result['total_duration']:.2f} seconds")
     print(f"Records processed: {pipeline_result['phases']['transform']['records_processed']}")
     print(f"Data quality score: {pipeline_result['validation_results']['data_quality_score']}")
@@ -300,13 +268,13 @@ conn = duckdb.connect("warehouse.duckdb")
 # Initialize schema
 schema_sql = tpcdi.get_create_tables_sql()
 conn.execute("BEGIN TRANSACTION")
-for statement in schema_sql.split(';'):
+for statement in schema_sql.split(";"):
     if statement.strip():
         conn.execute(statement)
 conn.execute("COMMIT")
 
 # Process multiple batch types in sequence
-batch_types = ['historical', 'incremental', 'incremental', 'scd']
+batch_types = ["historical", "incremental", "incremental", "scd"]
 pipeline_results = []
 
 for i, batch_type in enumerate(batch_types, 1):
@@ -316,20 +284,20 @@ for i, batch_type in enumerate(batch_types, 1):
     result = tpcdi.run_etl_pipeline(
         connection=conn,
         batch_type=batch_type,
-        validate_data=(batch_type in ['historical', 'scd'])  # Validate key batches
+        validate_data=(batch_type in ["historical", "scd"]),  # Validate key batches
     )
 
-    result['batch_number'] = i
-    result['start_time'] = start_time
+    result["batch_number"] = i
+    result["start_time"] = start_time
     pipeline_results.append(result)
 
-    if result['success']:
-        phases = result['phases']
+    if result["success"]:
+        phases = result["phases"]
         print(f"  ✅ Completed in {result['total_duration']:.2f}s")
         print(f"    Extract: {phases['extract']['duration']:.2f}s")
         print(f"    Transform: {phases['transform']['duration']:.2f}s")
         print(f"    Load: {phases['load']['duration']:.2f}s")
-        if 'validation' in phases:
+        if "validation" in phases:
             print(f"    Validation: {phases['validation']['duration']:.2f}s")
     else:
         print(f"  ❌ Failed: {result.get('error', 'Unknown error')}")
@@ -337,9 +305,9 @@ for i, batch_type in enumerate(batch_types, 1):
 conn.close()
 
 # Analyze pipeline performance
-successful_batches = [r for r in pipeline_results if r['success']]
+successful_batches = [r for r in pipeline_results if r["success"]]
 if successful_batches:
-    avg_time = sum(r['total_duration'] for r in successful_batches) / len(successful_batches)
+    avg_time = sum(r["total_duration"] for r in successful_batches) / len(successful_batches)
     print(f"\nPipeline Summary:")
     print(f"  Successful batches: {len(successful_batches)}/{len(pipeline_results)}")
     print(f"  Average execution time: {avg_time:.2f} seconds")
@@ -354,7 +322,7 @@ if successful_batches:
 
 ```python
 # Extract phase results
-extract_results = pipeline_result['phases']['extract']
+extract_results = pipeline_result["phases"]["extract"]
 print(f"Files generated: {extract_results['files_generated']}")
 print(f"Extract duration: {extract_results['duration']:.2f}s")
 ```
@@ -366,7 +334,7 @@ print(f"Extract duration: {extract_results['duration']:.2f}s")
 
 ```python
 # Transform phase results
-transform_results = pipeline_result['phases']['transform']
+transform_results = pipeline_result["phases"]["transform"]
 print(f"Records processed: {transform_results['records_processed']}")
 print(f"Transformations applied: {len(transform_results['transformations_applied'])}")
 print(f"Transform duration: {transform_results['duration']:.2f}s")
@@ -379,7 +347,7 @@ print(f"Transform duration: {transform_results['duration']:.2f}s")
 
 ```python
 # Load phase results
-load_results = pipeline_result['phases']['load']
+load_results = pipeline_result["phases"]["load"]
 print(f"Records loaded: {load_results['records_loaded']}")
 print(f"Tables updated: {load_results['tables_updated']}")
 print(f"Load duration: {load_results['duration']:.2f}s")
@@ -400,7 +368,7 @@ The TPC-DI implementation includes systematic validation queries:
 
 ```python
 # Run individual validation queries
-for query_id in ['V1', 'V2', 'V3']:
+for query_id in ["V1", "V2", "V3"]:
     query_sql = tpcdi.get_query(query_id)
     result = conn.execute(query_sql).fetchall()
     print(f"Validation {query_id}: {len(result)} records")
@@ -416,7 +384,7 @@ for query_id in ['V1', 'V2', 'V3']:
 
 ```python
 # Run analytical queries
-analytical_queries = ['A1', 'A2']
+analytical_queries = ["A1", "A2"]
 for query_id in analytical_queries:
     query_sql = tpcdi.get_query(query_id)
     result = conn.execute(query_sql).fetchall()
@@ -436,19 +404,19 @@ print(f"Quality issues: {len(validation_results['data_quality_issues'])}")
 
 # Detailed validation breakdown
 print("\nValidation Query Results:")
-for query_id, result in validation_results['validation_queries'].items():
-    status = "✅" if result['success'] else "❌"
-    row_count = result.get('row_count', 'N/A')
+for query_id, result in validation_results["validation_queries"].items():
+    status = "✅" if result["success"] else "❌"
+    row_count = result.get("row_count", "N/A")
     print(f"  {status} {query_id}: {row_count} rows")
 
 # Data quality checks
 print("\nData Quality Checks:")
-for check_type in ['completeness_checks', 'consistency_checks', 'accuracy_checks']:
+for check_type in ["completeness_checks", "consistency_checks", "accuracy_checks"]:
     if check_type in validation_results:
         print(f"  {check_type.replace('_', ' ').title()}:")
         checks = validation_results[check_type]
         for check_name, check_result in checks.items():
-            if isinstance(check_result, dict) and 'error' not in check_result:
+            if isinstance(check_result, dict) and "error" not in check_result:
                 print(f"    ✅ {check_name}")
             else:
                 print(f"    ❌ {check_name}: {check_result}")
@@ -466,60 +434,55 @@ class CustomDataQualityValidator:
     def check_referential_integrity(self):
         """Check foreign key relationships."""
         checks = {
-            'customer_account_fk': """
+            "customer_account_fk": """
                 SELECT COUNT(*) FROM DimAccount a
                 LEFT JOIN DimCustomer c ON a.SK_CustomerID = c.SK_CustomerID
                 WHERE c.SK_CustomerID IS NULL
             """,
-            'trade_customer_fk': """
+            "trade_customer_fk": """
                 SELECT COUNT(*) FROM FactTrade t
                 LEFT JOIN DimCustomer c ON t.SK_CustomerID = c.SK_CustomerID
                 WHERE c.SK_CustomerID IS NULL
-            """
+            """,
         }
 
         results = {}
         for check_name, check_sql in checks.items():
             violations = self.connection.execute(check_sql).fetchone()[0]
-            results[check_name] = {
-                'violations': violations,
-                'status': 'PASS' if violations == 0 else 'FAIL'
-            }
+            results[check_name] = {"violations": violations, "status": "PASS" if violations == 0 else "FAIL"}
 
         return results
 
     def check_business_rules(self):
         """Check domain-specific business rules."""
         rules = {
-            'positive_trade_prices': """
+            "positive_trade_prices": """
                 SELECT COUNT(*) FROM FactTrade WHERE TradePrice <= 0
             """,
-            'valid_customer_tiers': """
+            "valid_customer_tiers": """
                 SELECT COUNT(*) FROM DimCustomer WHERE Tier NOT IN (1, 2, 3)
             """,
-            'current_records_no_end_date': """
+            "current_records_no_end_date": """
                 SELECT COUNT(*) FROM DimCustomer
                 WHERE IsCurrent = 1 AND EndDate IS NOT NULL
-            """
+            """,
         }
 
         results = {}
         for rule_name, rule_sql in rules.items():
             violations = self.connection.execute(rule_sql).fetchone()[0]
-            results[rule_name] = {
-                'violations': violations,
-                'status': 'PASS' if violations == 0 else 'FAIL'
-            }
+            results[rule_name] = {"violations": violations, "status": "PASS" if violations == 0 else "FAIL"}
 
         return results
 
     def run_complete_validation(self):
         """Run all custom validation checks."""
         return {
-            'referential_integrity': self.check_referential_integrity(),
-            'business_rules': self.check_business_rules(),
-            'timestamp': datetime.now().isoformat()
+            "referential_integrity": self.check_referential_integrity(),
+            "business_rules": self.check_business_rules(),
+            "timestamp": datetime.now().isoformat(),
         }
+
 
 # Usage
 validator = CustomDataQualityValidator(conn)
@@ -534,7 +497,7 @@ print("Custom validation results:", custom_results)
 ```python
 # Get current ETL status and metrics
 etl_status = tpcdi.get_etl_status()
-metrics = etl_status['metrics']
+metrics = etl_status["metrics"]
 
 print("ETL Performance Metrics:")
 print(f"  Batches processed: {metrics['batches_processed']}")
@@ -544,7 +507,7 @@ print(f"  Error count: {metrics['error_count']}")
 
 # Batch status tracking
 print("\nBatch Status:")
-for batch_type, status in metrics['batch_status'].items():
+for batch_type, status in metrics["batch_status"].items():
     print(f"  {batch_type}: {status['status']} ({status['records']} records)")
 ```
 
@@ -553,11 +516,12 @@ for batch_type, status in metrics['batch_status'].items():
 ```python
 import time
 
+
 def benchmark_etl_performance(tpcdi, connection, iterations=3):
     """Benchmark ETL performance across multiple iterations."""
 
     results = []
-    batch_types = ['historical', 'incremental', 'scd']
+    batch_types = ["historical", "incremental", "scd"]
 
     for batch_type in batch_types:
         batch_results = []
@@ -571,37 +535,40 @@ def benchmark_etl_performance(tpcdi, connection, iterations=3):
             pipeline_result = tpcdi.run_etl_pipeline(
                 connection=connection,
                 batch_type=batch_type,
-                validate_data=False  # Skip validation for pure performance
+                validate_data=False,  # Skip validation for pure performance
             )
             total_time = time.time() - start_time
 
-            if pipeline_result['success']:
-                phases = pipeline_result['phases']
-                records_processed = phases['transform']['records_processed']
+            if pipeline_result["success"]:
+                phases = pipeline_result["phases"]
+                records_processed = phases["transform"]["records_processed"]
 
-                batch_results.append({
-                    'iteration': i + 1,
-                    'total_time': total_time,
-                    'extract_time': phases['extract']['duration'],
-                    'transform_time': phases['transform']['duration'],
-                    'load_time': phases['load']['duration'],
-                    'records_processed': records_processed,
-                    'throughput': records_processed / total_time if total_time > 0 else 0
-                })
+                batch_results.append(
+                    {
+                        "iteration": i + 1,
+                        "total_time": total_time,
+                        "extract_time": phases["extract"]["duration"],
+                        "transform_time": phases["transform"]["duration"],
+                        "load_time": phases["load"]["duration"],
+                        "records_processed": records_processed,
+                        "throughput": records_processed / total_time if total_time > 0 else 0,
+                    }
+                )
 
         if batch_results:
             avg_results = {
-                'batch_type': batch_type,
-                'iterations': len(batch_results),
-                'avg_total_time': sum(r['total_time'] for r in batch_results) / len(batch_results),
-                'avg_throughput': sum(r['throughput'] for r in batch_results) / len(batch_results),
-                'avg_extract_time': sum(r['extract_time'] for r in batch_results) / len(batch_results),
-                'avg_transform_time': sum(r['transform_time'] for r in batch_results) / len(batch_results),
-                'avg_load_time': sum(r['load_time'] for r in batch_results) / len(batch_results)
+                "batch_type": batch_type,
+                "iterations": len(batch_results),
+                "avg_total_time": sum(r["total_time"] for r in batch_results) / len(batch_results),
+                "avg_throughput": sum(r["throughput"] for r in batch_results) / len(batch_results),
+                "avg_extract_time": sum(r["extract_time"] for r in batch_results) / len(batch_results),
+                "avg_transform_time": sum(r["transform_time"] for r in batch_results) / len(batch_results),
+                "avg_load_time": sum(r["load_time"] for r in batch_results) / len(batch_results),
             }
             results.append(avg_results)
 
     return results
+
 
 # Run performance benchmark
 benchmark_results = benchmark_etl_performance(tpcdi, conn, iterations=3)
@@ -624,6 +591,7 @@ import psutil
 import threading
 import time
 
+
 class ResourceMonitor:
     """Monitor system resources during ETL execution."""
 
@@ -640,7 +608,7 @@ class ResourceMonitor:
     def stop_monitoring(self):
         """Stop resource monitoring."""
         self.monitoring = False
-        if hasattr(self, 'monitor_thread'):
+        if hasattr(self, "monitor_thread"):
             self.monitor_thread.join()
 
     def _monitor_resources(self):
@@ -648,15 +616,17 @@ class ResourceMonitor:
         while self.monitoring:
             cpu_percent = psutil.cpu_percent(interval=1)
             memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
-            self.metrics.append({
-                'timestamp': time.time(),
-                'cpu_percent': cpu_percent,
-                'memory_percent': memory.percent,
-                'memory_used_gb': memory.used / (1024**3),
-                'disk_used_percent': disk.percent
-            })
+            self.metrics.append(
+                {
+                    "timestamp": time.time(),
+                    "cpu_percent": cpu_percent,
+                    "memory_percent": memory.percent,
+                    "memory_used_gb": memory.used / (1024**3),
+                    "disk_used_percent": disk.percent,
+                }
+            )
 
             time.sleep(1)
 
@@ -665,28 +635,25 @@ class ResourceMonitor:
         if not self.metrics:
             return {}
 
-        cpu_values = [m['cpu_percent'] for m in self.metrics]
-        memory_values = [m['memory_percent'] for m in self.metrics]
+        cpu_values = [m["cpu_percent"] for m in self.metrics]
+        memory_values = [m["memory_percent"] for m in self.metrics]
 
         return {
-            'duration': len(self.metrics),
-            'avg_cpu': sum(cpu_values) / len(cpu_values),
-            'max_cpu': max(cpu_values),
-            'avg_memory': sum(memory_values) / len(memory_values),
-            'max_memory': max(memory_values),
-            'peak_memory_gb': max(m['memory_used_gb'] for m in self.metrics)
+            "duration": len(self.metrics),
+            "avg_cpu": sum(cpu_values) / len(cpu_values),
+            "max_cpu": max(cpu_values),
+            "avg_memory": sum(memory_values) / len(memory_values),
+            "max_memory": max(memory_values),
+            "peak_memory_gb": max(m["memory_used_gb"] for m in self.metrics),
         }
+
 
 # Usage with resource monitoring
 monitor = ResourceMonitor()
 monitor.start_monitoring()
 
 # Run ETL pipeline
-pipeline_result = tpcdi.run_etl_pipeline(
-    connection=conn,
-    batch_type='historical',
-    validate_data=True
-)
+pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="historical", validate_data=True)
 
 monitor.stop_monitoring()
 
@@ -708,11 +675,7 @@ The ETL implementation includes built-in SCD Type 2 logic for dimension tables:
 
 ```python
 # SCD Type 2 processing example
-scd_result = tpcdi.run_etl_pipeline(
-    connection=conn,
-    batch_type='scd',
-    validate_data=True
-)
+scd_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="scd", validate_data=True)
 
 # Verify SCD implementation
 scd_validation_sql = """
@@ -740,19 +703,16 @@ for result in scd_results:
 
 ```python
 # Test ETL across multiple database engines
-databases = {
-    'sqlite': sqlite3.connect('warehouse_sqlite.db'),
-    'duckdb': duckdb.connect('warehouse_duckdb.db')
-}
+databases = {"sqlite": sqlite3.connect("warehouse_sqlite.db"), "duckdb": duckdb.connect("warehouse_duckdb.db")}
 
 # Initialize schemas
 for db_name, conn in databases.items():
     schema_sql = tpcdi.get_create_tables_sql()
-    if db_name == 'sqlite':
+    if db_name == "sqlite":
         conn.executescript(schema_sql)
     else:  # DuckDB
         conn.execute("BEGIN TRANSACTION")
-        for statement in schema_sql.split(';'):
+        for statement in schema_sql.split(";"):
             if statement.strip():
                 conn.execute(statement)
         conn.execute("COMMIT")
@@ -763,23 +723,19 @@ for db_name, conn in databases.items():
     print(f"Running ETL on {db_name}...")
 
     start_time = time.time()
-    pipeline_result = tpcdi.run_etl_pipeline(
-        connection=conn,
-        batch_type='historical',
-        validate_data=True
-    )
+    pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="historical", validate_data=True)
     execution_time = time.time() - start_time
 
     results[db_name] = {
-        'success': pipeline_result['success'],
-        'execution_time': execution_time,
-        'data_quality_score': pipeline_result.get('validation_results', {}).get('data_quality_score', 0)
+        "success": pipeline_result["success"],
+        "execution_time": execution_time,
+        "data_quality_score": pipeline_result.get("validation_results", {}).get("data_quality_score", 0),
     }
 
 # Compare results
 print("\nDatabase Comparison:")
 for db_name, result in results.items():
-    status = "✅" if result['success'] else "❌"
+    status = "✅" if result["success"] else "❌"
     print(f"  {status} {db_name}: {result['execution_time']:.2f}s, quality score {result['data_quality_score']:.1f}")
 
 # Clean up connections
@@ -802,23 +758,24 @@ class CustomETLTransformer:
 
         # Example: Custom customer tier calculation
         for record in transformed_data:
-            if 'customer' in record:
+            if "customer" in record:
                 # Apply custom tier logic based on business rules
-                age = self._calculate_age(record.get('DOB', '1980-01-01'))
+                age = self._calculate_age(record.get("DOB", "1980-01-01"))
                 if age > 65:
-                    record['Tier'] = 3  # Senior tier
+                    record["Tier"] = 3  # Senior tier
                 elif age > 35:
-                    record['Tier'] = 2  # Standard tier
+                    record["Tier"] = 2  # Standard tier
                 else:
-                    record['Tier'] = 1  # Basic tier
+                    record["Tier"] = 1  # Basic tier
 
         return transformed_data
 
     def _calculate_age(self, dob_string):
         """Calculate age from date of birth string."""
         from datetime import datetime
+
         try:
-            dob = datetime.strptime(dob_string, '%Y-%m-%d')
+            dob = datetime.strptime(dob_string, "%Y-%m-%d")
             today = datetime.now()
             return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
         except:
@@ -837,22 +794,19 @@ class CustomETLTransformer:
             ORDER BY Tier
         """).fetchall()
 
-        validation_results['tier_distribution'] = {
-            'distribution': tier_distribution,
-            'has_all_tiers': len(tier_distribution) == 3
+        validation_results["tier_distribution"] = {
+            "distribution": tier_distribution,
+            "has_all_tiers": len(tier_distribution) == 3,
         }
 
         return validation_results
+
 
 # Usage
 custom_transformer = CustomETLTransformer(tpcdi)
 
 # Run ETL with custom validation
-pipeline_result = tpcdi.run_etl_pipeline(
-    connection=conn,
-    batch_type='historical',
-    validate_data=True
-)
+pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="historical", validate_data=True)
 
 # Apply custom validation
 custom_validation = custom_transformer.validate_custom_rules(conn)
@@ -870,27 +824,23 @@ from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
 from benchbox import TPCDI
 
+
 def extract_source_data(**context):
     """Extract data from source systems."""
     tpcdi = TPCDI(scale_factor=1.0, etl_mode=True, output_dir=f"/data/tpcdi/{context['ds']}")
 
-    source_files = tpcdi.generate_source_data(
-        formats=['csv', 'xml', 'json'],
-        batch_types=['incremental']
-    )
+    source_files = tpcdi.generate_source_data(formats=["csv", "xml", "json"], batch_types=["incremental"])
 
-    return {
-        'source_files': source_files,
-        'extraction_date': context['ds']
-    }
+    return {"source_files": source_files, "extraction_date": context["ds"]}
+
 
 def transform_and_load(**context):
     """Transform and load data into warehouse."""
     import duckdb
 
     # Get source files from previous task
-    ti = context['ti']
-    extract_output = ti.xcom_pull(task_ids='extract_source_data')
+    ti = context["ti"]
+    extract_output = ti.xcom_pull(task_ids="extract_source_data")
 
     # Initialize TPC-DI and database connection
     tpcdi = TPCDI(scale_factor=1.0, etl_mode=True, output_dir=f"/data/tpcdi/{context['ds']}")
@@ -899,27 +849,24 @@ def transform_and_load(**context):
     # Create schema if needed
     schema_sql = tpcdi.get_create_tables_sql()
     conn.execute("BEGIN TRANSACTION")
-    for statement in schema_sql.split(';'):
+    for statement in schema_sql.split(";"):
         if statement.strip():
             conn.execute(statement)
     conn.execute("COMMIT")
 
     # Run ETL pipeline
-    pipeline_result = tpcdi.run_etl_pipeline(
-        connection=conn,
-        batch_type='incremental',
-        validate_data=True
-    )
+    pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type="incremental", validate_data=True)
 
     conn.close()
 
-    if not pipeline_result['success']:
+    if not pipeline_result["success"]:
         raise Exception(f"ETL pipeline failed: {pipeline_result.get('error')}")
 
     return {
-        'records_processed': pipeline_result['phases']['transform']['records_processed'],
-        'data_quality_score': pipeline_result['validation_results']['data_quality_score']
+        "records_processed": pipeline_result["phases"]["transform"]["records_processed"],
+        "data_quality_score": pipeline_result["validation_results"]["data_quality_score"],
     }
+
 
 def validate_data_quality(**context):
     """Run systematic data quality validation."""
@@ -934,56 +881,43 @@ def validate_data_quality(**context):
     conn.close()
 
     # Check quality thresholds
-    quality_score = validation_results.get('data_quality_score', 0)
+    quality_score = validation_results.get("data_quality_score", 0)
     if quality_score < 80:
         raise Exception(f"Data quality score {quality_score} below threshold of 80")
 
     return validation_results
 
+
 # Define DAG
 default_args = {
-    'owner': 'data-engineering',
-    'depends_on_past': False,
-    'start_date': datetime(2023, 1, 1),
-    'email_on_failure': True,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5)
+    "owner": "data-engineering",
+    "depends_on_past": False,
+    "start_date": datetime(2023, 1, 1),
+    "email_on_failure": True,
+    "email_on_retry": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=5),
 }
 
 dag = DAG(
-    'tpcdi_etl_pipeline',
+    "tpcdi_etl_pipeline",
     default_args=default_args,
-    description='TPC-DI ETL Pipeline',
-    schedule_interval='@daily',
+    description="TPC-DI ETL Pipeline",
+    schedule_interval="@daily",
     catchup=False,
-    max_active_runs=1
+    max_active_runs=1,
 )
 
 # Define tasks
-extract_task = PythonOperator(
-    task_id='extract_source_data',
-    python_callable=extract_source_data,
-    dag=dag
-)
+extract_task = PythonOperator(task_id="extract_source_data", python_callable=extract_source_data, dag=dag)
 
-transform_load_task = PythonOperator(
-    task_id='transform_and_load',
-    python_callable=transform_and_load,
-    dag=dag
-)
+transform_load_task = PythonOperator(task_id="transform_and_load", python_callable=transform_and_load, dag=dag)
 
-validate_task = PythonOperator(
-    task_id='validate_data_quality',
-    python_callable=validate_data_quality,
-    dag=dag
-)
+validate_task = PythonOperator(task_id="validate_data_quality", python_callable=validate_data_quality, dag=dag)
 
 # Archive successful runs
 archive_task = BashOperator(
-    task_id='archive_data',
-    bash_command='tar -czf /archive/tpcdi_{{ ds_nodash }}.tar.gz /data/tpcdi/{{ ds }}/',
-    dag=dag
+    task_id="archive_data", bash_command="tar -czf /archive/tpcdi_{{ ds_nodash }}.tar.gz /data/tpcdi/{{ ds }}/", dag=dag
 )
 
 # Set task dependencies
@@ -999,21 +933,16 @@ from datetime import timedelta
 import duckdb
 from benchbox import TPCDI
 
+
 @task(cache_key_fn=task_input_hash, cache_expiration=timedelta(hours=1))
 def extract_tpcdi_data(scale_factor: float, batch_type: str):
     """Extract TPC-DI source data."""
     tpcdi = TPCDI(scale_factor=scale_factor, etl_mode=True, output_dir=f"prefect_etl_{batch_type}")
 
-    source_files = tpcdi.generate_source_data(
-        formats=['csv', 'xml', 'json'],
-        batch_types=[batch_type]
-    )
+    source_files = tpcdi.generate_source_data(formats=["csv", "xml", "json"], batch_types=[batch_type])
 
-    return {
-        'tpcdi_instance': tpcdi,
-        'source_files': source_files,
-        'batch_type': batch_type
-    }
+    return {"tpcdi_instance": tpcdi, "source_files": source_files, "batch_type": batch_type}
+
 
 @task
 def setup_warehouse_schema(database_path: str):
@@ -1031,7 +960,7 @@ def setup_warehouse_schema(database_path: str):
 
     schema_sql = tpcdi.get_create_tables_sql()
     conn.execute("BEGIN TRANSACTION")
-    for statement in schema_sql.split(';'):
+    for statement in schema_sql.split(";"):
         if statement.strip():
             conn.execute(statement)
     conn.execute("COMMIT")
@@ -1039,46 +968,44 @@ def setup_warehouse_schema(database_path: str):
     conn.close()
     return database_path
 
+
 @task
 def run_etl_pipeline(extract_result: dict, database_path: str):
     """Run the ETL pipeline."""
-    tpcdi = extract_result['tpcdi_instance']
-    batch_type = extract_result['batch_type']
+    tpcdi = extract_result["tpcdi_instance"]
+    batch_type = extract_result["batch_type"]
 
     conn = duckdb.connect(database_path)
 
-    pipeline_result = tpcdi.run_etl_pipeline(
-        connection=conn,
-        batch_type=batch_type,
-        validate_data=True
-    )
+    pipeline_result = tpcdi.run_etl_pipeline(connection=conn, batch_type=batch_type, validate_data=True)
 
     conn.close()
 
-    if not pipeline_result['success']:
+    if not pipeline_result["success"]:
         raise Exception(f"ETL pipeline failed: {pipeline_result.get('error')}")
 
     return pipeline_result
 
+
 @task
 def validate_and_report(pipeline_result: dict):
     """Validate results and generate report."""
-    phases = pipeline_result['phases']
-    validation = pipeline_result.get('validation_results', {})
+    phases = pipeline_result["phases"]
+    validation = pipeline_result.get("validation_results", {})
 
     report = {
-        'success': pipeline_result['success'],
-        'total_duration': pipeline_result['total_duration'],
-        'records_processed': phases['transform']['records_processed'],
-        'records_loaded': phases['load']['records_loaded'],
-        'data_quality_score': validation.get('data_quality_score', 0),
-        'validation_queries_passed': len([
-            q for q in validation.get('validation_queries', {}).values()
-            if q.get('success', False)
-        ])
+        "success": pipeline_result["success"],
+        "total_duration": pipeline_result["total_duration"],
+        "records_processed": phases["transform"]["records_processed"],
+        "records_loaded": phases["load"]["records_loaded"],
+        "data_quality_score": validation.get("data_quality_score", 0),
+        "validation_queries_passed": len(
+            [q for q in validation.get("validation_queries", {}).values() if q.get("success", False)]
+        ),
     }
 
     return report
+
 
 @flow(name="TPC-DI ETL Flow")
 def tpcdi_etl_flow(scale_factor: float = 0.1, batch_type: str = "historical"):
@@ -1097,6 +1024,7 @@ def tpcdi_etl_flow(scale_factor: float = 0.1, batch_type: str = "historical"):
     final_report = validate_and_report(pipeline_result)
 
     return final_report
+
 
 # Run the flow
 if __name__ == "__main__":
@@ -1282,7 +1210,7 @@ if isinstance(connection, sqlite3.Connection):
     connection.executescript(schema_sql)
 else:  # DuckDB
     connection.execute("BEGIN TRANSACTION")
-    for statement in schema_sql.split(';'):
+    for statement in schema_sql.split(";"):
         if statement.strip():
             connection.execute(statement)
     connection.execute("COMMIT")
@@ -1298,16 +1226,12 @@ else:  # DuckDB
 tpcdi = TPCDI(scale_factor=0.1, etl_mode=True)  # Instead of 1.0+
 
 # Solution 2: Use in-memory database for testing
-conn = duckdb.connect(':memory:')
+conn = duckdb.connect(":memory:")
 
 # Solution 3: Process in smaller batches
 # Split large batches into smaller incremental batches
 for i in range(5):
-    result = tpcdi.run_etl_pipeline(
-        connection=conn,
-        batch_type='incremental',
-        validate_data=False
-    )
+    result = tpcdi.run_etl_pipeline(connection=conn, batch_type="incremental", validate_data=False)
 ```
 
 #### 4. Data Quality Validation Failures
@@ -1320,17 +1244,17 @@ for i in range(5):
 validation_results = tpcdi.validate_etl_results(conn)
 
 # Check specific validation queries
-for query_id, result in validation_results['validation_queries'].items():
-    if not result['success']:
+for query_id, result in validation_results["validation_queries"].items():
+    if not result["success"]:
         print(f"Failed validation {query_id}: {result.get('error', 'Unknown error')}")
 
 # Check data quality issues
-for issue in validation_results['data_quality_issues']:
+for issue in validation_results["data_quality_issues"]:
     print(f"Quality issue: {issue}")
 
 # Check completeness
-for table, completeness in validation_results['completeness_checks'].items():
-    if 'error' in completeness:
+for table, completeness in validation_results["completeness_checks"].items():
+    if "error" in completeness:
         print(f"Completeness check failed for {table}: {completeness['error']}")
 ```
 
@@ -1343,16 +1267,17 @@ for table, completeness in validation_results['completeness_checks'].items():
 # Solution 1: Skip validation for performance testing
 pipeline_result = tpcdi.run_etl_pipeline(
     connection=conn,
-    batch_type='historical',
-    validate_data=False  # Skip time-consuming validation
+    batch_type="historical",
+    validate_data=False,  # Skip time-consuming validation
 )
 
 # Solution 2: Use faster database engine
 # Use DuckDB instead of SQLite for faster ETL processing
-conn = duckdb.connect(':memory:')  # In-memory for fastest performance
+conn = duckdb.connect(":memory:")  # In-memory for fastest performance
 
 # Solution 3: Monitor resource usage
 import psutil
+
 process = psutil.Process()
 print(f"Memory usage: {process.memory_info().rss / 1024 / 1024:.1f} MB")
 print(f"CPU usage: {process.cpu_percent():.1f}%")
@@ -1367,11 +1292,8 @@ import logging
 # Set up detailed logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('tpcdi_etl_debug.log'),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("tpcdi_etl_debug.log"), logging.StreamHandler()],
 )
 
 # Initialize TPC-DI with verbose output
@@ -1381,10 +1303,7 @@ tpcdi = TPCDI(scale_factor=0.1, etl_mode=True, verbose=True)
 #### Inspect Generated Source Files
 ```python
 # Check generated source files
-source_files = tpcdi.generate_source_data(
-    formats=['csv'],
-    batch_types=['historical']
-)
+source_files = tpcdi.generate_source_data(formats=["csv"], batch_types=["historical"])
 
 for format_type, files in source_files.items():
     for file_path in files:
@@ -1395,7 +1314,7 @@ for format_type, files in source_files.items():
         print(f"  Size: {file_size:,} bytes")
 
         # Check file content
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             lines = f.readlines()
             print(f"  Lines: {len(lines)}")
             print(f"  Header: {lines[0].strip() if lines else 'Empty file'}")
@@ -1409,7 +1328,7 @@ def inspect_database_state(connection):
     """Inspect database state for debugging."""
 
     # Check table existence
-    tables = ['DimCustomer', 'FactTrade', 'DimAccount']
+    tables = ["DimCustomer", "FactTrade", "DimAccount"]
 
     for table in tables:
         try:
@@ -1424,6 +1343,7 @@ def inspect_database_state(connection):
 
         except Exception as e:
             print(f"{table}: Error - {e}")
+
 
 # Usage
 inspect_database_state(conn)
@@ -1441,13 +1361,9 @@ def robust_etl_pipeline(tpcdi, connection, batch_type, max_retries=3):
             print(f"ETL attempt {attempt + 1}/{max_retries}")
 
             # Run ETL pipeline
-            pipeline_result = tpcdi.run_etl_pipeline(
-                connection=connection,
-                batch_type=batch_type,
-                validate_data=True
-            )
+            pipeline_result = tpcdi.run_etl_pipeline(connection=connection, batch_type=batch_type, validate_data=True)
 
-            if pipeline_result['success']:
+            if pipeline_result["success"]:
                 print(f"ETL successful on attempt {attempt + 1}")
                 return pipeline_result
             else:
@@ -1472,9 +1388,10 @@ def robust_etl_pipeline(tpcdi, connection, batch_type, max_retries=3):
 
     raise Exception(f"ETL failed after {max_retries} attempts")
 
+
 # Usage
 try:
-    result = robust_etl_pipeline(tpcdi, conn, 'historical')
+    result = robust_etl_pipeline(tpcdi, conn, "historical")
     print("ETL completed successfully with recovery")
 except Exception as e:
     print(f"ETL failed permanently: {e}")
@@ -1488,38 +1405,38 @@ except Exception as e:
 ```python
 # Development setup - fast iteration
 tpcdi_dev = TPCDI(
-    scale_factor=0.01,          # Minimal data for fast testing
+    scale_factor=0.01,  # Minimal data for fast testing
     output_dir="dev_etl",
     etl_mode=True,
-    verbose=True                # Enable detailed logging
+    verbose=True,  # Enable detailed logging
 )
 
 # Use in-memory database for speed
-conn = duckdb.connect(':memory:')
+conn = duckdb.connect(":memory:")
 ```
 
 #### Testing Environment
 ```python
 # Testing setup - systematic validation
 tpcdi_test = TPCDI(
-    scale_factor=0.1,           # Reasonable data size
+    scale_factor=0.1,  # Reasonable data size
     output_dir="test_etl",
     etl_mode=True,
-    verbose=False               # Reduce log noise in tests
+    verbose=False,  # Reduce log noise in tests
 )
 
 # Use persistent database for test reproducibility
-conn = duckdb.connect('test_warehouse.duckdb')
+conn = duckdb.connect("test_warehouse.duckdb")
 ```
 
 #### Production-like Environment
 ```python
 # Production setup - full scale validation
 tpcdi_prod = TPCDI(
-    scale_factor=1.0,           # Full scale factor
+    scale_factor=1.0,  # Full scale factor
     output_dir="/data/etl/tpcdi",
     etl_mode=True,
-    verbose=False
+    verbose=False,
 )
 
 # Use production database connection
@@ -1534,48 +1451,45 @@ def systematic_etl_validation(tpcdi, connection):
     """Implement systematic ETL validation strategy."""
 
     validation_results = {
-        'pre_etl_checks': {},
-        'post_etl_validation': {},
-        'business_rule_validation': {},
-        'summary': {}
+        "pre_etl_checks": {},
+        "post_etl_validation": {},
+        "business_rule_validation": {},
+        "summary": {},
     }
 
     # Pre-ETL checks
     print("Running pre-ETL environment checks...")
-    validation_results['pre_etl_checks'] = {
-        'database_accessible': check_database_connection(connection),
-        'schema_exists': check_schema_exists(connection),
-        'sufficient_space': check_disk_space(),
-        'dependencies_available': check_dependencies()
+    validation_results["pre_etl_checks"] = {
+        "database_accessible": check_database_connection(connection),
+        "schema_exists": check_schema_exists(connection),
+        "sufficient_space": check_disk_space(),
+        "dependencies_available": check_dependencies(),
     }
 
     # Run ETL pipeline
-    pipeline_result = tpcdi.run_etl_pipeline(
-        connection=connection,
-        batch_type='historical',
-        validate_data=True
-    )
+    pipeline_result = tpcdi.run_etl_pipeline(connection=connection, batch_type="historical", validate_data=True)
 
     # Post-ETL validation
-    if pipeline_result['success']:
+    if pipeline_result["success"]:
         print("Running post-ETL validation...")
-        validation_results['post_etl_validation'] = tpcdi.validate_etl_results(connection)
+        validation_results["post_etl_validation"] = tpcdi.validate_etl_results(connection)
 
         # Additional business rule validation
-        validation_results['business_rule_validation'] = validate_business_rules(connection)
+        validation_results["business_rule_validation"] = validate_business_rules(connection)
 
         # Calculate overall validation score
-        quality_score = validation_results['post_etl_validation']['data_quality_score']
-        business_score = calculate_business_rule_score(validation_results['business_rule_validation'])
+        quality_score = validation_results["post_etl_validation"]["data_quality_score"]
+        business_score = calculate_business_rule_score(validation_results["business_rule_validation"])
 
-        validation_results['summary'] = {
-            'overall_success': pipeline_result['success'],
-            'data_quality_score': quality_score,
-            'business_rule_score': business_score,
-            'combined_score': (quality_score + business_score) / 2
+        validation_results["summary"] = {
+            "overall_success": pipeline_result["success"],
+            "data_quality_score": quality_score,
+            "business_rule_score": business_score,
+            "combined_score": (quality_score + business_score) / 2,
         }
 
     return validation_results
+
 
 def check_database_connection(connection):
     """Check if database connection is working."""
@@ -1585,6 +1499,7 @@ def check_database_connection(connection):
     except:
         return False
 
+
 def check_schema_exists(connection):
     """Check if required schema exists."""
     try:
@@ -1593,29 +1508,35 @@ def check_schema_exists(connection):
     except:
         return False
 
+
 def check_disk_space():
     """Check available disk space."""
     import shutil
+
     total, used, free = shutil.disk_usage("/")
     return free > 1024**3  # At least 1GB free
+
 
 def check_dependencies():
     """Check if required dependencies are available."""
     try:
         import duckdb
         import sqlite3
+
         return True
     except ImportError:
         return False
 
+
 def validate_business_rules(connection):
     """Validate domain-specific business rules."""
     rules = {
-        'positive_prices': connection.execute("SELECT COUNT(*) FROM FactTrade WHERE TradePrice > 0").fetchone()[0],
-        'valid_tiers': connection.execute("SELECT COUNT(*) FROM DimCustomer WHERE Tier IN (1,2,3)").fetchone()[0],
-        'current_flags': connection.execute("SELECT COUNT(*) FROM DimCustomer WHERE IsCurrent IN (0,1)").fetchone()[0]
+        "positive_prices": connection.execute("SELECT COUNT(*) FROM FactTrade WHERE TradePrice > 0").fetchone()[0],
+        "valid_tiers": connection.execute("SELECT COUNT(*) FROM DimCustomer WHERE Tier IN (1,2,3)").fetchone()[0],
+        "current_flags": connection.execute("SELECT COUNT(*) FROM DimCustomer WHERE IsCurrent IN (0,1)").fetchone()[0],
     }
     return rules
+
 
 def calculate_business_rule_score(business_rules):
     """Calculate business rule compliance score."""
@@ -1635,12 +1556,12 @@ def configured_batch_processing(tpcdi, connection, batch_types):
     connection.execute("PRAGMA cache_size = 100000")  # SQLite optimization
 
     # Process batches in appropriate order
-    ordered_batches = ['historical', 'incremental', 'incremental', 'scd']
+    ordered_batches = ["historical", "incremental", "incremental", "scd"]
 
     performance_metrics = []
 
     for i, batch_type in enumerate(ordered_batches):
-        print(f"Processing batch {i+1}/{len(ordered_batches)}: {batch_type}")
+        print(f"Processing batch {i + 1}/{len(ordered_batches)}: {batch_type}")
 
         # Measure performance
         start_time = time.time()
@@ -1650,23 +1571,23 @@ def configured_batch_processing(tpcdi, connection, batch_types):
         pipeline_result = tpcdi.run_etl_pipeline(
             connection=connection,
             batch_type=batch_type,
-            validate_data=(batch_type == 'historical')  # Only validate historical
+            validate_data=(batch_type == "historical"),  # Only validate historical
         )
 
         end_time = time.time()
         end_memory = psutil.Process().memory_info().rss
 
         # Record metrics
-        if pipeline_result['success']:
-            phases = pipeline_result['phases']
+        if pipeline_result["success"]:
+            phases = pipeline_result["phases"]
             metrics = {
-                'batch_type': batch_type,
-                'batch_number': i + 1,
-                'total_time': end_time - start_time,
-                'memory_delta': (end_memory - start_memory) / 1024 / 1024,  # MB
-                'records_processed': phases['transform']['records_processed'],
-                'records_loaded': phases['load']['records_loaded'],
-                'throughput': phases['transform']['records_processed'] / (end_time - start_time)
+                "batch_type": batch_type,
+                "batch_number": i + 1,
+                "total_time": end_time - start_time,
+                "memory_delta": (end_memory - start_memory) / 1024 / 1024,  # MB
+                "records_processed": phases["transform"]["records_processed"],
+                "records_loaded": phases["load"]["records_loaded"],
+                "throughput": phases["transform"]["records_processed"] / (end_time - start_time),
             }
             performance_metrics.append(metrics)
 
@@ -1676,6 +1597,7 @@ def configured_batch_processing(tpcdi, connection, batch_types):
             time.sleep(0.1)  # Brief pause for system recovery
 
     return performance_metrics
+
 
 # Usage
 performance_results = configured_batch_processing(tpcdi, conn, ordered_batches)
@@ -1697,6 +1619,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+
 class ETLMonitor:
     """Production-grade ETL monitoring and error handling."""
 
@@ -1705,7 +1628,7 @@ class ETLMonitor:
         self.log_dir.mkdir(exist_ok=True)
 
         # Set up logging
-        self.logger = logging.getLogger('tpcdi_etl')
+        self.logger = logging.getLogger("tpcdi_etl")
         self.logger.setLevel(logging.INFO)
 
         # File handler
@@ -1718,9 +1641,7 @@ class ETLMonitor:
         console_handler.setLevel(logging.INFO)
 
         # Formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
 
@@ -1730,7 +1651,7 @@ class ETLMonitor:
     def run_monitored_etl(self, tpcdi, connection, batch_type):
         """Run ETL with systematic monitoring."""
 
-        run_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.logger.info(f"Starting ETL run {run_id} for batch type {batch_type}")
 
         try:
@@ -1739,26 +1660,24 @@ class ETLMonitor:
 
             # Run ETL pipeline
             start_time = time.time()
-            pipeline_result = tpcdi.run_etl_pipeline(
-                connection=connection,
-                batch_type=batch_type,
-                validate_data=True
-            )
+            pipeline_result = tpcdi.run_etl_pipeline(connection=connection, batch_type=batch_type, validate_data=True)
             execution_time = time.time() - start_time
 
             # Log results
-            if pipeline_result['success']:
+            if pipeline_result["success"]:
                 self.logger.info(f"ETL run {run_id} completed successfully in {execution_time:.2f}s")
 
                 # Log phase details
-                phases = pipeline_result['phases']
-                self.logger.info(f"Phase timings - Extract: {phases['extract']['duration']:.2f}s, "
-                               f"Transform: {phases['transform']['duration']:.2f}s, "
-                               f"Load: {phases['load']['duration']:.2f}s")
+                phases = pipeline_result["phases"]
+                self.logger.info(
+                    f"Phase timings - Extract: {phases['extract']['duration']:.2f}s, "
+                    f"Transform: {phases['transform']['duration']:.2f}s, "
+                    f"Load: {phases['load']['duration']:.2f}s"
+                )
 
                 # Log data quality
-                if 'validation_results' in pipeline_result:
-                    quality_score = pipeline_result['validation_results']['data_quality_score']
+                if "validation_results" in pipeline_result:
+                    quality_score = pipeline_result["validation_results"]["data_quality_score"]
                     self.logger.info(f"Data quality score: {quality_score:.1f}/100")
 
                 # Post-execution validation
@@ -1797,6 +1716,7 @@ class ETLMonitor:
 
         # Check disk space
         import shutil
+
         total, used, free = shutil.disk_usage("/")
         free_gb = free / (1024**3)
         if free_gb > 1:
@@ -1828,13 +1748,14 @@ class ETLMonitor:
         self.logger.info("Handling ETL failure...")
 
         # Log detailed error information
-        error_msg = pipeline_result.get('error', 'Unknown error')
+        error_msg = pipeline_result.get("error", "Unknown error")
         self.logger.error(f"Detailed error: {error_msg}")
 
         # Save error state for debugging
         error_file = self.log_dir / f"error_state_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         import json
-        with open(error_file, 'w') as f:
+
+        with open(error_file, "w") as f:
             json.dump(pipeline_result, f, indent=2, default=str)
 
         self.logger.info(f"Error state saved to {error_file}")
@@ -1850,11 +1771,12 @@ class ETLMonitor:
         except:
             self.logger.warning("Failed to rollback transaction")
 
+
 # Usage
 monitor = ETLMonitor(log_dir="production_etl_logs")
 
 try:
-    result = monitor.run_monitored_etl(tpcdi, conn, 'historical')
+    result = monitor.run_monitored_etl(tpcdi, conn, "historical")
     print("ETL completed with monitoring")
 except Exception as e:
     print(f"ETL failed: {e}")
@@ -1870,6 +1792,7 @@ import tempfile
 import duckdb
 from benchbox import TPCDI
 
+
 class TPCDIETLTestSuite(unittest.TestCase):
     """Comprehensive test suite for TPC-DI ETL implementation."""
 
@@ -1880,14 +1803,14 @@ class TPCDIETLTestSuite(unittest.TestCase):
             scale_factor=0.01,  # Minimal scale for fast testing
             output_dir=self.temp_dir,
             etl_mode=True,
-            verbose=False
+            verbose=False,
         )
 
         # Create in-memory database for testing
-        self.conn = duckdb.connect(':memory:')
+        self.conn = duckdb.connect(":memory:")
         schema_sql = self.tpcdi.get_create_tables_sql()
         self.conn.execute("BEGIN TRANSACTION")
-        for statement in schema_sql.split(';'):
+        for statement in schema_sql.split(";"):
             if statement.strip():
                 self.conn.execute(statement)
         self.conn.execute("COMMIT")
@@ -1899,26 +1822,24 @@ class TPCDIETLTestSuite(unittest.TestCase):
 
         # Clean up temporary files
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_etl_mode_initialization(self):
         """Test ETL mode initialization."""
         # Test ETL mode enabled
         etl_status = self.tpcdi.get_etl_status()
-        self.assertTrue(etl_status['etl_mode_enabled'])
-        self.assertIn('csv', etl_status['supported_formats'])
-        self.assertIn('historical', etl_status['batch_types'])
+        self.assertTrue(etl_status["etl_mode_enabled"])
+        self.assertIn("csv", etl_status["supported_formats"])
+        self.assertIn("historical", etl_status["batch_types"])
 
     def test_source_data_generation(self):
         """Test source data generation in multiple formats."""
-        source_files = self.tpcdi.generate_source_data(
-            formats=['csv', 'xml'],
-            batch_types=['historical']
-        )
+        source_files = self.tpcdi.generate_source_data(formats=["csv", "xml"], batch_types=["historical"])
 
         # Verify files were generated
-        self.assertIn('csv', source_files)
-        self.assertIn('xml', source_files)
+        self.assertIn("csv", source_files)
+        self.assertIn("xml", source_files)
 
         # Verify files exist and have content
         for format_type, files in source_files.items():
@@ -1929,23 +1850,19 @@ class TPCDIETLTestSuite(unittest.TestCase):
 
     def test_historical_etl_pipeline(self):
         """Test historical ETL pipeline execution."""
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='historical',
-            validate_data=True
-        )
+        pipeline_result = self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="historical", validate_data=True)
 
         # Verify pipeline success
-        self.assertTrue(pipeline_result['success'])
-        self.assertIn('phases', pipeline_result)
-        self.assertIn('validation_results', pipeline_result)
+        self.assertTrue(pipeline_result["success"])
+        self.assertIn("phases", pipeline_result)
+        self.assertIn("validation_results", pipeline_result)
 
         # Verify phases completed
-        phases = pipeline_result['phases']
-        self.assertIn('extract', phases)
-        self.assertIn('transform', phases)
-        self.assertIn('load', phases)
-        self.assertIn('validation', phases)
+        phases = pipeline_result["phases"]
+        self.assertIn("extract", phases)
+        self.assertIn("transform", phases)
+        self.assertIn("load", phases)
+        self.assertIn("validation", phases)
 
         # Verify data was loaded
         customer_count = self.conn.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
@@ -1954,24 +1871,18 @@ class TPCDIETLTestSuite(unittest.TestCase):
     def test_incremental_etl_pipeline(self):
         """Test incremental ETL pipeline execution."""
         # Run historical first
-        self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='historical',
-            validate_data=False
-        )
+        self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="historical", validate_data=False)
 
         # Get initial count
         initial_count = self.conn.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
 
         # Run incremental
         pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='incremental',
-            validate_data=False
+            connection=self.conn, batch_type="incremental", validate_data=False
         )
 
         # Verify incremental success
-        self.assertTrue(pipeline_result['success'])
+        self.assertTrue(pipeline_result["success"])
 
         # Verify data was added (should be more records)
         final_count = self.conn.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
@@ -1980,43 +1891,31 @@ class TPCDIETLTestSuite(unittest.TestCase):
     def test_data_validation(self):
         """Test systematic data validation."""
         # Run ETL pipeline
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='historical',
-            validate_data=True
-        )
+        pipeline_result = self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="historical", validate_data=True)
 
         # Verify validation results
-        validation_results = pipeline_result['validation_results']
-        self.assertIn('data_quality_score', validation_results)
-        self.assertIn('validation_queries', validation_results)
+        validation_results = pipeline_result["validation_results"]
+        self.assertIn("data_quality_score", validation_results)
+        self.assertIn("validation_queries", validation_results)
 
         # Data quality score should be reasonable
-        quality_score = validation_results['data_quality_score']
+        quality_score = validation_results["data_quality_score"]
         self.assertGreaterEqual(quality_score, 0)
         self.assertLessEqual(quality_score, 100)
 
         # Validation queries should execute
-        validation_queries = validation_results['validation_queries']
+        validation_queries = validation_results["validation_queries"]
         self.assertGreater(len(validation_queries), 0)
 
     def test_scd_implementation(self):
         """Test SCD Type 2 implementation."""
         # Run historical load
-        self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='historical',
-            validate_data=False
-        )
+        self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="historical", validate_data=False)
 
         # Run SCD batch
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='scd',
-            validate_data=False
-        )
+        pipeline_result = self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="scd", validate_data=False)
 
-        self.assertTrue(pipeline_result['success'])
+        self.assertTrue(pipeline_result["success"])
 
         # Verify SCD implementation
         # Check for customers with multiple versions
@@ -2046,55 +1945,44 @@ class TPCDIETLTestSuite(unittest.TestCase):
         """Test error handling scenarios."""
         # Test with invalid batch type
         with self.assertRaises(Exception):
-            self.tpcdi.run_etl_pipeline(
-                connection=self.conn,
-                batch_type='invalid_batch_type',
-                validate_data=False
-            )
+            self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="invalid_batch_type", validate_data=False)
 
         # Test with closed connection
-        bad_conn = duckdb.connect(':memory:')
+        bad_conn = duckdb.connect(":memory:")
         bad_conn.close()
 
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=bad_conn,
-            batch_type='historical',
-            validate_data=False
-        )
+        pipeline_result = self.tpcdi.run_etl_pipeline(connection=bad_conn, batch_type="historical", validate_data=False)
 
         # Should fail gracefully
-        self.assertFalse(pipeline_result['success'])
-        self.assertIn('error', pipeline_result)
+        self.assertFalse(pipeline_result["success"])
+        self.assertIn("error", pipeline_result)
 
     def test_performance_within_limits(self):
         """Test that ETL performance is within acceptable limits."""
         import time
 
         start_time = time.time()
-        pipeline_result = self.tpcdi.run_etl_pipeline(
-            connection=self.conn,
-            batch_type='historical',
-            validate_data=True
-        )
+        pipeline_result = self.tpcdi.run_etl_pipeline(connection=self.conn, batch_type="historical", validate_data=True)
         execution_time = time.time() - start_time
 
         # Verify success
-        self.assertTrue(pipeline_result['success'])
+        self.assertTrue(pipeline_result["success"])
 
         # Verify execution time is reasonable (adjust based on environment)
         self.assertLess(execution_time, 30)  # Should complete within 30 seconds
 
         # Verify phase timing breakdown
-        phases = pipeline_result['phases']
+        phases = pipeline_result["phases"]
         total_phase_time = (
-            phases['extract']['duration'] +
-            phases['transform']['duration'] +
-            phases['load']['duration'] +
-            phases.get('validation', {}).get('duration', 0)
+            phases["extract"]["duration"]
+            + phases["transform"]["duration"]
+            + phases["load"]["duration"]
+            + phases.get("validation", {}).get("duration", 0)
         )
 
         # Total phase time should be close to overall execution time
-        self.assertLessEqual(abs(total_phase_time - pipeline_result['total_duration']), 1.0)
+        self.assertLessEqual(abs(total_phase_time - pipeline_result["total_duration"]), 1.0)
+
 
 def run_test_suite():
     """Run the complete TPC-DI ETL test suite."""
@@ -2108,11 +1996,14 @@ def run_test_suite():
 
     # Return test results
     return {
-        'tests_run': result.testsRun,
-        'failures': len(result.failures),
-        'errors': len(result.errors),
-        'success_rate': (result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun if result.testsRun > 0 else 0
+        "tests_run": result.testsRun,
+        "failures": len(result.failures),
+        "errors": len(result.errors),
+        "success_rate": (result.testsRun - len(result.failures) - len(result.errors)) / result.testsRun
+        if result.testsRun > 0
+        else 0,
     }
+
 
 # Run test suite
 if __name__ == "__main__":

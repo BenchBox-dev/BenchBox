@@ -63,6 +63,7 @@ Highlight the naming problem with a table:
 sf = self.metadata.get("scale_factor")
 if sf is not None:
     from benchbox.utils.scale_factor import format_scale_factor  # <-- ONE IMPORT
+
     parts.append(f"SF={format_scale_factor(sf)}")
 ```
 One import. That's all it took to make the entire 7,500-line package non-extractable.
@@ -96,6 +97,7 @@ One import. That's all it took to make the entire 7,500-line package non-extract
 - Replaced BenchBox's `ascii/` modules with thin re-export shims, each ~3 lines:
   ```python
   """Compatibility shim - delegates to textcharts.histogram."""
+
   from textcharts.histogram import *  # noqa: F401, F403
   ```
 - 568 tests passed without modification on the first try, because the shims preserved every import path
@@ -109,9 +111,7 @@ One import. That's all it took to make the entire 7,500-line package non-extract
   ```python
   # benchbox/core/visualization/ascii_runtime.py (AFTER)
   # EXPLICIT: BenchBox domain -> generic textcharts domain
-  histogram_data.append(
-      HistogramBar(label=query_id, value=mean_latency, platform=platform)
-  )
+  histogram_data.append(HistogramBar(label=query_id, value=mean_latency, platform=platform))
   ```
 
 ---

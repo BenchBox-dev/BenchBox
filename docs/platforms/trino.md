@@ -193,7 +193,7 @@ adapter = TrinoAdapter(
         "query_max_memory": "8GB",
         "query_max_memory_per_node": "2GB",
         "join_distribution_type": "AUTOMATIC",
-    }
+    },
 )
 ```
 

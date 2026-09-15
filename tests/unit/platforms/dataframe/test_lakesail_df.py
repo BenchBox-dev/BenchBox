@@ -532,7 +532,7 @@ class TestLakeSailMockedCoverage:
     def test_scalar_paths(self, monkeypatch):
         adapter, _, _, _ = _new_lakesail_adapter(monkeypatch)
         row = MagicMock()
-        row.__getitem__ = lambda self, k: (99 if k == 0 else "v")
+        row.__getitem__ = lambda self, k: 99 if k == 0 else "v"
         df = MagicMock()
         df.limit.return_value.collect.return_value = [row]
         assert adapter.scalar(df) == 99

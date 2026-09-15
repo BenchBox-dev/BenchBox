@@ -174,11 +174,11 @@ Phase costs now include timing information for better cost analysis:
 # Example: Understanding concurrent execution costs
 phase_cost = {
     "phase_name": "throughput_test",
-    "total_cost": 12.40,                    # Sum of all 88 queries
-    "query_count": 88,                      # 4 streams × 22 queries
-    "wall_clock_duration_seconds": 300.0,   # 5 minutes actual runtime
-    "concurrent_streams": 4,                # Queries ran concurrently
-    "effective_cost_per_hour": 148.80       # $12.40 / (300/3600) = $148.80/hr
+    "total_cost": 12.40,  # Sum of all 88 queries
+    "query_count": 88,  # 4 streams × 22 queries
+    "wall_clock_duration_seconds": 300.0,  # 5 minutes actual runtime
+    "concurrent_streams": 4,  # Queries ran concurrently
+    "effective_cost_per_hour": 148.80,  # $12.40 / (300/3600) = $148.80/hr
 }
 ```
 
@@ -193,8 +193,8 @@ All cost estimates include pricing version tracking:
 
 ```python
 platform_details = {
-    "pricing_version": "2025.11",      # YYYY.MM format
-    "pricing_date": "2025-11-09",      # Last validation
+    "pricing_version": "2025.11",  # YYYY.MM format
+    "pricing_date": "2025-11-09",  # Last validation
     # ... other platform details
 }
 ```
@@ -209,11 +209,11 @@ When benchmark data is loaded, storage costs are automatically estimated:
 
 ```python
 storage_estimate = {
-    "storage_cost": 0.1534,          # Prorated for duration
-    "storage_tb": 4.87,              # Data size in TB
-    "price_per_tb_month": 23.00,     # Monthly storage rate
-    "duration_hours": 1.0,           # Storage duration
-    "note": "Platform-specific notes..."
+    "storage_cost": 0.1534,  # Prorated for duration
+    "storage_tb": 4.87,  # Data size in TB
+    "price_per_tb_month": 23.00,  # Monthly storage rate
+    "duration_hours": 1.0,  # Storage duration
+    "note": "Platform-specific notes...",
 }
 ```
 
@@ -582,10 +582,7 @@ platform_config = {
     "cloud": "azure",
     "region": "eu-west-1",
 }
-updated_results = add_cost_estimation_to_results(
-    benchmark_results,
-    platform_config=platform_config
-)
+updated_results = add_cost_estimation_to_results(benchmark_results, platform_config=platform_config)
 ```
 
 ### Configuration Override

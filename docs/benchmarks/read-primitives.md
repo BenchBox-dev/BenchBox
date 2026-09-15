@@ -253,11 +253,7 @@ for category in categories:
         result = conn.execute(query_sql).fetchall()
         execution_time = time.time() - start_time
 
-        results[query_id] = {
-            'category': category,
-            'time': execution_time,
-            'rows': len(result)
-        }
+        results[query_id] = {"category": category, "time": execution_time, "rows": len(result)}
         print(f"  {query_id}: {execution_time:.3f}s ({len(result)} rows)")
 
 conn.close()
@@ -269,6 +265,7 @@ conn.close()
 import time
 from statistics import mean, median
 from typing import Dict, List
+
 
 class PrimitivesRegressionTester:
     def __init__(self, primitives: ReadPrimitives, connection):
@@ -297,18 +294,19 @@ class PrimitivesRegressionTester:
                     times.append(execution_time)
 
                 results[query_id] = {
-                    'category': category,
-                    'avg_time': mean(times),
-                    'median_time': median(times),
-                    'min_time': min(times),
-                    'times': times,
-                    'rows': len(result)
+                    "category": category,
+                    "avg_time": mean(times),
+                    "median_time": median(times),
+                    "min_time": min(times),
+                    "times": times,
+                    "rows": len(result),
                 }
 
         return results
 
-    def compare_with_baseline(self, current_results: Dict, baseline_results: Dict,
-                             threshold: float = 0.1) -> List[Dict]:
+    def compare_with_baseline(
+        self, current_results: Dict, baseline_results: Dict, threshold: float = 0.1
+    ) -> List[Dict]:
         """Compare current results with baseline, flag regressions."""
         regressions = []
 
@@ -317,18 +315,21 @@ class PrimitivesRegressionTester:
                 continue
 
             baseline = baseline_results[query_id]
-            time_increase = (current['median_time'] - baseline['median_time']) / baseline['median_time']
+            time_increase = (current["median_time"] - baseline["median_time"]) / baseline["median_time"]
 
             if time_increase > threshold:
-                regressions.append({
-                    'query_id': query_id,
-                    'category': current['category'],
-                    'baseline_time': baseline['median_time'],
-                    'current_time': current['median_time'],
-                    'increase_pct': time_increase * 100
-                })
+                regressions.append(
+                    {
+                        "query_id": query_id,
+                        "category": current["category"],
+                        "baseline_time": baseline["median_time"],
+                        "current_time": current["median_time"],
+                        "increase_pct": time_increase * 100,
+                    }
+                )
 
         return regressions
+
 
 # Usage
 tester = PrimitivesRegressionTester(primitives, conn)
@@ -353,6 +354,7 @@ else:
 from typing import Dict
 import time
 
+
 def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict:
     """Profile performance across all primitive categories."""
 
@@ -371,29 +373,25 @@ def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict
 
         if times:
             profile_results[category] = {
-                'query_count': len(category_queries),
-                'total_time': sum(times),
-                'avg_time': sum(times) / len(times),
-                'min_time': min(times),
-                'max_time': max(times)
+                "query_count": len(category_queries),
+                "total_time": sum(times),
+                "avg_time": sum(times) / len(times),
+                "min_time": min(times),
+                "max_time": max(times),
             }
 
     # Sort by total time to identify bottlenecks
-    sorted_categories = sorted(
-        profile_results.items(),
-        key=lambda x: x[1]['total_time'],
-        reverse=True
-    )
+    sorted_categories = sorted(profile_results.items(), key=lambda x: x[1]["total_time"], reverse=True)
 
     print("\nPerformance Profile by Category:")
     print(f"{'Category':<30} {'Queries':<10} {'Total Time':<15} {'Avg Time':<15}")
     print("-" * 70)
 
     for category, stats in sorted_categories:
-        print(f"{category:<30} {stats['query_count']:<10} "
-              f"{stats['total_time']:<15.3f} {stats['avg_time']:<15.3f}")
+        print(f"{category:<30} {stats['query_count']:<10} {stats['total_time']:<15.3f} {stats['avg_time']:<15.3f}")
 
     return dict(sorted_categories)
+
 
 # Usage
 profile = profile_primitive_categories(primitives, conn)
@@ -450,9 +448,9 @@ primitives = ReadPrimitives(scale_factor=1.0, output_dir="primitives_prod")
 primitives = ReadPrimitives(
     scale_factor=0.1,
     output_dir="primitives_data",
-    verbose=True,                # Enable detailed logging
-    parallel=4,                  # Parallel data generation
-    cache_data=True              # Cache generated data
+    verbose=True,  # Enable detailed logging
+    parallel=4,  # Parallel data generation
+    cache_data=True,  # Cache generated data
 )
 
 # Get queries with dialect translation

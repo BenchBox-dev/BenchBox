@@ -467,6 +467,7 @@ Validate extracted queries with external tools:
 import subprocess
 from pathlib import Path
 
+
 def validate_queries(dry_run_dir: str, dialect: str = "duckdb"):
     """Validate extracted SQL queries."""
 
@@ -480,22 +481,23 @@ def validate_queries(dry_run_dir: str, dialect: str = "duckdb"):
         print(f"  Checking {query_file.name}...", end="")
 
         # Basic validation
-        with open(query_file, 'r') as f:
+        with open(query_file, "r") as f:
             content = f.read()
 
         # Check for common issues
         issues = []
         if not content.strip():
             issues.append("Empty query")
-        if content.upper().count('SELECT') == 0:
+        if content.upper().count("SELECT") == 0:
             issues.append("No SELECT statement")
-        if content.count('(') != content.count(')'):
+        if content.count("(") != content.count(")"):
             issues.append("Unbalanced parentheses")
 
         if not issues:
             print(" ✅")
         else:
             print(f" ❌ ({', '.join(issues)})")
+
 
 # Usage
 validate_queries("./my_dry_run", "duckdb")
@@ -602,10 +604,7 @@ class DryRunExecutor:
         """
 
     def execute_dry_run(
-        self,
-        benchmark_config: BenchmarkConfig,
-        system_profile: SystemProfile,
-        database_config: DatabaseConfig
+        self, benchmark_config: BenchmarkConfig, system_profile: SystemProfile, database_config: DatabaseConfig
     ) -> DryRunResult:
         """Execute dry run.
 

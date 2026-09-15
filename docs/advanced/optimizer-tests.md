@@ -256,7 +256,7 @@ optimizer_queries = [
     "optimizer_column_pruning",
     "optimizer_in_to_exists",
     "optimizer_union_optimization",
-    "optimizer_runtime_filter"
+    "optimizer_runtime_filter",
 ]
 
 # Execute all optimizer queries

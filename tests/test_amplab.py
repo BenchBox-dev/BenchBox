@@ -316,8 +316,8 @@ class TestAMPLabBenchmarkDirectly(BenchmarkTestMixin):
             mock_cursor = Mock()
             mock_connection.cursor.return_value = mock_cursor
             mock_connection.commit = Mock()
-            delattr(mock_connection, "executescript")
-            delattr(mock_connection, "executemany")
+            del mock_connection.executescript
+            del mock_connection.executemany
 
             with patch.object(amplab_benchmark, "get_create_tables_sql") as mock_get_sql:
                 mock_get_sql.return_value = "CREATE TABLE rankings (...);"

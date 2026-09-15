@@ -259,11 +259,11 @@ class TestMockBaseBenchmarkAbstractMethods:
         benchmark._impl = SimpleNamespace(benchmark_name="impl-benchmark-name")
         assert benchmark.benchmark_name == "impl-benchmark-name"
 
-        delattr(benchmark, "_impl")
+        del benchmark._impl
         benchmark._name = "local-name"
         assert benchmark.benchmark_name == "local-name"
 
-        delattr(benchmark, "_name")
+        del benchmark._name
         assert benchmark.benchmark_name == "MockBaseBenchmark"
 
 
