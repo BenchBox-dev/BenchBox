@@ -3984,15 +3984,10 @@
       "title": "Define BenchBox results platform product boundary and launch strategy"
     },
     "delete-benchbox-core-runner-dataframe-runner-py-completely": {
-      "claim": {
-        "expires_at": "2026-09-16T00:33:06Z",
-        "generation": "c9a77047b5ab4be69959b404780e5f5d",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:a9e5b38beeec06bf686b41f0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Delete `benchbox/core/runner/dataframe_runner.py` completely"
     },
     "demote-falsifiability-lint-to-advisory": {
