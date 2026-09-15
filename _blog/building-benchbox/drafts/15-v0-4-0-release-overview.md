@@ -52,7 +52,7 @@ The repository name, PyPI project, domain, and `uv add benchbox` command stay th
 
 v0.4.0 adds a canonical vocabulary for result source, trust label, and funding, plus a `benchbox run --funding` flag and an optional provenance block in result bundles. The `vendor-supplied` trust label is new. The preview at [benchbox.dev/results/](https://benchbox.dev/results/) displays those fields in rankings, comparisons, and result details.
 
-Ranked tables include maintainer-run, CI, and vendor-supplied results. Community submissions stay visible and are not ranked. The vendor label cannot be self-applied: it is derived from bundles under `results-data/bundles/vendor/`, and submission CI rejects non-maintainer PRs that touch that path. In the August 28 preview snapshot, all 138 rows are `maintainer-run` with funding `unspecified`.
+Ranked tables include maintainer-run, CI, and vendor-supplied results. Community submissions stay visible and are currently excluded from ranked tables. The vendor label cannot be self-applied: it is derived from bundles under `results-data/bundles/vendor/`, and submission CI rejects non-maintainer PRs that touch that path. In the August 28 preview snapshot, all 138 rows are `maintainer-run` with funding `unspecified`.
 
 Accepted `--funding` values are `employer`, `personal`, `free-trial`, `vendor-sponsored`, `grant`, and `unspecified` (the default). Eligibility gates, the comparability receipt, and corpus curation get a deeper treatment in a follow-up Results Explorer post.
 
