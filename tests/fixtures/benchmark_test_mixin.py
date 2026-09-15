@@ -82,7 +82,7 @@ class BenchmarkTestMixin:
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
         mock_connection.cursor.return_value = mock_cursor
-        delattr(mock_connection, "execute")  # Remove execute method to force cursor path
+        del mock_connection.execute  # Remove execute method to force cursor path
 
         with patch.object(benchmark_instance, "get_query") as mock_get_query:
             mock_get_query.return_value = self.sample_sql
@@ -99,8 +99,8 @@ class BenchmarkTestMixin:
     def test_execute_query_unsupported_connection(self, benchmark_instance: Any) -> None:
         """Test execute_query with unsupported connection type raises ValueError."""
         mock_connection = Mock()
-        delattr(mock_connection, "execute")
-        delattr(mock_connection, "cursor")
+        del mock_connection.execute
+        del mock_connection.cursor
 
         with patch.object(benchmark_instance, "get_query") as mock_get_query:
             mock_get_query.return_value = self.sample_sql

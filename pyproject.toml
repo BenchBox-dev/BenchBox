@@ -418,7 +418,7 @@ error-on-warning = false
 
 [dependency-groups]
 dev = [
-    "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
+    "ruff==0.16.7",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
     "pillow>=12.3.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output; >=12.3.0: PYSEC-2026-2253..3453 fixes

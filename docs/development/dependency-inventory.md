@@ -178,7 +178,7 @@ or declaration appears unused.
 | `pytest-cov` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - `--cov` option used by `make coverage*` and CI |
 | `pytest-timeout` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - pytest plugin (timeout config in `pytest.ini` markers) |
 | `pytest-xdist` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - `-n auto` baked into `pytest.ini` addopts |
-| `ruff` | DEV | (CLI tool) | 0 | KEEP - `ruff check`/`ruff format`; pinned `==0.11.13` |
+| `ruff` | DEV | (CLI tool) | 0 | KEEP - `ruff check`/`ruff format`; pinned `==0.16.7` |
 | `ty` | DEV | (CLI tool) | 0 | KEEP - `uv run ty check`; configured under `[tool.ty]` |
 | `tox` | DEV | (CLI tool) | 0 | KEEP - `tox.ini` is present and used |
 | `mutmut` | DEV | (CLI tool) | 0 | KEEP - `[tool.mutmut]` config block targets specific files |

@@ -317,7 +317,7 @@ class TestPlatformAdapterEnhancedMethods:
         benchmark_without_tables = Mock()
         # Strip both tables attribute and _impl to simulate no tables scenario
         if hasattr(benchmark_without_tables, "tables"):
-            delattr(benchmark_without_tables, "tables")
+            del benchmark_without_tables.tables
         benchmark_without_tables._impl = None
 
         phase = self.adapter._create_enhanced_data_generation_phase(benchmark_without_tables)
