@@ -113,18 +113,15 @@ conn.execute("SELECT * FROM read_parquet('customer.parquet')")
 
 # PyArrow
 import pyarrow.parquet as pq
-
-table = pq.read_table("customer.parquet")
+table = pq.read_table('customer.parquet')
 
 # Polars
 import polars as pl
-
-df = pl.read_parquet("customer.parquet")
+df = pl.read_parquet('customer.parquet')
 
 # Pandas
 import pandas as pd
-
-df = pd.read_parquet("customer.parquet")
+df = pd.read_parquet('customer.parquet')
 ```
 
 ### Vortex
@@ -159,8 +156,7 @@ benchbox convert --input ./data --format vortex --compression zstd
 ```python
 # Python vortex library
 import vortex
-
-array = vortex.io.read("customer.vortex")
+array = vortex.io.read('customer.vortex')
 table = array.to_arrow()
 
 # DuckDB (requires vortex extension)
@@ -206,8 +202,7 @@ benchbox convert --input ./data --format delta --compression zstd
 ```python
 # Python deltalake library
 from deltalake import DeltaTable
-
-dt = DeltaTable("./customer")
+dt = DeltaTable('./customer')
 df = dt.to_pandas()
 
 # DuckDB (requires delta extension)
@@ -221,10 +216,10 @@ df = spark.read.format("delta").load("./customer")
 **Time Travel:**
 ```python
 # Query specific version
-dt = DeltaTable("./customer", version=0)
+dt = DeltaTable('./customer', version=0)
 
 # Query by timestamp
-dt = DeltaTable("./customer", as_of="2024-01-15T10:00:00")
+dt = DeltaTable('./customer', as_of='2024-01-15T10:00:00')
 ```
 
 ### Apache Iceberg
@@ -266,7 +261,6 @@ benchbox convert --input ./data --format iceberg --partition l_shipdate
 ```python
 # PyIceberg
 from pyiceberg.catalog import load_catalog
-
 catalog = load_catalog("local", **{"type": "sql", "uri": "sqlite:///catalog.db"})
 table = catalog.load_table("default.customer")
 df = table.scan().to_pandas()
@@ -316,25 +310,25 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
 **Reading Hudi:**
 ```python
 # PySpark
-spark = SparkSession.builder.config(
-    "spark.jars.packages", "org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0"
-).getOrCreate()
+spark = SparkSession.builder \
+    .config("spark.jars.packages", "org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0") \
+    .getOrCreate()
 
 df = spark.read.format("hudi").load("./customer")
 
 # Incremental query (changes since last commit)
-df = (
-    spark.read.format("hudi")
-    .option("hoodie.datasource.query.type", "incremental")
-    .option("hoodie.datasource.read.begin.instanttime", "20240101000000")
+df = spark.read.format("hudi") \
+    .option("hoodie.datasource.query.type", "incremental") \
+    .option("hoodie.datasource.read.begin.instanttime", "20240101000000") \
     .load("./customer")
-)
 ```
 
 **Time Travel:**
 ```python
 # Query specific timestamp
-df = spark.read.format("hudi").option("as.of.instant", "20240115100000").load("./customer")
+df = spark.read.format("hudi") \
+    .option("as.of.instant", "20240115100000") \
+    .load("./customer")
 ```
 
 ### DuckLake
@@ -522,14 +516,14 @@ conn.execute("""
 import polars as pl
 
 # Parquet
-df = pl.read_parquet("./data/customer.parquet")
+df = pl.read_parquet('./data/customer.parquet')
 
 # Delta Lake
-df = pl.read_delta("./data/customer")
+df = pl.read_delta('./data/customer')
 
 # Lazy evaluation for large datasets
-lf = pl.scan_parquet("./data/*.parquet")
-result = lf.filter(pl.col("c_acctbal") > 1000).collect()
+lf = pl.scan_parquet('./data/*.parquet')
+result = lf.filter(pl.col('c_acctbal') > 1000).collect()
 ```
 
 ### PySpark
@@ -537,35 +531,37 @@ result = lf.filter(pl.col("c_acctbal") > 1000).collect()
 ```python
 from pyspark.sql import SparkSession
 
-spark = SparkSession.builder.config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension").getOrCreate()
+spark = SparkSession.builder \
+    .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+    .getOrCreate()
 
 # Parquet
-df = spark.read.parquet("./data/customer.parquet")
+df = spark.read.parquet('./data/customer.parquet')
 
 # Delta Lake
-df = spark.read.format("delta").load("./data/customer")
+df = spark.read.format("delta").load('./data/customer')
 
 # Iceberg
-df = spark.read.format("iceberg").load("./data/customer")
+df = spark.read.format("iceberg").load('./data/customer')
 
 # Hudi
-df = spark.read.format("hudi").load("./data/customer")
+df = spark.read.format("hudi").load('./data/customer')
 ```
 
 ### Databricks
 
 ```python
 # Parquet (auto-detected)
-df = spark.read.load("/mnt/data/customer.parquet")
+df = spark.read.load('/mnt/data/customer.parquet')
 
 # Delta Lake (default format)
-df = spark.read.load("/mnt/data/customer")
+df = spark.read.load('/mnt/data/customer')
 
 # Iceberg
-df = spark.read.format("iceberg").load("/mnt/data/customer")
+df = spark.read.format("iceberg").load('/mnt/data/customer')
 
 # Hudi
-df = spark.read.format("hudi").load("/mnt/data/customer")
+df = spark.read.format("hudi").load('/mnt/data/customer')
 ```
 
 ### Onehouse Quanton
@@ -658,7 +654,6 @@ DuckLake requires DuckDB >= 1.2.0. The extension is auto-installed on first use:
 
 ```python
 import duckdb
-
 conn = duckdb.connect()
 conn.execute("INSTALL ducklake; LOAD ducklake;")
 ```

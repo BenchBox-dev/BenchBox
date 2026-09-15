@@ -21,7 +21,11 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
 # 1. Create benchmark
-benchmark = TPCH(scale_factor=0.01, output_dir="./data", force_regenerate=False)
+benchmark = TPCH(
+    scale_factor=0.01,
+    output_dir="./data",
+    force_regenerate=False
+)
 
 # 2. Generate data
 benchmark.generate_data()
@@ -30,7 +34,10 @@ benchmark.generate_data()
 adapter = DuckDBAdapter(database_path=":memory:")
 
 # 4. Run benchmark
-results = adapter.run_benchmark(benchmark, test_execution_type="power")
+results = adapter.run_benchmark(
+    benchmark,
+    test_execution_type="power"
+)
 
 # 5. Access results
 print(f"Total time: {results.total_execution_time:.2f}s")
@@ -66,12 +73,10 @@ See: [use_cases/](../use_cases/) directory
 ```python
 # TPC-H
 from benchbox.tpch import TPCH
-
 benchmark = TPCH(scale_factor=0.1, output_dir="./data")
 
 # TPC-DS
 from benchbox.tpcds import TPCDS
-
 benchmark = TPCDS(scale_factor=0.1, output_dir="./data")
 
 # Other benchmarks available:
@@ -83,17 +88,14 @@ benchmark = TPCDS(scale_factor=0.1, output_dir="./data")
 ```python
 # DuckDB
 from benchbox.platforms.duckdb import DuckDBAdapter
-
 adapter = DuckDBAdapter(database_path=":memory:")
 
 # SQLite
 from benchbox.platforms.sqlite import SQLiteAdapter
-
 adapter = SQLiteAdapter(database_path="./db.sqlite")
 
 # ClickHouse
 from benchbox.platforms.clickhouse import ClickHouseAdapter
-
 adapter = ClickHouseAdapter(host="localhost", port=9000)
 
 # Cloud platforms: Databricks, BigQuery, Snowflake, Redshift
@@ -104,13 +106,24 @@ adapter = ClickHouseAdapter(host="localhost", port=9000)
 
 ```python
 # Full benchmark
-results = adapter.run_benchmark(benchmark, test_execution_type="power")
+results = adapter.run_benchmark(
+    benchmark,
+    test_execution_type="power"
+)
 
 # Query subset
-results = adapter.run_benchmark(benchmark, test_execution_type="power", query_subset=["1", "6", "12"])
+results = adapter.run_benchmark(
+    benchmark,
+    test_execution_type="power",
+    query_subset=["1", "6", "12"]
+)
 
 # With custom configuration
-results = adapter.run_benchmark(benchmark, test_execution_type="throughput", num_streams=4)
+results = adapter.run_benchmark(
+    benchmark,
+    test_execution_type="throughput",
+    num_streams=4
+)
 ```
 
 ### Result Processing
@@ -129,7 +142,6 @@ for query_result in results.query_results:
 # Export results
 results_dict = results.model_dump()  # Convert to dictionary
 import json
-
 with open("results.json", "w") as f:
     json.dump(results_dict, f, indent=2)
 ```
@@ -166,7 +178,6 @@ print(f"Performance change: {change:+.1f}%")
 
 ```python
 from benchbox.base import BaseBenchmark
-
 
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):
@@ -218,7 +229,6 @@ from benchbox.tpch import TPCH
 
 app = FastAPI()
 
-
 @app.post("/benchmark/run")
 async def run_benchmark(scale_factor: float = 0.01):
     benchmark = TPCH(scale_factor=scale_factor, output_dir="./data")
@@ -230,7 +240,7 @@ async def run_benchmark(scale_factor: float = 0.01):
     return {
         "total_time": results.total_execution_time,
         "queries": results.total_queries,
-        "successful": results.successful_queries,
+        "successful": results.successful_queries
     }
 ```
 
@@ -240,7 +250,6 @@ async def run_benchmark(scale_factor: float = 0.01):
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
-
 
 def run_performance_test():
     from benchbox.platforms.duckdb import DuckDBAdapter
@@ -254,13 +263,14 @@ def run_performance_test():
 
     # Store results
     import json
-
     with open("/tmp/results.json", "w") as f:
         json.dump(results.model_dump(), f)
 
-
 with DAG("performance_test", start_date=datetime(2024, 1, 1), schedule="@daily") as dag:
-    test_task = PythonOperator(task_id="run_benchmark", python_callable=run_performance_test)
+    test_task = PythonOperator(
+        task_id="run_benchmark",
+        python_callable=run_performance_test
+    )
 ```
 
 ## Tips

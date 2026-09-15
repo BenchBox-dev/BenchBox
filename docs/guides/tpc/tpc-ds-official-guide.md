@@ -39,7 +39,10 @@ from benchbox.tpcds import TPCDSBenchmark
 benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=True)
 
 # Run complete official benchmark
-result = benchmark.run_official_benchmark(connection_string="your_database_connection_string", num_streams=2)
+result = benchmark.run_official_benchmark(
+    connection_string="your_database_connection_string",
+    num_streams=2
+)
 
 # Access official metrics
 print(f"QphDS@Size: {result.qphds_size:.2f}")
@@ -122,7 +125,12 @@ TPCDSBenchmark
 from benchbox.tpcds import TPCDSBenchmark
 
 # Create benchmark with configuration
-benchmark = TPCDSBenchmark(scale_factor=10.0, output_dir="/path/to/results", verbose=True, parallel=4)
+benchmark = TPCDSBenchmark(
+    scale_factor=10.0,
+    output_dir="/path/to/results",
+    verbose=True,
+    parallel=4
+)
 
 # Run complete benchmark
 result = benchmark.run_official_benchmark(
@@ -132,7 +140,7 @@ result = benchmark.run_official_benchmark(
     throughput_test=True,
     maintenance_test=True,
     result_validation=True,
-    dialect="postgres",
+    dialect="postgres"
 )
 ```
 
@@ -141,12 +149,19 @@ result = benchmark.run_official_benchmark(
 ```python
 # Power Test only
 result = benchmark.run_official_benchmark(
-    connection_string="your_connection", power_test=True, throughput_test=False, maintenance_test=False
+    connection_string="your_connection",
+    power_test=True,
+    throughput_test=False,
+    maintenance_test=False
 )
 
 # Throughput Test only
 result = benchmark.run_official_benchmark(
-    connection_string="your_connection", num_streams=8, power_test=False, throughput_test=True, maintenance_test=False
+    connection_string="your_connection",
+    num_streams=8,
+    power_test=False,
+    throughput_test=True,
+    maintenance_test=False
 )
 ```
 
@@ -161,7 +176,7 @@ result = benchmark.run_official_benchmark(
     data_maintenance=True,
     result_validation=True,
     dialect="mysql",
-    output_dir="/custom/output/path",
+    output_dir="/custom/output/path"
 )
 ```
 
@@ -537,7 +552,10 @@ The benchmark includes systematic validation to ensure TPC-DS compliance:
 
 ```python
 # Validation is automatic
-result = benchmark.run_official_benchmark(connection_string=connection_string, result_validation=True)
+result = benchmark.run_official_benchmark(
+    connection_string=connection_string,
+    result_validation=True
+)
 
 # Check validation results
 validation = result.validation_results
@@ -547,9 +565,9 @@ print(f"Throughput Test Valid: {validation['throughput_test_valid']}")
 print(f"Maintenance Test Valid: {validation['maintenance_test_valid']}")
 
 # Check for issues
-if validation["issues"]:
+if validation['issues']:
     print("Validation Issues:")
-    for issue in validation["issues"]:
+    for issue in validation['issues']:
         print(f"  - {issue}")
 ```
 
@@ -573,7 +591,7 @@ The validation framework checks:
 for phase_name, phase_result in [
     ("Power Test", result.power_test),
     ("Throughput Test", result.throughput_test),
-    ("Maintenance Test", result.maintenance_test),
+    ("Maintenance Test", result.maintenance_test)
 ]:
     if phase_result:
         success_rate = len([q for q in phase_result.queries if q.success]) / len(phase_result.queries)
@@ -607,7 +625,7 @@ class CustomDatabaseBenchmark(TPCDSBenchmark):
 benchmark = TPCDSBenchmark(
     scale_factor=100.0,
     parallel=8,  # More parallel processes
-    verbose=True,
+    verbose=True
 )
 
 # Optimize for many streams
@@ -616,7 +634,7 @@ result = benchmark.run_official_benchmark(
     num_streams=16,  # High concurrency
     power_test=True,
     throughput_test=True,
-    maintenance_test=False,  # Skip if not needed
+    maintenance_test=False  # Skip if not needed
 )
 ```
 
@@ -625,14 +643,15 @@ result = benchmark.run_official_benchmark(
 ```python
 import sys
 
-
 # CI/CD integration
 def run_benchmark_ci():
     benchmark = TPCDSBenchmark(scale_factor=0.1, verbose=False)
 
     try:
         result = benchmark.run_official_benchmark(
-            connection_string=os.getenv("DATABASE_URL"), num_streams=2, result_validation=True
+            connection_string=os.getenv("DATABASE_URL"),
+            num_streams=2,
+            result_validation=True
         )
 
         # Check minimum performance threshold
@@ -689,12 +708,11 @@ except Exception as e:
 benchmark = TPCDSBenchmark(
     scale_factor=100.0,
     parallel=1,  # Reduce parallel processes
-    verbose=True,
+    verbose=True
 )
 
 # Monitor memory usage
 import psutil
-
 print(f"Memory usage: {psutil.virtual_memory().percent}%")
 ```
 
@@ -713,9 +731,9 @@ if not result.power_test or not result.throughput_test:
     print("Warning: Incomplete benchmark results")
 
 # Check validation results
-if result.validation_results.get("issues"):
+if result.validation_results.get('issues'):
     print("Validation issues found:")
-    for issue in result.validation_results["issues"]:
+    for issue in result.validation_results['issues']:
         print(f"  - {issue}")
 ```
 
@@ -724,7 +742,6 @@ if result.validation_results.get("issues"):
 ```python
 # Enable debug mode
 import logging
-
 logging.basicConfig(level=logging.DEBUG)
 
 # Verbose benchmark execution
@@ -756,12 +773,12 @@ def robust_benchmark_run(connection_string, max_retries=3):
 ```python
 # Choose appropriate scale factor
 scale_factors = {
-    "development": 0.01,  # ~10MB
-    "testing": 0.1,  # ~100MB
-    "small": 1.0,  # ~1GB
-    "medium": 10.0,  # ~10GB
-    "large": 100.0,  # ~100GB
-    "enterprise": 1000.0,  # ~1TB
+    "development": 0.01,    # ~10MB
+    "testing": 0.1,         # ~100MB
+    "small": 1.0,           # ~1GB
+    "medium": 10.0,         # ~10GB
+    "large": 100.0,         # ~100GB
+    "enterprise": 1000.0    # ~1TB
 }
 
 benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
@@ -772,7 +789,11 @@ benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
 ```python
 # Proper resource management
 with tempfile.TemporaryDirectory() as temp_dir:
-    benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=True)
+    benchmark = TPCDSBenchmark(
+        scale_factor=1.0,
+        output_dir=temp_dir,
+        verbose=True
+    )
 
     try:
         result = benchmark.run_official_benchmark(connection_string)
@@ -807,7 +828,6 @@ print(f"Memory usage: {(end_memory - start_memory) / 1024 / 1024:.1f}MB")
 import json
 from datetime import datetime
 
-
 # Archive results for historical analysis
 def archive_results(result):
     archive_data = {
@@ -816,7 +836,7 @@ def archive_results(result):
         "power_size": result.power_size,
         "throughput_size": result.throughput_size,
         "scale_factor": result.scale_factor,
-        "configuration": result.configuration,
+        "configuration": result.configuration
     }
 
     with open(f"benchmark_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w") as f:

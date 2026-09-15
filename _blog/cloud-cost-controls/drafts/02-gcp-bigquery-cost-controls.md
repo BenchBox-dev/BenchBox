@@ -224,14 +224,15 @@ def budget_alert_handler(event, context):
     from google.cloud import billing_v1
 
     # Parse the Pub/Sub message
-    budget_data = json.loads(base64.b64decode(event["data"]).decode())
+    budget_data = json.loads(base64.b64decode(event['data']).decode())
 
-    if budget_data["costAmount"] >= budget_data["budgetAmount"]:
+    if budget_data['costAmount'] >= budget_data['budgetAmount']:
         # Disable billing for the project
         # NOTE: Requires appropriate IAM permissions and PROJECT_ID env var
         client = billing_v1.CloudBillingClient()
         client.update_project_billing_info(
-            name=f"projects/{PROJECT_ID}", project_billing_info={"billing_account_name": ""}
+            name=f"projects/{PROJECT_ID}",
+            project_billing_info={'billing_account_name': ''}
         )
 ```
 

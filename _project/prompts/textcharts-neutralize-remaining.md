@@ -305,7 +305,6 @@ For each rename:
 ```python
 import warnings
 
-
 def from_query_latency_data(*args, **kwargs):
     """Deprecated: use from_data() instead."""
     warnings.warn(
@@ -359,15 +358,15 @@ like:
 
 ```python
 # Factory functions (preferred generic names)
-("from_data",)  # bar_chart, comparison_bar, diverging_bar, histogram, stacked_bar
-("from_series",)  # box_plot, cdf_chart, percentile_ladder
-("from_points",)  # line_chart, scatter_plot
-("from_ratios",)  # normalized_speedup
-("from_matrix",)  # heatmap (already exists), rank_table
+"from_data",         # bar_chart, comparison_bar, diverging_bar, histogram, stacked_bar
+"from_series",       # box_plot, cdf_chart, percentile_ladder
+"from_points",       # line_chart, scatter_plot
+"from_ratios",       # normalized_speedup
+"from_matrix",       # heatmap (already exists), rank_table
 
 # Factory functions (deprecated domain-specific names — still exported)
-("cdf_from_query_results",)
-("from_bar_data",)
+"cdf_from_query_results",
+"from_bar_data",
 ...
 ```
 

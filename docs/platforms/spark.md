@@ -117,7 +117,7 @@ adapter = SparkAdapter(
     spark_config={
         "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
         "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
-    },
+    }
 )
 ```
 
@@ -179,7 +179,7 @@ adapter = SparkAdapter(
     spark_config={
         "spark.memory.fraction": "0.8",
         "spark.memory.storageFraction": "0.3",
-    },
+    }
 )
 ```
 
@@ -243,7 +243,7 @@ adapter = SparkAdapter(
     executor_memory="16g",
     spark_config={
         "spark.sql.shuffle.partitions": "400",
-    },
+    }
 )
 ```
 

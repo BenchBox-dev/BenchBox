@@ -47,7 +47,6 @@ bench = TransactionPrimitives(scale_factor=0.01)
 
 # Setup requires TPC-H data first
 from benchbox import TPCH
-
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
@@ -399,8 +398,11 @@ benchbox run --benchmark transaction_primitives --platform postgresql --scale 0.
 
 ```python
 from benchbox.platforms.postgresql import PostgreSQLAdapter
-
-adapter = PostgreSQLAdapter(host="localhost", database="benchmark", user="postgres")
+adapter = PostgreSQLAdapter(
+    host="localhost",
+    database="benchmark",
+    user="postgres"
+)
 ```
 
 - Full ACID support ✅
@@ -416,8 +418,11 @@ adapter = PostgreSQLAdapter(host="localhost", database="benchmark", user="postgr
 
 ```python
 import mysql.connector
-
-conn = mysql.connector.connect(host="localhost", user="root", database="benchmark")
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    database="benchmark"
+)
 ```
 
 - Full ACID support with InnoDB ✅
@@ -431,7 +436,6 @@ conn = mysql.connector.connect(host="localhost", user="root", database="benchmar
 
 ```python
 import duckdb
-
 conn = duckdb.connect(":memory:")
 ```
 
@@ -464,7 +468,6 @@ BigQuery has implicit transactions only. Use Write Primitives for BigQuery testi
 
 ```python
 from benchbox import TPCH
-
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 tpch.load_data_to_database(conn)

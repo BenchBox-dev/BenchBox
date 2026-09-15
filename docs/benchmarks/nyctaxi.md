@@ -160,7 +160,7 @@ nyctaxi_2023 = NYCTaxi(
     scale_factor=0.1,
     output_dir="nyctaxi_2023",
     year=2023,
-    months=[1, 2, 3],  # Q1 only
+    months=[1, 2, 3]  # Q1 only
 )
 data_files = nyctaxi_2023.generate_data()
 ```
@@ -417,7 +417,11 @@ data_files = nyctaxi.generate_data()
 ```python
 # Solution: Process in smaller chunks using months
 for month in [1, 2, 3]:
-    nyctaxi = NYCTaxi(scale_factor=10.0, year=2019, months=[month])
+    nyctaxi = NYCTaxi(
+        scale_factor=10.0,
+        year=2019,
+        months=[month]
+    )
     data_files = nyctaxi.generate_data()
     # Process and unload before next month
 ```

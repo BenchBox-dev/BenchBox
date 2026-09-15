@@ -251,7 +251,12 @@ queries = ssb.get_queries()
 print(f"Generated {len(queries)} SSB queries")
 
 # Get specific query with parameters
-query_1_1 = ssb.get_query("Q1.1", params={"year": 1993, "discount_min": 1, "discount_max": 3, "quantity": 25})
+query_1_1 = ssb.get_query("Q1.1", params={
+    'year': 1993,
+    'discount_min': 1,
+    'discount_max': 3,
+    'quantity': 25
+})
 print(query_1_1)
 ```
 
@@ -289,11 +294,11 @@ conn.execute(schema_sql)
 
 # Load SSB tables
 table_mappings = {
-    "date": "date.csv",
-    "customer": "customer.csv",
-    "supplier": "supplier.csv",
-    "part": "part.csv",
-    "lineorder": "lineorder.csv",
+    'date': 'date.csv',
+    'customer': 'customer.csv',
+    'supplier': 'supplier.csv',
+    'part': 'part.csv',
+    'lineorder': 'lineorder.csv'
 }
 
 for table_name, file_name in table_mappings.items():
@@ -310,19 +315,16 @@ for table_name, file_name in table_mappings.items():
 # Run SSB query flights
 flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 for query_id in flight_1_queries:
-    query_sql = ssb.get_query(
-        query_id,
-        params={
-            "year": 1993,
-            "year_month": 199401,
-            "week": 6,
-            "discount_min": 1,
-            "discount_max": 3,
-            "quantity": 25,
-            "quantity_min": 26,
-            "quantity_max": 35,
-        },
-    )
+    query_sql = ssb.get_query(query_id, params={
+        'year': 1993,
+        'year_month': 199401,
+        'week': 6,
+        'discount_min': 1,
+        'discount_max': 3,
+        'quantity': 25,
+        'quantity_min': 26,
+        'quantity_max': 35
+    })
 
     result = conn.execute(query_sql).fetchall()
     print(f"{query_id}: {len(result)} rows, Revenue: {result[0][0] if result else 0}")
@@ -333,7 +335,6 @@ for query_id in flight_1_queries:
 ```python
 import time
 from typing import Dict, List
-
 
 class SSBPerformanceTester:
     def __init__(self, ssb: SSB, connection):
@@ -346,7 +347,7 @@ class SSBPerformanceTester:
             1: ["Q1.1", "Q1.2", "Q1.3"],
             2: ["Q2.1", "Q2.2", "Q2.3"],
             3: ["Q3.1", "Q3.2", "Q3.3", "Q3.4"],
-            4: ["Q4.1", "Q4.2", "Q4.3"],
+            4: ["Q4.1", "Q4.2", "Q4.3"]
         }
 
         if flight_number not in flight_queries:
@@ -370,11 +371,11 @@ class SSBPerformanceTester:
                 times.append(execution_time)
 
             results[query_id] = {
-                "avg_time": sum(times) / len(times),
-                "min_time": min(times),
-                "max_time": max(times),
-                "rows_returned": len(result),
-                "times": times,
+                'avg_time': sum(times) / len(times),
+                'min_time': min(times),
+                'max_time': max(times),
+                'rows_returned': len(result),
+                'times': times
             }
 
         return results
@@ -383,22 +384,22 @@ class SSBPerformanceTester:
         """Example of getting query with custom parameters."""
         # Example custom parameters for each query type
         custom_params = {
-            "year": 1993,
-            "year_month": 199401,
-            "week": 6,
-            "discount_min": 1,
-            "discount_max": 3,
-            "quantity": 25,
-            "quantity_min": 26,
-            "quantity_max": 35,
-            "category": "MFGR#12",
-            "region": "AMERICA",
-            "brand_min": "MFGR#2221",
-            "brand_max": "MFGR#2228",
-            "brand": "MFGR#2221",
-            "nation1": "UNITED STATES",
-            "nation2": "JAPAN",
-            "city": "UNITED KI1",
+            'year': 1993,
+            'year_month': 199401,
+            'week': 6,
+            'discount_min': 1,
+            'discount_max': 3,
+            'quantity': 25,
+            'quantity_min': 26,
+            'quantity_max': 35,
+            'category': 'MFGR#12',
+            'region': 'AMERICA',
+            'brand_min': 'MFGR#2221',
+            'brand_max': 'MFGR#2228',
+            'brand': 'MFGR#2221',
+            'nation1': 'UNITED STATES',
+            'nation2': 'JAPAN',
+            'city': 'UNITED KI1'
         }
 
         return self.ssb.get_query(query_id, params=custom_params)
@@ -416,17 +417,16 @@ class SSBPerformanceTester:
         all_times = []
         for flight_data in complete_results.values():
             for query_data in flight_data.values():
-                all_times.extend(query_data["times"])
+                all_times.extend(query_data['times'])
 
-        complete_results["summary"] = {
-            "total_queries": sum(len(flight) for flight in complete_results.values() if isinstance(flight, dict)),
-            "total_avg_time": sum(all_times) / len(all_times),
-            "total_min_time": min(all_times),
-            "total_max_time": max(all_times),
+        complete_results['summary'] = {
+            'total_queries': sum(len(flight) for flight in complete_results.values() if isinstance(flight, dict)),
+            'total_avg_time': sum(all_times) / len(all_times),
+            'total_min_time': min(all_times),
+            'total_max_time': max(all_times)
         }
 
         return complete_results
-
 
 # Usage
 performance_tester = SSBPerformanceTester(ssb, conn)
@@ -446,7 +446,6 @@ complete_results = performance_tester.run_complete_benchmark()
 ```python
 # SSB is particularly well-suited for columnar databases
 # Example optimization for columnar systems
-
 
 def optimize_for_columnar(ssb: SSB, connection):
     """Optimize SSB for columnar database performance."""
@@ -484,7 +483,6 @@ def optimize_for_columnar(ssb: SSB, connection):
 
     connection.execute(optimization_sql)
     print("Applied columnar optimizations")
-
 
 # Apply optimizations
 optimize_for_columnar(ssb, conn)
@@ -542,18 +540,18 @@ ssb = SSB(
     scale_factor=1.0,
     output_dir="ssb_data",
     # SSB-specific configuration
-    date_range_years=7,  # Default date range
+    date_range_years=7,      # Default date range
     enable_compression=True,  # Compress output files
-    partition_fact_table=True,  # Partition LINEORDER by date
-    generate_indices=True,  # Generate recommended indices
+    partition_fact_table=True, # Partition LINEORDER by date
+    generate_indices=True    # Generate recommended indices
 )
 
 # Access query parameterization
 query_params = {
-    "year": 1995,  # Specific year for temporal queries
-    "region": "ASIA",  # Geographic focus
-    "category": "MFGR#13",  # Product category
-    "discount_range": (2, 4),  # Discount selectivity
+    'year': 1995,           # Specific year for temporal queries
+    'region': 'ASIA',       # Geographic focus
+    'category': 'MFGR#13',  # Product category
+    'discount_range': (2, 4) # Discount selectivity
 }
 
 query = ssb.get_query("Q2.1", params=query_params)
@@ -575,7 +573,7 @@ ssb = SSB(scale_factor=10, output_dir="/data/ssb_sf10")
 data_files = ssb.generate_data()
 
 # Create Spark tables
-tables = ["date", "customer", "supplier", "part", "lineorder"]
+tables = ['date', 'customer', 'supplier', 'part', 'lineorder']
 for table_name in tables:
     file_path = f"/data/ssb_sf10/{table_name}.csv"
 
@@ -583,22 +581,19 @@ for table_name in tables:
     df.createOrReplaceTempView(table_name)
 
     # Cache dimension tables for better join performance
-    if table_name != "lineorder":
+    if table_name != 'lineorder':
         df.cache()
 
 # Run SSB queries with Spark SQL
 flight_2_queries = ["Q2.1", "Q2.2", "Q2.3"]
 for query_id in flight_2_queries:
-    query_sql = ssb.get_query(
-        query_id,
-        params={
-            "category": "MFGR#12",
-            "region": "AMERICA",
-            "brand_min": "MFGR#2221",
-            "brand_max": "MFGR#2228",
-            "brand": "MFGR#2221",
-        },
-    )
+    query_sql = ssb.get_query(query_id, params={
+        'category': 'MFGR#12',
+        'region': 'AMERICA',
+        'brand_min': 'MFGR#2221',
+        'brand_max': 'MFGR#2228',
+        'brand': 'MFGR#2221'
+    })
 
     result_df = spark.sql(query_sql)
     result_df.show(10)
@@ -613,7 +608,7 @@ import clickhouse_connect
 from benchbox import SSB
 
 # Initialize ClickHouse client and SSB
-client = clickhouse_connect.get_client(host="localhost", port=8123)
+client = clickhouse_connect.get_client(host='localhost', port=8123)
 ssb = SSB(scale_factor=1.0, output_dir="ssb_data")
 
 # Generate data
@@ -663,29 +658,26 @@ ORDER BY c_custkey;
 client.execute(create_tables_sql)
 
 # Load data using ClickHouse CSV import
-for table_name in ["customer", "supplier", "part", "date", "lineorder"]:
+for table_name in ['customer', 'supplier', 'part', 'date', 'lineorder']:
     file_path = ssb.output_dir / f"{table_name}.csv"
 
     # Use ClickHouse's configured CSV import
-    with open(file_path, "rb") as f:
-        client.insert_file(table_name, f, fmt="CSV")
+    with open(file_path, 'rb') as f:
+        client.insert_file(table_name, f, fmt='CSV')
 
 # Run configured SSB queries
 flight_1_results = {}
 for query_id in ["Q1.1", "Q1.2", "Q1.3"]:
-    query_sql = ssb.get_query(
-        query_id,
-        params={
-            "year": 1993,
-            "year_month": 199401,
-            "week": 6,
-            "discount_min": 1,
-            "discount_max": 3,
-            "quantity": 25,
-            "quantity_min": 26,
-            "quantity_max": 35,
-        },
-    )
+    query_sql = ssb.get_query(query_id, params={
+        'year': 1993,
+        'year_month': 199401,
+        'week': 6,
+        'discount_min': 1,
+        'discount_max': 3,
+        'quantity': 25,
+        'quantity_min': 26,
+        'quantity_max': 35
+    })
 
     result = client.query(query_sql)
     flight_1_results[query_id] = result.result_rows
@@ -744,7 +736,7 @@ ssb = SSB(
     scale_factor=100,
     output_dir="/data/ssb_large",
     stream_generation=True,  # Generate in chunks
-    chunk_size=1000000,  # 1M rows per chunk
+    chunk_size=1000000       # 1M rows per chunk
 )
 ```
 
@@ -754,7 +746,7 @@ ssb = SSB(
 validation_queries = [
     "SELECT COUNT(*) FROM lineorder",
     "SELECT MIN(d_year), MAX(d_year) FROM date",
-    "SELECT COUNT(DISTINCT c_region) FROM customer",
+    "SELECT COUNT(DISTINCT c_region) FROM customer"
 ]
 
 for vq in validation_queries:

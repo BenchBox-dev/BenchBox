@@ -147,8 +147,20 @@ adapter = EMRServerlessAdapter(
     s3_staging_dir="s3://bucket/benchbox/",
     execution_role_arn="arn:aws:iam::123456789012:role/EMRRole",
     initial_capacity={
-        "Driver": {"workerCount": 1, "workerConfiguration": {"cpu": "4 vCPU", "memory": "16 GB"}},
-        "Executor": {"workerCount": 4, "workerConfiguration": {"cpu": "4 vCPU", "memory": "16 GB"}},
+        "Driver": {
+            "workerCount": 1,
+            "workerConfiguration": {
+                "cpu": "4 vCPU",
+                "memory": "16 GB"
+            }
+        },
+        "Executor": {
+            "workerCount": 4,
+            "workerConfiguration": {
+                "cpu": "4 vCPU",
+                "memory": "16 GB"
+            }
+        }
     },
 )
 ```

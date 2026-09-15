@@ -211,9 +211,9 @@ print(cpu_query)
 tsbs_custom = TSBSDevOps(
     scale_factor=0.5,
     output_dir="tsbs_custom",
-    num_hosts=50,  # Override: 50 hosts
-    duration_days=7,  # Override: 7 days of data
-    interval_seconds=60,  # 1-minute intervals
+    num_hosts=50,           # Override: 50 hosts
+    duration_days=7,        # Override: 7 days of data
+    interval_seconds=60,    # 1-minute intervals
 )
 data_files = tsbs_custom.generate_data()
 ```

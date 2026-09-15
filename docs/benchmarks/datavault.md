@@ -228,14 +228,14 @@ benchbox run --platform duckdb --benchmark datavault --scale 1 \
 
 ```python
 DataVault(
-    scale_factor=1.0,  # TPC-H scale factor (1.0 = ~1GB source)
-    output_dir="output",  # Directory for generated files
-    parallel=4,  # Parallel workers for TPC-H generation
-    force_regenerate=False,  # Regenerate even if data exists
-    hash_algorithm="md5",  # Hash algorithm (only md5 supported)
-    record_source="TPCH",  # Source identifier for audit columns
-    compress_data=False,  # Enable file compression
-    compression_type="gzip",  # Compression type (gzip, zstd)
+    scale_factor=1.0,       # TPC-H scale factor (1.0 = ~1GB source)
+    output_dir="output",    # Directory for generated files
+    parallel=4,             # Parallel workers for TPC-H generation
+    force_regenerate=False, # Regenerate even if data exists
+    hash_algorithm="md5",   # Hash algorithm (only md5 supported)
+    record_source="TPCH",   # Source identifier for audit columns
+    compress_data=False,    # Enable file compression
+    compression_type="gzip" # Compression type (gzip, zstd)
 )
 ```
 
@@ -270,18 +270,16 @@ from benchbox.core.datavault import validate_row_counts
 report = validate_row_counts(
     data_dir=Path("datavault_data"),
     scale_factor=1.0,
-    use_manifest=True,  # prefers _datagen_manifest.json if present
-    tolerance_pct=1.0,  # default variance allowance
+    use_manifest=True,   # prefers _datagen_manifest.json if present
+    tolerance_pct=1.0,   # default variance allowance
 )
 
-print(report)  # human-readable summary
-print(report.is_valid)  # True when every table is within tolerance
-print(
-    report.tables_passed,  # counts populated by __post_init__
-    report.tables_failed,
-    report.tables_validated,
-)
-report.to_dict()  # serialisable form for JSON output
+print(report)                  # human-readable summary
+print(report.is_valid)         # True when every table is within tolerance
+print(report.tables_passed,    # counts populated by __post_init__
+      report.tables_failed,
+      report.tables_validated)
+report.to_dict()               # serialisable form for JSON output
 ```
 
 Fields on `DataVaultValidationReport`:

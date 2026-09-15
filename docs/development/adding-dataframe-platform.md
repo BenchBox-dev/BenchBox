@@ -31,7 +31,11 @@ Use expression objects for column references and operations.
 
 ```python
 # Expression-style syntax
-result = df.filter(col("status") == lit("active")).group_by("category").agg(col("amount").sum().alias("total"))
+result = (
+    df.filter(col('status') == lit('active'))
+    .group_by('category')
+    .agg(col('amount').sum().alias('total'))
+)
 ```
 
 **Key characteristics:**
@@ -48,8 +52,8 @@ Use string-based column access and boolean indexing.
 
 ```python
 # Pandas-style syntax
-filtered = df[df["status"] == "active"]
-result = filtered.groupby("category").agg({"amount": "sum"})
+filtered = df[df['status'] == 'active']
+result = filtered.groupby('category').agg({'amount': 'sum'})
 ```
 
 **Key characteristics:**
@@ -66,7 +70,6 @@ Create a context class that provides table access and family-specific helpers.
 
 ```python
 # benchbox/core/dataframe/context.py
-
 
 class MyPlatformDataFrameContext(DataFrameContext):
     """Context for MyPlatform DataFrame operations."""
@@ -92,14 +95,12 @@ class MyPlatformDataFrameContext(DataFrameContext):
     def col(self):
         """Column reference function."""
         from myplatform import col
-
         return col
 
     @property
     def lit(self):
         """Literal value function."""
         from myplatform import lit
-
         return lit
 ```
 
@@ -144,7 +145,6 @@ For **expression family** platforms, inherit from `ExpressionFamilyAdapter`:
 
 from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
 
-
 class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
     """Adapter for MyPlatform DataFrame benchmarking."""
 
@@ -180,7 +180,7 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
         result = impl(ctx)
 
         # Collect if lazy
-        if hasattr(result, "collect"):
+        if hasattr(result, 'collect'):
             result = result.collect()
 
         return result
@@ -190,7 +190,6 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
         """Check if the platform is installed."""
         try:
             import myplatform
-
             return True
         except ImportError:
             return False
@@ -200,7 +199,6 @@ class MyPlatformAdapter(ExpressionFamilyAdapter[MyDF, MyLazyDF, MyExpr]):
         """Get platform version string."""
         try:
             import myplatform
-
             return myplatform.__version__
         except ImportError:
             return None
@@ -238,7 +236,6 @@ uv run -- python _project/scripts/platform_scaffold.py --name myplatform --kind 
 import pytest
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
 
-
 class TestMyPlatformAdapter:
     """Tests for MyPlatform DataFrame adapter."""
 
@@ -248,14 +245,20 @@ class TestMyPlatformAdapter:
         result = MyPlatformAdapter.is_available()
         assert isinstance(result, bool)
 
-    @pytest.mark.skipif(not MyPlatformAdapter.is_available(), reason="myplatform not installed")
+    @pytest.mark.skipif(
+        not MyPlatformAdapter.is_available(),
+        reason="myplatform not installed"
+    )
     def test_create_context(self, tmp_path):
         """Test context creation."""
         adapter = MyPlatformAdapter(str(tmp_path))
         ctx = adapter.create_context()
         assert ctx.family == "expression"  # or "pandas"
 
-    @pytest.mark.skipif(not MyPlatformAdapter.is_available(), reason="myplatform not installed")
+    @pytest.mark.skipif(
+        not MyPlatformAdapter.is_available(),
+        reason="myplatform not installed"
+    )
     def test_query_execution(self, tmp_path, sample_data):
         """Test query execution with sample data."""
         adapter = MyPlatformAdapter(str(tmp_path))
@@ -263,7 +266,6 @@ class TestMyPlatformAdapter:
         adapter.load_tables(ctx, sample_data)
 
         from benchbox.core.tpch.dataframe_queries import get_query
-
         query = get_query("Q1")
         result = adapter.execute_query(ctx, query)
 
@@ -278,9 +280,11 @@ class TestMyPlatformAdapter:
 import pytest
 from benchbox.platforms.dataframe.myplatform import MyPlatformAdapter
 
-
 @pytest.mark.integration
-@pytest.mark.skipif(not MyPlatformAdapter.is_available(), reason="myplatform not installed")
+@pytest.mark.skipif(
+    not MyPlatformAdapter.is_available(),
+    reason="myplatform not installed"
+)
 class TestMyPlatformTPCH:
     """Integration tests for MyPlatform TPC-H execution."""
 

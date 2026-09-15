@@ -147,15 +147,19 @@ def q1_datafusion_impl(ctx: DataFrameContext) -> Any:
     charge = disc_price * (ctx.lit(1) + ctx.col("l_tax"))
 
     # Aggregate with window functions
-    result = filtered.aggregate(
-        [ctx.col("l_returnflag"), ctx.col("l_linestatus")],
-        [
-            f.sum(ctx.col("l_quantity")).alias("sum_qty"),
-            f.avg(ctx.col("l_quantity")).alias("avg_qty"),
-            f.sum(disc_price).alias("sum_disc_price"),
-            f.sum(charge).alias("sum_charge"),
-        ],
-    ).sort(ctx.col("l_returnflag").sort(ascending=True))
+    result = (
+        filtered
+        .aggregate(
+            [ctx.col("l_returnflag"), ctx.col("l_linestatus")],
+            [
+                f.sum(ctx.col("l_quantity")).alias("sum_qty"),
+                f.avg(ctx.col("l_quantity")).alias("avg_qty"),
+                f.sum(disc_price).alias("sum_disc_price"),
+                f.sum(charge).alias("sum_charge"),
+            ]
+        )
+        .sort(ctx.col("l_returnflag").sort(ascending=True))
+    )
 
     return result
 ```
@@ -181,9 +185,16 @@ from benchbox.platforms.dataframe import DataFusionDataFrameAdapter
 adapter = DataFusionDataFrameAdapter()
 
 # Create window expressions
-row_num = adapter.window_row_number(order_by=[("sale_date", True)], partition_by=["category"])
+row_num = adapter.window_row_number(
+    order_by=[("sale_date", True)],
+    partition_by=["category"]
+)
 
-running_total = adapter.window_sum(column="amount", partition_by=["category"], order_by=[("sale_date", True)])
+running_total = adapter.window_sum(
+    column="amount",
+    partition_by=["category"],
+    order_by=[("sale_date", True)]
+)
 ```
 
 ## Troubleshooting
@@ -232,7 +243,7 @@ adapter = DataFusionDataFrameAdapter(
     parquet_pushdown=True,
     batch_size=8192,
     memory_limit="8G",  # Enable memory management with spilling
-    temp_dir="/tmp/datafusion",  # Directory for spilled data
+    temp_dir="/tmp/datafusion"  # Directory for spilled data
 )
 
 # Create context and load tables
@@ -245,7 +256,6 @@ result = adapter.collect(df)
 
 # Execute DataFrame query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
-
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)

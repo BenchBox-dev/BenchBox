@@ -126,8 +126,8 @@ When SQLGlot's emitter produces SQL the engine refuses, we ship hand-written var
 ```python
 # benchbox/sql_compat/rules/query_source/h2odb_variants.py
 CLICKHOUSE_Q9_SQL = "...uses ClickHouse quantile()..."
-STARROCKS_Q9_SQL = "...uses PERCENTILE_APPROX()..."
-MYSQL_Q9_SQL = "...verbatim ANSI WITHIN GROUP, bypasses SQLGlot..."
+STARROCKS_Q9_SQL  = "...uses PERCENTILE_APPROX()..."
+MYSQL_Q9_SQL      = "...verbatim ANSI WITHIN GROUP, bypasses SQLGlot..."
 ```
 
 `PERCENTILE_CONT WITHIN GROUP` is not exotic; it is a SQL standard ordered-set aggregate. SQLGlot's MySQL/SingleStore output adds a multi-expression `WITHIN GROUP ORDER BY (CASE ... ELSE NULL END)` decorator that SingleStore's parser rejects. We bypass SQLGlot for that single query. Same pattern in `nyctaxi_variants.py`, `coffeeshop_variants.py`, `tpcdi_variants.py`, `vector_search_variants.py`.

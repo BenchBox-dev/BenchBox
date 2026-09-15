@@ -85,7 +85,12 @@ print(f"Avg lazy overhead: {stats['avg_lazy_overhead_percent']:.1f}%")
 from benchbox.core.dataframe.profiling import capture_polars_plan
 
 # Build lazy query
-lazy_df = df.lazy().filter(col("l_shipdate") <= lit(cutoff)).group_by("l_returnflag").agg(col("l_quantity").sum())
+lazy_df = (
+    df.lazy()
+    .filter(col("l_shipdate") <= lit(cutoff))
+    .group_by("l_returnflag")
+    .agg(col("l_quantity").sum())
+)
 
 # Capture plan BEFORE collect
 plan = capture_polars_plan(lazy_df)
@@ -147,12 +152,14 @@ for query_id in benchmark.query_ids:
 sql_times = {"q1": 45.2, "q2": 123.4, "q3": 89.1}
 
 # Compare
-comparisons = compare_execution_modes(df_profiler.get_profiles(), sql_times)
+comparisons = compare_execution_modes(
+    df_profiler.get_profiles(),
+    sql_times
+)
 
 for comp in comparisons:
-    print(
-        f"{comp.query_id}: DataFrame={comp.dataframe_time_ms:.1f}ms, SQL={comp.sql_time_ms:.1f}ms, Winner={comp.winner}"
-    )
+    print(f"{comp.query_id}: DataFrame={comp.dataframe_time_ms:.1f}ms, "
+          f"SQL={comp.sql_time_ms:.1f}ms, Winner={comp.winner}")
     for note in comp.notes:
         print(f"  - {note}")
 ```
@@ -236,30 +243,34 @@ benchbox compare results/polars_sf1.json results/pandas_sf1.json results/duckdb_
 from pathlib import Path
 import json
 
-
 def load_results(path: str) -> dict:
     with open(path) as f:
         return json.load(f)
-
 
 def compare_platforms(result_paths: list[str]) -> dict:
     results = {Path(p).stem: load_results(p) for p in result_paths}
 
     comparison = {}
     for platform, data in results.items():
-        query_times = {q["query_id"]: q["execution_time_ms"] for q in data.get("query_results", [])}
+        query_times = {
+            q["query_id"]: q["execution_time_ms"]
+            for q in data.get("query_results", [])
+        }
         comparison[platform] = query_times
 
     return comparison
 
-
 # Analyze
-comparison = compare_platforms(["results/polars_sf1.json", "results/pandas_sf1.json", "results/duckdb_sf1.json"])
+comparison = compare_platforms([
+    "results/polars_sf1.json",
+    "results/pandas_sf1.json",
+    "results/duckdb_sf1.json"
+])
 
 # Find fastest platform per query
 for query_id in comparison["polars_sf1"]:
     times = {p: comparison[p].get(query_id) for p in comparison}
-    fastest = min(times, key=lambda x: times[x] or float("inf"))
+    fastest = min(times, key=lambda x: times[x] or float('inf'))
     print(f"{query_id}: {fastest} ({times[fastest]:.0f}ms)")
 ```
 
@@ -351,7 +362,8 @@ with profiler.profile_query("q1_eager") as ctx:
 lazy_profile = profiler.get_profile("q1_lazy")
 eager_profile = profiler.get_profile("q1_eager")
 
-print(f"Lazy: {lazy_profile.execution_time_ms:.2f}ms (overhead: {lazy_profile.lazy_overhead_percent:.1f}%)")
+print(f"Lazy: {lazy_profile.execution_time_ms:.2f}ms "
+      f"(overhead: {lazy_profile.lazy_overhead_percent:.1f}%)")
 print(f"Eager: {eager_profile.execution_time_ms:.2f}ms")
 ```
 

@@ -218,7 +218,8 @@ performance_rating = db_manager._get_performance_rating(recommended_db)
 # Get smart benchmark configuration
 bench_manager = BenchmarkManager()
 recommended_scale = bench_manager._get_recommended_scale(
-    bench_manager.benchmarks["tpch"], {"memory_gb": 16, "cpu_cores": 8}
+    bench_manager.benchmarks['tpch'],
+    {'memory_gb': 16, 'cpu_cores': 8}
 )
 
 print(f"System: {system_profile.cpu_cores} cores, {system_profile.memory_total_gb}GB")
@@ -231,20 +232,21 @@ print(f"Recommended scale for TPC-H: {recommended_scale}")
 ```python
 from benchbox.cli.benchmarks import BenchmarkManager
 
-
 def run_appropriate_benchmarks():
     """Run benchmarks with system-configured settings."""
     manager = BenchmarkManager()
     system_profile = manager._get_system_profile()
 
-    benchmarks = ["tpch", "tpcds", "ssb"]
+    benchmarks = ['tpch', 'tpcds', 'ssb']
 
     for benchmark_id in benchmarks:
         benchmark_info = manager.benchmarks[benchmark_id]
 
         # Get intelligent recommendations
         recommended_scale = manager._get_recommended_scale(benchmark_info, system_profile)
-        recommended_queries = manager._get_recommended_query_subset(benchmark_info, recommended_scale, system_profile)
+        recommended_queries = manager._get_recommended_query_subset(
+            benchmark_info, recommended_scale, system_profile
+        )
 
         print(f"Running {benchmark_id}:")
         print(f"  Scale: {recommended_scale}")

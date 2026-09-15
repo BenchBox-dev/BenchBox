@@ -154,7 +154,6 @@ For systematic platform evaluation:
 ```python
 #!/usr/bin/env python3
 """Compare TPC-H across platforms."""
-
 import subprocess
 import json
 
@@ -164,9 +163,13 @@ SCALE = 0.1
 results = {}
 for platform in PLATFORMS:
     output = f"{platform}_results.json"
-    subprocess.run(
-        ["benchbox", "run", "--platform", platform, "--benchmark", "tpch", "--scale", str(SCALE), "-o", output]
-    )
+    subprocess.run([
+        "benchbox", "run",
+        "--platform", platform,
+        "--benchmark", "tpch",
+        "--scale", str(SCALE),
+        "-o", output
+    ])
     with open(output) as f:
         results[platform] = json.load(f)
 

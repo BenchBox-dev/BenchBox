@@ -36,7 +36,6 @@ bench = WritePrimitives(scale_factor=0.01)
 
 # Setup requires TPC-H data first
 from benchbox import TPCH
-
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
@@ -509,7 +508,6 @@ results = bench.run_benchmark(conn, operation_ids=specific_ops)
 
 ```python
 import duckdb
-
 conn = duckdb.connect(":memory:")
 ```
 
@@ -524,7 +522,6 @@ conn = duckdb.connect(":memory:")
 
 ```python
 import psycopg2
-
 conn = psycopg2.connect("dbname=benchmark")
 ```
 
@@ -538,8 +535,7 @@ conn = psycopg2.connect("dbname=benchmark")
 
 ```python
 from clickhouse_driver import Client
-
-client = Client("localhost")
+client = Client('localhost')
 ```
 
 - No multi-statement transactions ✅ (Write Primitives doesn't require them)
@@ -552,7 +548,6 @@ client = Client("localhost")
 
 ```python
 from google.cloud import bigquery
-
 client = bigquery.Client()
 ```
 
@@ -566,7 +561,6 @@ client = bigquery.Client()
 
 ```python
 import snowflake.connector
-
 conn = snowflake.connector.connect(...)
 ```
 
@@ -584,7 +578,6 @@ conn = snowflake.connector.connect(...)
 
 ```python
 from benchbox import TPCH
-
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 tpch.load_data_to_database(conn)
@@ -726,14 +719,12 @@ print(f"Duration: {result.duration_ms:.2f}ms")
 import polars as pl
 
 # Create DataFrame with new rows
-new_orders = pl.DataFrame(
-    {
-        "o_orderkey": [9999001, 9999002],
-        "o_custkey": [12345, 12346],
-        "o_orderstatus": ["O", "O"],
-        "o_totalprice": [1500.00, 2500.00],
-    }
-)
+new_orders = pl.DataFrame({
+    "o_orderkey": [9999001, 9999002],
+    "o_custkey": [12345, 12346],
+    "o_orderstatus": ["O", "O"],
+    "o_totalprice": [1500.00, 2500.00],
+})
 
 # Execute INSERT
 result = manager.execute_insert(
@@ -772,13 +763,11 @@ print(f"Rows deleted: {result.rows_affected}")
 
 ```python
 # Create source DataFrame for merge
-source_df = pl.DataFrame(
-    {
-        "o_orderkey": [1, 2, 9999999],  # Mix of existing and new
-        "o_custkey": [100, 200, 300],
-        "o_totalprice": [1000.0, 2000.0, 3000.0],
-    }
-)
+source_df = pl.DataFrame({
+    "o_orderkey": [1, 2, 9999999],  # Mix of existing and new
+    "o_custkey": [100, 200, 300],
+    "o_totalprice": [1000.0, 2000.0, 3000.0],
+})
 
 # Execute MERGE (upsert)
 result = manager.execute_merge(

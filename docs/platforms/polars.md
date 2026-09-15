@@ -242,7 +242,11 @@ Polars SQL supports a subset of SQL. For unsupported features, use the DataFrame
 
 ```python
 # Instead of unsupported SQL, use DataFrame API
-result = df.filter(pl.col("column") > 10).group_by("category").agg(pl.sum("value"))
+result = (
+    df.filter(pl.col("column") > 10)
+    .group_by("category")
+    .agg(pl.sum("value"))
+)
 ```
 
 ### Thread Configuration
@@ -250,7 +254,6 @@ result = df.filter(pl.col("column") > 10).group_by("category").agg(pl.sum("value
 ```python
 # Limit thread usage
 import polars as pl
-
 pl.Config.set_global_string_cache()
 ```
 
@@ -272,7 +275,8 @@ result = (
     .agg(
         col("l_quantity").sum().alias("sum_qty"),
         col("l_extendedprice").sum().alias("sum_base_price"),
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("sum_disc_price"),
+        (col("l_extendedprice") * (lit(1) - col("l_discount")))
+            .sum().alias("sum_disc_price"),
     )
     .sort("l_returnflag", "l_linestatus")
 )

@@ -348,7 +348,6 @@ Yes! BenchBox provides APIs for creating custom benchmarks:
 ```python
 from benchbox.base import BaseBenchmark
 
-
 class MyCustomBenchmark(BaseBenchmark):
     # Implement required methods
     pass

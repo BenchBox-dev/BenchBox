@@ -22,7 +22,6 @@ from typing import Dict, Union, Optional
 import csv
 import random
 
-
 class SimpleBenchmark(BaseBenchmark):
     """Simple custom benchmark for demonstration."""
 
@@ -34,7 +33,7 @@ class SimpleBenchmark(BaseBenchmark):
             "count_all": "SELECT COUNT(*) FROM test_table",
             "sum_values": "SELECT SUM(value) FROM test_table",
             "avg_by_category": "SELECT category, AVG(value) FROM test_table GROUP BY category",
-            "top_values": "SELECT * FROM test_table ORDER BY value DESC LIMIT 10",
+            "top_values": "SELECT * FROM test_table ORDER BY value DESC LIMIT 10"
         }
 
         # Define schema
@@ -44,7 +43,7 @@ class SimpleBenchmark(BaseBenchmark):
                     {"name": "id", "type": "INTEGER", "primary_key": True},
                     {"name": "category", "type": "VARCHAR(10)", "nullable": False},
                     {"name": "value", "type": "DOUBLE", "nullable": False},
-                    {"name": "created_at", "type": "TIMESTAMP", "nullable": True},
+                    {"name": "created_at", "type": "TIMESTAMP", "nullable": True}
                 ]
             }
         }
@@ -60,10 +59,10 @@ class SimpleBenchmark(BaseBenchmark):
         # Generate test_table data
         test_file = self.output_dir / "test_table.csv"
 
-        categories = ["A", "B", "C", "D"]
+        categories = ['A', 'B', 'C', 'D']
 
-        with open(test_file, "w", newline="") as f:
-            writer = csv.writer(f, delimiter="|")
+        with open(test_file, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='|')
 
             for i in range(row_count):
                 category = random.choice(categories)
@@ -98,7 +97,6 @@ class SimpleBenchmark(BaseBenchmark):
     def get_table_names(self) -> list:
         """Get list of table names."""
         return list(self._schema.keys())
-
 
 # Usage example
 def test_simple_benchmark():
@@ -138,7 +136,6 @@ def test_simple_benchmark():
 
     conn.close()
 
-
 if __name__ == "__main__":
     test_simple_benchmark()
 ```
@@ -157,22 +154,18 @@ from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
 import json
 
-
 @dataclass
 class TableSchema:
     """Schema definition for a benchmark table."""
-
     name: str
     columns: List[Dict[str, Any]]
     primary_key: Optional[List[str]] = None
     foreign_keys: Optional[List[Dict[str, Any]]] = None
     indexes: Optional[List[Dict[str, Any]]] = None
 
-
 @dataclass
 class QueryMetadata:
     """Metadata for benchmark queries."""
-
     query_id: str
     name: str
     description: str
@@ -181,7 +174,6 @@ class QueryMetadata:
     sql_features: List[str]
     estimated_runtime_ms: Optional[int] = None
 
-
 class DataGenerator(ABC):
     """Abstract base class for data generators."""
 
@@ -189,7 +181,6 @@ class DataGenerator(ABC):
     def generate_table_data(self, table_schema: TableSchema, scale_factor: float, output_path: Path) -> Path:
         """Generate data for a specific table."""
         pass
-
 
 class QueryManager(ABC):
     """Abstract base class for query managers."""
@@ -204,7 +195,6 @@ class QueryManager(ABC):
         """Get queries filtered by category."""
         pass
 
-
 class AdvancedBenchmark(BaseBenchmark):
     """Advanced-level benchmark with modular architecture."""
 
@@ -213,7 +203,7 @@ class AdvancedBenchmark(BaseBenchmark):
         scale_factor: float = 1.0,
         output_dir: Optional[Path] = None,
         data_generator: Optional[DataGenerator] = None,
-        query_manager: Optional[QueryManager] = None,
+        query_manager: Optional[QueryManager] = None
     ):
         super().__init__(scale_factor, output_dir)
 
@@ -238,7 +228,7 @@ class AdvancedBenchmark(BaseBenchmark):
         return {
             "name": "Advanced-level Benchmark",
             "version": "1.0.0",
-            "description": "Advanced-level benchmark template",
+            "description": "Advanced-level benchmark template"
         }
 
     def _load_table_schemas(self) -> Dict[str, TableSchema]:
@@ -256,7 +246,9 @@ class AdvancedBenchmark(BaseBenchmark):
             print(f"Generating data for {table_name}...")
 
             output_path = self.output_dir / f"{table_name}.csv"
-            generated_file = self.data_generator.generate_table_data(schema, self.scale_factor, output_path)
+            generated_file = self.data_generator.generate_table_data(
+                schema, self.scale_factor, output_path
+            )
 
             data_files[table_name] = generated_file
 
@@ -278,7 +270,6 @@ class AdvancedBenchmark(BaseBenchmark):
         """Get queries by category."""
         return self.query_manager.get_queries_by_category(category)
 
-
 class DefaultDataGenerator(DataGenerator):
     """Default data generator implementation."""
 
@@ -289,8 +280,8 @@ class DefaultDataGenerator(DataGenerator):
         base_rows = self._get_base_row_count(table_schema.name)
         row_count = int(base_rows * scale_factor)
 
-        with open(output_path, "w", newline="") as f:
-            writer = csv.writer(f, delimiter="|")
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='|')
 
             for i in range(row_count):
                 row = []
@@ -322,7 +313,7 @@ class DefaultDataGenerator(DataGenerator):
 
         elif "VARCHAR" in column_type or "TEXT" in column_type:
             if "category" in column_name:
-                return random.choice(["A", "B", "C", "D", "E"])
+                return random.choice(['A', 'B', 'C', 'D', 'E'])
             elif "name" in column_name:
                 return f"Name_{random.randint(1, 1000)}"
             else:
@@ -336,7 +327,6 @@ class DefaultDataGenerator(DataGenerator):
 
         else:
             return f"default_{row_id}"
-
 
 class DefaultQueryManager(QueryManager):
     """Default query manager implementation."""
@@ -389,7 +379,6 @@ from faker import Faker
 from datetime import datetime, timedelta
 import string
 
-
 class RealisticDataGenerator(DataGenerator):
     """Generate realistic data for benchmarks."""
 
@@ -411,12 +400,14 @@ class RealisticDataGenerator(DataGenerator):
         # Generate data in batches for memory efficiency
         batch_size = 10000
 
-        with open(output_path, "w", newline="") as f:
-            writer = csv.writer(f, delimiter="|")
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter='|')
 
             for batch_start in range(0, row_count, batch_size):
                 batch_end = min(batch_start + batch_size, row_count)
-                batch_data = self._generate_batch(table_schema, batch_start, batch_end, table_config)
+                batch_data = self._generate_batch(
+                    table_schema, batch_start, batch_end, table_config
+                )
 
                 for row in batch_data:
                     writer.writerow(row)
@@ -431,31 +422,35 @@ class RealisticDataGenerator(DataGenerator):
                 "base_rows": 10000,
                 "distributions": {
                     "segment": {"AUTOMOBILE": 0.3, "BUILDING": 0.3, "FURNITURE": 0.25, "MACHINERY": 0.15},
-                    "nation": "uniform",
-                },
+                    "nation": "uniform"
+                }
             },
             "orders": {
                 "base_rows": 50000,
                 "date_range": (datetime(2020, 1, 1), datetime(2023, 12, 31)),
-                "order_priority": ["1-URGENT", "2-HIGH", "3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"],
+                "order_priority": ["1-URGENT", "2-HIGH", "3-MEDIUM", "4-NOT SPECIFIED", "5-LOW"]
             },
             "lineitem": {
                 "base_rows": 200000,
                 "lines_per_order": (1, 7),  # Min, max lines per order
                 "discount_range": (0.0, 0.10),
-                "tax_range": (0.0, 0.08),
+                "tax_range": (0.0, 0.08)
             },
             "part": {
                 "base_rows": 5000,
                 "part_types": ["ECONOMY ANODIZED", "ECONOMY BRUSHED", "ECONOMY BURNISHED"],
-                "containers": ["SM CASE", "SM BOX", "SM PACK", "LG CASE", "LG BOX", "LG PACK"],
-            },
+                "containers": ["SM CASE", "SM BOX", "SM PACK", "LG CASE", "LG BOX", "LG PACK"]
+            }
         }
 
         return configs.get(table_name, {"base_rows": 1000})
 
     def _generate_batch(
-        self, table_schema: TableSchema, start_id: int, end_id: int, table_config: Dict[str, Any]
+        self,
+        table_schema: TableSchema,
+        start_id: int,
+        end_id: int,
+        table_config: Dict[str, Any]
     ) -> List[List[Any]]:
         """Generate a batch of rows."""
 
@@ -472,7 +467,12 @@ class RealisticDataGenerator(DataGenerator):
 
         return batch_data
 
-    def _generate_realistic_value(self, column: Dict[str, Any], row_id: int, table_config: Dict[str, Any]) -> Any:
+    def _generate_realistic_value(
+        self,
+        column: Dict[str, Any],
+        row_id: int,
+        table_config: Dict[str, Any]
+    ) -> Any:
         """Generate realistic value based on column semantics."""
 
         column_name = column["name"].lower()
@@ -498,7 +498,7 @@ class RealisticDataGenerator(DataGenerator):
 
         # Address fields
         if "address" in column_name:
-            return self.fake.address().replace("\n", ", ")
+            return self.fake.address().replace('\n', ', ')
 
         # Phone fields
         if "phone" in column_name:
@@ -514,7 +514,7 @@ class RealisticDataGenerator(DataGenerator):
                 start_date, end_date = table_config["date_range"]
                 return self.fake.date_between(start_date=start_date, end_date=end_date)
             else:
-                return self.fake.date_between(start_date="-2y", end_date="today")
+                return self.fake.date_between(start_date='-2y', end_date='today')
 
         # Numeric fields with semantic meaning
         if "price" in column_name or "amount" in column_name:
@@ -576,16 +576,16 @@ class RealisticDataGenerator(DataGenerator):
 
         # Map foreign key columns to their referenced table sizes
         fk_mappings = {
-            "custkey": 10000,  # customer table size
-            "orderkey": 50000,  # orders table size
-            "partkey": 5000,  # part table size
-            "suppkey": 1000,  # supplier table size
-            "nationkey": 25,  # nation table size
-            "regionkey": 5,  # region table size
+            "custkey": 10000,      # customer table size
+            "orderkey": 50000,     # orders table size
+            "partkey": 5000,       # part table size
+            "suppkey": 1000,       # supplier table size
+            "nationkey": 25,       # nation table size
+            "regionkey": 5         # region table size
         }
 
         # Extract the base name (remove prefixes like o_, l_, etc.)
-        base_name = column_name.split("_")[-1]
+        base_name = column_name.split('_')[-1]
 
         if base_name in fk_mappings:
             max_value = fk_mappings[base_name]
@@ -597,10 +597,8 @@ class RealisticDataGenerator(DataGenerator):
     def _extract_varchar_length(self, column_type: str) -> Optional[int]:
         """Extract length from VARCHAR(n) type."""
         import re
-
-        match = re.search(r"VARCHAR\((\d+)\)", column_type)
+        match = re.search(r'VARCHAR\((\d+)\)', column_type)
         return int(match.group(1)) if match else None
-
 
 # Example usage with realistic data
 class ECommerceBenchmark(AdvancedBenchmark):
@@ -621,8 +619,8 @@ class ECommerceBenchmark(AdvancedBenchmark):
                     {"name": "phone", "type": "VARCHAR(15)", "nullable": False},
                     {"name": "acctbal", "type": "DECIMAL(15,2)", "nullable": False},
                     {"name": "mktsegment", "type": "VARCHAR(10)", "nullable": False},
-                    {"name": "comment", "type": "VARCHAR(117)", "nullable": True},
-                ],
+                    {"name": "comment", "type": "VARCHAR(117)", "nullable": True}
+                ]
             ),
             "orders": TableSchema(
                 name="orders",
@@ -635,9 +633,9 @@ class ECommerceBenchmark(AdvancedBenchmark):
                     {"name": "orderpriority", "type": "VARCHAR(15)", "nullable": False},
                     {"name": "clerk", "type": "VARCHAR(15)", "nullable": False},
                     {"name": "shippriority", "type": "INTEGER", "nullable": False},
-                    {"name": "comment", "type": "VARCHAR(79)", "nullable": True},
-                ],
-            ),
+                    {"name": "comment", "type": "VARCHAR(79)", "nullable": True}
+                ]
+            )
         }
 
     def _create_default_query_manager(self) -> QueryManager:
@@ -660,8 +658,8 @@ class ECommerceBenchmark(AdvancedBenchmark):
                 description="Find top 10 customers by total purchase amount",
                 category="analytics",
                 complexity="medium",
-                sql_features=["JOIN", "GROUP BY", "ORDER BY", "LIMIT"],
-            ),
+                sql_features=["JOIN", "GROUP BY", "ORDER BY", "LIMIT"]
+            )
         )
 
         query_manager.add_query(
@@ -682,12 +680,11 @@ class ECommerceBenchmark(AdvancedBenchmark):
                 description="Calculate monthly revenue and order count trends",
                 category="time_series",
                 complexity="simple",
-                sql_features=["EXTRACT", "GROUP BY", "ORDER BY"],
-            ),
+                sql_features=["EXTRACT", "GROUP BY", "ORDER BY"]
+            )
         )
 
         return query_manager
-
 
 # Usage example
 def test_ecommerce_benchmark():
@@ -707,7 +704,6 @@ def test_ecommerce_benchmark():
         print(f"Complexity: {metadata.complexity}")
         print()
 
-
 if __name__ == "__main__":
     test_ecommerce_benchmark()
 ```
@@ -723,7 +719,6 @@ from typing import Set
 import re
 import sqlparse
 
-
 class AdvancedQueryManager(QueryManager):
     """Advanced-level query manager with analysis capabilities."""
 
@@ -733,7 +728,7 @@ class AdvancedQueryManager(QueryManager):
 
     def add_query_from_file(self, query_id: str, file_path: Path, metadata: QueryMetadata):
         """Add query from SQL file."""
-        with open(file_path, "r") as f:
+        with open(file_path, 'r') as f:
             query_sql = f.read()
 
         self.add_query(query_id, query_sql, metadata)
@@ -746,11 +741,11 @@ class AdvancedQueryManager(QueryManager):
             # Create default metadata
             metadata = QueryMetadata(
                 query_id=query_id,
-                name=query_id.replace("_", " ").title(),
+                name=query_id.replace('_', ' ').title(),
                 description=f"Query loaded from {sql_file.name}",
                 category="unknown",
                 complexity="unknown",
-                sql_features=[],
+                sql_features=[]
             )
 
             self.add_query_from_file(query_id, sql_file, metadata)
@@ -786,27 +781,27 @@ class AdvancedQueryManager(QueryManager):
 
                 # Map keywords to features
                 keyword_mappings = {
-                    "JOIN": "joins",
-                    "INNER JOIN": "joins",
-                    "LEFT JOIN": "joins",
-                    "RIGHT JOIN": "joins",
-                    "FULL JOIN": "joins",
-                    "GROUP BY": "aggregation",
-                    "HAVING": "aggregation",
-                    "WINDOW": "window_functions",
-                    "OVER": "window_functions",
-                    "WITH": "cte",
-                    "RECURSIVE": "recursive_cte",
-                    "UNION": "set_operations",
-                    "INTERSECT": "set_operations",
-                    "EXCEPT": "set_operations",
-                    "EXISTS": "subqueries",
-                    "IN": "subqueries",
-                    "ANY": "subqueries",
-                    "ALL": "subqueries",
-                    "CASE": "conditional_logic",
-                    "WHEN": "conditional_logic",
-                    "ORDER BY": "sorting",
+                    'JOIN': 'joins',
+                    'INNER JOIN': 'joins',
+                    'LEFT JOIN': 'joins',
+                    'RIGHT JOIN': 'joins',
+                    'FULL JOIN': 'joins',
+                    'GROUP BY': 'aggregation',
+                    'HAVING': 'aggregation',
+                    'WINDOW': 'window_functions',
+                    'OVER': 'window_functions',
+                    'WITH': 'cte',
+                    'RECURSIVE': 'recursive_cte',
+                    'UNION': 'set_operations',
+                    'INTERSECT': 'set_operations',
+                    'EXCEPT': 'set_operations',
+                    'EXISTS': 'subqueries',
+                    'IN': 'subqueries',
+                    'ANY': 'subqueries',
+                    'ALL': 'subqueries',
+                    'CASE': 'conditional_logic',
+                    'WHEN': 'conditional_logic',
+                    'ORDER BY': 'sorting'
                 }
 
                 for kw, feature in keyword_mappings.items():
@@ -814,7 +809,7 @@ class AdvancedQueryManager(QueryManager):
                         features.add(feature)
 
             # Recursive analysis for nested tokens
-            if hasattr(token, "tokens"):
+            if hasattr(token, 'tokens'):
                 for subtoken in token.tokens:
                     analyze_token(subtoken)
 
@@ -831,15 +826,15 @@ class AdvancedQueryManager(QueryManager):
 
         # Define patterns for SQL features
         patterns = {
-            "joins": r"\b(JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN)\b",
-            "aggregation": r"\b(GROUP\s+BY|HAVING|COUNT|SUM|AVG|MIN|MAX)\b",
-            "window_functions": r"\b(OVER\s*\(|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD)\b",
-            "cte": r"\bWITH\b",
-            "recursive_cte": r"\bWITH\s+RECURSIVE\b",
-            "set_operations": r"\b(UNION|INTERSECT|EXCEPT)\b",
-            "subqueries": r"\b(EXISTS|IN\s*\(|ANY\s*\(|ALL\s*\()\b",
-            "conditional_logic": r"\b(CASE\s+WHEN|IF\()\b",
-            "sorting": r"\bORDER\s+BY\b",
+            'joins': r'\b(JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN)\b',
+            'aggregation': r'\b(GROUP\s+BY|HAVING|COUNT|SUM|AVG|MIN|MAX)\b',
+            'window_functions': r'\b(OVER\s*\(|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD)\b',
+            'cte': r'\bWITH\b',
+            'recursive_cte': r'\bWITH\s+RECURSIVE\b',
+            'set_operations': r'\b(UNION|INTERSECT|EXCEPT)\b',
+            'subqueries': r'\b(EXISTS|IN\s*\(|ANY\s*\(|ALL\s*\()\b',
+            'conditional_logic': r'\b(CASE\s+WHEN|IF\()\b',
+            'sorting': r'\bORDER\s+BY\b'
         }
 
         for feature, pattern in patterns.items():
@@ -862,22 +857,22 @@ class AdvancedQueryManager(QueryManager):
 
         # Feature-based scoring
         feature_weights = {
-            "joins": 3,
-            "aggregation": 2,
-            "window_functions": 4,
-            "cte": 3,
-            "recursive_cte": 5,
-            "set_operations": 3,
-            "subqueries": 2,
-            "conditional_logic": 1,
-            "sorting": 1,
+            'joins': 3,
+            'aggregation': 2,
+            'window_functions': 4,
+            'cte': 3,
+            'recursive_cte': 5,
+            'set_operations': 3,
+            'subqueries': 2,
+            'conditional_logic': 1,
+            'sorting': 1
         }
 
         for feature in features:
             complexity_score += feature_weights.get(feature, 1)
 
         # Count number of tables
-        table_count = len(re.findall(r"\bFROM\s+(\w+)", query_sql, re.IGNORECASE))
+        table_count = len(re.findall(r'\bFROM\s+(\w+)', query_sql, re.IGNORECASE))
         complexity_score += table_count
 
         # Classify complexity
@@ -914,23 +909,29 @@ class AdvancedQueryManager(QueryManager):
             categories_count[category] = categories_count.get(category, 0) + 1
 
         # Calculate distributions
-        complexity_dist = {complexity: complexities.count(complexity) for complexity in ["simple", "medium", "complex"]}
+        complexity_dist = {
+            complexity: complexities.count(complexity)
+            for complexity in ["simple", "medium", "complex"]
+        }
 
         return {
             "total_queries": total_queries,
             "complexity_distribution": complexity_dist,
             "feature_usage": features_count,
             "category_distribution": categories_count,
-            "most_common_features": sorted(features_count.items(), key=lambda x: x[1], reverse=True)[:5],
+            "most_common_features": sorted(features_count.items(), key=lambda x: x[1], reverse=True)[:5]
         }
 
     def export_query_catalog(self, output_file: Path):
         """Export query catalog to JSON."""
 
         catalog = {
-            "metadata": {"total_queries": len(self.queries), "generated_at": datetime.now().isoformat()},
+            "metadata": {
+                "total_queries": len(self.queries),
+                "generated_at": datetime.now().isoformat()
+            },
             "statistics": self.get_query_statistics(),
-            "queries": {},
+            "queries": {}
         }
 
         for query_id in self.queries:
@@ -945,12 +946,11 @@ class AdvancedQueryManager(QueryManager):
                 "complexity": complexity,
                 "sql_features": list(features),
                 "estimated_runtime_ms": metadata.estimated_runtime_ms,
-                "query_sql": self.get_query(query_id),
+                "query_sql": self.get_query(query_id)
             }
 
-        with open(output_file, "w") as f:
+        with open(output_file, 'w') as f:
             json.dump(catalog, f, indent=2)
-
 
 # Example: Web Analytics Benchmark
 class WebAnalyticsBenchmark(AdvancedBenchmark):
@@ -979,8 +979,8 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
                 description="Analyze daily page views and unique visitors",
                 category="analytics",
                 complexity="medium",
-                sql_features=["aggregation", "date_functions", "filtering"],
-            ),
+                sql_features=["aggregation", "date_functions", "filtering"]
+            )
         )
 
         # User journey analysis
@@ -1022,8 +1022,8 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
                 description="Analyze most common user journey paths",
                 category="behavior_analysis",
                 complexity="complex",
-                sql_features=["cte", "window_functions", "aggregation", "string_functions"],
-            ),
+                sql_features=["cte", "window_functions", "aggregation", "string_functions"]
+            )
         )
 
         # Conversion funnel
@@ -1085,12 +1085,11 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
                 description="Analyze conversion rates through purchase funnel",
                 category="conversion_analysis",
                 complexity="complex",
-                sql_features=["cte", "conditional_logic", "set_operations", "aggregation"],
-            ),
+                sql_features=["cte", "conditional_logic", "set_operations", "aggregation"]
+            )
         )
 
         return query_manager
-
 
 def test_web_analytics_benchmark():
     """Test web analytics benchmark with query analysis."""
@@ -1109,7 +1108,6 @@ def test_web_analytics_benchmark():
     # Export catalog
     query_manager.export_query_catalog(Path("web_analytics_catalog.json"))
     print("Query catalog exported to web_analytics_catalog.json")
-
 
 if __name__ == "__main__":
     test_web_analytics_benchmark()

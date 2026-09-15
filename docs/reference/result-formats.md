@@ -409,7 +409,7 @@ print(f"Power at Size: {results['summary']['tpc_metrics']['power_at_size']}")
 print(f"Total time: {results['summary']['timing']['total_ms']}ms")
 
 # Access query details
-for query in results["queries"]:
+for query in results['queries']:
     print(f"{query['id']}: {query['ms']}ms")
 ```
 
@@ -424,12 +424,12 @@ with open("benchmark_runs/results/tpch_duckdb_sf0.01_*.json") as f:
     results = json.load(f)
 
 # Convert queries to DataFrame
-queries = results["queries"]
+queries = results['queries']
 df = pd.DataFrame(queries)
 
 # Analyze
 print(df.describe())
-print(df.groupby("id")["ms"].mean())
+print(df.groupby('id')['ms'].mean())
 ```
 
 ### Load CSV Results
@@ -598,8 +598,8 @@ idempotent — and the pass-through happens *before* the salt is consulted:
 a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
 b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
 
-a.anonymize_result_payload({"machine_id": raw})  # machine_9ba319f754a5
-b.anonymize_result_payload({"machine_id": raw})  # machine_ac228f1f75af  (differs)
+a.anonymize_result_payload({"machine_id": raw})   # machine_9ba319f754a5
+b.anonymize_result_payload({"machine_id": raw})   # machine_ac228f1f75af  (differs)
 
 # But B re-anonymizing A's already-published bundle:
 b.anonymize_result_payload({"machine_id": "machine_9ba319f754a5"})
@@ -631,16 +631,14 @@ with open("results.json") as f:
 
 # Flatten to table
 queries = []
-for q in results["queries"]:
-    queries.append(
-        {
-            "run_id": results["run"]["id"],
-            "benchmark": results["benchmark"]["id"],
-            "platform": results["platform"]["name"],
-            "scale_factor": results["benchmark"]["scale_factor"],
-            **q,
-        }
-    )
+for q in results['queries']:
+    queries.append({
+        'run_id': results['run']['id'],
+        'benchmark': results['benchmark']['id'],
+        'platform': results['platform']['name'],
+        'scale_factor': results['benchmark']['scale_factor'],
+        **q
+    })
 
 df = pd.DataFrame(queries)
 

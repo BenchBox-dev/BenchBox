@@ -83,14 +83,10 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".pre-commit-config.yaml",
     "Makefile",
     "make/",
-    ".pre-commit-config.yaml",
     # Internal tooling, specs, decisions, audits, and tracker state.
     # Lane-owned exact files under here (e.g. the explorer pipeline, this
     # verifier) still classify to their lane first.
     "_project/",
-    # Vendor/spec reference material (TPC-DS/TPC-H notes, diagnostics) read
-    # by developers, not by any lane build.
-    "_sources/",
     # Repo-root agent docs, skill config, and local-tooling config.
     "AGENTS.md",
     "CONTRIBUTING.md",

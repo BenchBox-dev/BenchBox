@@ -109,7 +109,6 @@ schema = benchmark.get_schema()
 
 # Load data to database
 import duckdb
-
 conn = duckdb.connect(":memory:")
 benchmark.load_data_to_database(conn)
 

@@ -36,9 +36,10 @@ class ScaleFactorNotSupportedError(ValueError):
     """Raised when scale_factor is not in the benchmark's declared
     scale_options."""
 
-
 # benchbox/core/benchmark_registry.py
-def validate_scale_factor(benchmark_id: str, scale_factor: float) -> None:
+def validate_scale_factor(
+    benchmark_id: str, scale_factor: float
+) -> None:
     """Raise ScaleFactorNotSupportedError if `scale_factor` is not
     in the benchmark's declared scale_options.
 
@@ -128,14 +129,11 @@ No new CLI flag, no benchmark-specific env var.
 class DataFetchError(Exception):
     """Base."""
 
-
 class ManifestValidationError(DataFetchError):
     """data_manifest.toml is malformed or missing required fields."""
 
-
 class ChecksumMismatchError(DataFetchError):
     """Downloaded or pre-populated data does not match manifest hash."""
-
 
 class DownloadError(DataFetchError):
     """HTTP-layer failure with no successful retry."""

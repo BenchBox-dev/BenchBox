@@ -201,8 +201,8 @@ At runtime, BenchBox captures platform metadata:
         "deployment": "managed",
         "host": "abc123.us-east-2.aws.clickhouse.cloud",
         "port": 8443,
-        "secure": True,
-    },
+        "secure": True
+    }
 }
 ```
 

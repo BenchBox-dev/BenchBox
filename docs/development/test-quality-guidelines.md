@@ -30,7 +30,6 @@ def test_all_tables_have_required_columns():
         assert table.has_primary_key()
         assert "created_at" in table.column_names
 
-
 # GOOD - tests specific requirements
 def test_required_tables_present():
     required = {"users", "orders", "products"}

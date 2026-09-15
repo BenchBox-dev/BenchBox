@@ -251,7 +251,7 @@ import duckdb
 import pyarrow.parquet as pq
 
 # Read Parquet with PyArrow
-table = pq.read_table("./data/customer.parquet")
+table = pq.read_table('./data/customer.parquet')
 df = table.to_pandas()
 
 # Read Parquet with DuckDB
@@ -260,8 +260,7 @@ df = conn.execute("SELECT * FROM read_parquet('./data/customer.parquet')").fetch
 
 # Read Delta Lake
 from deltalake import DeltaTable
-
-dt = DeltaTable("./data/customer")
+dt = DeltaTable('./data/customer')
 df = dt.to_pandas()
 
 # Read DuckLake

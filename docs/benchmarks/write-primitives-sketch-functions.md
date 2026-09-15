@@ -439,7 +439,6 @@ supplied callables that own the engine-specific sketch chain:
 ```python
 manager = get_dataframe_write_manager("pyspark-df", spark_session=spark)
 
-
 def build_state():
     return (
         spark.read.parquet(source)
@@ -447,15 +446,12 @@ def build_state():
         .agg(F.hll_sketch_agg("l_orderkey").alias("user_sketch"))
     )
 
-
 persist = manager.execute_aggregate_persist(target_path, build_state, compression="zstd")
-
 
 def merge_extract(path):
     state = spark.read.parquet(str(path))
     estimate = state.agg(F.hll_sketch_estimate(F.hll_union_agg("user_sketch"))).collect()[0][0]
     return float(estimate)
-
 
 merge = manager.execute_aggregate_merge(target_path, merge_extract)
 # merge.metrics["aggregate_value"] holds the extracted scalar
@@ -530,8 +526,7 @@ manager = get_dataframe_write_manager("pyspark-df", spark_session=spark)
 target = Path("/tmp/sketch_state/hll")
 
 builder = make_pyspark_hll_persist_builder(
-    spark,
-    "/data/lineitem",
+    spark, "/data/lineitem",
     group_cols=["l_shipdate", "l_returnflag"],
     value_col="l_orderkey",
 )

@@ -108,14 +108,25 @@ benchbox run --platform databricks --benchmark ai_primitives \
 from benchbox.core.ai_primitives import AIPrimitivesBenchmark
 
 # Initialize with cost budget
-benchmark = AIPrimitivesBenchmark(scale_factor=0.01, max_cost_usd=1.00, dry_run=False)
+benchmark = AIPrimitivesBenchmark(
+    scale_factor=0.01,
+    max_cost_usd=1.00,
+    dry_run=False
+)
 
 # Estimate costs before execution
-total_cost, estimates = benchmark.estimate_cost(platform="snowflake", categories=["nlp", "transform"])
+total_cost, estimates = benchmark.estimate_cost(
+    platform="snowflake",
+    categories=["nlp", "transform"]
+)
 print(f"Estimated cost: ${total_cost:.4f}")
 
 # Run benchmark
-result = benchmark.run_benchmark(connection=snowflake_connection, platform="snowflake", categories=["nlp"])
+result = benchmark.run_benchmark(
+    connection=snowflake_connection,
+    platform="snowflake",
+    categories=["nlp"]
+)
 
 print(f"Successful: {result.successful_queries}/{result.total_queries}")
 print(f"Total cost: ${result.total_cost_estimated_usd:.4f}")
@@ -300,7 +311,7 @@ Prevent runaway costs with budget limits:
 ```python
 benchmark = AIPrimitivesBenchmark(
     scale_factor=0.01,
-    max_cost_usd=1.00,  # Hard limit
+    max_cost_usd=1.00  # Hard limit
 )
 ```
 
