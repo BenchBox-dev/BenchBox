@@ -256,7 +256,8 @@ class TestMakefileCommands:
         assert expected_path in result.stdout
         assert "~/tmp/benchbox-lock-probe/test.lock" not in result.stdout
         assert "uv:" not in result.stdout + result.stderr
-        assert not lock_path.exists()
+        assert lock_path.exists()
+        assert lock_path.read_text(encoding="utf-8") == ""
 
     def test_makefile_test_all_splits_parallel_and_serial_lanes_explicitly(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
@@ -390,7 +391,7 @@ class TestMakefileCommands:
         assert make is not None
 
         result = subprocess.run(
-            [make, "--no-print-directory", "pr-preflight", f"MAKE={fake_make}"],
+            [make, "--no-print-directory", "pr-preflight-uncached", f"MAKE={fake_make}"],
             cwd=Path.cwd(),
             capture_output=True,
             text=True,
@@ -463,11 +464,13 @@ class TestMakefileCommands:
     def test_skill_integrity_preflight_consumes_one_classifier_artifact_without_path_globs(self):
         makefile_content = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
         preflight_body = _makefile_target_body(makefile_content, "pr-preflight")
+        uncached_body = _makefile_target_body(makefile_content, "pr-preflight-uncached")
         route_body = _makefile_target_body(makefile_content, ".pr-preflight-route")
         fast_tests_body = _makefile_target_body(makefile_content, "pr-preflight-fast-tests")
 
-        assert 'PATH_DECISION="$$DECISION"' in preflight_body
-        assert "scripts/path_filter_decision.py --base-ref origin/develop" in preflight_body
+        assert "scripts/local_validation.py ordered" in preflight_body
+        assert 'PATH_DECISION="$$DECISION"' in uncached_body
+        assert "scripts/path_filter_decision.py --base-ref origin/develop" in uncached_body
         assert "path_filter_decision.py --base-ref" not in route_body
         assert ".claude/skills" not in route_body
         assert "skill-sync.yaml" not in route_body

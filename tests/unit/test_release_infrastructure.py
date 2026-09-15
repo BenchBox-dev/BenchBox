@@ -1088,6 +1088,58 @@ class TestReleaseInfrastructure:
         assert "pr-open" not in combined
         assert "pr-arm-auto-merge" not in combined
 
+    def test_local_preflight_orders_receipt_bound_stages_without_duplicate_fast_lane(self):
+        preflight = _make_target_recipe("pr-preflight")
+        uncached = _make_target_recipe("pr-preflight-uncached")
+        route = _make_target_recipe(".pr-preflight-route")
+
+        assert "scripts/local_validation.py ordered" in preflight
+        assert '--focused-gate "local-focused-check"' in preflight
+        assert "--focused-cmd 'make pr-preflight-focused-tests'" in preflight
+        assert '--preflight-gate "required-pr-preflight"' in preflight
+        assert "pr-preflight-uncached SKIP_FAST_TESTS=1" in preflight
+        assert "pr-preflight-fast-tests" not in uncached
+        assert '"$(SKIP_FAST_TESTS)" = "1"' in route
+        assert "pr-preflight-fast-tests SKIP_CONTENT_GUARD=1" in _make_target_recipe("pr-preflight-focused-tests")
+        assert '"$(SKIP_CONTENT_GUARD)" = "1"' in _make_target_recipe("pr-preflight-fast-tests")
+        assert "Focused checks defer content guard to required preflight." in _make_target_recipe(
+            "pr-preflight-fast-tests"
+        )
+        assert "Focused local gate already completed; skipping duplicate fast tests." in route
+
+    def test_pre_push_focused_hook_skips_or_runs_its_actual_entry(self, tmp_path: Path):
+        config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+        hook = next(
+            hook
+            for repo in config["repos"]
+            for hook in repo.get("hooks", [])
+            if hook.get("id") == "pr-preflight-fast-tests"
+        )
+        entry = hook["entry"]
+
+        skipped_env = os.environ.copy()
+        skipped_env.pop("BENCHBOX_PREPUSH", None)
+        skipped_env["BENCHBOX_VALIDATION_RECEIPTS_DIR"] = str(tmp_path / "skipped-receipts")
+        skipped = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env)
+        assert skipped.returncode == 0
+        assert "SKIPPED" in skipped.stdout
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        trace = tmp_path / "make.trace"
+        fake_make = bin_dir / "make"
+        fake_make.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" > "$HOOK_TRACE"\n', encoding="utf-8")
+        fake_make.chmod(0o755)
+        active_env = os.environ.copy()
+        active_env.update(
+            {"BENCHBOX_PREPUSH": "1", "HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{active_env['PATH']}"}
+        )
+        active = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env)
+        assert active.returncode == 0, active.stderr
+        assert "local-validation" in trace.read_text(encoding="utf-8")
+        assert "GATE=local-focused-check" in trace.read_text(encoding="utf-8")
+        assert "pr-preflight-focused-tests" in trace.read_text(encoding="utf-8")
+
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"

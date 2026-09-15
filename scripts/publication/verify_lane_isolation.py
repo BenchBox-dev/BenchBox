@@ -80,6 +80,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".claude/",
     # CI definitions and repo orchestration.
     ".github/",
+    ".pre-commit-config.yaml",
     "Makefile",
     "make/",
     # Internal tooling, specs, decisions, audits, and tracker state.

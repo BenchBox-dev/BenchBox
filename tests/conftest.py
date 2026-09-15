@@ -242,13 +242,16 @@ def pytest_configure(config) -> None:
         # Write diagnostic info so other processes can identify the lock holder.
         # ftruncate is safe here: O_RDWR opens at position 0, so the subsequent
         # write lands at offset 0 without needing an explicit seek.
-        started = time.strftime("%Y-%m-%d %H:%M:%S")
-        cmd = " ".join(sys.argv[:4])
-        try:
-            os.ftruncate(fd, 0)
-            os.write(fd, f"pid:{os.getpid()} started:{started} cmd:{cmd}\n".encode())
-        except OSError:
-            pass
+        if waiter is not None:
+            waiter.write_holder(fd, test_lock_path, phase="pytest-session", gate="xdist")
+        else:
+            started = time.strftime("%Y-%m-%d %H:%M:%S")
+            cmd = " ".join(sys.argv[:4])
+            try:
+                os.ftruncate(fd, 0)
+                os.write(fd, f"pid:{os.getpid()} started:{started} phase:pytest-session cmd:{cmd}\n".encode())
+            except OSError:
+                pass
         _test_lock_fd = fd  # Keep fd open to maintain the lock for the whole session.
 
     # Limit DuckDB internal threads.  DuckDB ignores environment variables;

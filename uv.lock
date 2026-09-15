@@ -779,9 +779,9 @@ requires-dist = [
     { name = "dask", extras = ["distributed"], marker = "extra == 'dataframe-dask'", specifier = ">=2024.1.0" },
     { name = "dask", extras = ["distributed"], marker = "extra == 'dataframe-pandas-family'", specifier = ">=2024.1.0" },
     { name = "databend-driver", marker = "extra == 'databend'", specifier = ">=0.28.0" },
-    { name = "databricks-connect", marker = "extra == 'all'", specifier = ">=14.0.0" },
+    { name = "databricks-connect", marker = "extra == 'all'", specifier = ">=14.0.0,<19" },
     { name = "databricks-connect", marker = "extra == 'cloud-spark'", specifier = ">=14.0.0" },
-    { name = "databricks-connect", marker = "extra == 'cloud-spark-databricks'", specifier = ">=14.0.0" },
+    { name = "databricks-connect", marker = "extra == 'cloud-spark-databricks'", specifier = ">=14.0.0,<19" },
     { name = "databricks-sdk", marker = "extra == 'all'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'cloud'", specifier = ">=0.20.0" },
     { name = "databricks-sdk", marker = "extra == 'cloud-spark'", specifier = ">=0.20.0" },
@@ -1772,7 +1772,7 @@ wheels = [
 
 [[package]]
 name = "dask"
-version = "2026.3.0"
+version = "2026.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1784,9 +1784,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "toolz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d7/2a/5d8cc1579590af86576dde890254440e478c7174b93a02095ecfc2e6ba38/dask-2026.3.0.tar.gz", hash = "sha256:f7d96c8274e8a900d217c1ff6ea8d1bbf0b4c2c21e74a409644498d925eb8f85", size = 11000710, upload-time = "2026-03-18T07:10:14.945Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/33/a7/6b3c7ac32b642fbbe0821111654e0bd8cfbe88f68560bcf23cc78ab35c71/dask-2026.8.0.tar.gz", hash = "sha256:8a94c37b5de6d869343340dc26c3c3acca7ec48a3abdabe00ea3abb1125884d5", size = 11561752, upload-time = "2026-08-24T19:21:25.906Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/f3/00bb1e867fba351e2d784170955713bee200c43ea306c59f30bd7e748192/dask-2026.3.0-py3-none-any.whl", hash = "sha256:be614b9242b0b38288060fb2d7696125946469c98a1c30e174883fd199e0428d", size = 1485630, upload-time = "2026-03-18T07:10:12.832Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/3a/4fc99e788bcfa1b3b3f21abf57da45898d807d007e7f6fd1c7300904eb70/dask-2026.8.0-py3-none-any.whl", hash = "sha256:ccc0c83a189b0398602435189771d28dad7b5773b6089bb8dce14ae732dd782c", size = 1492182, upload-time = "2026-08-24T19:21:23.997Z" },
 ]
 
 [package.optional-dependencies]
@@ -1866,16 +1866,17 @@ wheels = [
 
 [[package]]
 name = "databricks-sdk"
-version = "0.102.0"
+version = "0.139.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "google-auth" },
     { name = "protobuf" },
     { name = "requests" },
+    { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ab/b3/41ff1c3afe092df9085e084e0dc81c45bca5ed65f7b60dc59df0ade43c76/databricks_sdk-0.102.0.tar.gz", hash = "sha256:8fa5f82317ee27cc46323c6e2543d2cfefb4468653f92ba558271043c6f72fb9", size = 887450, upload-time = "2026-03-19T08:15:54.428Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/72/74a547b6a3b9b048ad348df5042a832560c2c673ff16f1fd1138b97eedaf/databricks_sdk-0.139.0.tar.gz", hash = "sha256:a1c1e1ca5db02fa13a3b40d78794b411ea33cb6b78e24905328a4e24d25b21af", size = 1098889, upload-time = "2026-09-13T05:27:40.383Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/8c/d082bd5f72d7613524d5b35dfe1f71732b2246be2704fad68cd0e3fdd020/databricks_sdk-0.102.0-py3-none-any.whl", hash = "sha256:75d1253276ee8f3dd5e7b00d62594b7051838435e618f74a8570a6dbd723ec12", size = 838533, upload-time = "2026-03-19T08:15:52.248Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/fc/245d6a55c1c7933ed1a2349ab92f2173b7c80fee12400176bb9af5930280/databricks_sdk-0.139.0-py3-none-any.whl", hash = "sha256:ac1ede8bdd69edba12b93e3102b248cd26cced4d2e6c22cd3e7dac8c0aef9ceb", size = 1043276, upload-time = "2026-09-13T05:27:38.782Z" },
 ]
 
 [[package]]
@@ -1971,7 +1972,7 @@ wheels = [
 
 [[package]]
 name = "distributed"
-version = "2026.3.0"
+version = "2026.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1987,12 +1988,11 @@ dependencies = [
     { name = "tblib" },
     { name = "toolz" },
     { name = "tornado" },
-    { name = "urllib3" },
     { name = "zict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/84/3e98a2d61493d201f253743091cbd4f099f502f957a9a33bb9ce5b8d5416/distributed-2026.3.0.tar.gz", hash = "sha256:4a8fc6102fededfbaae45288501276da2297a054d74eb6589f01b087c7f95c26", size = 2103970, upload-time = "2026-03-18T07:10:23.555Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ff/18/1c98f0a36eccfcce109f054456f38767ac5d4b3fac124dcd5a35b1cd6167/distributed-2026.8.0.tar.gz", hash = "sha256:6f55008ecacf96ba945309fc12e680544764995e27bd63cc5e109afb97d7044d", size = 2465942, upload-time = "2026-08-24T19:36:00.554Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/77/2ff7aefc09cf1306a81cd7a46af34f80ebefef81a2e8329b94b58ad813ae/distributed-2026.3.0-py3-none-any.whl", hash = "sha256:52518f4b3e6795e87b442e8f57788ba1ddc750c62d0835669c85927280d38f07", size = 1009769, upload-time = "2026-03-18T07:10:21.241Z" },
+    { url = "https://files.pythonhosted.org/packages/28/d4/017e2d39d797eaa38a52b4459c8bea875d5e0ada335a62aafe98193041a6/distributed-2026.8.0-py3-none-any.whl", hash = "sha256:3bd8882861a2cf497453f28c6b61135fa8ef2bb1d6885ad3b9f27e887e9c0e01", size = 1008640, upload-time = "2026-08-24T19:35:58.622Z" },
 ]
 
 [[package]]
