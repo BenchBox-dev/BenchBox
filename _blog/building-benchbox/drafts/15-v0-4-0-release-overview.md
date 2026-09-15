@@ -21,7 +21,7 @@ BenchBox v0.4.0 was released on **August 28, 2026**.
 
 The headline change is the move to its own GitHub organization. The repository name, the PyPI project `benchbox`, and `benchbox.dev` are unchanged, and old remotes keep redirecting. The project now lives in an organization account.
 
-The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) has been reachable since April 2026; this tagged release is the first that names that preview and shows those labels on it. An organization account and labels for who produced a result are both prerequisites for results from other people.
+The second change is a vocabulary for published results: who produced a run, its trust label, and disclosed funding. The Results Explorer preview at [benchbox.dev/results/](https://benchbox.dev/results/) first ships in this tagged release and shows those labels. An organization account and labels for who produced a result are both prerequisites for results from other people.
 
 The third is DuckLake as `--platform ducklake`, still beta: Parquet table data with catalog metadata in a SQL database, and catalog backend and data path chosen independently.
 
@@ -31,7 +31,7 @@ The third is DuckLake as `--platform ducklake`, still beta: Parquet table data w
 | --- | --- | --- |
 | Project home | Repository moved to `github.com/BenchBox-dev/BenchBox` | Org-owned home; old links redirect; install command unchanged |
 | Provenance and funding | Source, trust label, and funding recorded, including `vendor-supplied` | A published number can say who ran it and who paid |
-| Results Explorer | Preview at `benchbox.dev/results/` now shows those labels | Reachable since April 2026; this release names the preview |
+| Results Explorer | Preview at `benchbox.dev/results/` shows those labels | First public release of the preview |
 | DuckLake (beta) | `--platform ducklake` with independent catalog and data path | Four documented modes validated at TPC-H SF1 |
 | MCP transport | `benchbox-mcp --transport streamable-http` | Extra local path; stdio unchanged; hosted use unsupported |
 | TPC throughput | Throughput@Size counts every executed query | Corrects 22x (TPC-H) and 99x (TPC-DS) understatements |
