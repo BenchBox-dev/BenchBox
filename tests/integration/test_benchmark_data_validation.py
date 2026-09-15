@@ -240,7 +240,7 @@ class TestBenchmarkDataValidation:
         mock_connection.cursor.return_value = mock_cursor
         # Strip _mock_name attribute so the validation logic treats it as a real connection
         if hasattr(mock_connection, "_mock_name"):
-            delattr(mock_connection, "_mock_name")
+            del mock_connection._mock_name
 
         table_stats = {"test_table": 100}
 
@@ -291,7 +291,7 @@ class TestBenchmarkDataValidation:
         mock_connection.cursor.return_value = mock_cursor
         # Strip _mock_name attribute so the validation logic treats it as a real connection
         if hasattr(mock_connection, "_mock_name"):
-            delattr(mock_connection, "_mock_name")
+            del mock_connection._mock_name
         self.adapter._get_existing_tables = Mock(return_value=[])
 
         table_stats = {"test_table": 0}  # Empty table

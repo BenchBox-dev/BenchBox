@@ -623,7 +623,7 @@ class TestHiveTuning:
         col_mock.name = "region"
         col_mock.order = 1
         tt = MagicMock()
-        tt.get_columns_by_type.side_effect = lambda t: ([col_mock] if t == TuningType.PARTITIONING else [])
+        tt.get_columns_by_type.side_effect = lambda t: [col_mock] if t == TuningType.PARTITIONING else []
         clauses = mixin._generate_hive_tuning(tt)
         assert "region STRING" in clauses.partition_by
 

@@ -213,7 +213,7 @@ class TestPySparkCoverageMocked:
     def test_scalar_paths(self, monkeypatch):
         adapter, _, _, _ = _new_adapter(monkeypatch)
         row = MagicMock()
-        row.__getitem__ = lambda self, idx: (99 if idx == 0 else "x")
+        row.__getitem__ = lambda self, idx: 99 if idx == 0 else "x"
         df = MagicMock()
         df.limit.return_value.collect.return_value = [row]
         assert adapter.scalar(df) == 99

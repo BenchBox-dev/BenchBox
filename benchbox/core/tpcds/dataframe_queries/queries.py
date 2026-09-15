@@ -4170,9 +4170,11 @@ def q31_pandas_impl(ctx: DataFrameContext) -> Any:
 
     result = result[
         result.apply(
-            lambda r: (safe_ratio(r["ws2_sales"], r["ws1_sales"]) or 0)
-            > (safe_ratio(r["ss2_sales"], r["ss1_sales"]) or 0)
-            and (safe_ratio(r["ws3_sales"], r["ws2_sales"]) or 0) > (safe_ratio(r["ss3_sales"], r["ss2_sales"]) or 0),
+            lambda r: (
+                (safe_ratio(r["ws2_sales"], r["ws1_sales"]) or 0) > (safe_ratio(r["ss2_sales"], r["ss1_sales"]) or 0)
+                and (safe_ratio(r["ws3_sales"], r["ws2_sales"]) or 0)
+                > (safe_ratio(r["ss3_sales"], r["ss2_sales"]) or 0)
+            ),
             axis=1,
         )
     ]
@@ -4553,8 +4555,10 @@ def q74_pandas_impl(ctx: DataFrameContext) -> Any:
         (result["ss_y1_total"] > 0)
         & (result["ws_y1_total"] > 0)
         & result.apply(
-            lambda r: (safe_ratio(r["ws_y2_total"], r["ws_y1_total"]) or 0)
-            > (safe_ratio(r["ss_y2_total"], r["ss_y1_total"]) or 0),
+            lambda r: (
+                (safe_ratio(r["ws_y2_total"], r["ws_y1_total"]) or 0)
+                > (safe_ratio(r["ss_y2_total"], r["ss_y1_total"]) or 0)
+            ),
             axis=1,
         )
     ]
@@ -6964,12 +6968,14 @@ def q93_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Compute actual sales
     ss_with_reason["act_sales"] = ss_with_reason.apply(
-        lambda row: (row["ss_quantity"] - row["sr_return_quantity"]) * row["ss_sales_price"]
-        if row["sr_return_quantity"] is not None
-        and not (
-            isinstance(row["sr_return_quantity"], float) and row["sr_return_quantity"] != row["sr_return_quantity"]
-        )
-        else row["ss_quantity"] * row["ss_sales_price"],
+        lambda row: (
+            (row["ss_quantity"] - row["sr_return_quantity"]) * row["ss_sales_price"]
+            if row["sr_return_quantity"] is not None
+            and not (
+                isinstance(row["sr_return_quantity"], float) and row["sr_return_quantity"] != row["sr_return_quantity"]
+            )
+            else row["ss_quantity"] * row["ss_sales_price"]
+        ),
         axis=1,
     )
 

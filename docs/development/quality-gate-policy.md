@@ -33,7 +33,7 @@ from the local aggregate.
 This policy was derived from the behavior of more than four independent
 implementations/consumers rather than from comments alone:
 
-1. `[tool.ruff]`, `[tool.ruff.lint]`, and the exact `ruff==0.11.13` development
+1. `[tool.ruff]`, `[tool.ruff.lint]`, and the exact `ruff==0.16.7` development
    dependency in `pyproject.toml` define configured discovery and rule behavior.
 2. `Makefile` targets `lint`, `ci-lint`, `complexity-check`,
    `quality-governance-typecheck`, `duplicate-check`, and

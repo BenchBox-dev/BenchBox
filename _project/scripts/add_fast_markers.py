@@ -175,7 +175,7 @@ def process_file(filepath: Path, dry_run: bool = False) -> tuple[bool, str]:
     Returns:
         (changed, message) tuple
     """
-    content = filepath.read_text()
+    content = filepath.read_text(encoding="utf-8")
 
     # Skip if already has fast marker
     if has_fast_marker(content):
@@ -197,7 +197,7 @@ def process_file(filepath: Path, dry_run: bool = False) -> tuple[bool, str]:
         return False, "no changes needed"
 
     if not dry_run:
-        filepath.write_text(new_content)
+        filepath.write_text(new_content, encoding="utf-8")
 
     return True, action
 

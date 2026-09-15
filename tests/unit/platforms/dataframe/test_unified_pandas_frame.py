@@ -578,7 +578,7 @@ class TestUnifiedPandasFrameIntegration:
 
         # Create adapter mock that implements groupby_agg properly
         adapter = Mock()
-        adapter.groupby_agg = lambda df, by, agg, as_index: (df.groupby(by, as_index=False).agg(**agg))
+        adapter.groupby_agg = lambda df, by, agg, as_index: df.groupby(by, as_index=False).agg(**agg)
 
         wrapper = UnifiedPandasFrame(df, adapter)
         result = wrapper.groupby("group", as_index=False).agg(total=("value", "sum"))
