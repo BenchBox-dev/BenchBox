@@ -67,7 +67,7 @@ To provide reproducible results, BenchBox result "bundles" include all of the de
 
 1. **Hardware used**: CPU type/name, physical/logical cores, total RAM, OS kernel, and client-to-engine locality
 2. **BenchBox version**: Git commit hash and release version
-3. **Platform version**: DuckDB v2.0.0-preview, DataFusion 46.0, ClickHouse 24.8, etc.
+3. **Platform version**: DuckDB 1.4.4, 1.5.5, 2.0.0-alpha38615, etc.
 4. **Benchmark configuration**: Scale factor, execution phase, memory limits, thread pools, and optimizer flags
 
 To support public sharing of results, BenchBox v0.4.0 improved the bundle output with additional details:
@@ -132,7 +132,7 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 - No backend
 - Static site on GitHub Pages
 - Queries run in your browser via DuckDB-WASM
-- Fast, cheap, can't go down
+- Fast and cheap; no server to run
 
 ---
 
@@ -146,20 +146,26 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 
 2. Package with `benchbox submit`
 
-   - Set one stable, private salt
-   - Reuse it for every submission
+   - One private, stable salt pseudonymizes your machine ID
+   - A new salt per run breaks comparability across your submissions
+   - Keep it out of the repo and the PR
 
    ```bash
    export BENCHBOX_MACHINE_ID_SALT="<stable-private-random-value>"
    uv run -- benchbox submit --last --output ./submission
    ```
 
+   - Refuses runs that aren't submittable
+   - Writes the bundle plus a SHA-256 manifest
+   - The hash covers file integrity, not query correctness
+
 3. Open a PR against `published-results`
 
    - Fork [BenchBox-dev/BenchBox](https://github.com/BenchBox-dev/BenchBox)
    - Copy `submission/bundle/` and the manifest into `results-data/bundles/`
    - Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
-   - Maintainers review before anything goes public
+   - Maintainers review the PR
+   - Merged runs appear in the Explorer after a later curated publish, not at merge
 
 Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contributing-results.html)
 
