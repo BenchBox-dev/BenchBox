@@ -645,9 +645,9 @@ class UnifiedDtExpr:
 
             return UnifiedExpr(getattr(F, pyspark_fn_name or part)(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
-            return UnifiedExpr(df_f.date_part(df_lit(part), self._expr))
+            return UnifiedExpr(df_f.date_part(part, self._expr))
         return UnifiedExpr(getattr(self._expr.dt, part)())
 
     def year(self) -> UnifiedExpr:
@@ -682,10 +682,10 @@ class UnifiedDtExpr:
             # PySpark dayofweek: 1=Sunday..7=Saturday; convert to ISO
             return UnifiedExpr((F.dayofweek(self._expr) + 5) % 7)
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
             # DataFusion dow: 0=Sunday..6=Saturday; convert to ISO
-            return UnifiedExpr((df_f.date_part(df_lit("dow"), self._expr) + 6) % 7)
+            return UnifiedExpr((df_f.date_part("dow", self._expr) + 6) % 7)
         return UnifiedExpr(self._expr.dt.weekday())
 
     def truncate(self, every: str) -> UnifiedExpr:
@@ -705,11 +705,11 @@ class UnifiedDtExpr:
             fmt = fmt_map.get(every, every)
             return UnifiedExpr(F.date_trunc(fmt, self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
             fmt_map = {"1m": "minute", "1h": "hour", "1d": "day", "1w": "week", "1mo": "month", "1y": "year"}
             fmt = fmt_map.get(every, every)
-            return UnifiedExpr(df_f.date_trunc(df_lit(fmt), self._expr))
+            return UnifiedExpr(df_f.date_trunc(fmt, self._expr))
         return UnifiedExpr(self._expr.dt.truncate(every))
 
     def total_seconds(self) -> UnifiedExpr:
@@ -722,9 +722,9 @@ class UnifiedDtExpr:
             # PySpark durations: cast to long (seconds)
             return UnifiedExpr(self._expr.cast("long"))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
-            return UnifiedExpr(df_f.extract(df_lit("epoch"), self._expr))
+            return UnifiedExpr(df_f.extract("epoch", self._expr))
         return UnifiedExpr(self._expr.dt.total_seconds())
 
     def total_days(self) -> UnifiedExpr:
@@ -742,7 +742,7 @@ class UnifiedDtExpr:
             from datafusion import functions as df_f, lit as df_lit
 
             # Extract epoch seconds and divide by 86400
-            return UnifiedExpr(df_f.extract(df_lit("epoch"), self._expr) / df_lit(86400))
+            return UnifiedExpr(df_f.extract("epoch", self._expr) / df_lit(86400))
         return UnifiedExpr(self._expr.dt.total_days())
 
 

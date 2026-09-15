@@ -41,8 +41,8 @@ dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "pyyaml>=6.0.0",
     "packaging>=24.0",
-    # pyarrow: ABI-sensitive (bundled C++); wide cap to <25 to give runway while catching jumps.
-    "pyarrow>=21.0.0,<25.0.0",
+    # pyarrow: ABI-sensitive (bundled C++); wide cap to <26 to give runway while catching jumps.
+    "pyarrow>=21.0.0,<26.0.0",
     "numpy>=1.24.0",
     # pandas is intentionally NOT a core dependency. It is an optional
     # engine/DataFrame dep (DataFrame mode, TPC-DI, ClickHouse-local) declared
@@ -118,7 +118,9 @@ all = [
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",  # For DataFrame mode
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12,
+    # incompatible with the pandas 3 migration (revisit when 19.x lifts the cap).
+    "databricks-connect>=14.0.0,<19",  # For DataFrame mode
     "datafusion>=50.1.0",  # Updated to match datafusion extra
     "pyarrow>=10.0.0",  # For DataFusion (also in core with higher version)
     "firebolt-sdk>=1.18.0",
@@ -320,7 +322,8 @@ cloud-spark-snowflake = [
 cloud-spark-databricks = [
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12 (see core deps).
+    "databricks-connect>=14.0.0,<19",
     "cloudpathlib>=0.15.0",
 ]
 
@@ -418,7 +421,7 @@ error-on-warning = false
 
 [dependency-groups]
 dev = [
-    "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
+    "ruff==0.16.7",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
     "pillow>=12.3.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output; >=12.3.0: PYSEC-2026-2253..3453 fixes
@@ -601,6 +604,9 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+# ruff >= 0.16 formats Python code blocks inside Markdown; docs/blog snippets
+# keep a prose-oriented style, so Markdown stays outside the formatter contract.
+exclude = ["*.md"]
 
 [tool.interrogate]
 # Docstring coverage enforcement

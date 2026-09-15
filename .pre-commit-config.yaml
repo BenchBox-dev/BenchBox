@@ -52,7 +52,7 @@ repos:
 
       - id: timing-policy-fast-lane
         name: timing policy (fast-lane collect)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane; else echo "SKIPPED (timing policy fast lane is pre-push only)"; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
@@ -64,7 +64,7 @@ repos:
       # plus the fast test lane.
       - id: pr-preflight-fast-tests
         name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make pr-preflight-fast-tests; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make local-validation GATE=local-focused-check CMD="make pr-preflight-focused-tests"; else exec uv run -- python scripts/local_validation.py skip --gate local-focused-check; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]
