@@ -68,7 +68,7 @@ AI/LLM leaderboards have become a ubiquitous feature of the AI arms race. These 
 BenchBox result publication relies on a trust model using hashed outputs and consistent machine IDs.
 
 * Runs record an anonymous machine ID locally so runs from the same hardware can be compared; public bundles drop it.
-* A result integrity hash is calculated when you package a run with `benchbox submit`. It validates that the result has not been modified.
+* A result integrity hash is calculated when you package a run with `benchbox submit`. CI checks it to confirm the result has not been modified since packaging.
 * Result submissions go through a GitHub PR review by BenchBox maintainers before public release.
 
 To provide reproducible results, BenchBox result "bundles" include all of the details necessary to interpret and (if needed) reproduce and validate the benchmarking. Bundles specify:
@@ -79,7 +79,7 @@ To provide reproducible results, BenchBox result "bundles" include all of the de
 
 To support public sharing of results, bundles also record:
 
-1. **Run Validation**: Per-query checksums, row counts, and schema validation against known references.
+1. **Run Validation**: Row counts and schema validation against known references.
 2. **Run Provenance** (added in BenchBox v0.4.0): User type (maintainer, vendor, or community) and funding (employer, personal, free-trial, grant, vendor-sponsored, or unspecified, the default).
 
 ---
@@ -170,7 +170,7 @@ Find runs (`/results/query`) does two jobs. The first is search: filter by bench
 
 Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. The screenshot shows the published DuckDB 1.5.5 SF 10 bundle opened this way. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result, though a preview isn't ranked and has no bundle download or Find a run to compare button.
 
-It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` does that, and the Submit for public review button links to the guide that walks you through it.
+It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` checks whether a run can be submitted, and the Submit for public review button links to the guide that walks you through it.
 
 ---
 
