@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "3f324ff7864d0b698fcb415203d32db50b0008449de51a69c4a3597e1b75a0e9",
+  "contract_sha256": "39e34ae5b865f285532d93343e1754bce6c40a0f05c81fd88bd5be7bc82fce44",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -83,6 +83,9 @@
     "lint-imports",
     "lint-markers",
     "lint-site-theme-tokens",
+    "local-validation",
+    "local-validation-path",
+    "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
     "oracle-coverage-map",
@@ -99,6 +102,8 @@
     "pr-open",
     "pr-preflight",
     "pr-preflight-fast-tests",
+    "pr-preflight-focused-tests",
+    "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",
     "pr-review-followups",
@@ -170,7 +175,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 200,
+  "public_target_count": 203,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -242,6 +247,7 @@
     "lint-markers",
     "lint-site-theme-tokens",
     "local-validation",
+    "local-validation-path",
     "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
@@ -264,6 +270,8 @@
     "pr-open",
     "pr-preflight",
     "pr-preflight-fast-tests",
+    "pr-preflight-focused-tests",
+    "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",
     "pr-review-followups",
@@ -384,8 +392,8 @@
     ".pr-preflight-route": [
       {
         "header": ".pr-preflight-route:",
-        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\tROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); keys=(\"skill_integrity_needed\", \"content_guard_needed\", \"skill_integrity_only\", \"needs_code_ci\"); assert all(type(d.get(k)) is bool for k in keys), \"invalid preflight decision\"; assert not d[\"skill_integrity_only\"] or (d[\"skill_integrity_needed\"] and not d[\"needs_code_ci\"]), \"contradictory preflight decision\"; print(*(str(d[k]).lower() for k in keys))' \"$(PATH_DECISION)\"); \\\n\tset -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \\\n\tif [ \"$$SKILL_ONLY\" = true ] && [ \"$$CONTENT\" != true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\telif [ \"$$SKILL_ONLY\" = true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity content\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tLANES=product; [ \"$$CONTENT\" = true ] && LANES=\"$$LANES content\"; [ \"$$SKILL\" = true ] && LANES=\"$$LANES skill-integrity\"; \\\n\t\techo \"Selected preflight lanes: $$LANES\"; \\\n\t\t$(MAKE) ci-lint; \\\n\t\tif [ \"$$SKILL\" = true ]; then $(MAKE) -s skill-integrity-check; fi; \\\n\t\t$(MAKE) -s pr-preflight-fast-tests PATH_DECISION=\"$(PATH_DECISION)\" PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tfi",
-        "recipe_sha256": "805054f863663f788ce281d7bd20129c56887c2cf4dc66faf86aa62c7ebe48a5"
+        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\tROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); keys=(\"skill_integrity_needed\", \"content_guard_needed\", \"skill_integrity_only\", \"needs_code_ci\"); assert all(type(d.get(k)) is bool for k in keys), \"invalid preflight decision\"; assert not d[\"skill_integrity_only\"] or (d[\"skill_integrity_needed\"] and not d[\"needs_code_ci\"]), \"contradictory preflight decision\"; print(*(str(d[k]).lower() for k in keys))' \"$(PATH_DECISION)\"); \\\n\tset -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \\\n\tif [ \"$$SKILL_ONLY\" = true ] && [ \"$$CONTENT\" != true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\telif [ \"$$SKILL_ONLY\" = true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity content\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tLANES=product; [ \"$$CONTENT\" = true ] && LANES=\"$$LANES content\"; [ \"$$SKILL\" = true ] && LANES=\"$$LANES skill-integrity\"; \\\n\t\techo \"Selected preflight lanes: $$LANES\"; \\\n\t\t$(MAKE) ci-lint; \\\n\t\tif [ \"$$SKILL\" = true ]; then $(MAKE) -s skill-integrity-check; fi; \\\n\t\tif [ \"$(SKIP_FAST_TESTS)\" = \"1\" ]; then \\\n\t\t\techo \"Focused local gate already completed; skipping duplicate fast tests.\"; \\\n\t\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\t\telse \\\n\t\t\t$(MAKE) -s pr-preflight-fast-tests PATH_DECISION=\"$(PATH_DECISION)\" PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\t\tfi; \\\n\tfi",
+        "recipe_sha256": "cc17b2f4742cb8d7b5098a07a4f98ffaba09c65e6d78cf340c875d30392f7d44"
       }
     ],
     ".release-cut-tree-required": [
@@ -995,6 +1003,13 @@
         "recipe_sha256": "767721bd1b17d4804424a04a2ad5d999f702c08328e33851077722c509bdb2ef"
       }
     ],
+    "local-validation-path": [
+      {
+        "header": "local-validation-path:",
+        "recipe": "\t@echo \"Running receipt-bound canonical preflight path (focused then required lanes).\"\n\t$(MAKE) -s pr-preflight $(BATCH_ARGS)",
+        "recipe_sha256": "acdaf3500b403e1cf4791b41ca86b98f865f201dd6876c64e138012970893f22"
+      }
+    ],
     "local-validation-show": [
       {
         "header": "local-validation-show:",
@@ -1163,15 +1178,29 @@
     "pr-preflight": [
       {
         "header": "pr-preflight:",
-        "recipe": "\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
-        "recipe_sha256": "f422fbdc52307d1bc4db02eea10f665b41e0cba18b11123829fcb6597af01bca"
+        "recipe": "\t@git fetch origin develop --quiet\n\tuv run -- python scripts/local_validation.py ordered \\\n\t\t--focused-gate \"local-focused-check\" --focused-cmd 'make pr-preflight-focused-tests' \\\n\t\t--preflight-gate \"required-pr-preflight\" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \\\n\t\t$(BATCH_ARGS)",
+        "recipe_sha256": "7d81a0eeddf8bfca9db82bc3b386f79b5bf735a6fb183986245e498a5aff08ab"
       }
     ],
     "pr-preflight-fast-tests": [
       {
         "header": "pr-preflight-fast-tests:",
-        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
-        "recipe_sha256": "f07bd5de61e69488cdd95e450ba39ae294311c033b71d1750750528f09e8ac63"
+        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
+        "recipe_sha256": "be6d0e1afed5ae70a012cee2e58ef0492d9e4cf77bdad8eea6fee4bf3c94ef06"
+      }
+    ],
+    "pr-preflight-focused-tests": [
+      {
+        "header": "pr-preflight-focused-tests:",
+        "recipe": "\t@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1",
+        "recipe_sha256": "43e775e7957b2190b1ae67b23c2c7d2a013e47e064b4964d8dace3d1819bcf59"
+      }
+    ],
+    "pr-preflight-uncached": [
+      {
+        "header": "pr-preflight-uncached:",
+        "recipe": "\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
+        "recipe_sha256": "16eb65d51b01963e0e1f72b3534d3b8a56e7199fcfe56c06a84e85d68dff3538"
       }
     ],
     "pr-ready": [
@@ -1768,8 +1797,8 @@
     "test-unlock": [
       {
         "header": "test-unlock:",
-        "recipe": "\t@LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"; \\\n\tcase \"$$LOCK_DIR\" in \\\n\t\t\"~\") LOCK_DIR=\"$$HOME\" ;; \\\n\t\t\"~/\"*) LOCK_DIR=\"$$HOME/$${LOCK_DIR#\\~/}\" ;; \\\n\tesac; \\\n\tLOCK_PATH=\"$$LOCK_DIR/test.lock\"; \\\n\techo \"Removing stale BenchBox test lock at $$LOCK_PATH...\"; \\\n\trm -f \"$$LOCK_PATH\"\n\t@echo \"Lock cleared.\"",
-        "recipe_sha256": "836b57dc1503d3a3ae9f16c226de70999443e87cca859304d2496f79cb3b3d1c"
+        "recipe": "\t@LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"; \\\n\tcase \"$$LOCK_DIR\" in \\\n\t\t\"~\") LOCK_DIR=\"$$HOME\" ;; \\\n\t\t\"~/\"*) LOCK_DIR=\"$$HOME/$${LOCK_DIR#\\~/}\" ;; \\\n\tesac; \\\n\tLOCK_PATH=\"$$LOCK_DIR/test.lock\"; \\\n\tpython3 scripts/local_validation.py clear-test-lock \"$$LOCK_PATH\"",
+        "recipe_sha256": "56933b2700dcacbc30411823088f4fc8c60e5aa6320e578ef71ece3ff4f1a227"
       }
     ],
     "test-verbose": [
@@ -2058,7 +2087,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "9dd0a1a4f08ca59d2ae21d355d4e6fffd6ca3c73de716d7cd949e462f377160f",
+  "semantic_sha256": "3f70cdcefde875ac2352a00e2cda4ae9c66e1e8d13e71b62b3284bc636cbe209",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2187,9 +2216,9 @@
       "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit",
+      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
       "kind": "rule",
-      "sha256": "690189a9c2b128932cb03e2e3a48a90bfcd79bdd8d65fb972dbcf7aa43ae3d26",
+      "sha256": "4f766b9d6859e691e5ebaaad9a80f352ff504ff7b0c122779eb26f3632042548",
       "targets": [
         ".PHONY"
       ]
@@ -2345,9 +2374,9 @@
       ]
     },
     {
-      "body": "test-unlock:\n\t@LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"; \\\n\tcase \"$$LOCK_DIR\" in \\\n\t\t\"~\") LOCK_DIR=\"$$HOME\" ;; \\\n\t\t\"~/\"*) LOCK_DIR=\"$$HOME/$${LOCK_DIR#\\~/}\" ;; \\\n\tesac; \\\n\tLOCK_PATH=\"$$LOCK_DIR/test.lock\"; \\\n\techo \"Removing stale BenchBox test lock at $$LOCK_PATH...\"; \\\n\trm -f \"$$LOCK_PATH\"\n\t@echo \"Lock cleared.\"",
+      "body": "test-unlock:\n\t@LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"; \\\n\tcase \"$$LOCK_DIR\" in \\\n\t\t\"~\") LOCK_DIR=\"$$HOME\" ;; \\\n\t\t\"~/\"*) LOCK_DIR=\"$$HOME/$${LOCK_DIR#\\~/}\" ;; \\\n\tesac; \\\n\tLOCK_PATH=\"$$LOCK_DIR/test.lock\"; \\\n\tpython3 scripts/local_validation.py clear-test-lock \"$$LOCK_PATH\"",
       "kind": "rule",
-      "sha256": "590576ed661354ee68a9222d5c7f5a99c1150097741494858408dfd991a8f793",
+      "sha256": "b59f0f48e1dc55d1607a88b85ee8dab10fcb9c5597caa5f99209cffe849900e6",
       "targets": [
         "test-unlock"
       ]
@@ -3649,9 +3678,9 @@
       ]
     },
     {
-      "body": ".PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
+      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
       "kind": "rule",
-      "sha256": "565311a30eb1131a0cd12a6aea341a88199b2387fa88f4b1b78987dd48477d45",
+      "sha256": "6e4887c6eac6f0aa82f4c14e8ace468283f28628b2e7ebebebaed67ab70c60b9",
       "targets": [
         ".PHONY"
       ]
@@ -3665,25 +3694,41 @@
       ]
     },
     {
-      "body": "pr-preflight:\n\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
+      "body": "pr-preflight-uncached:\n\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
       "kind": "rule",
-      "sha256": "6af2f6e74f0d9b78055ca67f0f3944df180032bc2f5c5a0be359a3036bfc04ad",
+      "sha256": "4bbb519db97e7fa4cb5cbfa91b41decfc6ea037f5242bc80b2086115f952b6ba",
+      "targets": [
+        "pr-preflight-uncached"
+      ]
+    },
+    {
+      "body": "pr-preflight:\n\t@git fetch origin develop --quiet\n\tuv run -- python scripts/local_validation.py ordered \\\n\t\t--focused-gate \"local-focused-check\" --focused-cmd 'make pr-preflight-focused-tests' \\\n\t\t--preflight-gate \"required-pr-preflight\" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \\\n\t\t$(BATCH_ARGS)",
+      "kind": "rule",
+      "sha256": "e6225832ad53d0139252bfccce56902e1b96f82a19fda39c55a1ef260e2515a9",
       "targets": [
         "pr-preflight"
       ]
     },
     {
-      "body": ".pr-preflight-route:\n\t@set -eu; \\\n\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\tROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); keys=(\"skill_integrity_needed\", \"content_guard_needed\", \"skill_integrity_only\", \"needs_code_ci\"); assert all(type(d.get(k)) is bool for k in keys), \"invalid preflight decision\"; assert not d[\"skill_integrity_only\"] or (d[\"skill_integrity_needed\"] and not d[\"needs_code_ci\"]), \"contradictory preflight decision\"; print(*(str(d[k]).lower() for k in keys))' \"$(PATH_DECISION)\"); \\\n\tset -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \\\n\tif [ \"$$SKILL_ONLY\" = true ] && [ \"$$CONTENT\" != true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\telif [ \"$$SKILL_ONLY\" = true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity content\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tLANES=product; [ \"$$CONTENT\" = true ] && LANES=\"$$LANES content\"; [ \"$$SKILL\" = true ] && LANES=\"$$LANES skill-integrity\"; \\\n\t\techo \"Selected preflight lanes: $$LANES\"; \\\n\t\t$(MAKE) ci-lint; \\\n\t\tif [ \"$$SKILL\" = true ]; then $(MAKE) -s skill-integrity-check; fi; \\\n\t\t$(MAKE) -s pr-preflight-fast-tests PATH_DECISION=\"$(PATH_DECISION)\" PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tfi",
+      "body": ".pr-preflight-route:\n\t@set -eu; \\\n\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\tROUTE=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); keys=(\"skill_integrity_needed\", \"content_guard_needed\", \"skill_integrity_only\", \"needs_code_ci\"); assert all(type(d.get(k)) is bool for k in keys), \"invalid preflight decision\"; assert not d[\"skill_integrity_only\"] or (d[\"skill_integrity_needed\"] and not d[\"needs_code_ci\"]), \"contradictory preflight decision\"; print(*(str(d[k]).lower() for k in keys))' \"$(PATH_DECISION)\"); \\\n\tset -- $$ROUTE; SKILL=$$1; CONTENT=$$2; SKILL_ONLY=$$3; \\\n\tif [ \"$$SKILL_ONLY\" = true ] && [ \"$$CONTENT\" != true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\telif [ \"$$SKILL_ONLY\" = true ]; then \\\n\t\techo \"Selected preflight lanes: skill-integrity content\"; \\\n\t\t$(MAKE) -s skill-integrity-check; \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tLANES=product; [ \"$$CONTENT\" = true ] && LANES=\"$$LANES content\"; [ \"$$SKILL\" = true ] && LANES=\"$$LANES skill-integrity\"; \\\n\t\techo \"Selected preflight lanes: $$LANES\"; \\\n\t\t$(MAKE) ci-lint; \\\n\t\tif [ \"$$SKILL\" = true ]; then $(MAKE) -s skill-integrity-check; fi; \\\n\t\tif [ \"$(SKIP_FAST_TESTS)\" = \"1\" ]; then \\\n\t\t\techo \"Focused local gate already completed; skipping duplicate fast tests.\"; \\\n\t\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\t\telse \\\n\t\t\t$(MAKE) -s pr-preflight-fast-tests PATH_DECISION=\"$(PATH_DECISION)\" PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\t\tfi; \\\n\tfi",
       "kind": "rule",
-      "sha256": "d898d5238c5110b49448af34431bf7c1acea49cb29c17e87d3a53d567f242765",
+      "sha256": "985ea16de50b9b05ee1bde15a2d01bfd163cd4859cd35d408ed5db9d9e9897ac",
       "targets": [
         ".pr-preflight-route"
       ]
     },
     {
-      "body": "pr-preflight-fast-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
+      "body": "pr-preflight-focused-tests:\n\t@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1",
       "kind": "rule",
-      "sha256": "1abed8b3ed3c9b4e32b644c5303bcd571e0ba1019d0d6110e1ff9579d0a63f12",
+      "sha256": "565424cfbf9722239f949a15a922b9964336b3944cfe46898695041975c6ff0b",
+      "targets": [
+        "pr-preflight-focused-tests"
+      ]
+    },
+    {
+      "body": "pr-preflight-fast-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
+      "kind": "rule",
+      "sha256": "09ce5d931e7cba452e441482581e8bfa5427b429180d1a3bc2e739ab7a34e65c",
       "targets": [
         "pr-preflight-fast-tests"
       ]
@@ -3710,6 +3755,26 @@
       "sha256": "e640083950b17af4e5f80d769af03447c4afc122ddf36df13689f6c328a45597",
       "targets": [
         "local-validation-show"
+      ]
+    },
+    {
+      "body": "FOCUSED_CMD ?= uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q",
+      "kind": "variable",
+      "name": "FOCUSED_CMD",
+      "sha256": "1359d6727d7153e5b79d325ba602b4c6b0d247b87a1a6ede8936d35a6b3802d0"
+    },
+    {
+      "body": "PREFLIGHT_CMD ?= make pr-preflight",
+      "kind": "variable",
+      "name": "PREFLIGHT_CMD",
+      "sha256": "a9d0ae36efbd67cea6ba02d97a5a77de679d5fad97ca4a54292eb2ecfe64bab0"
+    },
+    {
+      "body": "local-validation-path:\n\t@echo \"Running receipt-bound canonical preflight path (focused then required lanes).\"\n\t$(MAKE) -s pr-preflight $(BATCH_ARGS)",
+      "kind": "rule",
+      "sha256": "e99a49b73aa12130df1311d2f77cd5aaa55db85b4747a57a8cdf82858d409db3",
+      "targets": [
+        "local-validation-path"
       ]
     },
     {
@@ -4195,7 +4260,7 @@
       ]
     }
   ],
-  "target_count": 206,
+  "target_count": 209,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4270,6 +4335,7 @@
     "lint-markers",
     "lint-site-theme-tokens",
     "local-validation",
+    "local-validation-path",
     "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
@@ -4292,6 +4358,8 @@
     "pr-open",
     "pr-preflight",
     "pr-preflight-fast-tests",
+    "pr-preflight-focused-tests",
+    "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",
     "pr-review-followups",
@@ -4531,6 +4599,13 @@
         "operator": ":="
       }
     ],
+    "FOCUSED_CMD": [
+      {
+        "body": "FOCUSED_CMD ?= uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
     "FORMAT": [
       {
         "body": "override FORMAT := $(value FORMAT)",
@@ -4576,6 +4651,13 @@
     "PARITY_PLATFORMS": [
       {
         "body": "PARITY_PLATFORMS ?= questdb postgresql",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PREFLIGHT_CMD": [
+      {
+        "body": "PREFLIGHT_CMD ?= make pr-preflight",
         "directive": "",
         "operator": "?="
       }
