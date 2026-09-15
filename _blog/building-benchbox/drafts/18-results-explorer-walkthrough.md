@@ -23,6 +23,8 @@ The new [Results Explorer](https://benchbox.dev/results/) feature allows you to 
 
 Likewise, benchmarking blog posts and PR announcements are (at best) backed up by results on GitHub shared as shell scripts and CSVs. It's time-consuming to validate the shared assets and determine whether they are trustworthy and reproducible. Common concerns: ran with very large compute, used special tunings, used a modified benchmark, used a specific cloud provider, etc.
 
+A shared benchmark result is only useful if someone else can easily understand how it was run and easily compare it to other results.
+
 ---
 
 ## Inspirations
@@ -89,7 +91,7 @@ The Explorer has six tabs: Overview, Benchmarks, Platforms, Compare, Find runs, 
 
 ![Results Explorer Overview: 22 supported benchmarks (16 with public results), 244 published runs, 13 platforms with public results, 37 rankings, and a Recent results table.](../images/results_explorer_overview.png)
 
-Overview (`/results/`) answers the first question anyone asks: what's here, and what's new? You don't need to set a filter. Four counts sit at the top: supported benchmarks, published runs, platforms, and rankings. As of this post, that's 244 published runs across 13 platforms. Below the counts, Recent results lists the latest arrivals, and three numbered shortcuts take you from running a benchmark to comparing your result to submitting a bundle.
+Overview (`/results/`) answers the first question anyone asks: what's here, and what's new? You don't need to set a filter. Four counts sit at the top: supported benchmarks, published runs, platforms, and rankings. As of this post, that's 244 published runs across 13 platforms. This initial set of results is exclusively small scale (scale factor 10 or smaller) and maintainer-run today. It is intended to seed the project and demonstrate its value. Below the counts, Recent results lists the latest arrivals, and three numbered shortcuts take you from running a benchmark to comparing your result to submitting a bundle.
 
 ### 2. Platforms
 
