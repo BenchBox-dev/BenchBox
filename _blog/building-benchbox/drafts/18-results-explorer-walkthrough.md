@@ -1,5 +1,5 @@
 ---
-title: "Results Explorer release"
+title: "Introducing the BenchBox Results Explorer"
 blogpost: true
 status: draft
 date: September 15, 2026
@@ -8,10 +8,14 @@ series: building-benchbox
 post_number: 18
 type: architecture-design
 tags: [benchbox, results-explorer, benchmarking, geekbench, llm-leaderboards, duckdb-wasm, provenance]
-meta_description: "The BenchBox Results Explorer shares verifiable, reproducible benchmark results publicly. Inspirations, the trust model, and a screenshot tour of the Explorer."
+meta_description: "Results Explorer allows BenchBox users to share and compare their own benchmarking results with results shared by the BenchBox community. Anyone can submit a run for publication through a pull request."
 ---
 
-# Results Explorer release
+# Introducing the BenchBox Results Explorer
+
+> A Geekbench for data platform benchmarks
+
+**TL;DR**: Results Explorer allows BenchBox users to share and compare their own benchmarking results with results shared by the BenchBox community. Anyone can submit a run for publication through a pull request.
 
 BenchBox makes data platform benchmarking simple by executing consistent and clearly documented benchmarking using well-known (and clearly defined) benchmarks against a large set of popular data platforms using the most popular language for data engineering.
 
