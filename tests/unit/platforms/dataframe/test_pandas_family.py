@@ -471,7 +471,7 @@ class TestPandasFamilyContextHelpers:
     """Tests for PandasFamilyContext helper methods.
 
     These methods provide platform-agnostic DataFrame operations
-    that work across Pandas, Dask, Modin, and cuDF.
+    that work across Pandas, Dask, and cuDF.
     """
 
     @pytest.fixture

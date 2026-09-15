@@ -508,4 +508,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
+    benchmark_class=DataVaultBenchmark,
 )

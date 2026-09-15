@@ -487,6 +487,23 @@ def test_verify_live_receipt_signature_handles_missing_openssl(
     )
 
 
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        ("benchbox.dev", True),
+        ("https://benchbox.dev", False),
+        ({"environment": "github-pages", "repository": "BenchBox-dev/BenchBox", "url": "https://benchbox.dev"}, True),
+        ({"url": "benchbox.dev"}, True),
+        ({"url": "https://staging.benchbox.dev"}, False),
+        ({}, False),
+        (None, False),
+    ],
+)
+def test_receipt_targets_benchbox_dev_accepts_legacy_and_transaction_schemas(target, expected) -> None:
+    receipt = {"target": target} if target is not None else {}
+    assert recon_mod.receipt_targets_benchbox_dev(receipt) is expected
+
+
 # ======================================================================
 # INDEPENDENCE MATRIX (w2)
 # ======================================================================

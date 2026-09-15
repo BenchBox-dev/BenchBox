@@ -2,7 +2,7 @@
 
 #904 made empty-string-vs-null CSV loading uniform but pinned only DataFusion and
 PySpark. This parametrizes the same contract across every installed DataFrame adapter
-(pandas/polars/dask/modin, cudf availability-skipped) and adds a CSV-path
+(pandas/polars/dask, cudf availability-skipped) and adds a CSV-path
 SQL<->DataFrame parity case (``prefer_parquet=False``), so the uniformity the #904
 metric claims is actually pinned. Test-only: a surfaced gap is a defect TODO, not an
 in-test fix.
@@ -27,7 +27,6 @@ from benchbox.platforms.dataframe.benchmark_mixin import DataFrameRunOptions
 from benchbox.platforms.dataframe.cudf_df import CUDF_AVAILABLE, CuDFDataFrameAdapter
 from benchbox.platforms.dataframe.dask_df import DASK_AVAILABLE, DaskDataFrameAdapter
 from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE, DataFusionDataFrameAdapter
-from benchbox.platforms.dataframe.modin_df import MODIN_AVAILABLE, ModinDataFrameAdapter
 from benchbox.platforms.dataframe.pandas_df import PANDAS_AVAILABLE, PandasDataFrameAdapter
 from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE, PolarsDataFrameAdapter
 from benchbox.platforms.dataframe.pyspark_df import PYSPARK_AVAILABLE, PySparkDataFrameAdapter
@@ -177,7 +176,6 @@ _ADAPTER_CASES = [
     _AdapterCase("pandas", PANDAS_AVAILABLE, PandasDataFrameAdapter),
     _AdapterCase("polars", POLARS_AVAILABLE, PolarsDataFrameAdapter),
     _AdapterCase("dask", DASK_AVAILABLE, _make_dask),
-    _AdapterCase("modin", MODIN_AVAILABLE, ModinDataFrameAdapter),
     _AdapterCase("cudf", CUDF_AVAILABLE, CuDFDataFrameAdapter),
 ]
 

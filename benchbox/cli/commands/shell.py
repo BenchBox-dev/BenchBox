@@ -42,7 +42,6 @@ def _get_platform_from_extension(extension: str) -> str:
         ".polars-df": "polars-df",
         ".pandas-df": "pandas-df",
         ".cudf-df": "cudf-df",
-        ".modin-df": "modin-df",
         ".dask-df": "dask-df",
         # Other platforms
         ".cudf": "cudf",
@@ -81,7 +80,6 @@ def discover_local_databases(base_dir: Path | None = None) -> list[dict[str, Any
         ".polars-df",
         ".pandas-df",
         ".cudf-df",
-        ".modin-df",
         ".dask-df",
         ".cudf",
         ".spark",

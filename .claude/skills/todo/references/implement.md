@@ -22,6 +22,12 @@ your judgment define the work.
 If the claim may outlast its lease (default 24h), call
 `renew(id=..., generation=...)`. Same generation, no milestones needed.
 
+For a declared feature batch, a completed member uses `prepare`, not `finish`:
+the call includes the member's batch metadata, clean exact source checkout and
+revision, and passed bounded-suite evidence. `prepare` releases the claim and
+preserves the receipt; it does not mark the member done. Do not use it for
+ordinary work or to bypass external, review, or approval dependencies.
+
 ### 3. Finish or hand back
 
 1. Call `finish(id=..., generation=...)` to close the item.

@@ -128,7 +128,7 @@ Running TPC-H on a tool optimized for TPC-C (or vice versa) produces misleading 
 - Comparing **cloud data warehouses** (Snowflake vs BigQuery vs Databricks)
 - Benchmarking **embedded analytics** (DuckDB, DataFusion, SQLite)
 - **Benchmarking DataFrame libraries**, BenchBox is the only tool with full DataFrame support:
-  - Polars, Pandas, PySpark DataFrame, DataFusion, Modin, Dask, cuDF (GPU)
+  - Polars, Pandas, PySpark DataFrame, DataFusion, Dask, cuDF (GPU)
   - Native DataFrame API translations (not SQL-over-DataFrame)
   - Side-by-side SQL vs DataFrame comparisons on the same data
 - You need **benchmark variety** (22 benchmarks, TPC standards + industry + real-world + time-series + AI/ML)

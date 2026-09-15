@@ -108,10 +108,6 @@ def _invoke_run(platform="duckdb", database_config=None):
 
 
 @pytest.mark.unit
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestRunDriverVersionAnnouncement:
     """The 'Running ...' line should include driver version when available."""
 

@@ -76,8 +76,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # bytes to any lane artifact. Lane-owned scripts below this prefix are
     # still classified first by ``verify_lane_isolation``.
     "scripts/publication/",
-    # Agent skill mirrors: consumed by coding agents, not lane builds.
-    ".claude/skills/",
+    # Agent configurations, skills, and settings: consumed by coding agents, not lane builds.
+    ".claude/",
     # CI definitions and repo orchestration.
     ".github/",
     "Makefile",
@@ -88,6 +88,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "_project/",
     # Repo-root agent docs, skill config, and local-tooling config.
     "AGENTS.md",
+    "CONTRIBUTING.md",
     "CLAUDE.md",
     "GEMINI.md",
     "ANTIGRAVITY.md",
@@ -98,11 +99,26 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "skill-sync.conf",
     "tools/skill-sync",
     "scripts/skill_sync_ci_policy.py",
+    # Deleted cloud setup script still appears in the changed-paths of the
+    # removal, so it stays classified.
+    "scripts/cloud-claude-setup.sh",
     # CI/dev plumbing never read by lane artifact builds.
     "scripts/check_release_curation.py",
     "scripts/check_untracked_skill_mirrors.sh",
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",
+    # Repository guidance and release notes are linked from the site but are
+    # not read while assembling any publication artifact.
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "examples/",
+    # Developer checks and source-generation helpers are exercised by CI or
+    # invoked manually; publication builds do not execute them.
+    "scripts/_compose_joinorder_hero.py",
+    "scripts/check_dependency_bounds.py",
+    "scripts/check_duplicate_code.py",
+    "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
     "scripts/set_worktree_identity.sh",

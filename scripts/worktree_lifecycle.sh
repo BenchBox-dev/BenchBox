@@ -169,6 +169,8 @@ create_worktree() {
   base_oid=$(git rev-parse origin/develop^{commit}) || die "Could not resolve fetched origin/develop"
   creation_started=yes
   git worktree add -b "$branch" "$worktree_path" origin/develop
+  # Hooks live in the common Git directory. Installation is owned by the
+  # primary clone; never rewrite the shared hook from this linked worktree.
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
 
   py_runner="python3"

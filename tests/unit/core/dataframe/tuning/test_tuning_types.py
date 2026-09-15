@@ -71,12 +71,6 @@ class TestDataFrameTuningType:
         assert DataFrameTuningType.GPU_POOL_TYPE.is_compatible_with_platform("cudf") is True
         assert DataFrameTuningType.GPU_SPILL_TO_HOST.is_compatible_with_platform("cudf") is True
 
-    def test_is_compatible_with_platform_modin(self):
-        """Test Modin platform compatibility."""
-        # Compatible with Modin
-        assert DataFrameTuningType.WORKER_COUNT.is_compatible_with_platform("modin") is True
-        assert DataFrameTuningType.ENGINE_AFFINITY.is_compatible_with_platform("modin") is True
-
     def test_is_compatible_with_platform_case_insensitive(self):
         """Test that platform name matching is case-insensitive."""
         assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("POLARS") is True
@@ -89,9 +83,9 @@ class TestDataFrameTuningType:
 
     def test_compatible_with_multiple_platforms(self):
         """Test that settings are compatible with multiple platforms."""
-        # THREAD_COUNT should be compatible with Polars and Modin
-        assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("polars") is True
-        assert DataFrameTuningType.THREAD_COUNT.is_compatible_with_platform("modin") is True
+        # DTYPE_BACKEND should be compatible with Pandas and Dask
+        assert DataFrameTuningType.DTYPE_BACKEND.is_compatible_with_platform("pandas") is True
+        assert DataFrameTuningType.DTYPE_BACKEND.is_compatible_with_platform("dask") is True
 
         # GPU_DEVICE should only be compatible with cuDF
         assert DataFrameTuningType.GPU_DEVICE.is_compatible_with_platform("cudf") is True
@@ -108,7 +102,6 @@ class TestGetAllPlatforms:
         assert "datafusion" in platforms
         assert "pandas" in platforms
         assert "dask" in platforms
-        assert "modin" in platforms
         assert "cudf" in platforms
 
     def test_returns_list(self):

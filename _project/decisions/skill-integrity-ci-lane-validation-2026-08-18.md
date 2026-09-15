@@ -1,7 +1,7 @@
 # Decision: skill-integrity CI lane live-validation protocol
 
-Date: 2026-08-18 (interim checkpoint: 2026-09-06)
-Status: **INSUFFICIENT SAMPLE (1/3 legitimate samples observed at Day 19; interim checkpoint)**
+Date: 2026-08-18 (interim checkpoints: 2026-09-06, 2026-09-12)
+Status: **INSUFFICIENT SAMPLE (2/3 legitimate samples observed; interim checkpoint)**
 
 This is the evidence contract and interim checkpoint for
 `skill-integrity-ci-lane-live-validation`. It is observational only. It does
@@ -47,7 +47,7 @@ The 14-day observation window elapsed on 2026-09-01. As of 2026-09-06 (Day 19), 
 | sample | PR | head SHA | base SHA | lane | status |
 |---|---:|---|---|---|---|
 | sample-1 | #1996 | 2a0a21a57401815cd8d0cc0f6fc06ae15716d352 | 16f95adf5b2eba29574a095e4cca7fd9f5b89207 | skill-only | observed / verified |
-| sample-2 | pending | pending | pending | skill-only | pending legitimate consumer PR |
+| sample-2 | #2094 | e4a6e316c150c753b33ae78ee24bbc60282b96fa | 25002c8be18da0dd9f4f260921ca5313d158a857 | skill-only | observed / verified |
 | sample-3 | pending | pending | pending | skill-only | pending legitimate consumer PR |
 
 ## Evidence captured per sample
@@ -270,3 +270,127 @@ PR #2042 (todo-db vendor, merged 2026-09-05) touches `AGENTS.md`, `.mcp.json`,
 and a vendored wheel, so it is mixed-lane, not skill-only. Observed samples
 remain 1 of 3; `sample-2` and `sample-3` still pending legitimate consumer
 PRs. Next review date unchanged (`2026-09-20`). No synthetic canaries created.
+
+### Addendum: Sample-2 live validation (2026-09-12, still INSUFFICIENT SAMPLE)
+
+PR #2094 merged into `develop` on 2026-09-10 and is the second legitimate
+skill-only consumer sample. The live evidence was collected without modifying
+workflow routing or creating a synthetic trigger.
+
+#### Sample-2 identity and classification
+
+- PR: #2094 (`chore: sync skill mirrors — catalog + todo-db 0.7`)
+- Head SHA: `e4a6e316c150c753b33ae78ee24bbc60282b96fa`
+- Event base SHA: `25002c8be18da0dd9f4f260921ca5313d158a857`
+- Head ref: `chore/bump-catalog-8726899`
+- Opened: `2026-09-10T20:24:21Z`; merged: `2026-09-10T22:15:16Z`
+- Merge commit: `fa46421f2df69a0fe1dde25e164cd1b9c05a66a6`
+- Exact changed paths: `.claude/skills/code/SKILL.md`,
+  `.claude/skills/shared-review-protocol/references/adversarial-review.md`,
+  `.claude/skills/skill-sync.manifest`,
+  `.claude/skills/skill-sync.receipt`,
+  `.claude/skills/todo-db/SKILL.md`,
+  `.claude/skills/todo-db/references/batch.md`,
+  `.claude/skills/todo-db/references/bootstrap.md`,
+  `.claude/skills/todo-db/references/closeout.md`,
+  `.claude/skills/todo-db/references/handoff.md`,
+  `.claude/skills/todo-db/references/ideate.md`,
+  `.claude/skills/todo-db/references/implement.md`,
+  `.claude/skills/todo-db/references/prioritize.md`,
+  `.claude/skills/todo-db/references/queries.md`,
+  `.claude/skills/todo-db/references/recovery.md`,
+  `.claude/skills/todo-db/references/review.md`,
+  `.claude/skills/todo-db/references/spec.md`,
+  and `skill-sync.conf` (17 paths total).
+- Path-decision artifact: run `34531230281`, artifact `10173558966`
+  (`ci-path-decision.json`). It records
+  `manifest_decision_reason=approved_ref_only_change`,
+  `skill_integrity_needed=true`, `skill_integrity_only=true`,
+  `content_guard_needed=false`, `needs_code_ci=false`, and an empty
+  `code_paths` list. Its captured `manifest_base_sha` equals the event base
+  SHA above.
+
+#### Sample-2 routing and certification
+
+- `Develop PR` run `34531230281` succeeded. Its `skill-integrity` job
+  `103052247564`, `certification-identity` job `103052247941`, and
+  `ci-required-result` job `103052579395` all succeeded.
+- Required sibling contexts succeeded: `ci-required-result` check
+  `103052579395`, `Results Explorer browser gate` check `103052231112`, and
+  `ruleset-drift` check `103052154524`.
+- Product lanes were skipped, including lint, fast/medium tests, correctness,
+  plan capture, content guard, audit, packaging, parity, Explorer tests and
+  tokens, site-theme, TPC-H framing, and database integrations. No product
+  job falsely started and no expected product skip was absent.
+- Certification artifacts were `10173570298` (`pr-certification-identity`)
+  and `10173605658` (`pr-certification-lanes`). The certification kind was
+  `skill_integrity`, with only the `skill-integrity` lane selected. This is the
+  expected `prior_certification_not_full` outcome for a skill-only sample; no
+  full certification was produced.
+
+#### Sample-2 event history and fan-out
+
+The existing `_project/scripts/dev_loop_pr_metrics.py` collector was run with
+`event_fanout_v1` for the final head SHA. It found one completed synchronize
+head and no cancelled job or replacement head in the same-head run set. The
+same-head workflow IDs were `34531230281` (`Develop PR`), `34531230232`
+(`Results Explorer browser tests`), `34531230257` (`Develop ruleset drift`),
+`34531230233` (`Develop refresh shadow`), `34531230304` (`Auto-merge
+revocation`), two `PR base guard` runs (`34531230247`, `34531267407`),
+`34531229935` (`Orphaned Commit Detector`), and independent runs
+`34531228549` (`validate-submission`) and `34531227529`
+(`publication-canaries`). The last two independent runs failed immediately;
+they contributed no failed jobs to the collector's job buckets and did not
+alter the required gate.
+
+The collector reported:
+
+- required-gate and merge-unblock: 88 seconds each;
+- all-workflow: 94 seconds;
+- successful completed runner time: 3.53 minutes, split into 1.78 execution
+  and 1.12 setup minutes;
+- cancelled runner time: 0 minutes, with 0 cancelled jobs;
+- failed jobs: 0; incomplete job records: 21 (the skipped product records);
+- queue delay from the required-gate end to squash merge: 3,455 seconds
+  (57 minutes 35 seconds);
+- first-pass green: true; no fast- or medium-test runtime was available because
+  those lanes were skipped; the collector counted one commit timestamp after
+  PR open, but no distinct superseded head or cancelled replacement attempt
+  was present.
+
+The merge-group required gate was observed separately on merge commit
+`fa46421f2df69a0fe1dde25e164cd1b9c05a66a6`: `Develop PR` run `34536335139`,
+browser run `34536335143`, and ruleset run `34536335192`. The same collector
+logic, restricted to those `merge_group` runs, reported a 75-second required
+gate, 93-second all-workflow span, 2.02 successful runner-minutes, and 0
+cancelled runner-minutes. It is not combined with the synchronize-event
+measurement.
+
+#### Sample-2 post-merge and interference
+
+The post-merge run was `Develop post-merge` run `34536503510` on merge commit
+`fa46421f2df69a0fe1dde25e164cd1b9c05a66a6`. Its `ci-lint` job (`lint`,
+`103069257874`) succeeded in 338 seconds (5 minutes 38 seconds); the complete
+post-merge workflow ran for 1,302 seconds (21 minutes 42 seconds). This is
+reported separately from the pre-merge clocks.
+
+The event base was captured immutably in both the path-decision and
+certification artifacts, and no refresh, `BEHIND` transition, leapfrog, or
+cancellation was observed in the recorded event set. Because the collector
+counted one post-open commit timestamp, the report preserves that history flag
+instead of treating the sample as proof of zero fix-forward activity. No
+additional sample is counted for it.
+
+#### Updated blocker status
+
+- **Status:** `INSUFFICIENT SAMPLE`
+- **Observed samples:** 2 of 3 required legitimate skill-only samples
+  (`sample-1`: PR #1996; `sample-2`: PR #2094).
+- **Missing samples:** 1 (`sample-3`).
+- **Action:** Keep TODO item `skill-integrity-ci-lane-live-validation`
+  blocked until one additional legitimate consumer PR supplies complete
+  routing, fan-out, and post-merge evidence. No synthetic canary will be
+  created.
+- **Next review date:** `2026-09-20`.
+- **Durable budget:** Unmeasured. Two samples are insufficient to publish a
+  budget or change the `SHADOW_ONLY` status of 07a/07b.

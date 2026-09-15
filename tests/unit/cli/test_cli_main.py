@@ -114,10 +114,6 @@ class TestCLIMain:
         assert payload["version_consistent"] is True
         assert payload["version_message"] == f"All version markers aligned at {benchbox.__version__}"
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     @patch("benchbox.cli.main.ConfigManager")
     def test_cli_context_initialization(self, mock_config_manager):
         """Test CLI context is properly initialized."""
@@ -132,10 +128,6 @@ class TestCLIMain:
 
 
 @pytest.mark.unit
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestRunCommand:
     """Test run command functionality."""
 
@@ -462,10 +454,6 @@ class TestRunCommand:
 
 
 @pytest.mark.unit
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestCLIIntegration:
     """Test CLI integration scenarios."""
 
@@ -599,10 +587,6 @@ class TestCLIIntegration:
 
 
 @pytest.mark.unit
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 class TestCLIExceptionHandling:
     """Test CLI exception handling scenarios."""
 

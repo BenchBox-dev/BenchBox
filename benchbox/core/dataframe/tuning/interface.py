@@ -25,9 +25,9 @@ class ParallelismConfiguration:
 
     Attributes:
         thread_count: Number of threads to use (None = platform default).
-            Applicable to: Polars (POLARS_MAX_THREADS), Modin (MODIN_CPUS)
+            Applicable to: Polars (POLARS_MAX_THREADS)
         worker_count: Number of worker processes (None = platform default).
-            Applicable to: Dask (n_workers), Modin (NPartitions)
+            Applicable to: Dask (n_workers)
         threads_per_worker: Threads per worker process.
             Applicable to: Dask only
     """
@@ -149,7 +149,6 @@ class ExecutionConfiguration:
             Applicable to: Polars (collect with engine='streaming')
         engine_affinity: Preferred execution engine.
             Polars: 'streaming' or 'in-memory'
-            Modin: 'ray' or 'dask'
         lazy_evaluation: Enable lazy evaluation where supported.
             Applicable to: Polars (LazyFrame), Dask (lazy by default)
         collect_timeout: Maximum seconds for collect/compute operations (None = no limit).
@@ -200,12 +199,12 @@ class DataTypeConfiguration:
     """Configuration for data type optimization settings.
 
     Attributes:
-        dtype_backend: Backend for nullable dtypes in Pandas/Dask/Modin.
+        dtype_backend: Backend for nullable dtypes in Pandas/Dask.
             Options: 'numpy' (classic), 'numpy_nullable' (default), 'pyarrow'
         enable_string_cache: Enable global string caching for categoricals.
             Applicable to: Polars (StringCache), Pandas (category dtype)
         auto_categorize_strings: Automatically convert low-cardinality strings to categoricals.
-            Applicable to: Pandas, Modin
+            Applicable to: Pandas
         categorical_threshold: Unique ratio threshold for auto-categorization (0.0-1.0).
             Strings with unique_count/total_count < threshold become categoricals.
     """
@@ -260,7 +259,7 @@ class IOConfiguration:
         memory_pool: Memory allocator for Arrow operations.
             Options: 'default', 'jemalloc', 'mimalloc', 'system'
         memory_map: Use memory-mapped files for reading.
-            Applicable to: Pandas, Dask, Modin
+            Applicable to: Pandas, Dask
         pre_buffer: Pre-buffer data during file reads.
             Applicable to: Pandas, Dask (via PyArrow)
         row_group_size: Row group size for Parquet writing (None = default).

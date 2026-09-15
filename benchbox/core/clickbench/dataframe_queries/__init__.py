@@ -2,7 +2,7 @@
 
 This module provides DataFrame implementations of ClickBench analytics queries
 that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas, Modin, Dask) platforms.
+Pandas-like (Pandas and Dask) platforms.
 
 Copyright 2026 Joe Harris / BenchBox Project
 

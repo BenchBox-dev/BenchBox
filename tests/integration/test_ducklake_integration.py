@@ -191,9 +191,11 @@ class TestDuckLakeLiveConnection:
 
             # After USE lake, unqualified DDL/DML targets the lake catalog.
             conn.execute("CREATE TABLE ducklake_smoke (id INTEGER, name VARCHAR)")
-            conn.execute("INSERT INTO ducklake_smoke VALUES (1, 'a'), (2, 'b')")
+            # Exceed DuckLake's default data-inlining threshold so this test can
+            # verify DATA_PATH without relying on version-specific maintenance commands.
+            conn.execute("INSERT INTO ducklake_smoke SELECT i, 'name-' || i::VARCHAR FROM range(12) AS rows(i)")
             rows = conn.execute("SELECT * FROM ducklake_smoke ORDER BY id").fetchall()
-            assert rows == [(1, "a"), (2, "b")]
+            assert rows == [(i, f"name-{i}") for i in range(12)]
 
             current_catalog = conn.execute("SELECT current_catalog()").fetchone()[0]
             assert current_catalog == "lake"
@@ -214,7 +216,9 @@ class TestDuckLakeLiveConnection:
         conn1 = adapter1.create_connection()
         try:
             conn1.execute("CREATE TABLE t (id INTEGER)")
-            conn1.execute("INSERT INTO t VALUES (1)")
+            # Force a Parquet write even when the active DuckLake extension
+            # inlines small inserts in catalog metadata.
+            conn1.execute("INSERT INTO t SELECT i FROM range(12) AS rows(i)")
         finally:
             conn1.close()
         assert metadata_path.exists()
@@ -298,15 +302,16 @@ class TestDuckLakeLiveConnection:
         conn = adapter.create_connection()
         try:
             conn.execute("CREATE TABLE sqlite_smoke (id INTEGER, name VARCHAR)")
-            conn.execute("INSERT INTO sqlite_smoke VALUES (1, 'a'), (2, 'b')")
+            # Keep the DATA_PATH assertion independent of data-inlining defaults.
+            conn.execute("INSERT INTO sqlite_smoke SELECT i, 'name-' || i::VARCHAR FROM range(12) AS rows(i)")
             rows = conn.execute("SELECT * FROM sqlite_smoke ORDER BY id").fetchall()
-            assert rows == [(1, "a"), (2, "b")]
+            assert rows == [(i, f"name-{i}") for i in range(12)]
 
             # Regression: a fresh cursor must still resolve the unqualified
             # table via the _DuckLakeCursorConnection wrapper's USE lake.
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM sqlite_smoke")
-            assert cur.fetchone()[0] == 2
+            assert cur.fetchone()[0] == 12
         finally:
             conn.close()
 

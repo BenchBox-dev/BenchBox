@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import re
 from pathlib import Path
 
 import pytest
@@ -145,7 +146,9 @@ def test_release_canary_workflow_uses_collection_artifact_and_six_single_threade
     assert workflow["env"]["RELEASE_CANARY_SHARD_COUNT"] == DEFAULT_SHARD_COUNT
     shard_text = _run_text("credential-free-non-fast")
     assert shard_text.count(f'-m "{MARKER_EXPRESSION}"') == 1
-    assert "actions/download-artifact@v4" in "\n".join(str(step) for step in shards["steps"])
+    assert any(re.search(r"actions/download-artifact@[0-9a-f]{40}", str(step)) for step in shards["steps"]), (
+        "canary shards must pin actions/download-artifact to an immutable SHA"
+    )
     assert "release_canary_sharding.py" in shard_text
     assert "mapfile -t node_ids" in shard_text
     assert "-n 0" in shard_text

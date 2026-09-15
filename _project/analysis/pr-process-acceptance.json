@@ -7,8 +7,10 @@
     "process_digest": "88a5e3b19f8dac60d89909a336baa084333ed52645ecad26409a8ebaadead118"
   },
   "registration": {
-    "commit": "d2fa960e4ab81d71af0ba0f5f13ad0f844c5e577",
-    "time": "2026-09-08T12:33:43Z"
+    "commit": "cc9b66b9b3de3a2639451b079833405e16d17e60",
+    "original_commit": "d2fa960e4ab81d71af0ba0f5f13ad0f844c5e577",
+    "time": "2026-09-08T12:33:43Z",
+    "note": "Squash-merge ancestry reconciliation: d2fa960e4 is the freeze-only preregistration (baseline-only commit on parent b221e852d); PR #2086 squash-merged as cc9b66b9b with the identical baseline digest, orphaning d2fa. commit points at the durable develop ancestor for the verification gate; original_commit preserves the freeze-before-implementation boundary (kept reachable via tag pr-process-acceptance-freeze-v1). Final acceptance must cite original_commit for the freeze proof, not the bundled squash commit."
   },
   "incident_replays": [
     {

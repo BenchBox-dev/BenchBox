@@ -20,15 +20,11 @@ import argparse
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, cast
-
-try:
-    import tomllib  # ty: ignore[unresolved-import] -- Python 3.11+ stdlib branch
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 
 _C901_RE = re.compile(
     r"^(?P<file>[^:]+):(?P<line>\d+):\d+: C901 `(?P<func>[^`]+)` is too complex "

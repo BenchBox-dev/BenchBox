@@ -27,7 +27,6 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 |----------|----------|--------|--------|---------------|
 | **Polars** | `polars-df` | Expression | Production-ready | [Polars DataFrame](polars.md) |
 | **Pandas** | `pandas-df` | Pandas | Production-ready | [Pandas DataFrame](pandas-dataframe.md) |
-| **Modin** | `modin-df` | Pandas | Production-ready | [Modin DataFrame](modin-dataframe.md) |
 | **Dask** | `dask-df` | Pandas | Production-ready | [Dask DataFrame](dask-dataframe.md) |
 | **cuDF** | `cudf-df` | Pandas | Production-ready | [cuDF DataFrame](cudf.md) |
 | **PySpark** | `pyspark-df` | Expression | Production-ready | [PySpark DataFrame](pyspark-dataframe.md) |
@@ -39,7 +38,6 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 # Quick start with DataFrame platforms
 benchbox run --platform polars-df --benchmark tpch --scale 0.1    # Recommended - fast
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1    # Familiar API
-benchbox run --platform modin-df --benchmark tpch --scale 0.1     # Parallel Pandas
 benchbox run --platform dask-df --benchmark tpch --scale 0.1      # Distributed
 benchbox run --platform cudf-df --benchmark tpch --scale 0.1      # GPU (Linux only)
 benchbox run --platform pyspark-df --benchmark tpch --scale 0.1   # Spark ecosystem

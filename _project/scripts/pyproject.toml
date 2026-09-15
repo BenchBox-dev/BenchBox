@@ -17,7 +17,7 @@
 name = "benchbox-project-scripts"
 version = "0.1.0"
 description = "Internal BenchBox TODO and release tooling - not shipped in the wheel"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     # Cap <2 to catch the next-major API break; browser results.duckdb files use
     # the default v1.0.0 on-disk format, attachable by @duckdb/duckdb-wasm
@@ -35,4 +35,4 @@ dependencies = [
 managed = true
 
 [tool.uv.sources]
-todo-db = { path = "vendor/todo_db-0.7.2-py3-none-any.whl" }
+todo-db = { path = "vendor/todo_db-0.7.3-py3-none-any.whl" }

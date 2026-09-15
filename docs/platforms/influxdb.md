@@ -27,7 +27,7 @@ InfluxDB 3.x is a time series database built on the FDAP stack (Apache Arrow, Da
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - InfluxDB 3.x server (Core or Cloud)
 - Authentication token with read/write permissions
 

@@ -3,7 +3,10 @@
 ```{tags} beginner, quickstart
 ```
 
-BenchBox targets Python 3.10+ and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+BenchBox requires Python 3.11 or newer and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+
+BenchBox plans to require Python 3.12 in its first release after Python 3.11
+reaches end of life in October 2027.
 
 ## 1. Install BenchBox
 
@@ -37,6 +40,26 @@ Extras keep the base install lean.
 | `[clickhouse]` | ClickHouse native driver | `uv add benchbox --extra clickhouse` | `uv pip install "benchbox[clickhouse]"` |
 | `[databricks]` / `[bigquery]` / `[redshift]` / `[snowflake]` | Single-platform installs | `uv add benchbox --extra databricks` | `uv pip install "benchbox[databricks]"` |
 | `[all]` | Everything listed above | `uv add benchbox --extra all` | `uv pip install "benchbox[all]"` |
+
+### DuckDB 2.0 Preview
+
+Stable DuckDB releases remain the default. To test the current
+[DuckDB 2.0 preview](https://duckdb.org/install/preview), install BenchBox's
+DuckDB extra and then select the preview package explicitly:
+
+```bash
+# uv project
+uv add benchbox --extra duckdb
+uv add --prerelease=allow "duckdb==1.6.0.dev379"
+
+# Active pip environment
+python -m pip install "benchbox[duckdb]" "duckdb==1.6.0.dev379"
+```
+
+DuckDB distributes the 2.0 alpha engine in the Python package's 1.6 development
+series. BenchBox's nightly checks pin `1.6.0.dev379`, which contains engine
+`v2.0.0-alpha39998`, so a later preview does not enter supported environments
+without a compatibility run and an explicit pin update.
 
 ### Cloud Spark Platforms
 

@@ -5,15 +5,11 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+import tomllib
 from datetime import date
 from pathlib import Path
 
 import pytest
-
-try:
-    import tomllib  # ty: ignore[unresolved-import] -- Python 3.11+ stdlib branch
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

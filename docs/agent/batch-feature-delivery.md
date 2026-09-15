@@ -1,6 +1,33 @@
-# Feature-batch branch integration
+# Batch delivery modes
 
-One shared integration branch per batch, one recorded base, one integrator.
+BenchBox has two delivery modes. Serial mode is the default for independent,
+cross-repository, review-separated, approval-separated, or unrelated items.
+Feature delivery mode is opt-in for related items whose prerequisites are
+already installed and verified. A source PR, catalog revision, or local mirror
+does not by itself install the capability required for feature mode.
+
+## Serial mode
+
+Use the ordinary claim, implementation, isolated-worktree, verification, review,
+merge, deployment, and authority boundaries. Tracker dependencies remain
+tracker-managed, and a shared branch must not be used to make independent work
+look related.
+
+## Feature delivery mode
+
+Before entering this mode, verify from the active MCP server (not a source
+receipt or narrative handoff) the registered-batch capability and compatible
+schema. If either is absent, retain serial mode and record the owned blocker.
+Prerequisite work that installs or upgrades that capability is always delivered
+serially and cannot use feature mode to prove itself.
+
+One feature batch has one shared integration branch and worktree, one
+integrator, one immutable base, and one final PR. The registration records the
+exact project/repository identity, ordered member set, frozen per-member scope,
+and delivery boundary. Each member records its explicit same-batch dependency,
+actual base, accepted head, and final-tree evidence. The integrator records the
+current integration head, member-head ancestry, scope union, and final PR before
+closeout.
 
 ## Protocol
 
@@ -40,6 +67,21 @@ endpoints must be distinct manifested members and `evidence` must name the
 tracker-side proof. An empty list is valid for a delivery with no such edge;
 the prospective process cohort applies its separate minimum across recorded
 deliveries.
+
+Feature mode is bounded by these additional rules:
+
+- No feature-base PRs. The final PR targets the supported base and is reviewed
+  as one integrated change.
+- No new CI skips, protected-branch bypasses, credential changes, or
+  publication shortcuts.
+- Member preparation is not completion. Review, approval, merge, deployment,
+  and soak gates still require their normal evidence; the final tree is checked
+  again before any member reaches tracker completion.
+- A moved base, member, scope, dependency, integration head, or final tree
+  invalidates the affected evidence and requires revalidation. Conflicts go to
+  the integrator or maintainer; they are not silently absorbed.
+- Abort and rollback are previews or explicit reversible operations. Do not
+  delete prepared records or perform destructive cleanup as recovery.
 
 ## This batch
 

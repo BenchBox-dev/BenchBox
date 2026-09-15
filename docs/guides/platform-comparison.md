@@ -489,7 +489,7 @@ detected, inconsistent = detect_platform_types(["duckdb", "sqlite", "polars-df"]
 | Category | Platforms | Use Case |
 |----------|-----------|----------|
 | **Single Node** | Polars, Pandas, DataFusion | In-memory, medium datasets |
-| **Distributed** | PySpark, Dask, Modin | Large datasets, cluster |
+| **Distributed** | PySpark and Dask | Large datasets, cluster |
 | **GPU Accelerated** | cuDF | CUDA GPU acceleration |
 
 ## Best Practices

@@ -344,7 +344,6 @@ _MIGRATED_ADAPTER_PATHS = (
     "benchbox/platforms/base/spark_execution_mixin.py",
     # Dataframe adapters migrated in w5 (migrate-remaining-sql-and-dataframe-adapters-to-csv-resolver)
     "benchbox/platforms/dataframe/pandas_df.py",
-    "benchbox/platforms/dataframe/modin_df.py",
     "benchbox/platforms/dataframe/cudf_df.py",
     "benchbox/platforms/dataframe/dask_df.py",
     "benchbox/platforms/dataframe/pyspark_df.py",

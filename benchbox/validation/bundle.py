@@ -160,7 +160,6 @@ KNOWN_PLATFORMS = {
     "lakesail",
     # DataFrame
     "pandas",
-    "modin",
     "cudf",
     "dask",
     # Microsoft Fabric / Synapse

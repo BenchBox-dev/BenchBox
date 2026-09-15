@@ -16,7 +16,7 @@ class StateContractError(ValueError):
 
 EXPECTED_REMOTE = "https://github.com/BenchBox-dev/BenchBox.git"
 EXPECTED_BRANCH = "todo-state"
-EXPECTED_WHEEL = "todo_db-0.7.2-py3-none-any.whl"
+EXPECTED_WHEEL = "todo_db-0.7.3-py3-none-any.whl"
 
 
 def validate_contract(*, repo_root: Path) -> None:
@@ -46,14 +46,21 @@ def validate_contract(*, repo_root: Path) -> None:
     try:
         with zipfile.ZipFile(wheels[0]) as archive:
             names = set(archive.namelist())
+            required = {"todo_db/git_backend.py", "todo_db/cli.py", "todo_db/mcp/server.py", "todo_db/mcp/tools.py"}
+            missing = sorted(required - names)
+            if missing:
+                raise StateContractError(f"{wheels[0]} is missing JSON/Git implementation files: {missing!r}")
+            if "todo_db/database.py" in names or any(name.startswith("todo_db/migrations/") for name in names):
+                raise StateContractError(f"{wheels[0]} still contains the retired SQLite implementation")
+            try:
+                metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+                metadata = archive.read(metadata_name).decode("utf-8")
+            except (StopIteration, UnicodeDecodeError, KeyError) as exc:
+                raise StateContractError(f"cannot read package metadata from {wheels[0]}") from exc
     except (OSError, zipfile.BadZipFile) as exc:
         raise StateContractError(f"cannot inspect {wheels[0]}: {exc}") from exc
-    required = {"todo_db/git_backend.py", "todo_db/cli.py"}
-    missing = sorted(required - names)
-    if missing:
-        raise StateContractError(f"{wheels[0]} is missing JSON/Git implementation files: {missing!r}")
-    if "todo_db/database.py" in names or any(name.startswith("todo_db/migrations/") for name in names):
-        raise StateContractError(f"{wheels[0]} still contains the retired SQLite implementation")
+    if "Name: todo-db\n" not in metadata or "Version: 0.7.3\n" not in metadata:
+        raise StateContractError(f"{wheels[0]} does not identify the reviewed todo-db 0.7.3 runtime")
 
 
 def main(argv: list[str] | None = None) -> int:

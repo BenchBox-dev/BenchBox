@@ -17,12 +17,8 @@ import json
 import pathlib
 import re
 import sys
+import tomllib
 from collections import defaultdict
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib
 
 # Package-name → top-level import-name(s) mapping. Most packages match their
 # install name, but several do not. Update this map whenever you discover a new
@@ -50,7 +46,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "delta-spark": {"delta"},
     "pyspark": {"pyspark"},
     "polars": {"polars"},
-    "modin": {"modin"},
     "dask": {"dask", "distributed"},
     "datafusion": {"datafusion"},
     "pyarrow": {"pyarrow"},
@@ -69,7 +64,6 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
     "databend-driver": {"databend_driver"},
     "vortex-data": {"vortex"},
     "textcharts": {"textcharts"},
-    "tomli": {"tomli"},
     "ty": {"ty"},
     "ruff": {"ruff"},
     "tox": {"tox"},

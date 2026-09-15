@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DuckDB 2.0 preview compatibility** - BenchBox can parse the analyzed-plan
+  JSON emitted by the DuckDB 2.0 alpha engine. A pinned nightly lane checks the
+  preview package while stable DuckDB remains the default installation.
+
+### Changed
+
+- **BREAKING: Python 3.11 is now required.** BenchBox has removed Python 3.10
+  support ahead of CPython's end-of-life date in October 2026. BenchBox plans
+  to require Python 3.12 in its first release after Python 3.11 reaches end of
+  life in October 2027.
+
+### Removed
+
+- **BREAKING: Modin platform support removed** - The `modin` and `modin-df`
+  platform selectors and the `modin` and `dataframe-modin` install extras are
+  no longer available. Use `pandas-df` for pandas-compatible execution or
+  `dask-df` for distributed DataFrames.
+
 ## [0.4.0] - 2026-08-27
 
 > **Post-publication accounting correction:** This section was reconciled on

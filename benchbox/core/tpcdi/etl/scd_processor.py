@@ -430,11 +430,12 @@ class EnhancedSCDType2Processor:
 
             # Apply configuration-based comparison logic
             if self.config.trim_strings:
-                # Trim string values
-                new_values = new_values.astype(str).str.strip() if new_values.dtype == object else new_values
-                current_values = (
-                    current_values.astype(str).str.strip() if current_values.dtype == object else current_values
-                )
+                # Trim string values. Pandas 3 stores text as StringDtype/str
+                # rather than object, so test for string-ness, not object dtype.
+                if pd.api.types.is_string_dtype(new_values.dtype):
+                    new_values = new_values.astype(str).str.strip()
+                if pd.api.types.is_string_dtype(current_values.dtype):
+                    current_values = current_values.astype(str).str.strip()
 
             # Handle null comparisons
             if self.config.null_equals_empty_string:

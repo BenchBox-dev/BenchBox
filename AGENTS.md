@@ -70,7 +70,7 @@ A disposable clone (remote agent session, CI runner) has no canonical clone; it 
 - Prefer repository `make` targets and existing helpers.
 - Python tooling is `uv` only: `uv run -- ...`, `uv add`, `uv sync`, `uv lock`.
 - Research the affected path, make the narrowest coherent change, and preserve compatibility and critical-path performance. Before writing a new helper, search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
-- Use Python 3.10+, four spaces, 120 columns, Ruff, and public API type hints.
+- Use Python 3.11+, four spaces, 120 columns, Ruff, and public API type hints.
 - No credentials in Git; redact logs and use environment variables.
 - Live cloud tests and broad/destructive cleanup require explicit approval.
 
@@ -91,6 +91,26 @@ Dev PRs target `develop` (or `release` / `published-results`), use squash merge,
 ## TODO tracker
 
 Use the `todo` skill for tracker operations. Tracker writes follow worktree policy; `_project/todo-db-export/` is public, so never recover plaintext into it.
+
+### Delivery modes
+
+Serial mode is the default for independent, cross-repository, review-separated,
+approval-separated, or otherwise unrelated work: follow the ordinary claim,
+implementation, verification, review, merge, and deployment boundaries.
+
+Feature delivery mode is opt-in for related items only after its prerequisites
+are already deployed and verified. It requires the active todo-db MCP server to
+advertise the registered-batch capability on a compatible schema; a source PR,
+catalog pin, or local mirror is not an installation. The mode uses one shared
+integration branch and worktree, one integrator, an immutable base, an explicit
+ordered member set, frozen member scopes, explicit member/base/head/final-tree
+evidence, and one final PR. It never creates a feature-base PR, skips CI, or
+bypasses hosted/native review, merge, deployment, or authority controls.
+
+Feature delivery cannot certify or unlock the runtime, source, catalog, or
+workflow changes that make feature delivery possible. If the capability or
+schema is absent, retain serial mode and record the owned blocker and next
+operator step.
 
 ## BenchBox invariants
 

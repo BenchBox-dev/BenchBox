@@ -223,6 +223,23 @@ def canonical_live_receipt_payload(receipt: dict[str, Any]) -> bytes:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
+def receipt_targets_benchbox_dev(receipt: dict[str, Any]) -> bool:
+    """Return True if a live receipt's target resolves to the production site.
+
+    Receipts built by the legacy candidate-builder workflow record ``target``
+    as the plain string ``"benchbox.dev"``. Receipts built by the transaction
+    writer (``scripts/publication/transaction.py``) record it as the
+    structured ``{"environment", "repository", "url"}`` mapping instead.
+    Accept either form rather than favoring one schema over the other.
+    """
+    target = receipt.get("target")
+    if target == "benchbox.dev":
+        return True
+    if isinstance(target, dict):
+        return str(target.get("url", "")).rstrip("/").split("://")[-1] == "benchbox.dev"
+    return False
+
+
 def verify_live_receipt_signature(receipt: dict[str, Any], public_key_path: Path | None = None) -> tuple[bool, str]:
     """Verify an Ed25519 receipt signature with the repository public key.
 

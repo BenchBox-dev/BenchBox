@@ -30,9 +30,9 @@ def test_dotted_bigquery_style_classname_normalizes() -> None:
     assert sig.failure_id_test_paths(["tests.unit.foo::test_bar"]) == ["tests/unit/foo.py"]
 
 
-def test_job_level_ids_stay_fail_closed_revert() -> None:
+def test_job_level_ids_are_advisory_incidents() -> None:
     action, basis = sig.attribution_detail(["lint:Run CI lint mirror"], ["docs/x.md"])
-    assert (action, basis) == ("revert", "no-extractable-path")
+    assert (action, basis) == ("advisory", "no-ownership-evidence")
 
 
 def test_cleared_sha_is_advisory() -> None:
@@ -45,9 +45,9 @@ def test_owning_test_path_reverts() -> None:
     assert (action, basis) == ("revert", "test-path")
 
 
-def test_unrecognized_class_escalates(tmp_path: Path) -> None:
+def test_unrecognized_class_is_an_advisory_incident() -> None:
     action, basis = sig.attribution_detail(["weird-id-without-shape"], ["anything.py"])
-    assert (action, basis) == ("escalate", "unrecognized-class")
+    assert (action, basis) == ("advisory", "unrecognized-class")
     assert sig.unrecognized_failure_ids(["weird-id-without-shape", 42]) == [
         "weird-id-without-shape",
         "42",
@@ -102,17 +102,50 @@ def test_isolated_bad_fix_verification(tmp_path: Path, monkeypatch: pytest.Monke
     assert sig.attribution_detail(failing, other_paths, repo_root=tmp_path / "repo")[0] == "advisory"
 
 
-def test_attribute_cli_binds_sha_and_basis(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_attribute_cli_requires_complete_evidence_for_revert(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     bad, _ = _git_repo(tmp_path / "repo")
     monkeypatch.chdir(tmp_path / "repo")
     ids = tmp_path / "ids.json"
     ids.write_text(json.dumps(["test_owner.py::test_v"]), encoding="utf-8")
+    ungated_out = tmp_path / "ungated-attribution.json"
+    assert sig.main(["attribute", "--sha", bad, "--failure-ids", str(ids), "--out", str(ungated_out)]) == 0
+    ungated_data = json.loads(ungated_out.read_text(encoding="utf-8"))
+    assert ungated_data["action"] == "advisory"
+    assert ungated_data["ownership_basis"] == "import"
+
+    evidence = tmp_path / "evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "current_target_sha": bad,
+                "predecessor_evidence": {"run_url": "https://example.test/runs/previous"},
+                "comparison_state": "new",
+                "ownership_match": True,
+            }
+        ),
+        encoding="utf-8",
+    )
     out = tmp_path / "attribution.json"
-    assert sig.main(["attribute", "--sha", bad, "--failure-ids", str(ids), "--out", str(out)]) == 0
+    assert (
+        sig.main(
+            [
+                "attribute",
+                "--sha",
+                bad,
+                "--failure-ids",
+                str(ids),
+                "--evidence",
+                str(evidence),
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["sha"] == bad
     assert data["action"] == "revert"
-    assert data["attribution_basis"] == "import"
+    assert data["ownership_basis"] == "import"
 
 
 def test_diff_reports_only_new_ids(tmp_path: Path) -> None:

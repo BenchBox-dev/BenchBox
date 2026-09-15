@@ -74,7 +74,7 @@ result = (
 )
 ```
 
-### Pandas Family (Pandas, Modin, cuDF, Dask)
+### Pandas Family (Pandas, cuDF, Dask)
 ```python
 # Imperative style with string-based column access
 filtered = df[df['shipdate'] <= cutoff]

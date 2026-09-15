@@ -17,7 +17,7 @@ This runbook provides the operational procedure and scenario checklist for condu
 ### Scenario 1: Documentation / Content PR (Fast Lane)
 - **Action:** Open PR modifying markdown documentation only (e.g. `docs/about/overview.md`).
 - **Execution:**
-  1. Open and arm PR: `make pr-open READY=1`
+  1. Open and arm PR with a serial readiness evidence file: `make pr-open READY=1 EVIDENCE=<readiness.json>`
   2. Verify PR enters the merge queue upon passing initial branch checks.
   3. Inspect the spawned `merge_group` workflow run:
      - `ci-paths` classifies `safe-content-only: true`.
@@ -29,7 +29,7 @@ This runbook provides the operational procedure and scenario checklist for condu
 ### Scenario 2: Code PR (Full Test Matrix)
 - **Action:** Open PR modifying core Python code and unit tests (e.g. `benchbox/core/` non-soundness path).
 - **Execution:**
-  1. Open and arm PR: `make pr-open READY=1`
+  1. Open and arm PR with a serial readiness evidence file: `make pr-open READY=1 EVIDENCE=<readiness.json>`
   2. Verify PR enters the merge queue.
   3. Inspect the spawned `merge_group` workflow run:
      - `ci-paths` classifies `needs-code-ci: true`.
@@ -42,8 +42,8 @@ This runbook provides the operational procedure and scenario checklist for condu
 ### Scenario 3: Soundness PR Negative Control (Review Withholding)
 - **Action:** Open PR modifying a soundness-critical path (e.g. `benchbox/core/expected_results/` or `_project/scripts/auto_merge_soundness_paths.py`).
 - **Execution:**
-  1. Attempt to open with auto-merge: `make pr-open READY=1`
-  2. Assert that `make pr-arm-auto-merge` prints: `Soundness-critical paths changed; leaving auto-merge disabled pending review.`
+  1. Attempt to open with auto-merge and exact readiness evidence: `make pr-open READY=1 EVIDENCE=<readiness.json>`
+  2. Assert that the readiness transaction reports: `soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge`.
   3. Verify on GitHub that `autoMergeRequest` is `null` (auto-merge withheld).
   4. If manually armed via API, verify `.github/workflows/auto-merge-on-open.yml` immediately executes and revokes auto-merge.
   5. Confirm PR **does not enter the merge queue** without maintainer CODEOWNERS review and explicit manual enqueue.

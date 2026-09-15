@@ -1,16 +1,11 @@
 """Dependency guards for the optional MCP integration."""
 
+import tomllib
 from pathlib import Path
 
 import pytest
 from packaging.requirements import Requirement
 from packaging.version import Version
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover - Python 3.10
-    import tomli as tomllib  # type: ignore[import-not-found,no-redef]
-
 
 REPO_ROOT = Path(__file__).parents[3]
 

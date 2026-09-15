@@ -109,13 +109,13 @@ DataFrame benchmarking is supported for 21 benchmarks across two API families:
 - NYC Taxi, Flight Data, JoinOrder, JoinOrder Synthetic
 - Read Primitives, Write Primitives, AI Primitives, Metadata Primitives
 
-**Pandas Family** (Pandas, Modin, cuDF, Dask):
+**Pandas Family** (Pandas, cuDF, Dask):
 - Full coverage matching the Expression Family above
 
 **Transaction Primitives** — restricted to ACID-capable table-format adapters only:
 Delta Lake (`delta-lake`, `delta`), PySpark with Delta Lake (run via `--platform
 pyspark-df` using the Delta Lake table format), and Iceberg (`iceberg`). Polars,
-DataFusion, and all Pandas-family adapters (`pandas-df`, Modin, cuDF, Dask) are
+DataFusion, and all Pandas-family adapters (`pandas-df`, cuDF, Dask) are
 rejected at runtime because they do not support ACID transactions.
 
 ### Remaining Expansion

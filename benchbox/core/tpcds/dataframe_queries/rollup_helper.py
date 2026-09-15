@@ -123,7 +123,7 @@ def expand_rollup_pandas(
 ) -> Any:
     """Expand ROLLUP into multiple GROUP BYs for pandas-family DataFrames.
 
-    This handles ROLLUP expansion for Pandas, Modin, Dask, and similar libraries.
+    This handles ROLLUP expansion for Pandas and Dask, and similar libraries.
 
     Args:
         df: Input DataFrame (may be UnifiedPandasFrame or native)

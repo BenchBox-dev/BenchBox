@@ -232,15 +232,17 @@ uv run -- python scripts/validate_submission.py results-data/bundles/
 uv run -- python scripts/generate_corpus_inventory.py --check
 ```
 
-If you use pre-commit locally, install the hooks once so inventory drift is
-checked automatically:
+If you use pre-commit locally, install the shared hooks once from the primary
+clone (never from a linked worktree) so inventory drift is checked
+automatically:
 
 ```bash
-pre-commit install
+uv run -- pre-commit install
 ```
 
 If this clone installed hooks before BenchBox added its pre-push timing-policy
-stage, re-run `pre-commit install` once so the pre-push hook is installed too.
+stage, re-run the same command from the primary clone so the pre-push hook is
+installed too.
 
 ## Questions?
 

@@ -2910,42 +2910,6 @@ _PLATFORM_MANIFEST_JSON = """[
     "support_status": "stable"
   },
   {
-    "key": "modin",
-    "aliases": [
-      {
-        "name": "modin-df",
-        "scopes": ["cli"],
-        "implied_mode": "dataframe"
-      }
-    ],
-    "adapter": null,
-    "display_name": "Modin",
-    "description": "Distributed Pandas • Ray/Dask backend • Drop-in",
-    "category": "dataframe",
-    "libraries": [
-      {
-        "name": "modin",
-        "required": true
-      }
-    ],
-    "requirements": [
-      "modin[ray]>=0.28.0"
-    ],
-    "installation_command": "uv add modin[ray]",
-    "adoption": "niche",
-    "supports": [
-      "dataframe",
-      "distributed"
-    ],
-    "driver_package": null,
-    "capabilities": {
-      "supports_sql": false,
-      "supports_dataframe": true,
-      "default_mode": "dataframe"
-    },
-    "support_status": "experimental"
-  },
-  {
     "key": "cudf",
     "aliases": [
       {

@@ -167,6 +167,15 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "scripts/check_untracked_skill_mirrors.sh",
         "scripts/path_filter_decision.py",
         "scripts/pr_refresh_certification.py",
+        "README.md",
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "examples/features/README.md",
+        "examples/dataframe/README.md",
+        "scripts/_compose_joinorder_hero.py",
+        "scripts/check_dependency_bounds.py",
+        "scripts/check_duplicate_code.py",
+        "tox.ini",
         ".gitattributes",
         ".mcp.json",
         ".todo-db/config.json",
@@ -203,6 +212,7 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["benchbox/core/runner.py"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["pyproject.toml"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
+    assert determine_affected_lanes(["CONTRIBUTING.md"]) == set()
 
     # Non-lane inputs affect no lanes
     assert (

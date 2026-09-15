@@ -116,6 +116,14 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/main.py",
     "benchbox/cli/onboarding.py",
     "benchbox/cli/orchestrator.py",
+    # Removing Modin also removes its readiness alias and package/backend
+    # checks. The remaining readiness checks and Click surface are unchanged.
+    "benchbox/cli/platform_readiness.py",
+    # plan-capture knobs (plan_max_depth, plan_capture_timeout_seconds)
+    # registered as --platform-option specs. Registry data only; no @click
+    # decorator, option, or function signature changed, so the guard's
+    # decorator/signature snapshot stays equal.
+    "benchbox/cli/platform_defaults.py",
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
@@ -124,6 +132,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # or function signature changed; the guard's decorator/signature snapshot
     # stays equal. File-level allow is required because this test first diffs
     # names under benchbox/cli/ against the allowlist.
+    # Live run concurrency validation mirrors the saved-path check via a
+    # private helper; no Click decorator, option, or command signature changed.
+    "benchbox/cli/run_resolution.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",

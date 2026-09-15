@@ -33,6 +33,20 @@ def _compose_published_ports(platform: str) -> dict[int, str]:
     return mapping
 
 
+def test_service_ports_derive_from_adapter_defaults():
+    """PLATFORM_SERVICE_PORT is generated from adapter declarations, not hardcoded."""
+    from benchbox.core.platform_registry import PlatformRegistry
+
+    for platform in docker_assets.PLATFORM_SERVICE_PORT:
+        adapter_class = PlatformRegistry.get_adapter_class(platform)
+        assert adapter_class.default_service_port is not None, (
+            f"{platform}: {adapter_class.__name__} declares no default_service_port"
+        )
+        assert docker_assets.PLATFORM_SERVICE_PORT[platform] == adapter_class.default_service_port, (
+            f"{platform}: table contradicts its adapter declaration"
+        )
+
+
 def test_connection_registry_drift_matches_compose():
     """Every docker platform's resolved reachability port comes from compose."""
     unresolved = []

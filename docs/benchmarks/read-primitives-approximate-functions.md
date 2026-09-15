@@ -97,7 +97,7 @@ Three of the five approximate-aggregate queries run on the BenchBox
 DataFrame surface. The other two are PySpark-only at the DataFrame
 layer and stay in `SKIP_FOR_DATAFRAME`.
 
-| Query                            | Polars                       | PySpark                                   | DataFusion                                  | Pandas / Modin / cuDF | Dask |
+| Query                            | Polars                       | PySpark                                   | DataFusion                                  | Pandas / cuDF | Dask |
 |----------------------------------|------------------------------|--------------------------------------------|---------------------------------------------|-----------------------|------|
 | `approx_count_distinct_simple`   | `approx_n_unique` (HLL)      | `approx_count_distinct` (HLL)             | `approx_distinct` (HLL)                     | `nunique` (exact)     | `nunique_approx` (HLL) |
 | `approx_count_distinct_groupby`  | `approx_n_unique` (HLL)      | `approx_count_distinct` (HLL)             | `approx_distinct` (HLL)                     | `nunique` (exact)     | `nunique` (exact; no groupby HLL API in dask-expr) |
@@ -116,7 +116,7 @@ cardinality-proportional cost while sketches pay roughly constant
 cost. Cross-engine comparisons in this category are most informative
 within the sketch-backed column group.
 
-Pandas / Modin / cuDF have no native sketch surface at all. Dask exposes
+Pandas / cuDF have no native sketch surface at all. Dask exposes
 Series-level `nunique_approx()` (HLL), which BenchBox uses for the
 single-value distinct query. Current dask-expr does not expose matching
 groupby HLL or groupby T-Digest APIs; those groupby queries remain exact

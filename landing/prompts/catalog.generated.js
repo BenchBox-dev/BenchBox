@@ -643,18 +643,6 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "label": "LakeSail Sail"
     },
     {
-      "cost_class": "free",
-      "deployments": [
-        "local"
-      ],
-      "id": "modin",
-      "install_command": "uv add modin[ray]",
-      "interfaces": [
-        "dataframe"
-      ],
-      "label": "Modin"
-    },
-    {
       "cost_class": "paid_credits",
       "credential_deployments": [
         "managed"

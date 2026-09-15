@@ -497,42 +497,6 @@ class TestDirectHandleResult:
 
 
 # ===================================================================
-# _describe_platform_options
-# ===================================================================
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
-class TestDescribePlatformOptions:
-    def test_no_options(self):
-        from benchbox.cli.commands.run import _describe_platform_options
-
-        with patch.object(_run_module, "console") as mock_console:
-            with patch(
-                "benchbox.cli.platform_hooks.PlatformHookRegistry.describe_options",
-                return_value=[],
-            ):
-                _describe_platform_options(["duckdb"])
-        # Should print "no platform-specific options registered"
-        calls = [str(c) for c in mock_console.print.call_args_list]
-        assert any("no platform-specific options registered" in c for c in calls)
-
-    def test_with_options(self):
-        from benchbox.cli.commands.run import _describe_platform_options
-
-        with patch.object(_run_module, "console") as mock_console:
-            with patch(
-                "benchbox.cli.platform_hooks.PlatformHookRegistry.describe_options",
-                return_value=["memory_limit: Set memory limit", "threads: Set thread count"],
-            ):
-                _describe_platform_options(["duckdb"])
-        calls = [str(c) for c in mock_console.print.call_args_list]
-        assert any("memory_limit" in c for c in calls)
-
-
-# ===================================================================
 # setup_verbose_logging
 # ===================================================================
 
@@ -909,10 +873,6 @@ class TestRunCommandBranchCoverage:
         assert result.exit_code == 1
         assert "Platform options require a --platform selection" in result.output
 
-    @pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    )
     def test_platform_option_parse_error_logs_and_exits(self):
         from benchbox.cli.commands.run import PlatformOptionError, run
 

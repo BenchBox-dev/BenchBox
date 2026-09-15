@@ -84,6 +84,7 @@ from benchbox.core.results.status import result_cli_failure_reason, result_non_c
 from benchbox.core.schemas import ExecutionContext
 from benchbox.core.tuning import modes as tuning_modes
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
+from benchbox.platforms.adapter_factory import _reject_removed_platform
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
 from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
@@ -522,26 +523,102 @@ class BenchmarkOptionParamType(click.ParamType):
             self.fail("Benchmark option key cannot be empty", param, ctx)
         return key, raw.strip()
 
+    def shell_complete(self, ctx, param, incomplete: str):
+        """Complete registered benchmark-option keys and choice values.
+
+        KEYs come from the BenchmarkHookRegistry specs for the selected
+        --benchmark (so it must precede --benchmark-option on the command
+        line); after KEY=, specs declaring choices complete allowed values.
+        Keys already given on the command line are omitted.
+        """
+        from click.shell_completion import CompletionItem
+
+        specs = _benchmark_specs_for_completion(ctx)
+        if "=" in incomplete:
+            key, _, value_prefix = incomplete.partition("=")
+            return _complete_benchmark_option_value(specs, key.strip(), value_prefix)
+        used = _used_benchmark_option_keys(ctx, specs)
+        return [
+            CompletionItem(f"{name}=", help=spec.help or "")
+            for name, spec in sorted(specs.items())
+            if name.startswith(incomplete.strip().lower()) and name not in used
+        ]
+
+
+def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
+    """Return registry specs for the --benchmark already on the command line."""
+    from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
+
+    params = getattr(ctx, "params", None) or {}
+    benchmark = params.get("benchmark") or ""
+    benchmark = str(benchmark).strip().lower()
+    if not benchmark:
+        return {}
+    _ensure_benchmark_specs(benchmark)
+    return BenchmarkHookRegistry.list_option_specs(benchmark)
+
+
+def _ensure_benchmark_specs(benchmark: str) -> None:
+    """Import the selected benchmark module so its option specs register.
+
+    Benchmark modules load lazily, so in a fresh CLI process only
+    incidentally-imported benchmarks have specs; without this, completion
+    offers nothing for benchmarks like nyctaxi. Mirrors the
+    `--help-topic benchmarks` eager-import path for one id. Unknown ids stay
+    silent — completion simply offers nothing.
+    """
+    try:
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        get_core_benchmark_class(benchmark)
+    except (ValueError, ImportError):
+        pass
+
+
+def _find_benchmark_spec(specs: dict[str, Any], key: str):
+    """Return the spec for a key or alias, or None when unknown."""
+    lowered = str(key).strip().lower()
+    for name, spec in specs.items():
+        if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
+            return spec
+    return None
+
+
+def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
+    """Canonical benchmark-option keys already present on the command line."""
+    params = getattr(ctx, "params", None) or {}
+    used: set = set()
+    for key, _raw in params.get("benchmark_option_pairs") or ():
+        spec = _find_benchmark_spec(specs, key)
+        if spec is not None:
+            used.add(spec.name.lower())
+    return used
+
+
+def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_prefix: str):
+    """Complete allowed values after KEY= for specs declaring choices."""
+    from click.shell_completion import CompletionItem
+
+    target = _find_benchmark_spec(specs, key)
+    if target is None or not target.choices:
+        return []
+    if "," in value_prefix:
+        stem, _, tail = value_prefix.rpartition(",")
+        stem += ","
+    else:
+        stem, tail = "", value_prefix
+    return [
+        CompletionItem(f"{stem}{choice}", help=target.help or "")
+        for choice in (str(choice) for choice in target.choices)
+        if choice.startswith(tail)
+    ]
+
 
 def _derive_execution_type(phases: list[str]) -> str:
     """Derive benchmark execution type through the shared core service."""
     from benchbox.core.run_service import map_phases_to_execution_type
 
     return map_phases_to_execution_type(phases)
-
-
-def _describe_platform_options(platform_names: Iterable[str]) -> None:
-    for name in platform_names:
-        platform_key = name.lower()
-        lines = PlatformHookRegistry.describe_options(platform_key)
-        header = f"[bold cyan]{platform_key} platform options[/bold cyan]"
-        if not lines:
-            console.print(f"{header}: (no platform-specific options registered)")
-            continue
-        console.print(header)
-        for line in lines:
-            console.print(f"  • {line}")
-        console.print()
 
 
 from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging  # noqa: E402
@@ -588,16 +665,11 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     s.enable_postgen_manifest_validation = val_config.postgen
     s.enable_postload_validation = val_config.postload
 
-    s.describe_platforms = ()
     s.plan_queries = s.plan_queries_str
 
 
 def _validate_initial_flags(s: types.SimpleNamespace) -> None:
-    """Validate describe_platforms, quiet+verbose, official mode."""
-    if s.describe_platforms:
-        _describe_platform_options(s.describe_platforms)
-        s.ctx.exit(0)
-
+    """Validate quiet+verbose, official mode."""
     if s.quiet and s.verbose:
         console.print("[red]❌ --quiet cannot be used with -v/-vv flags[/red]")
         s.ctx.exit(2)
@@ -957,9 +1029,30 @@ def _check_platforms_status(s: types.SimpleNamespace) -> None:
         console.print("[green]All enabled platforms are ready![/green]")
 
 
+def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
+    """Reject selectors for platforms removed from BenchBox."""
+    raw_platform = getattr(s, "platform", None)
+    for candidate in (raw_platform, getattr(s, "platform_key", None)):
+        if not candidate:
+            continue
+        try:
+            _reject_removed_platform(candidate)
+        except ValueError as exc:
+            console.print(f"[red]❌ {exc}[/red]")
+            if s.logger:
+                s.logger.error(str(exc))
+            if hasattr(s, "ctx") and s.ctx is not None and hasattr(s.ctx, "exit"):
+                s.ctx.exit(1)
+                return False
+            raise
+    return True
+
+
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     """Validate platform, resolve execution mode, and check availability."""
     s.resolved_mode = None
+    if not _validate_not_removed_platform(s):
+        return
     if not s.platform_key:
         return
 
@@ -1004,7 +1097,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
                 is_available = s.platform_manager.is_platform_available(s.platform_key)
         else:
             is_available = caps.supports_dataframe
-            if is_available and s.platform_key in ["polars", "pandas", "modin", "cudf", "dask"]:
+            if is_available and s.platform_key in ["polars", "pandas", "cudf", "dask"]:
                 df_platforms = list_available_dataframe_platforms()
                 legacy_key = f"{s.platform_key}-df"
                 is_available = df_platforms.get(legacy_key, df_platforms.get(s.platform_key, False))
@@ -2965,11 +3058,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
+    "--streams",
     "--concurrency",
+    "concurrency",
     type=click.IntRange(min=1),
     default=None,
     hidden=True,
-    help="Concurrent streams (hidden; for run-official)",
+    help="Concurrent streams for throughput (canonical; --concurrency accepted as alias for run-official forwarding)",
 )
 @advanced_option(
     "--iterations",

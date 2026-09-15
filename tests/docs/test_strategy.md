@@ -112,7 +112,7 @@ This document outlines the comprehensive testing strategy for the BenchBox libra
 ### Continuous Integration Environment
 
 - Automated test execution on every pull request
-- Matrix testing across Python versions (3.10, 3.11, 3.12, 3.13)
+- Matrix testing across Python versions (3.11, 3.12, 3.13, 3.14)
 - Coverage reporting and enforcement
 - Performance regression detection
 

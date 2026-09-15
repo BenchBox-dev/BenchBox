@@ -213,7 +213,7 @@ def test_enumerate_records_datafusion_clickhouse_pruned_benchmark_gates():
 
 def test_enumerate_records_dataframe_pruned_mutation_and_maintenance_gates():
     raw = {
-        "platforms": {"include": ["polars-df", "pandas-df", "pyspark-df", "dask-df", "datafusion-df", "modin-df"]},
+        "platforms": {"include": ["polars-df", "pandas-df", "pyspark-df", "dask-df", "datafusion-df"]},
         "benchmarks": {"include": ["write_primitives", "transaction_primitives", "tpcdi", "tpch"]},
         "scales": {"rungs": [0.01]},
     }
@@ -224,7 +224,7 @@ def test_enumerate_records_dataframe_pruned_mutation_and_maintenance_gates():
     for platform in ("polars-df", "pandas-df", "pyspark-df"):
         assert (platform, "write_primitives") in cell_pairs
         assert (platform, "tpch") in cell_pairs
-    for platform in ("dask-df", "datafusion-df", "modin-df"):
+    for platform in ("dask-df", "datafusion-df"):
         assert (platform, "write_primitives") not in cell_pairs
         assert (platform, "tpch") in cell_pairs
 
@@ -235,7 +235,7 @@ def test_enumerate_records_dataframe_pruned_mutation_and_maintenance_gates():
         )
         assert pruned[(platform, "tpcdi")].rule_id == f"uat.compat.{platform}.tpcdi.benchmark_gate"
         assert "transaction" in pruned[(platform, "tpcdi")].reason.lower()
-    for platform in ("dask-df", "datafusion-df", "modin-df"):
+    for platform in ("dask-df", "datafusion-df"):
         assert pruned[(platform, "write_primitives")].rule_id == (
             f"uat.compat.{platform}.write_primitives.benchmark_gate"
         )

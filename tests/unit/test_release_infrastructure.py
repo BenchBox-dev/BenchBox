@@ -62,10 +62,7 @@ def _workflow(workflow_name: str) -> dict:
     return yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib  # type: ignore[import-not-found]
+import tomllib
 
 
 class TestReleaseInfrastructure:
@@ -105,6 +102,16 @@ class TestReleaseInfrastructure:
         for url in urls.values():
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
+
+    def test_supported_python_range_matches_release_policy(self):
+        """Package metadata must expose the reviewed minimum and upper bound."""
+        with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
+            project = tomllib.load(handle)["project"]
+
+        assert project["requires-python"] == ">=3.11,<3.15"
+        assert "Programming Language :: Python :: 3.10" not in project["classifiers"]
+        for version in ("3.11", "3.12", "3.13", "3.14"):
+            assert f"Programming Language :: Python :: {version}" in project["classifiers"]
 
     def test_import_benchbox_succeeds_without_pandas(self):
         """`import benchbox` must work on a clean core install even when pandas is absent.
@@ -539,7 +546,9 @@ class TestReleaseInfrastructure:
 
         job = workflow["jobs"]["validate-base"]
         steps = job["steps"]
-        checkout_step = next(step for step in steps if step.get("uses") == "actions/checkout@v4")
+        checkout_step = next(
+            step for step in steps if re.fullmatch(r"actions/checkout@[0-9a-f]{40}", str(step.get("uses") or ""))
+        )
         assert checkout_step["name"] == "Checkout trusted release policy"
         assert checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha }}"
         assert checkout_step["with"]["fetch-depth"] == 0
@@ -1018,22 +1027,28 @@ class TestReleaseInfrastructure:
         assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
 
     def test_pr_open_refuses_behind_origin_develop(self):
-        """Open-stale branches must not reach git push / gh pr create.
+        """Open-stale branches use the verified queue or the refresh path.
 
         #1751 opened already behind because pr-open fetched origin/develop
-        for path filters and then ignored ancestry. The absorb stays
-        make pr-refresh (one PR at a time). pr-open must not merge
-        develop itself or pr-fanout becomes a refresh storm.
+        for path filters and then ignored ancestry. A verified native queue can
+        validate the speculative merge without a local refresh; every other
+        state stays on make pr-refresh (one PR at a time). pr-open must not
+        merge develop itself or pr-fanout becomes a refresh storm.
         """
         recipe = _make_target_recipe("pr-open")
         assert "git merge-base --is-ancestor origin/develop HEAD" in recipe
-        assert '$(STALE)" != "1"' in recipe
+        assert "git merge-tree --write-tree origin/develop HEAD" in recipe
+        assert "scripts/ruleset_drift_check.py --queue-policy" in recipe
+        assert "--require-bypass-actor-visibility" in recipe
+        assert "scripts/pr_landing.py --worktree . queue-policy" in recipe
         assert "git merge --no-edit origin/develop" not in recipe
         fetch_at = recipe.find("git fetch origin develop --quiet")
         gate_at = recipe.find("git merge-base --is-ancestor origin/develop HEAD")
+        conflict_at = recipe.find("git merge-tree --write-tree origin/develop HEAD")
+        queue_at = recipe.find("scripts/ruleset_drift_check.py --queue-policy")
         push_at = recipe.find("git push -u origin")
-        assert fetch_at != -1 and gate_at != -1 and push_at != -1
-        assert fetch_at < gate_at < push_at
+        assert fetch_at != -1 and gate_at != -1 and conflict_at != -1 and queue_at != -1 and push_at != -1
+        assert fetch_at < gate_at < conflict_at < queue_at < push_at
 
         refresh = _make_target_recipe("pr-refresh")
         assert "git merge --no-edit origin/develop" in refresh
@@ -1045,6 +1060,12 @@ class TestReleaseInfrastructure:
 
         makefile_content = _makefile_text()
         assert "worktree-release-locked" not in makefile_content
+
+    def test_stale_override_cannot_bypass_unknown_queue_state(self):
+        recipe = _make_target_recipe("pr-open")
+        assert "STALE" not in recipe
+        assert "native merge queue and its protections could not be verified" in recipe
+        assert "current-base gate" in recipe
 
         worktree_recipe = (REPO_ROOT / "make" / "worktrees.mk").read_text(encoding="utf-8")
         worktree_helper = (REPO_ROOT / "scripts" / "worktree_lifecycle.sh").read_text(encoding="utf-8")

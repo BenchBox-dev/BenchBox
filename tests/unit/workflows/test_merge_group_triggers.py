@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -63,7 +64,9 @@ def test_drift_checkout_uses_trusted_base_on_merge_group() -> None:
     """develop-ruleset-drift must checkout the trusted base SHA on merge_group events."""
     drift = _load_workflow(DRIFT_WORKFLOW)
     checkout_step = drift["jobs"]["ruleset-drift"]["steps"][0]
-    assert checkout_step["uses"] == "actions/checkout@v4"
+    assert re.fullmatch(r"actions/checkout@[0-9a-f]{40}", checkout_step["uses"]), (
+        "merge-group checkout must pin actions/checkout to an immutable SHA"
+    )
     assert (
         checkout_step["with"]["ref"] == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
     )

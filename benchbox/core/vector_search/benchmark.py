@@ -376,4 +376,5 @@ BenchmarkHookRegistry.register_option_specs(
         default=DEFAULT_DIMENSIONS,
         help="Embedding vector dimensions",
     ),
+    benchmark_class=VectorSearchBenchmark,
 )

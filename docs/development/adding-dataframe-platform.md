@@ -48,7 +48,7 @@ result = (
 
 Use string-based column access and boolean indexing.
 
-**Members:** Pandas, Modin, cuDF, Dask, Vaex
+**Members:** Pandas, cuDF, Dask, Vaex
 
 ```python
 # Pandas-style syntax
@@ -308,12 +308,6 @@ class TestMyPlatformTPCH:
 - Requires Spark session management
 - Use `spark.createDataFrame()` for table registration
 - Handle distributed execution semantics
-
-### Modin/Ray
-
-- Drop-in Pandas replacement
-- Import `modin.pandas as pd` instead of `pandas`
-- Context is identical to Pandas family
 
 ### cuDF (GPU)
 

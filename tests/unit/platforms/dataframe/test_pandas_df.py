@@ -68,7 +68,10 @@ class TestPandasDataFrameAdapter:
 
         adapter = PandasDataFrameAdapter(copy_on_write=True)
 
-        if pandas_version >= (2, 0):
+        if pandas_version >= (3, 0):
+            # In Pandas 3.0+, CoW is permanent and cannot be disabled
+            assert adapter.copy_on_write is True
+        elif pandas_version >= (2, 0):
             # CoW should be enabled for Pandas 2.0+
             assert adapter.copy_on_write is True
             assert pd.options.mode.copy_on_write is True
@@ -82,7 +85,10 @@ class TestPandasDataFrameAdapter:
 
         adapter = PandasDataFrameAdapter(copy_on_write=False)
 
-        if pandas_version >= (2, 0):
+        if pandas_version >= (3, 0):
+            # In Pandas 3.0+, CoW is permanent and cannot be disabled
+            assert adapter.copy_on_write is True
+        elif pandas_version >= (2, 0):
             assert adapter.copy_on_write is False
             assert pd.options.mode.copy_on_write is False
 

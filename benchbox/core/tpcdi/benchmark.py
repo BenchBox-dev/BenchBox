@@ -2844,4 +2844,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Maximum number of parallel workers",
         aliases=("max-workers",),
     ),
+    benchmark_class=TPCDIBenchmark,
 )

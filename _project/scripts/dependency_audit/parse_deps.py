@@ -19,12 +19,8 @@ import argparse
 import pathlib
 import re
 import sys
+import tomllib
 from collections import defaultdict
-
-try:
-    import tomllib
-except ImportError:  # pragma: no cover - Python 3.10 compatibility
-    import tomli as tomllib
 
 # ---------------------------------------------------------------------------
 # Paths (resolved at runtime). Mirror check_deps.py: take the containing

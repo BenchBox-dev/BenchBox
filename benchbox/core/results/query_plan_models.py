@@ -649,6 +649,28 @@ class FingerprintIntegrity:
     RECOMPUTED = "recomputed"  # Fingerprint was missing/stale and has been recomputed
 
 
+def find_truncation_depth(node: Any) -> int | None:
+    """Shallowest depth-truncation cut in a serialized plan, if any.
+
+    ``LogicalOperator.to_dict`` replaces nodes past ``max_depth`` with markers
+    carrying ``truncated_at_depth``. The rehydrated operator tree drops those
+    markers (a marker reloads as a plain childless leaf), so without this scan
+    a truncated plan is indistinguishable from a genuinely small one.
+    """
+    depths: list[int] = []
+    stack: list[Any] = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            marker = current.get("truncated_at_depth")
+            if isinstance(marker, int) and not isinstance(marker, bool):
+                depths.append(marker)
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return min(depths) if depths else None
+
+
 @dataclass
 class QueryPlanDAG:
     """
@@ -684,6 +706,11 @@ class QueryPlanDAG:
         # dataclass field, so it stays out of asdict()/to_dict() serialization and
         # __eq__ — the default plan_fingerprint remains the only persisted fingerprint.
         self._normalized_fingerprint: str | None = None
+        # Shallowest depth-truncation cut in the persisted tree, if any. A plain
+        # attribute (same exclusion rationale as above); set by from_dict when
+        # the serialized plan carries truncation markers, so consumers can tell
+        # a genuinely small tree from a depth-truncated one.
+        self.truncated_at_depth: int | None = None
         if self.plan_fingerprint is None:
             self.plan_fingerprint = self.compute_plan_fingerprint()
             self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
@@ -871,6 +898,10 @@ class QueryPlanDAG:
             recomputes to a different (v2) value and therefore lands STALE
             (untrusted) - so it compares via a full tree walk, never via
             cross-version fingerprint equality.
+            Depth-truncation markers (``truncated_at_depth``) reload as plain
+            childless leaves; the shallowest cut is preserved on the plan's
+            ``truncated_at_depth`` attribute so consumers can distinguish a
+            truncated tree from a genuinely small one.
         """
         logical_root_data = data.get("logical_root")
         stored_fingerprint = data.get("plan_fingerprint")
@@ -895,6 +926,10 @@ class QueryPlanDAG:
             fingerprint_integrity=FingerprintIntegrity.UNVERIFIED,
             fingerprint_version=stored_version,
         )
+
+        # Preserve depth-truncation evidence across the reload: markers rehydrate
+        # as plain childless leaves, so record the shallowest cut on the plan.
+        plan.truncated_at_depth = find_truncation_depth(logical_root_data)
 
         if stored_fingerprint is None:
             # __post_init__ computed a fresh v2 fingerprint and optimistically

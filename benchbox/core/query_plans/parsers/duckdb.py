@@ -218,13 +218,19 @@ class DuckDBQueryPlanParser(QueryPlanParser):
         - Wrapped in QUERY_PLAN: {"name": "QUERY_PLAN", "children": [...]}
         - Nested structure: {"children": [{"name": "QUERY_PLAN", ...}]}
         - EXPLAIN (ANALYZE, FORMAT JSON): {"operator_type": "EXPLAIN_ANALYZE", "children": [...]}
+        - DuckDB 2.0 preview analyzed plans: {"operator": [{"type": "RESULT_COLLECTOR", ...}]}
         """
         # Wrapper nodes to skip through (not real operators).
         # EXPLAIN_ANALYZE is the root wrapper injected by EXPLAIN (ANALYZE, FORMAT JSON).
-        wrapper_names = ("QUERY_PLAN", "RESULT", "EXPLAIN", "QUERY", "EXPLAIN_ANALYZE")
+        wrapper_names = ("QUERY_PLAN", "RESULT", "RESULT_COLLECTOR", "EXPLAIN", "QUERY", "EXPLAIN_ANALYZE")
 
-        # Support both EXPLAIN FORMAT JSON ('name' key) and EXPLAIN (ANALYZE, FORMAT JSON) ('operator_type' key)
-        node_name = data.get("name") or data.get("operator_type", "")
+        # DuckDB 2.0 preview puts the analyzed plan below a root-level `operator` array.
+        if "operator" in data and data["operator"]:
+            return self._find_plan_root_in_json(data["operator"][0])
+
+        # Support stable FORMAT JSON (`name`), stable analyzed JSON (`operator_type`),
+        # and DuckDB 2.0 preview analyzed JSON (`type`).
+        node_name = data.get("name") or data.get("operator_name") or data.get("operator_type") or data.get("type", "")
 
         if node_name:
             name = node_name.upper().strip()
@@ -252,10 +258,13 @@ class DuckDBQueryPlanParser(QueryPlanParser):
         Returns:
             LogicalOperator instance
         """
-        # EXPLAIN (ANALYZE, FORMAT JSON) uses operator_name/operator_type; EXPLAIN (FORMAT JSON) uses name.
+        # EXPLAIN (ANALYZE, FORMAT JSON) uses operator_name/operator_type; EXPLAIN (FORMAT JSON) uses name;
+        # DuckDB 2.0 preview analyzed plans use type.
         # operator_name (e.g. "SEQ_SCAN ") is preferred over operator_type (e.g. "TABLE_SCAN") for
         # harmonization because it matches the physical operator names expected by _harmonize_duckdb_operator.
-        raw_name = node.get("operator_name") or node.get("name") or node.get("operator_type", "UNKNOWN")
+        raw_name = (
+            node.get("operator_name") or node.get("name") or node.get("operator_type") or node.get("type", "UNKNOWN")
+        )
         operator_name = raw_name.strip()
         operator_type = self._harmonize_duckdb_operator(operator_name)
 
@@ -304,16 +313,21 @@ class DuckDBQueryPlanParser(QueryPlanParser):
 
         # Create physical operator with DuckDB-specific details.
         # EXPLAIN (ANALYZE, FORMAT JSON) uses operator_timing/operator_cardinality;
-        # EXPLAIN (FORMAT JSON) uses timing/cardinality.
+        # EXPLAIN (FORMAT JSON) uses timing/cardinality;
+        # DuckDB 2.0 preview analyzed plans use intermediate_rows.
         # Use explicit None-check (not falsy `or`) so that 0.0 timing and 0-row
         # cardinality are preserved rather than silently replaced by None.
         _timing = node.get("timing")
         _cardinality = node.get("cardinality")
+        if _cardinality is None:
+            _cardinality = node.get("operator_cardinality")
+        if _cardinality is None:
+            _cardinality = node.get("intermediate_rows")
         physical_op = self._create_physical_operator(
             operator_name,
             properties={
                 "timing": _timing if _timing is not None else node.get("operator_timing"),
-                "cardinality": _cardinality if _cardinality is not None else node.get("operator_cardinality"),
+                "cardinality": _cardinality,
             },
             platform_metadata={"extra_info": extra_info} if extra_info else {},
         )

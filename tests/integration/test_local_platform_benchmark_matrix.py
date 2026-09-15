@@ -52,7 +52,6 @@ LOCAL_DATAFRAME_PLATFORMS: tuple[str, ...] = (
     "dask-df",
     "pyspark-df",
     "datafusion-df",
-    "modin-df",
     "cudf-df",
 )
 # Platform/benchmark combos known to fail at runtime (not test bugs).

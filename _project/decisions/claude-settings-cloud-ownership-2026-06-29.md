@@ -151,3 +151,16 @@ gap, not a defect in the script.
   are the only documented cloud provisioning hook), admin-setup / permissions
   (`allowManagedHooksOnly`, managed `enabledPlugins` are the only *guaranteed*
   activation path, enterprise-only).
+
+## Addendum (2026-09-13): Plugin retirement and cloud setup script deprecation
+
+Revalidation of `scripts/cloud-claude-setup.sh` and the committed `enabledPlugins` block showed that the premise of provisioning external marketplace plugins for BenchBox was obsolete and counterproductive:
+
+1. **Policy violations**: `commit-commands` automated `git commit` with agent attribution trailers, violating `[COMMIT-IDENTITY-001]`, and bypassed worktree preflights. `claude-md-management` conflicted with the architecture wherein `AGENTS.md` is the cross-agent authority.
+2. **Irrelevant dependencies**: `clangd-lsp` (C/C++ LSP for a Python project), `code-modernization` (COBOL/legacy migration), and `claude-code-setup` (onboarding wizard) served no purpose for BenchBox.
+3. **Passive capabilities suffice**: Project skills (`.claude/skills/**`) and commands (`.claude/commands/**`) load passively in cloud sessions without installation. The `todo-db` MCP server is defined in `.mcp.json`.
+
+Decision:
+- Purged `extraKnownMarketplaces` and `enabledPlugins` from `.claude/settings.json`, retaining only `enabledMcpjsonServers`.
+- Removed `scripts/cloud-claude-setup.sh`.
+- Dropped tracker task `cloud-setup-script-plugin-activation`.

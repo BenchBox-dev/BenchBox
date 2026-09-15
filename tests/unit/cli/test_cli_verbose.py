@@ -25,13 +25,6 @@ pytestmark = [
 ]
 
 
-# Skip marker for tests that use mock.patch on Click commands (Python 3.10 incompatible)
-skip_py310_click_mock = pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
-
-
 class TestVerboseLogging:
     """Test verbose logging setup and configuration."""
 
@@ -85,7 +78,6 @@ class TestVerboseLogging:
         assert normal_settings.verbose_enabled is False
 
 
-@skip_py310_click_mock
 class TestCLIVerboseMode:
     """Test CLI verbose mode functionality."""
 
@@ -185,7 +177,6 @@ class TestVerboseModeIntegration:
             assert hasattr(logger, "info")
 
 
-@skip_py310_click_mock
 class TestVerboseModeExamples:
     """Test that verbose mode examples work as documented."""
 

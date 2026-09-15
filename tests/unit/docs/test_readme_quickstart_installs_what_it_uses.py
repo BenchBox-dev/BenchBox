@@ -15,14 +15,10 @@ first runnable command was most of the way down the page.
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
-    import tomli as tomllib  # type: ignore[no-redef]
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 

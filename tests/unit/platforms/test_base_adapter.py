@@ -1555,7 +1555,8 @@ class TestThroughputPhaseCreation:
         assert result is not None
         assert result.streams[0].query_executions[0].run_type == "warmup"
 
-    def test_create_throughput_phase_preserves_explicit_zero_position(self):
+    def test_create_throughput_phase_ignores_stream_local_position_for_persistence(self):
+        """Persisted execution_order is the flattened global order, not the stream-local slot."""
         adapter = MockPlatformAdapter()
         stream = Mock()
         stream.stream_id = 0
@@ -1580,7 +1581,72 @@ class TestThroughputPhaseCreation:
 
         result = adapter._create_throughput_phase(throughput_result)
 
-        assert result.streams[0].query_executions[0].execution_order == 0
+        assert result.streams[0].query_executions[0].execution_order == 1
+
+    def test_create_throughput_phase_persists_global_order_across_streams(self):
+        """Overlapping stream-local positions must not persist overlapping execution orders."""
+        adapter = MockPlatformAdapter()
+
+        def _stream(stream_id):
+            stream = Mock()
+            stream.stream_id = stream_id
+            stream.start_time = "2025-01-01T10:00:00"
+            stream.end_time = "2025-01-01T10:01:00"
+            stream.duration = 60.0
+            stream.query_results = [
+                {"query_id": "Q1", "position": 1, "execution_time_seconds": 1.0, "success": True},
+                {"query_id": "Q2", "position": 2, "execution_time_seconds": 2.0, "success": True},
+            ]
+            stream.queries_executed = 2
+            stream.success = True
+            stream.error = None
+            return stream
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [_stream(0), _stream(1)]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = "2025-01-01T10:00:00"
+        throughput_result.end_time = "2025-01-01T10:01:00"
+        throughput_result.config = Mock(num_streams=2)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 2
+        throughput_result.streams_successful = 2
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        orders = [execution.execution_order for stream in result.streams for execution in stream.query_executions]
+        assert orders == [1, 2, 3, 4]
+
+    def test_create_throughput_phase_preserves_explicit_execution_order(self):
+        """A producer-supplied execution_order keeps governing persistence, as on the standard path."""
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 0
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [
+            {"query_id": "Q19", "execution_order": 19, "position": 1, "execution_time_seconds": 0.25, "success": True}
+        ]
+        stream.queries_executed = 1
+        stream.success = True
+        stream.error = None
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = stream.start_time
+        throughput_result.end_time = stream.end_time
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result.streams[0].query_executions[0].execution_order == 19
 
     @pytest.mark.parametrize(
         ("query_result", "expected_duration_ms"),

@@ -72,10 +72,11 @@ jobs:
       parent_sha: ${{ steps.lineage.outputs.parent_sha || steps.approved.outputs.parent_sha }}
       parent_generation: ${{ steps.lineage.outputs.parent_generation || steps.approved.outputs.parent_generation }}
       parent_artifact_id: ${{ steps.lineage.outputs.parent_artifact_id || steps.approved.outputs.parent_artifact_id }}
+      parent_receipt_id: ${{ steps.lineage.outputs.parent_receipt_id || steps.approved.outputs.parent_receipt_id }}
       candidate_artifact_id: ${{ steps.upload_candidate.outputs.artifact-id }}
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
@@ -189,12 +190,12 @@ jobs:
           test -d results-data/bundles
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Install Python dependencies
         if: inputs.approved_manifest_digest == ''
@@ -219,14 +220,14 @@ jobs:
               if uv run python - <<'PY'
           import json
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           tx = json.loads(Path("durable-parent.json").read_text())
           receipt = tx.get("attestation")
           if not isinstance(receipt, dict):
               raise SystemExit(1)
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           PY
               then
@@ -259,6 +260,7 @@ jobs:
                 echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
                 echo "parent_generation=$PARENT_GENERATION" >> "$GITHUB_OUTPUT"
                 echo "parent_artifact_id=$PARENT_ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+                echo "parent_receipt_id=$PRIOR_LIVE_RECEIPT_ID" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
             fi
@@ -281,14 +283,14 @@ jobs:
           import os
           import re
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           path = Path("prior-candidate/live-receipt.json")
           if not path.is_file():
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           if os.environ["RUN_CONCLUSION"] != "success":
               if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
@@ -334,6 +336,7 @@ jobs:
               echo "parent_sha=$PARENT_SHA" >> "$GITHUB_OUTPUT"
               echo "parent_generation=$RECEIPT_GENERATION" >> "$GITHUB_OUTPUT"
               echo "parent_artifact_id=$ARTIFACT_ID" >> "$GITHUB_OUTPUT"
+              echo "parent_receipt_id=$RECEIPT_ID" >> "$GITHUB_OUTPUT"
               exit 0
             fi
           done < prior-candidates.txt
@@ -341,6 +344,7 @@ jobs:
             echo "parent_sha=" >> "$GITHUB_OUTPUT"
             echo "parent_generation=" >> "$GITHUB_OUTPUT"
             echo "parent_artifact_id=" >> "$GITHUB_OUTPUT"
+            echo "parent_receipt_id=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "::error::no authoritative attested live head is available for generation $GENERATION"
@@ -432,11 +436,12 @@ jobs:
               output.write(f"parent_sha={desired.get('parent_sha') or ''}\n")
               output.write(f"parent_generation={desired.get('parent_generation') or ''}\n")
               output.write(f"parent_artifact_id={assembly.get('parent_artifact_id') or ''}\n")
+              output.write(f"parent_receipt_id={desired.get('prior_live_receipt_id') or ''}\n")
           PY
 
       - name: Set up Node.js
         if: inputs.approved_manifest_digest == ''
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "20"
           cache: npm
@@ -509,7 +514,7 @@ jobs:
       - name: Write desired and assembly receipts
         id: receipt
         env:
-          PRIOR_LIVE_RECEIPT_ID: ${{ inputs.prior_live_receipt_id }}
+          PRIOR_LIVE_RECEIPT_ID: ${{ steps.lineage.outputs.parent_receipt_id || inputs.prior_live_receipt_id }}
           BUILD_GENERATION: ${{ steps.inputs.outputs.generation }}
           BUILD_DEVELOP_SHA: ${{ steps.inputs.outputs.develop_sha }}
           BUILD_PUBLISHED_RESULTS_SHA: ${{ steps.inputs.outputs.published_results_sha }}
@@ -712,7 +717,7 @@ jobs:
 
       - name: Upload candidate receipts for independent review
         if: inputs.approved_manifest_digest == '' && always() && steps.receipt.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-candidate-receipts-${{ steps.inputs.outputs.generation }}-${{ github.run_id }}
           path: receipt-dist/
@@ -740,7 +745,7 @@ jobs:
       - name: Upload immutable candidate bundle
         id: upload_candidate
         if: inputs.approved_manifest_digest == '' && (inputs.candidate_only == true || inputs.expect_noop == true)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-candidate-${{ github.run_id }}
           path: candidate-bundle/
@@ -774,13 +779,13 @@ jobs:
           fi
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           name: publication-pages-${{ steps.inputs.outputs.generation }}
           path: site
 
       - name: Retain immutable site artifact for attested rollback
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ steps.inputs.outputs.site_artifact }}
           path: site
@@ -788,7 +793,7 @@ jobs:
           retention-days: 90
 
       - name: Upload build receipts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-build-receipts-${{ steps.inputs.outputs.generation }}
           path: receipt-dist/
@@ -814,12 +819,12 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Revalidate authoritative live head
         env:
           GH_TOKEN: ${{ github.token }}
-          EXPECTED_PARENT_ARTIFACT_ID: ${{ needs.build.outputs.parent_artifact_id }}
+          EXPECTED_PARENT_RECEIPT_ID: ${{ needs.build.outputs.parent_receipt_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -831,25 +836,26 @@ jobs:
             [ -n "${ARTIFACT_ID:-}" ] || continue
             RUN_META=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID" --jq '[.name, .status, .conclusion, .event] | @tsv')
             IFS=$'\t' read -r RUN_NAME RUN_STATUS RUN_CONCLUSION RUN_EVENT <<< "$RUN_META"
-            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" || "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
+            if [[ "$RUN_NAME" != "Publication Control Plane Deployment" && "$RUN_NAME" != "Publication Transactions" ]] || \
+               [[ "$RUN_STATUS" != "completed" || "$RUN_EVENT" != "workflow_dispatch" ]]; then
               continue
             fi
             rm -rf current-candidate && mkdir current-candidate
             gh api "repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > current-candidate.zip
             unzip -q current-candidate.zip -d current-candidate
-            if EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
+            if CURRENT_RECEIPT_ID=$(EXPECTED_RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" python3 - <<'PY'
           import json
           import os
           import re
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
 
           path = Path("current-candidate/live-receipt.json")
           if not path.is_file():
               raise SystemExit(1)
           receipt = json.loads(path.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get("target") != "benchbox.dev":
+          if not valid or not receipt_targets_benchbox_dev(receipt):
               raise SystemExit(1)
           if os.environ["RUN_CONCLUSION"] != "success":
               if not str(receipt.get("receipt_id", "")).startswith("rollback-"):
@@ -860,20 +866,24 @@ jobs:
               raise SystemExit(1)
           if not re.fullmatch(r"[0-9a-f]{40}", str(receipt.get("source_commit", ""))):
               raise SystemExit(1)
+          receipt_id = str(receipt.get("receipt_id", ""))
+          if not receipt_id:
+              raise SystemExit(1)
+          print(receipt_id)
           PY
-            then
-              CURRENT="$ARTIFACT_ID"
+            ); then
+              CURRENT="$CURRENT_RECEIPT_ID"
               break
             fi
           done < current-candidates.txt
-          [ "$CURRENT" = "$EXPECTED_PARENT_ARTIFACT_ID" ] || {
+          [ "$CURRENT" = "$EXPECTED_PARENT_RECEIPT_ID" ] || {
             echo "::error::publication live head changed after build; refusing stale deployment"
             exit 1
           }
 
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
         with:
           artifact_name: publication-pages-${{ needs.build.outputs.generation }}
 
@@ -887,18 +897,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Download build receipts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: publication-build-receipts-${{ needs.build.outputs.generation }}
           path: receipt-dist
@@ -924,7 +934,7 @@ jobs:
           PY
 
       - name: Upload provider deployment acknowledgement
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-deployment-receipt-${{ needs.build.outputs.generation }}
           path: receipt-dist/deployment-receipt.json
@@ -1007,7 +1017,7 @@ jobs:
           PY
 
       - name: Upload attested live receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-live-receipt-${{ needs.build.outputs.generation }}
           path: receipt-dist/
@@ -1034,15 +1044,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Resolve last known-good attested receipt
         id: known_good
@@ -1069,12 +1079,12 @@ jobs:
             if RUN_ID="$RUN_ID" RUN_CONCLUSION="$RUN_CONCLUSION" uv run python - <<'PY'
           import json, os
           from pathlib import Path
-          from scripts.publication.reconciliation import verify_live_receipt_signature
+          from scripts.publication.reconciliation import receipt_targets_benchbox_dev, verify_live_receipt_signature
           p = Path('candidate/live-receipt.json')
           if not p.is_file(): raise SystemExit(1)
           receipt = json.loads(p.read_text())
           valid, _ = verify_live_receipt_signature(receipt)
-          if not valid or receipt.get('target') != 'benchbox.dev': raise SystemExit(1)
+          if not valid or not receipt_targets_benchbox_dev(receipt): raise SystemExit(1)
           if os.environ['RUN_CONCLUSION'] != 'success':
               if not str(receipt.get('receipt_id', '')).startswith('rollback-'): raise SystemExit(1)
               if not receipt.get('routes') or not all(route.get('ok') for route in receipt['routes']): raise SystemExit(1)
@@ -1114,13 +1124,13 @@ jobs:
           EXPECTED_ARTIFACT_NAME: ${{ steps.known_good.outputs.artifact_name }}
 
       - name: Upload attested rollback Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         with:
           name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: restored-site
 
       - name: Retain restored site artifact for the new rollback head
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-site-${{ needs.build.outputs.generation }}-rollback
           path: restored-site
@@ -1129,7 +1139,7 @@ jobs:
 
       - name: Deploy attested rollback artifact to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
         with:
           artifact_name: publication-rollback-pages-${{ github.run_id }}-${{ github.run_attempt }}
 
@@ -1162,7 +1172,7 @@ jobs:
           PY
 
       - name: Upload rollback provider acknowledgement
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-rollback-deployment-receipt-${{ needs.build.outputs.generation }}
           path: known-good-receipt/rollback-deployment-receipt.json
@@ -1264,14 +1274,14 @@ jobs:
           cp known-good-receipt/rollback-live-receipt.json successor-live-receipt/live-receipt.json
 
       - name: Publish rollback as the new attested live head
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-live-receipt-${{ needs.build.outputs.generation }}
           path: successor-live-receipt/
           retention-days: 90
 
       - name: Upload rollback audit receipt
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: publication-rollback-${{ github.run_id }}
           path: known-good-receipt/

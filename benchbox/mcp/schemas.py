@@ -165,7 +165,6 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
         ),
         "liquid_clustering_columns": _MCP_OPTION("string"),
     },
-    "modin": {"engine": _MCP_OPTION("string", choices=("ray", "dask"))},
     "pandas": {"dtype_backend": _MCP_OPTION("string", choices=("numpy_nullable", "pyarrow"))},
     "polars": {
         "n_rows": _MCP_OPTION("int", minimum=1, maximum=10_000_000),
@@ -261,7 +260,6 @@ MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = 
             "Databricks PlatformOptimizationConfiguration clustering columns", "layout"
         ),
     },
-    "modin": {"engine": _contract("Modin dataframe backend selector", "execution")},
     "pandas": {"dtype_backend": _contract("pandas dataframe dtype backend", "execution")},
     "polars": {
         "n_rows": _contract("Polars input row limit", "resource"),

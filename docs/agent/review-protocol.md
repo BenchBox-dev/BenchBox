@@ -37,7 +37,15 @@ on the exact head before enqueue. Wrong-PR resolution, unpublished work,
 head races, and durable holds refuse loudly; a merge that wins the race
 stops modification and routes to follow-up. Batch readiness additionally
 binds id/version, member heads (ancestors of the integration head), owner
-generation, and writer quiescence.
+generation, writer quiescence, explicit member/base/head/final-tree evidence,
+and the final PR. Serial mode remains the default for independent or
+approval-separated work. Feature delivery mode is opt-in only after the active
+todo-db MCP server advertises the compatible registered-batch capability and
+schema; it cannot be used to establish those prerequisites. Feature mode has
+one shared integration branch, one integrator, no feature-base PRs, no new CI
+skips, and no change to hosted/native review, merge, deployment, or authority
+boundaries. A source receipt, catalog pin, or local mirror is not active
+runtime evidence.
 
 ## Architecture and plan review axes
 

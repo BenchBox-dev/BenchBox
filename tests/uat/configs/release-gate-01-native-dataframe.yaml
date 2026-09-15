@@ -74,13 +74,13 @@ report:
   # sweep.
   # Derivation (uat-release-gate-enforcement w4, 2026-07-12, updated for the
   # SQLite vector_search benchmark capability gate): enumerate_cells_with_pruning
-  # over this config yields 150 pairs with every
+  # over this config yields 138 pairs with every
   # rung (0.01/0.1/1.0) enumerable -- the only pairs the cross-scale check can
   # ever count (208 raw pairs minus 55 whose registry scale ladder omits a
   # rung, e.g. clickbench/joinorder 1.0-only and read_primitives 0.01/0.1-only,
-  # three measured runtime-envelope exclusions, and the SQLite vector_search
-  # capability exclusion).
-  # floor = max(8, floor(0.8 * 150)) = 120. The 0.8 slack absorbs legitimate
+  # three measured runtime-envelope exclusions, the SQLite vector_search
+  # capability exclusion, and the removal of Modin's 12 eligible pairs).
+  # floor = max(8, floor(0.8 * 138)) = 110. The 0.8 slack absorbs legitimate
   # environment variance without letting a mass regression sign off; never set
   # this to the eligible count exactly.
-  cross_scale_coverage_min_pairs: 120
+  cross_scale_coverage_min_pairs: 110

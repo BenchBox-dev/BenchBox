@@ -49,13 +49,6 @@ def reset_platform_registry_test_state() -> None:
     PlatformRegistry.clear_cache()
 
 
-# Skip marker for tests that use mock.patch on CLI module attributes (Python 3.10 incompatible)
-skip_py310_cli_mock = pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="CLI mock.patch requires Python 3.11+ for module attribute access",
-)
-
-
 class TestLibraryInfo:
     """Test LibraryInfo dataclass."""
 
@@ -137,7 +130,6 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("pyspark-df") == "pyspark"
         assert normalize_platform_name("datafusion-df") == "datafusion"
         assert normalize_platform_name("dask-df") == "dask"
-        assert normalize_platform_name("modin-df") == "modin"
         assert normalize_platform_name("cudf-df") == "cudf"
         assert normalize_platform_name("lakesail-df") == "lakesail"
 
@@ -729,7 +721,6 @@ class TestPlatformManager:
         assert "Usage: benchbox run --platform <platform>:<mode>" in output
 
 
-@skip_py310_cli_mock
 class TestCLICommands:
     """Test CLI command functionality."""
 
@@ -1312,7 +1303,6 @@ class TestGlobalPlatformManager:
         assert isinstance(manager, PlatformManager)
 
 
-@skip_py310_cli_mock
 class TestSetupPlatformsCommand:
     """Test the interactive and non-interactive setup wizard branches."""
 

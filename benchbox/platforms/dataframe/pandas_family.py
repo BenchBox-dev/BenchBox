@@ -3,7 +3,6 @@
 This module provides the PandasFamilyAdapter abstract base class that
 serves as the foundation for Pandas-like DataFrame libraries:
 - Pandas (reference implementation)
-- Modin (distributed Pandas)
 - cuDF (GPU-accelerated)
 - Vaex (out-of-core)
 - Dask (lazy distributed)
@@ -120,7 +119,7 @@ class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
         """Get a registered table wrapped in UnifiedPandasFrame.
 
         This override wraps native DataFrames in UnifiedPandasFrame to provide
-        a consistent API across Pandas, Modin, cuDF, and Dask.
+        a consistent API across Pandas and cuDF, and Dask.
 
         Args:
             name: The table name (case-insensitive)
@@ -301,7 +300,7 @@ class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
         Uses the adapter's platform-specific concat implementation.
 
         For Dask, this uses dd.concat instead of pd.concat.
-        For Pandas/Modin/cuDF, this uses pd.concat.
+        For Pandas/cuDF, this uses pd.concat.
 
         Args:
             dataframes: List of DataFrames to concatenate
@@ -479,7 +478,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
     """Abstract base class for Pandas-like DataFrame platform adapters.
 
     This class provides the common interface and functionality for
-    Pandas-family DataFrame libraries (Pandas, Modin, cuDF, Vaex, Dask).
+    Pandas-family DataFrame libraries (Pandas, cuDF, Vaex, Dask).
 
     Implements run_benchmark() for unified interface with SQL adapters,
     enabling polymorphic adapter usage without caller branching.
@@ -935,7 +934,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             Single-row DataFrame
         """
         # Default implementation wraps each value in a list
-        # This works for Pandas, Modin, cuDF
+        # This works for Pandas and cuDF
         # Subclasses may override for platform-specific optimizations
         import pandas as pd
 
@@ -977,7 +976,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
     ) -> DF:
         """Perform grouped aggregation with platform-specific handling.
 
-        This is the default implementation for Pandas/Modin/cuDF which support
+        This is the default implementation for Pandas/cuDF which support
         as_index=False natively. Dask overrides this to use reset_index() instead.
 
         Args:

@@ -122,6 +122,7 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = _DEFAULT_PORT
 
     _platform_key: ClassVar[str] = "singlestore"
 

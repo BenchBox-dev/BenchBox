@@ -25,10 +25,6 @@ pytestmark = [
 ]
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 def test_export_helper_applies_directory_manager_naming_and_output_dir() -> None:
     result = SimpleNamespace(execution_id="abc123", output_filename=None)
 
@@ -58,10 +54,6 @@ def test_export_helper_applies_directory_manager_naming_and_output_dir() -> None
     exporter.export_result.assert_called_once_with(result, ["json"])
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 def test_export_helper_defaults_to_json_format() -> None:
     result = SimpleNamespace(execution_id="abc123", output_filename=None)
     result_path = Path("/tmp/results/out.json")

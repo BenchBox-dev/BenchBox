@@ -14,7 +14,7 @@ from benchbox.core.dataframe.tuning.interface import DataFrameTuningConfiguratio
 
 # DataFrame platforms supported by the tuning system — mirrors
 # ``benchbox.platforms.dataframe.platform_checker.DATAFRAME_PLATFORMS`` keys.
-DATAFRAME_PLATFORMS = frozenset({"datafusion", "polars", "pandas", "dask", "modin", "cudf"})
+DATAFRAME_PLATFORMS = frozenset({"datafusion", "polars", "pandas", "dask", "cudf"})
 
 # Hardcoded DataFrame capability table previously in the CLI's ``list_platforms``
 # command. Kept here so the CLI's ``tuning platforms`` table is a projection of
@@ -24,7 +24,6 @@ DATAFRAME_CAPABILITY_ROWS: list[tuple[str, str, str, str]] = [
     ("polars", "Expression", "Lazy evaluation, streaming, thread control", "No"),
     ("pandas", "Pandas", "dtype_backend, categorical strings", "No"),
     ("dask", "Pandas", "Distributed, worker/thread control, spill to disk", "No"),
-    ("modin", "Pandas", "Engine selection (ray/dask), parallelization", "No"),
     ("cudf", "Pandas", "GPU acceleration, memory pools, spill to host", "Yes"),
 ]
 

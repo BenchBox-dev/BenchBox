@@ -262,7 +262,14 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             pandas_version = (1, 0)
         self._pandas_version = pandas_version
 
-        if pandas_version >= (2, 0):
+        if pandas_version >= (3, 0):
+            # In Pandas 3.0+, Copy-on-Write is always enabled and cannot be disabled.
+            # Reading or mutating pd.options.mode.copy_on_write emits Pandas4Warning.
+            if copy_on_write is False:
+                logger.warning(f"Copy-on-write cannot be disabled in Pandas {pd.__version__} (permanently enabled).")
+            self.copy_on_write = True
+            self._log_verbose(f"Copy-on-write: enabled (permanent in Pandas {pd.__version__})")
+        elif pandas_version >= (2, 0):
             if copy_on_write is not None:
                 # Track what this instance configured
                 self.copy_on_write = copy_on_write
@@ -493,7 +500,9 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
             info["copy_on_write"] = self.copy_on_write
 
             # Also report current global state for debugging multi-adapter scenarios
-            if self._pandas_version >= (2, 0):
+            if self._pandas_version >= (3, 0):
+                info["copy_on_write_active"] = True
+            elif self._pandas_version >= (2, 0):
                 current_global = pd.options.mode.copy_on_write
                 info["copy_on_write_active"] = current_global
                 # Warn if global state doesn't match what this instance expects

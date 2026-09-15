@@ -329,12 +329,12 @@ OSError: [Errno 111] Connection refused
 
 ## Comparison: Dask vs Other DataFrame Platforms
 
-| Aspect | Dask (`dask-df`) | Pandas (`pandas-df`) | Modin (`modin-df`) |
-|--------|-----------------|----------------------|-------------------|
-| Evaluation | Lazy | Eager | Eager |
-| Memory | Out-of-core | In-memory | In-memory |
-| Distributed | Yes | No | Optional |
-| Best for | Large/cluster | Small data | Medium data |
+| Aspect | Dask (`dask-df`) | Pandas (`pandas-df`) |
+|--------|-----------------|----------------------|
+| Evaluation | Lazy | Eager |
+| Memory | Out-of-core | In-memory |
+| Distributed | Yes | No |
+| Best for | Large/cluster | Small data |
 
 ## Dask vs PySpark
 
@@ -349,7 +349,7 @@ OSError: [Errno 111] Connection refused
 
 - [DataFrame Platforms Overview](dataframe.md) - Architecture and concepts
 - [Pandas DataFrame](pandas-dataframe.md) - Single-core Pandas
-- [Modin DataFrame](modin-dataframe.md) - Parallel Pandas
+- [Migrating from Modin](modin-dataframe.md) - Replacement guidance
 - [PySpark DataFrame](pyspark-dataframe.md) - Distributed Spark
 - [cuDF Platform](cudf.md) - GPU-accelerated DataFrame
 - [Getting Started](../usage/getting-started.md) - BenchBox quick start

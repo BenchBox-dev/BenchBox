@@ -255,7 +255,7 @@ class TestLoaderSaveRoundtrip:
 class TestTemplates:
     """Tests for get_template, get_optimized_template, get_memory_constrained_template."""
 
-    @pytest.mark.parametrize("platform", ["polars", "pandas", "dask", "modin", "cudf"])
+    @pytest.mark.parametrize("platform", ["polars", "pandas", "dask", "cudf"])
     def test_get_template_all_platforms(self, platform):
         """get_template returns valid config for all known platforms."""
         loader = DataFrameTuningLoader()
@@ -321,12 +321,6 @@ class TestTemplates:
         loader = DataFrameTuningLoader()
         config = loader.get_template("cudf")
         assert config.gpu.enabled is True
-
-    def test_modin_template_has_engine_affinity(self):
-        """Modin template sets engine_affinity to ray."""
-        loader = DataFrameTuningLoader()
-        config = loader.get_template("modin")
-        assert config.execution.engine_affinity == "ray"
 
 
 # ---------------------------------------------------------------------------

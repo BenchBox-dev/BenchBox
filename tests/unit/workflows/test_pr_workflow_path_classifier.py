@@ -445,11 +445,15 @@ def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None
     steps = job["steps"]
 
     setup_python = next(step for step in steps if step.get("name") == "Set up Python")
-    assert setup_python["uses"] == "actions/setup-python@v5"
+    assert re.fullmatch(r"actions/setup-python@[0-9a-f]{40}", setup_python["uses"]), (
+        "explorer-vitest setup-python must pin to an immutable SHA"
+    )
     assert setup_python["with"]["python-version"] == "3.12"
 
     setup_uv = next(step for step in steps if step.get("name") == "Install uv")
-    assert setup_uv["uses"] == "astral-sh/setup-uv@v4"
+    assert re.fullmatch(r"astral-sh/setup-uv@[0-9a-f]{40}", setup_uv["uses"]), (
+        "explorer-vitest setup-uv must pin to an immutable SHA"
+    )
 
     install_python = next(step for step in steps if step.get("name") == "Install Python dependencies")
     assert install_python["run"] == "uv sync --group dev"

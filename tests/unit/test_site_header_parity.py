@@ -134,6 +134,74 @@ def test_landing_has_no_duplicate_ai_assistants_section_and_mcp_links_to_prompts
     assert "https://benchbox.dev/prompts/" in mcp_section, "#mcp section should link to the prompt builder"
 
 
+def test_landing_section_navigation_links_to_each_major_section_in_order() -> None:
+    source = _read("landing/index.html")
+    expected_links = [
+        ("Overview", "#overview", "overview"),
+        ("Public Results", "#results-explorer", "results"),
+        ("Benchmarks", "#benchmarks", "benchmarks"),
+        ("Platforms", "#platforms", "platforms"),
+        ("Table Formats", "#formats", "formats"),
+        ("AI Agents", "#mcp", "agents"),
+        ("Get Started", "#install", "install"),
+    ]
+
+    nav_start = source.index('<nav class="section-nav"')
+    nav = source[nav_start : source.index("</nav>", nav_start)]
+    link_positions = []
+    for label, href, accent in expected_links:
+        link_start = nav.index(f'class="section-nav__link section-nav__link--{accent}"')
+        link_positions.append(link_start)
+        assert f'href="{href}"' in nav[link_start:]
+        assert label in nav[link_start:]
+        assert f'id="{href.removeprefix("#")}"' in source
+
+    assert link_positions == sorted(link_positions)
+    assert source.index("</section>") < nav_start < source.index('id="features"')
+
+
+def test_landing_section_navigation_is_sticky_colored_and_tracks_the_current_section() -> None:
+    css = _read("landing/style.css")
+    script = _read("landing/script.js")
+
+    assert ".section-nav {" in css
+    assert "position: sticky" in css
+    assert "top: 4rem" in css
+    for color in ("--platforms-heading", "--formats-heading", "--mcp-heading"):
+        assert color in css
+    assert '.section-nav__link[aria-current="location"]' in css
+    assert "function updateCurrentSection()" in script
+    assert "link.setAttribute('aria-current', 'location')" in script
+    assert "sectionNavigationOffset()" in script
+    assert "sectionNavLinksContainer.scrollTo({ left: centeredLeft" in script
+    assert "window.history.pushState(null, '', targetId)" in script
+
+    landing = _read("landing/index.html")
+    prompts = _read("landing/prompts/index.html")
+    assert 'href="style.css?v=6"' in landing
+    assert 'src="script.js?v=1"' in landing
+    assert 'href="../style.css?v=6"' in prompts
+
+
+def test_landing_introduces_results_explorer_with_public_compare_and_local_workflows() -> None:
+    source = _read("landing/index.html")
+    section_start = source.index('<section id="results-explorer"')
+    section = source[section_start : source.index("</section>", section_start)]
+
+    assert "Explore and Compare Benchmark Results" in section
+    assert 'href="https://benchbox.dev/results/"' in section
+    assert "Find relevant runs" in section
+    assert "Compare like with like" in section
+    assert "Check your own result" in section
+    assert "without uploading it" in section
+    assert "Four DuckDB versions, one comparable cohort" in section
+    assert "281,041" in section
+    assert "Box plots of query latency by DuckDB version" in section
+    assert "Cumulative query latency by DuckDB version" in section
+    assert section.count("compare?ids=6235bd1a,47bdcef5,282a4d75,19b96c85") == 3
+    assert source.index('id="features"') < section_start < source.index('id="benchmarks"')
+
+
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     layout = _read("results-explorer/src/components/Layout.tsx")
     contract = _read("results-explorer/src/components/headerContract.ts")

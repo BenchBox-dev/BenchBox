@@ -28,7 +28,7 @@ jobs:
     steps:
       # Trusted base checkout: execute validator from BASE_SHA, not PR head.
       # Payload is read from MERGE_SHA via git show / sparse checkout to /tmp/payload.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
@@ -184,10 +184,10 @@ jobs:
           echo "No non-maintainer vendor/ additions - proceeding."
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11"
 
@@ -478,7 +478,7 @@ jobs:
 
       - name: Upload validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: submission-validation-comment
           path: /tmp/pr-comment-artifact/
@@ -488,7 +488,7 @@ jobs:
       - name: Post PR comment (same-repo fast path)
         if: steps.validate.outcome != 'skipped' && always()
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const fs = require('fs');

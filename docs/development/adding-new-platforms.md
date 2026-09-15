@@ -91,7 +91,6 @@ The following inventory is generated from the manifest:
 | `glue` | — | SQL + DataFrame | `experimental` | #33 `benchbox.platforms.aws:AWSGlueAdapter` |
 | `influxdb` | — | SQL | `beta` | #30 `benchbox.platforms.influxdb:InfluxDBAdapter` |
 | `lakesail` | `lakesail-df` (cli, mode=dataframe) | SQL + DataFrame | `experimental` | #42 `benchbox.platforms.lakesail:LakeSailAdapter` |
-| `modin` | `modin-df` (cli, mode=dataframe) | DataFrame | `experimental` | DataFrame factory only |
 | `motherduck` | — | SQL | `beta` | #1 `benchbox.platforms.motherduck:MotherDuckAdapter` |
 | `pandas` | `pandas-df` (cli, mode=dataframe) | DataFrame | `stable` | DataFrame factory only |
 | `pg-duckdb` | — | SQL | `experimental` | #20 `benchbox.platforms.pg_duckdb:PgDuckDBAdapter` |

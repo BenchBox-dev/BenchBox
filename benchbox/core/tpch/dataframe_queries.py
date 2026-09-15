@@ -2,7 +2,7 @@
 
 This module provides DataFrame implementations of TPC-H benchmark queries
 that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas, Modin, Dask) platforms.
+Pandas-like (Pandas and Dask) platforms.
 
 Each query is implemented using the DataFrameQuery class with separate
 implementations for each family:
@@ -88,7 +88,7 @@ TPCH_DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
     22: {"country_codes": ["13", "31", "23", "29", "30", "18", "17"]},
 }
 
-# Module-level parameter overrides. When set by the dataframe_runner before
+# Module-level parameter overrides. When set by the DataFrame run path before
 # query execution, get_tpch_parameters() merges these into the defaults.
 _parameter_overrides: dict[int, dict[str, Any]] | None = None
 
@@ -97,7 +97,7 @@ _parameter_overrides: dict[int, dict[str, Any]] | None = None
 # value in TPCH_DEFAULT_PARAMS is the SF=1 rendering. get_tpch_parameters()
 # scales it by this factor so unseeded DataFrame runs stay scale-faithful at
 # every scale, mirroring the SQL run path's {q11_fraction} rendering. Set by the
-# dataframe_runner (and the TPC-Havoc equivalence gate) before execution;
+# DataFrame run path (and the TPC-Havoc equivalence gate) before execution;
 # defaults to 1.0 (the qgen SF=1 rendering).
 _scale_factor: float = 1.0
 
@@ -105,7 +105,7 @@ _scale_factor: float = 1.0
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
     """Set parameter overrides for the current benchmark run.
 
-    Called by the dataframe_runner before query execution to inject seed-derived
+    Called by the DataFrame run path before query execution to inject seed-derived
     parameters. Pass None to clear overrides and revert to static defaults.
 
     Args:
@@ -119,7 +119,7 @@ def set_scale_factor(scale_factor: float | None) -> None:
     """Set the scale factor used for scale-dependent parameter defaults.
 
     Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``. The
-    dataframe_runner calls this before query execution so unseeded runs derive
+    DataFrame run path calls this before query execution so unseeded runs derive
     the scale-correct Q11 fraction (mirroring the SQL run path) instead of
     always using the SF=1 default. Pass ``None`` (or ``1.0``) to reset to the
     SF=1 rendering.
@@ -1068,7 +1068,7 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 # =============================================================================
-# Pandas Family Implementations (Pandas, Modin, Dask)
+# Pandas Family Implementations (Pandas and Dask)
 # =============================================================================
 
 

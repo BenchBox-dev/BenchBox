@@ -1,8 +1,9 @@
 """Tests for the monitoring optional-import gate.
 
-Verifies that runner.py, dataframe_runner.py, and progress.py degrade
-gracefully when benchbox.monitoring is not importable - i.e. when
-_MONITORING_AVAILABLE is False.
+Verifies that runner.py and progress.py degrade gracefully when
+benchbox.monitoring is not importable - i.e. when _MONITORING_AVAILABLE
+is False. The DataFrame mixin takes an optional monitor and guards its
+use, covered by the mixin execution tests.
 """
 
 from __future__ import annotations
@@ -146,34 +147,3 @@ class TestProgressMonitoringGate:
             progress = BenchmarkProgress(console, enable_monitoring=False)
 
         assert progress.monitor is None
-
-
-class TestDataFrameRunnerMonitoringGate:
-    """dataframe_runner.py degrades gracefully when monitor is None."""
-
-    def test_time_operation_skipped_when_monitor_is_none(self):
-        """_execute_dataframe_queries returns without error when monitor=None."""
-        from benchbox.core.runner.dataframe_runner import _execute_dataframe_queries
-
-        mock_adapter = MagicMock()
-        mock_adapter.run_query.return_value = {"duration_ms": 10.0, "rows": 0}
-
-        mock_ctx = MagicMock()
-        mock_ctx.warmup_iterations = 0
-        mock_ctx.measurement_iterations = 0
-        mock_ctx.queries = []
-
-        mock_benchmark_config = MagicMock()
-        mock_benchmark_config.options = {}
-        mock_benchmark_config.name = "tpch"
-
-        # Should not raise - monitor=None is safe even with no queries
-        result = _execute_dataframe_queries(
-            adapter=mock_adapter,
-            ctx=mock_ctx,
-            benchmark_config=mock_benchmark_config,
-            benchmark_instance=None,
-            monitor=None,
-        )
-
-        assert isinstance(result, list)

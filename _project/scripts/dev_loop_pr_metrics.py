@@ -1331,11 +1331,101 @@ def _is_ancestor(commit: str, head: str = "HEAD") -> bool:
     return proc.returncode == 0
 
 
+def _commit_parents(commit: str) -> list[str] | None:
+    """Parent SHAs for *commit*, or None when the probe itself fails.
+
+    One successful command distinguishes "no such parent" (an empty entry)
+    from a failed probe (indeterminate), so a transient Git failure can
+    never read as a proven single-parent freeze.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "rev-list", "--parents", "-1", commit],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    tokens = proc.stdout.strip().split()
+    if not tokens:
+        return None
+    return tokens[1:]
+
+
+def _commit_parent(commit: str) -> str | None:
+    parents = _commit_parents(commit)
+    return parents[0] if parents else None
+
+
+def _has_second_parent(commit: str) -> bool | None:
+    parents = _commit_parents(commit)
+    if parents is None:
+        return None
+    return len(parents) > 1
+
+
+def _commit_timestamp(commit: str) -> int | None:
+    try:
+        proc = subprocess.run(
+            ["git", "log", "-1", "--format=%ct", commit],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return None
+
+
+def _commit_diff_names(base: str, commit: str) -> list[str] | None:
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", "-z", base, commit, "--"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [os.fsdecode(entry) for entry in proc.stdout.split(b"\0") if entry]
+
+
+def _pinned_registration_pointers(commit: str, acceptance_relpath: str) -> set[str]:
+    """Registration SHAs pinned by the acceptance record stored at *commit*."""
+    raw = _git_show_bytes(commit, acceptance_relpath)
+    if raw is None:
+        return set()
+    try:
+        record = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return set()
+    registration = record.get("registration")
+    if not isinstance(registration, dict):
+        return set()
+    return {str(value).lower() for value in (registration.get("commit"), registration.get("original_commit")) if value}
+
+
 def validate_process_acceptance(
     acceptance: dict,
     process: dict,
     process_digest: str,
     process_relpath: str = "_project/analysis/pr-process-acceptance-baseline.json",
+    acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
 ) -> list[str]:
     """Check the final acceptance record against the frozen preregistration.
 
@@ -1351,15 +1441,37 @@ def validate_process_acceptance(
         return [f"acceptance record schema must be {PROCESS_ACCEPTANCE_SCHEMA!r}"]
     if not isinstance(process, dict):
         return ["process baseline must be a JSON object"]
-    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath))
+    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath, acceptance_relpath))
     errors.extend(_check_acceptance_cohort(acceptance, process))
     errors.extend(_check_acceptance_replays(acceptance, process))
     errors.extend(_check_acceptance_efficiency(acceptance, process))
     return errors
 
 
-def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: str, process_relpath: str) -> list[str]:
-    """Criteria binding plus freeze-before-implementation proof."""
+def _check_acceptance_binding(
+    acceptance: dict,
+    process: dict,
+    process_digest: str,
+    process_relpath: str,
+    acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
+) -> list[str]:
+    """Criteria binding plus freeze-before-implementation proof.
+
+    The durable registration commit must be an ancestor of HEAD while
+    original_commit preserves the freeze-only boundary (they coincide when
+    no squash merge orphaned the freeze); both pointers must be full commit
+    SHAs (refs are movable) and both pinned copies must match
+    the bound digest so dropping either pointer fails closed. The original
+    commit must also be the freeze-only child of the baseline's bound
+    base_commit_at_freeze and change nothing else, so a bundled squash
+    commit cannot stand in as its own freeze proof. When the pointers
+    differ, the original SHA must additionally be anchored by published
+    history (a pointer pinned in the durable commit's own acceptance
+    record); a same-commit registration needs no indirection proof because
+    its ancestry, content, and diff already establish the freeze. Finally
+    the original must predate the durable commit, so a commit fabricated
+    after observing results cannot serve as the freeze.
+    """
     errors: list[str] = []
     binding = acceptance.get("process_binding") or {}
     if binding.get("criteria_version") != process.get("criteria_version"):
@@ -1367,9 +1479,12 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
     if binding.get("process_digest") != process_digest:
         errors.append("process baseline content differs from the bound digest (thresholds or scenarios changed)")
     registration = acceptance.get("registration") or {}
-    reg_commit = str(registration.get("commit") or "")
+    reg_commit = str(registration.get("commit") or "").lower()
     if not reg_commit:
         errors.append("acceptance must record its preregistration commit")
+        return errors
+    if re.fullmatch(r"[0-9a-fA-F]{40}", reg_commit) is None:
+        errors.append("registration commit must be a full commit SHA (refs are movable)")
         return errors
     frozen = _git_show_bytes(reg_commit, process_relpath)
     if frozen is None:
@@ -1378,7 +1493,95 @@ def _check_acceptance_binding(acceptance: dict, process: dict, process_digest: s
         errors.append("process file at the registration commit differs from the bound digest")
     if not _is_ancestor(reg_commit):
         errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
+    original = str(registration.get("original_commit") or "").lower()
+    if not original:
+        errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
+        return errors
+    if re.fullmatch(r"[0-9a-fA-F]{40}", original) is None:
+        errors.append("original registration commit must be a full commit SHA (refs are movable)")
+        return errors
+    errors.extend(
+        _check_original_freeze(original, reg_commit, process, process_digest, process_relpath, acceptance_relpath)
+    )
     return errors
+
+
+def _check_original_freeze(
+    original: str,
+    reg_commit: str,
+    process: dict,
+    process_digest: str,
+    process_relpath: str,
+    acceptance_relpath: str,
+) -> list[str]:
+    """Digest, freeze-only, history-anchor, and ordering proof for the original freeze commit."""
+    errors: list[str] = []
+    original_frozen = _git_show_bytes(original, process_relpath)
+    if original_frozen is None:
+        return [f"original registration commit {original[:12]} not resolvable in this tree"]
+    if _sha256_bytes(original_frozen) != process_digest:
+        return ["process file at the original registration commit differs from the bound digest"]
+    base_freeze = str(process.get("base_commit_at_freeze") or "").lower()
+    if not base_freeze or re.fullmatch(r"[0-9a-fA-F]{40}", base_freeze) is None:
+        return ["frozen baseline fixes no base_commit_at_freeze (freeze base must be a full commit SHA)"]
+    errors.extend(_check_freeze_only_child(original, base_freeze, process_relpath))
+    if original != reg_commit:
+        errors.extend(_check_history_anchor(original, reg_commit, acceptance_relpath))
+    errors.extend(_check_freeze_ordering(original, reg_commit))
+    return errors
+
+
+def _check_freeze_only_child(original: str, base_freeze: str, process_relpath: str) -> list[str]:
+    """The original must be the freeze-only child of the bound base: nothing but the baseline changes."""
+    parent = _commit_parent(original)
+    if parent is None:
+        return [f"original registration commit {original[:12]} parent not resolvable in this tree"]
+    if parent != base_freeze:
+        return [
+            "original registration commit is not the freeze-only child of the bound base_commit_at_freeze"
+            " (a bundled squash commit cannot serve as its own freeze proof)"
+        ]
+    second_parent = _has_second_parent(original)
+    if second_parent is None:
+        return [f"original registration commit {original[:12]} parent count not resolvable in this tree"]
+    if second_parent:
+        return ["original registration commit is a merge commit (freeze must be a single-parent commit)"]
+    diff_names = _commit_diff_names(base_freeze, original)
+    if diff_names is None:
+        return [f"original registration commit {original[:12]} diff not resolvable in this tree"]
+    if sorted(diff_names) != [process_relpath]:
+        return ["original registration commit changes more than the frozen baseline (freeze must be baseline-only)"]
+    return []
+
+
+def _check_history_anchor(original: str, reg_commit: str, acceptance_relpath: str) -> list[str]:
+    """A reconciled freeze SHA must be pinned by the durable commit's own acceptance record."""
+    pinned = _pinned_registration_pointers(reg_commit, acceptance_relpath)
+    if not pinned:
+        return [
+            "durable registration commit pins no registration pointers in its acceptance record"
+            " (freeze SHA must be anchored by published history)"
+        ]
+    if original not in pinned:
+        return [
+            "original registration commit matches no registration pointer pinned in the durable"
+            " commit's own acceptance record (freeze SHA must be anchored by published history)"
+        ]
+    return []
+
+
+def _check_freeze_ordering(original: str, reg_commit: str) -> list[str]:
+    """The freeze must predate the durable integration commit."""
+    original_ts = _commit_timestamp(original)
+    reg_ts = _commit_timestamp(reg_commit)
+    if original_ts is None or reg_ts is None:
+        return ["cannot establish freeze ordering for the original registration commit"]
+    if original_ts > reg_ts:
+        return [
+            "original registration commit is newer than the durable registration commit"
+            " (freeze must precede integration)"
+        ]
+    return []
 
 
 def _check_acceptance_cohort(acceptance: dict, process: dict) -> list[str]:
@@ -1659,7 +1862,21 @@ def run_validate_process_acceptance(acceptance_path: str, process_path: str) -> 
     except (OSError, ValueError) as exc:
         print(f"INCOMPLETE process baseline {process_path}: {exc}")
         return 1
-    errors = validate_process_acceptance(acceptance, process, _sha256_bytes(process_raw))
+    try:
+        acceptance_relpath = Path(acceptance_path).resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except (OSError, ValueError):
+        acceptance_relpath = "_project/analysis/pr-process-acceptance.json"
+    try:
+        process_relpath = Path(process_path).resolve().relative_to(REPO_ROOT.resolve()).as_posix()
+    except (OSError, ValueError):
+        process_relpath = "_project/analysis/pr-process-acceptance-baseline.json"
+    errors = validate_process_acceptance(
+        acceptance,
+        process,
+        _sha256_bytes(process_raw),
+        process_relpath=process_relpath,
+        acceptance_relpath=acceptance_relpath,
+    )
     if errors:
         print(f"INCOMPLETE acceptance {acceptance_path}:")
         for error in errors:

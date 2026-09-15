@@ -34,10 +34,6 @@ def _mock_result() -> SimpleNamespace:
     )
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 def test_direct_and_non_interactive_direct_use_shared_execution_and_export_helpers() -> None:
     runner = CliRunner()
 
@@ -87,10 +83,6 @@ def test_direct_and_non_interactive_direct_use_shared_execution_and_export_helpe
         assert mock_export.call_count == 2
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason="Click command mock.patch requires Python 3.11+ for attribute access",
-)
 def test_load_only_uses_shared_execution_and_export_helpers() -> None:
     runner = CliRunner()
 

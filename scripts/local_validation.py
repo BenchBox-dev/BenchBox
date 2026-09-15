@@ -184,7 +184,7 @@ def wait_for_lock(lock_path: Path, timeout_seconds: float) -> int:
     """Open *lock_path* and acquire it via :func:`wait_on_fd`.
 
     Returns the open fd (caller must close it to release). Closes the fd
-    before raising TimeoutError.
+    before raising while waiting for the lock.
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
@@ -298,6 +298,20 @@ def _hash_bounded(repo: Path, names: list[str], kind: str, budget: list) -> dict
         except OSError as exc:
             raise IdentityUnknown(f"cannot hash {kind} {name}: {exc}") from exc
     return digests
+
+
+def active_skill_mirror_identity(repo: Path, budget: list) -> dict:
+    """Digest the ignored active skill mirror when it is present.
+
+    The mirror is intentionally untracked, so Git porcelain cannot contribute
+    it to receipt identity. A validation run that reads the mirror must not be
+    reused in a checkout where the mirror is absent or has different bytes.
+    """
+    root = repo / ".agents" / "skills"
+    if not root.is_dir():
+        return {"present": False}
+    names = sorted(path.relative_to(repo).as_posix() for path in root.rglob("*") if path.is_file())
+    return {"present": True, "files": _hash_bounded(repo, names, "active skill mirror", budget)}
 
 
 def tracked_modified(porcelain: list[str]) -> list[str]:
@@ -614,6 +628,7 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
     budget = [0]
     digests = _hash_bounded(repo, untracked, "untracked", budget)
     tracked = _hash_bounded(repo, tracked_modified(porcelain), "tracked-modified", budget)
+    active_mirror = active_skill_mirror_identity(repo, budget)
     uv_lock = repo / "uv.lock"
     try:
         lock_digest: str | None = _sha256_file(uv_lock) if uv_lock.is_file() else None
@@ -628,6 +643,7 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
         "porcelain": sorted(porcelain),
         "untracked_digests": digests,
         "tracked_digests": tracked,
+        "active_skill_mirror": active_mirror,
         "argv": [str(part) for part in argv],
         "python": sys.version.split()[0],
         "uv_lock": lock_digest,

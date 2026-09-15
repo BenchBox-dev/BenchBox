@@ -106,8 +106,6 @@ def validate_dataframe_tuning(
         issues.extend(_validate_pandas(config))
     elif platform_lower == "dask":
         issues.extend(_validate_dask(config))
-    elif platform_lower == "modin":
-        issues.extend(_validate_modin(config))
     elif platform_lower == "cudf":
         issues.extend(_validate_cudf(config))
 
@@ -231,25 +229,6 @@ def _validate_dask(config: DataFrameTuningConfiguration) -> list[ValidationIssue
                 message="Single worker may limit parallelism",
                 setting="worker_count",
                 suggestion="Consider at least 2 workers for parallel execution",
-            )
-        )
-
-    return issues
-
-
-def _validate_modin(config: DataFrameTuningConfiguration) -> list[ValidationIssue]:
-    """Validate Modin-specific configuration."""
-    issues: list[ValidationIssue] = []
-
-    # Validate engine_affinity values
-    valid_engines = {"ray", "dask", None}
-    if config.execution.engine_affinity is not None and config.execution.engine_affinity not in valid_engines:
-        issues.append(
-            ValidationIssue(
-                level=ValidationLevel.ERROR,
-                message=f"Invalid engine_affinity for Modin: '{config.execution.engine_affinity}'",
-                setting="engine_affinity",
-                suggestion="Use 'ray' or 'dask'",
             )
         )
 

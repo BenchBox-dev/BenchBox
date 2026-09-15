@@ -44,7 +44,7 @@ benchbox visualize polars.json pandas.json --chart-type performance_bar
 | Category | Platforms | Use Case |
 |----------|-----------|----------|
 | **Single Node** | Polars, Pandas, DataFusion | In-memory analysis, medium datasets |
-| **Distributed** | PySpark, Dask, Modin, LakeSail | Large datasets, cluster computing |
+| **Distributed** | PySpark, Dask, LakeSail | Large datasets, cluster computing |
 | **GPU Accelerated** | cuDF | CUDA-enabled GPU acceleration |
 
 ## Best Practices

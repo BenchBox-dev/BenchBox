@@ -42,6 +42,7 @@ class ClickHouseServerAdapter(ClickHouseAdapter):
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 9000
 
     def __init__(self, **config: Any) -> None:
         config["deployment_mode"] = "server"
