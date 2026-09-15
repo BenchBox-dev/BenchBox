@@ -161,11 +161,15 @@ Further down, the page charts each query's time, the spread across queries, and 
 
 ### 6. Find runs
 
-Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
+![Find runs with Advanced SQL open: a query over bench.results lists each DuckDB release at TPC-H SF 10 with its power score and geomean.](../images/results_explorer_find_runs_sql_duckdb_sf10.png)
+
+Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. The query in the screenshot lists every DuckDB release at TPC-H SF 10 with its power score and geomean. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
 
 ### 7. Open local result
 
-Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
+![Local preview of the DuckDB 1.5.5 TPC-H SF 10 bundle: the banner says the file has not been uploaded, reviewed, or added to the public rankings, and the power score reads 236,191.](../images/results_explorer_local_result_duckdb_sf10.png)
+
+Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. The screenshot shows the published DuckDB 1.5.5 SF 10 bundle opened this way. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
 
 It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` does that, and the Submit for public review button links to the guide that walks you through it.
 
