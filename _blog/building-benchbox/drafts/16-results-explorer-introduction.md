@@ -41,7 +41,7 @@ Geekbench allows you to benchmark the performance of your own computer and share
 
 ![Tom's Hardware table of Geekbench scores by Apple A-series generation, from A16 Bionic to A20 Pro, with single-thread and multi-thread improvement percentages.](../images/tomshardware_apple_a_series_geekbench.png)
 
-We borrowed Geekbench's path from a local run to a public page others can inspect and compare, not its single headline score: BenchBox ranks runs only within one benchmark, scale factor, and phase.
+We borrowed Geekbench's path from a local run to a public page others can inspect and compare, not its single headline score: BenchBox ranks runs only within one benchmark, scale factor (data size), and phase.
 
 AI/LLM leaderboards have become a ubiquitous feature of the AI arms race. These leaderboards synthesize LLM performance across diverse benchmarks to provide a holistic view of highly variable performance (sound familiar?). There are a number of these leaderboards, but a few good examples are:
 
@@ -67,21 +67,20 @@ AI/LLM leaderboards have become a ubiquitous feature of the AI arms race. These 
 
 BenchBox result publication relies on a trust model using hashed outputs and consistent machine IDs.
 
-* Machine ID is generated and reused consistently so runs from the same hardware can be compared.
-* A result integrity hash is calculated when a run completes. It validates that the result has not been modified.
+* Runs record an anonymous machine ID locally so runs from the same hardware can be compared; public bundles drop it.
+* A result integrity hash is calculated when you package a run with `benchbox submit`. It validates that the result has not been modified.
 * Result submissions go through a GitHub PR review by BenchBox maintainers before public release.
 
 To provide reproducible results, BenchBox result "bundles" include all of the details necessary to interpret and (if needed) reproduce and validate the benchmarking. Bundles specify:
 
-1. **Hardware used**: CPU type/name, physical/logical cores, total RAM, OS kernel, and client-to-engine locality
-2. **BenchBox version**: Git commit hash and release version
-3. **Platform version**: DuckDB 1.4.4, 1.5.5, 2.0.0-alpha38615, etc.
-4. **Benchmark configuration**: Scale factor, execution phase, memory limits, thread pools, and optimizer flags
+1. **Hardware used**, when recorded: CPU model, CPU count, total RAM, OS release, and client-to-engine locality
+2. **Platform version**: DuckDB 1.4.4, 1.5.5, 2.0.0-alpha38615, etc.
+3. **Benchmark configuration**: Scale factor, execution phase, memory limits, thread limits, and tuning mode
 
-To support public sharing of results, BenchBox v0.4.0 improved the bundle output with additional details:
+To support public sharing of results, bundles also record:
 
 1. **Run Validation**: Per-query checksums, row counts, and schema validation against known references.
-2. **Run Provenance**: User type (maintainer, vendor, or community) and funding (employer, personal, free-trial, grant, vendor-sponsored).
+2. **Run Provenance** (added in BenchBox v0.4.0): User type (maintainer, vendor, or community) and funding (employer, personal, free-trial, grant, vendor-sponsored, or unspecified, the default).
 
 ---
 
@@ -103,11 +102,11 @@ Benchmarks (`/results/benchmarks/`) lists every benchmark with public results, n
 
 ![TPC-H Results page filtered to SF 10: 7 published runs, 22 queries, power phase, with filters for scale, phase, tuning, platform version, trust tier, platform, validation, hardware, and run date.](../images/results_explorer_benchmark_tpch_sf10_filters.png)
 
-Pick a benchmark and its page (`/results/:benchmark/`) shows one ranking at a time. Every ranking holds one scale factor and one test phase, because performance depends on the queries, the schema, and the data size. Scale factor (SF) sets the data size; for TPC-H, SF 10 is about 10 GB. That rule keeps an SF 1 run from ever ranking against an SF 10 run. TPC-H at SF 10 in the power phase holds seven published runs, one for each DuckDB release.
+Pick a benchmark and its page (`/results/:benchmark/`) shows one ranking at a time. Every ranking holds one scale factor and one test phase (such as the power test, which runs the queries in a single stream), because performance depends on the queries, the schema, and the data size. Scale factor (SF) sets the data size; for TPC-H, SF 10 is about 10 GB, and other benchmarks size data differently. That rule keeps an SF 1 run from ever ranking against an SF 10 run. TPC-H at SF 10 in the power phase holds seven published runs, one for each DuckDB release.
 
 ![Analysis section for TPC-H SF 10: display geomean (lower is better) and Power@Size (higher is better) for seven DuckDB releases, from the 2.0.0 alpha at 128 ms and 281,041 down to 1.0.0 at 208 ms and 173,508.](../images/results_explorer_benchmark_tpch_sf10_analysis.png)
 
-The Analysis section sets two measures side by side: display geomean, where lower is better, and Power@Size, where higher is better. The 2.0.0 alpha leads on both, at 128 ms and 281,041. Release order doesn't hold all the way down: 1.3.2 sits at 189 ms and 198,175, behind 1.2.2.
+The Analysis section sets two measures side by side: display geomean (the geometric mean of per-query times), where lower is better, and Power@Size (the TPC-H power metric), where higher is better. The 2.0.0 alpha leads on both, at 128 ms and 281,041. Release order doesn't hold all the way down: 1.3.2 sits at 189 ms and 198,175, behind 1.2.2.
 
 ![Box plots of per-query latency for seven DuckDB releases on TPC-H SF 10, with a note that the spread is across different queries, not repeated runs of the same query.](../images/results_explorer_benchmark_tpch_sf10_boxplot.png)
 
@@ -127,7 +126,7 @@ Platforms (`/results/platforms/`) lists every platform with the same weekly stri
 
 A platform page (`/results/p/:platform/`) follows one engine across every workload it has run. It's also where version history lives: did a release get faster, or did it regress? Filtered to TPC-H at SF 10, the DuckDB page shows seven releases that ran on Apple silicon on the same day, with no tuning. Architecture, CPU family, and memory filters let you line up versions on similar hardware, when the runs record it.
 
-The measurement basis decides which timings you see. Choose all warm passes, the warmup pass alone, or a single named warm pass, then reduce each query's timings by median or min. Whole-run wall-clock totals appear for context only, and there is no CPU-time basis.
+The measurement basis decides which timings you see. Choose all warm passes, the warmup pass alone, or a single named warm pass, then reduce each query's timings by median or fastest. Whole-run wall-clock totals appear for context only, and there is no CPU-time basis.
 
 ![DuckDB platform results table for TPC-H SF 10 with four versions selected, including v1.6.0.dev365, v1.5.5, and v1.4.4. Unselected rows explain that the selection limit is reached, and a tray at the bottom offers Compare 4 selected.](../images/results_explorer_platform_duckdb_selection.png)
 
@@ -137,7 +136,7 @@ Each version in the results table links to that run's page, and its checkbox add
 
 ![TPC-H Comparison of four DuckDB runs at SF 10: Before you compare lists 2 warnings (platform version and driver version), and the Comparison summary shows v1.6.0.dev365 leading at 1.42x the lowest selected run, winning 20 of 22 queries, with p50 111 ms, p90 274 ms, and p99 395 ms.](../images/results_explorer_compare_duckdb_summary.png)
 
-Compare (`/results/compare?ids=...`) puts up to four runs side by side. The screenshots follow [four DuckDB releases on TPC-H SF 10](https://benchbox.dev/results/compare?ids=6235bd1a,47bdcef5,282a4d75,19b96c85): the 2.0.0 alpha, 1.5.5, 1.4.4, and 1.3.2. Before it shows any numbers, a "Before you compare" panel confirms the runs share a benchmark, scale factor, and phase, then lists every other difference as a warning. These runs carry two, platform version and driver version, which are exactly the differences we want to measure.
+Compare (`/results/compare?ids=...`) puts up to four runs side by side. The screenshots follow [four DuckDB releases on TPC-H SF 10](https://benchbox.dev/results/compare?ids=6235bd1a,47bdcef5,282a4d75,19b96c85): the 2.0.0 alpha, 1.5.5, 1.4.4, and 1.3.2. Before it shows any numbers, a "Before you compare" panel confirms the runs share a benchmark, scale factor, and phase, then lists fields that differ as warnings and marks fields a run didn't record as Not recorded. These runs carry two warnings, platform version and driver version: expected for a version-history question, but worth reviewing before calling a winner.
 
 The Comparison summary comes next. In these runs, the 2.0.0 alpha's power score was 1.42x that of the lowest selected run, 1.3.2, and the summary counts 20 of 22 queries where the alpha wins. Its latency profile reads 111 ms at p50, 274 ms at p90, and 395 ms at p99.
 
@@ -147,9 +146,9 @@ Below the summary, bars compare each run's geomean and Power@Size, and a query m
 
 ![Box plots and a CDF of per-query latency for DuckDB 2.0.0 alpha, 1.5.5, 1.4.4, and 1.3.2 on TPC-H SF 10. The 2.0.0 alpha's CDF curve sits furthest left.](../images/results_explorer_compare_duckdb_distribution.png)
 
-Box plots and a CDF show each release's whole latency distribution. The 2.0.0 alpha's curve sits furthest left, so more of its queries finish sooner. Further down, a Platform and hardware panel marks which details differ between runs and which were never recorded. When runs don't share a scale factor, Compare still shows the evidence but won't name a winner.
+Box plots and a CDF show each release's whole latency distribution. The 2.0.0 alpha's curve sits furthest left, so more of its queries finish sooner. Further down, a Platform and hardware panel marks which details differ between runs and which were never recorded. Compare also states a hardware boundary: CPU count and memory are not recorded for every run, so it compares recorded runs, not platforms in isolation. When runs don't share a scale factor, Compare still shows the evidence but won't name a winner.
 
-### 5. Result pages
+### Result pages
 
 ![Result page for the DuckDB 2.0.0 alpha on TPC-H at SF 10, power phase, Public ID 875f8968: power score 281,041, maintainer run that passed validation, wall-clock total 38.96 s, no tuning, with Find a run to compare and Download bundle buttons.](../images/results_explorer_result_duckdb_header.png)
 
@@ -159,17 +158,17 @@ Every run you see links through to its own page (`/results/r/:id`). The 2.0.0 al
 
 Further down, the page charts each query's time, the spread across queries, and a CDF, followed by a run receipt with provenance and hardware details when recorded.
 
-### 6. Find runs
+### 5. Find runs
 
 ![Find runs with Advanced SQL open: a query over bench.results lists each DuckDB release at TPC-H SF 10 with its power score and geomean.](../images/results_explorer_find_runs_sql_duckdb_sf10.png)
 
-Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. The query in the screenshot lists every DuckDB release at TPC-H SF 10 with its power score and geomean. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no backend involved. When you're done, download the filtered rows as CSV or JSON.
+Find runs (`/results/query`) does two jobs. The first is search: filter by benchmark and platform, or search by platform, version, or public ID, then select up to four runs to compare. The second is SQL, for questions the built-in views don't answer. Open Advanced SQL, load a starter query or build one from your current filters, and run it. The query in the screenshot lists every DuckDB release at TPC-H SF 10 with its power score and geomean. Your browser does the work. DuckDB-WASM queries a static `results.duckdb` file, with no application server involved. When you're done, download the filtered rows as CSV or JSON.
 
-### 7. Open local result
+### 6. Open local result
 
 ![Local preview of the DuckDB 1.5.5 TPC-H SF 10 bundle: the banner says the file has not been uploaded, reviewed, or added to the public rankings, and the power score reads 236,191.](../images/results_explorer_local_result_duckdb_sf10.png)
 
-Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. The screenshot shows the published DuckDB 1.5.5 SF 10 bundle opened this way. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result.
+Open local result (`/results/local`) answers the question every contributor has before sharing: how does my run look? Pick a result JSON file and the Explorer parses it in your browser. The screenshot shows the published DuckDB 1.5.5 SF 10 bundle opened this way. Nothing is uploaded, and a banner says so. Your run gets the same cards, tables, and charts as a public result, though a preview isn't ranked and has no bundle download or Find a run to compare button.
 
 It's a preview, though. The Explorer checks the file's shape, derives timings, and shows the validation status the run recorded. It doesn't re-verify checksums, classify tuning, or decide whether the run can be submitted. `benchbox submit` does that, and the Submit for public review button links to the guide that walks you through it.
 
@@ -180,7 +179,7 @@ It's a preview, though. The Explorer checks the file's shape, derives timings, a
 The Explorer has no application server, account system, or server-side database. A static build turns curated result bundles into a DuckDB snapshot and downloadable JSON, GitHub Pages serves both, and DuckDB-WASM runs every query in your browser.
 
 ```text
-curated result bundles -> static build -> results.duckdb -> Explorer pages and Find runs
+curated result bundles -> static build -> results.duckdb -> every Explorer page, including Find runs
                                   `-> JSON bundles -> Download bundle
 ```
 
@@ -199,8 +198,8 @@ That keeps the site cheap to run and the evidence portable: use the pages, query
 
 2. Package with `benchbox submit`
 
-   - One private, stable salt pseudonymizes your machine ID
-   - A new salt per run breaks comparability across your submissions
+   - One private, stable salt pseudonymizes the identifiers a public bundle keeps, such as endpoints and database names
+   - A new salt per run makes those identifiers inconsistent across your submissions
    - Keep it out of the repo and the PR
 
    ```bash
@@ -216,10 +215,14 @@ That keeps the site cheap to run and the evidence portable: use the pages, query
 3. Open a PR against `published-results`
 
    - Fork [BenchBox-dev/BenchBox](https://github.com/BenchBox-dev/BenchBox)
-   - Copy `submission/bundle/` and the manifest into `results-data/bundles/`
+   - Copy the contents of `submission/bundle/` plus the manifest into `results-data/bundles/`
    - Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
+   - Keep the PR data-only: result JSON, companions, manifest, and inventory
+   - Title the PR `results: <benchmark> <platform> sf<scale>`
+   - CI checks the schema, manifest hash, and timing sanity, then posts a summary
    - Maintainers review the PR
    - Merged runs appear in the Explorer after a later curated publish, not at merge
+   - Ranked tables include maintainer-run, CI, and vendor-supplied results (vendor results carry a badge). A run also needs clean validation and no failed queries to rank.
    - Community results carry a Community submission label and are currently excluded from ranked tables. We will re-evaluate their inclusion over the coming months.
 
 Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contributing-results.html)
@@ -229,7 +232,7 @@ Full details: [Contributing Benchmark Results](https://benchbox.dev/docs/contrib
 ## Next steps
 
 - Explore the data: [benchbox.dev/results](https://benchbox.dev/results/)
-- Inspect your own runs: **Open local result**
+- Inspect your own runs: open [benchbox.dev/results](https://benchbox.dev/results/) and use **Open local result**
 - Contribute one back: `benchbox submit`, then a PR
 - Tell us what to cover next: which benchmarks, platforms, and scales? Start a [BenchBox discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
 
