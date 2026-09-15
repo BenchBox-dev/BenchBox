@@ -1,13 +1,12 @@
 ---
-title: "Introducing the BenchBox Results Explorer"
 blogpost: true
-status: draft
+status: published
 date: September 15, 2026
 author: Joe Harris
 series: building-benchbox
 post_number: 16
 type: architecture-design
-tags: [benchbox, results-explorer, benchmarking, geekbench, llm-leaderboards, duckdb-wasm, provenance]
+tags: benchbox, results-explorer, benchmarking, geekbench, llm-leaderboards, duckdb-wasm, provenance
 meta_description: "Results Explorer allows BenchBox users to share and compare their own benchmarking results with results shared by the BenchBox community. Anyone can submit a run for publication through a pull request."
 ---
 
