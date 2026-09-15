@@ -678,7 +678,7 @@ def test_changed_tool_identity_invalidates_receipt(repo: Path, tmp_path: Path, m
     monkeypatch.setattr(
         lv,
         "_tool_identity",
-        lambda executable: {"path": original(executable)["path"], "version": "changed"},
+        lambda executable, repo=None: {"path": original(executable, repo)["path"], "version": "changed"},
     )
     assert lv.run_gate("g", gate, None, 5.0, repo, lv.store_dir(repo)) == 0
     assert _count(marker) == 2
@@ -927,11 +927,11 @@ def test_ordered_path_runs_focused_before_required_preflight(repo: Path, monkeyp
         "required": required,
     }
 
-    def fake_run_gate(gate: str, *args, **kwargs) -> int:
+    def fake_run_gate(gate: str, *args, **kwargs) -> tuple[int, str]:
         calls.append(gate)
-        return 0
+        return 0, "reused"
 
-    monkeypatch.setattr(lv, "run_gate", fake_run_gate)
+    monkeypatch.setattr(lv, "run_gate_with_status", fake_run_gate)
     monkeypatch.setattr(lv, "ordered_identity", lambda *args: identity)
     monkeypatch.setattr(lv, "read_receipt", lambda *args, **kwargs: {})
     assert (
@@ -976,11 +976,11 @@ def test_ordered_path_restarts_when_tree_or_batch_changes_between_stages(
 
     monkeypatch.setattr(lv, "ordered_identity", lambda *args: next(identities))
 
-    def fake_run_gate(gate: str, *args, **kwargs) -> int:
+    def fake_run_gate(gate: str, *args, **kwargs) -> tuple[int, str]:
         calls.append(gate)
-        return 0
+        return 0, "reused"
 
-    monkeypatch.setattr(lv, "run_gate", fake_run_gate)
+    monkeypatch.setattr(lv, "run_gate_with_status", fake_run_gate)
     monkeypatch.setattr(lv, "read_receipt", lambda *args, **kwargs: {})
     assert (
         lv.run_ordered_path(
@@ -996,3 +996,130 @@ def test_ordered_path_restarts_when_tree_or_batch_changes_between_stages(
         == 0
     )
     assert calls == ["focused", "focused", "required-preflight"]
+
+
+def test_worktree_local_paths_normalize_across_worktrees(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "wt-a"
+    second = tmp_path / "wt-b"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.setenv("PATH", f"{first}/.venv/bin:/usr/bin")
+    monkeypatch.setenv("VIRTUAL_ENV", str(first / ".venv"))
+    env_first = lv._environment_identity(first)
+    monkeypatch.setenv("PATH", f"{second}/.venv/bin:/usr/bin")
+    monkeypatch.setenv("VIRTUAL_ENV", str(second / ".venv"))
+    env_second = lv._environment_identity(second)
+    assert env_first["PATH"] == env_second["PATH"]
+    assert env_first["VIRTUAL_ENV"] == env_second["VIRTUAL_ENV"]
+    assert lv._normalize_worktree_text(f"{first}/.venv/bin/pytest", first) == "<worktree>/.venv/bin/pytest"
+    assert lv._normalize_worktree_text(f"{second}/.venv/bin/pytest", second) == "<worktree>/.venv/bin/pytest"
+    assert lv._normalize_worktree_text("/usr/bin/make", first) == "/usr/bin/make"
+
+
+def test_prepush_selector_excluded_from_identity(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BENCHBOX_PREPUSH", "1")
+    assert "BENCHBOX_PREPUSH" not in lv._environment_identity(repo)
+    monkeypatch.delenv("BENCHBOX_PREPUSH", raising=False)
+    monkeypatch.setenv("BENCHBOX_GATE_MODE", "mode-a")
+    assert "BENCHBOX_GATE_MODE" in lv._environment_identity(repo)
+    monkeypatch.delenv("BENCHBOX_GATE_MODE", raising=False)
+
+    marker = tmp_path / "prepush-count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    monkeypatch.delenv("BENCHBOX_PREPUSH", raising=False)
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    monkeypatch.setenv("BENCHBOX_PREPUSH", "1")
+    assert lv.run_gate("g", gate, None, 5.0, repo, store) == 0
+    assert _count(marker) == 1
+
+
+def test_integrator_member_order_is_part_of_identity(repo: Path) -> None:
+    _commit_file(repo, "prior.txt", "prior")
+    first = _commit_file(repo, "first.txt", "one")
+    second = _commit_file(repo, "second.txt", "two")
+    _commit_file(repo, "integration.txt", "combined")
+    source_base = subprocess.run(
+        ["git", "rev-parse", "origin/develop"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    record_a = _member_record(repo, "member-a", source_base, first)
+    record_b = _member_record(repo, "member-b", source_base, second)
+    forward, reason = lv._canonical_member_identity(repo, [record_a, record_b])
+    assert reason == ""
+    assert forward is not None and [member["id"] for member in forward] == ["member-a", "member-b"]
+    reverse, reason = lv._canonical_member_identity(repo, [record_b, record_a])
+    assert reason == ""
+    assert reverse is not None and [member["id"] for member in reverse] == ["member-b", "member-a"]
+    assert forward != reverse
+    assert lv.receipt_path(Path("/tmp"), "g", {"h": 1}, {"member_identity": forward}) != lv.receipt_path(
+        Path("/tmp"), "g", {"h": 1}, {"member_identity": reverse}
+    )
+
+
+def test_ordered_uses_actual_singleflight_status(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    command = [sys.executable, "-c", "pass"]
+    identity = {
+        "batch": None,
+        "focused_gate": "focused",
+        "focused": {"head": "a" * 40, "argv": ["focused"], "tool_versions": {}},
+        "required_gate": "required-preflight",
+        "required": {"head": "b" * 40, "argv": ["required"], "tool_versions": {}},
+    }
+    monkeypatch.setattr(lv, "ordered_identity", lambda *args: identity)
+    monkeypatch.setattr(lv, "read_receipt", lambda *args, **kwargs: {})
+    monkeypatch.setattr(lv, "run_gate_with_status", lambda *args, **kwargs: (0, "reused"))
+    store = lv.store_dir(repo)
+    assert (
+        lv.run_ordered_path(
+            focused_gate="focused",
+            focused_command=command,
+            preflight_gate="required-preflight",
+            preflight_command=command,
+            batch=None,
+            lock_wait_seconds=1.0,
+            repo=repo,
+            store=store,
+        )
+        == 0
+    )
+    ordered = next(event for event in lv._accounting_report(store)["events"] if event["event_kind"] == "ordered")
+    assert ordered["executed_count"] == 0 and ordered["reused_count"] == 2
+    assert ordered["command_executions"] == 0
+    assert all(stage["status"] == "reused" for stage in ordered["stages"])
+
+
+def test_run_gate_with_status_reports_reuse(repo: Path, tmp_path: Path) -> None:
+    marker = tmp_path / "count.txt"
+    gate = _counter_gate(marker)
+    store = lv.store_dir(repo)
+    code, status = lv.run_gate_with_status("g", gate, None, 5.0, repo, store)
+    assert (code, status) == (0, "executed")
+    code, status = lv.run_gate_with_status("g", gate, None, 5.0, repo, store)
+    assert (code, status) == (0, "reused")
+    assert _count(marker) == 1
+
+
+def test_wait_on_fd_windows_uses_msvcrt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import types
+
+    lock = tmp_path / "win.lock"
+    lock.write_text("", encoding="utf-8")
+    fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
+    calls: list[tuple[int, int]] = []
+    fake = types.ModuleType("msvcrt")
+    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
+    fake.LK_UNLCK = 0  # type: ignore[attr-defined]
+
+    def fake_locking(fd_arg: int, mode: int, nbytes: int) -> None:
+        calls.append((mode, nbytes))
+
+    fake.locking = fake_locking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setattr(lv.sys, "platform", "win32")
+    try:
+        lv.wait_on_fd(fd, lock, 5.0)
+    finally:
+        os.close(fd)
+    assert calls == [(1, 1)]

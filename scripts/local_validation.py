@@ -65,6 +65,11 @@ VALIDATION_CONFIG_FILES = (
 VALIDATION_ENV_PREFIXES = ("BENCHBOX_", "PYTEST_", "PYTHON", "UV_", "PRE_COMMIT")
 VALIDATION_ENV_KEYS = {"CI", "GITHUB_ACTIONS", "PATH", "VIRTUAL_ENV"}
 RECEIPT_STORE_ENV = "BENCHBOX_VALIDATION_RECEIPTS_DIR"
+# Selector variables choose where evidence is stored or whether a wrapper runs;
+# they do not change gate behavior. BENCHBOX_PREPUSH only enables the opt-in
+# pre-push fast-test lane, so it must not fork the focused-stage identity.
+VALIDATION_ENV_IGNORED = frozenset({RECEIPT_STORE_ENV, "BENCHBOX_PREPUSH"})
+_WORKTREE_PLACEHOLDER = "<worktree>"
 MEMBER_BATCH_FIELDS = (
     "batch_id",
     "member",
@@ -144,21 +149,74 @@ def write_holder(fd: int, lock_path: Path, *, phase: str, gate: str | None = Non
         pass
 
 
+def _close_lock(fd: int) -> None:
+    """Release a receipt lock fd acquired via :func:`wait_on_fd`."""
+    if sys.platform == "win32":
+        try:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+            except OSError:
+                pass
+            import msvcrt
+
+            try:
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            except OSError:
+                pass
+        finally:
+            os.close(fd)
+    else:
+        os.close(fd)
+
+
 def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
-    """Acquire an exclusive flock on open *fd*, waiting up to *timeout_seconds*.
+    """Acquire an exclusive lock on open *fd*, waiting up to *timeout_seconds*.
 
     Raises TimeoutError carrying the last observed holder description without
-    closing *fd*. KeyboardInterrupt cancels the wait. A held flock always
+    closing *fd*. KeyboardInterrupt cancels the wait. A held lock always
     means a live holder: the kernel releases locks on process death, so this
     never steals, deletes, or bypasses. Shared with tests/conftest.py.
+    Uses ``fcntl.flock`` on POSIX and ``msvcrt.locking`` on Windows so the
+    canonical preflight remains usable on native Windows.
     """
-    import fcntl
-
     deadline = time.monotonic() + max(0.0, timeout_seconds)
     wait_started = time.monotonic()
     last_report = 0.0
     reported_wait = False
     holder = read_holder(lock_path)
+    if sys.platform == "win32":
+        import msvcrt
+
+        while True:
+            try:
+                try:
+                    os.lseek(fd, 0, os.SEEK_SET)
+                except OSError:
+                    pass
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                if reported_wait:
+                    elapsed = time.monotonic() - wait_started
+                    print(
+                        f"[local-validation] acquired lock after waiting {elapsed:.1f}s: {lock_path}",
+                        file=sys.stderr,
+                    )
+                return
+            except OSError:
+                holder = read_holder(lock_path)
+                now = time.monotonic()
+                if not reported_wait or now - last_report >= WAIT_PROGRESS_SECONDS:
+                    print(
+                        f"[local-validation] waiting for lock {lock_path} (holder: {holder})",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    reported_wait = True
+                    last_report = now
+                if now >= deadline:
+                    raise TimeoutError(f"timed out waiting for {lock_path} (holder: {holder})") from None
+                time.sleep(min(LOCK_POLL_SECONDS, max(0.0, deadline - now)))
+    import fcntl
+
     while True:
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -221,7 +279,7 @@ def clear_inactive_lock(lock_path: Path) -> int:
         print(f"[local-validation] cleared inactive lock: {lock_path}")
         return 0
     finally:
-        os.close(fd)
+        _close_lock(fd)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -241,7 +299,33 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _tool_identity(executable: str) -> dict[str, str]:
+def _normalize_worktree_text(text: str, repo: Path | None) -> str:
+    """Replace a worktree-local absolute prefix with a stable placeholder.
+
+    Each linked worktree has its own ``.venv`` and absolute checkout path, so
+    ``PATH``, ``VIRTUAL_ENV``, and resolved tool paths would otherwise fork the
+    receipt identity for identical heads. Normalizing the current checkout
+    prefix lets identical inputs coalesce across worktrees while system paths
+    outside the checkout keep their absolute identity.
+    """
+    if repo is None or not text:
+        return text
+    try:
+        candidate = Path(text)
+        if candidate.is_absolute():
+            rel = candidate.relative_to(repo)
+            return f"{_WORKTREE_PLACEHOLDER}/{rel.as_posix()}"
+    except (ValueError, RuntimeError, OSError):
+        pass
+    repo_str = str(repo)
+    if text == repo_str:
+        return _WORKTREE_PLACEHOLDER
+    if text.startswith(repo_str + os.sep):
+        return _WORKTREE_PLACEHOLDER + text[len(repo_str) :].replace(os.sep, "/")
+    return text
+
+
+def _tool_identity(executable: str, repo: Path | None = None) -> dict[str, str]:
     """Resolve the exact executable and record its version."""
     resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
     if not resolved:
@@ -260,7 +344,7 @@ def _tool_identity(executable: str) -> dict[str, str]:
     version = (proc.stdout or proc.stderr).strip().splitlines()
     if not version:
         raise IdentityUnknown(f"{resolved} returned no version")
-    return {"path": resolved, "version": version[0]}
+    return {"path": _normalize_worktree_text(resolved, repo), "version": version[0]}
 
 
 def _command_tools(argv: list[str]) -> list[str]:
@@ -341,19 +425,30 @@ def _config_digests(repo: Path) -> dict[str, str | None]:
     return digests
 
 
-def _environment_identity() -> dict[str, str]:
+def _environment_identity(repo: Path | None = None) -> dict[str, str]:
     """Hash gate-relevant environment values without persisting raw secrets.
 
     ``BENCHBOX_VALIDATION_RECEIPTS_DIR`` is intentionally excluded: it selects
     the local evidence store and does not change gate behavior; including it
     would also make the receipt key depend on the store that contains it.
+    ``BENCHBOX_PREPUSH`` is likewise excluded: it only enables the opt-in
+    pre-push fast-test lane and must not fork the focused-stage receipt shared
+    with manual preflight.
+    Worktree-local ``PATH`` and ``VIRTUAL_ENV`` prefixes are normalized so
+    identical heads in different linked worktrees share one receipt.
     """
     selected: dict[str, str] = {}
     for key, value in os.environ.items():
-        if key == RECEIPT_STORE_ENV:
+        if key in VALIDATION_ENV_IGNORED:
             continue
         if key in VALIDATION_ENV_KEYS or key.startswith(VALIDATION_ENV_PREFIXES):
-            selected[key] = hashlib.sha256(value.encode()).hexdigest()
+            if key == "PATH":
+                normalized = os.pathsep.join(_normalize_worktree_text(entry, repo) for entry in value.split(os.pathsep))
+                selected[key] = hashlib.sha256(normalized.encode()).hexdigest()
+            elif key == "VIRTUAL_ENV":
+                selected[key] = hashlib.sha256(_normalize_worktree_text(value, repo).encode()).hexdigest()
+            else:
+                selected[key] = hashlib.sha256(value.encode()).hexdigest()
     return selected
 
 
@@ -484,6 +579,12 @@ def _canonical_member_record(repo: Path, raw: object, integration_head: str) -> 
 
 
 def _canonical_member_identity(repo: Path, value: object) -> tuple[list[dict] | None, str]:
+    """Canonicalize integrator members while preserving declared order.
+
+    Feature delivery binds an explicit ordered member set, so the supplied
+    sequence is part of the integration identity: different orders produce
+    different receipt keys instead of coalescing onto one receipt.
+    """
     if not isinstance(value, (list, tuple)) or not value:
         return None, "integrator member_identity must be a non-empty JSON list"
     try:
@@ -501,7 +602,6 @@ def _canonical_member_identity(repo: Path, value: object) -> tuple[list[dict] | 
             return None, f"duplicate integrated member id: {record['id']}"
         seen.add(record["id"])
         canonical.append(record)
-    canonical.sort(key=lambda record: record["id"])
     return canonical, ""
 
 
@@ -635,8 +735,8 @@ def content_identity(repo: Path, argv: list[str]) -> dict:
     except OSError as exc:
         raise IdentityUnknown(f"cannot hash uv.lock: {exc}") from exc
     config_digests = _config_digests(repo)
-    tool_versions = {tool: _tool_identity(tool) for tool in _command_tools(argv)}
-    environment = _environment_identity()
+    tool_versions = {tool: _tool_identity(tool, repo) for tool in _command_tools(argv)}
+    environment = _environment_identity(repo)
     return {
         "head": head,
         "base": base,
@@ -701,7 +801,11 @@ def _identity_key(gate: str, identity: dict | None, batch: dict | None) -> str |
 
 
 def _event_batch(batch: dict | None) -> dict | None:
-    """Return only validated delivery identity; never persist caller input."""
+    """Return only validated delivery identity; never persist caller input.
+
+    Integrator member order is preserved: the declared integration sequence is
+    part of the identity, so accounting groups must not sort it away.
+    """
     if batch is None:
         return None
     role = batch.get("role") if isinstance(batch, dict) else None
@@ -716,9 +820,7 @@ def _event_batch(batch: dict | None) -> dict | None:
         member_fields = sorted(MEMBER_IDENTITY_FIELDS)
         if any(set(member) != set(member_fields) for member in members):
             return None
-        result["member_identity"] = [
-            {field: member[field] for field in member_fields} for member in sorted(members, key=lambda item: item["id"])
-        ]
+        result["member_identity"] = [{field: member[field] for field in member_fields} for member in members]
     return result
 
 
@@ -870,7 +972,7 @@ def _append_accounting_event(
         return
     finally:
         if lock_fd is not None:
-            os.close(lock_fd)
+            _close_lock(lock_fd)
 
 
 def _append_ordered_event(
@@ -930,7 +1032,7 @@ def _append_ordered_event(
         return
     finally:
         if lock_fd is not None:
-            os.close(lock_fd)
+            _close_lock(lock_fd)
 
 
 def _accounting_report(store: Path, gate: str | None = None) -> dict:
@@ -1057,7 +1159,7 @@ def _execute_without_receipt(
     started_at: str,
     started: float,
     lock_wait_seconds: float,
-) -> int:
+) -> tuple[int, str]:
     try:
         proc = subprocess.run(list(argv), cwd=repo, check=False)
     except KeyboardInterrupt:
@@ -1074,10 +1176,11 @@ def _execute_without_receipt(
             lock_wait_seconds=lock_wait_seconds,
         )
         raise
-    return _finish_gate(
+    status = "executed" if proc.returncode == 0 else "failed"
+    code = _finish_gate(
         store=store,
         gate=gate,
-        status="executed" if proc.returncode == 0 else "failed",
+        status=status,
         exit_code=proc.returncode,
         identity=identity,
         batch=batch,
@@ -1086,6 +1189,7 @@ def _execute_without_receipt(
         command_executions=1,
         lock_wait_seconds=lock_wait_seconds,
     )
+    return code, status
 
 
 def _write_receipt(path: Path, gate: str, identity: dict, batch: dict) -> None:
@@ -1121,15 +1225,21 @@ def _validated_batch(repo: Path, batch: dict | None) -> tuple[dict | None, str]:
     return (prepared, "") if valid and not reason else (None, reason or "batch metadata is invalid")
 
 
-def run_gate(
+def run_gate_with_status(
     gate: str,
     argv: list[str],
     batch: dict | None,
     lock_wait_seconds: float,
     repo: Path,
     store: Path,
-) -> int:
-    """Run *argv* under the singleflight receipt contract. Returns its exit code."""
+) -> tuple[int, str]:
+    """Run *argv* under the singleflight receipt contract.
+
+    Returns ``(exit_code, status)`` where *status* is the actual post-lock
+    outcome (``executed``, ``reused``, or ``failed``). Callers must use this
+    status for accounting instead of inferring reuse from a pre-lock receipt
+    probe, which races with concurrent identical invocations.
+    """
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     started = time.monotonic()
 
@@ -1227,7 +1337,7 @@ def run_gate(
                     f"[local-validation] REUSED {gate} receipt "
                     f"(head {identity['head'][:12]}, recorded {hit.get('recorded_at', '?')})"
                 )
-                return _finish_gate(
+                code = _finish_gate(
                     store=store,
                     gate=gate,
                     status="reused",
@@ -1239,6 +1349,7 @@ def run_gate(
                     command_executions=0,
                     lock_wait_seconds=lock_wait_seconds,
                 )
+                return code, "reused"
             write_holder(lock_fd, lock_path, phase="executing", gate=gate)
             print(f"[local-validation] EXECUTING {gate}: {' '.join(argv)}")
             try:
@@ -1273,10 +1384,11 @@ def run_gate(
                     print("[local-validation] inputs changed during execution; no receipt stored")
             else:
                 print(f"[local-validation] {gate} failed (exit {proc.returncode}); no receipt stored")
-            return _finish_gate(
+            status = "executed" if proc.returncode == 0 else "failed"
+            code = _finish_gate(
                 store=store,
                 gate=gate,
-                status="executed" if proc.returncode == 0 else "failed",
+                status=status,
                 exit_code=proc.returncode,
                 identity=identity,
                 batch=batch,
@@ -1285,8 +1397,9 @@ def run_gate(
                 command_executions=1,
                 lock_wait_seconds=lock_wait_seconds,
             )
+            return code, status
         finally:
-            os.close(lock_fd)
+            _close_lock(lock_fd)
     # A continuously changing tree cannot safely produce reusable evidence.
     # Execute once without a receipt instead of spinning or reusing stale data.
     print("[local-validation] inputs changed repeatedly; executing without receipt")
@@ -1301,6 +1414,18 @@ def run_gate(
         started=started,
         lock_wait_seconds=lock_wait_seconds,
     )
+
+
+def run_gate(
+    gate: str,
+    argv: list[str],
+    batch: dict | None,
+    lock_wait_seconds: float,
+    repo: Path,
+    store: Path,
+) -> int:
+    """Run *argv* under the singleflight receipt contract. Returns its exit code."""
+    return run_gate_with_status(gate, argv, batch, lock_wait_seconds, repo, store)[0]
 
 
 def show_gate(gate: str, batch: dict | None, repo: Path, store: Path, argv: list[str] | None = None) -> int:
@@ -1350,13 +1475,11 @@ def run_ordered_path(
             print(f"[local-validation] ordered input identity unknown: {exc}", file=sys.stderr)
             return 1
         focused_receipt = receipt_path(store, focused_gate, before["focused"], before["batch"])
-        focused_reused = (
-            read_receipt(focused_receipt, gate=focused_gate, identity=before["focused"], batch=before["batch"])
-            is not None
+        focused_code, focused_result = run_gate_with_status(
+            focused_gate, focused_command, batch, lock_wait_seconds, repo, store
         )
-        focused_status = run_gate(focused_gate, focused_command, batch, lock_wait_seconds, repo, store)
-        if focused_status != 0:
-            return focused_status
+        if focused_code != 0:
+            return focused_code
         try:
             after_focused = ordered_identity(
                 repo, batch, focused_gate, focused_command, preflight_gate, preflight_command
@@ -1372,13 +1495,11 @@ def run_ordered_path(
             print("[local-validation] ordered input changed between stages; restarting focused stage")
             continue
         required_receipt = receipt_path(store, preflight_gate, before["required"], before["batch"])
-        required_reused = (
-            read_receipt(required_receipt, gate=preflight_gate, identity=before["required"], batch=before["batch"])
-            is not None
+        preflight_code, required_result = run_gate_with_status(
+            preflight_gate, preflight_command, batch, lock_wait_seconds, repo, store
         )
-        preflight_status = run_gate(preflight_gate, preflight_command, batch, lock_wait_seconds, repo, store)
-        if preflight_status != 0:
-            return preflight_status
+        if preflight_code != 0:
+            return preflight_code
         try:
             after_preflight = ordered_identity(
                 repo, batch, focused_gate, focused_command, preflight_gate, preflight_command
@@ -1394,8 +1515,8 @@ def run_ordered_path(
             _append_ordered_event(
                 store,
                 before,
-                {"status": "reused" if focused_reused else "executed", "commands": 0 if focused_reused else 1},
-                {"status": "reused" if required_reused else "executed", "commands": 0 if required_reused else 1},
+                {"status": focused_result, "commands": 0 if focused_result == "reused" else 1},
+                {"status": required_result, "commands": 0 if required_result == "reused" else 1},
                 started_at,
                 time.monotonic() - started,
                 lock_wait_seconds,
