@@ -15171,7 +15171,7 @@
     "sql-transpiler-comparison-evidence": {
       "claim": null,
       "needs": [],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Preserve and refresh SQLGlot versus Polyglot execution evidence"
     },
