@@ -118,8 +118,12 @@ def test_worktree_create_does_not_install_shared_hooks_from_linked_worktree(tmp_
     try:
         assert result.returncode == 0, result.stderr
         assert not install_attempt.exists()
-        assert "pre-commit" not in calls.read_text(encoding="utf-8")
-        assert "install" not in calls.read_text(encoding="utf-8")
+        # The fake uv records one argv token per line: match whole lines so
+        # an absolute checkout path containing "pre-commit" (e.g. a worktree
+        # named *-pre-commit-*) cannot trip the hook-install detection.
+        call_lines = calls.read_text(encoding="utf-8").splitlines()
+        assert "pre-commit" not in call_lines
+        assert "install" not in call_lines
         assert hook.read_text(encoding="utf-8") == before
     finally:
         if linked.exists():
