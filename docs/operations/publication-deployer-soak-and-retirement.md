@@ -95,15 +95,18 @@ Cutover evidence state:
 
 - Verified production publication with signed receipt: present (generation 7).
 - Internal availability monitor (`publication-soak-monitor.yml`): running on its five-minute schedule
-  with 30-day observation artifacts, hourly full content checks, and `unknown` (never healthy) status
-  during an active transaction. Recent runs show GitHub scheduling gaps longer than five minutes, so
-  schedule cadence alone is not five-minute coverage.
+  with 30-day observation artifacts, a best-effort top-of-hour full content check, and `unknown`
+  (never healthy) status during an active transaction. Recent runs show GitHub scheduling gaps
+  longer than five minutes, so schedule cadence alone is not five-minute coverage; a top-of-hour
+  run delayed past minute five performs an availability check instead of a full comparison, so a
+  full check is not guaranteed every hour.
 - External independent monitor: still missing. No external monitor credential exists in the
   repository. Activation remains a deployment dependency, not completed evidence.
 - Safe exact-artifact restoration test through the protected rollback path: still pending
   post-cutover demonstration.
 - Legacy retirement: pending. `.github/workflows/docs.yml` still contains the release-to-Pages job,
-  but it skips while independent publication owns Pages (ownership guard). `develop` and `release`
+  but it skips while a recent independent publication owns Pages (ownership guard over unexpired
+  live-receipt artifacts, retained 90 days). `develop` and `release`
   both remain in the `github-pages` deployment-branch policy; `develop` must stay while the
   transaction workflow requires dispatch from that ref. `sync-results-data-to-published.yml` is a
   corpus mirror into `published-results`, not a Pages writer, so it stays.

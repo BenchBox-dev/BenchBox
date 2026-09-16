@@ -37,8 +37,9 @@ committed snapshot without refreshing it.
 
 ## Freeze and incident response
 
-> Superseded note: the A0 freeze closed on 2026-09-04
-> (`publication-freeze-closure-2026-09-04.json`, gates G1-G5 pass, tracker A0-A9 done).
+> Superseded note: the migration freeze closed on 2026-09-04
+> (`publication-freeze-closure-2026-09-04.json` records passing evidence for archive
+> preservation, dual publication, rollback, incident response, and reconciliation).
 > The section below is historical. Current production writes use the transaction writer in
 > `publication-deployer-soak-and-retirement.md`; incident recovery uses the protected rollback
 > path there, not a release-branch re-run.

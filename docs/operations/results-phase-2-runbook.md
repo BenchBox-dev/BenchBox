@@ -228,7 +228,7 @@ reads more protection into a green badge than is there:
 The static Explorer at `benchbox.dev/results/` publishes through the independent publication
 transaction from `develop` (candidate build plus `github-pages`-approved promotion in
 `publication-deployer-soak-and-retirement.md`). The legacy `docs.yml` release-to-Pages deploy
-remains in the tree but is skipped while independent publication owns Pages.
+remains in the tree but is skipped while a recent independent publication owns Pages.
 `published-results` is **not** the Explorer's build source — it is the
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.

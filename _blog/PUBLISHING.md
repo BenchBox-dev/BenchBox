@@ -6,7 +6,8 @@
 
 Blog content is developed under `_blog/` in the single `BenchBox-dev/BenchBox` repository. When a post is ready, archive the final source under `_blog/{series}/published/` and place its ABlog copy under `docs/blog/` in the same change.
 
-The release branch excludes `_blog/` but retains `docs/blog/` for versioned artifacts. A pull request to `develop` validates the post and assembled public site. The public site publishes through the independent publication transaction from `develop` (candidate build plus `github-pages`-approved promotion), not through the release flow. The release flow publishes the Python package; its Pages deploy is a legacy fallback that is skipped while independent publication owns Pages. See `docs/operations/publication-deployer-soak-and-retirement.md` for the promotion procedure.
+The release branch excludes `_blog/` but retains `docs/blog/` for versioned artifacts. A pull request to `develop` validates the post and assembled public site. The public site publishes through the independent publication transaction from `develop` (candidate build plus `github-pages`-approved promotion), not through the release flow. The release flow publishes the Python package; its Pages deploy is a legacy fallback that is skipped while a recent
+independent publication owns Pages. See `docs/operations/publication-deployer-soak-and-retirement.md` for the promotion procedure.
 
 ## Directory Structure
 
