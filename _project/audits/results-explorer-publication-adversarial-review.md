@@ -216,7 +216,7 @@ Findings by severity: **2 Critical, 11 Required, 11 Advisory.**
   - `pr.yml:858` gates on `needs.ci-paths.outputs.viz-needed == 'true'`.
   The classifier emits these as **step** outputs
   (`scripts/path_filter_decision.py:196-200`; `.github/path-filters.yml:93-98`),
-  but in GitHub Actions `needs.<job>.outputs.X` exists only if redeclared in the
+  but in GitHub Actions `needs.<job>.outputs.X` exists only if re-declared in the
   job's `outputs:` map. Undeclared → empty string → `== 'true'` always false →
   jobs always skipped. `ci-required-result` explicitly treats `skipped` as pass
   (`pr.yml:963-973`), and its comment claims this "cannot silently green a
