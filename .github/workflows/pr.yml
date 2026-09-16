@@ -1142,11 +1142,9 @@ jobs:
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
       # Keep empty unless triage is documented in the TODO item.
-      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
-      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
       # PYSEC-2026-3696..3699 and PYSEC-2026-3923 (sqlparse):
       # firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
-      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87,PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699,PYSEC-2026-3923"
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699,PYSEC-2026-3923"
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
