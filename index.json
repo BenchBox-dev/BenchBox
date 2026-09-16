@@ -8131,15 +8131,10 @@
       "title": "Raise DataLoadingError instead of silent zero-row loads in SQL/file loader"
     },
     "lxml-cve-pysec-2026-87-blocked-by-redshift-connector": {
-      "claim": {
-        "expires_at": "2026-09-17T00:53:20Z",
-        "generation": "ce38b3c7ebc74307b985071b8ae0d9cb",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3427f4f3a5ef52fe01de8d56"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Unblock lxml PYSEC-2026-87 fix once redshift-connector relaxes its lxml pin"
     },
     "maintainer-review-g4-uncertain-deferrals": {
