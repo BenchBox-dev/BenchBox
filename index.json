@@ -10494,7 +10494,7 @@
     "polyglot-source-aware-division-spike": {
       "claim": null,
       "needs": [],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Test source-type-aware SQLite division in a bounded Polyglot extension"
     },
