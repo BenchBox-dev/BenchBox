@@ -5,7 +5,7 @@ corpus. The product boundary and launch rationale live in
 [`docs/development/benchbox-results-platform-strategy.md`](../development/benchbox-results-platform-strategy.md).
 This runbook documents the current operating model only: contributor PRs target
 `published-results`, CI validates them, maintainers review them, and the protected
-release workflow is the only path that can rebuild and deploy the static Explorer;
+publication transaction is the normal path that rebuilds and deploys the static Explorer;
 no hosted API is involved.
 
 Authority is split by surface: `develop` owns code, validators, generators,
@@ -225,10 +225,10 @@ reads more protection into a green badge than is there:
 
 ### 1.3 Explorer publish path
 
-The static Explorer at `benchbox.dev/results/` is wired through
-[`docs.yml`](../../.github/workflows/docs.yml): the `build` job runs for
-documentation PRs targeting `release` or `develop` and for pushes to `release`,
-while the `deploy` job runs only for a protected push to `release`.
+The static Explorer at `benchbox.dev/results/` publishes through the independent publication
+transaction from `develop` (candidate build plus `github-pages`-approved promotion in
+`publication-deployer-soak-and-retirement.md`). The legacy `docs.yml` release-to-Pages deploy
+remains in the tree but is skipped while a recent independent publication owns Pages.
 `published-results` is **not** the Explorer's build source — it is the
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.
@@ -239,8 +239,10 @@ corpus-archive branch that contributor PRs target and that mirrors develop's
 > The `docs.yml` build still gates Explorer steps on
 > `hashFiles('results-explorer/package.json')`, but a release that includes the
 > application now fails closed when the corpus, helper set, or generated
-> snapshot is missing. The deploy job runs only after a protected push to
-> `release`, and the `github-pages` environment must permit `release`.
+> snapshot is missing. The legacy `docs.yml` deploy job runs only after a protected push to
+> `release`, and the `github-pages` environment must permit `release` for that fallback path.
+> Normal production writes use the transaction writer, whose `github-pages` approval is granted
+> on a dispatch from `develop`.
 >
 > This is a curated preview, not a broad leaderboard or full-cohort claim.
 > Completion evidence must pin the release SHA, artifact digest, deployment
@@ -366,11 +368,10 @@ gh run watch --repo BenchBox-dev/BenchBox
 
 Use `workflow_dispatch` only after confirming there is no newer push already
 rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
-**not** the `deploy` job — the Pages deploy is gated on
+**not** the legacy `deploy` job — the legacy Pages deploy is gated on
 `github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
-run validates the build without publishing. A publish requires a push to
-`release` (and, per §1.3, the Explorer paths actually being present on
-`release`).
+run validates the build without publishing. A publish uses the candidate build plus
+transaction promotion in §1.3, not a push to `release`.
 
 ## 7. Data Locations
 

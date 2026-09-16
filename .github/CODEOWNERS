@@ -54,10 +54,13 @@ scripts/publication/verify_lane_isolation.py @joeharris76
 # Self-protection: the review-gate machinery and the PyPI-publishing
 # workflow. In-workflow checks are attacker-controlled for same-repo PRs
 # (GitHub runs the PR's own copy of a pull_request-triggered workflow).
-# NOTE: no ruleset enforces code-owner approval — that target was retired
-# 2026-07-18 (sole owner authors every PR; GitHub forbids self-approval;
+# NOTE: the develop ruleset enforces code-owner review
+# (require_code_owner_review: true, live-verified 2026-09-16 against ruleset
+# 15611785, active; the 2026-07-18 retirement is superseded — sole owner
+# authors every PR and GitHub forbids self-approval, so soundness-path PRs
+# need manual maintainer merge;
 # see docs/operations/repo-admin-settings.md "Soundness-path review
-# enforcement (RETIRED 2026-07-18)"). This file's role is to mirror
+# enforcement"). This file's role is to mirror
 # SOUNDNESS_PREFIXES (auto-merge withholding) and route review requests.
 # .github/workflows/pr.yml deliberately excluded
 # (high churn; its required check is pinned by the ruleset-drift canary).

@@ -121,7 +121,7 @@ all = [
     # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12,
     # incompatible with the pandas 3 migration (revisit when 19.x lifts the cap).
     "databricks-connect>=14.0.0,<19",  # For DataFrame mode
-    "datafusion>=50.1.0",  # Updated to match datafusion extra
+    "datafusion>=54.0.0",  # Updated to match datafusion extra
     "pyarrow>=10.0.0",  # For DataFusion (also in core with higher version)
     "firebolt-sdk>=1.18.0",
     "google-cloud-bigquery>=3.0.0",
@@ -205,7 +205,7 @@ athena = [
     "pyathena>=3.0.0",
     "boto3>=1.20.0",
 ]
-datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]
+datafusion = ["datafusion>=54.0.0", "pyarrow>=10.0.0"]
 firebolt = [
     "firebolt-sdk>=1.18.0",
     "cloudpathlib>=0.15.0",
@@ -271,7 +271,7 @@ dataframe-pyspark = [
     "pyspark>=3.5.0",
 ]
 dataframe-datafusion = [
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
     "pyarrow>=10.0.0",
 ]
 
@@ -284,14 +284,14 @@ dataframe-pandas-family = [
 dataframe-expression-family = [
     "polars>=1.35.2",
     "pyspark>=3.5.0",
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
 ]
 dataframe-all = [
     "pandas>=2.0.0",
     "dask[distributed]>=2024.1.0",
     "polars>=1.35.2",
     "pyspark>=3.5.0",
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
 ]
 
 # Quick start - DuckDB + Polars for easy experimentation
@@ -344,7 +344,8 @@ cloud-spark = [
     # Databricks
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12 (see core deps).
+    "databricks-connect>=14.0.0,<19",
     "cloudpathlib>=0.15.0",
 ]
 
@@ -440,7 +441,7 @@ dev = [
     "pandas>=2.0.0", # DataFrame dependencies (needed for many tests)
     "pyiceberg[sql-sqlite,pyarrow]>=0.10.0", # Table format converters (needed for tests/unit/utils/format_converters/)
     "deltalake>=1.2.1",
-    "datafusion>=40.0.0", # DataFusion (needed for tests/integration/test_datafusion_integration.py)
+    "datafusion>=54.0.0", # DataFusion (needed for tests/integration/test_datafusion_integration.py)
     "cloudpathlib[s3,gs,azure]>=0.15.0", # Cloud storage with S3 support (needed for tests/unit/utils/test_cloud_storage.py)
     "chdb>=0.10.0; sys_platform != 'win32'", # ClickHouse local (chdb is not available on Windows)
     "clickhouse-driver>=0.2.0", # ClickHouse server (needed for tests/unit/platforms/test_clickhouse_local.py server tests)
