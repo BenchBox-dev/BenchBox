@@ -15182,7 +15182,7 @@
         "polyglot-source-aware-division-spike",
         "polyglot-benchbox-integration-assessment"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Choose BenchBox SQL transpiler maintenance strategy from execution and patch evidence"
     },
