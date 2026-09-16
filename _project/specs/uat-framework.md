@@ -865,7 +865,7 @@ schema change.
 **Counter.** Each W has its own PR per the TODO's "vertical slices"
 discipline. Without a spec gate, the user reviews 11 PRs against an
 implicit shared design. The spec gate is one review of one document
-that pre-empts wrong directions across all 11. The 2026-05-02 sweep
+that preempts wrong directions across all 11. The 2026-05-02 sweep
 ran with implicit shared design; the retrospective is the cost.
 
 ## 9. `tests/uat/configs/` content policy

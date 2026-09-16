@@ -51,7 +51,7 @@ evidence that this problem is real and distinct from the JOB paper's fixed-datas
 cardinality-estimation problem (engine docs on sampled/stale/partition statistics
 limits, BenchBox-local large-scale observations, and optimizer/planning-time
 literature) is collected separately from the original JOB cardinality-estimation
-framing and motivates a distinct workload identity rather than re-using `joinorder`.
+framing and motivates a distinct workload identity rather than reusing `joinorder`.
 
 ## Scale semantics
 
