@@ -355,7 +355,7 @@ _PLATFORM_MANIFEST_JSON = """[
       }
     ],
     "requirements": [
-      "datafusion>=34.0.0"
+      "datafusion>=54.0.0"
     ],
     "installation_command": "uv add datafusion",
     "adoption": "emerging",
