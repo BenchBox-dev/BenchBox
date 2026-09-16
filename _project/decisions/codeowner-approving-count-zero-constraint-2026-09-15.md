@@ -21,17 +21,20 @@ enforcement"); `_project/scripts/ruleset_review_enforcement.py`;
    GitHub offers no CODEOWNERS-scoped count, so a branch-wide count still
    gates all PRs and needs its own decision.
 2. `require_code_owner_review: true` stays on for the CODEOWNERS-owned
-   soundness surface. The sole owner authors every PR and GitHub forbids
-   self-approval, so soundness-path PRs merge manually, never hands-free.
-   The drift check (`scripts/ruleset_drift_check.py`,
+   soundness surface (live-verified 2026-09-16 against ruleset 15611785,
+   active). The sole owner authors every PR and GitHub forbids
+   self-approval, so under the current identity model a soundness-path PR
+   has no hands-free path: it merges only after an admin removes the live
+   rule or the identity model changes (second code owner or non-self
+   approval identity), per the runbook. The drift check
+   (`scripts/ruleset_drift_check.py`,
    `DEVELOP_REVIEW_RULE_ENFORCED`) keeps this blocking.
-3. No merge-blocking review gate (D7). The 08-06 batch showed every Codex
-   review failing on usage limits with zero completed external reviews;
-   coupling merge availability to reviewer quota deadlocks the queue.
-   Reviews are funded author-paced — PRs stay unarmed until reviewed when
-   the author chooses — and any automated-review signal (for example a
-   Codex-reviewed-this-head check) stays advisory: recorded, never a member
-   of the readiness failure set.
+3. No merge-blocking *automated* review gate (D7). The 08-06 batch showed
+   every Codex review failing on usage limits with zero completed external
+   reviews; coupling merge availability to reviewer quota deadlocks the
+   queue. Automated review signals stay advisory: recorded, never a member
+   of the readiness failure set. This does not weaken item 2 — the human
+   CODEOWNERS gate above stays merge-blocking.
 
 ## What this item does not do
 
