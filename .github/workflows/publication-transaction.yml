@@ -331,10 +331,11 @@ jobs:
       - name: Upload Pages artifact
         if: needs.prepare.outputs.kind == 'promotion'
         id: upload_pages
-        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           name: publication-pages-${{ needs.prepare.outputs.generation }}
           path: site
+          include-hidden-files: true
 
       - name: Retain candidate receipts for verification and audit
         if: needs.prepare.outputs.kind == 'promotion'
