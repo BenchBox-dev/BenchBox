@@ -14,7 +14,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "publication-deploy.yml"
 BASELINE_PATH = ROOT / "docs" / "operations" / "publication-baseline-2026-08-31.json"
-DEPLOY_PAGES_ACTION = "actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e"
+DEPLOY_PAGES_ACTION = "actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346"
 UPLOAD_PAGES_ACTION = "actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa"
 
 

@@ -48,7 +48,7 @@ jobs:
       - name: Download validation comment artifact
         id: download
         continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: submission-validation-comment
           path: artifact
@@ -57,7 +57,7 @@ jobs:
 
       - name: Post or update the comment
         if: steps.download.outcome == 'success'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           script: |
             const fs = require('fs');
