@@ -2079,7 +2079,7 @@
     "clickhouse-local-tpcds-query-35-fails-at-sf1": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "ClickHouse Local fails TPC-DS query 35 at SF1, blocking it from the public corpus"
     },
