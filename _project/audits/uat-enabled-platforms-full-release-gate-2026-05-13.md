@@ -174,7 +174,7 @@ TimescaleDB cells. The most visible signatures from this run:
   so multi-cell UAT promotion does not exhaust the default sender limit.
   After that provisioning fix, `write_primitives` reached execution but failed
   setup against mooncake mirror tables with `DuckDB does not support
-  modifying Postgres tables`; `transaction_primitives` failed in the same
+  modififying Postgres tables`; `transaction_primitives` failed in the same
   TPC-H corpus promotion/write path with Moonlink duplicate replication
   registration. Added pg-mooncake-only benchmark gates for both write-heavy
   primitive benchmarks:

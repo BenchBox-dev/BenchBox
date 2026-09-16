@@ -174,7 +174,7 @@ repos:
           - --skip=*.pyc,_build,_binaries/*,benchbox/_binaries/*,*.json,*.lock,*.svg,*.min.js,*.min.css,*.csv
           - --quiet-level=2
         stages: [pre-commit]
-        exclude: ^(_sources/|\.claude/skills/|_project/todo-db-export/)  # vendored/generated snapshots; validate export structure separately
+        exclude: ^(_sources/|\.claude/skills/|_project/todo-db-export/|_project/audits/)  # vendored/generated snapshots (audits are dated evidence: never spell-modernize frozen wording or quoted tool output); validate export structure separately
 
   # YAML validation
   - repo: https://github.com/pre-commit/pre-commit-hooks
