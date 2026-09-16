@@ -280,3 +280,27 @@ class TestFormatPlatformStatusTable:
 
         assert "Available:" in table
         assert "platforms" in table
+
+
+class TestMinimumVersionEnforcement:
+    """Below-minimum installs must report unavailable, not warn-and-pass."""
+
+    def test_below_minimum_reports_unavailable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Simulate DataFusion 53 against the 54 floor."""
+        monkeypatch.setattr(
+            DataFramePlatformChecker,
+            "get_version",
+            staticmethod(lambda platform: "53.0.0"),
+        )
+        status = DataFramePlatformChecker.check_platform("datafusion")
+
+        assert status.available is False
+        assert status.error is not None
+        assert "54.0.0" in status.error
+
+    def test_at_minimum_reports_available(self) -> None:
+        """The locked DataFusion 54 install stays available."""
+        status = DataFramePlatformChecker.check_platform("datafusion")
+
+        assert status.available is True
+        assert status.error is None

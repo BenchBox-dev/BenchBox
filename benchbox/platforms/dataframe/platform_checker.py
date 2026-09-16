@@ -103,7 +103,7 @@ DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
         version_attr="__version__",
         extra_name="datafusion",
         description="Apache DataFusion query engine",
-        min_version="40.0.0",
+        min_version="54.0.0",
     ),
 }
 
@@ -194,8 +194,11 @@ class DataFramePlatformChecker:
         version = DataFramePlatformChecker.get_version(platform)
         available = version is not None
 
-        # Check version compatibility
+        # Check version compatibility: below-minimum installs report
+        # unavailable so callers fail fast instead of crashing on
+        # version-gated API calls later.
         version_warning = None
+        error = None
         if available and version and info.min_version:
             from packaging import version as pkg_version
 
@@ -203,8 +206,10 @@ class DataFramePlatformChecker:
                 installed = pkg_version.parse(version)
                 minimum = pkg_version.parse(info.min_version)
                 if installed < minimum:
-                    version_warning = (
-                        f"Warning: {info.name} {version} is installed but >={info.min_version} is recommended."
+                    available = False
+                    error = (
+                        f"{info.name} {version} is installed but >={info.min_version} "
+                        f"is required; upgrade the '{info.extra_name}' extra."
                     )
             except Exception:
                 pass
@@ -214,6 +219,7 @@ class DataFramePlatformChecker:
             available=available,
             version=version,
             info=info,
+            error=error,
             version_warning=version_warning,
         )
 
@@ -321,6 +327,8 @@ def get_platform_error_message(platform: str, error: Exception | None = None) ->
         f"Description: {info.description}",
         f"Family: {info.family.value}",
     ]
+    if status.error:
+        lines += ["", f"Reason: {status.error}"]
 
     if info.extra_name:
         lines.append("")
