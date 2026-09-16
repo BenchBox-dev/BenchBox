@@ -293,9 +293,9 @@ _PLATFORM_MANIFEST_JSON = """[
       }
     ],
     "requirements": [
-      "duckdb>=1.3.0,<2.0.0"
+      "duckdb>=1.5.0,<2.0.0"
     ],
-    "installation_command": "uv add 'duckdb>=1.3,<2'",
+    "installation_command": "uv add 'duckdb>=1.5,<2'",
     "adoption": "mainstream",
     "supports": [
       "olap",
@@ -534,7 +534,7 @@ _PLATFORM_MANIFEST_JSON = """[
       }
     ],
     "requirements": [
-      "duckdb>=1.3.0"
+      "duckdb>=1.5.0"
     ],
     "installation_command": "uv add 'benchbox[ducklake]'",
     "adoption": "emerging",
