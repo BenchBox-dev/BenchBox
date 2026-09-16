@@ -18214,7 +18214,7 @@
         "worktree-maintenance-local-metadata"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "dropped",
       "title": "Consume Bossmode ownership and release evidence through a stable adapter"
     },
     "worktree-maintenance-contract-fixtures": {
