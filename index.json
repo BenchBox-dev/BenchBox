@@ -1678,6 +1678,13 @@
       "status": "done",
       "title": "Measure complete PR lifecycles and repair missing-head CI accounting"
     },
+    "ci-dedupe-01-post-merge-skip-queue-certified-shas": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Skip post-merge fast and medium tests on develop commits the merge queue already passed"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],
