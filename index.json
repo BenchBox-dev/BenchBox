@@ -10110,10 +10110,15 @@
       "title": "Pause internal tooling, CI and governance work until the customer-facing queue ships"
     },
     "per-engine-sql-dialect-translation-for-the-113-queries-on-no": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T18:28:41Z",
+        "generation": "e2b2db642bb441139a7fb99991dfa151",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Per-engine SQL dialect translation for the 113 queries on non-DuckDB engines"
     },
     "performance-regression-detection-system": {
