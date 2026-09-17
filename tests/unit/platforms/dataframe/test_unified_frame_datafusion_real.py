@@ -72,6 +72,56 @@ def test_datafusion_string_operations(datafusion_frame):
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_split_returns_full_list_expression(datafusion_frame):
+    """str.split() returns a real list expression, not a get-only proxy."""
+    from benchbox.platforms.dataframe.unified_frame import UnifiedListExpr
+
+    _, frame = datafusion_frame
+
+    split_expr = UnifiedExpr(datafusion.col("text")).str.split(" ")
+    assert isinstance(split_expr, UnifiedListExpr)
+
+    result = frame.with_columns(
+        split_expr.list.get(0).alias("first_name"),
+        UnifiedExpr(datafusion.col("text")).str.split(" ").list.len().alias("word_count"),
+        UnifiedExpr(datafusion.col("text")).str.split(" ").list.contains("Smith").alias("has_smith"),
+        UnifiedExpr(datafusion.col("text")).str.split(" ").alias("words"),
+    ).collect()
+
+    result_dict = result.to_pydict()
+    assert result_dict["first_name"] == ["Alice", "Bob"]
+    assert result_dict["word_count"] == [2, 2]
+    assert result_dict["has_smith"] == [True, False]
+    assert result_dict["words"] == [["Alice", "Smith"], ["Bob", "Jones"]]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_split_edge_cases_match_list_semantics(datafusion_frame):
+    """Out-of-range/missing-separator edges return NULL, like polars/pyspark.
+
+    (The retired split_part proxy returned "" here; real list semantics is
+    NULL. A column expression is also accepted as the separator.)
+    """
+    _, frame = datafusion_frame
+
+    split_expr = UnifiedExpr(datafusion.col("text")).str.split(" ")
+    missing_sep = UnifiedExpr(datafusion.col("text")).str.split(",")
+    expr_sep = UnifiedExpr(datafusion.col("text")).str.split(datafusion.lit(" "))
+    result = frame.with_columns(
+        split_expr.list.get(5).alias("oob"),
+        missing_sep.list.get(0).alias("whole"),
+        missing_sep.list.get(1).alias("missing"),
+        expr_sep.list.get(1).alias("expr_last"),
+    ).collect()
+
+    result_dict = result.to_pydict()
+    assert result_dict["oob"] == [None, None]
+    assert result_dict["whole"] == ["Alice Smith", "Bob Jones"]
+    assert result_dict["missing"] == [None, None]
+    assert result_dict["expr_last"] == ["Smith", "Jones"]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_date_operations_and_string_concat(datafusion_frame):
     _, frame = datafusion_frame
 

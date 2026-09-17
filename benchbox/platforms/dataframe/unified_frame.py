@@ -276,8 +276,10 @@ class UnifiedStrExpr:
 
             return UnifiedListExpr(F.split(self._expr, separator), is_pyspark=True)
         if self._is_datafusion:
-            # string_to_array not in v50 Python bindings; use split_part proxy
-            return _DataFusionSplitListExpr(self._expr, separator)
+            from datafusion import functions as df_f, lit as df_lit
+
+            sep = separator if _is_datafusion_expr(separator) else df_lit(separator)
+            return UnifiedListExpr(df_f.string_to_array(self._expr, sep), is_datafusion=True)
         return UnifiedListExpr(self._expr.str.split(separator), is_polars=True)
 
     def len_chars(self) -> UnifiedExpr:
@@ -295,30 +297,6 @@ class UnifiedStrExpr:
 
             return UnifiedExpr(df_f.character_length(self._expr))
         return UnifiedExpr(self._expr.str.len_chars())
-
-
-class _DataFusionSplitListExpr:
-    """Proxy for DataFusion str.split() that delegates .list.get(n) to split_part.
-
-    DataFusion v50 Python bindings lack string_to_array. This proxy intercepts
-    the .list.get(n) pattern (used by json_extract queries) and translates it
-    to split_part(expr, separator, n+1).
-    """
-
-    def __init__(self, expr: DataFusionExpr, separator: str) -> None:
-        self._expr = expr
-        self._separator = separator
-
-    @property
-    def list(self) -> _DataFusionSplitListExpr:
-        return self
-
-    def get(self, index: int | DataFusionExpr) -> UnifiedExpr:
-        from datafusion import functions as df_f, lit as df_lit
-
-        # split_part is 1-indexed
-        idx = index + 1 if isinstance(index, int) else index
-        return UnifiedExpr(df_f.split_part(self._expr, df_lit(self._separator), df_lit(idx)))
 
 
 class UnifiedListExpr:
