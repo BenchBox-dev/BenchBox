@@ -1,0 +1,3 @@
+{
+  "description": "Follow-up from external review of qpc-14-history-fingerprint-version-guard (FINDING-03, FINDING-04). get_plan_version_history does not partition by platform (detect_plan_flapping does), so multi-platform histories compare fingerprints across engines; and the plan_history CLI counts unique plans / highlights changes on raw fingerprint equality without version awareness, so a v1->v2 upgrade of an unchanged plan shows Unique plans: 2, Plan changes: 1. Consider a platform filter on get_plan_version_history and version-aware CLI metrics."
+}

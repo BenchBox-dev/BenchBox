@@ -11526,6 +11526,15 @@
       "status": "done",
       "title": "compare-plans drops an explicitly-requested query at --threshold 0.0"
     },
+    "qpc-history-version-awareness-hardening": {
+      "claim": null,
+      "needs": [
+        "qpc-14-history-fingerprint-version-guard"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Harden plan-history version awareness: platform partition and CLI metrics"
+    },
     "quality-add-cross-platform-result-validation": {
       "claim": null,
       "needs": [],
