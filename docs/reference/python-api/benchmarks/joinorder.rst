@@ -128,26 +128,31 @@ Convenience wrapper that returns schema DDL for the requested dialect.
 Query Methods
 -------------
 
-``get_query(query_id, *, params=None) -> str``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``get_query(query_id, *, params=None, dialect=None) -> str``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Returns a static JOB query by ID, such as ``"1a"`` or ``"33c"``.
-``params`` is not supported because JOB queries are fixed.
+``params`` is not supported because JOB queries are fixed. Pass
+``dialect`` (for example ``"duckdb"``) for SQLGlot-translated SQL;
+without it the canonical text is returned unchanged.
 
 .. code-block:: python
 
     benchmark = JoinOrder(scale_factor=1.0)
     query = benchmark.get_query("1a")
+    duckdb_query = benchmark.get_query("1a", dialect="duckdb")
 
-``get_queries() -> dict[str, str]``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``get_queries(dialect=None) -> dict[str, str]``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Returns all embedded canonical JOB queries.
+Returns all embedded canonical JOB queries, translated via SQLGlot when
+``dialect`` is given.
 
 .. code-block:: python
 
     benchmark = JoinOrder(scale_factor=1.0)
     queries = benchmark.get_queries()
+    spark_queries = benchmark.get_queries(dialect="spark")
 
     assert len(queries) == 113
     assert "1a" in queries
