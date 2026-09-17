@@ -1166,16 +1166,17 @@ class BigQueryAdapter(PlatformAdapter):
 
                 benchmark_name = getattr(benchmark, "name", "unknown")
                 scale_factor = getattr(benchmark, "scale_factor", "unknown")
+                data_dir = getattr(benchmark, "data_dir", getattr(benchmark, "output_dir", "<data_dir>"))
                 raise ValueError(
                     f"\n❌ Incompatible data compression detected\n\n"
                     f"BigQuery does not support Zstd (.zst) compression for CSV file loading.\n"
                     f"Found Zstd file: {Path(file_path).name}\n\n"
                     f"To fix this, regenerate the data with gzip compression:\n\n"
                     f"  # Remove existing incompatible data\n"
-                    f"  rm -rf {benchmark.data_dir}\n\n"
+                    f"  rm -rf {data_dir}\n\n"
                     f"  # Regenerate with gzip compression\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
-                    f"--scale {scale_factor} --compression-type gzip\n\n"
+                    f"--scale {scale_factor} --compression gzip\n\n"
                     f"Or use uncompressed data (larger files, slower uploads):\n\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
                     f"--scale {scale_factor} --no-compression\n"
@@ -1600,19 +1601,29 @@ class BigQueryAdapter(PlatformAdapter):
 
         Makes tables idempotent by using CREATE OR REPLACE TABLE.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        import re
+
+        if not statement.strip().upper().startswith("CREATE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE (defense-in-depth)
-        if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
-
-        # Include dataset qualification
-        if f"{self.dataset_id}." not in statement:
-            statement = statement.replace(
-                "CREATE OR REPLACE TABLE ", f"CREATE OR REPLACE TABLE `{self.project_id}.{self.dataset_id}."
-            )
-            statement = statement.replace(" (", "` (")
+        pattern = re.compile(
+            r"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_.]+)`?\s*(\(.*)",
+            re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.match(statement)
+        if match:
+            table_name = match.group(1)
+            rest = match.group(2)
+            if f"{self.dataset_id}." not in table_name:
+                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
+            elif not table_name.startswith("`"):
+                qualified_table = f"`{table_name}`"
+            else:
+                qualified_table = table_name
+            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+        else:
+            if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
+                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in statement.upper() and self.partitioning_field:

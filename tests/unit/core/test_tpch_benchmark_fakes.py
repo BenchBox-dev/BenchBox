@@ -108,3 +108,36 @@ def test_get_table_loading_order_is_fk_safe_for_available_subset(fake_tpch_compo
     # returned rather than dropped.
     order_with_extra = bench.get_table_loading_order([*available, "some_extra_table"])
     assert "some_extra_table" in order_with_extra
+
+
+def test_expand_sqlite_named_column_aliases():
+    from benchbox.core.tpch.benchmark import _expand_sqlite_named_column_aliases
+
+    raw_query = """
+    select c_count, count(*) as custdist
+    from (
+        select c_custkey, count(o_orderkey)
+        from customer left outer join orders on c_custkey = o_custkey
+        group by c_custkey
+    ) as c_orders (c_custkey, c_count)
+    group by c_count
+    """
+    transformed = _expand_sqlite_named_column_aliases(raw_query)
+    assert "(c_custkey, c_count)" not in transformed
+    assert "AS c_count" in transformed
+    assert ") as c_orders" in transformed.lower()
+
+
+def test_tpch_benchmark_translates_bigquery_q13(fake_tpch_components):
+    bench = TPCHBenchmark(scale_factor=0.1, output_dir=fake_tpch_components)
+    raw_q13 = """
+    select c_count, count(*) as custdist
+    from (
+        select c_custkey, count(o_orderkey)
+        from customer left outer join orders on c_custkey = o_custkey
+        group by c_custkey
+    ) as c_orders (c_custkey, c_count)
+    group by c_count
+    """
+    translated = bench.translate_query_text(raw_q13, "netezza", "bigquery")
+    assert "(c_custkey, c_count)" not in translated

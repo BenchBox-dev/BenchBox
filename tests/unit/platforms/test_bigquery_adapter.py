@@ -1793,6 +1793,20 @@ class TestConvertToBigqueryTable:
         result = adapter._convert_to_bigquery_table(sql)
         assert result.count("CLUSTER BY") == 1
 
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_backticked_table_name_qualified(self, mock_bigquery):
+        """Table name in backticks is correctly parsed and qualified without double backticks."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE `orders` (id INT64)")
+        assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.orders` (id INT64)"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_already_qualified_table_name(self, mock_bigquery):
+        """Table name already containing dataset qualification is not double-qualified."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE `my_ds.orders` (id INT64)")
+        assert result == "CREATE OR REPLACE TABLE `my_ds.orders` (id INT64)"
+
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestQualifyTableNames:
@@ -2271,6 +2285,21 @@ class TestValidateCompressionSupport:
         with (
             patch("benchbox.platforms.bigquery.detect_compression", return_value="zstd"),
             pytest.raises(ValueError, match="Zstd"),
+        ):
+            adapter._validate_compression_support({"lineitem": [Path("/tmp/lineitem.csv.zst")]}, mock_benchmark)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_zstd_file_raises_with_output_dir(self, mock_bigquery):
+        """Zstd error message formatting works when benchmark has output_dir instead of data_dir."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        mock_benchmark = Mock(spec=["name", "scale_factor", "output_dir"])
+        mock_benchmark.name = "tpch"
+        mock_benchmark.scale_factor = 1
+        mock_benchmark.output_dir = "/tmp/bench_out"
+
+        with (
+            patch("benchbox.platforms.bigquery.detect_compression", return_value="zstd"),
+            pytest.raises(ValueError, match="rm -rf /tmp/bench_out"),
         ):
             adapter._validate_compression_support({"lineitem": [Path("/tmp/lineitem.csv.zst")]}, mock_benchmark)
 

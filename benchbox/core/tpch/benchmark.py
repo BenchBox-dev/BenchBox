@@ -135,7 +135,14 @@ def _resolve_tpch_seed(
 
 def _expand_sqlite_named_column_aliases(query: str) -> str:
     """Move TPC-H named table-alias columns into SELECT aliases for SQLite translation."""
-    if ") as c_orders (c_custkey, c_count)" in query:
+    import re
+
+    alias_pattern = re.compile(r"(\bAS\s+c_orders)\s*\(\s*c_custkey\s*,\s*c_count\s*\)", re.IGNORECASE)
+    if alias_pattern.search(query):
+        sub_pattern = re.compile(r"(\bcount\s*\(\s*o_orderkey\s*\))(\s+FROM\b)", re.IGNORECASE)
+        query = sub_pattern.sub(r"\1 AS c_count\2", query, count=1)
+        query = alias_pattern.sub(r"\1", query, count=1)
+    elif ") as c_orders (c_custkey, c_count)" in query:
         query = query.replace(
             "count(o_orderkey)\nfrom",
             "count(o_orderkey) as c_count\nfrom",
@@ -288,7 +295,7 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         src = (source_dialect or "netezza").lower()
         tgt = (target_dialect or src).lower()
-        if tgt in ("sqlite", "mysql"):
+        if tgt in ("sqlite", "mysql", "bigquery"):
             query = _expand_sqlite_named_column_aliases(query)
 
         return translate_sql_query(

@@ -685,12 +685,18 @@ class SnowflakeAdapter(PlatformAdapter):
 
                 # Check if table exists
                 cursor.execute(f"SHOW TABLES LIKE '{table_upper}'")
-                if not cursor.fetchone():
+                row = cursor.fetchone()
+                if not row:
                     self.log_verbose(f"Table {table_upper} missing - schema creation required")
                     return False
 
+                catalog_name = row[1] if len(row) > 1 and row[1] else table_upper
+
                 # Check if table has data
-                cursor.execute(f"SELECT COUNT(*) FROM {table_upper}")
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table_upper}")
+                except Exception:
+                    cursor.execute(f'SELECT COUNT(*) FROM "{catalog_name}"')
                 row_count = cursor.fetchone()[0]
                 if row_count == 0:
                     self.log_verbose(f"Table {table_upper} empty - schema creation required")
@@ -998,28 +1004,54 @@ class SnowflakeAdapter(PlatformAdapter):
     ) -> int:
         """Upload table files to stage, COPY INTO target table, and return actual row count."""
         stage_name = f"@%{table_name_upper}"
+        target_table = table_name_upper
         self.log_very_verbose(f"Using stage: {stage_name}")
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_msg = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
             self.log_very_verbose(f"Uploading file{chunk_msg} with PUT: {file_path.name}")
-            cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+            try:
+                cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+            except Exception as e:
+                if "does not exist or not authorized" in str(e):
+                    stage_name = f'@%"{table_name}"'
+                    target_table = f'"{table_name}"'
+                    cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+                else:
+                    raise
 
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
         file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
         copy_command = f"""
-            COPY INTO {table_name_upper}
+            COPY INTO {target_table}
             FROM {stage_name}
             FILE_FORMAT = (FORMAT_NAME = '{file_format}')
             ON_ERROR = 'CONTINUE'
             PURGE = TRUE
         """
-        self.log_very_verbose(f"Executing COPY INTO for {table_name_upper}")
-        cursor.execute(copy_command)
+        self.log_very_verbose(f"Executing COPY INTO for {target_table}")
+        try:
+            cursor.execute(copy_command)
+        except Exception as e:
+            if target_table != f'"{table_name}"' and "does not exist or not authorized" in str(e):
+                target_table = f'"{table_name}"'
+                copy_command = f"""
+                    COPY INTO {target_table}
+                    FROM {stage_name}
+                    FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+                    ON_ERROR = 'CONTINUE'
+                    PURGE = TRUE
+                """
+                cursor.execute(copy_command)
+            else:
+                raise
         self._parse_copy_results(cursor.fetchall())
 
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+        except Exception:
+            cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
         return cursor.fetchone()[0]
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
@@ -1132,7 +1164,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
         return validate_session_cache_control(
             connection=connection,
-            query="SELECT SYSTEM$GET_SESSION_PARAMETER('USE_CACHED_RESULT') as value",
+            query="SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION",
             setting_key="USE_CACHED_RESULT",
             disabled_value="FALSE",
             enabled_value="TRUE",
@@ -1141,6 +1173,7 @@ class SnowflakeAdapter(PlatformAdapter):
             disable_result_cache=self.disable_result_cache,
             strict_validation=self.strict_validation,
             adapter_logger=self.logger,
+            value_column_index=1,
         )
 
     def execute_query(
