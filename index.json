@@ -1687,9 +1687,9 @@
     },
     "ci-dedupe-02-hourly-sweep-skip-tested-tip": {
       "claim": {
-        "expires_at": "2026-09-18T13:31:19Z",
+        "expires_at": "2026-09-18T14:52:22Z",
         "generation": "7b7a46d78dd14a869926682a9f48b973",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
       },
       "needs": [],
