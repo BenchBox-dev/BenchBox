@@ -20,7 +20,7 @@ def test_platform_optimization_defaults_include_sorted_ingestion_and_databricks_
     config = PlatformOptimizationConfiguration()
     assert config.sorted_ingestion_mode == "off"
     assert config.sorted_ingestion_method == "auto"
-    assert config.databricks_clustering_strategy == "z_order"
+    assert config.databricks_clustering_strategy == "none"
     assert config.liquid_clustering_enabled is False
     assert config.liquid_clustering_columns == []
 
@@ -191,3 +191,28 @@ def test_unified_tuning_enable_disable_liquid_clustering() -> None:
 
     config.disable_platform_optimization(TuningType.LIQUID_CLUSTERING)
     assert config.platform_optimizations.liquid_clustering_enabled is False
+
+
+def test_platform_optimization_from_dict_defaults_to_none_without_layout_flags() -> None:
+    config = PlatformOptimizationConfiguration.from_dict({})
+
+    assert config.databricks_clustering_strategy == "none"
+
+
+def test_platform_optimization_from_dict_infers_z_order_from_z_order_flags() -> None:
+    config = PlatformOptimizationConfiguration.from_dict({"z_ordering_enabled": True})
+
+    assert config.databricks_clustering_strategy == "z_order"
+
+    columns_config = PlatformOptimizationConfiguration.from_dict({"z_ordering_columns": ["event_time"]})
+
+    assert columns_config.databricks_clustering_strategy == "z_order"
+
+
+def test_unified_tuning_enable_z_ordering_sets_strategy() -> None:
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["event_time"])
+
+    assert config.platform_optimizations.z_ordering_enabled is True
+    assert config.platform_optimizations.z_ordering_columns == ["event_time"]
+    assert config.platform_optimizations.databricks_clustering_strategy == "z_order"

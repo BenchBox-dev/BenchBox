@@ -649,19 +649,19 @@ class TestExecuteQueryFailurePath:
 class TestResolveClusteringStrategy:
     """Test _resolve_databricks_clustering_strategy precedence rules."""
 
-    def test_returns_z_order_when_no_effective_config(self):
+    def test_returns_none_when_no_effective_config(self):
         adapter = _make_adapter()
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
             result = adapter._resolve_databricks_clustering_strategy()
-        assert result == "z_order"
+        assert result == "none"
 
-    def test_returns_z_order_when_platform_opts_is_none(self):
+    def test_returns_none_when_platform_opts_is_none(self):
         adapter = _make_adapter()
         effective_config = MagicMock()
         effective_config.platform_optimizations = None
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=effective_config):
             result = adapter._resolve_databricks_clustering_strategy()
-        assert result == "z_order"
+        assert result == "none"
 
     def test_liquid_enabled_flag_returns_liquid_clustering(self):
         adapter = _make_adapter()
