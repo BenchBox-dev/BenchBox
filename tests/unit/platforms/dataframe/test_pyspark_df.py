@@ -621,6 +621,209 @@ class TestPySparkWindowFunctions:
         )
         assert "cnt" in result.columns
 
+    def test_window_lag(self, adapter, test_df):
+        """Test lag window function offsets within each partition."""
+        expr = adapter.window_lag(
+            column="value",
+            offset=1,
+            partition_by=["category"],
+            order_by=[("value", True)],
+        )
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("prev_value"),
+        ).orderBy("category", "value")
+        assert "prev_value" in result.columns
+        rows = {(row.category, row.value): row.prev_value for row in result.collect()}
+        assert rows[("A", 10)] is None
+        assert rows[("A", 20)] == 10
+        assert rows[("B", 30)] is None
+        assert rows[("B", 40)] == 30
+
+    def test_window_lead(self, adapter, test_df):
+        """Test lead window function offsets within each partition."""
+        expr = adapter.window_lead(
+            column="value",
+            offset=1,
+            partition_by=["category"],
+            order_by=[("value", True)],
+        )
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("next_value"),
+        ).orderBy("category", "value")
+        assert "next_value" in result.columns
+        rows = {(row.category, row.value): row.next_value for row in result.collect()}
+        assert rows[("A", 10)] == 20
+        assert rows[("A", 20)] is None
+        assert rows[("B", 30)] == 40
+        assert rows[("B", 40)] is None
+
+    def test_window_ntile(self, adapter, test_df):
+        """Test ntile window function buckets rows within each partition."""
+        expr = adapter.window_ntile(
+            n=2,
+            order_by=[("value", True)],
+            partition_by=["category"],
+        )
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("bucket"),
+        ).orderBy("category", "value")
+        assert "bucket" in result.columns
+        rows = {(row.category, row.value): row.bucket for row in result.collect()}
+        assert rows == {("A", 10): 1, ("A", 20): 2, ("B", 30): 1, ("B", 40): 2}
+
+    def test_window_percent_rank(self, adapter, test_df):
+        """Test percent_rank window function spans 0 to 1 per partition."""
+        expr = adapter.window_percent_rank(
+            order_by=[("value", True)],
+            partition_by=["category"],
+        )
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("pct_rank"),
+        ).orderBy("category", "value")
+        assert "pct_rank" in result.columns
+        rows = {(row.category, row.value): row.pct_rank for row in result.collect()}
+        assert rows[("A", 10)] == 0.0
+        assert rows[("A", 20)] == 1.0
+        assert rows[("B", 30)] == 0.0
+        assert rows[("B", 40)] == 1.0
+
+    def test_window_cume_dist(self, adapter, test_df):
+        """Test cume_dist window function accumulates to 1 per partition."""
+        expr = adapter.window_cume_dist(
+            order_by=[("value", True)],
+            partition_by=["category"],
+        )
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("cume"),
+        ).orderBy("category", "value")
+        assert "cume" in result.columns
+        rows = {(row.category, row.value): row.cume for row in result.collect()}
+        assert rows[("A", 10)] == pytest.approx(0.5)
+        assert rows[("A", 20)] == pytest.approx(1.0)
+        assert rows[("B", 30)] == pytest.approx(0.5)
+        assert rows[("B", 40)] == pytest.approx(1.0)
+
+    def test_window_lag_default_ordering(self, adapter, test_df):
+        """Lag with order_by=None falls back to the lagged column (no raise)."""
+        expr = adapter.window_lag(column="value", partition_by=["category"])
+        result = test_df.select(
+            adapter.col("category"),
+            adapter.col("value"),
+            expr.alias("prev_value"),
+        ).orderBy("category", "value")
+        rows = {(row.category, row.value): row.prev_value for row in result.collect()}
+        assert rows[("A", 10)] is None
+        assert rows[("A", 20)] == 10
+
+    def test_window_lead_offset_two(self, adapter, test_df):
+        """Lead with offset=2 skips one row ahead within each partition."""
+        expr = adapter.window_lead(
+            column="value",
+            offset=2,
+            partition_by=["category"],
+            order_by=[("value", True)],
+        )
+        rows = {
+            (row.category, row.value): row.next2
+            for row in test_df.select(
+                adapter.col("category"),
+                adapter.col("value"),
+                expr.alias("next2"),
+            )
+            .orderBy("category", "value")
+            .collect()
+        }
+        # Two-row partitions: offset 2 always runs past the frame edge.
+        assert rows[("A", 10)] is None
+        assert rows[("A", 20)] is None
+        assert rows[("B", 30)] is None
+        assert rows[("B", 40)] is None
+
+    def test_window_rank_with_ties(self, adapter):
+        """Tied order keys share a rank; percent_rank and cume_dist diverge."""
+        df = adapter.spark.createDataFrame(
+            [("A", 10), ("A", 10), ("A", 30)],
+            ["category", "value"],
+        )
+        rows = [
+            (row.rnk, row.pct, row.cume)
+            for row in df.select(
+                adapter.window_rank(order_by=[("value", True)], partition_by=["category"]).alias("rnk"),
+                adapter.window_percent_rank(order_by=[("value", True)], partition_by=["category"]).alias("pct"),
+                adapter.window_cume_dist(order_by=[("value", True)], partition_by=["category"]).alias("cume"),
+            )
+            .orderBy("value")
+            .collect()
+        ]
+        assert sorted(r[0] for r in rows) == [1, 1, 3]
+        assert sorted(r[1] for r in rows) == pytest.approx([0.0, 0.0, 1.0])
+        assert sorted(r[2] for r in rows) == pytest.approx([2 / 3, 2 / 3, 1.0])
+
+    def test_window_descending_multi_key(self, adapter):
+        """Descending and multi-key orderings apply in the given key order."""
+        df = adapter.spark.createDataFrame(
+            [("A", 1, 10), ("A", 1, 20), ("A", 2, 30)],
+            ["category", "rank", "value"],
+        )
+        rows = [
+            (row.category, row.rank, row.value, row.rn)
+            for row in df.select(
+                adapter.col("category"),
+                adapter.col("rank"),
+                adapter.col("value"),
+                adapter.window_row_number(
+                    order_by=[("rank", True), ("value", False)],
+                    partition_by=["category"],
+                ).alias("rn"),
+            )
+            .orderBy("rn")
+            .collect()
+        ]
+        assert [(r[1], r[2], r[3]) for r in rows] == [(1, 20, 1), (1, 10, 2), (2, 30, 3)]
+
+    def test_window_single_row_partition(self, adapter):
+        """Single-row partitions yield rank 1, null lag, and ntile 1."""
+        df = adapter.spark.createDataFrame([("A", 10)], ["category", "value"])
+        row = df.select(
+            adapter.window_rank(order_by=[("value", True)], partition_by=["category"]).alias("rnk"),
+            adapter.window_lag(column="value", partition_by=["category"]).alias("prev"),
+            adapter.window_ntile(4, order_by=[("value", True)], partition_by=["category"]).alias("bucket"),
+        ).collect()[0]
+        assert row.rnk == 1
+        assert row.prev is None
+        assert row.bucket == 1
+
+    def test_cast_python_int_is_64_bit(self, adapter):
+        """cast(int) maps to LongType, matching Polars Int64 and DataFusion Int64."""
+        from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
+
+        df = adapter.spark.createDataFrame([(5_000_000_000,)], ["big"])
+        expr = UnifiedExpr(df["big"]).cast(int)
+        assert dict(df.select(expr.native.alias("v")).dtypes)["v"] == "bigint"
+        assert df.select(expr.native.alias("v")).collect()[0].v == 5_000_000_000
+
+    def test_sort_alias_list_keeps_order(self, adapter):
+        """A sort() collect order survives alias() before list()."""
+        ctx = adapter.create_context()
+        ctx.register_table(
+            "vals",
+            adapter.spark.createDataFrame([(1,), (3,), (2,)], ["v"]),
+        )
+        frame = ctx.get_table("vals")
+        result = frame.group_by().agg(ctx.col("v").sort(descending=True).alias("v2").list().alias("ordered"))
+        collected = result.native.limit(10).toPandas()
+        assert list(collected["ordered"][0]) == [3, 2, 1]
+
 
 @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)
 class TestPySparkDataFrameOperations:

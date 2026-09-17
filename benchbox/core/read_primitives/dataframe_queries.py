@@ -180,6 +180,45 @@ SKIP_FOR_PYSPARK = [
     # see TODO read-primitives-simplify-inline-window-helpers). pl.col(...) on a
     # non-Polars native frame fails, so PySpark skips it until the impl is ported.
     "window_lead_lag_same_frame",
+    # qualify_lag_lead's expression impl uses raw Polars (`.native` +
+    # pl.col(...).shift().over()) after a total-order sort matching the catalog
+    # SQL's window tie-break. Same porting precondition as above.
+    "qualify_lag_lead",
+    # qualify_ntile's expression impl computes NTILE inline with raw Polars
+    # (int_range().over() bucket formula). Same porting precondition as above.
+    "qualify_ntile",
+    # window_moving_frame's expression impl uses raw Polars rolling_mean and
+    # rolling_sum_by for bounded ROWS/RANGE frames the unified window helpers
+    # cannot express. pl.col(...) on a non-Polars native frame fails, so
+    # PySpark skips it until the impl is ported.
+    "window_moving_frame",
+    # window_multiple_orderings' expression impl uses raw Polars
+    # (.native + pl.col(...).rank().over()) for the dense-rank/percent-rank/
+    # cume-dist combination. Same porting precondition as above.
+    "window_multiple_orderings",
+    # optimizer_common_subexpression's expression impl builds the revenue
+    # expression with raw Polars (pl.col arithmetic + pl.when). pl.col(...)
+    # on a non-Polars native frame fails, so PySpark skips it until ported.
+    "optimizer_common_subexpression",
+    # statistical_correlation's expression impl uses raw Polars (pl.corr/pl.cov
+    # with ddof control UnifiedExpr.var/std lack). Same precondition.
+    "statistical_correlation",
+    # statistical_variance_stddev's expression impl uses raw Polars
+    # (.var(ddof=1)/.std(ddof=0/1)) for sample/population moments.
+    # Same porting precondition as above.
+    "statistical_variance_stddev",
+    # struct_construction's expression impl uses raw Polars (.native +
+    # pl.concat_list) for the contact-info array. Same precondition.
+    "struct_construction",
+    # timeseries_trend_analysis's expression impl uses raw Polars (.native +
+    # .dt.truncate + pl.len) for month bucketing. Same precondition.
+    "timeseries_trend_analysis",
+    # olap_cube_analysis's expression impl builds the 2^4 grouping sets with
+    # raw Polars (.native + pl.col/pl.len/pl.concat). Same precondition.
+    "olap_cube_analysis",
+    # olap_rollup_analysis's expression impl uses the same raw-Polars
+    # grouping-set construction. Same porting precondition as above.
+    "olap_rollup_analysis",
 ]
 
 # Queries skipped specifically for DataFusion DataFrame mode.
@@ -4404,7 +4443,9 @@ def get_skip_for_pyspark() -> list[str]:
     """Get query IDs that should be skipped for PySpark DataFrame mode.
 
     PySpark lacks native implementations for higher-order list functions
-    that use the unified expression API's element() hook.
+    that use the unified expression API's element() hook, and several
+    window expression impls use raw Polars (``.native`` + ``pl.col``)
+    until they are ported to the unified window helpers.
 
     Returns:
         List of query IDs to skip for PySpark

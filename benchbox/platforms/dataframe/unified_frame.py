@@ -86,6 +86,30 @@ def _get_datafusion_type_mapping() -> dict[str, Any]:
     return _DATAFUSION_TYPE_MAPPING
 
 
+# =============================================================================
+# PySpark Python-Type Mapping (module-level for efficiency)
+# =============================================================================
+# Maps plain Python types to Spark types for UnifiedExpr.cast() on PySpark.
+# ``int`` maps to LongType (64-bit) to match Polars (Int64) and DataFusion
+# (Int64): IntegerType would diverge cross-family and overflow under ANSI.
+_PYSPARK_PYTHON_TYPE_MAP: dict[Any, Any] | None = None
+
+
+def _pyspark_python_type(dtype: Any) -> Any:
+    """Get or create the PySpark Python-type mapping (lazy initialization)."""
+    global _PYSPARK_PYTHON_TYPE_MAP
+    if _PYSPARK_PYTHON_TYPE_MAP is None:
+        from pyspark.sql import types as _pyspark_types
+
+        _PYSPARK_PYTHON_TYPE_MAP = {
+            int: _pyspark_types.LongType(),
+            float: _pyspark_types.DoubleType(),
+            str: _pyspark_types.StringType(),
+            bool: _pyspark_types.BooleanType(),
+        }
+    return _PYSPARK_PYTHON_TYPE_MAP[dtype]
+
+
 def _is_pyspark_column(expr: Any) -> bool:
     """Check if an expression is a PySpark Column."""
     type_name = type(expr).__module__
@@ -317,24 +341,30 @@ class UnifiedListExpr:
         is_pyspark: bool = False,
         is_datafusion: bool = False,
         is_polars: bool = False,
+        _ordered_collect_descending: bool | None = None,
     ) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark or _is_pyspark_column(expr)
         self._is_datafusion = is_datafusion or _is_datafusion_expr(expr)
         self._is_polars = is_polars or _is_polars_expr(expr)
+        self._ordered_collect_descending = _ordered_collect_descending
 
     def __call__(self) -> UnifiedExpr:
         """List aggregation - collect values into a list.
 
         Used in .agg() context: col("x").list() -> collect into list.
         - Polars: .implode() (renamed from .list() in newer versions)
-        - PySpark: F.collect_list()
+        - PySpark: F.collect_list(), wrapped in sort_array() when a preceding
+          agg-context .sort() recorded an element order
         - DataFusion: f.array_agg()
         """
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.collect_list(self._expr))
+            collected = F.collect_list(self._expr)
+            if self._ordered_collect_descending is not None:
+                collected = F.sort_array(collected, asc=not self._ordered_collect_descending)
+            return UnifiedExpr(collected, _is_agg_array=True)
         if self._is_datafusion:
             from datafusion import functions as df_f
 
@@ -770,6 +800,8 @@ class UnifiedExpr:
         *,
         _is_string_literal: bool = False,
         _literal_value: Any = _NO_LITERAL_VALUE,
+        _is_agg_array: bool = False,
+        _ordered_collect_descending: bool | None = None,
     ) -> None:
         """Initialize the expression wrapper.
 
@@ -778,6 +810,11 @@ class UnifiedExpr:
             _is_string_literal: Internal flag indicating this is a string literal
                                (used for PySpark string concatenation detection)
             _literal_value: Optional scalar value behind a backend literal expression.
+            _is_agg_array: Marks a PySpark array produced by an aggregation
+                           (collect_list/collect_set), which ``sort()`` sorts
+                           in place instead of recording a collect order.
+            _ordered_collect_descending: Element order recorded by ``sort()``
+                           on a plain PySpark column, honored by ``list()``.
 
         `expr: Any` is the same escape-hatch documented on `.native`: the
         honest type is the union of every backend's expression class plus
@@ -790,6 +827,8 @@ class UnifiedExpr:
         self._is_datafusion = _is_datafusion_expr(expr)
         self._is_string_literal = _is_string_literal
         self._literal_value = _literal_value
+        self._is_agg_array = _is_agg_array
+        self._ordered_collect_descending = _ordered_collect_descending
 
     @property
     def native(self) -> Any:
@@ -1140,8 +1179,17 @@ class UnifiedExpr:
     # =========================================================================
 
     def alias(self, name: str) -> UnifiedExpr:
-        """Rename the expression/column."""
-        return UnifiedExpr(self._expr.alias(name))
+        """Rename the expression/column.
+
+        Aggregation markers (``_is_agg_array`` and the ``sort()`` collect
+        order) travel with the rename so ``col("v").sort().alias("w").list()``
+        keeps the recorded element order instead of silently reverting.
+        """
+        return UnifiedExpr(
+            self._expr.alias(name),
+            _is_agg_array=self._is_agg_array,
+            _ordered_collect_descending=self._ordered_collect_descending,
+        )
 
     # =========================================================================
     # Cast Methods
@@ -1155,12 +1203,20 @@ class UnifiedExpr:
         - PySpark: Accepts PySpark types (IntegerType(), StringType(), etc.)
         - DataFusion: Accepts PyArrow types (pa.int64(), pa.utf8(), etc.)
 
+        The PySpark branch also accepts plain Python types (``int``, ``float``,
+        ``str``, ``bool``), which PySpark's ``Column.cast`` rejects, mapping
+        them to the matching Spark type. ``int`` maps to ``LongType``
+        (64-bit) to match Polars ``Int64`` and DataFusion ``Int64``.
+
         Args:
             dtype: The target data type (platform-specific or common type name)
 
         Returns:
             UnifiedExpr with casted values
         """
+        if self._is_pyspark and dtype in (int, float, str, bool):
+            return UnifiedExpr(self._expr.cast(_pyspark_python_type(dtype)))
+
         if self._is_datafusion:
             import pyarrow as pa
 
@@ -1741,6 +1797,13 @@ class UnifiedExpr:
 
         In Polars agg context: col("x").sort_by("y") sorts x by y within each group.
         In DataFusion: wraps in array_agg with order_by to produce ordered list.
+        In PySpark agg context: collects key/value structs, sorts the array
+        (which orders by the key field first), then projects the values back
+        out, producing an ordered list aggregate. Null-key placement follows
+        Spark (nulls first ascending, last when descending via reverse) rather
+        than Polars' nulls-first default, and unorderable value types (e.g.
+        maps) cannot ride in the sort struct. The result is already an
+        aggregate: chaining ``.list()`` after ``sort_by`` raises on PySpark.
 
         Args:
             column: Column name or expression to sort by
@@ -1756,8 +1819,15 @@ class UnifiedExpr:
                 order_expr = col_name.sort(ascending=not descending)
             return UnifiedExpr(df_f.array_agg(self._expr, order_by=[order_expr]))
         if self._is_pyspark:
-            # PySpark: no direct equivalent in agg context, pass through
-            return UnifiedExpr(self._expr)
+            from pyspark.sql import functions as F  # noqa: N812
+
+            key = column._expr if isinstance(column, UnifiedExpr) else column
+            if isinstance(key, str):
+                key = F.col(key)
+            ordered = F.sort_array(F.collect_list(F.struct(key.alias("__sort_key"), self._expr.alias("__sort_value"))))
+            if descending:
+                ordered = F.reverse(ordered)
+            return UnifiedExpr(F.transform(ordered, lambda entry: entry.getField("__sort_value")), _is_agg_array=True)
         col_name = column._expr if isinstance(column, UnifiedExpr) else column
         return UnifiedExpr(self._expr.sort_by(col_name, descending=descending))
 
@@ -1771,7 +1841,7 @@ class UnifiedExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.collect_set(self._expr))
+            return UnifiedExpr(F.collect_set(self._expr), _is_agg_array=True)
         if self._is_datafusion:
             from datafusion import functions as df_f
 
@@ -1782,12 +1852,22 @@ class UnifiedExpr:
         """Sort expression values (used in aggregation context).
 
         In Polars agg context: col("x").sort() sorts collected values.
+        In PySpark agg context: when applied to an already-collected array
+        (e.g. ``col("x").unique().sort()``) this sorts the array; when applied
+        to a plain column (e.g. ``col("x").sort().list()``) it records the
+        requested element order, which ``list()`` honors when collecting.
 
         Args:
             descending: Sort in descending order
         """
-        if self._is_pyspark or self._is_datafusion:
-            # PySpark/DataFusion: no direct agg-context sort, pass through
+        if self._is_pyspark:
+            from pyspark.sql import functions as F  # noqa: N812
+
+            if self._is_agg_array:
+                return UnifiedExpr(F.sort_array(self._expr, asc=not descending), _is_agg_array=True)
+            return UnifiedExpr(self._expr, _ordered_collect_descending=descending)
+        if self._is_datafusion:
+            # DataFusion: no direct agg-context sort, pass through
             return UnifiedExpr(self._expr)
         return UnifiedExpr(self._expr.sort(descending=descending))
 
@@ -1846,6 +1926,7 @@ class UnifiedExpr:
             is_pyspark=self._is_pyspark,
             is_datafusion=self._is_datafusion,
             is_polars=not self._is_pyspark and not self._is_datafusion,
+            _ordered_collect_descending=self._ordered_collect_descending,
         )
 
     @property
