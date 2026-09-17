@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 452
+**Total registered rules:** 463
 
 **Platforms covered:** 34
 
@@ -37,7 +37,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | redshift | - | - | - | 2 | 1 | - | 3 |
 | singlestore | - | - | - | - | 4 | - | 4 |
 | snowflake | - | 6 | - | 2 | 1 | - | 9 |
-| spark | - | 6 | - | 2 | 1 | - | 9 |
+| spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
@@ -576,6 +576,17 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q4_variant` |
 | query_source | benchmark=vector_search, query=Q5 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q5_variant` |
 | query_source | benchmark=vector_search, query=Q6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q6_variant` |
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.spark.all.optimize_table_definition` |

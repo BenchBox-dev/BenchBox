@@ -477,7 +477,27 @@ class SparkQueryExecutionMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query with the shared Spark query implementation."""
+        """Execute a SQL query with the shared Spark query implementation.
+
+        TPC-Havoc variants Spark rejects are rewritten first (all inheriting
+        Spark-family engines share this hook). Dispatch is by benchmark, or —
+        when the caller leaves ``benchmark_type`` unset — by variant ID
+        against the transformer's known sets, so direct calls cannot silently
+        bypass the rewrite.
+        """
+        from benchbox.platforms.spark_query_transformer import SparkTPCHavocQueryTransformer
+
+        benchmark_slug = (benchmark_type or "").lower().replace("-", "")
+        transformer = SparkTPCHavocQueryTransformer()
+        needs_rewrite = benchmark_slug == "tpchavoc" or (
+            benchmark_type is None and transformer.normalize_query_id(query_id) in transformer.known_variant_ids()
+        )
+        if needs_rewrite:
+            query = transformer.transform(query, query_id=query_id)
+            if transformer.get_transformations_applied():
+                self.log_very_verbose(
+                    f"Query {query_id}: Applied transformations: {', '.join(transformer.get_transformations_applied())}"
+                )
         return self._execute_query_spark(
             connection=connection,
             query=query,
