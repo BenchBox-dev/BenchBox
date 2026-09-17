@@ -1692,6 +1692,13 @@
       "status": "open",
       "title": "Make the hourly post-merge sweep exit when the develop tip is already tested"
     },
+    "ci-dedupe-03-docs-cancel-superseded-pr-runs": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Cancel superseded Documentation workflow runs on pull requests"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],

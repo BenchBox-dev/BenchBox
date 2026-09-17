@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "docs.yml has a concurrency block that cancels superseded pull_request runs only.",
+    "A test or workflow lint asserts push runs on develop and release are never cancel-in-progress.",
+    "On a PR with two quick pushes, the first docs run is cancelled and the second completes.",
+    "Post-landing note reports docs PR runner-minutes for 7 days, measured from the Actions jobs API."
+  ],
+  "context": "Guardrails:\n1. Cancel-in-progress applies to `pull_request` events only. Pushes to `develop` and `release` must never cancel each other, because that path feeds the deploy job.\n2. Key the group on the PR ref for pull_request and on the SHA for push, following the `develop-post-merge.yml` pattern.\n3. Do not narrow the path filter or change job content in this item; failure causes are handled by ci-dedupe-08.\n4. Documentation is not a required check; confirm that remains true and that no ruleset change is needed.",
+  "description": "`.github/workflows/docs.yml` has no `concurrency` block, and it is the only large PR workflow without one. Its path filter includes `benchbox/**`, `scripts/**`, and `Makefile`, so it runs on nearly every code PR push, and every superseded run finishes. A sampled PR run used about 19 runner-minutes (Sphinx build 14, linkcheck 2, visual regression 3). It ran on 662 PRs between 2026-08-23 and 2026-09-16.\n\nChange: add a concurrency group that cancels in-progress `pull_request` runs for the same PR when a newer push arrives.",
+  "links": [
+    ".github/workflows/docs.yml",
+    ".github/workflows/develop-post-merge.yml"
+  ]
+}
