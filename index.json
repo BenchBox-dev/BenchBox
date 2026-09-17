@@ -1707,12 +1707,17 @@
       "title": "Decision gate: approve or reject running the heavy CI tier only in the merge queue"
     },
     "ci-dedupe-05-pr-preflight-medium-tier": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T15:31:14Z",
+        "generation": "0e2c5e1c24cf4f55a2739625bad6c21c",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
+      },
       "needs": [
         "ci-dedupe-04-heavy-tier-queue-only-decision-gate"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Add the medium test tier to make pr-preflight for code-routed diffs"
     },
     "ci-dedupe-06-heavy-tier-queue-only": {
