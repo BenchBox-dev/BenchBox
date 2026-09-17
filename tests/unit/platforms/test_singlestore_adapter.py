@@ -639,6 +639,7 @@ class TestSingleStoreDataLoading:
         assert "part" in per_table
         assert per_table["part"]["rows"] == 100
         assert "duration_seconds" in per_table["part"]
+        assert per_table["part"]["total_ms"] >= 0
 
     def test_load_data_strips_trailing_delim_for_tbl_files(self):
         """.tbl suffix → strip_trailing_delim=True regardless of dialect.

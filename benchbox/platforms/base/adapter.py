@@ -286,6 +286,7 @@ class PlatformAdapter(
         self.database_was_reused = False
         self._last_power_test_result = None
         self._last_throughput_test_result = None
+        self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables = []
         self._sorted_ingestion_total_apply_seconds = 0.0
         self._reset_plan_capture_stats()
@@ -1094,6 +1095,7 @@ class PlatformAdapter(
                 total_rows_loaded=total_rows_loaded,
                 data_size_mb=data_size_mb,
                 table_statistics=table_stats or {},
+                per_table_timings=getattr(self, "_last_per_table_timings", None),
                 platform_info=platform_info,
                 **normalized_metadata,
                 tunings_applied=tunings_applied_dict,
@@ -1372,6 +1374,7 @@ class PlatformAdapter(
             _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
             quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
             data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+            self._last_per_table_timings = per_table_timings
             return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
         quiet_console.print("Creating database schema...")
@@ -1409,6 +1412,7 @@ class PlatformAdapter(
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
         quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        self._last_per_table_timings = per_table_timings
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:

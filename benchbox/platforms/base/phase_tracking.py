@@ -237,7 +237,7 @@ class PhaseTrackingMixin:
             # Use actual per-table timings from adapter
             for table_name, row_count in table_stats.items():
                 timing_info = per_table_timings.get(table_name, {})
-                actual_time_ms = timing_info.get("total_ms", 0)
+                actual_time_ms = timing_info.get("total_ms", 0) if isinstance(timing_info, dict) else 0
                 per_table_loading[table_name] = TableLoadingStats(
                     rows=row_count, load_time_ms=int(actual_time_ms), status="SUCCESS"
                 )

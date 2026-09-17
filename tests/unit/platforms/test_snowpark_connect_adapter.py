@@ -530,6 +530,7 @@ class TestSnowparkConnectAdapterSchema:
         assert elapsed >= 0
         assert per_table is not None
         assert "lineitem" in per_table
+        assert per_table["lineitem"]["total_ms"] >= 0
         mock_session.read.parquet.assert_called_once_with("@~/lineitem/")
 
 

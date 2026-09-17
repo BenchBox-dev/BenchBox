@@ -349,7 +349,12 @@ class MySqlWireLifecycleMixin:
                         table_rows = 0
                         break
             table_stats[target_table] = table_rows
-            per_table_timings[target_table] = {"rows": table_rows, "duration_seconds": elapsed_seconds(table_start)}
+            table_time = elapsed_seconds(table_start)
+            per_table_timings[target_table] = {
+                "rows": table_rows,
+                "duration_seconds": table_time,
+                "total_ms": table_time * 1000,
+            }
             self.log_verbose(f"Loaded {table_rows:,} rows into {target_table}")
 
         loading_time = elapsed_seconds(start_time)

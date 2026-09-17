@@ -2137,13 +2137,17 @@ class TestLoadData:
         with (
             patch.object(adapter, "_resolve_data_files", return_value=data_files),
             patch.object(adapter, "_validate_compression_support"),
-            patch.object(adapter, "_load_tables_direct", return_value={"LINEITEM": 100}) as mock_direct,
+            patch.object(
+                adapter,
+                "_load_tables_direct",
+                return_value=({"LINEITEM": 100}, {"LINEITEM": {"total_ms": 10}}),
+            ) as mock_direct,
         ):
             stats, time_, details = adapter.load_data(mock_benchmark, mock_conn, Path("/tmp/data"))
 
         mock_direct.assert_called_once()
         assert stats == {"LINEITEM": 100}
-        assert details is None
+        assert details == {"LINEITEM": {"total_ms": 10}}
 
     def test_cloud_storage_loading_when_bucket_configured(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj", storage_bucket="my-bucket")
@@ -2159,7 +2163,11 @@ class TestLoadData:
             patch.object(adapter, "_resolve_data_files", return_value=data_files),
             patch.object(adapter, "_validate_compression_support"),
             patch.object(adapter, "_create_storage_bucket", return_value=mock_bucket),
-            patch.object(adapter, "_load_tables_via_cloud_storage", return_value={"LINEITEM": 500}) as mock_cloud,
+            patch.object(
+                adapter,
+                "_load_tables_via_cloud_storage",
+                return_value=({"LINEITEM": 500}, {"LINEITEM": {"total_ms": 20}}),
+            ) as mock_cloud,
         ):
             stats, time_, details = adapter.load_data(mock_benchmark, mock_conn, Path("/tmp/data"))
 
@@ -2169,7 +2177,7 @@ class TestLoadData:
         assert actual_bucket is mock_bucket
         assert actual_benchmark is mock_benchmark
         assert stats == {"LINEITEM": 500}
-        assert details is None
+        assert details == {"LINEITEM": {"total_ms": 20}}
 
     def test_data_loading_raises_on_error(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -2322,9 +2330,10 @@ class TestLoadTablesDirect:
 
         # No valid files → table gets row count of 0
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
-            stats = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
+            stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
 
         assert stats.get("LINEITEM") == 0
+        assert timings == {}
         mock_conn.load_table_from_file.assert_not_called()
 
     def test_failed_table_load_logged(self):
@@ -2344,9 +2353,10 @@ class TestLoadTablesDirect:
                 patch.object(adapter, "_filter_valid_files", return_value=[tmp_path]),
                 patch.object(adapter, "_load_table_direct", side_effect=RuntimeError("load failed")),
             ):
-                stats = adapter._load_tables_direct(mock_conn, {"lineitem": [tmp_path]})
+                stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [tmp_path]})
 
             assert stats.get("LINEITEM") == 0
+            assert timings == {"LINEITEM": {"total_ms": 0}}
         finally:
             tmp_path.unlink(missing_ok=True)
 
@@ -2366,11 +2376,12 @@ class TestLoadTablesViaCloudStorage:
         mock_bucket = Mock()
 
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
-            stats = adapter._load_tables_via_cloud_storage(
+            stats, timings = adapter._load_tables_via_cloud_storage(
                 mock_conn, {"lineitem": ["gs://bucket/lineitem.parquet"]}, mock_bucket
             )
 
         assert stats.get("lineitem") == 0
+        assert timings == {}
 
     def test_failed_table_load_returns_zero(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -2382,11 +2393,12 @@ class TestLoadTablesViaCloudStorage:
             patch.object(adapter, "_filter_valid_files", return_value=["gs://bucket/lineitem.parquet"]),
             patch.object(adapter, "_load_table_via_cloud_storage", side_effect=RuntimeError("gcs error")),
         ):
-            stats = adapter._load_tables_via_cloud_storage(
+            stats, timings = adapter._load_tables_via_cloud_storage(
                 mock_conn, {"lineitem": ["gs://bucket/lineitem.parquet"]}, mock_bucket
             )
 
         assert stats.get("LINEITEM") == 0
+        assert timings == {"LINEITEM": {"total_ms": 0}}
 
 
 # ---------------------------------------------------------------------------

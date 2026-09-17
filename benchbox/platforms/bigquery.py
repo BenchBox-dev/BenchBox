@@ -1069,10 +1069,12 @@ class BigQueryAdapter(PlatformAdapter):
 
             if self.storage_bucket:
                 bucket = self._create_storage_bucket()
-                table_stats = self._load_tables_via_cloud_storage(connection, data_source, bucket, benchmark)
+                table_stats, per_table_timings = self._load_tables_via_cloud_storage(
+                    connection, data_source, bucket, benchmark
+                )
             else:
                 self.logger.warning("No Cloud Storage bucket configured, using direct loading")
-                table_stats = self._load_tables_direct(connection, data_source, benchmark)
+                table_stats, per_table_timings = self._load_tables_direct(connection, data_source, benchmark)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -1082,8 +1084,7 @@ class BigQueryAdapter(PlatformAdapter):
             self.logger.error(f"Data loading failed: {e}")
             raise
 
-        # BigQuery doesn't provide detailed per-table timings yet
-        return table_stats, total_time, None
+        return table_stats, total_time, per_table_timings
 
     def validate_external_table_requirements(self) -> None:
         """Validate required GCS configuration for external table mode."""
@@ -1319,10 +1320,11 @@ class BigQueryAdapter(PlatformAdapter):
         data_source: Any,
         bucket: Any,
         benchmark: Any | None = None,
-    ) -> dict[str, int]:
+    ) -> tuple[dict[str, int], dict[str, Any]]:
         """Load all tables using GCS staging."""
         logger = logging.getLogger(__name__)
         table_stats: dict[str, int] = {}
+        per_table_timings: dict[str, Any] = {}
 
         if not isinstance(data_source, DataSource):
             data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
@@ -1343,20 +1345,25 @@ class BigQueryAdapter(PlatformAdapter):
                 )
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
+                load_time = elapsed_seconds(load_start)
+                per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
                 self.logger.info(
-                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in "
-                    f"{elapsed_seconds(load_start):.2f}s"
+                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                 )
             except Exception as e:
                 self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
 
-        return table_stats
+        return table_stats, per_table_timings
 
-    def _load_tables_direct(self, connection: Any, data_source: Any, benchmark: Any | None = None) -> dict[str, int]:
+    def _load_tables_direct(
+        self, connection: Any, data_source: Any, benchmark: Any | None = None
+    ) -> tuple[dict[str, int], dict[str, Any]]:
         """Load all tables directly from local files."""
         table_stats: dict[str, int] = {}
+        per_table_timings: dict[str, Any] = {}
 
         if not isinstance(data_source, DataSource):
             data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
@@ -1375,16 +1382,18 @@ class BigQueryAdapter(PlatformAdapter):
                 row_count = self._load_table_direct(connection, table_name, valid_files, data_source, benchmark)
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
+                load_time = elapsed_seconds(load_start)
+                per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
                 self.logger.info(
-                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in "
-                    f"{elapsed_seconds(load_start):.2f}s"
+                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                 )
             except Exception as e:
                 self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
 
-        return table_stats
+        return table_stats, per_table_timings
 
     def _prepare_external_table_uris(self, bucket: Any, table_name: str, file_paths: Any) -> tuple[str, list[str]]:
         """Prepare BigQuery external-table sources for parquet files or delta directories."""
