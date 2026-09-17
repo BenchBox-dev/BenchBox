@@ -1295,6 +1295,7 @@ pr-preflight-uncached:
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS" SKIP_FAST_TESTS="$(SKIP_FAST_TESTS)"; \
+	$(MAKE) -s pr-preflight-medium-tests PATH_DECISION="$$DECISION"; \
 	$(MAKE) -s uat-artifact-hygiene
 
 # Canonical local preflight: the focused lane runs once, then the remaining
@@ -1370,6 +1371,38 @@ pr-preflight-fast-tests:
 		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
 	else \
 		echo "No code changes detected; skipping fast tests."; \
+	fi
+
+# Medium tier as its own receipt-bound preflight stage. Runs the exact CI
+# selection (`make test-medium`, no local-only subset) through
+# local_validation's medium-tier gate only when the classifier says the diff
+# needs code CI, so content-only and skill-integrity-only diffs skip it.
+# Identical trees reuse the receipt across worktrees without colliding on
+# the shared test lock. The stage fails pr-preflight on failure; there is
+# no skip flag. The gate invocation scrubs the preflight control variables
+# (PATH_DECISION, PATH_LISTS, SKIP_FAST_TESTS) from the environment and
+# blanks MAKEFLAGS: make exports command-line variables and smuggles their
+# assignments inside MAKEFLAGS, so a leak would make test-spawned makes take
+# the caller-supplied branch with no lists dir ("PATH_LISTS is required") or
+# flip the route into its skip branch (stale "already completed" line inside
+# the suite). BATCH_ARGS is deliberately not scrubbed so batch mode still
+# binds receipts.
+pr-preflight-medium-tests:
+	@set -eu; \
+	if [ -n "$(PATH_DECISION)" ]; then \
+		[ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+		DECISION="$(PATH_DECISION)"; \
+	else \
+		DECISION=$$(mktemp); \
+		trap 'rm -f "$$DECISION"' EXIT; \
+		git fetch origin develop --quiet; \
+		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" >/dev/null; \
+	fi; \
+	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
+		echo "==> medium tier (same marker selection as CI)"; \
+		env -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD="make test-medium"; \
+	else \
+		echo "No code changes detected; skipping medium tier."; \
 	fi
 
 # Publication lane isolation is a diff-vs-base guard. The path classifier has
