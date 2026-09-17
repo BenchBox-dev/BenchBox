@@ -14430,15 +14430,10 @@
       "title": "Make merge_scd_type2_basic idempotent (cross-op cleanup isolation deferred)"
     },
     "scd2-cleanup-isolation-distinct-effective-ts": {
-      "claim": {
-        "expires_at": "2026-09-18T13:47:22Z",
-        "generation": "ec9ea373e9cf40d3958defd5a513b533",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Isolate SCD2 op cleanups by giving each change_type group a distinct effective_ts"
     },
     "scd2-doc-count-hygiene": {
