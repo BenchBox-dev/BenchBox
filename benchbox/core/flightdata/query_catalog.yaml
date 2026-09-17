@@ -18,7 +18,7 @@ QUERIES:
         AND f.flight_date >= '{start_date}'
         AND f.flight_date < '{end_date}'
       GROUP BY f.reporting_airline, a.name
-      ORDER BY ontime_pct DESC
+      ORDER BY ontime_pct DESC, f.reporting_airline
   delay-by-airport:
     id: '2'
     name: Average Departure Delay by Origin Airport
@@ -51,7 +51,7 @@ QUERIES:
     category: ontime
     sql: |
       SELECT
-          (f.crs_dep_time / 100) AS dep_hour,
+          CAST(FLOOR(f.crs_dep_time / 100) AS INTEGER) AS dep_hour,
           COUNT(*) AS total_flights,
           ROUND(AVG(f.dep_delay), 2) AS avg_dep_delay,
           ROUND(AVG(f.arr_delay), 2) AS avg_arr_delay,
@@ -63,7 +63,7 @@ QUERIES:
         AND f.crs_dep_time IS NOT NULL
         AND f.flight_date >= '{start_date}'
         AND f.flight_date < '{end_date}'
-      GROUP BY (f.crs_dep_time / 100)
+      GROUP BY CAST(FLOOR(f.crs_dep_time / 100) AS INTEGER)
       ORDER BY dep_hour
   best-routes:
     id: '4'
@@ -89,7 +89,7 @@ QUERIES:
         AND f.flight_date < '{end_date}'
       GROUP BY f.origin, f.dest, ao.city, ad.city
       HAVING COUNT(*) >= 50
-      ORDER BY ontime_pct DESC
+      ORDER BY ontime_pct DESC, f.origin, f.dest
       LIMIT 25
   improvement-trend:
     id: '5'
@@ -147,14 +147,31 @@ QUERIES:
           SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) AS cascade_delayed,
           ROUND(100.0 * SUM(CASE WHEN f.late_aircraft_delay > 0 THEN 1 ELSE 0 END) / COUNT(*), 2) AS cascade_rate_pct,
           ROUND(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_cascade_delay,
-          ROUND(SUM(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay ELSE 0 END), 0) AS total_cascade_minutes
+          -- Whole-minute total via exact integer tenths: float summation order
+          -- varies by engine and run, so ROUND(float_sum, 0) flips whenever the
+          -- true total lands exactly on a half integer. Tenths of a minute are
+          -- exact integers, their sum is order-independent on every engine, and
+          -- (tenths + 5) / 10 with truncation is half-up rounding.
+          FLOOR(
+              (
+                  SUM(
+                      CAST(
+                          CASE
+                              WHEN f.late_aircraft_delay > 0 THEN ROUND(f.late_aircraft_delay * 10)
+                              ELSE 0
+                          END
+                          AS BIGINT
+                      )
+                  ) + 5
+              ) / 10
+          ) AS total_cascade_minutes
       FROM flights f
       LEFT JOIN airlines a ON f.reporting_airline = a.code
       WHERE f.cancelled = 0
         AND f.flight_date >= '{start_date}'
         AND f.flight_date < '{end_date}'
       GROUP BY f.reporting_airline, a.name
-      ORDER BY cascade_rate_pct DESC
+      ORDER BY cascade_rate_pct DESC, f.reporting_airline
   weather-impact:
     id: '8'
     name: Weather Delay Impact by Month
@@ -258,7 +275,7 @@ QUERIES:
         AND f.flight_date < '{end_date}'
       GROUP BY f.origin, f.dest, ao.city, ad.city
       HAVING COUNT(*) >= 100
-      ORDER BY ontime_pct DESC, cancellation_rate_pct ASC
+      ORDER BY ontime_pct DESC, cancellation_rate_pct ASC, f.origin, f.dest
       LIMIT 30
   distance-delay:
     id: '12'
@@ -413,7 +430,7 @@ QUERIES:
     category: temporal
     sql: |
       SELECT
-          (f.crs_dep_time / 100) AS hour_of_day,
+          CAST(FLOOR(f.crs_dep_time / 100) AS INTEGER) AS hour_of_day,
           COUNT(*) AS total_flights,
           ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.dep_delay END), 2) AS avg_dep_delay,
           ROUND(AVG(CASE WHEN f.cancelled = 0 THEN f.arr_delay END), 2) AS avg_arr_delay,
@@ -424,7 +441,7 @@ QUERIES:
       WHERE f.crs_dep_time IS NOT NULL
         AND f.flight_date >= '{start_date}'
         AND f.flight_date < '{end_date}'
-      GROUP BY (f.crs_dep_time / 100)
+      GROUP BY CAST(FLOOR(f.crs_dep_time / 100) AS INTEGER)
       ORDER BY hour_of_day
   carrier-ranking:
     id: '18'
@@ -450,7 +467,7 @@ QUERIES:
         AND f.flight_date < '{end_date}'
       GROUP BY f.reporting_airline, a.name
       HAVING COUNT(*) >= 1000
-      ORDER BY ontime_pct DESC
+      ORDER BY ontime_pct DESC, f.reporting_airline
   cancellation-rate:
     id: '19'
     name: Cancellation Rates by Carrier and Cause
@@ -473,7 +490,7 @@ QUERIES:
         AND f.flight_date < '{end_date}'
       GROUP BY f.reporting_airline, a.name
       HAVING COUNT(*) >= 100
-      ORDER BY cancellation_rate_pct DESC
+      ORDER BY cancellation_rate_pct DESC, f.reporting_airline
   market-share:
     id: '20'
     name: Carrier Market Share by Route

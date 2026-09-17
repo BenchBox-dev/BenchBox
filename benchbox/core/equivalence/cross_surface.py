@@ -95,6 +95,7 @@ from benchbox.core.equivalence.builders import (
     build_amplab_duckdb,
     build_clickbench_duckdb,
     build_coffeeshop_duckdb,
+    build_flightdata_duckdb,
     build_h2odb_duckdb,
     build_joinorder_synthetic_duckdb,
     build_read_primitives_duckdb,
@@ -1232,6 +1233,12 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
+#
+# The FlightData bounded cell is one synthetic month (SF=0.01), which stays offline
+# (larger scales attempt a BTS download with a synthetic fallback) while keeping
+# every query discriminating.
+_FLIGHTDATA_SCALE = 0.01
+
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
         name="ssb",
@@ -1334,11 +1341,25 @@ GATES: dict[str, CrossSurfaceGate] = {
 # Staged gates: a load-faithful builder is wired and runnable in report mode, but
 # the benchmark still has open cross-surface divergences to burn down before it can
 # be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded". Currently empty
-# - read_primitives graduated to GATES after its burn-down; the next gateable
-# benchmarks (datavault, flightdata, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops)
-# land here first when their builders are wired.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {}
+# coverage map does not prematurely mark these benchmarks "guarded".
+# FlightData is staged with a clean 40/40-cell run and no known-divergence
+# baseline after its output-contract fixes; promoting it to GATES also
+# refreshes the oracle coverage map, the applicability sweep artifact, and the
+# related registry tests. The next gateable benchmarks (datavault, nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    "flightdata": CrossSurfaceGate(
+        name="flightdata",
+        build=build_flightdata_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "FlightData expression and pandas DataFrame implementations are separately handwritten for each "
+            "query (expression helpers plus a compact pandas metadata DSL), so the gate has stronger "
+            "cross-implementation signal than shared-spec generators."
+        ),
+        scale_factor=_FLIGHTDATA_SCALE,
+    ),
+}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:

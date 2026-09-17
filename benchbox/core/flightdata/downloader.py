@@ -589,7 +589,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         metadata = {
             "csv_delimiter": ",",
             "csv_has_header": True,
-            "csv_null_marker": None,
+            # Empty fields in the generated CSVs encode NULL (the writers emit ""
+            # for missing delays/times), so the manifest must request empty->NULL
+            # conversion. None would disable conversion and load blanks as "".
+            "csv_null_marker": "",
         }
         for table_name, paths_or_path in table_files.items():
             paths = paths_or_path if isinstance(paths_or_path, list) else [paths_or_path]
