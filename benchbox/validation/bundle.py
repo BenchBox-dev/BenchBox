@@ -311,6 +311,44 @@ def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
         if normalized not in KNOWN_PLATFORMS:
             vr.warn(f"Unknown platform name: {pl_name!r}")
 
+    _validate_inline_applied_ledger(platform, vr)
+
+
+def _validate_inline_applied_ledger(platform: dict, vr: ValidationResult) -> None:
+    """Bound the applied-tuning ledger inlined at ``platform.tuning.applied``.
+
+    The ledger is carried inside the bundle as well as in the ``.applied.json``
+    companion. ``_validate_applied_companion_limits`` bounds the companion by
+    filename, so the inlined copy needs the same entry cap here: the validator
+    runs on attacker-controlled PR JSON, and a hand-authored bundle can inline an
+    unbounded receipt while shipping no companion at all.
+
+    Only the entry count is checked. Byte size is a property of the whole bundle
+    rather than of this block, and re-deriving it from a parsed sub-object would
+    measure something different from the companion's file-size gate.
+    """
+    tuning = platform.get("tuning")
+    if not isinstance(tuning, dict):
+        return
+    applied = tuning.get("applied")
+    if not isinstance(applied, dict):
+        return
+
+    statements = applied.get("statements")
+    if isinstance(statements, list) and len(statements) > APPLIED_RECEIPT_MAX_ENTRIES:
+        vr.error(
+            f"platform.tuning.applied.statements exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit "
+            f"({len(statements)} entries)"
+        )
+
+    receipt = applied.get("receipt")
+    entries = receipt.get("entries") if isinstance(receipt, dict) else None
+    if isinstance(entries, list) and len(entries) > APPLIED_RECEIPT_MAX_ENTRIES:
+        vr.error(
+            f"platform.tuning.applied.receipt.entries exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit "
+            f"({len(entries)} entries)"
+        )
+
 
 def _validate_summary_section(
     summary: Any,

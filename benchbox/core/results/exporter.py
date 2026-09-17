@@ -51,6 +51,7 @@ from benchbox.core.results.schema import (
     build_plans_payload,
     build_result_payload,
     build_tuning_payload,
+    inline_tuning_artifacts,
 )
 from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.core.runtime_paths import resolve_results_dir
@@ -305,6 +306,12 @@ class ResultExporter:
         # Build primary payload
         payload = build_result_payload(result, sanitize_platform_secrets=self.anonymize)
 
+        # Tuning artifacts are built once, in this export mode, and are then both
+        # inlined into the bundle and written as companions, so the two can never
+        # disagree about what the run requested or applied.
+        tuning_payload = self._build_export_tuning_payload(result)
+        applied_payload = self._build_export_applied_payload(result)
+
         # Apply anonymization if enabled
         if self.anonymize and self.anonymization_manager:
             self._apply_anonymization(payload)
@@ -315,6 +322,13 @@ class ResultExporter:
             # connection identities verbatim, so redact them at this boundary.
             payload = _redact_usernames(payload)
             anonymized = False
+
+        # Inline after the main anonymization walk, never before: both artifacts
+        # arrive already scrubbed by the tuning-specific and applied-ledger
+        # policies, which the general result anonymizer does not implement.
+        # Re-walking them with the general policy would not add protection and
+        # would let the inlined copy drift from the companion.
+        inline_tuning_artifacts(payload, tuning_payload, applied_payload)
 
         # Add export metadata
         payload["export"] = {
@@ -335,15 +349,47 @@ class ResultExporter:
         self._write_file(filepath, json_content)
 
         # Write companion files
-        self._write_companion_files(result, filename_base)
+        self._write_companion_files(result, filename_base, tuning_payload, applied_payload)
 
         # Opt-in plan-history recording (single call site; see plan_history_dir).
         self._record_plan_history(result)
 
         return filepath
 
-    def _write_companion_files(self, result: ResultLike, filename_base: str) -> None:
-        """Write companion files for plans and tuning if present."""
+    def _build_export_tuning_payload(self, result: ResultLike) -> dict[str, Any] | None:
+        """Build the requested-tuning payload, scrubbed for this export mode."""
+        tuning_payload = build_tuning_payload(result)
+        if not tuning_payload:
+            return None
+        if self.anonymize and self.anonymization_manager:
+            return self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
+        # Private exports keep the requested template verbatim, matching the
+        # long-standing `.tuning.json` behavior, minus connection identities.
+        return _redact_usernames(tuning_payload)
+
+    def _build_export_applied_payload(self, result: ResultLike) -> dict[str, Any] | None:
+        """Build the applied-tuning ledger payload, scrubbed for this export mode."""
+        applied_payload = build_applied_ledger_payload(result)
+        if not applied_payload:
+            return None
+        if self.anonymize and self.anonymization_manager:
+            return self._anonymize_applied_payload(applied_payload)
+        return _redact_usernames(applied_payload)
+
+    def _write_companion_files(
+        self,
+        result: ResultLike,
+        filename_base: str,
+        tuning_payload: dict[str, Any] | None = None,
+        applied_payload: dict[str, Any] | None = None,
+    ) -> None:
+        """Write companion files for plans and tuning if present.
+
+        ``tuning_payload`` / ``applied_payload`` are the already-scrubbed
+        artifacts the bundle inlined. They are passed in rather than rebuilt so
+        the companion and the inlined copy are byte-identical; they are rebuilt
+        here only for callers that invoke this method on its own.
+        """
         # Plans companion file
         plans_payload = build_plans_payload(result)
         if plans_payload:
@@ -354,9 +400,8 @@ class ResultExporter:
             self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
 
         # Tuning companion file
-        tuning_payload = build_tuning_payload(result)
-        if tuning_payload and self.anonymize and self.anonymization_manager:
-            tuning_payload = self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
+        if tuning_payload is None:
+            tuning_payload = self._build_export_tuning_payload(result)
         if tuning_payload:
             tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
             self._write_file(tuning_path, canonical_json_text(tuning_payload))
@@ -364,10 +409,9 @@ class ResultExporter:
 
         # Applied-tuning ledger companion file (ADR-1): what the execution path
         # actually ran, additive to the requested-config .tuning.json above.
-        applied_payload = build_applied_ledger_payload(result)
+        if applied_payload is None:
+            applied_payload = self._build_export_applied_payload(result)
         if applied_payload:
-            if self.anonymize and self.anonymization_manager:
-                applied_payload = self._anonymize_applied_payload(applied_payload)
             applied_path = self._create_file_path(f"{filename_base}.applied.json")
             self._write_file(applied_path, canonical_json_text(applied_payload))
             self.console.print(f"[dim]Exported applied ledger: {applied_path}[/dim]")
