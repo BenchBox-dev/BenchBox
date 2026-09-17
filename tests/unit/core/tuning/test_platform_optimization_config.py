@@ -216,3 +216,60 @@ def test_unified_tuning_enable_z_ordering_sets_strategy() -> None:
     assert config.platform_optimizations.z_ordering_enabled is True
     assert config.platform_optimizations.z_ordering_columns == ["event_time"]
     assert config.platform_optimizations.databricks_clustering_strategy == "z_order"
+
+
+def test_unified_tuning_disable_z_ordering_resets_strategy_and_columns() -> None:
+    config = UnifiedTuningConfiguration()
+    config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["event_time"])
+    config.disable_platform_optimization(TuningType.Z_ORDERING)
+
+    assert config.platform_optimizations.z_ordering_enabled is False
+    assert config.platform_optimizations.z_ordering_columns == []
+    assert config.platform_optimizations.databricks_clustering_strategy == "none"
+    config.platform_optimizations.__post_init__()
+
+
+def test_unified_tuning_from_dict_infers_z_order_from_table_clustering() -> None:
+    config = UnifiedTuningConfiguration.from_dict(
+        {
+            "table_tunings": {
+                "orders": {
+                    "table_name": "orders",
+                    "clustering": [{"name": "o_orderkey", "type": "INTEGER", "order": 1}],
+                }
+            }
+        }
+    )
+
+    assert config.platform_optimizations.databricks_clustering_strategy == "z_order"
+
+
+def test_unified_tuning_from_dict_keeps_none_for_sorting_only_tables() -> None:
+    config = UnifiedTuningConfiguration.from_dict(
+        {
+            "table_tunings": {
+                "orders": {
+                    "table_name": "orders",
+                    "sorting": [{"name": "o_orderkey", "type": "INTEGER", "order": 1}],
+                }
+            }
+        }
+    )
+
+    assert config.platform_optimizations.databricks_clustering_strategy == "none"
+
+
+def test_unified_tuning_from_dict_respects_explicit_none_with_table_clustering() -> None:
+    config = UnifiedTuningConfiguration.from_dict(
+        {
+            "platform_optimizations": {"databricks_clustering_strategy": "none"},
+            "table_tunings": {
+                "orders": {
+                    "table_name": "orders",
+                    "clustering": [{"name": "o_orderkey", "type": "INTEGER", "order": 1}],
+                }
+            },
+        }
+    )
+
+    assert config.platform_optimizations.databricks_clustering_strategy == "none"

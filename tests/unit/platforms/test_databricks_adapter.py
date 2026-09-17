@@ -1428,6 +1428,16 @@ class TestResolveClusteringStrategy:
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "z_order"
 
+    def test_enable_then_disable_z_ordering_resolves_none(self):
+        from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
+
+        adapter = self._make_adapter()
+        config = UnifiedTuningConfiguration()
+        config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["event_time"])
+        config.disable_platform_optimization(TuningType.Z_ORDERING)
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=config):
+            assert adapter._resolve_databricks_clustering_strategy() == "none"
+
 
 class TestDeltaOperationsSql:
     """Test Delta table operations SQL generation (OPTIMIZE, VACUUM, ANALYZE)."""
