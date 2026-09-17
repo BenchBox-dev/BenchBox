@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "make pr-preflight runs the medium tier for code-routed diffs and skips it for content-only and skill-only diffs, covered by tests of the routing.",
+    "The stage is receipt-bound; a second run on an unchanged tree reuses the receipt.",
+    "A deliberately failing medium test fails pr-preflight.",
+    "Measured local wall time is reported in the PR description."
+  ],
+  "context": "Guardrails:\n1. Consume the existing classifier decision (`scripts/path_filter_decision.py`); do not reimplement path globs. Content-only and skill-integrity-only diffs skip the stage.\n2. Run through `scripts/local_validation.py` as a separate gate with its own content-bound receipt, so identical trees reuse the result across worktrees and never collide on the shared test lock.\n3. Use the same marker expression as CI (`make test-medium`); do not create a local-only selection.\n4. The stage fails pr-preflight on failure. There is no skip flag in this item.\n5. Measure and report local wall time on at least one Apple silicon developer machine; the CI p50 is 21.2 min on a 4-vCPU runner.\n6. Local results remain a pre-filter. They never satisfy or replace a hosted required check.\nImplement only after ci-dedupe-04 is APPROVE or APPROVE_WITH_CHANGES; apply any listed changes.",
+  "description": "If the heavy tier leaves pull_request CI, medium-test failures would first appear in the merge queue, where one failing entry forces the entries behind it to rebuild. Historically medium-test caught 10 of the 11 heavy-tier PR failures (2026-08-23 to 2026-09-16). Running it locally before submission keeps that catch before the queue.\n\nChange: `make pr-preflight` runs `make test-medium` as its own receipt-bound stage when the path classifier says the diff needs code CI.",
+  "links": [
+    "Makefile",
+    "scripts/local_validation.py",
+    "scripts/path_filter_decision.py",
+    "ci-dedupe-04-heavy-tier-queue-only-decision-gate"
+  ]
+}
