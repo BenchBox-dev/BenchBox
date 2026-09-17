@@ -26,6 +26,14 @@ permissions:
   contents: read
   actions: read
 
+concurrency:
+  # Cancel superseded pull_request runs for the same PR when a newer push
+  # arrives. Pushes to develop and release feed the deploy job and must
+  # never cancel each other, so push and workflow_dispatch runs each get a
+  # unique per-SHA group with cancellation disabled.
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || format('docs-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Build HTML documentation with warnings as errors
   build:
