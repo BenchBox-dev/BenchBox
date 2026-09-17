@@ -2826,3 +2826,347 @@ class TestManifestPatternForName:
         base, ext = DatabricksAdapter._manifest_pattern_for_name("orders.parquet")
         # Non-sharded - uses stem/suffix logic
         assert "orders" in base
+
+
+# ---------------------------------------------------------------------------
+# Databricks version probing via SELECT current_version()
+# ---------------------------------------------------------------------------
+
+_LIVE_WAREHOUSE_STRUCT = {
+    "dbr_version": None,
+    "dbsql_version": "2026.36",
+    "u_build_hash": "ae9b8c94bd7756748eadf8dbbb27f84a703ed782",
+    "r_build_hash": "85f51ee3c849b3c03c13ad723d1a65378a77d8c2",
+}
+
+_LIVE_SPARK_RAW = "4.2.0 0000000000000000000000000000000000000000"
+
+
+def _mock_version_connection(
+    fetchone_values=None,
+    execute_side_effect=None,
+    fetchall_values=None,
+):
+    """Build a MagicMock connection with a single shared cursor."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    if fetchone_values is not None:
+        mock_cursor.fetchone.side_effect = list(fetchone_values)
+    if fetchall_values is not None:
+        mock_cursor.fetchall.side_effect = list(fetchall_values)
+    if execute_side_effect is not None:
+        mock_cursor.execute.side_effect = execute_side_effect
+    return mock_conn, mock_cursor
+
+
+class TestSanitizeSparkEngineVersion:
+    """Unit tests for hash-aware SELECT version() sanitization."""
+
+    def test_strips_placeholder_hash(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version(_LIVE_SPARK_RAW) == "4.2.0"
+
+    def test_strips_real_commit_hash(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version("3.5.0 abcdef1234567890abcdef1234567890abcdef12") == "3.5.0"
+
+    def test_preserves_runtime_string(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version("Runtime 14.3 LTS") == "Runtime 14.3 LTS"
+
+    def test_preserves_spark_detail_string(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        raw = "14.3 LTS (apache-spark-3.5.0-bin-hadoop3)"
+        assert _sanitize_spark_engine_version(raw) == raw
+
+    def test_none_and_blank(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version(None) is None
+        assert _sanitize_spark_engine_version("") is None
+        assert _sanitize_spark_engine_version("   ") is None
+
+
+class TestParseCurrentVersionPayload:
+    """Unit tests for current_version() struct normalization."""
+
+    def test_parses_warehouse_dict(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        parsed = _parse_current_version_payload(dict(_LIVE_WAREHOUSE_STRUCT))
+        assert parsed is not None
+        assert parsed["dbsql_version"] == "2026.36"
+        assert parsed["dbr_version"] is None
+        assert parsed["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert parsed["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+
+    def test_parses_dbr_cluster_dict(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        parsed = _parse_current_version_payload({"dbr_version": "14.3 LTS", "dbsql_version": None})
+        assert parsed is not None
+        assert parsed["dbr_version"] == "14.3 LTS"
+        assert parsed["dbsql_version"] is None
+
+    def test_parses_connector_row(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        parsed = _parse_current_version_payload(row)
+        assert parsed is not None
+        assert parsed["dbsql_version"] == "2026.36"
+
+    def test_parses_row_wrapped_in_tuple(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        from benchbox.platforms.databricks.adapter import (
+            _parse_current_version_payload,
+            _unwrap_current_version_struct,
+        )
+
+        row = Row(dbr_version="14.3 LTS", dbsql_version=None, u_build_hash=None, r_build_hash=None)
+        unwrapped = _unwrap_current_version_struct((row,))
+        parsed = _parse_current_version_payload(unwrapped)
+        assert parsed is not None
+        assert parsed["dbr_version"] == "14.3 LTS"
+
+    def test_rejects_plain_string(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        assert _parse_current_version_payload("4.2.0 0000000000000000000000000000000000000000") is None
+        assert _parse_current_version_payload(None) is None
+        assert _parse_current_version_payload({}) is None
+
+    def test_prefers_dbsql_over_dbr(self):
+        from benchbox.platforms.databricks.adapter import _select_databricks_platform_version
+
+        assert _select_databricks_platform_version({"dbsql_version": "2026.36", "dbr_version": "14.3"}) == "2026.36"
+        assert _select_databricks_platform_version({"dbsql_version": None, "dbr_version": "14.3 LTS"}) == "14.3 LTS"
+        assert _select_databricks_platform_version({"dbsql_version": None, "dbr_version": None}) is None
+
+
+class TestGetPlatformInfoCurrentVersion:
+    """get_platform_info() prefers current_version() with version() fallback."""
+
+    def test_warehouse_dict_struct(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(fetchone_values=[(dict(_LIVE_WAREHOUSE_STRUCT),)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "2026.36"
+        assert info["engine_version"] == "2026.36"
+        assert info["engine_version_source"] == "current_version"
+        assert info["dbsql_version"] == "2026.36"
+        assert info["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert info["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+        assert cursor.execute.call_args_list[0].args[0] == "SELECT current_version()"
+        cursor.close.assert_called()
+
+    def test_connector_row_struct(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        adapter = _make_adapter()
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        conn, cursor = _mock_version_connection(fetchone_values=[(row,)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "2026.36"
+        assert info["engine_version_source"] == "current_version"
+        assert info["dbsql_version"] == "2026.36"
+
+    def test_dbr_cluster_selects_dbr_version(self):
+        adapter = _make_adapter()
+        struct = {"dbr_version": "14.3 LTS", "dbsql_version": None, "u_build_hash": None, "r_build_hash": None}
+        conn, _ = _mock_version_connection(fetchone_values=[(struct,)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "14.3 LTS"
+        assert info["engine_version"] == "14.3 LTS"
+        assert info["engine_version_source"] == "current_version"
+
+    def test_current_version_error_falls_back_to_sanitized_version(self):
+        adapter = _make_adapter()
+
+        def _execute(query, *args, **kwargs):
+            if "current_version()" in query:
+                raise RuntimeError("no such function current_version")
+            return Mock()
+
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(_LIVE_SPARK_RAW,)],
+            execute_side_effect=_execute,
+        )
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "4.2.0"
+        assert info["engine_version"] == "4.2.0"
+        assert info["engine_version_source"] == "sql_query"
+
+    def test_current_version_none_falls_back_to_version(self):
+        adapter = _make_adapter()
+        conn, _ = _mock_version_connection(fetchone_values=[None, ("Runtime 14.3 LTS",)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "Runtime 14.3 LTS"
+        assert info["engine_version_source"] == "sql_query"
+
+    def test_version_fallback_spark_version_query(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(fetchone_values=[None, None, ("3.5.1",)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "3.5.1"
+        assert info["engine_version_source"] == "sql_query"
+        queries = [call.args[0] for call in cursor.execute.call_args_list]
+        assert queries[0] == "SELECT current_version()"
+        assert queries[1] == "SELECT version()"
+        assert queries[2] == "SELECT spark_version() as version"
+
+    def test_total_failure_returns_nones(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(execute_side_effect=RuntimeError("down"))
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] is None
+        assert info["engine_version"] is None
+        assert info["engine_version_source"] is None
+        cursor.close.assert_called()
+
+    def test_no_connection_returns_nones(self):
+        adapter = _make_adapter()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            with patch.dict("sys.modules", {"databricks.sdk": None}):
+                info = adapter.get_platform_info(connection=None)
+
+        assert info["platform_version"] is None
+        assert info["engine_version"] is None
+        assert info["engine_version_source"] is None
+
+
+class TestGetPlatformMetadataCurrentVersion:
+    """_get_platform_metadata() records DBSQL version plus sanitized Spark version."""
+
+    def test_warehouse_records_dbsql_and_spark_versions(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(
+            fetchone_values=[
+                (dict(_LIVE_WAREHOUSE_STRUCT),),
+                (_LIVE_SPARK_RAW,),
+                ("main", "benchbox"),
+            ],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "2026.36"
+        assert metadata["engine_version"] == "2026.36"
+        assert metadata["engine_version_source"] == "current_version"
+        assert metadata["dbsql_version"] == "2026.36"
+        assert metadata["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert metadata["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+        assert metadata["spark_version"] == "4.2.0"
+        assert metadata["current_catalog"] == "main"
+        assert metadata["current_schema"] == "benchbox"
+        queries = [call.args[0] for call in cursor.execute.call_args_list]
+        assert queries[0] == "SELECT current_version()"
+
+    def test_row_struct_metadata(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        adapter = _make_adapter()
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(row,), (_LIVE_SPARK_RAW,), ("main", "benchbox")],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "2026.36"
+        assert metadata["spark_version"] == "4.2.0"
+
+    def test_fallback_metadata_sanitizes_version(self):
+        adapter = _make_adapter()
+
+        def _execute(query, *args, **kwargs):
+            if "current_version()" in query:
+                raise RuntimeError("unsupported")
+            return Mock()
+
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(_LIVE_SPARK_RAW,), ("main", "benchbox")],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+            execute_side_effect=_execute,
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "4.2.0"
+        assert metadata["engine_version_source"] == "sql_query"
+        assert metadata["spark_version"] == "4.2.0"

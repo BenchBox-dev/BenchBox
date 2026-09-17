@@ -662,9 +662,11 @@ class TestDatabricksAdapter:
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock query responses
+        # Mock query responses: current_version() probe first, then version() fallback,
+        # then current catalog/schema. None forces the sanitized version() path.
         mock_cursor.fetchone.side_effect = [
-            ["Spark 3.4.1"],  # Spark version
+            None,  # SELECT current_version() (unsupported in this fixture)
+            ["Spark 3.4.1"],  # SELECT version() fallback
             ["test_catalog", "test_schema"],  # Current catalog and schema
         ]
 
