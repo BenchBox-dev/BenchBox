@@ -9345,7 +9345,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Modin, cuDF, and Dask adapter integration into cross-platform suite"
     },
     "modin-cudf-dask-production-ready": {
