@@ -368,7 +368,20 @@ class ResultExporter:
         return _redact_usernames(tuning_payload)
 
     def _build_export_applied_payload(self, result: ResultLike) -> dict[str, Any] | None:
-        """Build the applied-tuning ledger payload, scrubbed for this export mode."""
+        """Build the applied-tuning ledger payload, scrubbed for this export mode.
+
+        On the public path this drops the free-text ``statement`` / ``error``
+        fields and every identifier the ledger and its receipt can carry.
+
+        A private capture keeps them, exactly as ``.applied.json`` always has,
+        because the executed DDL is the point of the private ledger. Inlining
+        therefore widens what the primary ``<stem>.json`` holds on that path: the
+        raw statements now sit in the bundle as well as the companion beside it.
+        The pair is written together into the same private results directory, so
+        this adds no egress route, but a private bundle is not a redacted
+        artifact and must not be forwarded as one. ``export.anonymized`` records
+        which path produced it.
+        """
         applied_payload = build_applied_ledger_payload(result)
         if not applied_payload:
             return None
@@ -387,8 +400,12 @@ class ResultExporter:
 
         ``tuning_payload`` / ``applied_payload`` are the already-scrubbed
         artifacts the bundle inlined. They are passed in rather than rebuilt so
-        the companion and the inlined copy are byte-identical; they are rebuilt
-        here only for callers that invoke this method on its own.
+        both copies come from one scrub and can never disagree about what the run
+        requested or applied; they are rebuilt here only for callers that invoke
+        this method on its own. The inlined copy is not a byte-for-byte clone of
+        the companion: ``inline_tuning_artifacts`` drops the companion's own
+        ``version`` / ``run_id`` envelope, flattens ``requested``, and moves the
+        ledger hash onto the summary that owns it.
         """
         # Plans companion file
         plans_payload = build_plans_payload(result)

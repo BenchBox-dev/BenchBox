@@ -59,6 +59,13 @@ _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
 # Omit the empty block rather than publishing a hollow object (e.g. client_host
 # that only held machine_id). Compact forms match ``_compact_key``.
 _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS = frozenset({"clienthost"})
+# Tuning clause keys whose values name columns. A first-party tuning config
+# renders each column as a `{"name": ...}` dict, but a hand-authored or
+# republished companion may write a bare string or list of strings, which the
+# structural walk cannot recognize as an identifier on its own.
+_TUNING_COLUMN_BEARING_KEYS = frozenset(
+    {"clustering", "partitioning", "sorting", "distribution", "columns", "indexes", "order_by", "bucketing"}
+)
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
@@ -616,7 +623,7 @@ class AnonymizationManager:
             }
         return self._anonymize_tuning_value(value)
 
-    def _anonymize_tuning_value(self, value: Any) -> Any:
+    def _anonymize_tuning_value(self, value: Any, *, column_context: bool = False) -> Any:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
@@ -627,12 +634,20 @@ class AnonymizationManager:
                 elif key in {"column", "column_name", "name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "column")
                 else:
-                    anonymized[key] = self._anonymize_tuning_value(child)
+                    anonymized[key] = self._anonymize_tuning_value(
+                        child, column_context=key in _TUNING_COLUMN_BEARING_KEYS
+                    )
             return anonymized
-        if isinstance(value, list):
-            return [self._anonymize_tuning_value(item) for item in value]
-        if isinstance(value, tuple):
-            return [self._anonymize_tuning_value(item) for item in value]
+        if isinstance(value, (list, tuple)):
+            return [self._anonymize_tuning_value(item, column_context=column_context) for item in value]
+        # A first-party tuning config renders columns as `{"name": ...}` dicts,
+        # which the branch above hashes. A hand-authored or republished companion
+        # may instead write a bare string or a list of strings under a clause key
+        # -- `{"clustering": ["o_orderkey"]}` -- and those identifiers reached the
+        # public companion verbatim. They are hashed here so the clause key alone,
+        # not the value's shape, decides whether a value is an identifier.
+        if column_context and isinstance(value, str) and value:
+            return self._hash_public_identifier(value, "column")
         return value
 
     def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:

@@ -262,3 +262,83 @@ class TestLoaderReadsTheBundleAlone:
         assert tuning_block["applied_ledger_hash"] == _APPLIED_LEDGER["applied_ledger_hash"]
         assert tuning_block["requested"]["table_tunings"]["LINEITEM"]["sorting"][0]["name"] == "l_orderkey"
         assert tuning_block["applied"]["statements"][0]["phase"] == "ddl"
+
+
+class TestCompanionWinsFieldByField:
+    def test_a_minimal_companion_does_not_wipe_inlined_fields(self, tmp_path: Path) -> None:
+        """A companion wins per field, not wholesale.
+
+        A stale, hand-authored, or republished companion can carry only
+        ``requested``. Overwriting unconditionally wiped the inlined
+        ``source_file`` and ``validation_status`` with None, losing -- on a bundle
+        that states them -- the template the run used and whether its tuning was
+        verified.
+        """
+        _export(tmp_path, anonymize=False)
+        (tmp_path / "run.applied.json").unlink()
+        (tmp_path / "run.tuning.json").write_text(
+            json.dumps({"requested": {"table_tunings": {"LINEITEM": {"table_name": "LINEITEM"}}}}),
+            encoding="utf-8",
+        )
+
+        result, _raw = load_result_file(tmp_path / "run.json")
+
+        assert result.tuning_source_file == "examples/tunings/duckdb/tpch_tuned.yaml"
+        assert result.tuning_validation_status == "applied_unverified"
+        assert result.tuning_config_hash == "a" * 64
+        assert result.tuning_source == "auto_discovered"
+        # The companion's own content still wins where it has any.
+        assert result.tunings_applied is not None
+        assert "LINEITEM" in result.tunings_applied["table_tunings"]
+
+
+class TestBareStringIdentifiersAreHashed:
+    def test_string_clause_values_do_not_reach_a_public_bundle(self, tmp_path: Path) -> None:
+        """A first-party tuning config renders columns as ``{"name": ...}`` dicts,
+        which the structural walk hashes. A hand-authored or republished
+        companion may instead write a bare string or a list of strings under a
+        clause key, and those identifiers reached the public artifact verbatim.
+
+        Inlining put them in the primary bundle too, so the clause key -- not the
+        value's shape -- now decides what counts as an identifier.
+        """
+        benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
+        result = build_enhanced_benchmark_result(
+            benchmark=benchmark,
+            platform="duckdb",
+            query_results=[],
+            tunings_applied={
+                "table_tunings": {
+                    "acme_orders": {
+                        "table_name": "acme_orders",
+                        "clustering": ["customer_ssn_column"],
+                        "partitioning": "revenue_bucket_column",
+                    }
+                }
+            },
+            tuning_config_hash="c" * 64,
+            tuning_source="explicit_file",
+        )
+        result.output_filename = "run.json"
+        ResultExporter(output_dir=tmp_path, anonymize=True).export_result(result, formats=["json"])
+
+        bundle_text = (tmp_path / "run.json").read_text(encoding="utf-8")
+        companion_text = (tmp_path / "run.tuning.json").read_text(encoding="utf-8")
+
+        for identifier in ("acme_orders", "customer_ssn_column", "revenue_bucket_column"):
+            assert identifier not in bundle_text, f"{identifier} leaked into the public bundle"
+            assert identifier not in companion_text, f"{identifier} leaked into the public companion"
+
+        requested = json.loads(bundle_text)["platform"]["tuning"]["requested"]
+        clause = next(iter(requested["table_tunings"].values()))
+        assert clause["clustering"][0].startswith("column_")
+        assert clause["partitioning"].startswith("column_")
+
+    def test_non_identifier_clause_values_are_left_alone(self, tmp_path: Path) -> None:
+        """Only clause keys that name columns are treated as identifiers; a
+        column's ``type`` and ``order`` are data and must survive readable."""
+        bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
+
+        sorting = next(iter(bundle["platform"]["tuning"]["requested"]["table_tunings"].values()))["sorting"][0]
+        assert sorting["type"] == "INTEGER"
+        assert sorting["order"] == 1

@@ -70,3 +70,42 @@ class TestInlineAppliedLedgerBounds:
             platform["tuning"] = tuning
 
         assert _validate(platform).ok
+
+
+class TestBoundsCoverEveryLedgerArray:
+    """An entry cap on two arrays is evadable through the other eight."""
+
+    @pytest.mark.parametrize(
+        "applied",
+        [
+            pytest.param({"dropped": [{"redacted": True}] * (APPLIED_RECEIPT_MAX_ENTRIES + 1)}, id="dropped"),
+            pytest.param(
+                {"receipt": {"observed": [{"kind": "index"}] * (APPLIED_RECEIPT_MAX_ENTRIES + 1)}},
+                id="receipt.observed",
+            ),
+            pytest.param(
+                {"receipt": {"dropped": [{"redacted": True}] * (APPLIED_RECEIPT_MAX_ENTRIES + 1)}},
+                id="receipt.dropped",
+            ),
+            pytest.param(
+                {"drift_check": {"errors": ["x"] * (APPLIED_RECEIPT_MAX_ENTRIES + 1)}},
+                id="drift_check.errors",
+            ),
+            pytest.param(
+                {"drift_check": {"missing_tables": ["t"] * (APPLIED_RECEIPT_MAX_ENTRIES + 1)}},
+                id="drift_check.missing_tables",
+            ),
+        ],
+    )
+    def test_every_unbounded_array_is_rejected(self, applied: dict) -> None:
+        vr = _validate(_platform(applied))
+
+        assert not vr.ok
+        assert any("exceeds the" in error for error in vr.errors)
+
+    def test_few_entries_holding_huge_strings_are_rejected(self) -> None:
+        """A per-array entry cap alone passes a handful of multi-megabyte strings."""
+        vr = _validate(_platform({"statements": [{"phase": "ddl", "note": "x" * (3 * 1024 * 1024)}] * 4}))
+
+        assert not vr.ok
+        assert any("byte limit" in error for error in vr.errors)

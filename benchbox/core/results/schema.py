@@ -473,39 +473,40 @@ def _build_platform_section(
             platform["variant"] = variant
 
         config = _extract_platform_config(result.platform_info)
+
+    metadata_payload = build_platform_metadata_payload(
+        platform_info=result.platform_info,
+        platform_config=config,
+        deployment=getattr(result, "platform_deployment", None),
+        cloud=getattr(result, "platform_cloud", None),
+        compute=getattr(result, "platform_compute", None),
+        storage=getattr(result, "platform_storage", None),
+        raw_config=getattr(result, "platform_raw_config", None) or sanitize_platform_options(config),
+        raw_metadata=(
+            getattr(result, "platform_raw_metadata", None)
+            if getattr(result, "platform_raw_metadata", None) is not None
+            else getattr(result, "platform_metadata", None)
+        ),
+        # Credential redaction is a boundary invariant for every exported
+        # result, including explicitly private/internal artifacts. The
+        # flag still controls public anonymization elsewhere, but it must
+        # not turn raw adapter config/metadata or normalized deployment/
+        # cloud/compute/storage blocks into a credential egress channel.
+        sanitize_raw_config=True,
+    )
+
+    if config:
         # `platform.config` is the flattened adapter-config view; the normalized
-        # deployment/cloud/compute/storage blocks below are the canonical one.
-        # Sub-blocks that those blocks fully cover are dropped here so a consumer
-        # cannot read a stale or contradictory copy (see
-        # `_prune_duplicated_platform_config`). `config` itself stays whole for
-        # the raw_config fallback and for deployment inference, both of which are
-        # meant to see the adapter's config verbatim.
-        public_config = _prune_duplicated_platform_config(config)
+        # deployment/cloud/compute/storage blocks are the canonical one. Drop the
+        # sub-blocks the normalized blocks actually carry, so a consumer cannot
+        # read a stale or contradictory copy. `config` itself stays whole for the
+        # raw_config fallback and for deployment inference above, both of which
+        # are meant to see the adapter's config verbatim.
+        public_config = _prune_duplicated_platform_config(config, metadata_payload.get("compute"))
         if public_config:
             platform["config"] = public_config
 
-    platform.update(
-        build_platform_metadata_payload(
-            platform_info=result.platform_info,
-            platform_config=config,
-            deployment=getattr(result, "platform_deployment", None),
-            cloud=getattr(result, "platform_cloud", None),
-            compute=getattr(result, "platform_compute", None),
-            storage=getattr(result, "platform_storage", None),
-            raw_config=getattr(result, "platform_raw_config", None) or sanitize_platform_options(config),
-            raw_metadata=(
-                getattr(result, "platform_raw_metadata", None)
-                if getattr(result, "platform_raw_metadata", None) is not None
-                else getattr(result, "platform_metadata", None)
-            ),
-            # Credential redaction is a boundary invariant for every exported
-            # result, including explicitly private/internal artifacts. The
-            # flag still controls public anonymization elsewhere, but it must
-            # not turn raw adapter config/metadata or normalized deployment/
-            # cloud/compute/storage blocks into a credential egress channel.
-            sanitize_raw_config=True,
-        )
-    )
+    platform.update(metadata_payload)
 
     for src_key, dest_key in _DRIVER_PLATFORM_KEYS:
         if driver_metadata.get(src_key):
@@ -1770,26 +1771,22 @@ def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
     return sanitize_platform_options(config)
 
 
-# Keys dropped from the exported ``platform.config`` because a normalized block
-# carries the same facts in the canonical shape. Each entry names where the
-# information still lives, and none of them is the only copy:
-#
-# ``compute_configuration`` / ``cluster_info``
-#     The per-adapter warehouse/cluster metadata dicts. ``platform.compute``
-#     holds the normalized form with ``source`` / ``collection_status``
-#     provenance, and ``platform.raw_metadata`` keeps the adapter's raw shape.
-#     Publishing a third copy inside ``platform.config`` is what let a Databricks
-#     bundle assert ``cluster_size: "Medium"`` (an adapter constructor default)
-#     beside an observed ``warehouse_size: "2X-Small"``.
-# layout-operation ledgers
-#     What tuning physically executed. The applied-tuning ledger is the record
-#     of that (ADR-1), and ``platform.raw_config`` keeps the adapter's own copy.
-#     A third copy in ``platform.config`` fractured the single source of truth
-#     for whether an OPTIMIZE ran.
-_PLATFORM_CONFIG_DUPLICATED_KEYS = frozenset(
+# Per-adapter warehouse/cluster metadata mappings. ``platform.compute`` holds the
+# same facts in normalized form with ``source`` / ``collection_status``
+# provenance, so a copy here is a third representation that can contradict it --
+# it is what let a Databricks bundle assert ``cluster_size: "Medium"`` (an adapter
+# constructor default) beside an observed ``warehouse_size: "2X-Small"``. Pruned
+# only when a normalized compute block actually exists: adapters without a
+# normalized-metadata hook (ClickHouse, which records `system_settings` and
+# `build_options` here) have no other structured home for it.
+_PLATFORM_CONFIG_COMPUTE_KEYS = frozenset({"compute_configuration", "cluster_info"})
+
+# Ledgers of what tuning physically executed. The applied-tuning ledger is the
+# record of that (ADR-1) and `platform.raw_config` keeps the adapter's own copy,
+# so a third copy in `platform.config` fractured the single source of truth for
+# whether an OPTIMIZE ran.
+_PLATFORM_CONFIG_LAYOUT_KEYS = frozenset(
     {
-        "compute_configuration",
-        "cluster_info",
         "applied_layout_operations",
         "skipped_layout_operations",
         "liquid_clustering_operations",
@@ -1798,12 +1795,26 @@ _PLATFORM_CONFIG_DUPLICATED_KEYS = frozenset(
 )
 
 
-def _prune_duplicated_platform_config(config: dict[str, Any]) -> dict[str, Any]:
+def _prune_duplicated_platform_config(
+    config: dict[str, Any],
+    normalized_compute: Any = None,
+) -> dict[str, Any]:
     """Drop ``platform.config`` entries a normalized platform block already owns.
 
     Pruning happens at the export boundary rather than in
     ``_extract_platform_config`` so the unpruned mapping is still available to
     the ``raw_config`` fallback and to deployment inference, which exist to read
     the adapter's configuration verbatim.
+
+    The compute mappings are pruned only when ``normalized_compute`` carries
+    content. Not every adapter has a normalized-metadata hook: ClickHouse records
+    its `system_settings` and `build_options` under `compute_configuration` and
+    publishes no `platform.compute` at all, so pruning unconditionally would move
+    engine settings that shape the result out of the block consumers read.
     """
-    return {key: value for key, value in config.items() if key not in _PLATFORM_CONFIG_DUPLICATED_KEYS}
+    drop = set(_PLATFORM_CONFIG_LAYOUT_KEYS)
+    if isinstance(normalized_compute, Mapping) and any(
+        key not in {"source", "collection_status"} and value is not None for key, value in normalized_compute.items()
+    ):
+        drop |= _PLATFORM_CONFIG_COMPUTE_KEYS
+    return {key: value for key, value in config.items() if key not in drop}

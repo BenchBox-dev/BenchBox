@@ -430,15 +430,20 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
             tunings_applied = _flatten_requested_tuning(inline_requested)
 
     if tuning_data:
+        # A companion wins field by field, never wholesale. A companion that is
+        # stale, hand-authored, or minimal can carry only `requested`, and
+        # overwriting unconditionally would wipe the inlined `source_file` and
+        # `validation_status` with None -- losing, on a bundle that states them,
+        # the template the run used and whether its tuning was verified.
         requested = tuning_data.get("requested")
         if requested:
             tunings_applied = _flatten_requested_tuning(requested)
-        else:
-            tunings_applied = tuning_data.get("clauses", {})
-        tuning_source_file = tuning_data.get("source_file")
+        elif tuning_data.get("clauses"):
+            tunings_applied = tuning_data["clauses"]
+        tuning_source_file = tuning_data.get("source_file") or tuning_source_file
         tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
         tuning_source = tuning_data.get("tuning_source") or tuning_source
-        tuning_validation_status = tuning_data.get("validation_status")
+        tuning_validation_status = tuning_data.get("validation_status") or tuning_validation_status
 
     return {
         "tunings_applied": tunings_applied,
