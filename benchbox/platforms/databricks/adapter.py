@@ -81,6 +81,9 @@ _COMMIT_HASH_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 _CURRENT_VERSION_KEYS = ("dbr_version", "dbsql_version", "u_build_hash", "r_build_hash")
 
+_ENGINE_VERSION_SOURCE_CURRENT_VERSION = "current_version"
+_ENGINE_VERSION_SOURCE_SQL_QUERY = "sql_query"
+
 
 def _sanitize_spark_engine_version(value: Any) -> str | None:
     """Strip the commit-hash suffix from ``SELECT version()`` output.
@@ -130,6 +133,8 @@ def _first_column(row: Any) -> Any:
             return row[0]
         except Exception:
             return None
+    if isinstance(row, (str, bytes)):
+        return row
     try:
         return row[0]  # type: ignore[index]
     except Exception:
@@ -152,6 +157,8 @@ def _unwrap_current_version_struct(row: Any) -> Any:
     if isinstance(row, (tuple, list)):
         if len(row) == 0:
             return None
+        # databricks.sql.types.Row is a tuple that matches field names with `in`;
+        # a plain tuple never does, so it falls through to row[0] below.
         try:
             if "dbsql_version" in row or "dbr_version" in row:  # type: ignore[operator]
                 return row
@@ -214,7 +221,8 @@ def _parse_current_version_payload(payload: Any) -> dict[str, str | None] | None
         if len(payload) == 0:
             return None
         # Double-wrapped struct (e.g. Row inside Row): unwrap one more level
-        # only when the outer row does not itself carry version keys.
+        # only when the outer row does not itself carry version keys. As above,
+        # `in` matches field names only on Row, never on a plain tuple.
         try:
             if "dbsql_version" in payload or "dbr_version" in payload:  # type: ignore[operator]
                 pass
@@ -602,7 +610,7 @@ class DatabricksAdapter(PlatformAdapter):
                         resolved: dict[str, Any] = {
                             "platform_version": selected,
                             "engine_version": selected,
-                            "engine_version_source": "current_version",
+                            "engine_version_source": _ENGINE_VERSION_SOURCE_CURRENT_VERSION,
                         }
                         for key in _CURRENT_VERSION_KEYS:
                             if parsed.get(key):
@@ -624,7 +632,7 @@ class DatabricksAdapter(PlatformAdapter):
                     resolved = {
                         "platform_version": sanitized,
                         "engine_version": sanitized,
-                        "engine_version_source": "sql_query",
+                        "engine_version_source": _ENGINE_VERSION_SOURCE_SQL_QUERY,
                     }
                     resolved.update(fallback_hashes)
                     return resolved
@@ -634,7 +642,7 @@ class DatabricksAdapter(PlatformAdapter):
                     resolved = {
                         "platform_version": sanitized,
                         "engine_version": sanitized,
-                        "engine_version_source": "sql_query",
+                        "engine_version_source": _ENGINE_VERSION_SOURCE_SQL_QUERY,
                     }
                     resolved.update(fallback_hashes)
                     return resolved
@@ -2435,18 +2443,15 @@ class DatabricksAdapter(PlatformAdapter):
         for key in ("platform_version", "engine_version", "engine_version_source", *_CURRENT_VERSION_KEYS):
             if resolved_version.get(key) is not None:
                 metadata[key] = resolved_version[key]
-        # Preserve the raw Spark engine string for diagnostics; sanitized so the
+        # Preserve the Spark engine string for diagnostics; sanitized so the
         # 40-zero placeholder hash never leaks into stored metadata.
-        if resolved_version.get("engine_version_source") == "current_version":
+        if resolved_version.get("engine_version_source") == _ENGINE_VERSION_SOURCE_CURRENT_VERSION:
             try:
                 version_cursor = connection.cursor()
                 try:
                     version_cursor.execute("SELECT version()")
-                    raw_spark = _first_column(version_cursor.fetchone())
-                    sanitized_spark = _sanitize_spark_engine_version(raw_spark)
+                    sanitized_spark = _sanitize_spark_engine_version(_first_column(version_cursor.fetchone()))
                     metadata["spark_version"] = sanitized_spark if sanitized_spark else "unknown"
-                    if raw_spark is not None and sanitized_spark is None:
-                        metadata["spark_version_raw"] = str(raw_spark)
                 finally:
                     try:
                         version_cursor.close()

@@ -2892,6 +2892,26 @@ class TestSanitizeSparkEngineVersion:
         assert _sanitize_spark_engine_version("   ") is None
 
 
+class TestFirstColumnScalarGuard:
+    """_first_column must not truncate bare scalar strings via indexing."""
+
+    def test_bare_string_returned_intact(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column("Spark 3.4.1") == "Spark 3.4.1"
+
+    def test_bytes_returned_intact(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column(b"3.5.1") == b"3.5.1"
+
+    def test_tuple_still_unpacks(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column(("4.2.0",)) == "4.2.0"
+        assert _first_column(None) is None
+
+
 class TestParseCurrentVersionPayload:
     """Unit tests for current_version() struct normalization."""
 
