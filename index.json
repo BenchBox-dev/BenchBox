@@ -3282,6 +3282,13 @@
       "status": "done",
       "title": "Implement CTAS-based sorted data loading for DuckDB"
     },
+    "cudf-dask-adapter-integration-cross-platform": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Integrate cuDF and Dask adapters into the cross-platform suite (Modin-free)"
+    },
     "curate-release-branch-and-changelog": {
       "claim": null,
       "needs": [],

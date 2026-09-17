@@ -1,0 +1,9 @@
+{
+  "acceptance": [
+    "cuDF adapter is exercised in the cross-platform comparison suite",
+    "Dask adapter is exercised in the cross-platform comparison suite",
+    "Modin stays out of scope: platform support was removed (#2116)"
+  ],
+  "context": "Split out of modin-cudf-and-dask-adapter-integration-into-cross-platform (dropped when the Modin platform was removed in #2116). Dask adapter ships in the dataframe extras; cuDF/Dask production adapters were completed under modin-cudf-dask-production-ready (done) — this item is the remaining suite-integration step.",
+  "description": "Promoted from deferral #143 of deferred-dataframe-performance-analysis, rescoped Modin-free after the Modin platform removal (#2116): integrate the cuDF and Dask adapters into the cross-platform comparison suite. Add to the suite incrementally as adapter coverage allows. Modin work (query failures, adapter integration) was dropped with the platform and must not be re-added here."
+}
