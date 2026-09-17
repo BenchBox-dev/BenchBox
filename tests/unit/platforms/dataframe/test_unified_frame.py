@@ -1188,7 +1188,7 @@ class TestFrameAggFacadeDataFusion:
         assert as_dict["avg_yearly"] == [None]
 
 
-@pytest.mark.medium
+@pytest.mark.slow
 class TestFrameAggIdiomsPySpark:
     """The Q17 NULL-selection idiom through the real PySpark adapter."""
 
