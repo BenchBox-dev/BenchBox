@@ -1123,7 +1123,7 @@ class TestFrameAggFacadeDataFusion:
 
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
-        table = pa.table({"x": [10.0, 20.0, 30.0, 40.0], "d": [0.1, 0.2, 0.0, 0.5]})
+        table = pa.table({"x": [10.0, 20.0, 30.0, 40.0], "d": [0.1, 0.2, 0.0, 0.5], "g": ["a", "a", "b", "b"]})
         adapter.session_ctx.register_record_batches("t", [table.to_batches()])
         ctx.register_table("t", adapter.session_ctx.sql("SELECT * FROM t"))
         return ctx
@@ -1157,6 +1157,21 @@ class TestFrameAggFacadeDataFusion:
         )
         assert result.to_pydict()["r"] == pytest.approx([10000.0 / 0.8])
 
+    def test_grouped_precomputed_sums(self, dframe):
+        """The Q1/Q3/Q5/Q7/Q10 idiom: precompute, then plain grouped sums."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .with_columns((col("x") * (lit(1) - col("d"))).alias("revenue"))
+            .group_by("g")
+            .agg(col("revenue").sum().alias("revenue"))
+            .sort("g")
+            .collect()
+        )
+        as_dict = result.to_pydict()
+        assert as_dict["g"] == ["a", "b"]
+        assert as_dict["revenue"] == pytest.approx([10 * 0.9 + 20 * 0.8, 30 * 1.0 + 40 * 0.5])
+
     def test_empty_set_selects_null_row(self, dframe):
         """The Q17 idiom: zero-row counts select a single NULL row."""
         col, lit = dframe.col, dframe.lit
@@ -1171,3 +1186,43 @@ class TestFrameAggFacadeDataFusion:
         )
         as_dict = result.to_pydict()
         assert as_dict["avg_yearly"] == [None]
+
+
+@pytest.mark.medium
+class TestFrameAggIdiomsPySpark:
+    """The Q17 NULL-selection idiom through the real PySpark adapter."""
+
+    @pytest.fixture(scope="class")
+    def sframe(self):
+        pytest.importorskip("pyspark")
+        from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
+
+        _java_version, _ = ensure_compatible_java()
+        if not is_java_compatible(_java_version):
+            pytest.skip("no compatible Java for PySpark")
+
+        from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
+
+        adapter = PySparkDataFrameAdapter(master="local[2]", driver_memory="1g")
+        ctx = adapter.create_context()
+        ctx.register_table("t", adapter.spark.createDataFrame([(10.0,), (20.0,)], ["x"]))
+        yield ctx
+        adapter.close()
+
+    def _avg_yearly(self, sframe, pred):
+        col, lit = sframe.col, sframe.lit
+        return (
+            sframe.get_table("t")
+            .filter(pred(col, lit))
+            .agg(col("x").sum().alias("total"), col("x").count().alias("n"))
+            .select(
+                sframe.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly")
+            )
+            .collect_column_as_list("avg_yearly")
+        )
+
+    def test_empty_set_selects_null_row(self, sframe):
+        assert self._avg_yearly(sframe, lambda col, lit: col("x") > lit(1000.0)) == [None]
+
+    def test_nonempty_set_selects_value(self, sframe):
+        assert self._avg_yearly(sframe, lambda col, lit: col("x") > lit(0.0)) == pytest.approx([30.0 / 7.0])

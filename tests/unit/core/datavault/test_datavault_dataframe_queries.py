@@ -616,14 +616,15 @@ class TestQ15MaxSupplier:
 
     @pytest.mark.parametrize("family", ["expression", "pandas"])
     def test_sub_cent_difference_selects_true_max(self, family):
-        """A 0.004 revenue gap is invisible at cent precision but decisive.
+        """A 1e-4 revenue gap is invisible at cent precision but decisive: it
+        pins the tolerance to the data's own granularity.
 
         Cent rounding would return both suppliers; SQL exact-max semantics
         return only the true max.
         """
         from benchbox.core.datavault.dataframe_queries import get_datavault_query
 
-        expr_ctx, pandas_ctx = _register_contexts(self._tables([100.0, 100.004]))
+        expr_ctx, pandas_ctx = _register_contexts(self._tables([100.0, 100.0001]))
         ctx = expr_ctx if family == "expression" else pandas_ctx
         query = get_datavault_query("Q15")
         impl = query.expression_impl if family == "expression" else query.pandas_impl

@@ -415,33 +415,43 @@ class TestDataVaultManifestDialectMetadata:
 
     def test_satellite_manifest_resolves_empty_field_to_null(self, tmp_path: Path) -> None:
         """Loader-side contract: a satellite manifest must resolve to a dialect
-        that reads the empty load_end_dts field as NULL, not ''."""
-        from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
+        that the DuckDB handler turns into nullstr='', so the empty
+        load_end_dts field loads as NULL, not ''."""
+        from benchbox.platforms.base.data_loading import (
+            DataSource,
+            DuckDBNativeHandler,
+            resolve_csv_dialect,
+        )
 
         manifest = self._write(tmp_path, "tbl")
         metadata = manifest["tables"]["hub_region"]["formats"]["tbl"][0]["metadata"]
-        data_file = tmp_path / "hub_region.tbl"
+        data_file = tmp_path / "sat_customer.tbl"
+        data_file.write_text("hk1|ACME|\n")
         source = DataSource(
             source_type="manifest",
-            tables={"hub_region": data_file},
-            table_metadata={"hub_region": metadata},
+            tables={"sat_customer": data_file},
+            table_metadata={"sat_customer": metadata},
         )
-        dialect = resolve_csv_dialect(source, "hub_region", data_file, benchmark=None)
+        dialect = resolve_csv_dialect(source, "sat_customer", data_file, benchmark=None)
         assert dialect.delimiter == "|"
         assert dialect.has_header is False
         assert dialect.null_marker == ""
 
+        handler = DuckDBNativeHandler(
+            delimiter=dialect.delimiter, adapter=None, benchmark=None, null_marker=dialect.null_marker
+        )
+        assert handler._pipe_nullstr_config() == "nullstr=''"
+
         duckdb = pytest.importorskip("duckdb")
-        data_file.write_text("hk1|ACME|\n")
         conn = duckdb.connect(":memory:")
         try:
-            conn.execute("CREATE TABLE hub_region (hk VARCHAR, name VARCHAR, load_end_dts TIMESTAMP)")
+            conn.execute("CREATE TABLE sat_customer (hk VARCHAR, name VARCHAR, load_end_dts TIMESTAMP)")
             conn.execute(
-                "INSERT INTO hub_region SELECT * FROM read_csv("
+                "INSERT INTO sat_customer SELECT * FROM read_csv("
                 f"'{data_file}', delim='{dialect.delimiter}', header=false, "
-                f"nullstr='{dialect.null_marker}', names=['hk', 'name', 'load_end_dts'])"
+                f"{handler._pipe_nullstr_config()}, names=['hk', 'name', 'load_end_dts'])"
             )
-            (is_null,) = conn.execute("SELECT load_end_dts IS NULL FROM hub_region").fetchone()
+            (is_null,) = conn.execute("SELECT load_end_dts IS NULL FROM sat_customer").fetchone()
             assert is_null is True
         finally:
             conn.close()

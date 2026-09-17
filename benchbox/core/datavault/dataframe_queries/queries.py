@@ -67,11 +67,18 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     df = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
     df = df.filter(col("l_shipdate") <= lit(cutoff))
 
+    # Row-level values are precomputed so the grouped aggregates stay plain
+    # column sums on every backend (arithmetic inside an aggregate is not
+    # portable).
+    df = df.with_columns(
+        (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("disc_price"),
+        (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias("charge"),
+    )
     result = df.group_by("l_returnflag", "l_linestatus").agg(
         col("l_quantity").sum().alias("sum_qty"),
         col("l_extendedprice").sum().alias("sum_base_price"),
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("sum_disc_price"),
-        (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).sum().alias("sum_charge"),
+        col("disc_price").sum().alias("sum_disc_price"),
+        col("charge").sum().alias("sum_charge"),
         col("l_quantity").mean().alias("avg_qty"),
         col("l_extendedprice").mean().alias("avg_price"),
         col("l_discount").mean().alias("avg_disc"),
@@ -256,8 +263,11 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("o_orderkey", "o_orderdate", "o_shippriority").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
     # Column order matches the SQL surface (key, revenue, date, priority).
     result = result.select("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
@@ -407,8 +417,11 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
         col("hk_supplier") == col("hk_supplier_lsn")
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("n_name").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
     return result.sort([("revenue", "desc")])
 
@@ -555,11 +568,14 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
+    # The revenue is precomputed so the grouped aggregate stays a plain column
+    # sum on every backend (arithmetic inside an aggregate is not portable).
     result = (
         df.with_columns(col("l_shipdate").dt.year().alias("l_year"))
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("supp_nation", "cust_nation", "l_year")
         .agg(
-            (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+            col("revenue").sum().alias("revenue"),
         )
     )
     return result.sort("supp_nation", "cust_nation", "l_year")
@@ -651,14 +667,18 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
         .join(supp_nation, left_on="hk_supplier", right_on="hk_supplier")
     )
 
+    # Both row-level values are precomputed so the grouped aggregates stay
+    # plain column sums on every backend (a CASE expression inside an
+    # aggregate is not portable either).
     df = df.with_columns(col("o_orderdate").dt.year().alias("o_year")).with_columns(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("volume")
     )
+    df = df.with_columns(
+        ctx.when(col("supp_nation") == lit(target_nation)).then(col("volume")).otherwise(lit(0)).alias("nation_vol")
+    )
 
     result = df.group_by("o_year").agg(
-        (ctx.when(col("supp_nation") == lit(target_nation)).then(col("volume")).otherwise(lit(0)))
-        .sum()
-        .alias("nation_vol"),
+        col("nation_vol").sum().alias("nation_vol"),
         col("volume").sum().alias("total_vol"),
     )
     result = result.with_columns((col("nation_vol") / col("total_vol")).alias("mkt_share"))
@@ -816,8 +836,11 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
         .join(sn, left_on="hk_nation", right_on="hk_nation")
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
     # Column order matches the SQL surface (revenue third).
     result = result.select("c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment")
