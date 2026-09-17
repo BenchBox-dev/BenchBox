@@ -1,0 +1,3 @@
+{
+  "description": "Follow-up from external review (F-01, F-03) of full-string-to-array-support-returning-actual-list-expressio. UnifiedListExpr has no .native property, so unaliased list expressions fail in with_columns/select (all backends); and UnifiedListExpr.get does not accept expression indices (df_lit(idx) raises TypeError on DataFusion). Add .native to UnifiedListExpr with unwrap support in with_columns/select, and unwrap expression indices in get (applying the 0-to-1 offset for DataFusion expressions)."
+}
