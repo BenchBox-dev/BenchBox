@@ -1699,6 +1699,13 @@
       "status": "open",
       "title": "Cancel superseded Documentation workflow runs on pull requests"
     },
+    "ci-dedupe-04-heavy-tier-queue-only-decision-gate": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Decision gate: approve or reject running the heavy CI tier only in the merge queue"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],
