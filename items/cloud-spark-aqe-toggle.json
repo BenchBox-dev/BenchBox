@@ -1,0 +1,3 @@
+{
+  "description": "Follow-up from external review (REQ-01 remainder) of port-the-same-fixes-to-the-sibling-spark-family-adapters-lak. SynapseSparkAdapter and FabricSparkAdapter session builds hardcode AQE \"true\" (missing skewJoin key) with no adaptive_enabled toggle, and CloudSparkConfigMixin/SparkConfigOptimizer unconditionally force-enable AQE for tpch/tpcds/ssb. The user-config-wins merge order was fixed in the parent item. Remaining: add an adaptive_enabled toggle to both Azure adapters, set all three AQE keys explicitly in both directions at Livy session build, and make the optimizer/mixin honor the toggle with user-config precedence. Needs live-cloud verification (Synapse/Fabric) before merge."
+}
