@@ -110,7 +110,7 @@ class TestDataGeneration:
         assert flight_entries[0]["metadata"] == {
             "csv_delimiter": ",",
             "csv_has_header": True,
-            "csv_null_marker": None,
+            "csv_null_marker": "",
         }
 
         reused_downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)

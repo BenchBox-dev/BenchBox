@@ -42,7 +42,12 @@ from typing import Any
 import yaml
 
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+from benchbox.utils.datagen_manifest import (
+    MANIFEST_FILENAME,
+    DataGenerationManifest,
+    load_manifest,
+    resolve_compression_metadata,
+)
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 logger = logging.getLogger(__name__)
@@ -206,6 +211,59 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         if self._table_file_row_counts:
             self._write_manifest(table_files)
         return table_files
+
+    def backfill_csv_dialect_metadata(self) -> bool:
+        """Patch empty-means-NULL dialect metadata into a reused manifest.
+
+        Caches generated before the null-marker fix carry manifests whose
+        entries lack ``csv_null_marker`` (or record ``None``), so SQL loaders
+        would keep loading empty fields as ``""`` even though current
+        generations write ``""``. The runner reuses a structurally valid
+        manifest without regenerating, so heal it in place: set the marker to
+        ``""`` on this benchmark's own csv entries and rewrite the file.
+        Returns True when the manifest was changed.
+        """
+        manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, ValueError):
+            return False
+        if str(manifest.get("benchmark", "")).lower() != "flightdata":
+            return False
+        changed = False
+        tables = manifest.get("tables", {}) or {}
+        for formats in tables.values():
+            if not isinstance(formats, dict):
+                continue
+            inner = formats.get("formats")
+            if not isinstance(inner, dict):
+                continue
+            for format_name, entries in inner.items():
+                if format_name != "csv" or not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    metadata = entry.get("metadata")
+                    if not isinstance(metadata, dict):
+                        continue
+                    if metadata.get("csv_null_marker") != "":
+                        metadata["csv_null_marker"] = ""
+                        changed = True
+        if not changed:
+            return False
+        # Rewrite atomically so an interrupted heal cannot leave an invalid
+        # manifest behind (the next run would then regenerate the data), keep
+        # the trailing newline DataGenerationManifest.write emits, and never
+        # fail a run over a read-only cache: the data itself is still usable.
+        try:
+            tmp_path = manifest_path.with_name(manifest_path.name + ".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            tmp_path.replace(manifest_path)
+        except OSError:
+            logger.warning("Could not heal CSV dialect metadata in %s; continuing", manifest_path)
+            return False
+        return True
 
     def repair_reusable_layout(self) -> dict[str, Path | list[Path]] | None:
         """Repair a reusable FlightData cache when its source layout is loader-hostile.
@@ -589,7 +647,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         metadata = {
             "csv_delimiter": ",",
             "csv_has_header": True,
-            "csv_null_marker": None,
+            # Empty fields in the generated CSVs encode NULL (the writers emit ""
+            # for missing delays/times), so the manifest must request empty->NULL
+            # conversion. None would disable conversion and load blanks as "".
+            "csv_null_marker": "",
         }
         for table_name, paths_or_path in table_files.items():
             paths = paths_or_path if isinstance(paths_or_path, list) else [paths_or_path]
