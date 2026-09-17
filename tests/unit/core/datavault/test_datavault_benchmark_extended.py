@@ -374,3 +374,41 @@ class TestDataVaultBenchmarkEdgeCases:
         bm.output_dir = None  # type: ignore[assignment]
         with pytest.raises(ValueError, match="output_dir must be set"):
             bm.generate_data()
+
+
+class TestDataVaultManifestDialectMetadata:
+    """Generated-table manifest entries carry durable CSV dialect metadata (w4)."""
+
+    def _write(self, tmp_path: Path, output_format: str) -> dict:
+        import json
+        from datetime import datetime
+
+        from benchbox.core.datavault.etl.transformer import DataVaultETLTransformer
+
+        transformer = DataVaultETLTransformer(scale_factor=0.01)
+        data_file = tmp_path / f"hub_region.{output_format}"
+        data_file.write_text("a|b\n")
+        transformer._write_manifest(
+            output_dir=tmp_path,
+            table_paths={"hub_region": data_file},
+            table_row_counts={"hub_region": 1},
+            output_format=output_format,
+            load_timestamp=datetime(2024, 1, 1),
+        )
+        return json.loads((tmp_path / "_datagen_manifest.json").read_text())
+
+    def test_tbl_manifest_records_pipe_dialect(self, tmp_path: Path) -> None:
+        manifest = self._write(tmp_path, "tbl")
+        entry = manifest["tables"]["hub_region"]["formats"]["tbl"][0]
+        assert entry["metadata"] == {
+            "csv_delimiter": "|",
+            "csv_has_header": False,
+            "csv_null_marker": None,
+            "csv_normalize_booleans": False,
+        }
+
+    def test_csv_manifest_records_comma_dialect(self, tmp_path: Path) -> None:
+        manifest = self._write(tmp_path, "csv")
+        entry = manifest["tables"]["hub_region"]["formats"]["csv"][0]
+        assert entry["metadata"]["csv_delimiter"] == ","
+        assert entry["metadata"]["csv_has_header"] is False

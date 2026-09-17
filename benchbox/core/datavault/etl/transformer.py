@@ -429,6 +429,15 @@ class DataVaultETLTransformer(CompressionMixin):
             },
         )
 
+        # CSV dialect metadata so downstream loaders can reuse these files
+        # without re-deriving the delimiter/header contract (same keys as the
+        # DataGenerationManifest.add_entry() contract used by other generators).
+        dialect_metadata = {
+            "csv_delimiter": "," if (output_format or "tbl").lower() == "csv" else "|",
+            "csv_has_header": False,
+            "csv_null_marker": None,
+            "csv_normalize_booleans": False,
+        }
         for name, path in table_paths.items():
             p = Path(path)
             manifest.add_entry(
@@ -437,6 +446,7 @@ class DataVaultETLTransformer(CompressionMixin):
                 row_count=int(table_row_counts.get(name, 0)),
                 size_bytes=p.stat().st_size if p.exists() else 0,
                 format=output_format,
+                metadata=dialect_metadata,
             )
 
         manifest.write()

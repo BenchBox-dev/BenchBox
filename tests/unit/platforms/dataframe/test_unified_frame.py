@@ -1049,3 +1049,53 @@ class TestUnifiedExprNUnique:
         result = ulf.group_by("group").agg(val_col.n_unique().alias("distinct")).sort("group").collect()
         # A has 1 unique, B has 1 unique
         assert result["distinct"].to_list() == [1, 1]
+
+
+class TestFrameAggFacade:
+    """Tests for the frame-level UnifiedLazyFrame.agg global-aggregation facade."""
+
+    @pytest.fixture
+    def frame(self):
+        """Three-row frame wrapped with a mock adapter."""
+        polars = pytest.importorskip("polars")
+
+        unified_lazy_frame_cls = _get_unified_lazy_frame()
+        mock_adapter = _create_mock_adapter()
+        unified_expr_cls = _get_unified_expr()
+
+        df = polars.DataFrame({"x": [1.0, 2.0, 3.0], "y": [10.0, 20.0, 30.0]}).lazy()
+        return {
+            "polars": polars,
+            "df": unified_lazy_frame_cls(df, mock_adapter),
+            "expr": unified_expr_cls,
+        }
+
+    def test_global_sum(self, frame):
+        """agg with a single aggregate yields one row."""
+        pl = frame["polars"]
+        result = frame["df"].agg(frame["expr"](pl.col("x").sum().alias("s"))).collect()
+        assert result.to_dicts() == [{"s": 6.0}]
+
+    def test_arithmetic_over_aggregates(self, frame):
+        """agg supports arithmetic combining several aggregates (Q6/Q14/Q17 shape)."""
+        pl = frame["polars"]
+        expr = frame["expr"]((pl.col("x").sum() * 100.0 / pl.col("y").sum()).alias("r"))
+        result = frame["df"].agg(expr).collect()
+        assert result.to_dicts() == [{"r": 10.0}]
+
+    def test_list_form(self, frame):
+        """agg accepts a single list of expressions like group_by().agg() does."""
+        pl = frame["polars"]
+        expr_cls = frame["expr"]
+        result = frame["df"].agg([expr_cls(pl.col("x").max().alias("m"))]).collect()
+        assert result.to_dicts() == [{"m": 3.0}]
+
+    def test_empty_frame_yields_single_row(self, frame):
+        """agg over an empty frame still yields one row (SQL global-agg shape)."""
+        pl = frame["polars"]
+
+        unified_lazy_frame_cls = _get_unified_lazy_frame()
+        mock_adapter = _create_mock_adapter()
+        empty = unified_lazy_frame_cls(pl.DataFrame({"x": []}, schema={"x": pl.Float64}).lazy(), mock_adapter)
+        result = empty.agg(frame["expr"](pl.col("x").count().alias("n"))).collect()
+        assert result.to_dicts() == [{"n": 0}]
