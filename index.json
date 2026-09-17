@@ -11316,10 +11316,15 @@
       "title": "PySpark DataFrame read-primitives map/fulltext/window/array expression gaps"
     },
     "pyspark-parquet-time-millis-false-cache-loader-compatibility": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T17:18:17Z",
+        "generation": "f00e9bc10f1f4286882203d2bf04b74e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "PySpark Parquet TIME(MILLIS,false) cache/loader compatibility"
     },
     "pyspark-sql-adapter-core": {
