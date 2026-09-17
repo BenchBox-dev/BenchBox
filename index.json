@@ -16910,6 +16910,15 @@
       "status": "done",
       "title": "Applied-ledger capture for native Spark/Snowpark session tuning"
     },
+    "tuning-partition-order-rendered-contract": {
+      "claim": null,
+      "needs": [
+        "starrocks-distribute-by-clause-contract-20260724"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Extend rendered-SQL clause contract to partition_by/order_by previews"
+    },
     "tuning-platform-identity-canonical-keys-20260712": {
       "claim": null,
       "needs": [],
