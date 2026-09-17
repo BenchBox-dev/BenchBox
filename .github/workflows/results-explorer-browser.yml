@@ -76,12 +76,48 @@ jobs:
           echo "explorer-relevant changed paths:"
           echo "${changed:-<none>}"
 
+  # Develop-push certification: when the pushed SHA is queue-certified
+  # (the merge queue already passed this exact tree, including its own
+  # browser gate), the push re-run of the browser suite skips. Push-only:
+  # pull_request, merge_group, schedule, and workflow_dispatch always run
+  # the suite when explorer changes need it.
+  queue-certification:
+    name: queue-certification
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      certified: ${{ steps.certify.outputs.certified }}
+      certifying_run_id: ${{ steps.certify.outputs.certifying_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Look up merge-queue certification with browser gate
+        id: certify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Bare python is intentional: the lookup is stdlib-only and always
+          # exits 0 (fail open), so this step never reds the workflow itself.
+          python scripts/queue_certification.py \
+            --sha "$TARGET_SHA" \
+            --require-browser-gate \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
   # Blocking gate: Chromium runs the full suite. Every acceptance path
   # asserted in `results-explorer/e2e/` must stay green for the PR to merge.
   chromium:
     name: Chromium (full suite, blocking)
-    needs: explorer-changes
-    if: needs.explorer-changes.outputs.needed == 'true'
+    needs: [ explorer-changes, queue-certification ]
+    if: ${{ needs.explorer-changes.outputs.needed == 'true' && needs.queue-certification.outputs.certified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -149,8 +185,8 @@ jobs:
   # once flake data supports it (tracked by w9 of the parent TODO).
   firefox-smoke:
     name: Firefox (@smoke, non-blocking)
-    needs: explorer-changes
-    if: needs.explorer-changes.outputs.needed == 'true'
+    needs: [ explorer-changes, queue-certification ]
+    if: ${{ needs.explorer-changes.outputs.needed == 'true' && needs.queue-certification.outputs.certified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -211,8 +247,8 @@ jobs:
   # once flake data supports it (tracked by w9 of the parent TODO).
   webkit-smoke:
     name: WebKit (@smoke, non-blocking)
-    needs: explorer-changes
-    if: needs.explorer-changes.outputs.needed == 'true'
+    needs: [ explorer-changes, queue-certification ]
+    if: ${{ needs.explorer-changes.outputs.needed == 'true' && needs.queue-certification.outputs.certified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     continue-on-error: true
@@ -282,7 +318,7 @@ jobs:
   # blocking as a silent side effect.
   browser-required-result:
     name: Results Explorer browser gate
-    needs: [ explorer-changes, chromium ]
+    needs: [ explorer-changes, chromium, queue-certification ]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -293,5 +329,7 @@ jobs:
           CHANGES_RESULT: ${{ needs.explorer-changes.result }}
           CHROMIUM_RESULT: ${{ needs.chromium.result }}
           NEEDED: ${{ needs.explorer-changes.outputs.needed }}
+          CERTIFIED: ${{ needs.queue-certification.outputs.certified }}
+          CERTIFYING_RUN_ID: ${{ needs.queue-certification.outputs.certifying_run_id }}
         run: |
           python _project/scripts/browser_gate_aggregate.py

@@ -167,6 +167,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "scripts/check_untracked_skill_mirrors.sh",
         "scripts/path_filter_decision.py",
         "scripts/pr_refresh_certification.py",
+        "scripts/queue_certification.py",
         "README.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
@@ -227,6 +228,7 @@ def test_determine_affected_lanes() -> None:
                 "scripts/local_validation.py",
                 "scripts/post_merge_signature.py",
                 "scripts/pr_landing.py",
+                "scripts/queue_certification.py",
                 "scripts/ruleset_drift_check.py",
             ]
         )
