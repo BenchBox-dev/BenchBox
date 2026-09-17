@@ -15458,10 +15458,15 @@
       "title": "Starburst Platform Adapter"
     },
     "starrocks-distribute-by-clause-contract-20260724": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T16:20:52Z",
+        "generation": "f75a84b4f69d4216b728699a4b54eb35",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Decide the distribute_by contract (SQL clause vs summary) - StarRocks dry-run preview emits a stray bare column"
     },
     "starrocks-olap-platform": {
