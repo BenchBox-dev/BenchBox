@@ -207,3 +207,175 @@ class TestRegionIsNeverInvented:
         assert normalized["cost_status"] == "unavailable"
         # The observed size still survives alongside the honest region gap.
         assert normalized["deployment"]["warehouse_size"] == "2X-Small"
+
+
+class TestLocationMetadataIsNotSizingMetadata:
+    """Cloud and region follow a presence rule, not the observed-only sizing rule.
+
+    Adapters derive the provider from the workspace hostname or the platform's
+    own identity and stamp the cloud block ``inferred``; they omit a region they
+    could not read rather than inventing one. Judging those by the sizing rule
+    made supplying correct metadata strictly worse than supplying none.
+    """
+
+    def test_inferred_cloud_metadata_is_not_penalized(self) -> None:
+        platform_info = {"name": "Athena", "configuration": {"platform_type": "athena", "region": "us-west-2"}}
+        without_block = _extract_platform_config_from_results(_results(platform="Athena", platform_info=platform_info))
+        with_block = _extract_platform_config_from_results(
+            _results(
+                platform="Athena",
+                platform_info=platform_info,
+                platform_cloud={"provider": "aws", "region": "us-west-2", "source": "inferred"},
+            )
+        )
+
+        assert without_block["cloud"] == with_block["cloud"] == "aws"
+        assert without_block["region"] == with_block["region"] == "us-west-2"
+        # Supplying the block must not be worse than omitting it.
+        assert "_defaulted_fields" not in without_block
+        assert "_defaulted_fields" not in with_block
+
+    def test_a_fully_observed_run_has_nothing_defaulted(self) -> None:
+        """The whole point of the fix: such a run must be able to reach a total."""
+        config = _extract_platform_config_from_results(
+            _results(
+                platform_info={
+                    "name": "Databricks",
+                    "configuration": {"platform_type": "databricks", "server_hostname": "dbc-1.cloud.databricks.com"},
+                },
+                platform_cloud={"provider": "aws", "region": "us-east-1", "source": "inferred"},
+                platform_compute={
+                    "warehouse_size": "Large",
+                    "warehouse_type": "PRO",
+                    "source": "observed",
+                    "collection_status": "available",
+                },
+            )
+        )
+
+        assert config["warehouse_size"] == "Large"
+        assert config["cluster_size_dbu_per_hour"] == 16.0
+        assert "_defaulted_fields" not in config
+
+
+class TestComputeBlocksMergePerField:
+    def test_a_partial_normalized_block_does_not_shadow_legacy_sizing(self) -> None:
+        """A normalized block holding `warehouse_type` but no `warehouse_size`
+        used to win wholesale, hiding an observed size and costing the run at the
+        2.0 DBU/hour fallback."""
+        config = _extract_platform_config_from_results(
+            _results(
+                platform_info={
+                    "name": "Databricks",
+                    "configuration": {"platform_type": "databricks"},
+                    "compute_configuration": {
+                        "warehouse_size": "Large",
+                        "warehouse_metadata_collection_status": "available",
+                    },
+                },
+                platform_compute={
+                    "warehouse_type": "PRO",
+                    "source": "observed",
+                    "collection_status": "available",
+                },
+            )
+        )
+
+        assert config["warehouse_size"] == "Large"
+        assert config["cluster_size_dbu_per_hour"] == 16.0
+        assert "warehouse_size" not in config.get("_defaulted_fields", [])
+
+    def test_a_legacy_value_keeps_its_own_provenance(self) -> None:
+        """Filled in from a mapping the adapter could not collect, the value is
+        usable for an estimate but must not back a published total."""
+        config = _extract_platform_config_from_results(
+            _results(
+                platform_info={
+                    "name": "Databricks",
+                    "configuration": {"platform_type": "databricks"},
+                    "compute_configuration": {
+                        "warehouse_size": "Large",
+                        "warehouse_metadata_collection_status": "unavailable",
+                    },
+                },
+                platform_compute={"warehouse_type": "PRO", "source": "observed", "collection_status": "available"},
+            )
+        )
+
+        assert config["warehouse_size"] == "Large"
+        assert "warehouse_size" in config["_defaulted_fields"]
+
+
+class TestConfiguredSizingIsRecordedAsDefaulted:
+    def test_snowflake_configured_warehouse_size_is_marked(self) -> None:
+        """A configured size is user intent, not a reading of the live service."""
+        config = _extract_platform_config_from_results(
+            _results(
+                platform="Snowflake",
+                platform_info={
+                    "name": "Snowflake",
+                    "configuration": {"platform_type": "snowflake", "warehouse_size": "X-Large"},
+                },
+            )
+        )
+
+        assert config["warehouse_size"] == "X-Large"
+        assert "warehouse_size" in config["_defaulted_fields"]
+
+    def test_redshift_node_count_from_cluster_info_is_marked(self) -> None:
+        config = _extract_platform_config_from_results(
+            _results(
+                platform="Redshift",
+                platform_info={
+                    "name": "Redshift",
+                    "configuration": {"platform_type": "redshift"},
+                    "cluster_info": {"node_type": "ra3.4xlarge", "number_of_nodes": 4},
+                },
+            )
+        )
+
+        assert config["node_type"] == "ra3.4xlarge"
+        assert config["node_count"] == 4
+        assert "node_type" in config["_defaulted_fields"]
+        assert "node_count" in config["_defaulted_fields"]
+
+
+class TestPlatformResolvedFromTypeAloneIsCosted:
+    def test_a_result_without_a_display_name_is_not_skipped(self) -> None:
+        """Gating on `results.platform` skipped a result that declares its
+        platform only through `platform_info["platform_type"]`."""
+        results = _results(
+            platform="",
+            platform_info={"platform_type": "clickhouse-local"},
+        )
+        add_cost_estimation_to_results(results)
+
+        assert results.cost_summary is not None
+        assert results.cost_summary["normalized_cost"]["cost_status"] == "not_applicable_local"
+
+
+class TestConfiguredOnlySizingDoesNotPublish:
+    def test_configured_only_warehouse_size_does_not_publish_a_total(self) -> None:
+        """`SnowflakeAdapter.__init__` sets `warehouse_size` to "MEDIUM" when the
+        user set nothing -- the same fabricated-default shape as the Databricks
+        `cluster_size`. Cost estimation still uses it, because a rough number
+        beats none, but it must not reach `cost_status="normalized"`.
+        """
+        results = _results(
+            platform="Snowflake",
+            platform_info={
+                "platform_type": "snowflake",
+                "edition": "standard",
+                "cloud_provider": "aws",
+                "region": "us-east-1",
+                "configuration": {"warehouse_size": "MEDIUM"},
+            },
+            query_results=[{"query_id": "Q1", "resource_usage": {"credits_used": 0.5}}],
+        )
+        add_cost_estimation_to_results(results)
+
+        normalized = (results.cost_summary or {})["normalized_cost"]
+        assert normalized["cost_status"] == "unavailable"
+        assert normalized["normalized_cost_usd"] is None
+        # The size is still reported, so a reader can see what the estimate used.
+        assert normalized["deployment"]["warehouse_size"] == "MEDIUM"

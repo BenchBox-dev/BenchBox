@@ -98,7 +98,10 @@ def add_cost_estimation_to_results(
     platform = canonical_cost_platform_key(results) or "unknown"
 
     try:
-        if not results.platform:
+        # Gate on the resolved key, not on `results.platform`: a result that
+        # declares its platform only through `platform_info["platform_type"]`
+        # resolves fine here and must not be skipped for lacking a display name.
+        if platform == "unknown":
             logger.debug("No platform specified in results, skipping cost estimation")
             return results
 
@@ -373,8 +376,12 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
     if platform_type == "snowflake":
         config["edition"] = _value_or_default(platform_info, "edition", "standard", defaulted_fields)
         warehouse_size = _observed_or_requested(
-            compute, "warehouse_size", "warehouse_size", defaulted_fields
-        ) or config_section.get("warehouse_size")
+            compute,
+            "warehouse_size",
+            "warehouse_size",
+            defaulted_fields,
+            fallback=config_section.get("warehouse_size"),
+        )
         if warehouse_size:
             config["warehouse_size"] = warehouse_size
 
@@ -388,10 +395,12 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
     elif platform_type == "redshift":
         cluster_info = platform_info.get("cluster_info")
         cluster_info = cluster_info if isinstance(cluster_info, Mapping) else {}
-        node_type = _observed_or_requested(compute, "node_type", "node_type", defaulted_fields) or cluster_info.get(
-            "node_type"
+        node_type = _observed_or_requested(
+            compute, "node_type", "node_type", defaulted_fields, fallback=cluster_info.get("node_type")
         )
-        node_count = compute.get("node_count") or cluster_info.get("number_of_nodes")
+        node_count = _observed_or_requested(
+            compute, "node_count", "node_count", defaulted_fields, fallback=cluster_info.get("number_of_nodes")
+        )
         if node_type:
             config["node_type"] = node_type
         else:
@@ -439,27 +448,44 @@ def _effective_compute_block(
     ``platform.compute`` is the normalized block and already carries provenance.
     ``platform_info["compute_configuration"]`` is the older per-adapter shape --
     still the live shape for a hand-assembled result and for any adapter whose
-    normalized hook has not landed -- so it is used when the normalized block
-    carries no sizing at all. Its own ``warehouse_metadata_collection_status``
-    decides whether it counts as observed, because an adapter that could not
-    reach the service writes that dict with an "unavailable" status rather than
-    omitting it.
+    normalized hook has not landed. Its own
+    ``warehouse_metadata_collection_status`` decides whether it counts as
+    observed, because an adapter that could not reach the service writes that
+    dict with an "unavailable" status rather than omitting it.
+
+    The two are merged per field rather than chosen wholesale. Picking the
+    normalized block whenever it held *any* sizing key let a partial one shadow
+    the other: a block carrying ``warehouse_type`` but no ``warehouse_size``
+    hid an observed size in the legacy mapping, and the run was then costed at
+    the 2.0 DBU/hour fallback. Each key keeps the provenance of the block it came
+    from, so a value filled in from the legacy mapping is judged on that
+    mapping's collection status, not the normalized block's.
     """
     block = normalized["compute"]
-    if any(block.get(key) is not None for key in _COMPUTE_SIZING_KEYS):
+    legacy = platform_info.get("compute_configuration")
+    if not isinstance(legacy, Mapping):
         return block
 
-    legacy = platform_info.get("compute_configuration")
-    if not isinstance(legacy, Mapping) or not any(legacy.get(key) is not None for key in _COMPUTE_SIZING_KEYS):
+    missing = [key for key in _COMPUTE_SIZING_KEYS if block.get(key) is None and legacy.get(key) is not None]
+    if not missing:
         return block
 
     status = str(legacy.get("warehouse_metadata_collection_status") or "available").lower()
-    return {**legacy, "source": "observed" if status == "available" else "inferred"}
+    legacy_source = "observed" if status == "available" else "inferred"
+    merged = dict(block)
+    merged.update({key: legacy[key] for key in missing})
+    # Per-field provenance for exactly the keys that came from the legacy mapping;
+    # `_field_source` prefers it over the block-level `source`.
+    merged["_field_sources"] = {**dict(block.get("_field_sources") or {}), **dict.fromkeys(missing, legacy_source)}
+    return merged
 
 
-def _block_is_observed(block: Mapping[str, Any]) -> bool:
-    """Return True when a normalized block was read back from the live service."""
-    return str(block.get("source") or "").lower() in _OBSERVED_METADATA_SOURCES
+def _field_source(block: Mapping[str, Any], key: str) -> str:
+    """Return the provenance that applies to one field of a compute block."""
+    field_sources = block.get("_field_sources")
+    if isinstance(field_sources, Mapping) and key in field_sources:
+        return str(field_sources[key] or "").lower()
+    return str(block.get("source") or "").lower()
 
 
 def _observed_or_requested(
@@ -467,19 +493,29 @@ def _observed_or_requested(
     key: str,
     alias: str,
     defaulted_fields: list[str],
+    *,
+    fallback: Any = None,
 ) -> Any:
-    """Read one field from a normalized block, recording unobserved provenance.
+    """Read one sizing field, recording unobserved provenance.
 
     A value present in an ``observed`` block is returned clean. The same value in
     a ``requested`` / ``inferred`` block is still returned -- a rough estimate
     beats none -- but ``alias`` is recorded as defaulted so the normalized-cost
     contract keeps ``cost_status="unavailable"`` rather than publishing a total
     computed from an adapter constructor default.
+
+    ``fallback`` is the adapter's own configured value, used when the block
+    carries nothing. It is user-supplied intent rather than a reading of the live
+    service, so it is always recorded as defaulted; taking it silently was how an
+    unobserved configured warehouse size could back a published total.
     """
     value = block.get(key)
     if value is None:
-        return None
-    if not _block_is_observed(block):
+        if fallback is None:
+            return None
+        defaulted_fields.append(alias)
+        return fallback
+    if _field_source(block, key) not in _OBSERVED_METADATA_SOURCES:
         defaulted_fields.append(alias)
     return value
 
@@ -530,7 +566,17 @@ def _resolve_cloud_and_region(
     recorded as defaulted and left out, so the published field stays null.
     """
     cloud_block = normalized["cloud"]
-    cloud = _observed_or_requested(cloud_block, "provider", "cloud", defaulted_fields)
+    # Deliberately not `_observed_or_requested`: that helper enforces the sizing
+    # rule, where a non-observed value is an adapter constructor default and must
+    # not back a published total. Location metadata does not work that way.
+    # Adapters derive the provider from the workspace hostname or the platform's
+    # own identity and stamp the block `inferred`, and they omit a region they
+    # could not read rather than inventing one. Treating `inferred` as defaulted
+    # here made supplying correct metadata worse than supplying none: a fully
+    # observed Databricks run was marked `cloud`/`region` defaulted and pinned to
+    # `cost_status="unavailable"`, while a run with no cloud block at all resolved
+    # through the single-cloud map and stayed eligible. Presence is what counts.
+    cloud = cloud_block.get("provider")
     if not cloud:
         cloud = platform_info.get("cloud_provider") or platform_info.get("cloud")
     if not cloud and platform_type in {"databricks", "databricks-df"}:
@@ -550,9 +596,13 @@ def _resolve_cloud_and_region(
     else:
         defaulted_fields.append("cloud")
 
-    region = _observed_or_requested(cloud_block, "region", "region", defaulted_fields)
-    if not region:
-        region = platform_info.get("region") or config_section.get("region") or normalized["deployment"].get("region")
+    region = (
+        cloud_block.get("region")
+        or cloud_block.get("location")
+        or platform_info.get("region")
+        or config_section.get("region")
+        or normalized["deployment"].get("region")
+    )
     if region:
         config["region"] = region
     else:

@@ -36,9 +36,22 @@ class TestAddCostEstimationToResults:
     """Tests for add_cost_estimation_to_results function."""
 
     def test_adds_cost_summary_to_results(self):
-        """Test that cost_summary is added to BenchmarkResults."""
+        """Test that cost_summary is added to BenchmarkResults.
+
+        The warehouse size arrives through the normalized compute block marked
+        observed. A size read only from adapter configuration cannot reach
+        ``cost_status="normalized"``: ``SnowflakeAdapter`` defaults it to
+        "MEDIUM" when the user set nothing, so an unobserved configured size may
+        be a fabricated value and must not back a published total. See
+        ``test_configured_only_warehouse_size_does_not_publish_a_total``.
+        """
         results = create_test_results(
             benchmark_name="TPC-H",
+            platform_compute={
+                "warehouse_size": "MEDIUM",
+                "source": "observed",
+                "collection_status": "available",
+            },
             platform_info={
                 "platform_type": "snowflake",
                 "edition": "standard",
