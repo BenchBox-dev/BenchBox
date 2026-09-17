@@ -196,7 +196,18 @@ class TestVeloxSparkConf:
         from benchbox.platforms.velox import VeloxAdapter
 
         conf = VeloxAdapter(adaptive_enabled=False)._get_spark_conf()
-        assert "spark.sql.adaptive.enabled" not in conf
+        # Spark enables AQE by default since 3.2.0, so disabling must set the
+        # keys to "false" explicitly rather than omitting them.
+        assert conf["spark.sql.adaptive.enabled"] == "false"
+        assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
+        assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
+
+    def test_aqe_disabled_spark_config_still_wins(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        adapter = VeloxAdapter(adaptive_enabled=False, spark_config={"spark.sql.adaptive.enabled": "true"})
+        conf = adapter._get_spark_conf()
+        assert conf["spark.sql.adaptive.enabled"] == "true"
 
     def test_cache_disabled_by_default(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
@@ -221,6 +232,43 @@ class TestVeloxSparkConf:
         )
         with pytest.raises(ValueError, match="ColumnarShuffleManager"):
             adapter._get_spark_conf()
+
+
+class TestVeloxConfigureForBenchmark:
+    """configure_for_benchmark() must not clobber explicit spark_config entries."""
+
+    @pytest.fixture
+    def mock_pyspark(self):
+        with patch.dict(
+            "sys.modules",
+            {
+                "pyspark": MagicMock(),
+                "pyspark.sql": MagicMock(SparkSession=MagicMock()),
+                "pyspark.sql.types": MagicMock(),
+            },
+        ):
+            yield MagicMock()
+
+    def test_olap_sets_cbo_by_default(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        mock_session = MagicMock()
+        VeloxAdapter().configure_for_benchmark(mock_session, "tpch")
+
+        mock_session.conf.set.assert_any_call("spark.sql.cbo.enabled", "true")
+        mock_session.conf.set.assert_any_call("spark.sql.cbo.joinReorder.enabled", "true")
+
+    def test_olap_respects_spark_config_cbo_override(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        mock_session = MagicMock()
+        adapter = VeloxAdapter(spark_config={"spark.sql.cbo.enabled": "false"})
+        adapter.configure_for_benchmark(mock_session, "olap")
+
+        # The explicit spark_config entry must not be clobbered at run time.
+        mock_session.conf.set.assert_any_call("spark.sql.cbo.enabled", "false")
+        # Keys without an override still default to true.
+        mock_session.conf.set.assert_any_call("spark.sql.cbo.joinReorder.enabled", "true")
 
 
 class TestVeloxLocalModeValidation:

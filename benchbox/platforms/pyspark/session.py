@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.platform_options import sanitize_platform_options
+from benchbox.platforms._spark_helpers import spark_aqe_conf_entries
 from benchbox.platforms.base.spark_logging import suppress_window_exec_warning
 from benchbox.utils.dependencies import get_package_install_message
 
@@ -421,11 +422,12 @@ class SparkSessionManager:
         if config.executor_memory:
             builder = builder.config("spark.executor.memory", config.executor_memory)
 
-        if config.enable_aqe:
-            builder = builder.config("spark.sql.adaptive.enabled", "true")
-            builder = builder.config("spark.sql.adaptive.coalescePartitions.enabled", "true")
-        else:
-            builder = builder.config("spark.sql.adaptive.enabled", "false")
+        # Set every AQE key explicitly in both directions: Spark enables AQE by
+        # default since 3.2.0, so an omitted key would silently stay on even
+        # when enable_aqe is False. Extra configs are applied next, so an
+        # explicit override there still wins.
+        for aqe_key, aqe_value in spark_aqe_conf_entries(config.enable_aqe).items():
+            builder = builder.config(aqe_key, aqe_value)
 
         # Apply extra configs, skipping extraJavaOptions since we already merged it
         for key, value in config.extra_configs:

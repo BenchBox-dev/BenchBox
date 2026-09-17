@@ -278,7 +278,39 @@ class TestLakeSailDataFrameAdapterLifecycle:
             (("spark.app.name", "BenchBox-LakeSail-Tests"), {}),
             (("spark.sql.shuffle.partitions", "4"), {}),
             (("spark.sql.adaptive.enabled", "true"), {}),
+            (("spark.sql.adaptive.coalescePartitions.enabled", "true"), {}),
+            (("spark.sql.adaptive.skewJoin.enabled", "true"), {}),
             (("spark_sql_catalog_implementation", "in-memory"), {}),
+        ]
+
+    @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")
+    def test_session_builder_disables_aqe_explicitly(self):
+        """Disabling AQE must write every key as false, not omit them."""
+        from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
+
+        mock_session = MagicMock()
+        mock_builder = MagicMock()
+        mock_builder.remote.return_value = mock_builder
+        mock_builder.config.return_value = mock_builder
+        mock_builder.getOrCreate.return_value = mock_session
+        mock_spark_class = MagicMock(builder=mock_builder)
+
+        with patch("benchbox.platforms.dataframe.lakesail_df.SparkSession", mock_spark_class):
+            adapter = LakeSailDataFrameAdapter(
+                endpoint="sc://lakehouse:50051",
+                enable_aqe=False,
+            )
+
+            assert adapter.spark is mock_session
+
+        # Spark enables AQE by default since 3.2.0, so an omitted key would
+        # silently stay on.
+        assert mock_builder.config.call_args_list == [
+            (("spark.app.name", "BenchBox-LakeSail-DF"), {}),
+            (("spark.sql.shuffle.partitions", str(adapter._shuffle_partitions)), {}),
+            (("spark.sql.adaptive.enabled", "false"), {}),
+            (("spark.sql.adaptive.coalescePartitions.enabled", "false"), {}),
+            (("spark.sql.adaptive.skewJoin.enabled", "false"), {}),
         ]
 
     @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not available")

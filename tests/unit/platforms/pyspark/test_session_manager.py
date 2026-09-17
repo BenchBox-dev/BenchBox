@@ -12,6 +12,7 @@ import pytest
 from benchbox.platforms.pyspark import session as session_module
 from benchbox.platforms.pyspark.session import (
     SparkConfigurationError,
+    SparkSessionConfig,
     SparkSessionManager,
     suppress_window_exec_warning,
 )
@@ -236,3 +237,80 @@ class TestSuppressWindowExecWarning:
 
         # Should not raise
         suppress_window_exec_warning(mock_spark)
+
+
+class _RecordingBuilder:
+    """Stand-in for the chained SparkSession.builder calls."""
+
+    def __init__(self) -> None:
+        self.entries: dict[str, str] = {}
+        self.session = MagicMock()
+
+    def master(self, _value: str) -> _RecordingBuilder:
+        return self
+
+    def appName(self, _value: str) -> _RecordingBuilder:
+        return self
+
+    def config(self, key: str, value: str) -> _RecordingBuilder:
+        self.entries[key] = value
+        return self
+
+    def getOrCreate(self) -> MagicMock:
+        return self.session
+
+
+def _create_session_with_fake_builder(monkeypatch: pytest.MonkeyPatch, config: SparkSessionConfig) -> dict[str, str]:
+    """Run _create_session against a recording builder; return its entries."""
+    builder = _RecordingBuilder()
+    fake_spark_session = SimpleNamespace(builder=builder)
+    monkeypatch.setattr(session_module, "SparkSession", fake_spark_session)
+    SparkSessionManager._create_session(config)
+    assert isinstance(builder.entries, dict)
+    return builder.entries
+
+
+def _session_config(**overrides) -> SparkSessionConfig:
+    params = {
+        "master": "local[*]",
+        "app_name": "BenchBox-Tests",
+        "driver_memory": "2g",
+        "executor_memory": None,
+        "shuffle_partitions": 8,
+        "enable_aqe": True,
+        "extra_configs": (),
+    }
+    params.update(overrides)
+    return SparkSessionConfig(**params)  # type: ignore[arg-type]
+
+
+class TestCreateSessionAqeKeys:
+    """_create_session() must set every AQE key explicitly in both directions."""
+
+    def test_aqe_enabled_sets_all_keys_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        entries = _create_session_with_fake_builder(monkeypatch, _session_config(enable_aqe=True))
+
+        assert entries["spark.sql.adaptive.enabled"] == "true"
+        assert entries["spark.sql.adaptive.coalescePartitions.enabled"] == "true"
+        assert entries["spark.sql.adaptive.skewJoin.enabled"] == "true"
+
+    def test_aqe_disabled_sets_all_keys_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Spark enables AQE by default since 3.2.0: an omitted key would
+        # silently stay on, so disabling must write "false" explicitly.
+        entries = _create_session_with_fake_builder(monkeypatch, _session_config(enable_aqe=False))
+
+        assert entries["spark.sql.adaptive.enabled"] == "false"
+        assert entries["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
+        assert entries["spark.sql.adaptive.skewJoin.enabled"] == "false"
+
+    def test_extra_configs_override_aqe(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        entries = _create_session_with_fake_builder(
+            monkeypatch,
+            _session_config(
+                enable_aqe=True,
+                extra_configs=(("spark.sql.adaptive.enabled", "false"),),
+            ),
+        )
+
+        assert entries["spark.sql.adaptive.enabled"] == "false"
+        assert entries["spark.sql.adaptive.skewJoin.enabled"] == "true"

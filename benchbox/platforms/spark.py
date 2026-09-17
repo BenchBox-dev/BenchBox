@@ -29,12 +29,14 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from ._spark_helpers import (
+    SPARK_AQE_KEYS,
     SparkLikeAdapterMixin,
     analyze_spark_table,
     get_spark_query_plan,
     list_spark_tables,
     optimize_spark_table_definition,
     run_spark_schema_creation_loop,
+    spark_aqe_conf_entries,
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
@@ -69,11 +71,9 @@ _MAX_COMPATIBLE_JAVA_VERSION = 22
 
 _logger = logging.getLogger(__name__)
 _SPARK_AUTO_BROADCAST_THRESHOLD = "spark.sql.autoBroadcastJoinThreshold"
-_SPARK_AQE_KEYS = (
-    "spark.sql.adaptive.enabled",
-    "spark.sql.adaptive.coalescePartitions.enabled",
-    "spark.sql.adaptive.skewJoin.enabled",
-)
+# Shared AQE key tuple (single source of truth in _spark_helpers); kept as a
+# module alias for existing importers.
+_SPARK_AQE_KEYS = SPARK_AQE_KEYS
 
 
 def _get_java_version(java_home: str | None = None) -> int | None:
@@ -448,9 +448,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         # Adaptive Query Execution. Set explicitly in both directions: Spark
         # enables AQE by default since 3.2.0, so omitting the keys would leave
         # it on even when adaptive_enabled is False.
-        aqe_value = "true" if self.adaptive_enabled else "false"
-        for aqe_key in _SPARK_AQE_KEYS:
-            conf[aqe_key] = aqe_value
+        conf.update(spark_aqe_conf_entries(self.adaptive_enabled))
 
         # Broadcast threshold
         if self.broadcast_threshold is not None:
@@ -652,27 +650,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply Spark-specific optimizations based on benchmark type."""
-
-        spark = connection
-
-        try:
-            if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds", "joinorder"]:
-                # OLAP-specific optimizations via Spark SQL settings. Honor the
-                # adapter's AQE setting instead of force-enabling, and let an
-                # explicit spark_config entry win so session-build overrides
-                # are not clobbered at run time.
-                aqe_value = "true" if self.adaptive_enabled else "false"
-                for aqe_key in _SPARK_AQE_KEYS:
-                    spark.conf.set(aqe_key, self.spark_config.get(aqe_key, aqe_value))
-
-                # Cost-based optimization, with the same spark_config precedence
-                for cbo_key in ("spark.sql.cbo.enabled", "spark.sql.cbo.joinReorder.enabled"):
-                    spark.conf.set(cbo_key, self.spark_config.get(cbo_key, "true"))
-
-                self.logger.debug("Applied OLAP optimizations for Spark")
-
-        except Exception as e:
-            self.logger.warning(f"Failed to apply benchmark configuration: {e}")
+        self.apply_olap_runtime_conf(connection, benchmark_type, "Spark")
 
     def _remove_orphaned_table_location(self, spark: Any, table_name: str) -> None:
         """Remove orphaned managed-table directory when catalog entry is gone.
