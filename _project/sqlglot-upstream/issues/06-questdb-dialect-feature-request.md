@@ -1,6 +1,6 @@
 ---
 sqlglot_version: 30.6.0
-status: drafted
+status: needs-engine-revalidation-and-maintainer-discussion
 type: feature-request
 target_dialect: questdb
 benchbox_workaround: benchbox/platforms/questdb_rewriter.py
@@ -73,14 +73,16 @@ substring(name, 1, 3)
 
 ### 4. CTE column-alias lists rejected
 
-QuestDB does not accept `WITH cte (col1, col2) AS (SELECT ...)`; the column list must be omitted.
+The reported QuestDB version rejects `WITH cte (col1, col2) AS (SELECT ...)`.
+Revalidate that restriction before filing. If the column list must be removed,
+its names must be transferred to the projected expressions, not discarded.
 
 ```sql
 -- input
 WITH x (a, b) AS (SELECT 1, 2) SELECT * FROM x
 
 -- needs to become
-WITH x AS (SELECT 1, 2) SELECT * FROM x
+WITH x AS (SELECT 1 AS a, 2 AS b) SELECT * FROM x
 ```
 
 ## Offer
@@ -89,6 +91,12 @@ We have a working post-AST rewriter in `benchbox/platforms/questdb_rewriter.py` 
 
 - Contribute a `QuestDB` dialect class derived from `Postgres`, lifting the four transformations into the dialect's parser/generator.
 - Contribute the BenchBox query corpus as test fixtures.
+
+Before making either offer, revalidate the claimed workload coverage and
+engine restrictions, establish a maintenance owner, and check redistribution
+rights for each fixture. Prefer independently authored minimal SQL. Compare
+a built-in dialect with SQLGlot's existing plugin mechanism; a plugin would
+need its own compatibility check against compiled SQLGlot.
 
 If the maintainers prefer to scope a first pass narrowly, items (1) and (2) cover the largest fraction of failures we see on real workloads.
 
