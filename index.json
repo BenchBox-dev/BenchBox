@@ -6657,15 +6657,10 @@
       "title": "Fix type checking errors - Quick Wins (4 rules enabled)"
     },
     "fk-aware-drop-ordering-20260717": {
-      "claim": {
-        "expires_at": "2026-09-18T15:14:13Z",
-        "generation": "f9ed26667f004452ba7732e02c46baf2",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "FK-aware table DROP ordering: schema recreation fails on DuckDB when FK constraints were applied"
     },
     "fk-drop-ordering-caller-txn-test-red": {
