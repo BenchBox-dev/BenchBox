@@ -18,6 +18,8 @@ from benchbox.core.query_plans.history import (
     create_plan_history,
 )
 from benchbox.core.results.query_plan_models import (
+    FINGERPRINT_VERSION,
+    LEGACY_FINGERPRINT_VERSION,
     LogicalOperator,
     LogicalOperatorType,
     QueryPlanDAG,
@@ -584,3 +586,132 @@ class TestAddRunEndToEndViaCLI:
             assert "run0" in result.output
             assert "run2" in result.output
             assert "Unique plans: 2" in result.output
+
+
+def _write_legacy_history_file(
+    tmpdir: str | Path,
+    exec_id: str,
+    timestamp: str,
+    query_id: str,
+    fingerprint: str,
+    platform: str = "duckdb",
+) -> None:
+    """Write a history file in the pre-fingerprint_version on-disk shape.
+
+    Mirrors what ``PlanHistory.add_run`` wrote before the version field
+    existed: the same keys minus ``fingerprint_version``.
+    """
+    payload = {
+        "run_id": exec_id,
+        "timestamp": timestamp,
+        "platform": platform,
+        "plan_fingerprints": {
+            query_id: {
+                "fingerprint": fingerprint,
+                "estimated_cost": 100.0,
+                "execution_time_ms": 50.0,
+            }
+        },
+    }
+    with open(Path(tmpdir) / f"{exec_id}.json", "w", encoding="utf-8") as f:
+        json.dump(payload, f)
+
+
+class TestFingerprintVersionLegacy:
+    """A tool upgrade that bumps the fingerprint encoding (v1 -> v2) changes
+    the fingerprint string for an unchanged plan. That boundary must read as
+    neither flapping nor a plan-version bump, and history files written
+    before the version field existed must load as v1 rather than be dropped."""
+
+    def test_from_dict_legacy_defaults_to_v1_and_round_trips(self) -> None:
+        entry = PlanHistoryEntry.from_dict(
+            {
+                "run_id": "run1",
+                "timestamp": "2024-01-01T00:00:00+00:00",
+                "fingerprint": "a" * 64,
+                "estimated_cost": 100.0,
+                "execution_time_ms": 50.0,
+                "platform": "duckdb",
+            }
+        )
+
+        assert entry.fingerprint_version == LEGACY_FINGERPRINT_VERSION
+        assert entry.to_dict()["fingerprint_version"] == LEGACY_FINGERPRINT_VERSION
+        assert PlanHistoryEntry.from_dict(entry.to_dict()).fingerprint_version == LEGACY_FINGERPRINT_VERSION
+
+    def test_legacy_history_file_loads_as_v1_without_drops(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            _write_legacy_history_file(tmpdir, "run0", "2024-01-01T00:00:00+00:00", "q1", "a" * 64)
+            _write_legacy_history_file(tmpdir, "run1", "2024-01-02T00:00:00+00:00", "q1", "b" * 64)
+
+            entries = PlanHistory(Path(tmpdir)).query_plan_history("q1")
+
+            assert [e.run_id for e in entries] == ["run0", "run1"]
+            assert all(e.fingerprint_version == LEGACY_FINGERPRINT_VERSION for e in entries)
+
+    def test_legacy_v1_then_v2_boundary_is_neither_flap_nor_bump(self) -> None:
+        """The real upgrade shape: an old on-disk file with no version field
+        followed by runs recorded under the current encoding, then a v1
+        rollback. The strings differ by encoding alone, so no flap and no
+        plan-version bump -- in either direction.
+
+        Three post-boundary runs are deliberate: with only two total runs the
+        flapping check short-circuits (len < 3) and the assertion below would
+        pass even with the version guard removed. Here pairs run0->run1 and
+        run2->run3 cross the encoding boundary; without the guard they read
+        as 2/3 transitions (flapping), with it as 0/3.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+            _write_legacy_history_file(tmpdir, "run0", "2024-01-01T00:00:00+00:00", "q1", "a" * 64)
+
+            plan = _create_plan_with_fingerprint("q1", "c" * 64)
+            assert plan.fingerprint_version == FINGERPRINT_VERSION != LEGACY_FINGERPRINT_VERSION
+            for i, exec_id in enumerate(("run1", "run2")):
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=exec_id,
+                        timestamp=datetime(2024, 1, i + 2, tzinfo=timezone.utc),
+                        platform="duckdb",
+                        query_results=[_qr("q1", 100.0, plan)],
+                    )
+                )
+            _write_legacy_history_file(tmpdir, "run3", "2024-01-04T00:00:00+00:00", "q1", "a" * 64)
+
+            entries = history.query_plan_history("q1")
+            assert [e.fingerprint_version for e in entries] == [
+                LEGACY_FINGERPRINT_VERSION,
+                plan.fingerprint_version,
+                plan.fingerprint_version,
+                LEGACY_FINGERPRINT_VERSION,
+            ]
+            assert history.detect_plan_flapping("q1") is False
+            assert history.get_plan_version_history("q1") == [
+                ("a" * 64, 1),
+                ("c" * 64, 1),
+                ("c" * 64, 1),
+                ("a" * 64, 1),
+            ]
+
+    def test_genuine_flap_within_v2_after_boundary_still_detected(self) -> None:
+        """The boundary exclusion must not blind later detection: a genuine
+        same-encoding oscillation after the upgrade still flaps and still
+        bumps the plan version."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+            _write_legacy_history_file(tmpdir, "run0", "2024-01-01T00:00:00+00:00", "q1", "a" * 64)
+
+            for i, fp in enumerate(["x" * 64, "y" * 64, "x" * 64, "y" * 64, "x" * 64]):
+                plan = _create_plan_with_fingerprint("q1", fp)
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=f"run{i + 1}",
+                        timestamp=datetime(2024, 1, i + 2, tzinfo=timezone.utc),
+                        platform="duckdb",
+                        query_results=[_qr("q1", 100.0, plan)],
+                    )
+                )
+
+            assert history.detect_plan_flapping("q1") is True
+            versions = history.get_plan_version_history("q1")
+            assert [v for _, v in versions] == [1, 1, 2, 3, 4, 5]
