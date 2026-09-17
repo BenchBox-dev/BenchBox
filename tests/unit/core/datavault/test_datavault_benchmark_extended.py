@@ -374,3 +374,84 @@ class TestDataVaultBenchmarkEdgeCases:
         bm.output_dir = None  # type: ignore[assignment]
         with pytest.raises(ValueError, match="output_dir must be set"):
             bm.generate_data()
+
+
+class TestDataVaultManifestDialectMetadata:
+    """Generated-table manifest entries carry durable CSV dialect metadata."""
+
+    def _write(self, tmp_path: Path, output_format: str) -> dict:
+        import json
+        from datetime import datetime
+
+        from benchbox.core.datavault.etl.transformer import DataVaultETLTransformer
+
+        transformer = DataVaultETLTransformer(scale_factor=0.01)
+        data_file = tmp_path / f"hub_region.{output_format}"
+        data_file.write_text("a|b\n")
+        transformer._write_manifest(
+            output_dir=tmp_path,
+            table_paths={"hub_region": data_file},
+            table_row_counts={"hub_region": 1},
+            output_format=output_format,
+            load_timestamp=datetime(2024, 1, 1),
+        )
+        return json.loads((tmp_path / "_datagen_manifest.json").read_text())
+
+    def test_tbl_manifest_records_pipe_dialect(self, tmp_path: Path) -> None:
+        manifest = self._write(tmp_path, "tbl")
+        entry = manifest["tables"]["hub_region"]["formats"]["tbl"][0]
+        assert entry["metadata"] == {
+            "csv_delimiter": "|",
+            "csv_has_header": False,
+            "csv_null_marker": "",
+            "csv_normalize_booleans": False,
+        }
+
+    def test_csv_manifest_records_comma_dialect(self, tmp_path: Path) -> None:
+        manifest = self._write(tmp_path, "csv")
+        entry = manifest["tables"]["hub_region"]["formats"]["csv"][0]
+        assert entry["metadata"]["csv_delimiter"] == ","
+        assert entry["metadata"]["csv_has_header"] is False
+
+    def test_satellite_manifest_resolves_empty_field_to_null(self, tmp_path: Path) -> None:
+        """Loader-side contract: a satellite manifest must resolve to a dialect
+        that the DuckDB handler turns into nullstr='', so the empty
+        load_end_dts field loads as NULL, not ''."""
+        from benchbox.platforms.base.data_loading import (
+            DataSource,
+            DuckDBNativeHandler,
+            resolve_csv_dialect,
+        )
+
+        manifest = self._write(tmp_path, "tbl")
+        metadata = manifest["tables"]["hub_region"]["formats"]["tbl"][0]["metadata"]
+        data_file = tmp_path / "sat_customer.tbl"
+        data_file.write_text("hk1|ACME|\n")
+        source = DataSource(
+            source_type="manifest",
+            tables={"sat_customer": data_file},
+            table_metadata={"sat_customer": metadata},
+        )
+        dialect = resolve_csv_dialect(source, "sat_customer", data_file, benchmark=None)
+        assert dialect.delimiter == "|"
+        assert dialect.has_header is False
+        assert dialect.null_marker == ""
+
+        handler = DuckDBNativeHandler(
+            delimiter=dialect.delimiter, adapter=None, benchmark=None, null_marker=dialect.null_marker
+        )
+        assert handler._pipe_nullstr_config() == "nullstr=''"
+
+        duckdb = pytest.importorskip("duckdb")
+        conn = duckdb.connect(":memory:")
+        try:
+            conn.execute("CREATE TABLE sat_customer (hk VARCHAR, name VARCHAR, load_end_dts TIMESTAMP)")
+            conn.execute(
+                "INSERT INTO sat_customer SELECT * FROM read_csv("
+                f"'{data_file}', delim='{dialect.delimiter}', header=false, "
+                f"{handler._pipe_nullstr_config()}, names=['hk', 'name', 'load_end_dts'])"
+            )
+            (is_null,) = conn.execute("SELECT load_end_dts IS NULL FROM sat_customer").fetchone()
+            assert is_null is True
+        finally:
+            conn.close()

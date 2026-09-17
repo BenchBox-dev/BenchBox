@@ -1,9 +1,8 @@
 ---
 sqlglot_version: 30.6.0
-status: drafted
+status: needs-native-engine-validation
 type: bug
 target_dialect: mysql
-also_affects: singlestore
 benchbox_workaround: benchbox/sql_compat/rules/query_source/h2odb_variants.py
 filed: false
 related: https://github.com/tobymao/sqlglot/issues/3257
@@ -14,6 +13,16 @@ related: https://github.com/tobymao/sqlglot/issues/3257
 MySQL generator decorates `PERCENTILE_CONT WITHIN GROUP (ORDER BY x)` with synthetic `CASE WHEN x IS NULL` clause that engines reject
 
 # Body
+
+## Submission hold
+
+Do not file this draft as a general MySQL defect. The engine observation below
+is about SingleStore through a MySQL target declaration. Reproduce with
+`write="singlestore"` and execute against a named SingleStore version before
+deciding whether this is an upstream generator defect or a BenchBox dialect
+selection problem. MySQL wire-protocol compatibility does not establish SQL
+function compatibility. The original expected output below is a candidate,
+not an engine-verified MySQL translation.
 
 ## Description
 

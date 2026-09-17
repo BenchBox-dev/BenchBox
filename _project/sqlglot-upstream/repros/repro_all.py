@@ -5,10 +5,11 @@ at the time the issues were drafted). Run with:
 
     uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.py
 
-Each repro prints PASS / FAIL with the offending output. Tier A items are
-defects we plan to file. Tier B items must reproduce as FAIL on this version
-before we file; if they PASS on 30.6.0 the workaround is obsolete and we
-should remove it from BenchBox instead of filing upstream.
+Each repro prints PASS / FAIL for a syntax or capability observation. Historical
+tier labels are not filing decisions. PASS does not establish execution
+equivalence or authorize workaround removal; FAIL can reflect a proxy dialect
+choice rather than an upstream defect. See sqlite_extract.py for bounded
+execution witnesses and the README for contribution readiness.
 """
 
 from __future__ import annotations
@@ -164,7 +165,8 @@ def main() -> int:
         ("#6 questdb-dialect-missing (Tier A)", repro_6_questdb_dialect_missing()),
     ]
 
-    _section("Summary (FAIL = defect reproduces; PASS = no longer reproduces)")
+    _section("Summary (FAIL = observation differs from expected; PASS = observation matches)")
+    print("FAIL can reflect a proxy dialect choice rather than an upstream defect.")
     for label, passed in results:
         marker = "PASS" if passed else "FAIL"
         print(f"  [{marker}] {label}")

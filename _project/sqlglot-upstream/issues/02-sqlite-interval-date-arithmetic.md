@@ -1,6 +1,6 @@
 ---
 sqlglot_version: 30.6.0
-status: drafted
+status: needs-semantic-validation
 type: bug
 target_dialect: sqlite
 benchbox_workaround: benchbox/utils/dialect_utils.py:_fix_sqlite_unsupported_syntax
@@ -29,10 +29,12 @@ print(out)
 
 ## Expected output
 
-Something equivalent to:
+The expected result must preserve the source expression's result type as well
+as its calendar value. PostgreSQL DATE plus INTERVAL returns a timestamp; for
+this literal day-arithmetic example, the candidate SQLite representation is:
 
 ```sql
-SELECT DATE('2025-01-01', '+5 days')
+SELECT DATETIME('2025-01-01', '+5 days')
 ```
 
 ## Actual output (sqlglot 30.6.0)
@@ -45,7 +47,11 @@ SQLite rejects this with `Parse error: near "INTERVAL"`.
 
 ## Scope
 
-This affects all `INTERVAL '<n>' (DAY|MONTH|YEAR)` expressions when targeting SQLite, including TPC-H Q1, Q4, Q6, Q12, Q14, Q15, Q20 and broadly any analytical workload with date-bounded predicates.
+This reproducer covers binary addition of a DATE literal and a day interval.
+Do not extrapolate it to all interval expressions: DATE_ADD function calls can
+take a different translation path. Month/year rollover, fractional seconds,
+timezones and typed columns need separate execution evidence. The existing
+BenchBox DATE(...) repair does not establish the expected timestamp semantics.
 
 ## Version
 

@@ -141,6 +141,29 @@ def build_signature_from_job_failure(
     )
 
 
+def build_signature_certified(
+    job: str, certifying_run_id: int, source_inputs: dict[str, str] | None = None
+) -> dict[str, object]:
+    """Build the third-state signature for a queue-certified skip.
+
+    The job did not execute because the merge queue already passed this
+    exact SHA (see scripts/queue_certification.py). It carries no failure
+    IDs, so it can never fire auto-revert, and its ``kind`` keeps it
+    distinct from a fresh green baseline: baseline selection walks back
+    past certified runs instead of diffing real failures against an empty
+    certified signature.
+    """
+    return _with_source_inputs(
+        {
+            "job": job,
+            "kind": "certified",
+            "failure_ids": [],
+            "certified_by_run": certifying_run_id,
+        },
+        source_inputs,
+    )
+
+
 def load_signature(path: Path) -> dict[str, object]:
     """Load a signature JSON file, validating its minimal shape."""
     if not path.exists():
@@ -492,7 +515,12 @@ def diff_signatures(previous: dict[str, object], current: dict[str, object]) -> 
 def _build_command(args: argparse.Namespace) -> int:
     try:
         source_inputs = _parse_source_inputs(args.source_input)
-        if args.junit:
+        certified_by = getattr(args, "certified_by", None)
+        if certified_by is not None:
+            if args.junit or args.failed_step or args.job_failed:
+                raise SignatureError("--certified-by is mutually exclusive with --junit/--failed-step/--job-failed")
+            signature = build_signature_certified(args.job, certified_by, source_inputs)
+        elif args.junit:
             signature = build_signature_from_junit(args.job, args.junit, source_inputs)
             # A gate can fail for a reason junit never records - e.g. pytest-cov's
             # --cov-fail-under gate, which fails the step (and job) while every
@@ -650,6 +678,14 @@ def main(argv: list[str] | None = None) -> int:
         action="append",
         default=[],
         help="Immutable source identity in NAME=IDENTITY form; may be repeated.",
+    )
+    build_parser.add_argument(
+        "--certified-by",
+        type=int,
+        default=None,
+        help="Merge-queue run ID that certified this SHA, for a gate skipped "
+        "as queue-certified. Produces kind 'certified' with no failure IDs; "
+        "mutually exclusive with --junit/--failed-step/--job-failed.",
     )
     build_parser.add_argument("--out", type=Path, required=True, help="Path to write the signature JSON")
     build_parser.set_defaults(func=_build_command)
