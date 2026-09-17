@@ -262,7 +262,7 @@ def _materialize(result):
 
 
 class TestHousekeepingColumnStripping:
-    """Unit tests for the join-duplicate guards (w1)."""
+    """Unit tests for the join-duplicate guards."""
 
     def test_expression_strips_all_housekeeping_columns(self):
         import polars as pl
@@ -324,7 +324,7 @@ class TestHousekeepingColumnStripping:
 
 
 class TestAllQueriesExecuteOnSchemaFaithfulData:
-    """Every query x backend executes over full-schema data without join errors (w1/w2)."""
+    """Every query x backend executes over full-schema data without join errors."""
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     @pytest.mark.parametrize("family", ["expression", "pandas"])
@@ -343,7 +343,7 @@ class TestAllQueriesExecuteOnSchemaFaithfulData:
 
 
 class TestQ17NullSemantics:
-    """Q17 preserves SQL NULL (not 0.0) when the filtered set is empty (w3)."""
+    """Q17 preserves SQL NULL (not 0.0) when the filtered set is empty."""
 
     def _tables(self, brand, container):
         import pandas as pd
@@ -602,6 +602,34 @@ class TestQ15MaxSupplier:
         assert len(rows) == 1
         assert rows[0][0] == 2
         assert rows[0][4] == pytest.approx(300.0)
+
+    @pytest.mark.parametrize("family", ["expression", "pandas"])
+    def test_exact_tie_returns_both_suppliers(self, family):
+        from benchbox.core.datavault.dataframe_queries import get_datavault_query
+
+        expr_ctx, pandas_ctx = _register_contexts(self._tables([100.0, 100.0]))
+        ctx = expr_ctx if family == "expression" else pandas_ctx
+        query = get_datavault_query("Q15")
+        impl = query.expression_impl if family == "expression" else query.pandas_impl
+        _, rows = _materialize(impl(ctx))
+        assert sorted(r[0] for r in rows) == [1, 2]
+
+    @pytest.mark.parametrize("family", ["expression", "pandas"])
+    def test_sub_cent_difference_selects_true_max(self, family):
+        """A 0.004 revenue gap is invisible at cent precision but decisive.
+
+        Cent rounding would return both suppliers; SQL exact-max semantics
+        return only the true max.
+        """
+        from benchbox.core.datavault.dataframe_queries import get_datavault_query
+
+        expr_ctx, pandas_ctx = _register_contexts(self._tables([100.0, 100.004]))
+        ctx = expr_ctx if family == "expression" else pandas_ctx
+        query = get_datavault_query("Q15")
+        impl = query.expression_impl if family == "expression" else query.pandas_impl
+        _, rows = _materialize(impl(ctx))
+        assert len(rows) == 1
+        assert rows[0][0] == 2
 
     @pytest.mark.parametrize("family", ["expression", "pandas"])
     def test_empty_revenue_yields_no_rows(self, family):

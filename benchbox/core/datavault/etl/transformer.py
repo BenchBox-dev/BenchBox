@@ -432,10 +432,13 @@ class DataVaultETLTransformer(CompressionMixin):
         # CSV dialect metadata so downstream loaders can reuse these files
         # without re-deriving the delimiter/header contract (same keys as the
         # DataGenerationManifest.add_entry() contract used by other generators).
+        # Satellite NULLs are written as empty fields, so the null marker must
+        # stay "" (empty means NULL): an explicit None would disable NULL
+        # conversion and break SQL-side loads of the generated files.
         dialect_metadata = {
             "csv_delimiter": "," if (output_format or "tbl").lower() == "csv" else "|",
             "csv_has_header": False,
-            "csv_null_marker": None,
+            "csv_null_marker": "",
             "csv_normalize_booleans": False,
         }
         for name, path in table_paths.items():

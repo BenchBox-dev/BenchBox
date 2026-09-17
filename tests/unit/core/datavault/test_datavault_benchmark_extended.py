@@ -377,7 +377,7 @@ class TestDataVaultBenchmarkEdgeCases:
 
 
 class TestDataVaultManifestDialectMetadata:
-    """Generated-table manifest entries carry durable CSV dialect metadata (w4)."""
+    """Generated-table manifest entries carry durable CSV dialect metadata."""
 
     def _write(self, tmp_path: Path, output_format: str) -> dict:
         import json
@@ -403,7 +403,7 @@ class TestDataVaultManifestDialectMetadata:
         assert entry["metadata"] == {
             "csv_delimiter": "|",
             "csv_has_header": False,
-            "csv_null_marker": None,
+            "csv_null_marker": "",
             "csv_normalize_booleans": False,
         }
 
@@ -412,3 +412,36 @@ class TestDataVaultManifestDialectMetadata:
         entry = manifest["tables"]["hub_region"]["formats"]["csv"][0]
         assert entry["metadata"]["csv_delimiter"] == ","
         assert entry["metadata"]["csv_has_header"] is False
+
+    def test_satellite_manifest_resolves_empty_field_to_null(self, tmp_path: Path) -> None:
+        """Loader-side contract: a satellite manifest must resolve to a dialect
+        that reads the empty load_end_dts field as NULL, not ''."""
+        from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
+
+        manifest = self._write(tmp_path, "tbl")
+        metadata = manifest["tables"]["hub_region"]["formats"]["tbl"][0]["metadata"]
+        data_file = tmp_path / "hub_region.tbl"
+        source = DataSource(
+            source_type="manifest",
+            tables={"hub_region": data_file},
+            table_metadata={"hub_region": metadata},
+        )
+        dialect = resolve_csv_dialect(source, "hub_region", data_file, benchmark=None)
+        assert dialect.delimiter == "|"
+        assert dialect.has_header is False
+        assert dialect.null_marker == ""
+
+        duckdb = pytest.importorskip("duckdb")
+        data_file.write_text("hk1|ACME|\n")
+        conn = duckdb.connect(":memory:")
+        try:
+            conn.execute("CREATE TABLE hub_region (hk VARCHAR, name VARCHAR, load_end_dts TIMESTAMP)")
+            conn.execute(
+                "INSERT INTO hub_region SELECT * FROM read_csv("
+                f"'{data_file}', delim='{dialect.delimiter}', header=false, "
+                f"nullstr='{dialect.null_marker}', names=['hk', 'name', 'load_end_dts'])"
+            )
+            (is_null,) = conn.execute("SELECT load_end_dts IS NULL FROM hub_region").fetchone()
+            assert is_null is True
+        finally:
+            conn.close()

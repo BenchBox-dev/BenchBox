@@ -1076,11 +1076,16 @@ class TestFrameAggFacade:
         result = frame["df"].agg(frame["expr"](pl.col("x").sum().alias("s"))).collect()
         assert result.to_dicts() == [{"s": 6.0}]
 
-    def test_arithmetic_over_aggregates(self, frame):
-        """agg supports arithmetic combining several aggregates (Q6/Q14/Q17 shape)."""
+    def test_plain_aggregates_with_select_arithmetic(self, frame):
+        """agg takes plain column aggregates; arithmetic goes in a later select."""
         pl = frame["polars"]
-        expr = frame["expr"]((pl.col("x").sum() * 100.0 / pl.col("y").sum()).alias("r"))
-        result = frame["df"].agg(expr).collect()
+        expr_cls = frame["expr"]
+        result = (
+            frame["df"]
+            .agg(expr_cls(pl.col("x").sum().alias("s")), expr_cls(pl.col("y").sum().alias("t")))
+            .select((expr_cls(pl.col("s")) * 100.0 / expr_cls(pl.col("t"))).alias("r"))
+            .collect()
+        )
         assert result.to_dicts() == [{"r": 10.0}]
 
     def test_list_form(self, frame):
@@ -1099,3 +1104,70 @@ class TestFrameAggFacade:
         empty = unified_lazy_frame_cls(pl.DataFrame({"x": []}, schema={"x": pl.Float64}).lazy(), mock_adapter)
         result = empty.agg(frame["expr"](pl.col("x").count().alias("n"))).collect()
         assert result.to_dicts() == [{"n": 0}]
+
+
+class TestFrameAggFacadeDataFusion:
+    """The supported agg idioms through the real DataFusion adapter.
+
+    Arithmetic inside an aggregate is not portable (it mis-rewrites on
+    DataFusion), so queries precompute row-level values or post-process plain
+    aggregates. These tests pin exactly those idioms on DataFusion.
+    """
+
+    @pytest.fixture
+    def dframe(self):
+        pytest.importorskip("datafusion")
+        pa = pytest.importorskip("pyarrow")
+
+        from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
+
+        adapter = DataFusionDataFrameAdapter()
+        ctx = adapter.create_context()
+        table = pa.table({"x": [10.0, 20.0, 30.0, 40.0], "d": [0.1, 0.2, 0.0, 0.5]})
+        adapter.session_ctx.register_record_batches("t", [table.to_batches()])
+        ctx.register_table("t", adapter.session_ctx.sql("SELECT * FROM t"))
+        return ctx
+
+    def test_plain_global_sums(self, dframe):
+        col = dframe.col
+        result = dframe.get_table("t").agg(col("x").sum().alias("s"), col("d").sum().alias("t")).collect()
+        as_dict = result.to_pydict()
+        assert as_dict["s"] == [100.0]
+        assert as_dict["t"] == pytest.approx([0.8])
+
+    def test_precomputed_product_sums_correctly(self, dframe):
+        """The Q19 idiom: with_columns product, then a plain sum."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .with_columns((col("x") * (lit(1) - col("d"))).alias("revenue"))
+            .agg(col("revenue").sum().alias("revenue"))
+            .collect()
+        )
+        assert result.to_pydict()["revenue"] == pytest.approx([75.0])
+
+    def test_ratio_over_plain_sums(self, dframe):
+        """The Q14 idiom: plain sums, ratio as column arithmetic in select."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .agg(col("x").sum().alias("s"), col("d").sum().alias("t"))
+            .select((col("s") * lit(100.0) / col("t")).alias("r"))
+            .collect()
+        )
+        assert result.to_pydict()["r"] == pytest.approx([10000.0 / 0.8])
+
+    def test_empty_set_selects_null_row(self, dframe):
+        """The Q17 idiom: zero-row counts select a single NULL row."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .filter(col("x") > lit(1000.0))
+            .agg(col("x").sum().alias("total"), col("x").count().alias("n"))
+            .select(
+                dframe.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly")
+            )
+            .collect()
+        )
+        as_dict = result.to_pydict()
+        assert as_dict["avg_yearly"] == [None]

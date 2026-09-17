@@ -475,7 +475,11 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
         & (col("l_discount") <= lit(discount_high))
         & (col("l_quantity") < lit(quantity))
     )
-    return df.agg((col("l_extendedprice") * col("l_discount")).sum().alias("revenue"))
+    # Precompute row-level values so the global aggregate stays a plain column
+    # sum on every backend (arithmetic inside an aggregate is not portable).
+    return df.with_columns((col("l_extendedprice") * col("l_discount")).alias("charge")).agg(
+        col("charge").sum().alias("revenue")
+    )
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -881,13 +885,17 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
         .join(hp, left_on="hk_part", right_on="hk_part")
     )
 
+    # Precompute the row-level value so both aggregates stay plain column sums
+    # on every backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("ps_supplycost") * col("ps_availqty")).alias("stock_value"))
+
     # Threshold: total value * fraction
-    total = df.agg((col("ps_supplycost") * col("ps_availqty")).sum().alias("total_value"))
+    total = df.agg(col("stock_value").sum().alias("total_value"))
     threshold = ctx.scalar(total, "total_value") * fraction
 
     # Group by part and filter (SQL projects the p_partkey business key, not hk_part)
     by_part = df.group_by("p_partkey").agg(
-        (col("ps_supplycost") * col("ps_availqty")).sum().alias("value"),
+        col("stock_value").sum().alias("value"),
     )
     result = by_part.filter(col("value") > lit(threshold))
     return result.sort([("value", "desc")])
@@ -1069,12 +1077,17 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
     )
 
-    revenue_expr = col("l_extendedprice") * (lit(1) - col("l_discount"))
-    promo_expr = ctx.when(col("p_type").str.starts_with("PROMO")).then(revenue_expr).otherwise(lit(0))
-
-    return df.agg(
-        (promo_expr.sum() * lit(100.0) / revenue_expr.sum()).alias("promo_revenue"),
+    # Precompute row-level values so the global aggregate holds plain column
+    # sums and the ratio is ordinary column arithmetic in the select: aggregate
+    # expressions combined with arithmetic are not portable across backends.
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
+    df = df.with_columns(
+        ctx.when(col("p_type").str.starts_with("PROMO")).then(col("revenue")).otherwise(lit(0)).alias("promo_revenue")
     )
+    return df.agg(
+        col("promo_revenue").sum().alias("promo_sum"),
+        col("revenue").sum().alias("revenue_sum"),
+    ).select((col("promo_sum") * lit(100.0) / col("revenue_sum")).alias("promo_revenue"))
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1118,12 +1131,15 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     hs = _strip_audit_columns(ctx.get_table("hub_supplier"))
     ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
 
-    # CTE: revenue per supplier
+    # CTE: revenue per supplier. The row-level revenue is precomputed so the
+    # grouped aggregate stays a plain column sum on every backend (arithmetic
+    # inside an aggregate is not portable).
     revenue = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("hk_supplier")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("total_revenue"))
+        .agg(col("revenue").sum().alias("total_revenue"))
     )
 
     max_rev = ctx.scalar(revenue.agg(col("total_revenue").max().alias("max_rev")), "max_rev")
@@ -1140,9 +1156,10 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
         )
     return (
         suppliers
-        # Float sums re-evaluate with last-bit wobble per collect; compare at
-        # cent precision (revenues are exact cents) so the max filter is stable.
-        .filter(col("total_revenue").round(2) == lit(round(max_rev, 2)))
+        # Engine float sums can wobble a last bit across collects, so compare
+        # below the data's granularity (revenues carry 4 decimal places): this
+        # keeps SQL's exact-max semantics without engine rounding rules.
+        .filter((col("total_revenue") - lit(max_rev)).abs() < lit(5e-5))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
@@ -1254,20 +1271,24 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
     )
 
-    # Average quantity per part
-    avg_qty = df.group_by("hk_part").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
+    # Average quantity per part. The mean stays a plain grouped aggregate and the
+    # scaling is ordinary column arithmetic afterwards: arithmetic inside an
+    # aggregate is not portable across backends.
+    avg_qty = (
+        df.group_by("hk_part")
+        .agg(col("l_quantity").mean().alias("mean_qty"))
+        .with_columns((col("mean_qty") * lit(0.2)).alias("avg_qty"))
+        .drop("mean_qty")
+    )
 
-    # SQL SUM() over an empty set is NULL (not 0.0): extract the scalar in
-    # Python (as Q11/Q15/Q22 do) so the empty-filter case yields a single NULL
-    # row like the reference query on every backend.
+    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
+    # selecting NULL when the row count is zero so every backend yields one
+    # NULL row like the reference query.
     filtered = df.join(avg_qty, left_on="hk_part", right_on="hk_part").filter(col("l_quantity") < col("avg_qty"))
-    totals = filtered.agg(
+    return filtered.agg(
         col("l_extendedprice").sum().alias("total"),
         col("l_extendedprice").count().alias("n"),
-    )
-    n = ctx.scalar(totals, "n")
-    total = ctx.scalar(totals, "total") if n else None
-    return ctx.scalar_to_df({"avg_yearly": (total / 7.0) if n else None})
+    ).select(ctx.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly"))
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1295,7 +1316,9 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     import pandas as pd
 
     # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
-    if df.empty:
+    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
+    # .empty is not implemented by Dask.
+    if len(df) == 0:
         return pd.DataFrame({"avg_yearly": [None]})
     return pd.DataFrame({"avg_yearly": [df["l_extendedprice"].sum() / 7.0]})
 
@@ -1419,8 +1442,13 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         & deliver
     )
 
-    return df.filter(cond1 | cond2 | cond3).agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+    # Precompute the row-level revenue so the global aggregate stays a plain
+    # column sum on every backend (arithmetic inside an aggregate is not
+    # portable).
+    return (
+        df.filter(cond1 | cond2 | cond3)
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
+        .agg(col("revenue").sum().alias("revenue"))
     )
 
 
@@ -1502,12 +1530,15 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
     # Parts matching color
     color_parts = sp.filter(col("p_name").str.starts_with(color))
 
-    # Lineitem quantity by part+supplier in date range
+    # Lineitem quantity by part+supplier in date range. The aggregate stays a
+    # plain column sum and the halving folds into the downstream comparison
+    # (avail > half ⟺ avail * 2 > total): arithmetic inside an aggregate is not
+    # portable across backends.
     li_qty = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
         .group_by("hk_part", "hk_supplier")
-        .agg((col("l_quantity").sum() * lit(0.5)).alias("half_qty"))
+        .agg(col("l_quantity").sum().alias("total_qty"))
     )
 
     # Partsupp with excess stock
@@ -1515,7 +1546,7 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
         lps.join(sps, left_on="hk_part_supplier", right_on="hk_part_supplier")
         .join(color_parts, left_on="hk_part", right_on="hk_part")
         .join(li_qty, left_on=["hk_part", "hk_supplier"], right_on=["hk_part", "hk_supplier"])
-        .filter(col("ps_availqty") > col("half_qty"))
+        .filter(col("ps_availqty") * lit(2) > col("total_qty"))
         .select("hk_supplier")
         .unique()
     )
