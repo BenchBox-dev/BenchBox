@@ -1725,6 +1725,15 @@
       "status": "open",
       "title": "Run the heavy CI tier on merge_group only, with soundness and packaging carve-outs"
     },
+    "ci-dedupe-07-heavy-tier-rollback-watch": {
+      "claim": null,
+      "needs": [
+        "ci-dedupe-06-heavy-tier-queue-only"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Watch the queue-only heavy tier for 14 days and roll back on the recorded trigger"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],
