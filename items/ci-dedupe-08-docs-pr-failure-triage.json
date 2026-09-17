@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "A failure table by job and cause with run IDs covers the window.",
+    "The top cause is fixed or moved to a recorded, scheduled lane.",
+    "Seven days after the fix, the docs PR failure rate is reported against the 22% baseline."
+  ],
+  "context": "Guardrails:\n1. Classify from the Actions jobs API and failed-step logs by pinned run IDs; report counts per job (build, linkcheck, spellcheck, docstring-coverage, example-validation, public-site visual regression) and per cause.\n2. Separate external causes (link rot, network) from repository defects. An external-only class may move to a scheduled lane instead of every PR; record that as a decision, not a silent filter edit.\n3. Any path-filter narrowing must name the input the removed path no longer feeds. Autodoc reads `benchbox/**`, so that path stays unless proven unused.\n4. Do not make docs.yml a required check in this item.",
+  "description": "Between 2026-08-23 and 2026-09-16, `docs.yml` failed on 144 of 662 pull_request runs (22%) and 20 of 264 develop pushes. It is not a required check, so these red results create noise and reruns without blocking merges. Per-job causes and runner-minutes were not collected.\n\nChange: classify the failures by job and cause, then fix the dominant causes or narrow the path filter where a failure class is unrelated to the changed files.",
+  "links": [
+    ".github/workflows/docs.yml",
+    "ci-dedupe-03-docs-cancel-superseded-pr-runs"
+  ]
+}
