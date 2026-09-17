@@ -14819,10 +14819,15 @@
       "title": "Add SingleStore Platform Adapter"
     },
     "singlestore-non-tpc-csv-null-marker": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T13:16:50Z",
+        "generation": "eb23a1cce99f4c7dba04142aa3125570",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "SingleStore: set csv_null_marker for nyctaxi/clickbench/amplab before smoke tests"
     },
     "singlestore-setup-persists-password-on-failed-validation": {
