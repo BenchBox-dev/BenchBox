@@ -4,6 +4,9 @@ Run in an isolated environment with a selected SQLGlot version. Exit 1 means
 at least one translation disagrees with its explicit expected result; exit 2
 means the reproducer or a reference query failed. These cases are witnesses,
 not a general equivalence proof. PostgreSQL is not executed by this script.
+The verdict also gates on translated equivalents of the naive-lowering
+counterexamples, so an incomplete upstream fix cannot pass on the
+projection cases while leaving TIMESTAMP casts or integer division wrong.
 """
 
 from __future__ import annotations
@@ -58,6 +61,32 @@ def cases() -> list[tuple[str, str, str, list[tuple[object, ...]]]]:
     return result
 
 
+def translated_trap_cases() -> list[tuple[str, str, str, list[tuple[object, ...]]]]:
+    """Source-level equivalents of the naive-lowering traps, translated at runtime.
+
+    Each entry is (id, source dialect, source SQL, expected rows). Unlike the
+    hand-written SQLite traps in main() (which pin the already-lowered shape
+    and only guard the witness, never the verdict), these go through sqlglot's
+    read->sqlite lowering inside main(), so a naive STRFTIME lowering that is
+    still wrong on TIMESTAMP casts or integer division fails the harness
+    instead of passing silently.
+    """
+    return [
+        (
+            "timestamp-cast-affinity",
+            "postgres",
+            "SELECT EXTRACT(YEAR FROM CAST('2020-06-01 12:00:00' AS TIMESTAMP))",
+            [(2020,)],
+        ),
+        (
+            "integer-division",
+            "postgres",
+            "SELECT EXTRACT(YEAR FROM DATE '2020-06-01') / 3 > 673",
+            [(1,)],
+        ),
+    ]
+
+
 def main() -> int:
     records = []
     with sqlite3.connect(":memory:") as connection:
@@ -102,6 +131,18 @@ def main() -> int:
         if reference != [(2000,), (1900,), (2024,), (2024,), (None,)]:
             raise AssertionError("SQLite DATE-text reference failed")
 
+        translated_traps = []
+        for case_id, source, query, expected in translated_trap_cases():
+            entry: dict[str, object] = {"id": case_id, "source": source, "sql": query, "expected": expected}
+            try:
+                translated = sqlglot.transpile(query, read=source, write="sqlite")[0]
+                entry["translated"] = translated
+                actual = connection.execute(translated).fetchall()
+                entry.update(actual=actual, matched=actual == expected)
+            except (sqlglot.errors.SqlglotError, sqlite3.Error) as exc:
+                entry.update(matched=False, error=f"{type(exc).__name__}: {exc}")
+            translated_traps.append(entry)
+
     report = {
         "sqlglot_version": getattr(sqlglot, "__version__", "unknown"),
         "sqlglot_path": sqlglot.__file__,
@@ -109,11 +150,13 @@ def main() -> int:
         "fixture_contract": "Source DATE columns represented as ISO date TEXT in SQLite; no PostgreSQL execution",
         "cases": records,
         "naive_lowering_counterexamples": counterexamples,
+        "translated_counterexamples": translated_traps,
         "passed": sum(bool(record["matched"]) for record in records),
         "total": len(records),
     }
     print(json.dumps(report, indent=2))
-    return 0 if all(record["matched"] for record in records) else 1
+    complete = all(record["matched"] for record in records) and all(trap["matched"] for trap in translated_traps)
+    return 0 if complete else 1
 
 
 if __name__ == "__main__":

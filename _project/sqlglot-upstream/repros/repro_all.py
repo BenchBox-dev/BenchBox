@@ -165,7 +165,8 @@ def main() -> int:
         ("#6 questdb-dialect-missing (Tier A)", repro_6_questdb_dialect_missing()),
     ]
 
-    _section("Summary (FAIL = defect reproduces; PASS = no longer reproduces)")
+    _section("Summary (FAIL = observation differs from expected; PASS = observation matches)")
+    print("FAIL can reflect a proxy dialect choice rather than an upstream defect.")
     for label, passed in results:
         marker = "PASS" if passed else "FAIL"
         print(f"  [{marker}] {label}")
