@@ -15092,15 +15092,10 @@
       "title": "Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps"
     },
     "spark-sql-tpchavoc-scalar-subquery-and-dual-rewrites": {
-      "claim": {
-        "expires_at": "2026-09-18T17:30:49Z",
-        "generation": "b9913dcfd35143a2ab7af0f5dc884752",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Spark SQL TPCHavoc scalar subquery and dual rewrites"
     },
     "spellcheck-node-modules-skip-never-landed": {
