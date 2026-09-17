@@ -253,22 +253,25 @@ def test_close_orphaned_prs_waits_for_post_merge_validation_success() -> None:
     assert "always()" not in str(job_if or "")
 
 
-def test_post_merge_explorer_tokens_job_runs_unconditionally() -> None:
-    # The post-merge `explorer-tokens` job must have no `if:` so it always
-    # runs against the merged develop tree. If a future cleanup added an
-    # `if:` (e.g. mirroring the PR-time path-gated form), the post-merge
-    # re-scan would silently stop firing while the auto-revert wiring would
-    # still reference `needs.explorer-tokens.result == 'failure'` — a state
-    # that could no longer occur. The whole blind-spot remediation
-    # (squash-race regressions tripping auto-revert) depends on this job
-    # running on every push to develop.
+def test_post_merge_explorer_tokens_job_runs_on_every_push() -> None:
+    # The post-merge `explorer-tokens` job must run against the merged
+    # develop tree on every push. If a future cleanup gated the push path
+    # (e.g. mirroring the PR-time path-gated form), the post-merge re-scan
+    # would silently stop firing while the auto-revert wiring would still
+    # reference `needs.explorer-tokens.result == 'failure'` — a state that
+    # could no longer occur. The whole blind-spot remediation (squash-race
+    # regressions tripping auto-revert) depends on this job running on
+    # every push to develop. Since ci-dedupe-02 it skips only on a
+    # covered-tip schedule run, which already gated this exact SHA.
     workflow_yaml = yaml.safe_load(
         (REPO_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8")
     )
     job = workflow_yaml["jobs"]["explorer-tokens"]
-    assert job.get("if") is None, (
-        f"post-merge explorer-tokens job must have no `if:` (always runs); found: {job.get('if')!r}"
+    condition = str(job.get("if") or "")
+    assert "github.event_name != 'schedule'" in condition, (
+        f"post-merge explorer-tokens job must run on every push; found: {job.get('if')!r}"
     )
+    assert "needs.sweep-coverage.outputs.covered != 'true'" in condition
 
 
 def test_baseline_selection_filters_by_event() -> None:
