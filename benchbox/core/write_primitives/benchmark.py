@@ -669,22 +669,30 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             #               re-run produces zero new versions);
             #   new       - brand-new business keys (custkey offset beyond the
             #               current max) that have no current version yet.
+            # Each group carries its own effective date so per-operation
+            # cleanups and validations can scope on the timestamp without
+            # touching the other groups' rows. The insert-only new-keys op
+            # additionally offsets its written valid_from by one day (see
+            # its catalog entry), keeping its rows distinct from the basic
+            # op's new-key versions stamped here.
             fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
             fp_same = self._scd2_row_hash_expr("c_acctbal")
-            effective = self._date_literal("2026-01-01")
+            effective_changed = self._date_literal("2026-01-01")
+            effective_unchanged = self._date_literal("2026-01-02")
+            effective_new = self._date_literal("2026-01-03")
             return (
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey, c_name, c_address, c_acctbal + 100, c_mktsegment, "
-                f"{fp_changed} AS row_hash, {effective} AS effective_ts, 'changed' AS change_type "
+                f"{fp_changed} AS row_hash, {effective_changed} AS effective_ts, 'changed' AS change_type "
                 f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20;\n"
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey, c_name, c_address, c_acctbal, c_mktsegment, "
-                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'unchanged' AS change_type "
+                f"{fp_same} AS row_hash, {effective_unchanged} AS effective_ts, 'unchanged' AS change_type "
                 f"FROM {quoted_source} WHERE c_custkey BETWEEN 21 AND 40;\n"
                 f"INSERT INTO {quoted_table} "
                 f"SELECT c_custkey + (SELECT MAX(c_custkey) FROM {quoted_source}), "
                 f"c_name, c_address, c_acctbal, c_mktsegment, "
-                f"{fp_same} AS row_hash, {effective} AS effective_ts, 'new' AS change_type "
+                f"{fp_same} AS row_hash, {effective_new} AS effective_ts, 'new' AS change_type "
                 f"FROM {quoted_source} WHERE c_custkey BETWEEN 1 AND 20"
             )
         elif table_name == "ddl_truncate_target":
