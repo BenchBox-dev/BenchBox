@@ -1700,15 +1700,10 @@
       "title": "Cancel superseded Documentation workflow runs on pull requests"
     },
     "ci-dedupe-04-heavy-tier-queue-only-decision-gate": {
-      "claim": {
-        "expires_at": "2026-09-18T01:46:13Z",
-        "generation": "b7286aa5d9d942eeb12cac0e92a01d77",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Decision gate: approve or reject running the heavy CI tier only in the merge queue"
     },
     "ci-dedupe-05-pr-preflight-medium-tier": {
