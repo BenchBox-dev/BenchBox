@@ -993,6 +993,26 @@ class TestDryRunDisplayConfigurationSummary:
 class TestDryRunDisplayBehavioral:
     """Behavioral coverage for branch-heavy dry-run rendering helpers."""
 
+    def test_ddl_preview_summary_shows_distribute_by(self):
+        """The Tuning summary line surfaces distribute_by (not dead keys)."""
+        from io import StringIO
+
+        from rich.console import Console
+
+        from benchbox.cli.dryrun import DryRunDisplay
+
+        buf = StringIO()
+        display = DryRunDisplay(console=Console(file=buf, force_terminal=False, width=140))
+        display._display_ddl_preview(
+            {
+                "lineitem": {
+                    "tuning_summary": {"distribute_by": "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"},
+                    "ddl_clauses": "CREATE TABLE lineitem (x INT)",
+                }
+            }
+        )
+        assert "Dist: DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in buf.getvalue()
+
     def _make_result(self, **overrides):
         from benchbox.core.schemas import DryRunResult
 
