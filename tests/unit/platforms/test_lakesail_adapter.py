@@ -455,6 +455,17 @@ class TestLakeSailAdapterExecution:
         plan = adapter.get_query_plan(mock_spark_session, "SELECT * FROM test")
         assert isinstance(plan, str)
 
+    def test_get_query_plan_failure_returns_none(self, mock_pyspark):
+        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        _, mock_spark_session = mock_pyspark
+        mock_spark_session.sql.side_effect = RuntimeError("explain failed")
+
+        adapter = LakeSailAdapter()
+
+        assert adapter.get_query_plan(mock_spark_session, "SELECT * FROM test") is None
+
     def test_analyze_table(self, mock_pyspark):
         """Test table analysis for query optimization."""
         from benchbox.platforms.lakesail import LakeSailAdapter

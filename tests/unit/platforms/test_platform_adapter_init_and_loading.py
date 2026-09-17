@@ -1121,7 +1121,7 @@ class TestAthenaAdditionalCoverage:
         conn.cursor.return_value = cur
         assert "line1" in adapter.get_query_plan(conn, "SELECT 1")
         cur.execute.side_effect = RuntimeError("bad explain")
-        assert "Could not get query plan" in adapter.get_query_plan(conn, "SELECT 1")
+        assert adapter.get_query_plan(conn, "SELECT 1") is None
 
     def test_connection_tuning_and_table_helpers(self):
         from benchbox.core.tuning.interface import TuningType
