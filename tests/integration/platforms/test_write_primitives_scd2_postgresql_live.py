@@ -145,6 +145,18 @@ class TestWritePrimitivesSCD2PostgreSQL:
             conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
         )
         assert stage == {"changed": 20, "unchanged": 20, "new": 20}
+        # Each change group carries its own effective date so per-op
+        # cleanups scope on the timestamp without touching other groups.
+        stamps = dict(
+            conn.execute(
+                "SELECT change_type, MAX(effective_ts) FROM scd2_ops_stage_customer GROUP BY change_type"
+            ).fetchall()
+        )
+        assert [str(stamps[k]) for k in ("changed", "unchanged", "new")] == [
+            "2026-01-01",
+            "2026-01-02",
+            "2026-01-03",
+        ]
         # The || / CAST(... AS VARCHAR) fingerprint agrees between dim and the
         # unchanged stage rows on PostgreSQL (setup portability).
         agree = conn.execute(

@@ -1302,7 +1302,7 @@ class AthenaAdapter(PlatformAdapter):
         """Normalize table names to lowercase in CREATE TABLE statements."""
         return normalize_table_name_in_sql(sql)
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
         Athena runs the Presto engine, so its EXPLAIN JSON is parsed by
@@ -1316,8 +1316,8 @@ class AthenaAdapter(PlatformAdapter):
             plan_rows = cursor.fetchall()
             return "\n".join(str(row[0]) for row in plan_rows)
         except Exception as e:
-            self.logger.debug(f"Could not get query plan: {e}")
-            return f"Could not get query plan: {e}"
+            self.logger.warning("Could not get query plan via EXPLAIN: %s", e)
+            return None
         finally:
             cursor.close()
 

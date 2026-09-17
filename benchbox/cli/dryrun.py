@@ -765,6 +765,8 @@ class DryRunDisplay:
                     summary_parts.append(f"Dist: {tuning_summary['distribution_style']}")
                 if tuning_summary.get("distribution_key"):
                     summary_parts.append(f"DistKey: {tuning_summary['distribution_key']}")
+                if tuning_summary.get("distribute_by"):
+                    summary_parts.append(f"Dist: {tuning_summary['distribute_by']}")
 
                 self.console.print(f"  [dim]Tuning: {' | '.join(summary_parts)}[/dim]")
 

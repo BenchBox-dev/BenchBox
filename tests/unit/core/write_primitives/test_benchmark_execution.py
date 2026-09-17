@@ -1778,6 +1778,8 @@ def test_get_population_sql_scd2_uses_sqlite_date_functions(fast_bench):
     assert "DATE('1990-01-01')" in dimension_sql
     assert "DATE('9999-12-31')" in dimension_sql
     assert "DATE('2026-01-01')" in stage_sql
+    assert "DATE('2026-01-02')" in stage_sql
+    assert "DATE('2026-01-03')" in stage_sql
 
 
 def test_populate_scd2_staging_table_succeeds_on_sqlite(fast_bench):
@@ -1811,7 +1813,7 @@ def test_populate_scd2_staging_table_succeeds_on_sqlite(fast_bench):
         )
         assert connection.execute(
             "SELECT effective_ts, change_type FROM scd2_ops_stage_customer ORDER BY c_custkey"
-        ).fetchall() == [("2026-01-01", "changed"), ("2026-01-01", "new")]
+        ).fetchall() == [("2026-01-01", "changed"), ("2026-01-03", "new")]
     finally:
         connection.close()
 

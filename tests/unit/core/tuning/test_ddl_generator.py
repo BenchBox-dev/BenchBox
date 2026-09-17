@@ -128,6 +128,57 @@ class TestTuningClauses:
         assert inline[1] == "PARTITION BY order_date"
         assert inline[2] == "SORTKEY(order_date, customer_id)"
 
+    def test_inline_clauses_distribute_after_partition_for_starrocks(self) -> None:
+        """StarRocks/Doris dialects require DISTRIBUTED BY after PARTITION BY."""
+        for platform in ("starrocks", "doris"):
+            clauses = TuningClauses(
+                platform=platform,
+                partition_by="l_shipdate",
+                distribute_by="DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8",
+                order_by="l_linenumber",
+            )
+            inline = clauses.get_inline_clauses()
+            assert inline.index("l_shipdate") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8")
+
+    def test_platform_marker_ignored_by_is_empty(self) -> None:
+        """The platform marker is ordering metadata, not a clause."""
+        assert TuningClauses(platform="starrocks").is_empty()
+
+    def test_empty_but_marked_serializes_as_empty(self) -> None:
+        """Ordering metadata is dropped when there are no clauses to order."""
+        assert TuningClauses(platform="starrocks").to_dict() == {}
+
+    def test_inline_clauses_doris_duplicate_key_first(self) -> None:
+        """Doris orders DUPLICATE KEY before PARTITION BY and DISTRIBUTED BY."""
+        clauses = TuningClauses(
+            platform="doris",
+            sort_by="l_orderkey, l_linenumber",
+            partition_by="l_shipdate",
+            distribute_by="DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10",
+        )
+        inline = clauses.get_inline_clauses()
+        assert inline.index("l_orderkey, l_linenumber") < inline.index("l_shipdate")
+        assert inline.index("l_shipdate") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10")
+
+    def test_platform_marker_serialized_only_when_set(self) -> None:
+        """Round-trip the marker without changing legacy JSON shapes."""
+        assert "platform" not in TuningClauses(distribute_by="DISTSTYLE KEY").to_dict()
+        clauses = TuningClauses(distribute_by="DISTRIBUTED BY HASH(`c`) BUCKETS 8", platform="starrocks")
+        assert clauses.to_dict()["platform"] == "starrocks"
+        assert TuningClauses.from_dict(clauses.to_dict()).platform == "starrocks"
+
+    def test_merge_propagates_platform_marker(self) -> None:
+        """Merging keeps the platform-aware order of either side."""
+        base = TuningClauses(partition_by="l_shipdate")
+        overlay = TuningClauses(
+            distribute_by="DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8",
+            platform="starrocks",
+        )
+        merged = base.merge(overlay)
+        assert merged.platform == "starrocks"
+        inline = merged.get_inline_clauses()
+        assert inline.index("l_shipdate") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8")
+
     def test_table_properties_clause(self) -> None:
         """Test TBLPROPERTIES clause generation."""
         clauses = TuningClauses(

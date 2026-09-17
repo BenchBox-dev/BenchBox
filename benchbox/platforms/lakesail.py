@@ -40,6 +40,7 @@ from ._spark_helpers import (
     parse_spark_connect_endpoint,
     purge_orphaned_warehouse_directory,
     run_spark_schema_creation_loop,
+    spark_aqe_conf_entries,
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
@@ -289,11 +290,10 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
             "spark.sql.shuffle.partitions": str(self.shuffle_partitions),
         }
 
-        # Adaptive Query Execution
-        if self.adaptive_enabled:
-            conf["spark.sql.adaptive.enabled"] = "true"
-            conf["spark.sql.adaptive.coalescePartitions.enabled"] = "true"
-            conf["spark.sql.adaptive.skewJoin.enabled"] = "true"
+        # Adaptive Query Execution. Set explicitly in both directions: Spark
+        # enables AQE by default since 3.2.0, so omitting the keys would leave
+        # it on even when adaptive_enabled is False.
+        conf.update(spark_aqe_conf_entries(self.adaptive_enabled))
 
         # Disable result cache for benchmarking
         if self.disable_cache:
@@ -525,20 +525,7 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply Sail-specific optimizations based on benchmark type."""
-        spark = connection
-
-        try:
-            if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
-                spark.conf.set("spark.sql.adaptive.enabled", "true")
-                spark.conf.set("spark.sql.adaptive.coalescePartitions.enabled", "true")
-                spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")
-                spark.conf.set("spark.sql.cbo.enabled", "true")
-                spark.conf.set("spark.sql.cbo.joinReorder.enabled", "true")
-
-                self.logger.debug("Applied OLAP optimizations for LakeSail Sail")
-
-        except Exception as e:
-            self.logger.warning(f"Failed to apply benchmark configuration: {e}")
+        self.apply_olap_runtime_conf(connection, benchmark_type, "LakeSail Sail")
 
     def _get_dialect_queries(self, benchmark: Any, benchmark_slug: str, connection: Any | None = None) -> dict:
         """Use LakeSail-specific query rules where Spark syntax compatibility diverges."""
@@ -552,9 +539,9 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
                 return benchmark.get_queries(dialect="lakesail")
         return super()._get_dialect_queries(benchmark, benchmark_slug, connection)
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan from Sail server."""
-        return get_spark_query_plan(connection, query)
+        return get_spark_query_plan(connection, query, logger=self.logger)
 
     def close_connection(self, connection: Any) -> None:
         """Close Spark Connect session and stop any auto-started local server."""

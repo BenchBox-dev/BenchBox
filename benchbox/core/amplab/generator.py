@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Union
 
-from benchbox.core.manifest_utils import write_generator_manifest
+from benchbox.core.manifest_utils import write_delimited_manifest
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 
@@ -389,4 +389,4 @@ class AMPLabDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated AMPLab datasets."""
-        write_generator_manifest(self, "amplab", table_paths, self._table_row_counts)
+        write_delimited_manifest(self, "amplab", table_paths, self._table_row_counts, null_marker="")

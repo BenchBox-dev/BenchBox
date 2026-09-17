@@ -1063,6 +1063,18 @@ class TestWritePrimitivesSCD2DuckDB:
             conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
         )
         assert stage == {"changed": 20, "unchanged": 20, "new": 20}
+        # Each change group carries its own effective date so per-op
+        # cleanups scope on the timestamp without touching other groups.
+        stamps = dict(
+            conn.execute(
+                "SELECT change_type, MAX(effective_ts) FROM scd2_ops_stage_customer GROUP BY change_type"
+            ).fetchall()
+        )
+        assert [str(stamps[k]) for k in ("changed", "unchanged", "new")] == [
+            "2026-01-01",
+            "2026-01-02",
+            "2026-01-03",
+        ]
 
     def test_scd2_basic_executes_validates_and_cleans_up(self, scd2_env):
         """Close-old + insert-new runs, validates, and restores pre-op state."""
@@ -1153,13 +1165,13 @@ class TestWritePrimitivesSCD2DuckDB:
         """#1155 review: new_keys_only's no_rows_closed check must not fire on
         rows a *different*, valid op closed.
 
-        All three staging groups share one effective_ts (DATE '2026-01-01'),
-        so after a valid basic write closes 20 'changed' keys at that
-        timestamp, an unscoped `valid_to IN (SELECT effective_ts FROM stage
-        WHERE change_type='new')` check selects those pre-existing closed rows
-        too (the shared timestamp, not the change_type, was the only filter)
-        and misreports new_keys_only as having wrongly closed rows. Scoping
-        the check to staged new business keys fixes it. Runs only basic's
+        Each staging group carries its own effective_ts (changed 2026-01-01,
+        unchanged 2026-01-02, new 2026-01-03), and new_keys_only stamps its
+        own inserts one day past the staged 'new' date, so after a valid
+        basic write closes 20 'changed' keys at the changed stamp, the
+        new_keys_only check -- scoped to its own offset stamp, with no
+        business-key filter so a wrongly closed seed key would also fail --
+        still passes. Runs only basic's
         close-old UPDATE directly (bypassing execute_operation's automatic
         cleanup, and skipping basic's own insert-new half) so the closed
         'changed' rows are still present when new_keys_only validates --
@@ -1183,6 +1195,59 @@ class TestWritePrimitivesSCD2DuckDB:
 
         assert result.validation_passed is True, result.error
         assert result.status == "SUCCESS"
+
+    def test_basic_cleanup_after_new_keys_only_write_deletes_nothing_foreign(self, scd2_env):
+        """Basic's cleanup must not remove rows another op wrote.
+
+        new_keys_only stamps its inserts one day past the staged 'new' date
+        (2026-01-04), while basic's cleanup only deletes valid_from rows at
+        the staged changed/new dates and only reopens rows closed at the
+        changed date. Running basic's cleanup right after new_keys_only's
+        raw write must therefore leave the dimension untouched; previously,
+        with one shared effective_ts, the unscoped cleanup deleted the other
+        op's new versions.
+        """
+        write_bench, conn = scd2_env
+        new_keys_op = write_bench.get_operation("merge_scd_type2_new_keys_only")
+        conn.execute(new_keys_op.write_sql)
+        assert self._current_state(conn) == (70, 70, 0)
+        own_rows = conn.execute(
+            "SELECT COUNT(*) FROM scd2_ops_dim_customer WHERE valid_from = DATE '2026-01-04'"
+        ).fetchone()[0]
+        assert own_rows == 20
+
+        basic_op = write_bench.get_operation("merge_scd_type2_basic")
+        conn.execute(basic_op.cleanup_sql)
+        assert self._current_state(conn) == (70, 70, 0)
+
+        conn.execute(new_keys_op.cleanup_sql)
+        assert self._current_state(conn) == (50, 50, 0)
+
+    def test_new_keys_only_cleanup_after_basic_write_deletes_nothing_foreign(self, scd2_env):
+        """new_keys_only's cleanup must not remove rows another op wrote.
+
+        Reciprocal of the test above: basic inserts its own 'new' versions at
+        the staged 'new' date (2026-01-03), while new_keys_only's cleanup only
+        deletes valid_from rows at its own offset stamp (2026-01-04) for
+        staged new business keys. Running new_keys_only's cleanup right after
+        basic's raw write must therefore leave basic's inserted versions (and
+        its closed rows) untouched.
+        """
+        write_bench, conn = scd2_env
+        basic_op = write_bench.get_operation("merge_scd_type2_basic")
+        conn.execute(basic_op.write_sql)
+        assert self._current_state(conn) == (90, 70, 20)
+        own_rows = conn.execute(
+            "SELECT COUNT(*) FROM scd2_ops_dim_customer WHERE valid_from = DATE '2026-01-03'"
+        ).fetchone()[0]
+        assert own_rows == 20
+
+        new_keys_op = write_bench.get_operation("merge_scd_type2_new_keys_only")
+        conn.execute(new_keys_op.cleanup_sql)
+        assert self._current_state(conn) == (90, 70, 20)
+
+        conn.execute(basic_op.cleanup_sql)
+        assert self._current_state(conn) == (50, 50, 0)
 
     def test_failing_validation_reports_validation_failed_not_success(self, scd2_env):
         """A post-condition validation failure must not report SUCCESS/green.

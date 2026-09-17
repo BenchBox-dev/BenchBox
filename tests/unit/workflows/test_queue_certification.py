@@ -403,20 +403,25 @@ def test_medium_test_keeps_schedule_exclusion_and_skips_on_certified_push() -> N
 
 def test_lint_and_fast_lane_cache_run_on_every_push() -> None:
     job = _post_merge()["jobs"]["lint"]
-    assert "needs" not in job
-    assert job.get("if") is None
+    # Since ci-dedupe-02, lint skips only on a covered-tip schedule run;
+    # push and dispatch always run it, so the per-push fast-lane baseline
+    # cache keeps its writer on every push.
+    condition = str(job.get("if") or "")
+    assert "github.event_name != 'schedule'" in condition
+    assert "needs.sweep-coverage.outputs.covered != 'true'" in condition
     steps = job["steps"]
     assert any("fast-lane-count" in str(step.get("run", "")) for step in steps)
     cache = next(step for step in steps if str(step.get("name", "")).startswith("Cache fast-lane count"))
     assert "fast-lane-count-develop-" in str(cache["with"]["key"])
 
 
-def test_schedule_and_dispatch_never_skip() -> None:
+def test_dispatch_never_skips_and_schedule_skips_only_when_covered() -> None:
     # The certify job always runs, but the script reports certified=false
-    # for schedule/dispatch (no API calls), so the gate conditions below
-    # stay true and the full gates run.
+    # for schedule/dispatch (no API calls). Dispatch always runs the full
+    # gates; schedule skips only via the sweep-coverage lookup (ci-dedupe-02).
     jobs = _post_merge()["jobs"]
     assert jobs["queue-certification"].get("if") is None
+    assert jobs["sweep-coverage"].get("if") is None
     for name in ("fast-test", "medium-test"):
         condition = str(jobs[name].get("if") or "")
         assert "github.event_name != 'push'" in condition or name == "medium-test"

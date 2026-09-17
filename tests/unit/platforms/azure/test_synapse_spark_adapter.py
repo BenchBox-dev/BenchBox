@@ -739,3 +739,39 @@ class TestSynapseLivyStateConstants:
         assert LivyStatementState.AVAILABLE == "available"
         assert LivyStatementState.ERROR == "error"
         assert LivyStatementState.CANCELLED == "cancelled"
+
+    def test_user_spark_config_wins_over_benchmark_config(self):
+        """Explicit user spark_config must survive benchmark config merge.
+
+        Benchmark-specific configuration (e.g. the optimizer's AQE enablement)
+        is merged first so an explicit user override is not clobbered.
+        """
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+            patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                spark_config={"spark.sql.adaptive.enabled": "false"},
+            )
+            adapter._spark_config = {"spark.sql.adaptive.enabled": "true"}
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert session_conf["spark.sql.adaptive.enabled"] == "false"

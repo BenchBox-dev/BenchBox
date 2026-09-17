@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "39e34ae5b865f285532d93343e1754bce6c40a0f05c81fd88bd5be7bc82fce44",
+  "contract_sha256": "fcfa7dd74c606017636120ee4a20889cafcc6aa70147ce5e3ec446c78eea39f9",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -175,7 +175,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 203,
+  "public_target_count": 204,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -271,6 +271,7 @@
     "pr-preflight",
     "pr-preflight-fast-tests",
     "pr-preflight-focused-tests",
+    "pr-preflight-medium-tests",
     "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",
@@ -1196,11 +1197,18 @@
         "recipe_sha256": "43e775e7957b2190b1ae67b23c2c7d2a013e47e064b4964d8dace3d1819bcf59"
       }
     ],
+    "pr-preflight-medium-tests": [
+      {
+        "header": "pr-preflight-medium-tests:",
+        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> medium tier (same marker selection as CI)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
+        "recipe_sha256": "af234b99f9301d79db5efc4683f4f848ec482a40bc35e698e5c4e75f4acb514a"
+      }
+    ],
     "pr-preflight-uncached": [
       {
         "header": "pr-preflight-uncached:",
-        "recipe": "\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
-        "recipe_sha256": "16eb65d51b01963e0e1f72b3534d3b8a56e7199fcfe56c06a84e85d68dff3538"
+        "recipe": "\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s pr-preflight-medium-tests PATH_DECISION=\"$$DECISION\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
+        "recipe_sha256": "6779829098064de1c4fdf5ae35d23defc8261450e9ebd8dc0fae1ab490c2e966"
       }
     ],
     "pr-ready": [
@@ -2087,7 +2095,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "3f70cdcefde875ac2352a00e2cda4ae9c66e1e8d13e71b62b3284bc636cbe209",
+  "semantic_sha256": "c6113a507c6300e6a559bcf14e5077efcc2c164817fd6d180742429e7a64b203",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3694,9 +3702,9 @@
       ]
     },
     {
-      "body": "pr-preflight-uncached:\n\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
+      "body": "pr-preflight-uncached:\n\t@set -eu; \\\n\tDECISION=$$(mktemp); \\\n\tLISTS=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\tgit fetch origin develop --quiet; \\\n\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\t$(MAKE) -s .pr-preflight-route PATH_DECISION=\"$$DECISION\" PATH_LISTS=\"$$LISTS\" SKIP_FAST_TESTS=\"$(SKIP_FAST_TESTS)\"; \\\n\t$(MAKE) -s pr-preflight-medium-tests PATH_DECISION=\"$$DECISION\"; \\\n\t$(MAKE) -s uat-artifact-hygiene",
       "kind": "rule",
-      "sha256": "4bbb519db97e7fa4cb5cbfa91b41decfc6ea037f5242bc80b2086115f952b6ba",
+      "sha256": "ea6790a9cf890fec541be10de98778733d9855274472a364a5df8f5da529db25",
       "targets": [
         "pr-preflight-uncached"
       ]
@@ -3731,6 +3739,14 @@
       "sha256": "09ce5d931e7cba452e441482581e8bfa5427b429180d1a3bc2e739ab7a34e65c",
       "targets": [
         "pr-preflight-fast-tests"
+      ]
+    },
+    {
+      "body": "pr-preflight-medium-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> medium tier (same marker selection as CI)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
+      "kind": "rule",
+      "sha256": "0d5e5bad138747c0b1d6be45506ae3eaba5e44d9ac39a455f534f9320fdc2983",
+      "targets": [
+        "pr-preflight-medium-tests"
       ]
     },
     {
@@ -4260,7 +4276,7 @@
       ]
     }
   ],
-  "target_count": 209,
+  "target_count": 210,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4359,6 +4375,7 @@
     "pr-preflight",
     "pr-preflight-fast-tests",
     "pr-preflight-focused-tests",
+    "pr-preflight-medium-tests",
     "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",

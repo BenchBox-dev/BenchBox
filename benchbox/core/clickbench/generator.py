@@ -25,7 +25,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
-from benchbox.core.manifest_utils import write_generator_manifest
+from benchbox.core.manifest_utils import write_delimited_manifest
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 
@@ -389,15 +389,4 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated ClickBench dataset."""
-        write_generator_manifest(
-            self,
-            "clickbench",
-            table_paths,
-            self._table_row_counts,
-            metadata={
-                "csv_delimiter": "|",
-                "csv_has_header": False,
-                "csv_null_marker": None,
-                "csv_normalize_booleans": False,
-            },
-        )
+        write_delimited_manifest(self, "clickbench", table_paths, self._table_row_counts)

@@ -82,7 +82,10 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # supplied. Pre-v5 caches for such benchmarks either failed conversion (and
 # silently fell back to an untyped read of the source file) or embedded the header
 # row as data, so they must be regenerated.
-DATAFRAME_CACHE_VERSION = "v5"
+# v6: inferred TIME columns (time32/time64) are now cast to string before the
+# Parquet write. Pre-v6 caches may embed INT32 TIME(MILLIS,false), which Spark
+# rejects on read (PARQUET_TYPE_ILLEGAL), so they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v6"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -446,6 +449,11 @@ class FormatConverter:
             if is_tbl_file and column_names and has_trailing:
                 table = table.select(column_names)
 
+            # PyArrow CSV inference types time-like fields as time32/time64,
+            # which Parquet stores as TIME(...,false) that Spark cannot read
+            # (PARQUET_TYPE_ILLEGAL). Persist them as strings instead.
+            table = FormatConverter._coerce_time_columns_to_string(table)
+
             # Apply physical layout options from write_config
             if write_config:
                 table = FormatConverter._apply_write_config(table, write_config)
@@ -486,6 +494,38 @@ class FormatConverter:
             "string": pa.string(),
         }
         return {col: type_lookup.get(dtype, pa.string()) for col, dtype in column_types.items()}
+
+    @staticmethod
+    def _coerce_time_columns_to_string(table: Any) -> Any:
+        """Cast inferred TIME columns to string for Parquet/Spark compatibility.
+
+        PyArrow's CSV inference types ``HH:MM:SS`` fields as ``time32``/``time64``
+        when no explicit column type pins them to string (e.g. the benchmark
+        schema is unavailable). Parquet stores those as ``TIME(MILLIS/MICROS,false)``,
+        which Spark rejects on read (``PARQUET_TYPE_ILLEGAL``); TIME also has no
+        reliable DataFrame dtype across backends (see :class:`SchemaMapper`), so
+        persist such columns as strings.
+
+        Boundary: this runs on the CSV/TBL/DAT conversion path only. A
+        pre-existing external Parquet source that already embeds a TIME
+        logical type bypasses conversion and is not coerced here.
+
+        Returns:
+            The table with every ``time32``/``time64`` column cast to string.
+        """
+        import pyarrow as pa
+        import pyarrow.compute as pc
+
+        time_columns = [
+            field.name for field in table.schema if pa.types.is_time32(field.type) or pa.types.is_time64(field.type)
+        ]
+        if not time_columns:
+            return table
+        logger.info(f"Casting inferred TIME column(s) to string for Parquet compatibility: {time_columns}")
+        for name in time_columns:
+            index = table.schema.get_field_index(name)
+            table = table.set_column(index, name, pc.cast(table.column(name), pa.string()))
+        return table
 
     @staticmethod
     def _build_write_kwargs(compression: str, write_config: Any, table: Any) -> dict[str, Any]:
@@ -597,14 +637,14 @@ class DataCache:
             nation.tbl              ← raw generated data (not managed by cache)
             _datagen_manifest.json  ← SQL datagen manifest (not managed by cache)
             parquet/                ← cached format conversions
-              v3/
+              v6/
                 _manifest.json
                 customer.parquet
                 lineitem.parquet
                 ...
           tpch_sf001/
             parquet/
-              v3/
+              v6/
                 ...
           tpcds_sf1/
             ...

@@ -54,15 +54,19 @@ Two additive pieces. Neither replaces per-push runs.
 
 | Job | `push` / `workflow_dispatch` | `schedule` |
 | --- | --- | --- |
-| lint, fast-test, explorer-tokens | yes | yes |
+| lint, fast-test, explorer-tokens | yes | yes, unless the tip is already covered (early exit) |
 | medium-test (~40 min) | yes | **no** |
 | close-orphaned-prs, auto-revert-on-failure, green-run-cleanup | yes | **no** (mutation) |
 
-Medium-test stays on the real merge path so a squash race still trips
-auto-revert; the hourly sweep deliberately omits it to avoid ~24 full
-medium runs/day when tip is already push-covered. Schedule also never
-opens revert PRs, closes orphaned PRs, or cleans green-run issues — those
-remain push/dispatch only.
+A covered tip — one with a success/failure per-push run on its exact SHA,
+or a merge-queue certification — exits the sweep early with a step-summary
+note instead of re-running the slim gates. Any lookup error runs the gates
+(fail open), and an uncovered tip still runs them, so a silent push-drop is
+still re-gated within about an hour. Medium-test stays on the real merge
+path so a squash race still trips auto-revert; the hourly sweep deliberately
+omits it to avoid ~24 full medium runs/day when tip is already push-covered.
+Schedule also never opens revert PRs, closes orphaned PRs, or cleans
+green-run issues — those remain push/dispatch only.
 
 Concurrency:
 

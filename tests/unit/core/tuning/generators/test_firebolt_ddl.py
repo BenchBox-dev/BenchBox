@@ -31,7 +31,8 @@ def test_generate_tuning_clauses_handles_distribution_partition_and_logs():
     with patch("benchbox.core.tuning.generators.firebolt.logger") as mock_logger:
         clauses = generator.generate_tuning_clauses(table_tuning)
 
-    assert clauses.distribute_by == "l_partkey, l_orderkey"
+    # Rendered-SQL contract: distribute_by holds the full PRIMARY INDEX clause.
+    assert clauses.distribute_by == "PRIMARY INDEX (l_partkey, l_orderkey)"
     assert clauses.partition_by == "l_shipdate"
     assert mock_logger.info.call_count >= 2
 

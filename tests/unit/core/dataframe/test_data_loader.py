@@ -398,6 +398,86 @@ class TestFormatConverter:
             shipdate_col = table.column("l_shipdate")
             assert shipdate_col[0].as_py() == __import__("datetime").date(1996, 3, 13)
 
+    def test_convert_csv_inferred_time_column_written_as_string(self):
+        """A time-like column with no declared type lands in Parquet as a string.
+
+        Regression test: when the benchmark schema is unavailable the converter
+        runs on full PyArrow inference, which types ``HH:MM:SS`` fields as
+        ``time32[ms]``. Parquet stores that as ``INT32 TIME(MILLIS,false)``,
+        which Spark rejects on read (``PARQUET_TYPE_ILLEGAL``) -- the PySpark
+        TPC-DS/coffeeshop cached-Parquet failure. The converter must coerce
+        inferred TIME columns to string, matching SchemaMapper's TIME policy.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            csv_path = tmpdir / "order_lines.csv"
+            csv_path.write_text("order_id,order_time,quantity\n1,08:30:00,2\n2,14:45:15,1\n3,23:59:59,5\n")
+            parquet_path = tmpdir / "order_lines.parquet"
+
+            # No column_types: the schema-less path taken when the benchmark
+            # schema lookup yields nothing for the table.
+            status, row_count = FormatConverter.convert_csv_to_parquet(
+                source_path=csv_path,
+                target_path=parquet_path,
+                column_names=["order_id", "order_time", "quantity"],
+                delimiter=",",
+                has_header=True,
+            )
+
+            assert status == ConversionStatus.SUCCESS
+            assert row_count == 3
+
+            table = pq.read_table(parquet_path)
+            assert table.schema.field("order_time").type == pa.string()
+            assert table.column("order_time").to_pylist() == ["08:30:00", "14:45:15", "23:59:59"]
+            # No TIME logical type anywhere: the file must stay Spark-readable.
+            for field in table.schema:
+                assert not pa.types.is_time32(field.type), field.name
+                assert not pa.types.is_time64(field.type), field.name
+
+    def test_coerce_time_columns_to_string_preserves_other_types(self):
+        """The TIME coercion touches only time32/time64 columns."""
+        import pyarrow as pa
+
+        table = pa.table(
+            {
+                "id": pa.array([1, 2], type=pa.int64()),
+                "day": pa.array([18628, 18629], type=pa.date32()),
+                # time32[s] is the unit CSV inference produces for "HH:MM:SS".
+                "at": pa.array([8 * 3600, 86399], type=pa.time32("s")),
+            }
+        )
+        coerced = FormatConverter._coerce_time_columns_to_string(table)
+        assert coerced.schema.field("at").type == pa.string()
+        assert coerced.column("at").to_pylist() == ["08:00:00", "23:59:59"]
+        assert coerced.schema.field("id").type == pa.int64()
+        assert coerced.schema.field("day").type == pa.date32()
+
+        # A table without TIME columns is returned unchanged.
+        plain = pa.table({"id": pa.array([1], type=pa.int64())})
+        assert FormatConverter._coerce_time_columns_to_string(plain).schema == plain.schema
+
+    def test_coerce_time64_micros_and_nulls_to_string(self):
+        """time64/us values keep microsecond fidelity; nulls stay null."""
+        import datetime
+
+        import pyarrow as pa
+
+        table = pa.table(
+            {
+                "at": pa.array(
+                    [datetime.time(12, 34, 56, 789123), None],
+                    type=pa.time64("us"),
+                ),
+            }
+        )
+        coerced = FormatConverter._coerce_time_columns_to_string(table)
+        assert coerced.schema.field("at").type == pa.string()
+        assert coerced.column("at").to_pylist() == ["12:34:56.789123", None]
+
     def test_sql_type_to_pyarrow_covers_type_families(self):
         """Declared SQL type families resolve to a PyArrow type (w9 regression).
 

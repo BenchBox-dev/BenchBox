@@ -800,6 +800,23 @@ class TestTrinoAdapter:
         assert "TableScan" in plan
         mock_cursor.close.assert_called_once()
 
+    def test_get_query_plan_error_returns_none(self):
+        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+        try:
+            adapter = TrinoAdapter(
+                host="trino-coordinator.example.com",
+            )
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = Exception("EXPLAIN failed")
+
+        assert adapter.get_query_plan(mock_connection, "SELECT * FROM test_table") is None
+        mock_cursor.close.assert_called_once()
+
     def test_close_connection(self):
         """Test connection closing."""
         try:

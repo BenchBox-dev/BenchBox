@@ -40,9 +40,15 @@ concurrency:
 
 jobs:
   lint:
+    needs: sweep-coverage
     # Baseline cache writes must follow develop history order. A SHA-specific
     # workflow-level group does not serialize two pushes, so an older run can
     # save after a newer run and win the restore-prefix lookup.
+    #
+    # A covered tip skips the re-run on schedule only: the covering push run
+    # already wrote this SHA's fast-lane-count cache entry, so the skip
+    # leaves no baseline gap. Push and dispatch always run.
+    if: ${{ github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true' }}
     concurrency:
       group: develop-post-merge-lint-${{ github.ref }}
       cancel-in-progress: false
@@ -187,13 +193,52 @@ jobs:
           path: certified/medium-test/signature.json
           retention-days: 14
 
+  sweep-coverage:
+    name: sweep-coverage
+    # Always runs: downstream jobs read these outputs on every event, and
+    # references to a skipped job's outputs do not evaluate reliably. The
+    # script itself returns covered=false without any API call unless this
+    # is a schedule run, so push and workflow_dispatch always run the full
+    # gates and the manual dispatch stays the full-run escape hatch.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      covered: ${{ steps.coverage.outputs.covered }}
+      covering_run_id: ${{ steps.coverage.outputs.covering_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+
+      - name: Check whether the tip is already covered
+        id: coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Bare python is intentional: the lookup is stdlib-only and always
+          # exits 0 (fail open), so this step never reds the workflow itself.
+          # Any API error, gap, ambiguity, or uncovered tip runs the full
+          # gates instead.
+          python scripts/sweep_coverage.py \
+            --sha "$TARGET_SHA" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
   fast-test:
-    needs: queue-certification
+    needs: [queue-certification, sweep-coverage]
     # Queue-certified pushes skip the re-run: the merge queue already passed
     # this exact SHA (certified by the run recorded in the step summary and
     # metrics). The lint job above still runs on every push: it writes the
-    # fast-lane-count-develop-<sha> cache the PR guard restores.
-    if: ${{ github.event_name != 'push' || needs.queue-certification.outputs.certified != 'true' }}
+    # fast-lane-count-develop-<sha> cache the PR guard restores. A covered
+    # tip skips the re-run on schedule too: a success/failure push run (or
+    # a queue certification) already gated this exact SHA, so the sweep
+    # exits early with a step-summary note.
+    if: ${{ (github.event_name != 'push' || needs.queue-certification.outputs.certified != 'true') && (github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -258,10 +303,14 @@ jobs:
 
   explorer-tokens:
     name: explorer-tokens
+    needs: sweep-coverage
     # Re-run the token-scan gate against the merged develop tree so that a
     # squash race that reintroduces raw Tailwind palette literals trips the
     # auto-revert path even when each PR-time scan passed against its own
-    # pre-merge tree. Stdlib-only so no dependency sync is required.
+    # pre-merge tree. Stdlib-only so no dependency sync is required. A
+    # covered tip skips the re-run on schedule only; push and dispatch
+    # always run.
+    if: ${{ github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

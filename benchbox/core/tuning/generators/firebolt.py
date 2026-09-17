@@ -10,7 +10,7 @@ Example:
     >>> from benchbox.core.tuning.generators.firebolt import FireboltDDLGenerator
     >>> generator = FireboltDDLGenerator()
     >>> clauses = generator.generate_tuning_clauses(table_tuning)
-    >>> emit(clauses.distribute_by)  # "l_orderkey, l_linenumber"
+    >>> emit(clauses.distribute_by)  # "PRIMARY INDEX (l_orderkey, l_linenumber)"
     >>> emit(clauses.partition_by)   # "l_shipdate"
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -114,7 +114,8 @@ class FireboltDDLGenerator(BaseDDLGenerator):
             platform_opts: Platform-specific options.
 
         Returns:
-            TuningClauses with distribute_by (for PRIMARY INDEX) and partition_by fields.
+            TuningClauses with distribute_by (rendered "PRIMARY INDEX (...)"
+            clause, never a bare column list) and partition_by fields.
         """
         clauses = TuningClauses()
 
@@ -141,12 +142,14 @@ class FireboltDDLGenerator(BaseDDLGenerator):
                 f"Clustering is achieved through PRIMARY INDEX in Firebolt."
             )
 
-        # Handle DISTRIBUTION -> PRIMARY INDEX
+        # Handle DISTRIBUTION -> PRIMARY INDEX. Stored rendered (not bare):
+        # get_inline_clauses() emits it verbatim and generate_create_table_ddl()
+        # uses it directly, so preview and execution can never disagree.
         distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
         if distribution_columns:
             sorted_cols = sorted(distribution_columns, key=lambda c: c.order)
             col_names = [c.name for c in sorted_cols]
-            clauses.distribute_by = ", ".join(col_names)
+            clauses.distribute_by = f"PRIMARY INDEX ({', '.join(col_names)})"
 
         # Handle partitioning -> PARTITION BY
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
@@ -190,10 +193,10 @@ class FireboltDDLGenerator(BaseDDLGenerator):
         col_list = self.generate_column_list(columns)
         statement = f"{statement}\n(\n    {col_list}\n)"
 
-        # Tuning clauses
+        # Tuning clauses (distribute_by is already the rendered PRIMARY INDEX clause)
         if tuning:
             if tuning.distribute_by:
-                statement = f"{statement}\nPRIMARY INDEX ({tuning.distribute_by})"
+                statement = f"{statement}\n{tuning.distribute_by}"
 
             if tuning.partition_by:
                 statement = f"{statement}\nPARTITION BY {tuning.partition_by}"

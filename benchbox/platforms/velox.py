@@ -46,6 +46,7 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from ._spark_helpers import (
+    SPARK_CBO_KEYS,
     SparkLikeAdapterMixin,
     analyze_spark_table,
     is_spark_connect_reachable,
@@ -54,6 +55,7 @@ from ._spark_helpers import (
     parse_spark_connect_endpoint,
     purge_orphaned_warehouse_directory,
     run_spark_schema_creation_loop,
+    spark_aqe_conf_entries,
     validate_spark_identifier,
 )
 from .base import DriverIsolationCapability, PlatformAdapter
@@ -294,10 +296,10 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "spark.sql.shuffle.partitions": str(self.shuffle_partitions),
         }
 
-        if self.adaptive_enabled:
-            conf["spark.sql.adaptive.enabled"] = "true"
-            conf["spark.sql.adaptive.coalescePartitions.enabled"] = "true"
-            conf["spark.sql.adaptive.skewJoin.enabled"] = "true"
+        # Adaptive Query Execution. Set explicitly in both directions: Spark
+        # enables AQE by default since 3.2.0, so omitting the keys would leave
+        # it on even when adaptive_enabled is False.
+        conf.update(spark_aqe_conf_entries(self.adaptive_enabled))
 
         if self.disable_cache:
             conf["spark.sql.inMemoryColumnarStorage.enabled"] = "false"
@@ -473,8 +475,10 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
                 # AQE settings are already applied at session creation; these are
                 # additional CBO optimisations specific to OLAP benchmark shapes.
-                spark.conf.set("spark.sql.cbo.enabled", "true")
-                spark.conf.set("spark.sql.cbo.joinReorder.enabled", "true")
+                # Let an explicit spark_config entry win so session-build
+                # overrides are not clobbered at run time.
+                for cbo_key in SPARK_CBO_KEYS:
+                    spark.conf.set(cbo_key, self.spark_config.get(cbo_key, "true"))
                 self.logger.debug("Applied OLAP optimisations for Velox")
         except Exception as e:
             self.logger.warning(f"Failed to apply benchmark configuration: {e}")
@@ -517,14 +521,22 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     # Query plans
     # ------------------------------------------------------------------
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
-        """Get extended query plan and annotate Velox vs JVM-fallback nodes."""
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
+        """Get extended query plan and annotate Velox vs JVM-fallback nodes.
+
+        Returns ``None`` (and logs a warning) when EXPLAIN fails, so a failed
+        EXPLAIN is never handed to a parser or displayed as if it were plan
+        output (qpc-13; matches the shared ``get_query_plan_from_cursor`` helper).
+        """
         import re
 
         spark = connection
         try:
             result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
             plan_rows = result_df.collect()
+            if not plan_rows:
+                self.logger.warning("Could not get query plan via EXPLAIN: empty plan rows")
+                return None
             plan_text = "\n".join(str(row[0]) for row in plan_rows)
 
             # Annotate the plan with native vs fallback summary.
@@ -548,7 +560,8 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
             return plan_text
         except Exception as e:
-            return f"Could not get query plan: {e}"
+            self.logger.warning("Could not get query plan via EXPLAIN: %s", e)
+            return None
 
     # ------------------------------------------------------------------
     # Tuning (partitioning only - plain Parquet/ORC tables have no DDL

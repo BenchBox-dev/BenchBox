@@ -196,6 +196,14 @@ class TestLakeSailAdapter:
         # Database name should be auto-generated
         assert "tpch" in adapter.database.lower() or "benchmark" in adapter.database.lower()
 
+    def test_from_config_adaptive_enabled_false_propagates(self, mock_pyspark):
+        """Explicit adaptive_enabled=False must survive from_config."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        adapter = LakeSailAdapter.from_config({"benchmark": "TPC-H", "scale_factor": 1.0, "adaptive_enabled": False})
+
+        assert adapter.adaptive_enabled is False
+
     def test_get_spark_conf(self, mock_pyspark):
         """Test Spark Connect configuration generation."""
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -221,7 +229,24 @@ class TestLakeSailAdapter:
 
         conf = adapter._get_spark_conf()
 
-        assert "spark.sql.adaptive.enabled" not in conf
+        # Spark enables AQE by default since 3.2.0, so disabling must set the
+        # keys to "false" explicitly rather than omitting them.
+        assert conf["spark.sql.adaptive.enabled"] == "false"
+        assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
+        assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
+
+    def test_get_spark_conf_aqe_disabled_spark_config_still_wins(self, mock_pyspark):
+        """An explicit spark_config AQE entry wins over adaptive_enabled=False."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        adapter = LakeSailAdapter(
+            adaptive_enabled=False,
+            spark_config={"spark.sql.adaptive.enabled": "true"},
+        )
+
+        conf = adapter._get_spark_conf()
+
+        assert conf["spark.sql.adaptive.enabled"] == "true"
 
     def test_add_cli_arguments_supports_disabling_adaptive(self, mock_pyspark):
         """CLI args should allow disabling AQE via --no-adaptive-enabled."""
@@ -440,6 +465,33 @@ class TestLakeSailAdapterExecution:
         # Should not raise
         adapter.configure_for_benchmark(mock_spark_session, "olap")
 
+    def test_configure_for_benchmark_olap_respects_adaptive_disabled(self, mock_pyspark):
+        """OLAP run-time config must honor adaptive_enabled=False."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        _, mock_spark_session = mock_pyspark
+
+        adapter = LakeSailAdapter(adaptive_enabled=False)
+        adapter.configure_for_benchmark(mock_spark_session, "tpch")
+
+        mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
+        mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.coalescePartitions.enabled", "false")
+        mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "false")
+
+    def test_configure_for_benchmark_olap_respects_spark_config_override(self, mock_pyspark):
+        """An explicit spark_config AQE entry must survive run-time config."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        _, mock_spark_session = mock_pyspark
+
+        adapter = LakeSailAdapter(spark_config={"spark.sql.adaptive.enabled": "false"})
+        adapter.configure_for_benchmark(mock_spark_session, "olap")
+
+        # The explicit spark_config entry must not be clobbered at run time.
+        mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
+        # Keys without an override still follow adaptive_enabled (default True).
+        mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "true")
+
     def test_get_query_plan(self, mock_pyspark):
         """Test query plan retrieval."""
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -454,6 +506,17 @@ class TestLakeSailAdapterExecution:
 
         plan = adapter.get_query_plan(mock_spark_session, "SELECT * FROM test")
         assert isinstance(plan, str)
+
+    def test_get_query_plan_failure_returns_none(self, mock_pyspark):
+        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+        from benchbox.platforms.lakesail import LakeSailAdapter
+
+        _, mock_spark_session = mock_pyspark
+        mock_spark_session.sql.side_effect = RuntimeError("explain failed")
+
+        adapter = LakeSailAdapter()
+
+        assert adapter.get_query_plan(mock_spark_session, "SELECT * FROM test") is None
 
     def test_analyze_table(self, mock_pyspark):
         """Test table analysis for query optimization."""

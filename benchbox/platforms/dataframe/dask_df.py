@@ -252,9 +252,22 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._record_runtime_tuning(f"memory_limit={self._memory_limit}")
         if config.memory.spill_to_disk:
             self._record_runtime_tuning("spill_to_disk=on")
-            spill_directory = getattr(config.memory, "spill_directory", None)
-            if spill_directory is not None:
-                self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
+        # The spill directory is recorded on effective consumption, not on the
+        # spill_to_disk flag: the local resource envelope may enable spilling
+        # by default after _apply_tuning ran, in which case a user-configured
+        # directory still reaches the cluster (local_directory) and must be
+        # claimed. An auto-created temp dir is never a tuned setting, so only
+        # a configured directory that setup actually resolved is recorded.
+        # Like every other entry here, the directory must come from the tuning
+        # configuration: a bare constructor/platform-option spill directory
+        # with no tuning config is infrastructure, not tuning, and claiming it
+        # would flip an untuned baseline from noop to applied_unverified.
+        if (
+            getattr(config.memory, "spill_directory", None) is not None
+            and self._configured_spill_directory is not None
+            and self._spill_directory is not None
+        ):
+            self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
 
     def _apply_local_resource_envelope_defaults(self) -> None:
         """Apply conservative defaults for local distributed Dask runs."""

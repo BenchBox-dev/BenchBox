@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
+from benchbox.platforms._spark_helpers import spark_aqe_conf_entries
 from benchbox.platforms.dataframe.expression_family import ExpressionFamilyAdapter
 from benchbox.platforms.dataframe.pyspark_df import (
     PYSPARK_AVAILABLE,
@@ -92,8 +93,12 @@ class LakeSailDataFrameAdapter(PySparkDataFrameAdapter):
             builder = SparkSession.builder.remote(self._endpoint)
             builder = builder.config("spark.app.name", self._app_name)
             builder = builder.config("spark.sql.shuffle.partitions", str(self._shuffle_partitions))
-            if self._enable_aqe:
-                builder = builder.config("spark.sql.adaptive.enabled", "true")
+            # Set every AQE key explicitly in both directions: Spark enables
+            # AQE by default since 3.2.0, so an omitted key would silently
+            # stay on even when enable_aqe is False. User spark_config is
+            # applied next, so an explicit override there still wins.
+            for aqe_key, aqe_value in spark_aqe_conf_entries(self._enable_aqe).items():
+                builder = builder.config(aqe_key, aqe_value)
             for key, value in self._spark_config.items():
                 builder = builder.config(key, str(value))
             self._spark = builder.getOrCreate()
