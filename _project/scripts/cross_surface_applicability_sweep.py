@@ -161,7 +161,15 @@ def build_applicability_sweep() -> list[dict[str, Any]]:
     """Drill into every dual-surface UNGUARDED benchmark from the coverage map."""
     from _project.scripts.generate_oracle_coverage_map import build_coverage_map
 
-    candidates = [row["benchmark"] for row in build_coverage_map() if row["dual_surface"] and not row["guarded"]]
+    # A STAGED cross-surface gate is registered but NOT CI-enforced
+    # (``cross_surface_enforced is False``), so the benchmark still needs its
+    # verified-overlap candidacy drilled here. Enforced gates stay out: their
+    # correspondence already blocks CI.
+    candidates = [
+        row["benchmark"]
+        for row in build_coverage_map()
+        if row["dual_surface"] and (not row["guarded"] or row.get("cross_surface_enforced") is False)
+    ]
     rows: list[dict[str, Any]] = []
     for benchmark_id in candidates:
         status, detail = classify_applicability(benchmark_id)
