@@ -109,6 +109,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",
     "scripts/queue_certification.py",
+    "scripts/sweep_coverage.py",
     # Repository guidance and release notes are linked from the site but are
     # not read while assembling any publication artifact.
     "README.md",

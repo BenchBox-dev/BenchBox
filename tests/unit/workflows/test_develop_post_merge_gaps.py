@@ -145,10 +145,12 @@ def test_medium_test_is_slim_schedule_omitted() -> None:
     workflow = _load_workflow(POST_MERGE)
     medium_if = str(workflow["jobs"]["medium-test"].get("if", ""))
     assert SCHEDULE_EXCLUSION in medium_if
-    # Slim gates remain unconditional (no schedule exclusion).
+    # Slim gates skip on schedule only when the tip is already covered
+    # (ci-dedupe-02 early exit); push and dispatch always run them.
     for name in ("lint", "fast-test", "explorer-tokens"):
-        job_if = workflow["jobs"][name].get("if")
-        assert job_if is None or SCHEDULE_EXCLUSION not in str(job_if)
+        job_if = str(workflow["jobs"][name].get("if") or "")
+        assert SCHEDULE_EXCLUSION in job_if
+        assert "needs.sweep-coverage.outputs.covered != 'true'" in job_if
 
 
 # ---------------------------------------------------------------------------
