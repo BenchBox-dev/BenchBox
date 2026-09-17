@@ -1,0 +1,7 @@
+{
+  "acceptance": [
+    "One documented dialect source feeds SQL and DataFrame loaders",
+    "pandas NULL group keys match SQL grouping semantics"
+  ],
+  "description": "Deferred from the independent adversarial review of flightdata-cross-surface-output-contract-burn-down (C3/C4): (1) SQL and DataFrame loaders resolve CSV dialects through separate paths (benchmark attributes vs manifest), so the same manifest metadata is interpreted in two places — consolidate on a single dialect source; (2) pandas groupby drops NULL group keys while SQL keeps NULL groups, so unmatched LEFT JOIN codes diverge on real data — align with dropna=False or equivalent after verifying Dask/cuDF support. Neither triggers on the synthetic gate data."
+}
