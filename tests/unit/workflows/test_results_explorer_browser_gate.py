@@ -163,8 +163,12 @@ def test_expensive_browser_jobs_are_gated_on_change_detection(workflow: dict[str
     """Dropping the trigger filter must not run a 25-minute suite on every PR."""
     for job_id in (CHROMIUM_JOB, *ADVISORY_JOBS):
         job = workflow["jobs"][job_id]
-        assert job.get("if") == "needs.explorer-changes.outputs.needed == 'true'", (
+        condition = str(job.get("if") or "")
+        assert "needs.explorer-changes.outputs.needed == 'true'" in condition, (
             f"{job_id} is not gated on explorer-changes; it would run on every PR"
+        )
+        assert "needs.queue-certification.outputs.certified != 'true'" in condition, (
+            f"{job_id} does not skip on queue-certified develop pushes"
         )
 
 

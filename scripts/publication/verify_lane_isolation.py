@@ -108,6 +108,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/check_untracked_skill_mirrors.sh",
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",
+    "scripts/queue_certification.py",
     # Repository guidance and release notes are linked from the site but are
     # not read while assembling any publication artifact.
     "README.md",
