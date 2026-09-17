@@ -5,6 +5,7 @@ to benchmark results after execution.
 """
 
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Optional
 
@@ -15,6 +16,14 @@ from benchbox.core.cost.models import PhaseCost
 from benchbox.core.results.models import BenchmarkResults
 
 logger = logging.getLogger(__name__)
+
+# Metadata provenance values that certify a normalized platform block was read
+# back from the live service rather than echoing requested configuration. Only
+# an observed value may seed a published cost total; a "requested" value is a
+# CLI flag or an adapter constructor default (Databricks' ``cluster_size`` falls
+# back to "Medium" whatever the warehouse actually is), so it is carried into
+# the estimate but recorded as defaulted so ``cost_status`` stays "unavailable".
+_OBSERVED_METADATA_SOURCES = frozenset({"observed"})
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -78,8 +87,15 @@ def add_cost_estimation_to_results(
     Returns:
         Updated BenchmarkResults with cost information
     """
-    # Extract platform early for error logging
-    platform = results.platform if results.platform else "unknown"
+    # Resolve the canonical registry key early, for error logging and for every
+    # platform lookup below. ``results.platform`` is a display name ("ClickHouse
+    # Local", "Databricks"), and every cost lookup -- the local-platform set, the
+    # per-platform calculators, billing unit, and pricing tables -- is keyed by
+    # the canonical platform key. Passing the display name through made
+    # ``is_local_platform("ClickHouse Local")`` false, which published
+    # ``cost_status="unavailable"`` plus a fabricated aws/us-east-1 deployment for
+    # an engine that has no cloud cost at all.
+    platform = canonical_cost_platform_key(results) or "unknown"
 
     try:
         if not results.platform:
@@ -259,119 +275,135 @@ def _add_storage_cost_estimate(
         )
 
 
-def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str, Any]:
-    """Extract platform configuration from BenchmarkResults.platform_info."""
-    config: dict[str, Any] = {}
+def canonical_cost_platform_key(results: BenchmarkResults) -> str:
+    """Resolve the canonical platform key every cost lookup is keyed by.
 
-    if not results.platform_info:
+    Preference order:
+
+    1. ``platform_info["platform_type"]`` -- what an adapter's
+       ``get_platform_info()`` declares. Direct callers and the pre-v2 result
+       shape still supply it here.
+    2. ``platform_info["configuration"]["platform_type"]`` -- where the v2
+       result builder actually leaves it: ``_build_platform_info_dict()`` stores
+       the adapter's whole ``get_platform_info()`` mapping under
+       ``configuration``, so the declared type is one level down and a top-level
+       read returns ``None`` for every bundle the v2 builder produced.
+    3. ``results.platform`` -- the display name, normalized. This is the only
+       identity a bundle round-tripped through the loader retains, because the
+       exported ``platform.config`` block drops ``platform_type`` outright.
+
+    Returns an empty string when the result carries no platform identity at all.
+    """
+    platform_info = results.platform_info if isinstance(results.platform_info, Mapping) else {}
+    declared = platform_info.get("platform_type")
+    if not declared:
+        nested = platform_info.get("configuration")
+        if isinstance(nested, Mapping):
+            declared = nested.get("platform_type")
+    if declared:
+        return _normalize_platform_token(str(declared))
+    # getattr: this module is duck-typed throughout, and result-like objects
+    # assembled by direct callers do not always carry every field.
+    display_name = getattr(results, "platform", None)
+    if display_name:
+        return _normalize_platform_token(str(display_name))
+    return ""
+
+
+def _normalize_platform_token(raw: str) -> str:
+    """Normalize a platform display name or declared type to its registry key."""
+    from benchbox.core.platform_manifest import get_all_platform_aliases
+
+    token = raw.strip().lower()
+    # Display names carry a mode suffix the registry keys never do.
+    for marker in (" (dataframe)", " (sql)"):
+        if token.endswith(marker):
+            token = token[: -len(marker)]
+    token = token.replace(" ", "-").replace("_", "-")
+    aliases = {key.replace("_", "-"): value for key, value in get_all_platform_aliases().items()}
+    canonical = aliases.get(token, token)
+    # `fabric_dw` is the one registry key spelled with an underscore; every cost
+    # table keys off that exact spelling.
+    return "fabric_dw" if canonical in {"fabric-dw", "fabric_dw"} else canonical
+
+
+def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str, Any]:
+    """Extract the cost-model platform configuration from a benchmark result.
+
+    Sizing, cloud, and region are read from the normalized ``platform_compute`` /
+    ``platform_cloud`` / ``platform_deployment`` blocks first: those are the
+    blocks an adapter populates from live service metadata and stamps with
+    ``source`` / ``collection_status`` provenance. ``platform_info`` remains the
+    fallback for results that predate the normalized blocks or that a direct
+    caller assembled by hand.
+
+    Values the normalized blocks mark as anything other than observed are still
+    used for the estimate but recorded in ``_defaulted_fields``, which keeps
+    ``cost_status`` at "unavailable" so a guessed warehouse size never backs a
+    published cost total.
+    """
+    config: dict[str, Any] = {}
+    defaulted_fields: list[str] = []
+
+    platform_type = canonical_cost_platform_key(results)
+    normalized = _normalized_platform_facets(results)
+
+    if not results.platform_info and not any(normalized.values()):
         return config
 
-    platform_info = results.platform_info
-    platform_type = platform_info.get("platform_type", "")
-
+    platform_info = results.platform_info if isinstance(results.platform_info, Mapping) else {}
     # Common fields
     config["platform_type"] = platform_type
-    defaulted_fields: list[str] = []
+
+    config_section = platform_info.get("configuration")
+    config_section = config_section if isinstance(config_section, Mapping) else {}
+
+    _resolve_cloud_and_region(
+        config,
+        platform_type,
+        normalized,
+        platform_info,
+        config_section,
+        defaulted_fields,
+    )
+
+    compute = _effective_compute_block(normalized, platform_info)
 
     # Platform-specific extraction
     if platform_type == "snowflake":
-        config_section = platform_info.get("configuration", {})
         config["edition"] = _value_or_default(platform_info, "edition", "standard", defaulted_fields)
-        config["cloud"] = _value_or_default(platform_info, "cloud_provider", "aws", defaulted_fields, alias="cloud")
-        config["region"] = _value_or_default(platform_info, "region", "us-east-1", defaulted_fields)
-        config["warehouse_size"] = config_section.get("warehouse_size")
+        warehouse_size = _observed_or_requested(
+            compute, "warehouse_size", "warehouse_size", defaulted_fields
+        ) or config_section.get("warehouse_size")
+        if warehouse_size:
+            config["warehouse_size"] = warehouse_size
 
     elif platform_type == "bigquery":
-        config_section = platform_info.get("configuration", {})
-        config["location"] = _value_or_default(config_section, "location", "us", defaulted_fields)
+        location = normalized["cloud"].get("location") or config_section.get("location")
+        if location:
+            config["location"] = location
+        else:
+            defaulted_fields.append("location")
 
     elif platform_type == "redshift":
-        config_section = platform_info.get("configuration", {})
-        cluster_info = platform_info.get("cluster_info", {})
-        config["node_type"] = _value_or_default(cluster_info, "node_type", "dc2.large", defaulted_fields)
-        config["node_count"] = _value_or_default(
-            cluster_info, "number_of_nodes", 1, defaulted_fields, alias="node_count"
+        cluster_info = platform_info.get("cluster_info")
+        cluster_info = cluster_info if isinstance(cluster_info, Mapping) else {}
+        node_type = _observed_or_requested(compute, "node_type", "node_type", defaulted_fields) or cluster_info.get(
+            "node_type"
         )
-        config["region"] = _value_or_default(platform_info, "region", "us-east-1", defaulted_fields)
-
-    elif platform_type == "databricks":
-        config_section = platform_info.get("configuration", {})
-        compute_config = platform_info.get("compute_configuration", {})
-
-        # Infer cloud from hostname - check both configuration and host fields
-        server_hostname = config_section.get("server_hostname", "") or platform_info.get("host", "")
-        if "azuredatabricks" in server_hostname:
-            cloud = "azure"
-        elif "gcp.databricks.com" in server_hostname:
-            cloud = "gcp"
+        node_count = compute.get("node_count") or cluster_info.get("number_of_nodes")
+        if node_type:
+            config["node_type"] = node_type
         else:
-            cloud = "aws"
-            if not server_hostname:
-                defaulted_fields.append("cloud")
+            defaulted_fields.append("node_type")
+        if node_count:
+            config["node_count"] = node_count
+        else:
+            defaulted_fields.append("node_count")
 
-        config["cloud"] = cloud
+    elif platform_type in {"databricks", "databricks-df"}:
         config["tier"] = platform_info.get("tier", "premium")
-
-        # Determine workload type from warehouse metadata
-        warehouse_type = compute_config.get("warehouse_type")
-
-        if warehouse_type:
-            # Map Databricks warehouse types to workload types for cost calculation
-            # SERVERLESS warehouses (detected by adapter as warehouse_type=PRO + enable_serverless_compute=True)
-            # are displayed as warehouse_type="SERVERLESS" and map to serverless_sql
-            # PRO and CLASSIC warehouses map to sql_compute
-            if warehouse_type.upper() == "SERVERLESS":
-                config["workload_type"] = "serverless_sql"
-            else:
-                config["workload_type"] = "sql_compute"
-        else:
-            config["workload_type"] = "all_purpose"  # Default assumption
-
-        # Extract actual cluster size from warehouse configuration
-        warehouse_size = compute_config.get("warehouse_size")
-        if warehouse_size:
-            # Map warehouse size to DBU per hour
-            # See: https://docs.databricks.com/sql/admin/warehouse-types.html
-            # Classic/Pro SQL Warehouses:
-            # 2X-Small: 1 DBU/hour, X-Small: 2 DBU/hour, Small: 4 DBU/hour
-            # Medium: 8 DBU/hour, Large: 16 DBU/hour, X-Large: 32 DBU/hour
-            # 2X-Large: 64 DBU/hour, 3X-Large: 128 DBU/hour, 4X-Large: 256 DBU/hour
-            size_to_dbu = {
-                "2X-Small": 1.0,
-                "X-Small": 2.0,
-                "Small": 4.0,
-                "Medium": 8.0,
-                "Large": 16.0,
-                "X-Large": 32.0,
-                "2X-Large": 64.0,
-                "3X-Large": 128.0,
-                "4X-Large": 256.0,
-            }
-            config["cluster_size_dbu_per_hour"] = size_to_dbu.get(warehouse_size, 2.0)
-            config["warehouse_size"] = warehouse_size
-        else:
-            # Fallback: Use conservative estimate
-            config["cluster_size_dbu_per_hour"] = 2.0
-            defaulted_fields.append("cluster_size_dbu_per_hour")
-            logger.warning(
-                "Databricks warehouse size not available in platform_info, using conservative estimate of 2.0 DBU/hour. "
-                "For accurate cost estimation, ensure databricks-sdk is installed."
-            )
-
-    else:
-        # Generic fallback for cloud adapters that emit `platform_type` values
-        # not covered above (e.g. "athena", "azure_synapse", future
-        # "clickhouse-cloud"). These adapters still populate `platform_info`
-        # with `region` and `cloud_provider`, but without this branch the cost
-        # calculator would warn `pricing region metadata missing` and force
-        # `cost_status="unavailable"`, blocking public cost totals in
-        # submission validation.
-        cloud_default = _DEFAULT_CLOUD_BY_PLATFORM_TYPE.get(platform_type, "aws")
-        region_default = _DEFAULT_REGION_BY_CLOUD.get(cloud_default, "us-east-1")
-        config["cloud"] = _value_or_default(
-            platform_info, "cloud_provider", cloud_default, defaulted_fields, alias="cloud"
-        )
-        config["region"] = _value_or_default(platform_info, "region", region_default, defaulted_fields)
+        _resolve_databricks_compute(config, compute, config_section, defaulted_fields)
 
     if defaulted_fields:
         config["_defaulted_fields"] = sorted(set(defaulted_fields))
@@ -379,23 +411,206 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
     return config
 
 
-_DEFAULT_CLOUD_BY_PLATFORM_TYPE: dict[str, str] = {
+def _normalized_platform_facets(results: BenchmarkResults) -> dict[str, Mapping[str, Any]]:
+    """Return the normalized platform blocks as mappings, empty when absent."""
+    facets: dict[str, Mapping[str, Any]] = {}
+    for facet, attribute in (
+        ("cloud", "platform_cloud"),
+        ("compute", "platform_compute"),
+        ("deployment", "platform_deployment"),
+        ("storage", "platform_storage"),
+    ):
+        block = getattr(results, attribute, None)
+        if block is not None and not isinstance(block, Mapping) and hasattr(block, "to_dict"):
+            block = block.to_dict()
+        facets[facet] = block if isinstance(block, Mapping) else {}
+    return facets
+
+
+_COMPUTE_SIZING_KEYS = ("warehouse_size", "warehouse_type", "node_type", "node_count")
+
+
+def _effective_compute_block(
+    normalized: dict[str, Mapping[str, Any]],
+    platform_info: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Return the compute block to read sizing from, newest representation first.
+
+    ``platform.compute`` is the normalized block and already carries provenance.
+    ``platform_info["compute_configuration"]`` is the older per-adapter shape --
+    still the live shape for a hand-assembled result and for any adapter whose
+    normalized hook has not landed -- so it is used when the normalized block
+    carries no sizing at all. Its own ``warehouse_metadata_collection_status``
+    decides whether it counts as observed, because an adapter that could not
+    reach the service writes that dict with an "unavailable" status rather than
+    omitting it.
+    """
+    block = normalized["compute"]
+    if any(block.get(key) is not None for key in _COMPUTE_SIZING_KEYS):
+        return block
+
+    legacy = platform_info.get("compute_configuration")
+    if not isinstance(legacy, Mapping) or not any(legacy.get(key) is not None for key in _COMPUTE_SIZING_KEYS):
+        return block
+
+    status = str(legacy.get("warehouse_metadata_collection_status") or "available").lower()
+    return {**legacy, "source": "observed" if status == "available" else "inferred"}
+
+
+def _block_is_observed(block: Mapping[str, Any]) -> bool:
+    """Return True when a normalized block was read back from the live service."""
+    return str(block.get("source") or "").lower() in _OBSERVED_METADATA_SOURCES
+
+
+def _observed_or_requested(
+    block: Mapping[str, Any],
+    key: str,
+    alias: str,
+    defaulted_fields: list[str],
+) -> Any:
+    """Read one field from a normalized block, recording unobserved provenance.
+
+    A value present in an ``observed`` block is returned clean. The same value in
+    a ``requested`` / ``inferred`` block is still returned -- a rough estimate
+    beats none -- but ``alias`` is recorded as defaulted so the normalized-cost
+    contract keeps ``cost_status="unavailable"`` rather than publishing a total
+    computed from an adapter constructor default.
+    """
+    value = block.get(key)
+    if value is None:
+        return None
+    if not _block_is_observed(block):
+        defaulted_fields.append(alias)
+    return value
+
+
+# Platforms that exist on exactly one cloud provider, so the provider is a
+# property of the platform rather than an observation about the run. This mirrors
+# the provider map CostCalculator._deployment_metadata already applies. Databricks,
+# Snowflake, ClickHouse Cloud and MotherDuck are deliberately absent: they are
+# multi-cloud, so their provider must be observed or derived from the endpoint.
+_SINGLE_CLOUD_PLATFORMS: dict[str, str] = {
     "athena": "aws",
-    "azure_synapse": "azure",
-    "azure-synapse": "azure",
+    "athena-spark": "aws",
+    "redshift": "aws",
+    "emr-serverless": "aws",
+    "glue": "aws",
+    "bigquery": "gcp",
+    "dataproc": "gcp",
+    "dataproc-serverless": "gcp",
     "synapse": "azure",
-    "clickhouse-cloud": "aws",
-    "motherduck": "aws",
-    "fabric": "azure",
-    "fabric_warehouse": "azure",
+    "synapse-spark": "azure",
+    "fabric_dw": "azure",
+    "fabric-lakehouse": "azure",
+    "fabric-spark": "azure",
 }
 
 
-_DEFAULT_REGION_BY_CLOUD: dict[str, str] = {
-    "aws": "us-east-1",
-    "azure": "eastus",
-    "gcp": "us-central1",
+def _resolve_cloud_and_region(
+    config: dict[str, Any],
+    platform_type: str,
+    normalized: dict[str, Mapping[str, Any]],
+    platform_info: Mapping[str, Any],
+    config_section: Mapping[str, Any],
+    defaulted_fields: list[str],
+) -> None:
+    """Resolve cloud provider and region without inventing a region.
+
+    The provider can be established truthfully: it is observed, carried on
+    ``platform_info``, encoded in a Databricks workspace hostname, or fixed by a
+    single-cloud platform's own identity.
+
+    The region cannot. The previous generic fallback wrote ``region="us-east-1"``
+    whenever the adapter reported none, on the theory that a prior beat blocking
+    public cost totals. It never could: ``_normalized_cost_warnings`` emits one
+    warning per ``_defaulted_fields`` entry and any warning forces
+    ``cost_status="unavailable"``, so the prior bought nothing and instead
+    published a deployment region the run never observed -- ``us-east-1`` on every
+    self-hosted ClickHouse bundle in the corpus. An unobserved region is now
+    recorded as defaulted and left out, so the published field stays null.
+    """
+    cloud_block = normalized["cloud"]
+    cloud = _observed_or_requested(cloud_block, "provider", "cloud", defaulted_fields)
+    if not cloud:
+        cloud = platform_info.get("cloud_provider") or platform_info.get("cloud")
+    if not cloud and platform_type in {"databricks", "databricks-df"}:
+        # Databricks encodes the provider in the workspace hostname; it has no
+        # provider field of its own.
+        hostname = str(config_section.get("server_hostname") or platform_info.get("host") or "")
+        if "azuredatabricks" in hostname:
+            cloud = "azure"
+        elif "gcp.databricks.com" in hostname:
+            cloud = "gcp"
+        elif hostname:
+            cloud = "aws"
+    if not cloud:
+        cloud = _SINGLE_CLOUD_PLATFORMS.get(platform_type)
+    if cloud:
+        config["cloud"] = cloud
+    else:
+        defaulted_fields.append("cloud")
+
+    region = _observed_or_requested(cloud_block, "region", "region", defaulted_fields)
+    if not region:
+        region = platform_info.get("region") or config_section.get("region") or normalized["deployment"].get("region")
+    if region:
+        config["region"] = region
+    else:
+        defaulted_fields.append("region")
+
+
+# DBU consumption per hour by SQL warehouse size.
+# See https://docs.databricks.com/sql/admin/warehouse-types.html
+_DATABRICKS_SIZE_TO_DBU: dict[str, float] = {
+    "2X-Small": 1.0,
+    "X-Small": 2.0,
+    "Small": 4.0,
+    "Medium": 8.0,
+    "Large": 16.0,
+    "X-Large": 32.0,
+    "2X-Large": 64.0,
+    "3X-Large": 128.0,
+    "4X-Large": 256.0,
 }
+
+
+def _resolve_databricks_compute(
+    config: dict[str, Any],
+    compute: Mapping[str, Any],
+    config_section: Mapping[str, Any],
+    defaulted_fields: list[str],
+) -> None:
+    """Resolve Databricks workload type and warehouse size from observed compute.
+
+    The compute block is the one the adapter fills from the warehouses API, so it
+    is the only place the live warehouse size appears. ``cluster_size`` in the
+    adapter config is not a fallback for it: the Databricks adapter defaults that
+    field to "Medium" whatever the warehouse is, which is how a 2X-Small
+    serverless warehouse came to be billed as an 8 DBU/hour Medium.
+    """
+    warehouse_type = compute.get("warehouse_type") or config_section.get("warehouse_type")
+    if warehouse_type:
+        # A serverless warehouse is reported by the adapter as
+        # warehouse_type="SERVERLESS" (raw PRO + enable_serverless_compute);
+        # PRO and CLASSIC bill as provisioned SQL compute.
+        config["workload_type"] = "serverless_sql" if str(warehouse_type).upper() == "SERVERLESS" else "sql_compute"
+    else:
+        config["workload_type"] = "all_purpose"
+
+    warehouse_size = _observed_or_requested(compute, "warehouse_size", "warehouse_size", defaulted_fields)
+    if warehouse_size:
+        config["warehouse_size"] = warehouse_size
+        config["cluster_size_dbu_per_hour"] = _DATABRICKS_SIZE_TO_DBU.get(str(warehouse_size), 2.0)
+        return
+
+    # No warehouse metadata at all: keep the conservative rate so a per-query
+    # estimate is still possible, and mark it defaulted so nothing publishes.
+    config["cluster_size_dbu_per_hour"] = 2.0
+    defaulted_fields.append("cluster_size_dbu_per_hour")
+    logger.warning(
+        "Databricks warehouse size unavailable in platform.compute; using a conservative 2.0 DBU/hour estimate. "
+        "Install databricks-sdk so the warehouse metadata can be collected."
+    )
 
 
 def _value_or_default(
