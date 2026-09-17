@@ -3822,6 +3822,15 @@
       "status": "done",
       "title": "Add Data Vault Benchmark Implementation"
     },
+    "datavault-cross-surface-gate-and-frame-api-check": {
+      "claim": null,
+      "needs": [
+        "datavault-cross-surface-query-execution-burn-down"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Staged Data Vault cross-surface gate plus static frame-API check"
+    },
     "datavault-cross-surface-query-execution-burn-down": {
       "claim": {
         "expires_at": "2026-09-18T00:50:15Z",

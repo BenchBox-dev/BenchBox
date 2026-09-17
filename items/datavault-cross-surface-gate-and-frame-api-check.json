@@ -1,0 +1,7 @@
+{
+  "acceptance": [
+    "A staged Data Vault cross-surface gate forces regeneration and runs all 22 queries on expression and pandas",
+    "A static check fails when a registered query module calls a missing UnifiedLazyFrame method"
+  ],
+  "description": "Durable prevention from the independent adversarial review (L3 reframe/K3) of datavault-cross-surface-query-execution-burn-down: (1) register a staged Data Vault cross-surface gate (slot noted at cross_surface.py) that forces data regeneration so probes cannot pass on stale manifests; (2) add a static check that every method registered DataFrame query modules call on UnifiedLazyFrame actually exists, catching the agg/rename_columns/with_column class across all benchmarks. Record which probe manifest was used on every run."
+}
