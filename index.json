@@ -10810,15 +10810,10 @@
       "title": "Close PR #1444 uppercase primary-bundle validation bypass"
     },
     "pre-cell-predictive-disk-check-so-one-oversized-cell-cannot": {
-      "claim": {
-        "expires_at": "2026-09-18T17:00:59Z",
-        "generation": "3096565ef8d74bf2b9e4b68127d9ab0b",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Pre-cell (predictive) disk check so one oversized cell cannot fill the disk before the post-cell watch fires"
     },
     "pre-compile-tpc-binaries-for-multiple-platforms-completed": {
