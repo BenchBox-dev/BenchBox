@@ -19,7 +19,7 @@ The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queu
 
 | Required Context | Workflow Path | Trigger Events | Contract on `merge_group` |
 |---|---|---|---|
-| `ci-required-result` | `.github/workflows/pr.yml` | `pull_request`, `push`, `merge_group` | Aggregates fast/medium tests, lint, type checks, and parity gates for the speculative tree. |
+| `ci-required-result` | `.github/workflows/pr.yml` | `pull_request`, `push`, `merge_group` | Aggregates fast/medium tests, lint, type checks, and parity gates for the speculative tree. The heavy tier (medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, integration samples) runs on `merge_group` for every code-routed tree; `pull_request` runs skip it unless a carve-out applies (soundness paths, packaging paths), and the umbrella models the skip explicitly (success when required, skipped when deferred). |
 | `Results Explorer browser gate` | `.github/workflows/results-explorer-browser.yml` | `pull_request`, `push`, `merge_group` | Always-reporting contract. Runs Chromium on explorer changes; posts success on unaffected paths. |
 | `ruleset-drift` | `.github/workflows/develop-ruleset-drift.yml` | `pull_request`, `push`, `merge_group`, `schedule` | Executes trusted base check to ensure no ruleset mutation occurs. |
 

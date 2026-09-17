@@ -76,7 +76,13 @@ the same umbrella, no ruleset change needed), `explorer-tokens`,
 `site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
 `dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
 `needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
-skipped where their classifier says they are not applicable.
+skipped where their classifier says they are not applicable. Since the
+heavy-tier queue-only change, the heavy tier (`medium-test`,
+`correctness-gate`, `plan-capture-gate`, `tpch-binary-framing`, and the
+integration samples) additionally reports skipped on `pull_request` runs
+unless the `heavy-needed` output fires (merge queue, soundness paths, or
+packaging paths); the umbrella requires success when the tier ran and
+skipped when it was deferred, so a silent skip can never read as a pass.
 
 Slow-marked reproducer jobs remain required PR CI through this umbrella. The
 post-merge workflow has fast and medium lanes but no slow-signature lane, so
