@@ -66,13 +66,14 @@ def get_flightdata_parameters() -> dict[str, Any]:
 def _round_half_away(ctx: DataFrameContext, value: Any, digits: int) -> Any:
     """Round half away from zero, matching SQL ROUND on the reference surface.
 
-    The expression engines round half even natively while SQL rounds half away,
-    so identical values landing exactly on a rounding boundary (a whole-minute
-    total of exactly N.5, or an average of exactly N.XX5) would diverge by one
-    output unit. Scaling by an exact power of ten, shifting by one half unit,
-    and flooring reproduces the SQL mode on every engine, including negatives
-    via the sign branch. Only inputs within about one ulp of a boundary can
-    still disagree, far below the coarsest output granularity (whole minutes).
+    Engine-native rounding modes disagree (Polars and numpy/pandas round half
+    to even; DataFusion and PySpark round half up), so identical values landing
+    exactly on a rounding boundary (a whole-minute total of exactly N.5, or an
+    average of exactly N.XX5) would diverge by one output unit. Scaling by an
+    exact power of ten, shifting by one half unit, and flooring reproduces the
+    SQL mode on every engine, including negatives via the sign branch. Only
+    inputs within about one ulp of a boundary can still disagree, far below
+    the coarsest output granularity (whole minutes).
     """
     lit = ctx.lit
     factor = 10.0**digits
@@ -168,7 +169,7 @@ def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
             "ontime_pct",
             "avg_delay_when_late",
         )
-        .sort(["ontime_pct", "reporting_airline"], descending=[True, False])
+        .sort(["ontime_pct", "reporting_airline"], descending=[True, False], nulls_last=True)
     )
 
 
@@ -214,7 +215,7 @@ def delay_by_airport_expression_impl(ctx: DataFrameContext) -> Any:
             "delayed_flights",
         )
         .filter(col("total_flights") >= lit(100))
-        .sort("avg_dep_delay", descending=True)
+        .sort(["avg_dep_delay", "origin"], descending=[True, False])
         .limit(50)
     )
 
@@ -291,7 +292,7 @@ def best_routes_expression_impl(ctx: DataFrameContext) -> Any:
             "avg_arr_delay",
             "avg_distance_miles",
         )
-        .sort(["ontime_pct", "origin", "dest"], descending=[True, False, False])
+        .sort(["ontime_pct", "origin", "dest"], descending=[True, False, False], nulls_last=True)
         .limit(25)
     )
 
@@ -447,21 +448,26 @@ def weather_impact_expression_impl(ctx: DataFrameContext) -> Any:
             .then(col("weather_delay"))
             .otherwise(lit(None))
             .alias("_weather_pos"),
-            col("weather_delay").fill_null(lit(0)).alias("_weather_total"),
+            # Exact integer tenths matching the SQL surface (see the
+            # cascade-delays expression impl): the tenth-minute sum is
+            # order-independent on every engine, unlike float summation.
+            _round_half_away(ctx, col("weather_delay").fill_null(lit(0)) * lit(10), 0)
+            .cast(int)
+            .alias("_weather_tenths"),
         )
         .group_by("month")
         .agg(
             col("flight_id").count().alias("total_flights"),
             col("_weather").sum().alias("weather_delayed"),
             col("_weather_pos").mean().alias("_avg_weather"),
-            col("_weather_total").sum().alias("_total_minutes"),
+            col("_weather_tenths").sum().alias("_tenths_sum"),
         )
         .with_columns(
             _round_half_away(ctx, lit(100.0) * col("weather_delayed") / col("total_flights"), 2).alias(
                 "weather_delay_rate_pct"
             ),
             _round_half_away(ctx, col("_avg_weather"), 2).alias("avg_weather_delay_min"),
-            _round_half_away(ctx, col("_total_minutes"), 0).alias("total_weather_minutes"),
+            ((col("_tenths_sum") + lit(5)) / lit(10)).floor().alias("total_weather_minutes"),
         )
         .select(
             "month",
@@ -572,7 +578,7 @@ def busiest_routes_expression_impl(ctx: DataFrameContext) -> Any:
             "avg_duration_min",
             "ontime_pct",
         )
-        .sort("total_flights", descending=True)
+        .sort(["total_flights", "origin", "dest"], descending=[True, False, False])
         .limit(25)
     )
 
@@ -707,7 +713,7 @@ def hub_connectivity_expression_impl(ctx: DataFrameContext) -> Any:
             "total_departures",
             "avg_dep_delay",
         )
-        .sort("total_departures", descending=True)
+        .sort(["total_departures", "origin"], descending=[True, False])
         .limit(30)
     )
 
@@ -980,7 +986,7 @@ def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
             "ontime_pct",
             "avg_route_distance_miles",
         )
-        .sort(["ontime_pct", "reporting_airline"], descending=[True, False])
+        .sort(["ontime_pct", "reporting_airline"], descending=[True, False], nulls_last=True)
     )
 
 
@@ -1060,7 +1066,7 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
             "avg_distance_miles",
             "market_share_pct",
         )
-        .sort("flight_count", descending=True)
+        .sort(["flight_count", "reporting_airline"], descending=[True, False])
         .limit(20)
     )
 
@@ -1192,7 +1198,12 @@ _PANDAS_DERIVED = {
     ),
     "weather": ("_weather_flag", lambda f: (f["weather_delay"] > 0).astype(int)),
     "weather_val": ("_weather_val", lambda f: f["weather_delay"].where(f["weather_delay"] > 0)),
-    "weather_total": ("_weather_total", lambda f: f["weather_delay"].fillna(0)),
+    # Exact integer tenths matching the SQL surface (see the cascade-delays
+    # "late_tenths" derive): NULL delays contribute 0 as SQL's COALESCE.
+    "weather_tenths": (
+        "_weather_tenths",
+        lambda f: (_pandas_round_half_away(f["weather_delay"].fillna(0) * 10, 0)).astype("int64"),
+    ),
     "severe_dep": ("_severely_delayed", lambda f: (f["dep_delay"] > 60).astype(int)),
     "code_a": ("_code_a", lambda f: (f["cancellation_code"] == "A").astype(int)),
     "code_b": ("_code_b", lambda f: (f["cancellation_code"] == "B").astype(int)),
@@ -1259,24 +1270,24 @@ def _make_pandas_impl(row: list[str]) -> Any:
 
 _PANDAS_QUERY_METADATA = """\
 ontime_by_carrier|operated|airline|ontime_raw,delayed_arr_positive|reporting_airline,airline_name|total_flights:flight_id:count;ontime_flights:_ontime:sum;avg_delay_when_late:_delayed_val:mean||avg_delay_when_late:2|ontime_pct:ontime_flights:total_flights:2|ontime_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,ontime_flights,ontime_pct,avg_delay_when_late|
-delay_by_airport|operated_dep|origin_airport|delayed_dep|origin,airport_name,city,state|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_flights:_delayed:sum|total_flights>=100|avg_dep_delay:2;avg_arr_delay:2||avg_dep_delay|False|50|||
+delay_by_airport|operated_dep|origin_airport|delayed_dep|origin,airport_name,city,state|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_flights:_delayed:sum|total_flights>=100|avg_dep_delay:2;avg_arr_delay:2||avg_dep_delay,origin|False,True|50|||
 delay_by_hour|operated_dep_time||dep_hour,delayed_dep|dep_hour|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_count:_delayed:sum||avg_dep_delay:2;avg_arr_delay:2|delay_rate_pct:delayed_count:total_flights:2|dep_hour|True||||
 best_routes|operated_arr|route_city|ontime_raw|origin,dest,origin_city,dest_city|total_flights:flight_id:count;_ontime_sum:_ontime:sum;avg_arr_delay:arr_delay:mean;avg_distance_miles:distance:mean|total_flights>=50|avg_arr_delay:2;avg_distance_miles:0|ontime_pct:_ontime_sum:total_flights:2|ontime_pct,origin,dest|False,True,True|25|_ontime_sum|origin,dest,origin_city,dest_city,total_flights,ontime_pct,avg_arr_delay,avg_distance_miles|
 improvement_trend|||cancelled,ontime,non_cancelled,arr_delay_nc|year|total_flights:flight_id:count;cancelled_flights:_cancelled:sum;ontime_flights:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean||avg_arr_delay:2|cancellation_rate_pct:cancelled_flights:total_flights:2;ontime_pct:ontime_flights:_non_cancelled:2|year|True||_non_cancelled|year,total_flights,cancelled_flights,cancellation_rate_pct,ontime_flights,ontime_pct,avg_arr_delay|
 cascade_delays|operated|airline|cascade,cascade_val,late_tenths|reporting_airline,airline_name|total_flights:flight_id:count;cascade_delayed:_cascade:sum;avg_cascade_delay:_cascade_val:mean;total_tenths:_late_tenths:sum||avg_cascade_delay:2|cascade_rate_pct:cascade_delayed:total_flights:2|cascade_rate_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,cascade_delayed,cascade_rate_pct,avg_cascade_delay,total_cascade_minutes|total_cascade_minutes:total_tenths:10
-weather_impact|operated||weather,weather_val,weather_total|month|total_flights:flight_id:count;weather_delayed:_weather_flag:sum;avg_weather_delay_min:_weather_val:mean;total_weather_minutes:_weather_total:sum||avg_weather_delay_min:2;total_weather_minutes:0|weather_delay_rate_pct:weather_delayed:total_flights:2|month|True|||month,total_flights,weather_delayed,weather_delay_rate_pct,avg_weather_delay_min,total_weather_minutes|
+weather_impact|operated||weather,weather_val,weather_tenths|month|total_flights:flight_id:count;weather_delayed:_weather_flag:sum;avg_weather_delay_min:_weather_val:mean;total_tenths:_weather_tenths:sum||avg_weather_delay_min:2|weather_delay_rate_pct:weather_delayed:total_flights:2|month|True|||month,total_flights,weather_delayed,weather_delay_rate_pct,avg_weather_delay_min,total_weather_minutes|total_weather_minutes:total_tenths:10
 recovery_time|operated_dep_arr||delay_bucket,minutes_recovered,recovered|delay_bucket|flight_count:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;avg_minutes_recovered:_minutes_recovered:mean;_total:flight_id:count;_recovered_sum:_recovered:sum||avg_dep_delay:2;avg_arr_delay:2;avg_minutes_recovered:2|pct_recovered:_recovered_sum:_total:2|avg_dep_delay|True||_total,_recovered_sum||
-busiest_routes|operated|route_state|ontime_raw|origin,dest,origin_city,origin_state,dest_city,dest_state|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_duration_min:actual_elapsed_time:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_duration_min:0|ontime_pct:_ontime_sum:total_flights:2|total_flights|False|25|_ontime_sum||
+busiest_routes|operated|route_state|ontime_raw|origin,dest,origin_city,origin_state,dest_city,dest_state|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_duration_min:actual_elapsed_time:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_duration_min:0|ontime_pct:_ontime_sum:total_flights:2|total_flights,origin,dest|False,True,True|25|_ontime_sum||
 route_reliability||route_city|cancelled,ontime,non_cancelled|origin,dest,origin_city,dest_city|total_scheduled:flight_id:count;cancelled_count:_cancelled:sum;ontime_count:_ontime:sum;_non_cancelled:_non_cancelled:sum;distance_miles:distance:mean|total_scheduled>=100|distance_miles:0|cancellation_rate_pct:cancelled_count:total_scheduled:2;ontime_pct:ontime_count:_non_cancelled:2|ontime_pct,cancellation_rate_pct,origin,dest|False,True,True,True|30|_non_cancelled|origin,dest,origin_city,dest_city,total_scheduled,cancelled_count,cancellation_rate_pct,ontime_count,ontime_pct,distance_miles|
 distance_delay|operated_arr||distance_bucket,ontime_raw|distance_bucket|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime_sum:total_flights:2|avg_distance_miles|True||_ontime_sum||
-hub_connectivity|operated|origin_airport||origin,airport_name,city,state|unique_destinations:dest:nunique;serving_carriers:reporting_airline:nunique;total_departures:flight_id:count;avg_dep_delay:dep_delay:mean||avg_dep_delay:2||total_departures|False|30|||
+hub_connectivity|operated|origin_airport||origin,airport_name,city,state|unique_destinations:dest:nunique;serving_carriers:reporting_airline:nunique;total_departures:flight_id:count;avg_dep_delay:dep_delay:mean||avg_dep_delay:2||total_departures,origin|False,True|30|||
 day_of_week|||day_name,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|day_of_week,day_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|day_of_week|True||_ontime,_non_cancelled||
 seasonal_trends|||month_name,cancelled,arr_delay_nc,ontime,non_cancelled|month,month_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:cancelled_count:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|month|True||_ontime,_non_cancelled|month,month_name,total_flights,cancelled_count,cancellation_rate_pct,avg_arr_delay,ontime_pct|
 holiday_impact|||period,cancelled,arr_delay_nc,ontime,non_cancelled|period|total_flights:flight_id:count;avg_arr_delay:_arr_delay_nc:mean;_cancelled_sum:_cancelled:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:_cancelled_sum:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|avg_arr_delay|False||_cancelled_sum,_ontime,_non_cancelled||
 time_of_day|dep_time||hour_of_day,dep_delay_nc,arr_delay_nc,severe_dep,ontime,non_cancelled|hour_of_day|total_flights:flight_id:count;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;severely_delayed:_severely_delayed:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|hour_of_day|True||_ontime,_non_cancelled||
 carrier_ranking||airline|operated,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|reporting_airline,airline_name|total_scheduled:flight_id:count;operated_flights:_operated:sum;cancelled_flights:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_route_distance_miles:distance:mean|total_scheduled>=1000|avg_dep_delay:2;avg_arr_delay:2;avg_route_distance_miles:0|cancellation_rate_pct:cancelled_flights:total_scheduled:2;ontime_pct:_ontime:_non_cancelled:2|ontime_pct,reporting_airline|False,True||_ontime,_non_cancelled|reporting_airline,airline_name,total_scheduled,operated_flights,cancelled_flights,cancellation_rate_pct,avg_dep_delay,avg_arr_delay,ontime_pct,avg_route_distance_miles|
 cancellation_rate||airline|cancelled,code_a,code_b,code_c,code_d|reporting_airline,airline_name|total_flights:flight_id:count;total_cancelled:_cancelled:sum;carrier_cancellations:_code_a:sum;weather_cancellations:_code_b:sum;nas_cancellations:_code_c:sum;security_cancellations:_code_d:sum|total_flights>=100||cancellation_rate_pct:total_cancelled:total_flights:3|cancellation_rate_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,total_cancelled,cancellation_rate_pct,carrier_cancellations,weather_cancellations,nas_cancellations,security_cancellations|
-market_share|operated|airline|route|reporting_airline,airline_name|flight_count:flight_id:count;routes_served:route:nunique;avg_distance_miles:distance:mean||avg_distance_miles:0|market_share_pct:flight_count:@sum:2|flight_count|False|20|||
+market_share|operated|airline|route|reporting_airline,airline_name|flight_count:flight_id:count;routes_served:route:nunique;avg_distance_miles:distance:mean||avg_distance_miles:0|market_share_pct:flight_count:@sum:2|flight_count,reporting_airline|False,True|20|||
 """
 
 globals().update(

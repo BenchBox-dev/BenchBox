@@ -1338,14 +1338,16 @@ GATES: dict[str, CrossSurfaceGate] = {
     ),
 }
 
-# Staged gates: a load-faithful builder is wired and runnable in report mode, but
-# the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded".
-# FlightData is staged with a clean 40/40-cell run and no known-divergence
-# baseline after its output-contract fixes; promoting it to GATES also
-# refreshes the oracle coverage map, the applicability sweep artifact, and the
-# related registry tests. The next gateable benchmarks (datavault, nyctaxi,
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# FlightData stages here with no known-divergence baseline after its
+# output-contract fixes; promoting it to GATES also refreshes the oracle
+# coverage map, the applicability sweep artifact, and the related registry tests.
+# The next gateable benchmarks (datavault, nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
     "flightdata": CrossSurfaceGate(

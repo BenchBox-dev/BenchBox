@@ -409,6 +409,21 @@ class TestHalfAwayRounding:
         wn_pandas = pandas_frame[pandas_frame["reporting_airline"] == "WN"].iloc[0]
         assert wn_pandas["total_cascade_minutes"] == 21
 
+    @pytest.mark.parametrize(
+        "value, digits, expected",
+        [(2.5, 0, 3.0), (-2.5, 0, -3.0), (0.125, 2, 0.13), (-0.125, 2, -0.13), (2.45, 1, 2.5)],
+    )
+    def test_helpers_match_duckdb_round_at_halves(self, value, digits, expected):
+        """Direct helper-vs-SQL agreement on exact-half inputs (C1)."""
+        import pandas as pd
+
+        from benchbox.core.flightdata.dataframe_queries import _pandas_round_half_away
+
+        duckdb = pytest.importorskip("duckdb")
+        (sql_value,) = duckdb.query(f"SELECT ROUND({value}, {digits})").fetchone()
+        assert float(sql_value) == pytest.approx(expected)
+        assert float(_pandas_round_half_away(pd.Series([value]), digits).iloc[0]) == pytest.approx(expected)
+
 
 class TestCsvNullDialect:
     def test_manifest_resolves_to_null_loading(self, tmp_path):
@@ -420,7 +435,10 @@ class TestCsvNullDialect:
         )
 
         flights_csv = tmp_path / "flights.csv"
-        flights_csv.write_text("flight_id,flight_date,arr_delay\n1,2024-12-01,10.5\n2,2024-12-02,\n", encoding="utf-8")
+        flights_csv.write_text(
+            "flight_id,flight_date,arr_delay,cancellation_code\n1,2024-12-01,10.5,A\n2,2024-12-02,,\n",
+            encoding="utf-8",
+        )
         airlines_csv = tmp_path / "airlines.csv"
         airlines_csv.write_text("code,name\nAA,American\n", encoding="utf-8")
         airports_csv = tmp_path / "airports.csv"
@@ -446,22 +464,100 @@ class TestCsvNullDialect:
         handler = DuckDBNativeHandler(",", None, benchmark, null_marker="")
         assert "nullstr=''" in handler._pipe_nullstr_config()
 
+        # End to end through the adapter load path the builder uses: an empty
+        # VARCHAR field (cancellation_code, unlike DOUBLE arr_delay which
+        # DuckDB nullifies even without nullstr) must load as NULL, not "".
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
         duckdb = pytest.importorskip("duckdb")
         conn = duckdb.connect(":memory:")
         try:
-            value = conn.execute(
-                f"SELECT arr_delay FROM read_csv('{flights_csv}', header=true, nullstr='') ORDER BY flight_id"
-            ).fetchall()
-            assert value[0][0] == 10.5
+            conn.execute(
+                "CREATE TABLE flights (flight_id INTEGER, flight_date DATE, "
+                "arr_delay DOUBLE, cancellation_code VARCHAR)"
+            )
+            conn.execute("CREATE TABLE airlines (code VARCHAR, name VARCHAR)")
+            conn.execute("CREATE TABLE airports (code VARCHAR, name VARCHAR)")
+            DuckDBAdapter(database=":memory:").load_data(benchmark, conn, tmp_path)
+            value = conn.execute("SELECT arr_delay, cancellation_code FROM flights ORDER BY flight_id").fetchall()
+            assert value[0] == (10.5, "A")
             assert value[1][0] is None
+            assert value[1][1] is None
         finally:
             conn.close()
+
+    def test_stale_manifest_backfilled_to_null_loading(self, tmp_path):
+        """Caches generated before the null-marker fix are healed in place."""
+        import json
+
+        from benchbox.core.flightdata.downloader import FlightDataDownloader
+
+        manifest = {
+            "benchmark": "flightdata",
+            "tables": {
+                "flights": {"formats": {"csv": [{"path": "flights.csv", "metadata": {"csv_delimiter": ","}}]}},
+                "airlines": {"formats": {"csv": [{"path": "airlines.csv", "metadata": {"csv_null_marker": None}}]}},
+            },
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+        assert downloader.backfill_csv_dialect_metadata() is True
+        healed = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
+        tables = healed["tables"]
+        assert tables["flights"]["formats"]["csv"][0]["metadata"]["csv_null_marker"] == ""
+        assert tables["airlines"]["formats"]["csv"][0]["metadata"]["csv_null_marker"] == ""
+        assert downloader.backfill_csv_dialect_metadata() is False
+
+    def test_backfill_ignores_foreign_manifest(self, tmp_path):
+        import json
+
+        from benchbox.core.flightdata.downloader import FlightDataDownloader
+
+        (tmp_path / "_datagen_manifest.json").write_text(
+            json.dumps({"benchmark": "tpch", "tables": {}}), encoding="utf-8"
+        )
+        downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+        assert downloader.backfill_csv_dialect_metadata() is False
+
+
+class TestOutputContractInvariants:
+    """Static guards so the two implicit contracts stay enforceable."""
+
+    def _catalog_sql(self):
+        from benchbox.core.flightdata.benchmark import FlightDataBenchmark
+
+        benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir="/tmp/fd-invariant")
+        return benchmark.get_queries()
+
+    def test_top_n_orders_end_in_unique_key(self):
+        """Every ORDER BY ... LIMIT must carry tiebreaker keys (L3)."""
+        for key, sql in self._catalog_sql().items():
+            if "LIMIT" not in sql:
+                continue
+            order = sql.split("ORDER BY", 1)[1].split("LIMIT", 1)[0]
+            keys = [k.strip() for k in order.split(",") if k.strip()]
+            assert len(keys) >= 2, f"{key}: top-N ORDER BY has no tiebreaker: {order!r}"
+
+    def test_no_float_sum_rounding_in_sql(self):
+        """ROUND(SUM(<float>), 0) flips on summation order; totals use integer tenths (L3)."""
+        for key, sql in self._catalog_sql().items():
+            assert "ROUND(SUM(" not in sql, f"{key}: float-sum rounding must use integer tenths"
 
 
 class TestExpressionEngineParity:
     @pytest.mark.parametrize(
         "query_key",
-        ["ontime-by-carrier", "improvement-trend", "delay-causes", "cascade-delays", "time-of-day"],
+        [
+            "ontime-by-carrier",
+            "improvement-trend",
+            "delay-causes",
+            "cascade-delays",
+            "time-of-day",
+            "weather-impact",
+            "best-routes",
+            "route-reliability",
+            "delay-by-hour",
+        ],
     )
     def test_polars_datafusion_agree(self, query_key, polars_ctx, datafusion_ctx):
         from benchbox.core.flightdata.dataframe_queries import get_dataframe_queries

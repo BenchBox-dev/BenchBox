@@ -163,6 +163,10 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         repaired = self.downloader.repair_reusable_layout()
         if repaired:
             self.tables = repaired
+        else:
+            # Heal pre-fix manifests whose entries lack the empty-means-NULL
+            # marker; the runner reuses such caches without regenerating.
+            self.downloader.backfill_csv_dialect_metadata()
 
     @staticmethod
     def _flatten_table_paths(tables: dict[str, Path | list[Path]]) -> list[Path]:
