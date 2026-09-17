@@ -6725,10 +6725,15 @@
       "title": "Full public-site visual regression suite"
     },
     "full-string-to-array-support-returning-actual-list-expressio": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T17:02:33Z",
+        "generation": "51af0364343d411191cebce114097416",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Full string_to_array support (returning actual list expressions, not split_part proxy)"
     },
     "future-ideas-backlog": {
