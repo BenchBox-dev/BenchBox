@@ -3938,6 +3938,33 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
 
         return UnifiedLazyFrame(result, self._adapter)
 
+    def agg(self, *exprs: Expr | list) -> UnifiedLazyFrame:
+        """Global (ungrouped) aggregation over the whole frame.
+
+        A frame-level ``agg`` is exactly a select of aggregate expressions:
+        - Polars: ``select`` with aggregate expressions yields one row.
+        - PySpark: ``select`` with aggregate expressions is a global aggregation.
+        - DataFusion: :meth:`select` routes aggregate expressions to
+          ``aggregate([])``.
+
+        Only plain column aggregates (``sum``/``mean``/``count``/``min``/``max``
+        over a single column) are portable here. Do not combine aggregates with
+        arithmetic inside ``agg``: precompute row-level values with
+        :meth:`with_columns` first, or apply arithmetic to the aggregated
+        columns in a later :meth:`select`.
+
+        Delegating to :meth:`select` keeps one backend-routing implementation
+        instead of a second per-backend branch here.
+
+        Args:
+            *exprs: Aliased aggregate expressions (may be UnifiedExpr).
+                    Also accepts a single list of expressions for convenience.
+
+        Returns:
+            UnifiedLazyFrame with a single row of aggregation results
+        """
+        return self.select(*exprs)
+
     # =========================================================================
     # Unique/Distinct Operations
     # =========================================================================
