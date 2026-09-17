@@ -3837,15 +3837,10 @@
       "title": "Staged Data Vault cross-surface gate plus static frame-API check"
     },
     "datavault-cross-surface-query-execution-burn-down": {
-      "claim": {
-        "expires_at": "2026-09-18T00:50:15Z",
-        "generation": "d676a3ae3bf2472aadae5bef24dfe1e1",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Burn down Data Vault cross-surface query execution defects"
     },
     "datavault-empty-aggregate-null-sweep-q6-q14-q19": {
