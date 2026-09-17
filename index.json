@@ -11492,15 +11492,10 @@
       "title": "Stop returning EXPLAIN error strings as plan text in the inline get_query_plan impls"
     },
     "qpc-14-history-fingerprint-version-guard": {
-      "claim": {
-        "expires_at": "2026-09-18T14:31:26Z",
-        "generation": "a8ba7d2f0cb141148540dab5627534f9",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Make plan-history flap/version detection fingerprint_version-aware"
     },
     "qpc-15-dataframe-capture-error-persistence": {
