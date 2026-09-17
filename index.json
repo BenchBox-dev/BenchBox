@@ -10610,15 +10610,10 @@
       "title": "Test source-type-aware SQLite division in a bounded Polyglot extension"
     },
     "port-the-same-fixes-to-the-sibling-spark-family-adapters-lak": {
-      "claim": {
-        "expires_at": "2026-09-18T14:50:44Z",
-        "generation": "b948f141f1f84f9b81664bdf6bb8caf6",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Port the same fixes to the sibling Spark-family adapters: lakesail.py (has defect 2 at ~292-295 and defect 3 at ~531-533; its CLI flag is already BooleanOptionalAction so --no-adaptive-enabled current"
     },
     "post-1578-mirror-published-results-corpus": {
