@@ -6657,15 +6657,10 @@
       "title": "Flight Data Benchmark - US Aviation On-Time Performance Analytics"
     },
     "flightdata-cross-surface-output-contract-burn-down": {
-      "claim": {
-        "expires_at": "2026-09-18T13:14:45Z",
-        "generation": "63bd540aa976415bbdd33eacb38ecb76",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Burn down FlightData SQL/DataFrame output-contract divergences"
     },
     "flightdata-dataframe-date-params-miss-the-generated-data": {
