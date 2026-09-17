@@ -49,9 +49,13 @@ Heavy-tier pull_request minutes by job:
 Failure attribution in the window:
 
 - The heavy tier failed in 11 `pull_request` runs on 8 branches
-  (medium-test 10, correctness-gate 2, everything else 0). Every one has a
-  later run on the same branch with the failed jobs green, so each was fixed
-  before merge. Two were dependency upgrades (pandas 3, sqlglot).
+  (medium-test 10, correctness-gate 2, everything else 0). For each one the
+  manifest pins the earliest later `pull_request` run on the same branch
+  whose previously-failed jobs are all green on a different SHA, and the
+  replay validates every pin. Two were dependency upgrades (pandas 3,
+  sqlglot). Merge ordering is not a replayed fact — run payloads carry no
+  merge timestamps — so recovery before merge is branch-history inference,
+  stated as such.
 - No `merge_group` run has a gating heavy-tier failure (medium-test,
   correctness-gate, plan-capture-gate, tpch-binary-framing: 0 failures in
   318 code-routed runs). The single postgres-integration failure in the
@@ -71,9 +75,14 @@ negative durations, matching the baseline collectors.
 
 Expected effect: about 29,000 fewer `pull_request` runner-minutes per
 25 days, with typical code-PR feedback moving from medium-test's p50
-(~21 min) toward code-test's p50 (~14 min). The planning figure for the
-worst case, if every historical pre-merge catch instead reached the queue,
-is about 3,900 additional queue minutes per 25 days.
+(~21 min) toward code-test's p50 (~14 min). That 29,000 is an upper
+bound, not the expected saving: it sums the whole historical heavy tier,
+including soundness-path and packaging runs that keep the full tier under
+section 3's carve-outs. The pinned cohort carries no per-run classifier
+or changed-path data with which to subtract those runs, so no tighter
+figure is claimed. The planning figure for the worst case, if every
+historical pre-merge catch instead reached the queue, is about 3,900
+additional queue minutes per 25 days.
 
 ## 2. Proposal
 

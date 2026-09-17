@@ -195,6 +195,40 @@ def heavy_failures(
     return sorted(found, key=lambda row: row["run_id"])
 
 
+def check_later_green(runs: dict[str, Any], jobs: dict[str, Any], expected: list[dict[str, Any]]) -> None:
+    """Require each pinned failure to have a later same-branch green run.
+
+    For every heavy-tier failure the manifest pins the earliest later
+    ``pull_request`` run on the same branch whose previously-failed jobs all
+    conclude ``success``, on a different head SHA. This validates the
+    recovery half of the baseline; merge ordering itself is not pinned
+    because run payloads carry no merge timestamps.
+    """
+    for entry in expected:
+        failed_id = str(entry["failed_run_id"])
+        later_id = str(entry["later_run_id"])
+        failed = runs.get(failed_id)
+        later = runs.get(later_id)
+        if failed is None or later is None:
+            raise ReplayError(f"later-green entry references an unknown run: {entry!r}")
+        if later.get("event") != "pull_request":
+            raise ReplayError(f"later run {later_id} is not a pull_request run")
+        if str(later.get("head_branch")) != str(failed.get("head_branch")):
+            raise ReplayError(f"later run {later_id} is on a different branch")
+        if not str(later.get("created_at") or "") > str(failed.get("created_at") or ""):
+            raise ReplayError(f"later run {later_id} is not later than {failed_id}")
+        if str(later.get("head_sha") or "") == str(failed.get("head_sha") or ""):
+            raise ReplayError(f"later run {later_id} replays the same SHA as {failed_id}")
+        conclusions = {}
+        for job in jobs.get(later_id, []):
+            if job.get("conclusion") in (None, "skipped"):
+                continue
+            conclusions.setdefault(normalize_job_name(str(job.get("name") or "")), job["conclusion"])
+        ungreen = [name for name in entry["failed_jobs"] if conclusions.get(name) != "success"]
+        if ungreen:
+            raise ReplayError(f"later run {later_id} is not green for {ungreen}")
+
+
 def _assert_close(actual: float, expected: float, tolerance: float, label: str) -> None:
     if not math.isclose(actual, expected, abs_tol=tolerance):
         raise ReplayError(f"{label} differs: expected {expected!r}, got {actual!r}")
@@ -239,21 +273,25 @@ def _gh_api(path: str) -> Any:
 
 
 def _rate_limit_remaining() -> int:
+    # Authenticated pool first: an unauthenticated api.github.com request
+    # succeeds but reports the anonymous allowance (tens of requests), which
+    # would always refuse a replay the token pool could afford.
+    completed = subprocess.run(
+        ["gh", "api", "rate_limit", "--jq", ".resources.core.remaining"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        return int(completed.stdout.strip())
+    except ValueError:
+        pass
     try:
         with urllib.request.urlopen("https://api.github.com/rate_limit", timeout=15) as response:
             payload = json.loads(response.read().decode("utf-8"))
         return int(payload["resources"]["core"]["remaining"])
     except (OSError, ValueError, KeyError, TypeError):
-        completed = subprocess.run(
-            ["gh", "api", "rate_limit", "--jq", ".resources.core.remaining"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        try:
-            return int(completed.stdout.strip())
-        except ValueError:
-            return -1
+        return -1
 
 
 def fetch_live(repo: str, manifest: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -362,6 +400,7 @@ def verify_aggregates(manifest: dict[str, Any], runs: dict[str, Any], jobs: dict
     failures_pr = heavy_failures(runs, jobs, "pull_request")
     failures_mg = heavy_failures(runs, jobs, "merge_group")
     check_failures(failures_pr, manifest["heavy_failures_pull_request"], "pull_request")
+    check_later_green(runs, jobs, manifest["later_green_runs"])
     gating_mg = [row for row in failures_mg if row["gating"]]
     if gating_mg != []:
         raise ReplayError(f"merge_group gating failures differ: got {gating_mg!r}")
@@ -466,6 +505,47 @@ def self_test() -> None:
     _expect_replay_error(
         "altered failure set",
         lambda: check_failures([{"run_id": 9, "failed_jobs": ["medium-test"]}], [], "pull_request"),
+    )
+    lg_runs = {
+        "1": {
+            "id": 1,
+            "event": "pull_request",
+            "created_at": "2026-09-01T00:00:00Z",
+            "head_branch": "feat/x",
+            "head_sha": "a" * 40,
+        },
+        "2": {
+            "id": 2,
+            "event": "pull_request",
+            "created_at": "2026-09-02T00:00:00Z",
+            "head_branch": "feat/x",
+            "head_sha": "b" * 40,
+        },
+    }
+    lg_jobs = {
+        "1": [dict(good, conclusion="failure")],
+        "2": [dict(good)],
+    }
+    check_later_green(
+        lg_runs,
+        lg_jobs,
+        [{"failed_run_id": 1, "later_run_id": 2, "failed_jobs": ["medium-test"]}],
+    )
+    _expect_replay_error(
+        "same-SHA later run",
+        lambda: check_later_green(
+            {**lg_runs, "2": {**lg_runs["2"], "head_sha": "a" * 40}},
+            lg_jobs,
+            [{"failed_run_id": 1, "later_run_id": 2, "failed_jobs": ["medium-test"]}],
+        ),
+    )
+    _expect_replay_error(
+        "ungreen later run",
+        lambda: check_later_green(
+            lg_runs,
+            {"1": lg_jobs["1"], "2": [dict(good, conclusion="failure")]},
+            [{"failed_run_id": 1, "later_run_id": 2, "failed_jobs": ["medium-test"]}],
+        ),
     )
     print(
         "PASS: name normalization, duration parsing with fail-open exclusions, "

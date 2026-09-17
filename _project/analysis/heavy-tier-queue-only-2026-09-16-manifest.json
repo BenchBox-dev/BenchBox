@@ -1301,7 +1301,7 @@
     "medium-test": 217,
     "correctness-gate": 179
   },
-  "later_green_note": "All 11 pull_request heavy-failure runs have a later run on the same head_branch with the failed jobs concluding success (8 distinct branches; dependency upgrades: feat/pandas-3-migration, feat/sqlglot-upgrade). Branch-to-PR-number mapping was not pinned: the collected runs payloads carry an empty pull_requests list.",
+  "later_green_note": "For each of the 11 pull_request heavy-tier failures the manifest pins the earliest later pull_request run on the same branch whose previously-failed jobs all conclude success, on a different head SHA; the replay validates every pin. 8 distinct branches; dependency upgrades: feat/pandas-3-migration, feat/sqlglot-upgrade. Merge ordering is NOT pinned: run payloads carry no merge timestamps and the branch-to-PR-number mapping was empty in the collection, so 'fixed before merge' is branch-history inference, not a replayed fact.",
   "merge_group_gating_note": "No merge_group run in the window has a gating heavy-tier failure (medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing). The single postgres-integration failure (run 34135929941) is a 13-second continue-on-error sample failure on an otherwise successful run.",
   "expected": {
     "pull_request": {
@@ -1668,5 +1668,118 @@
         }
       }
     }
-  }
+  },
+  "later_green_runs": [
+    {
+      "failed_run_id": 32659773083,
+      "later_run_id": 32674468621,
+      "head_branch": "fix/tpcds-official-end-to-end-guard",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "2624dd4c9cf03d264269929717441e1a6d099e60",
+      "later_created_at": "2026-08-23T23:43:44Z"
+    },
+    {
+      "failed_run_id": 32661865186,
+      "later_run_id": 32663049208,
+      "head_branch": "fix/platforms-list-readable-at-80-columns",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "e059066d9cae7dca40874ea80d87c1ff1a9b9fb4",
+      "later_created_at": "2026-08-23T20:00:29Z"
+    },
+    {
+      "failed_run_id": 32725614048,
+      "later_run_id": 32729852734,
+      "head_branch": "fix/dataframe-runs-that-execute-no-queries",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "918a214d62a22ba142731ffd4fec3b68d9440fc9",
+      "later_created_at": "2026-08-24T12:57:01Z"
+    },
+    {
+      "failed_run_id": 33288035987,
+      "later_run_id": 33290174614,
+      "head_branch": "fix/cpu-identity-capture-source",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "1799fae87b048ff1f187c1440335398c9d9d91d6",
+      "later_created_at": "2026-08-30T03:24:07Z"
+    },
+    {
+      "failed_run_id": 33288823136,
+      "later_run_id": 33290174614,
+      "head_branch": "fix/cpu-identity-capture-source",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "1799fae87b048ff1f187c1440335398c9d9d91d6",
+      "later_created_at": "2026-08-30T03:24:07Z"
+    },
+    {
+      "failed_run_id": 34366388157,
+      "later_run_id": 34370037477,
+      "head_branch": "feat/pr-batch-process-improvements",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "0262f72628b956dae5789ff77e3ddd863f55a680",
+      "later_created_at": "2026-09-09T15:24:29Z"
+    },
+    {
+      "failed_run_id": 34857007284,
+      "later_run_id": 34863943533,
+      "head_branch": "feat/pandas-3-migration",
+      "failed_jobs": [
+        "correctness-gate"
+      ],
+      "later_head_sha": "385cc4c37d69eea66c6bb6510d9e8aac81ebdac2",
+      "later_created_at": "2026-09-14T15:42:40Z"
+    },
+    {
+      "failed_run_id": 34858342600,
+      "later_run_id": 34862061202,
+      "head_branch": "feat/sqlglot-upgrade",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "26baedfdcd7d50c8ead2cf64865f3efbdc857eff",
+      "later_created_at": "2026-09-14T15:25:34Z"
+    },
+    {
+      "failed_run_id": 34859429736,
+      "later_run_id": 34863943533,
+      "head_branch": "feat/pandas-3-migration",
+      "failed_jobs": [
+        "correctness-gate",
+        "medium-test"
+      ],
+      "later_head_sha": "385cc4c37d69eea66c6bb6510d9e8aac81ebdac2",
+      "later_created_at": "2026-09-14T15:42:40Z"
+    },
+    {
+      "failed_run_id": 34985829807,
+      "later_run_id": 35010023987,
+      "head_branch": "feat/pr-local-validation-singleflight",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "79a3cc808bc9c9473e639dfd1c8dc79a768da9f0",
+      "later_created_at": "2026-09-15T18:51:01Z"
+    },
+    {
+      "failed_run_id": 34990506029,
+      "later_run_id": 35010023987,
+      "head_branch": "feat/pr-local-validation-singleflight",
+      "failed_jobs": [
+        "medium-test"
+      ],
+      "later_head_sha": "79a3cc808bc9c9473e639dfd1c8dc79a768da9f0",
+      "later_created_at": "2026-09-15T18:51:01Z"
+    }
+  ]
 }
