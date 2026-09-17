@@ -11499,17 +11499,12 @@
       "title": "Apply ordinal-column (#0/#1) fingerprint protection to filter/join/projection too"
     },
     "qpc-13-explain-error-string-inline-impls-sweep": {
-      "claim": {
-        "expires_at": "2026-09-18T15:47:43Z",
-        "generation": "530648b611a84bac8b769db21404c6a4",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [
         "qpc-05-silent-failure-surfacing"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Stop returning EXPLAIN error strings as plan text in the inline get_query_plan impls"
     },
     "qpc-14-history-fingerprint-version-guard": {
