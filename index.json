@@ -1685,6 +1685,13 @@
       "status": "open",
       "title": "Skip post-merge fast and medium tests on develop commits the merge queue already passed"
     },
+    "ci-dedupe-02-hourly-sweep-skip-tested-tip": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the hourly post-merge sweep exit when the develop tip is already tested"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],

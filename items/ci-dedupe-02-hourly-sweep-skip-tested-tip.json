@@ -1,0 +1,15 @@
+{
+  "acceptance": [
+    "Workflow tests cover: tip with successful push run exits early; tip with failed push run exits early; tip with cancelled or missing push run runs the gates; lookup error runs the gates.",
+    "A simulated dropped-push case (no push run for the tip) still runs the full sweep gates.",
+    "After landing, 24 hours of scheduled runs show early exits on covered tips and the covering run ID in each step summary.",
+    "Post-landing note reports scheduled runner-minutes for the first 7 days against the ~5,000 per 25 days baseline."
+  ],
+  "context": "Guardrails:\n1. Covered means either (a) a `develop-post-merge.yml` push run for the exact tip SHA that reached a terminal conclusion of `success` or `failure`, or (b) the tip is queue-certified under the exact rule in ci-dedupe-01. A `cancelled`, `startup_failure`, missing, or still-running push run is NOT coverage; the sweep runs.\n2. Fail open. Any lookup error runs the gates.\n3. Do not change the push-drop gap detector (`develop-post-merge-gap-detector.yml`); it keeps instrumenting missing push runs independently.\n4. Mutation jobs stay disabled on schedule exactly as today.\n5. Keep the hourly cadence; this item changes what a sweep does, not how often it fires.\n6. Scheduled failures on an unchanged SHA are flake signal, not regressions. Do not add new alerting here; route flakes to their own items.",
+  "description": "The `schedule` trigger in `develop-post-merge.yml` exists to cover dropped push events. It currently re-runs lint, fast-test, and explorer-tokens on the develop tip every hour, whether or not that tip was already tested.\n\nEvidence (2026-08-23 to 2026-09-16): 204 of 204 scheduled runs were on a SHA that already had a push run. Sampled scheduled runs cost 18-26 runner-minutes each, roughly 5,000 runner-minutes over the window. Tip a4599a9 was swept three consecutive times unchanged.\n\nChange: the sweep first checks whether the tip SHA is already covered. It exits with a step-summary note when covered, and runs the existing gates otherwise.",
+  "links": [
+    ".github/workflows/develop-post-merge.yml",
+    ".github/workflows/develop-post-merge-gap-detector.yml",
+    "docs/operations/develop-post-merge-gaps.md"
+  ]
+}
