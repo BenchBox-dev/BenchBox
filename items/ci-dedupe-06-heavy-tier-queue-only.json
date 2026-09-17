@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Workflow unit tests cover: code PR without carve-out skips the heavy tier and the umbrella passes; soundness-path PR and packaging PR run it; merge_group always runs it; heavy job skipped on merge_group fails the umbrella; heavy job run-and-failed on a PR fails the umbrella; classifier error fails closed to running the heavy tier.",
+    "ruleset_drift_check reports no change to required checks or queue parameters.",
+    "Governance docs, the TPC-H framing comment, certification_kind, and repo-admin-settings are updated in the same PR.",
+    "First 5 code PRs after landing show the light PR lane and a full heavy tier in their merge_group runs.",
+    "The PR body contains the ready-to-apply rollback plan."
+  ],
+  "context": "Implementation shape (change only if the decision record says so):\n- `ci-paths` emits `heavy-needed` = needs-code-ci AND (event is merge_group OR soundness paths touched OR packaging-needed). Soundness uses the union of base-ref and PR copies of `_project/scripts/auto_merge_soundness_paths.py`, stdlib only, fail-closed to true on any error.\n- Each heavy job conditions on `heavy-needed`. Integration samples keep `continue-on-error`.\n- `ci-required-result`: when heavy-needed is true, medium-test, correctness-gate, plan-capture-gate, and tpch-binary-framing must be `success`; when false they must be `skipped`; anything else fails. Keep `if: always()` on the umbrella so it is never skipped (a skipped required check counts as passing).\n\nGuardrails:\n1. Required check names, ruleset 15611785, and merge queue parameters are unchanged. Verify with `scripts/ruleset_drift_check.py`.\n2. code-test and all promoted slow reproducers stay on pull_request runs.\n3. merge_group never skips the heavy tier for a code-routed tree; a unit test pins this.\n4. The event name comes only from `github.event_name`; no PR label, body, or input can select the light path.\n5. Update, in the same PR: merge-queue-governance.md section 2, the pr.yml TPC-H framing comment, `certification_kind` in `certification-identity` (PR runs without the heavy tier must not claim `full`), and repo-admin-settings.md.\n6. Land after ci-dedupe-05 so local medium coverage exists before the PR lane drops it.\n7. Pre-author the revert PR description (the exact files and hunks to restore) in the PR body, so rollback is one step.\n8. Do not widen the moved set in this item. Any further job (code-test split, browser suite) needs a new decision item.",
+  "description": "Implement the approved decision from ci-dedupe-04: pull_request runs of `pr.yml` skip medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, and the three integration samples, unless a carve-out applies. merge_group runs keep the full tier on every code-routed tree.\n\nExpected effect from the 2026-08-23 to 2026-09-16 baseline: about 29,000 fewer pull_request runner-minutes per 25 days and typical PR feedback near code-test's p50 (13.5 min) instead of medium-test's (21.2 min). The worst case adds about 3,900 queue runner-minutes if all historical catches reached the queue.",
+  "links": [
+    ".github/workflows/pr.yml",
+    "scripts/path_filter_decision.py",
+    "_project/scripts/auto_merge_soundness_paths.py",
+    ".github/workflows/auto-merge-on-open.yml",
+    "scripts/ruleset_drift_check.py",
+    "docs/operations/merge-queue-governance.md",
+    "docs/operations/repo-admin-settings.md",
+    "tests/unit/workflows/test_pr_workflow_outputs.py"
+  ]
+}
