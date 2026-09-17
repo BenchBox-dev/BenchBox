@@ -3834,6 +3834,15 @@
       "status": "active",
       "title": "Burn down Data Vault cross-surface query execution defects"
     },
+    "datavault-empty-aggregate-null-sweep-q6-q14-q19": {
+      "claim": null,
+      "needs": [
+        "datavault-cross-surface-query-execution-burn-down"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Data Vault empty-aggregate NULL sweep for Q6/Q14/Q19"
+    },
     "datavault-sha256-hash-migration": {
       "claim": null,
       "needs": [],

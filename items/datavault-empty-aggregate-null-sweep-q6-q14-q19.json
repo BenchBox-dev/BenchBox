@@ -1,0 +1,6 @@
+{
+  "acceptance": [
+    "Q6/Q14/Q19 empty-set behavior matches the SQL reference on expression and pandas backends"
+  ],
+  "description": "Data Vault Q6/Q14/Q19 still return 0.0 or NaN instead of SQL NULL over an empty input set (flagged as N5 in the independent adversarial review of datavault-cross-surface-query-execution-burn-down). Untriggered with default parameters, so split out of the burn-down. Apply the Q17 when/otherwise single-pass NULL pattern to each."
+}
