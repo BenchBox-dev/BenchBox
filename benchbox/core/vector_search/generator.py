@@ -27,7 +27,7 @@ from typing import Union
 
 import numpy as np
 
-from benchbox.core.manifest_utils import write_generator_manifest
+from benchbox.core.manifest_utils import write_delimited_manifest
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 
@@ -202,15 +202,4 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return file_path
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
-        write_generator_manifest(
-            self,
-            "vector_search",
-            table_paths,
-            self._manifest_row_counts,
-            metadata={
-                "csv_delimiter": "|",
-                "csv_has_header": True,
-                "csv_null_marker": None,
-                "csv_normalize_booleans": False,
-            },
-        )
+        write_delimited_manifest(self, "vector_search", table_paths, self._manifest_row_counts, has_header=True)

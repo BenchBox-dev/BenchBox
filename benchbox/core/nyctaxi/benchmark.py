@@ -301,7 +301,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 metadata={
                     "csv_delimiter": ",",
                     "csv_has_header": True,
-                    "csv_null_marker": None,
+                    "csv_null_marker": "",
                     "csv_normalize_booleans": False,
                 },
             )
