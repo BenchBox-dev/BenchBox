@@ -90,8 +90,13 @@ def evaluate(run: Path, system: str) -> None:
             cases.append(case)
             seen.add(key)
     torch.set_num_threads(4)
-    cold = mono_time()
+    # Shared CodeT5 tokenizer setup stays outside the measured cold window:
+    # it is identical for every system under test, so starting the clock
+    # before it would attribute CodeT5 download/cache lookup, init time,
+    # and resident memory to the sqlglot/benchbox baselines. Model-specific
+    # loading below stays inside the window.
     tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
+    cold = mono_time()
     model = None
     model_identity = None
     if system in ("full", "edit"):
@@ -261,8 +266,10 @@ def report(run: Path) -> None:
         lines.extend(
             [
                 "",
-                f"{system}: cold loading {summary['cold_seconds']:.2f}s; "
-                f"sampled peak RSS {summary['peak_sampled_rss']} bytes.",
+                f"{system}: cold loading {summary['cold_seconds']:.2f}s "
+                f"(excludes shared tokenizer setup); "
+                f"sampled peak RSS {summary['peak_sampled_rss']} bytes "
+                f"(shared tokenizer resident for all systems).",
             ]
         )
         if summary["model_identity"]:
