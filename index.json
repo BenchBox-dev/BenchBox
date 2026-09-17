@@ -1708,9 +1708,9 @@
     },
     "ci-dedupe-05-pr-preflight-medium-tier": {
       "claim": {
-        "expires_at": "2026-09-18T15:31:14Z",
-        "generation": "0e2c5e1c24cf4f55a2739625bad6c21c",
-        "renewals": 0,
+        "expires_at": "2026-09-18T21:11:20Z",
+        "generation": "96759463689a4453a94ff88119272474",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
       },
       "needs": [
