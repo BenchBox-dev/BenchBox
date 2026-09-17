@@ -49,6 +49,15 @@ sys.modules[_BROWSER_GATE_SPEC.name] = gate_mod
 _BROWSER_GATE_SPEC.loader.exec_module(gate_mod)
 
 SHA = "a" * 40
+
+
+def _certify(*args: object, **kwargs: object) -> dict[str, object]:
+    """Call the lookup as a push to develop unless the test says otherwise."""
+    kwargs.setdefault("event", "push")
+    kwargs.setdefault("ref", "refs/heads/develop")
+    return qcert.find_certifying_run(*args, **kwargs)  # type: ignore[arg-type]
+
+
 OTHER_SHA = "b" * 40
 REPO = "BenchBox-dev/BenchBox"
 TOKEN = "test-token"
@@ -140,7 +149,7 @@ def test_certified_sha_with_successful_queue_run_and_required_result() -> None:
         [_run_record(101)],
         {101: [_job("ci-required-result"), _job("medium-test")]},
     )
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
+    result = _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
     assert result == {
         "certified": True,
         "run_id": 101,
@@ -150,7 +159,7 @@ def test_certified_sha_with_successful_queue_run_and_required_result() -> None:
 
 def test_uncertified_sha_without_matching_run_runs_full_gates() -> None:
     routes = _pr_routes([_run_record(101, head_sha=OTHER_SHA)], {101: [_job("ci-required-result")]})
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
+    result = _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
     assert result["certified"] is False
     assert result["run_id"] is None
 
@@ -160,7 +169,7 @@ def test_non_success_queue_run_does_not_certify() -> None:
         [_run_record(101, conclusion="failure")],
         {101: [_job("ci-required-result", "failure")]},
     )
-    assert qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
+    assert _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
 
 
 def test_pull_request_event_run_does_not_certify() -> None:
@@ -168,7 +177,7 @@ def test_pull_request_event_run_does_not_certify() -> None:
         [_run_record(101, event="pull_request")],
         {101: [_job("ci-required-result")]},
     )
-    assert qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
+    assert _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
 
 
 def test_wrong_workflow_path_does_not_certify() -> None:
@@ -176,7 +185,7 @@ def test_wrong_workflow_path_does_not_certify() -> None:
         [_run_record(101, path=".github/workflows/other.yml")],
         {101: [_job("ci-required-result")]},
     )
-    assert qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
+    assert _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
 
 
 def test_required_result_not_success_does_not_certify() -> None:
@@ -185,26 +194,46 @@ def test_required_result_not_success_does_not_certify() -> None:
             [_run_record(101)],
             {101: [_job("ci-required-result", conclusion), _job("medium-test")]},
         )
-        result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
+        result = _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
         assert result["certified"] is False, conclusion
 
 
 def test_missing_required_result_job_does_not_certify() -> None:
     routes = _pr_routes([_run_record(101)], {101: [_job("medium-test")]})
-    assert qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
+    assert _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))["certified"] is False
 
 
 def test_api_failure_fails_open() -> None:
     routes = _pr_routes([_run_record(101)], {101: [_job("ci-required-result")]})
     opener = _fake_urlopen(routes, failures={f"https://api.github.com/repos/{REPO}/actions/runs/101/jobs"})
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=opener)
+    result = _certify(SHA, REPO, TOKEN, urlopen=opener)
     assert result["certified"] is False
     assert "lookup failed open" in str(result["reason"])
 
 
 def test_missing_credentials_fail_open() -> None:
-    result = qcert.find_certifying_run(SHA, REPO, "")
+    result = _certify(SHA, REPO, "")
     assert result["certified"] is False
+
+
+def test_ineligible_events_make_no_api_calls() -> None:
+    def _forbidden(request: object, timeout: object = None) -> object:
+        raise AssertionError("no API call may happen for ineligible events")
+
+    for event in ("schedule", "workflow_dispatch", "pull_request", "merge_group", ""):
+        result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_forbidden, event=event, ref="refs/heads/develop")
+        assert result["certified"] is False
+        assert "never queue-certified" in str(result["reason"])
+
+
+def test_ineligible_refs_make_no_api_calls() -> None:
+    def _forbidden(request: object, timeout: object = None) -> object:
+        raise AssertionError("no API call may happen for ineligible refs")
+
+    for ref in ("refs/heads/release", "refs/pull/1/merge", ""):
+        result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_forbidden, event="push", ref=ref)
+        assert result["certified"] is False
+        assert "never queue-certified" in str(result["reason"])
 
 
 def test_newest_successful_run_wins_over_older_failure() -> None:
@@ -217,7 +246,7 @@ def test_newest_successful_run_wins_over_older_failure() -> None:
             101: [_job("ci-required-result")],
         },
     )
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
+    result = _certify(SHA, REPO, TOKEN, urlopen=_fake_urlopen(routes))
     assert result["certified"] is True
     assert result["run_id"] == 101
 
@@ -232,7 +261,7 @@ def test_browser_gate_required_for_browser_certification() -> None:
         browser_runs=[browser_run],
         browser_jobs=[_job("Results Explorer browser gate")],
     )
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, require_browser_gate=True, urlopen=_fake_urlopen(routes))
+    result = _certify(SHA, REPO, TOKEN, require_browser_gate=True, urlopen=_fake_urlopen(routes))
     assert result["certified"] is True
 
 
@@ -246,7 +275,7 @@ def test_browser_gate_failure_blocks_browser_certification() -> None:
         browser_runs=[browser_run],
         browser_jobs=[_job("Results Explorer browser gate", "failure")],
     )
-    result = qcert.find_certifying_run(SHA, REPO, TOKEN, require_browser_gate=True, urlopen=_fake_urlopen(routes))
+    result = _certify(SHA, REPO, TOKEN, require_browser_gate=True, urlopen=_fake_urlopen(routes))
     assert result["certified"] is False
 
 
@@ -332,9 +361,13 @@ def _jobs(name: str) -> dict[str, object]:
     return workflow["jobs"]  # type: ignore[no-any-return]
 
 
-def test_certification_job_is_push_only_with_actions_read() -> None:
+def test_certification_job_always_runs_with_actions_read() -> None:
+    # The job must not be event-gated: downstream jobs read its outputs on
+    # every event, and references to a skipped job's outputs do not
+    # evaluate reliably. The script returns certified=false without any API
+    # call for ineligible events (tested at the script level).
     job = _post_merge()["jobs"]["queue-certification"]
-    assert job.get("if") == "${{ github.event_name == 'push' }}"
+    assert job.get("if") is None
     assert job["permissions"]["actions"] == "read"
     assert job["outputs"]["certified"] == "${{ steps.certify.outputs.certified }}"
     assert job["outputs"]["certifying_run_id"] == "${{ steps.certify.outputs.certifying_run_id }}"
@@ -379,8 +412,11 @@ def test_lint_and_fast_lane_cache_run_on_every_push() -> None:
 
 
 def test_schedule_and_dispatch_never_skip() -> None:
+    # The certify job always runs, but the script reports certified=false
+    # for schedule/dispatch (no API calls), so the gate conditions below
+    # stay true and the full gates run.
     jobs = _post_merge()["jobs"]
-    assert jobs["queue-certification"].get("if") == "${{ github.event_name == 'push' }}"
+    assert jobs["queue-certification"].get("if") is None
     for name in ("fast-test", "medium-test"):
         condition = str(jobs[name].get("if") or "")
         assert "github.event_name != 'push'" in condition or name == "medium-test"
@@ -454,9 +490,11 @@ def test_baseline_selection_walks_back_past_certified_runs() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_browser_certification_requires_browser_gate_and_develop_push() -> None:
+def test_browser_certification_requires_browser_gate() -> None:
+    # Always runs (see above); the script limits certification to pushes to
+    # develop and additionally requires the queue run's browser gate here.
     job = _jobs("results-explorer-browser.yml")["queue-certification"]
-    assert job.get("if") == "${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}"
+    assert job.get("if") is None
     assert job["permissions"]["actions"] == "read"
     lookup = next(step for step in job["steps"] if step.get("id") == "certify")
     assert "--require-browser-gate" in lookup["run"]

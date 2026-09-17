@@ -78,12 +78,13 @@ jobs:
 
   # Develop-push certification: when the pushed SHA is queue-certified
   # (the merge queue already passed this exact tree, including its own
-  # browser gate), the push re-run of the browser suite skips. Push-only:
-  # pull_request, merge_group, schedule, and workflow_dispatch always run
-  # the suite when explorer changes need it.
+  # browser gate), the push re-run of the browser suite skips.
+  # Always runs: downstream jobs read these outputs on every event, and
+  # references to a skipped job's outputs do not evaluate reliably. The
+  # script returns certified=false without any API call unless this is a
+  # push to develop, so every other event runs the suite when needed.
   queue-certification:
     name: queue-certification
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

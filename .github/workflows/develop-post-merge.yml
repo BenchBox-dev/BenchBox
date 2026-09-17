@@ -119,10 +119,11 @@ jobs:
 
   queue-certification:
     name: queue-certification
-    # Push-only: schedule and workflow_dispatch never use the skip, and the
-    # manual dispatch stays the full-run escape hatch. On other events this
-    # job is skipped, its outputs are empty, and every gate runs (fail open).
-    if: ${{ github.event_name == 'push' }}
+    # Always runs: downstream jobs read these outputs on every event, and
+    # references to a skipped job's outputs do not evaluate reliably. The
+    # script itself returns certified=false without any API call unless this
+    # is a push to develop, so schedule and workflow_dispatch always run the
+    # full gates and the manual dispatch stays the full-run escape hatch.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -134,9 +135,6 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          # Same schedule pin as every other checkout (this job is push-only
-          # today; the pin keeps the count-match guard green and stays
-          # correct if the job's trigger ever widens).
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Look up merge-queue certification
@@ -148,7 +146,8 @@ jobs:
           set -euo pipefail
           # Bare python is intentional: the lookup is stdlib-only and always
           # exits 0 (fail open), so this step never reds the workflow itself.
-          # Any API error, gap, or ambiguity runs the full gates instead.
+          # Any API error, gap, ambiguity, or ineligible event runs the full
+          # gates instead.
           python scripts/queue_certification.py \
             --sha "$TARGET_SHA" \
             --github-output "$GITHUB_OUTPUT" \

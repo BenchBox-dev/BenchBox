@@ -21,6 +21,12 @@ the process still exits 0 so the lookup can never red a workflow on its
 own. Callers gate expensive jobs on ``certified == 'true'`` and run the
 full gates otherwise.
 
+The event/ref gate lives HERE, not in a workflow ``if:``: downstream jobs
+read this lookup's outputs on every event, and references to a skipped
+job's outputs do not evaluate reliably. The certify job therefore runs
+unconditionally and this script returns ``certified=false`` without any
+API call when the event or ref is ineligible.
+
 Stdlib-only (urllib, no ``gh`` dependency) so the lookup step needs no
 dependency sync; unit tests inject a fake ``urlopen``.
 """
@@ -104,14 +110,34 @@ def _job_conclusion(jobs: list[dict[str, Any]], name: str) -> str | None:
     return conclusion if isinstance(conclusion, str) else None
 
 
+def check_event_eligibility(event: str, ref: str, allow_ref: str) -> str | None:
+    """Return a not-certified reason when the event/ref is ineligible, else None.
+
+    Only pushes to the allowed ref can be queue-certified: schedule and
+    workflow_dispatch always run the full gates, and the manual dispatch
+    stays the full-run escape hatch. Decided before any API call.
+    """
+    if event != "push":
+        return f"event {event!r} is never queue-certified; running the full gates"
+    if ref != allow_ref:
+        return f"ref {ref!r} is never queue-certified; running the full gates"
+    return None
+
+
 def find_certifying_run(
     sha: str,
     repo: str,
     token: str,
     require_browser_gate: bool = False,
     urlopen: Callable[..., Any] = urllib.request.urlopen,
+    event: str = "push",
+    ref: str = "",
+    allow_ref: str = "refs/heads/develop",
 ) -> dict[str, Any]:
     """Return ``{certified, run_id, reason}``; never raises on lookup failure."""
+    ineligible = check_event_eligibility(event, ref, allow_ref)
+    if ineligible is not None:
+        return {"certified": False, "run_id": None, "reason": ineligible}
     try:
         return _find_certifying_run(sha, repo, token, require_browser_gate, urlopen)
     except CertificationError as exc:
@@ -199,6 +225,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--token", default=os.environ.get("GH_TOKEN", ""))
     parser.add_argument("--require-browser-gate", action="store_true")
+    parser.add_argument("--event", default=os.environ.get("GITHUB_EVENT_NAME", ""))
+    parser.add_argument("--ref", default=os.environ.get("GITHUB_REF", ""))
+    parser.add_argument("--allow-ref", default="refs/heads/develop")
     parser.add_argument("--github-output", type=Path, default=None)
     parser.add_argument("--summary", type=Path, default=None)
     args = parser.parse_args(argv)
@@ -208,6 +237,9 @@ def main(argv: list[str] | None = None) -> int:
         repo=args.repo,
         token=args.token,
         require_browser_gate=args.require_browser_gate,
+        event=args.event,
+        ref=args.ref,
+        allow_ref=args.allow_ref,
     )
     certified = bool(result["certified"])
     run_id = result["run_id"]
