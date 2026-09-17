@@ -837,6 +837,11 @@ ignore_rules = [
         "benchbox/platforms/dataframe/expression_family.py",
     ] },
 
+    # PySpark expression-adapter window-function wrappers added here: one named
+    # method per SQL window function implementing the expression-family
+    # contract. Thin same-shape delegations are intentional API surface.
+    { function_names = ["window_lag", "window_lead", "window_ntile", "window_percent_rank", "window_cume_dist"], path_contains = ["benchbox/platforms/dataframe/pyspark_df.py"] },
+
     # G3,G10: DataFrame platform adapter thin wrappers (col/lit/from_pandas/detect_format/read_*)
     # G29: extend with get_row_count and pandas_family.py
     { function_names = ["_detect_format", "get_dataframe_operations", "from_pandas", "lit", "read_parquet", "to_datetime", "read_csv", "concat", "get_row_count"], path_contains = [
