@@ -1511,6 +1511,7 @@ class ResultCaptureMixin:
         tuning_validation_status,
         tuning_metadata_saved,
         requested_config_hash=None,
+        per_table_timings=None,
     ):
         """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
@@ -1568,6 +1569,7 @@ class ResultCaptureMixin:
             data_loading_time=loading_time,
             schema_creation_time=getattr(schema_creation_phase, "duration_ms", 0) / 1000.0,
             table_statistics=table_stats,
+            per_table_timings=per_table_timings,
             tunings_applied=tunings_applied_dict,
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,

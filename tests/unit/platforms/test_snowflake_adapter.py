@@ -571,6 +571,28 @@ benchbox-fixture-key-material
             temp_path.unlink()
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_load_data_skip_uses_uppercase_keys_with_zero_timings(self, mock_snowflake):
+        """Skipped tables should use the same key casing with a zero timing entry."""
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = Mock()
+
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"ghost_table": "/nonexistent/path/ghost.tbl"}
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        table_stats, _, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+
+        assert table_stats == {"GHOST_TABLE": 0}
+        assert per_table_timings == {"GHOST_TABLE": {"total_ms": 0}}
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_validate_external_table_requirements_requires_staging_root(self, mock_snowflake):
         """External mode should require staging_root for Snowflake."""
         adapter = SnowflakeAdapter(

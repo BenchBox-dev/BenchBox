@@ -2328,12 +2328,12 @@ class TestLoadTablesDirect:
 
         mock_conn = Mock()
 
-        # No valid files → table gets row count of 0
+        # No valid files → table gets row count of 0 with a zero timing entry
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
             stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
 
         assert stats.get("LINEITEM") == 0
-        assert timings == {}
+        assert timings == {"LINEITEM": {"total_ms": 0}}
         mock_conn.load_table_from_file.assert_not_called()
 
     def test_failed_table_load_logged(self):
@@ -2380,8 +2380,8 @@ class TestLoadTablesViaCloudStorage:
                 mock_conn, {"lineitem": ["gs://bucket/lineitem.parquet"]}, mock_bucket
             )
 
-        assert stats.get("lineitem") == 0
-        assert timings == {}
+        assert stats.get("LINEITEM") == 0
+        assert timings == {"LINEITEM": {"total_ms": 0}}
 
     def test_failed_table_load_returns_zero(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")

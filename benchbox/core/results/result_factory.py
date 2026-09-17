@@ -58,13 +58,26 @@ def _apply_run_config(builder: ResultBuilder, execution_metadata: dict[str, Any]
     )
 
 
+def total_ms_or_zero(timing: Any) -> int:
+    """Extract total_ms from a per-table timing entry, degrading to 0."""
+    if not isinstance(timing, dict):
+        return 0
+    raw_ms = timing.get("total_ms", 0)
+    if raw_ms is None:
+        return 0
+    try:
+        return int(raw_ms)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def _add_table_statistics(builder: ResultBuilder, kwargs: dict[str, Any]) -> None:
     """Attach per-table row counts and load timings to the builder."""
     table_statistics = kwargs.get("table_statistics", {}) or {}
-    per_table_timings: dict[str, Any] = kwargs.get("per_table_timings") or {}
+    raw_timings = kwargs.get("per_table_timings")
+    per_table_timings: dict[str, Any] = raw_timings if isinstance(raw_timings, dict) else {}
     for table_name, row_count in table_statistics.items():
-        timing = per_table_timings.get(table_name, {})
-        load_time_ms = int(timing.get("total_ms", 0)) if isinstance(timing, dict) else 0
+        load_time_ms = total_ms_or_zero(per_table_timings.get(table_name, {}))
         builder.add_table_stats(table_name, row_count, load_time_ms=load_time_ms)
 
 

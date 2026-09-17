@@ -1059,6 +1059,7 @@ class BigQueryAdapter(PlatformAdapter):
 
         start_time = mono_time()
         table_stats = {}
+        per_table_timings: dict[str, Any] = {}
         total_time = 0.0
 
         try:
@@ -1333,7 +1334,8 @@ class BigQueryAdapter(PlatformAdapter):
             valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
             if not valid_files:
                 self.logger.warning(f"Skipping {table_name} - no valid data files")
-                table_stats[table_name] = 0
+                table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
                 continue
 
             logger.debug(f"Loading {table_name} from {len(valid_files)} file(s)")
@@ -1374,6 +1376,7 @@ class BigQueryAdapter(PlatformAdapter):
             if not valid_files:
                 self.logger.warning(f"Skipping {table_name} - no valid data files")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
                 continue
 
             try:

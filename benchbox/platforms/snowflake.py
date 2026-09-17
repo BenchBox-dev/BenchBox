@@ -792,7 +792,8 @@ class SnowflakeAdapter(PlatformAdapter):
 
                 if not valid_files:
                     self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name] = 0
+                    table_stats[table_name.upper()] = 0
+                    per_table_timings[table_name.upper()] = {"total_ms": 0}
                     continue
 
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""

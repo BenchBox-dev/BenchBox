@@ -329,11 +329,13 @@ class MySqlWireLifecycleMixin:
             if not self._validate_identifier(target_table) and not self._handle_invalid_load_table(
                 target_table, table_stats
             ):
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
             data_files = self._resolve_data_files(table_path)
             if not data_files:
                 self.logger.warning(f"Data file not found for {target_table}")
                 table_stats[target_table] = 0
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
 
             table_start = mono_time()

@@ -275,6 +275,8 @@ class PlatformAdapter(
 
         # Track latest throughput metrics for phase construction
         self._last_throughput_test_result = None
+        # Latest per-table load timings for result construction (reset per run)
+        self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
@@ -918,6 +920,7 @@ class PlatformAdapter(
                     tuning_validation_status,
                     tuning_metadata_saved,
                     requested_config_hash,
+                    per_table_timings=getattr(self, "_last_per_table_timings", None),
                 )
                 self._attach_applied_ledger_payload(failed_result, tuning_validation_status)
                 return failed_result

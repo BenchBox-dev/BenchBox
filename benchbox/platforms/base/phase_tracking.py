@@ -28,6 +28,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from benchbox.core.results.result_factory import total_ms_or_zero
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 if TYPE_CHECKING:
@@ -233,11 +234,11 @@ class PhaseTrackingMixin:
         total_rows = sum(table_stats.values())
 
         # Use actual timings if provided, otherwise distribute total time proportionally by row count
-        if per_table_timings:
+        timings = per_table_timings if isinstance(per_table_timings, dict) else {}
+        if timings:
             # Use actual per-table timings from adapter
             for table_name, row_count in table_stats.items():
-                timing_info = per_table_timings.get(table_name, {})
-                actual_time_ms = timing_info.get("total_ms", 0) if isinstance(timing_info, dict) else 0
+                actual_time_ms = total_ms_or_zero(timings.get(table_name, {}))
                 per_table_loading[table_name] = TableLoadingStats(
                     rows=row_count, load_time_ms=int(actual_time_ms), status="SUCCESS"
                 )

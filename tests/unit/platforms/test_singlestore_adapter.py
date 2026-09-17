@@ -611,9 +611,10 @@ class TestSingleStoreDataLoading:
         mock_benchmark = self._make_benchmark({"orders": "/nonexistent/path/orders.tbl"})
         mock_connection = Mock()
 
-        table_stats, _, _ = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+        table_stats, _, per_table = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
 
         assert table_stats["orders"] == 0
+        assert per_table["orders"]["total_ms"] == 0
 
     def test_load_data_returns_per_table_timings(self):
         """Test that load_data returns per-table timing metadata."""
