@@ -3537,10 +3537,15 @@
       "title": "Model Databricks TPC Liquid Clustering as a first-class reusable profile rendering"
     },
     "dataframe-adapter-ledger-instrumentation-20260724": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T15:22:38Z",
+        "generation": "06fd466ea4b94305bc0ae0c26697ff2a",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "DataFrame adapters export an empty applied ledger (datafusion-df, dask-df publish noop for tuned runs)"
     },
     "dataframe-ai-primitives": {
