@@ -259,10 +259,15 @@ class StarRocksWorkloadMixin:
                 suffix_clauses.append(partition_clause)
                 tuned_clauses.append(partition_clause)
 
-            # Tuned distribution column overrides the first-column baseline.
+            # Tuned distribution overrides the first-column baseline. distribute_by
+            # already holds the rendered DISTRIBUTED BY clause (single-renderer
+            # contract), so it is used verbatim; only the untuned baseline
+            # renders here from the first column.
             dist_tuned = bool(tuning_clauses and tuning_clauses.distribute_by)
-            dist_col = tuning_clauses.distribute_by if dist_tuned else first_col
-            distribution_clause = generator.render_distribution_clause(dist_col)
+            if dist_tuned:
+                distribution_clause = tuning_clauses.distribute_by
+            else:
+                distribution_clause = generator.render_distribution_clause(first_col)
             suffix_clauses.append(distribution_clause)
             if dist_tuned:
                 tuned_clauses.append(distribution_clause)

@@ -34,7 +34,7 @@ Example:
     >>> from benchbox.core.tuning.generators.starrocks import StarRocksDDLGenerator
     >>> generator = StarRocksDDLGenerator()
     >>> clauses = generator.generate_tuning_clauses(table_tuning)
-    >>> emit(clauses.distribute_by)  # "l_orderkey"
+    >>> emit(clauses.distribute_by)  # "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
     >>> emit(clauses.order_by)       # "l_orderkey, l_linenumber"
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -146,10 +146,14 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         """Generate StarRocks tuning clauses.
 
         Produces TuningClauses with:
-        - ``distribute_by``: the hash distribution column (bare name)
-        - ``additional_clauses``: the rendered ``DISTRIBUTED BY HASH`` clause
+        - ``distribute_by``: the rendered ``DISTRIBUTED BY HASH(`col`) BUCKETS N``
+          clause (rendered-SQL contract: never a bare column name, so dry-run
+          preview via ``TuningClauses.get_inline_clauses()`` and execution DDL
+          render the identical string exactly once)
         - ``partition_by``: ``PARTITION BY`` column expression
         - ``order_by``: sort-key column list (``ORDER BY``)
+        - ``platform``: ``"starrocks"`` so inline clauses order DISTRIBUTED BY
+          after PARTITION BY, as the StarRocks dialect requires
 
         All values derive purely from ``table_tuning`` -- there are no
         per-benchmark defaults. A ``table_tuning`` with no distribution column
@@ -164,7 +168,7 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         Returns:
             TuningClauses with StarRocks-specific configuration.
         """
-        clauses = TuningClauses()
+        clauses = TuningClauses(platform=self.platform_name)
 
         if not table_tuning:
             return clauses
@@ -175,9 +179,11 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
         if distribution_columns:
             sorted_cols = sorted(distribution_columns, key=lambda c: c.order)
-            # StarRocks HASH distribution uses a single column.
-            clauses.distribute_by = sorted_cols[0].name
-            clauses.additional_clauses.append(self.render_distribution_clause(clauses.distribute_by))
+            # StarRocks HASH distribution uses a single column. Stored rendered
+            # (not bare): get_inline_clauses() emits it verbatim after
+            # PARTITION BY, and generate_create_table_ddl()/the workload use it
+            # directly, so preview and execution can never disagree or duplicate it.
+            clauses.distribute_by = self.render_distribution_clause(sorted_cols[0].name)
 
         # ── PARTITION BY (from PARTITIONING tuning) ──
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
@@ -248,10 +254,11 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         if tuning and tuning.partition_by:
             statement = f"{statement}\n{self.render_partition_clause(tuning.partition_by)}"
 
-        # DISTRIBUTED BY HASH ... BUCKETS N (engine-mandatory). Prefer a tuned
-        # distribution column; otherwise fall back to the first column.
+        # DISTRIBUTED BY HASH ... BUCKETS N (engine-mandatory). A tuned
+        # distribute_by is already rendered, so it is used verbatim; only the
+        # untuned baseline renders here from the first column.
         if tuning and tuning.distribute_by:
-            statement = f"{statement}\n{self.render_distribution_clause(tuning.distribute_by)}"
+            statement = f"{statement}\n{tuning.distribute_by}"
         elif columns:
             statement = f"{statement}\n{self.render_distribution_clause(columns[0].name)}"
 

@@ -34,8 +34,10 @@ class TestGenerateTuningClausesLineitem:
         assert clauses.sort_by == "l_orderkey, l_linenumber"
 
     def test_distribute_by_lineitem(self, gen_tpch):
+        # Rendered-SQL contract: distribute_by holds the full DISTRIBUTED BY
+        # clause, never a bare column name.
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
-        assert clauses.distribute_by == "l_orderkey"
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"
 
     def test_colocate_with_group_orders(self, gen_tpch):
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
@@ -45,11 +47,15 @@ class TestGenerateTuningClausesLineitem:
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
         assert "l_orderkey" in clauses.table_properties["bloom_filter_columns"]
 
-    def test_additional_clauses_contains_distributed_by_hash(self, gen_tpch):
+    def test_distribution_rendered_once_in_distribute_by(self, gen_tpch):
+        # The rendered clause lives in distribute_by (not additional_clauses),
+        # so dry-run preview emits it exactly once with no stray bare column.
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
-        assert len(clauses.additional_clauses) >= 1
-        assert "DISTRIBUTED BY HASH" in clauses.additional_clauses[0]
-        assert "BUCKETS 10" in clauses.additional_clauses[0]
+        assert clauses.additional_clauses == []
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10"
+        inline = clauses.get_inline_clauses()
+        assert "l_orderkey" not in inline
+        assert inline.count("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 10") == 1
 
     def test_post_create_statements_contains_bitmap_index(self, gen_tpch):
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="lineitem"))
@@ -71,7 +77,7 @@ class TestScaleFactorBuckets:
     def test_scale_2_doubles_bucket_count(self):
         gen = DorisDDLGenerator(benchmark_type="tpch", scale_factor=2.0)
         clauses = gen.generate_tuning_clauses(TableTuning(table_name="lineitem"))
-        assert "BUCKETS 20" in clauses.additional_clauses[0]
+        assert "BUCKETS 20" in clauses.distribute_by
 
 
 class TestNoneTableTuningReturnsEmpty:
@@ -123,7 +129,7 @@ class TestTpcdsSupport:
     def test_store_sales_distribute_by(self):
         gen = DorisDDLGenerator(benchmark_type="tpcds")
         clauses = gen.generate_tuning_clauses(TableTuning(table_name="store_sales"))
-        assert clauses.distribute_by == "ss_item_sk"
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`ss_item_sk`) BUCKETS 10"
 
     def test_store_sales_sort_by_contains_date(self):
         gen = DorisDDLGenerator(benchmark_type="tpcds")

@@ -71,11 +71,14 @@ class TestClauseRenderers:
 
 
 class TestGenerateTuningClauses:
-    def test_distribution_column_and_additional_clause(self, gen):
+    def test_distribution_clause_rendered_into_distribute_by(self, gen):
+        # Rendered-SQL contract (distribute_by holds the full DISTRIBUTED BY
+        # clause, never a bare column): preview and execution emit it verbatim.
         tt = TableTuning(table_name="lineitem", distribution=[TuningColumn("l_orderkey", "INT", 1)])
         clauses = gen.generate_tuning_clauses(tt)
-        assert clauses.distribute_by == "l_orderkey"
-        assert clauses.additional_clauses == ["DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"]
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
+        assert clauses.additional_clauses == []
+        assert clauses.platform == "starrocks"
 
     def test_single_distribution_column_when_multiple_configured(self, gen):
         # StarRocks HASH distribution uses a single column -- the lowest-order one.
@@ -87,7 +90,7 @@ class TestGenerateTuningClauses:
             ],
         )
         clauses = gen.generate_tuning_clauses(tt)
-        assert clauses.distribute_by == "l_orderkey"
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
 
     def test_partition_by_ordered(self, gen):
         tt = TableTuning(
@@ -119,7 +122,7 @@ class TestGenerateTuningClauses:
             sorting=[TuningColumn("l_linenumber", "INT", 1)],
         )
         clauses = gen.generate_tuning_clauses(tt)
-        assert clauses.distribute_by == "l_orderkey"
+        assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
         assert clauses.partition_by == "l_shipdate"
         assert clauses.order_by == "l_linenumber"
 
@@ -148,17 +151,17 @@ class TestDryRunShape:
         )
         d = gen.generate_tuning_clauses(tt).to_dict()
         assert d == {
-            "distribute_by": "l_orderkey",
+            "distribute_by": "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8",
             "partition_by": "l_shipdate",
             "order_by": "l_linenumber",
-            "additional_clauses": ["DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"],
+            "platform": "starrocks",
         }
 
     def test_to_json_is_serializable(self, gen):
         tt = TableTuning(table_name="orders", distribution=[TuningColumn("o_orderkey", "INT", 1)])
         payload = gen.generate_tuning_clauses(tt).to_json()
         parsed = json.loads(payload)
-        assert parsed["distribute_by"] == "o_orderkey"
+        assert parsed["distribute_by"] == "DISTRIBUTED BY HASH(`o_orderkey`) BUCKETS 8"
 
 
 class TestGenerateCreateTableDdl:
@@ -200,3 +203,28 @@ class TestGenerateCreateTableDdl:
         ddl = gen.generate_create_table_ddl("orders", cols, clauses)
         assert "DISTRIBUTED BY HASH(`o_custkey`) BUCKETS 8" in ddl
         assert "HASH(`o_orderkey`)" not in ddl
+
+
+class TestInlineClausesContract:
+    """Dry-run preview (get_inline_clauses) must emit the rendered DISTRIBUTED BY
+    exactly once -- no stray bare column line -- and order it after PARTITION BY."""
+
+    def test_no_bare_column_and_single_distributed_by(self, gen):
+        tt = TableTuning(
+            table_name="lineitem",
+            distribution=[TuningColumn("l_orderkey", "INT", 1)],
+            partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
+            sorting=[TuningColumn("l_linenumber", "INT", 1)],
+        )
+        inline = gen.generate_tuning_clauses(tt).get_inline_clauses()
+        assert "l_orderkey" not in inline
+        assert inline.count("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8") == 1
+
+    def test_distributed_by_after_partition_by(self, gen):
+        tt = TableTuning(
+            table_name="lineitem",
+            distribution=[TuningColumn("l_orderkey", "INT", 1)],
+            partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
+        )
+        inline = gen.generate_tuning_clauses(tt).get_inline_clauses()
+        assert inline.index("l_shipdate") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8")
