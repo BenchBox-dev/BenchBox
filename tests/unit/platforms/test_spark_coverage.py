@@ -662,7 +662,7 @@ class TestGetQueryPlan:
         assert isinstance(plan, str)
         assert "EXPLAIN EXTENDED" in mock_session.sql.call_args[0][0].upper()
 
-    def test_plan_error_returns_string(self, mock_pyspark):
+    def test_plan_error_returns_none(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
@@ -670,7 +670,7 @@ class TestGetQueryPlan:
         mock_session.sql.side_effect = Exception("explain failed")
 
         plan = a.get_query_plan(mock_session, "SELECT * FROM t")
-        assert "Could not get query plan" in plan
+        assert plan is None
 
 
 # ---------------------------------------------------------------------------

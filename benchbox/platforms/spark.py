@@ -678,9 +678,9 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         except Exception as e:
             self.log_verbose(f"Could not remove orphaned location for {table_name}: {e}")
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan for analysis."""
-        return get_spark_query_plan(connection, query)
+        return get_spark_query_plan(connection, query, logger=self.logger)
 
     def close_connection(self, connection: Any) -> None:
         """Close Spark session."""

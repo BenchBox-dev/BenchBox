@@ -539,9 +539,9 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
                 return benchmark.get_queries(dialect="lakesail")
         return super()._get_dialect_queries(benchmark, benchmark_slug, connection)
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan from Sail server."""
-        return get_spark_query_plan(connection, query)
+        return get_spark_query_plan(connection, query, logger=self.logger)
 
     def close_connection(self, connection: Any) -> None:
         """Close Spark Connect session and stop any auto-started local server."""

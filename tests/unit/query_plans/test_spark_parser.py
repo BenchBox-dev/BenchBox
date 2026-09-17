@@ -111,17 +111,15 @@ class TestSparkErrorRecovery:
         result = parser.parse_explain_output("q", "!@#$ %^&*")
         assert result is None or result.logical_root is not None
 
-    @pytest.mark.parametrize(
-        "sentinel",
-        [
-            "Could not get query plan: EXPLAIN failed",
-            "Failed to get query plan: connection reset",
-        ],
-    )
-    def test_error_sentinel_returns_none(self, parser, sentinel):
-        # get_spark_query_plan returns an error sentinel string on EXPLAIN
-        # failure; it must not be accepted as a one-node "Other" plan.
-        assert parser.parse_explain_output("q", sentinel) is None
+    def test_error_sentinel_returns_none(self, parser):
+        # qpc-13: EXPLAIN-failure producers return None instead of an error
+        # string; the remaining "Failed to get query plan" prefix must still
+        # be rejected so it is never accepted as a one-node "Other" plan.
+        assert parser.parse_explain_output("q", "Failed to get query plan: connection reset") is None
+
+    def test_none_input_returns_none(self, parser):
+        # qpc-13: get_query_plan returns None on EXPLAIN failure.
+        assert parser.parse_explain_output("q", None) is None
 
 
 class TestSparkRegistration:

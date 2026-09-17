@@ -86,6 +86,11 @@ class QuestDBQueryPlanParser(QueryPlanParser):
     def __init__(self):
         super().__init__("questdb")
 
+    # qpc-13: the "Could not get query plan" producers now return None; the
+    # "Failed to get query plan" prefix (still emitted by the QuestDB
+    # adapter outside this item's scope) is rejected here, and the retired
+    # "Could not" prefix stays rejected as defense so stray error text can
+    # never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")

@@ -82,32 +82,54 @@ class TestNormalPlanCapture:
 
 
 class TestErrorHandling:
-    def test_returns_error_string_on_exception(self) -> None:
+    def test_returns_none_on_exception(self) -> None:
         spark = MagicMock()
         spark.sql.side_effect = RuntimeError("session closed")
         result = get_spark_query_plan(spark, "SELECT 1")
-        assert result.startswith("Could not get query plan:")
-        assert "session closed" in result
+        assert result is None
 
-    def test_returns_error_string_on_attribute_error(self) -> None:
+    def test_returns_none_on_attribute_error(self) -> None:
         # Simulates a None / closed connection
         result = get_spark_query_plan(None, "SELECT 1")
-        assert result.startswith("Could not get query plan:")
+        assert result is None
 
-    def test_returns_error_string_on_collect_failure(self) -> None:
+    def test_returns_none_on_collect_failure(self) -> None:
         spark = MagicMock()
         df = MagicMock()
         df.collect.side_effect = ConnectionError("lost connection")
         spark.sql.return_value = df
         result = get_spark_query_plan(spark, "SELECT 1")
-        assert result.startswith("Could not get query plan:")
-        assert "lost connection" in result
+        assert result is None
 
-    def test_error_string_format(self) -> None:
+    def test_failure_logs_warning(self, caplog) -> None:
+        import logging
+
         spark = MagicMock()
         spark.sql.side_effect = ValueError("bad query")
-        result = get_spark_query_plan(spark, "SELECT X")
-        assert result == "Could not get query plan: bad query"
+        with caplog.at_level(logging.WARNING):
+            result = get_spark_query_plan(spark, "SELECT X")
+        assert result is None
+        assert any("Could not get query plan" in message for message in caplog.messages)
+
+    def test_custom_logger_receives_warning(self) -> None:
+        import logging
+
+        spark = MagicMock()
+        spark.sql.side_effect = ValueError("bad query")
+        records: list = []
+
+        class Sink(logging.Handler):
+            def emit(self, record):
+                records.append(record.getMessage())
+
+        custom = logging.getLogger("test.qpc13.custom")
+        custom.addHandler(Sink())
+        custom.setLevel(logging.WARNING)
+        try:
+            assert get_spark_query_plan(spark, "SELECT X", logger=custom) is None
+        finally:
+            custom.handlers.clear()
+        assert any("Could not get query plan" in message for message in records)
 
 
 # ---------------------------------------------------------------------------

@@ -164,7 +164,12 @@ def analyze_spark_table(connection: Any, table_name: str, *, logger: logging.Log
         logger.warning(f"Failed to analyze table {table_name}: {e}")
 
 
-def get_spark_query_plan(connection: Any, query: str) -> str:
+def get_spark_query_plan(
+    connection: Any,
+    query: str,
+    *,
+    logger: logging.Logger | None = None,
+) -> str | None:
     """Return the ``EXPLAIN EXTENDED`` plan text for a Spark-like session.
 
     Works for both full PySpark sessions and Spark Connect sessions (LakeSail)
@@ -173,17 +178,27 @@ def get_spark_query_plan(connection: Any, query: str) -> str:
     Args:
         connection: Active Spark / Spark Connect session.
         query: SQL query to explain.
+        logger: Logger for the failure warning. Defaults to this module's logger.
 
     Returns:
-        Multi-line plan text, or a short error string on failure.
+        Multi-line plan text, or ``None`` on failure.
+
+    On failure this returns ``None`` and logs the exception, rather than
+    returning the error text AS the plan (qpc-05 / qpc-13). Encoding the error
+    in the data channel was actively harmful: the capture path
+    (``capture_query_plan``) would hand that error string to the platform
+    parser as though it were EXPLAIN output. A ``None`` return is treated as a
+    clean capture failure by callers and simply skips best-effort display.
     """
+    log = logger or logging.getLogger(__name__)
     spark = connection
     try:
         result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
         plan_rows = result_df.collect()
         return "\n".join([str(row[0]) for row in plan_rows])
     except Exception as e:
-        return f"Could not get query plan: {e}"
+        log.warning("Could not get query plan via EXPLAIN: %s", e)
+        return None
 
 
 # Spark V1 datasource tables (USING PARQUET / ORC) do not support PRIMARY KEY,

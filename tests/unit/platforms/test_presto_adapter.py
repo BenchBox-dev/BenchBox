@@ -567,7 +567,7 @@ class TestPrestoAdapter:
 
         plan = adapter.get_query_plan(mock_connection, "SELECT * FROM test")
 
-        assert "Could not get query plan" in plan
+        assert plan is None
 
     def test_close_connection(self, presto_stubs):
         """Test connection closing."""

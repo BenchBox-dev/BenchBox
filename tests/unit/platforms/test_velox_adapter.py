@@ -521,6 +521,28 @@ class TestVeloxQueryPlan:
 
         assert "NOT DETECTED" in plan
 
+    def test_explain_failure_returns_none(self, mock_pyspark):
+        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+        from benchbox.platforms.velox import VeloxAdapter
+
+        mock_spark = MagicMock()
+        mock_spark.sql.side_effect = RuntimeError("explain failed")
+
+        adapter = VeloxAdapter()
+        assert adapter.get_query_plan(mock_spark, "SELECT count(*) FROM t") is None
+
+    def test_empty_plan_rows_return_none(self, mock_pyspark):
+        """Empty EXPLAIN rows return None, not an annotation-only header (qpc-13)."""
+        from benchbox.platforms.velox import VeloxAdapter
+
+        mock_df = MagicMock()
+        mock_df.collect.return_value = []
+        mock_spark = MagicMock()
+        mock_spark.sql.return_value = mock_df
+
+        adapter = VeloxAdapter()
+        assert adapter.get_query_plan(mock_spark, "SELECT count(*) FROM t") is None
+
 
 class TestVeloxFromConfig:
     """from_config() builds the adapter correctly."""

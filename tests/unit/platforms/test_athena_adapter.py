@@ -1150,6 +1150,21 @@ class TestAthenaAdapterExecution:
 
         assert "Scan Table" in plan or "Stage" in plan
 
+    def test_get_query_plan_error_returns_none(self, mock_boto3, mock_pyathena, mock_aws_credentials):
+        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+        from benchbox.platforms.athena import AthenaAdapter
+
+        _, mock_cursor = mock_pyathena
+        mock_cursor.execute.side_effect = Exception("EXPLAIN failed")
+
+        mock_connection = MagicMock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        adapter = AthenaAdapter(s3_bucket="test-bucket")
+
+        assert adapter.get_query_plan(mock_connection, "SELECT * FROM test") is None
+        mock_cursor.close.assert_called_once()
+
 
 class TestAthenaAdapterImportError:
     """Tests for import error handling when pyathena is not installed."""
