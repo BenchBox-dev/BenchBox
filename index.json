@@ -3753,10 +3753,15 @@
       "title": "Add Data Vault Benchmark Implementation"
     },
     "datavault-cross-surface-query-execution-burn-down": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T00:50:15Z",
+        "generation": "d676a3ae3bf2472aadae5bef24dfe1e1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Burn down Data Vault cross-surface query execution defects"
     },
     "datavault-sha256-hash-migration": {
