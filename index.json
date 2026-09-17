@@ -11309,10 +11309,15 @@
       "title": "PySpark DataFrame Adapter Implementation"
     },
     "pyspark-dataframe-read-primitives-map-fulltext-window-array": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T17:50:54Z",
+        "generation": "06fc9bcb4f4b45498d4a3eef1726f176",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "PySpark DataFrame read-primitives map/fulltext/window/array expression gaps"
     },
     "pyspark-parquet-time-millis-false-cache-loader-compatibility": {
