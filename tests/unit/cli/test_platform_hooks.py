@@ -77,6 +77,16 @@ def test_spark_platform_options_adaptive_enabled():
     assert parsed["adaptive_enabled"] is False
 
 
+def test_lakesail_platform_options_adaptive_enabled():
+    # LakeSail exposes the same AQE toggle as spark/velox; without this spec
+    # row --platform-option adaptive_enabled=false is rejected as unknown.
+    parsed = PlatformHookRegistry.parse_options("lakesail", [])
+    assert parsed["adaptive_enabled"] is True
+
+    parsed = PlatformHookRegistry.parse_options("lakesail", [("adaptive_enabled", "false")])
+    assert parsed["adaptive_enabled"] is False
+
+
 @pytest.mark.parametrize(
     ("platform", "option", "expected"),
     [

@@ -286,12 +286,14 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             session_config["conf"]["spark.sql.catalog.spark_catalog"] = "org.apache.iceberg.spark.SparkSessionCatalog"
             session_config["conf"]["spark.sql.catalog.spark_catalog.type"] = "hive"
 
-        # Add user-provided Spark config
-        session_config["conf"].update(self.user_spark_config)
-
-        # Add benchmark-specific configuration
+        # Add benchmark-specific configuration first so an explicit
+        # user-provided Spark config wins (mirrors the resolve-then-apply
+        # precedence of the local Spark-family adapters).
         if self._spark_config:
             session_config["conf"].update(self._spark_config)
+
+        # Add user-provided Spark config last so explicit overrides are kept.
+        session_config["conf"].update(self.user_spark_config)
 
         if self.spark_pool_name:
             session_config["name"] = f"benchbox-{self.spark_pool_name}"
