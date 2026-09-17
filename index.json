@@ -9380,7 +9380,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Fix Modin TPCH Q7/Q8/Q9/Q17 query failures after Ray workers start"
     },
     "modularize-makefile-by-domain-20260808": {
