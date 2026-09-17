@@ -1233,10 +1233,6 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
-#
-# The FlightData bounded cell is one synthetic month (SF=0.01), which stays offline
-# (larger scales attempt a BTS download with a synthetic fallback) while keeping
-# every query discriminating.
 _FLIGHTDATA_SCALE = 0.01
 
 GATES: dict[str, CrossSurfaceGate] = {
@@ -1349,6 +1345,9 @@ GATES: dict[str, CrossSurfaceGate] = {
 # coverage map, the applicability sweep artifact, and the related registry tests.
 # The next gateable benchmarks (datavault, nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+# The FlightData bounded cell is one synthetic month (SF=0.01), which stays offline
+# (larger scales attempt a BTS download with a synthetic fallback) while keeping
+# every query discriminating.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
     "flightdata": CrossSurfaceGate(
         name="flightdata",

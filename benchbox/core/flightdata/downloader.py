@@ -250,9 +250,20 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     if metadata.get("csv_null_marker") != "":
                         metadata["csv_null_marker"] = ""
                         changed = True
-        if changed:
-            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        return changed
+        if not changed:
+            return False
+        # Rewrite atomically so an interrupted heal cannot leave an invalid
+        # manifest behind (the next run would then regenerate the data), keep
+        # the trailing newline DataGenerationManifest.write emits, and never
+        # fail a run over a read-only cache: the data itself is still usable.
+        try:
+            tmp_path = manifest_path.with_name(manifest_path.name + ".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            tmp_path.replace(manifest_path)
+        except OSError:
+            logger.warning("Could not heal CSV dialect metadata in %s; continuing", manifest_path)
+            return False
+        return True
 
     def repair_reusable_layout(self) -> dict[str, Path | list[Path]] | None:
         """Repair a reusable FlightData cache when its source layout is loader-hostile.

@@ -414,13 +414,17 @@ class TestHalfAwayRounding:
         [(2.5, 0, 3.0), (-2.5, 0, -3.0), (0.125, 2, 0.13), (-0.125, 2, -0.13), (2.45, 1, 2.5)],
     )
     def test_helpers_match_duckdb_round_at_halves(self, value, digits, expected):
-        """Direct helper-vs-SQL agreement on exact-half inputs (C1)."""
-        import pandas as pd
+        """Direct helper-vs-SQL agreement on exact-half inputs.
+
+        The SQL literal is cast to DOUBLE so both sides round binary floating
+        point (a bare literal would exercise DECIMAL rounding instead).
+        """
+        pd = pytest.importorskip("pandas")
 
         from benchbox.core.flightdata.dataframe_queries import _pandas_round_half_away
 
         duckdb = pytest.importorskip("duckdb")
-        (sql_value,) = duckdb.query(f"SELECT ROUND({value}, {digits})").fetchone()
+        (sql_value,) = duckdb.query(f"SELECT ROUND(CAST({value} AS DOUBLE), {digits})").fetchone()
         assert float(sql_value) == pytest.approx(expected)
         assert float(_pandas_round_half_away(pd.Series([value]), digits).iloc[0]) == pytest.approx(expected)
 
@@ -464,29 +468,50 @@ class TestCsvNullDialect:
         handler = DuckDBNativeHandler(",", None, benchmark, null_marker="")
         assert "nullstr=''" in handler._pipe_nullstr_config()
 
-        # End to end through the adapter load path the builder uses: an empty
-        # VARCHAR field (cancellation_code, unlike DOUBLE arr_delay which
-        # DuckDB nullifies even without nullstr) must load as NULL, not "".
-        from benchbox.platforms.duckdb import DuckDBAdapter
+        # End to end at the SQL layer: the external-scan builder must turn a
+        # healed manifest into nullstr='' while a stale manifest keeps the
+        # no-conversion sentinel (an empty VARCHAR then loads as "", not NULL).
+        import json
+
+        from benchbox.platforms.base.data_loading import (
+            DUCKDB_NO_NULL_CONVERSION_SENTINEL,
+            DataSource,
+        )
+        from benchbox.platforms.duckdb import _build_csv_scan_expression
+
+        columns = ["flight_id", "flight_date", "arr_delay", "cancellation_code"]
+
+        def scan_sql():
+            meta = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))["tables"]["flights"][
+                "formats"
+            ]["csv"][0]["metadata"]
+            source = DataSource(
+                source_type="manifest", tables={"flights": flights_csv}, table_metadata={"flights": meta}
+            )
+            return _build_csv_scan_expression([flights_csv], columns, data_source=source, table_name="flights")
+
+        manifest_path = tmp_path / "_datagen_manifest.json"
+        stale = json.loads(manifest_path.read_text(encoding="utf-8"))
+        stale["tables"]["flights"]["formats"]["csv"][0]["metadata"]["csv_null_marker"] = None
+        manifest_path.write_text(json.dumps(stale), encoding="utf-8")
+        assert DUCKDB_NO_NULL_CONVERSION_SENTINEL in scan_sql()
+
+        downloader.backfill_csv_dialect_metadata()
+        healed_sql = scan_sql()
+        assert "nullstr=''" in healed_sql
+        assert DUCKDB_NO_NULL_CONVERSION_SENTINEL not in healed_sql
 
         duckdb = pytest.importorskip("duckdb")
         conn = duckdb.connect(":memory:")
         try:
-            conn.execute(
-                "CREATE TABLE flights (flight_id INTEGER, flight_date DATE, "
-                "arr_delay DOUBLE, cancellation_code VARCHAR)"
-            )
-            conn.execute("CREATE TABLE airlines (code VARCHAR, name VARCHAR)")
-            conn.execute("CREATE TABLE airports (code VARCHAR, name VARCHAR)")
-            DuckDBAdapter(database=":memory:").load_data(benchmark, conn, tmp_path)
-            value = conn.execute("SELECT arr_delay, cancellation_code FROM flights ORDER BY flight_id").fetchall()
-            assert value[0] == (10.5, "A")
-            assert value[1][0] is None
-            assert value[1][1] is None
+            (is_null,) = conn.execute(
+                f"SELECT cancellation_code IS NULL FROM {healed_sql} WHERE flight_id = 2"
+            ).fetchone()
+            assert is_null is True
         finally:
             conn.close()
 
-    def test_stale_manifest_backfilled_to_null_loading(self, tmp_path):
+    def test_stale_manifest_backfilled_in_place(self, tmp_path):
         """Caches generated before the null-marker fix are healed in place."""
         import json
 
@@ -513,34 +538,91 @@ class TestCsvNullDialect:
 
         from benchbox.core.flightdata.downloader import FlightDataDownloader
 
-        (tmp_path / "_datagen_manifest.json").write_text(
-            json.dumps({"benchmark": "tpch", "tables": {}}), encoding="utf-8"
-        )
+        manifest = {
+            "benchmark": "tpch",
+            "tables": {
+                "lineitem": {"formats": {"tbl": [{"path": "lineitem.tbl", "metadata": {"csv_null_marker": None}}]}}
+            },
+        }
+        manifest_path = tmp_path / "_datagen_manifest.json"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
         assert downloader.backfill_csv_dialect_metadata() is False
+        assert json.loads(manifest_path.read_text(encoding="utf-8")) == manifest
+
+    def test_ensure_auxiliary_files_heals_stale_manifest(self, tmp_path, monkeypatch):
+        """The reuse hook runs the backfill when no layout repair applies."""
+        import json
+
+        from benchbox.core.flightdata.benchmark import FlightDataBenchmark
+
+        manifest_path = tmp_path / "_datagen_manifest.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "benchmark": "flightdata",
+                    "tables": {"flights": {"formats": {"csv": [{"path": "flights.csv", "metadata": {}}]}}},
+                }
+            ),
+            encoding="utf-8",
+        )
+        benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        monkeypatch.setattr(benchmark.downloader, "repair_reusable_layout", lambda: None)
+        calls = []
+        real_backfill = benchmark.downloader.backfill_csv_dialect_metadata
+        monkeypatch.setattr(
+            benchmark.downloader,
+            "backfill_csv_dialect_metadata",
+            lambda: calls.append(True) or real_backfill(),
+        )
+        benchmark.ensure_auxiliary_data_files()
+        assert calls == [True]
+        healed = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert healed["tables"]["flights"]["formats"]["csv"][0]["metadata"]["csv_null_marker"] == ""
 
 
 class TestOutputContractInvariants:
     """Static guards so the two implicit contracts stay enforceable."""
 
-    def _catalog_sql(self):
+    # The tiebreaker tail each top-N ORDER BY must end with: dimension keys
+    # that make the order total within the query's grouping.
+    _TOP_N_TIEBREAKERS = {
+        "delay-by-airport": ["origin"],
+        "best-routes": ["origin", "dest"],
+        "busiest-routes": ["origin", "dest"],
+        "route-reliability": ["origin", "dest"],
+        "hub-connectivity": ["origin"],
+        "market-share": ["reporting_airline"],
+    }
+
+    def _catalog_sql(self, tmp_path):
         from benchbox.core.flightdata.benchmark import FlightDataBenchmark
 
-        benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir="/tmp/fd-invariant")
+        benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir=tmp_path)
         return benchmark.get_queries()
 
-    def test_top_n_orders_end_in_unique_key(self):
-        """Every ORDER BY ... LIMIT must carry tiebreaker keys (L3)."""
-        for key, sql in self._catalog_sql().items():
-            if "LIMIT" not in sql:
-                continue
-            order = sql.split("ORDER BY", 1)[1].split("LIMIT", 1)[0]
-            keys = [k.strip() for k in order.split(",") if k.strip()]
-            assert len(keys) >= 2, f"{key}: top-N ORDER BY has no tiebreaker: {order!r}"
+    @staticmethod
+    def _order_keys(order_clause):
+        keys = []
+        for part in order_clause.split(","):
+            tokens = [t for t in part.strip().split() if t.upper() not in ("ASC", "DESC", "NULLS", "LAST", "FIRST")]
+            keys.append(tokens[-1].split(".")[-1])
+        return keys
 
-    def test_no_float_sum_rounding_in_sql(self):
+    def test_top_n_orders_end_in_unique_key(self, tmp_path):
+        """Every ORDER BY ... LIMIT ends in its documented tiebreaker tail."""
+        sql_by_key = self._catalog_sql(tmp_path)
+        assert set(self._TOP_N_TIEBREAKERS) <= set(sql_by_key), "tiebreaker map covers every top-N query"
+        for key, tiebreakers in self._TOP_N_TIEBREAKERS.items():
+            sql = sql_by_key[key]
+            assert "LIMIT" in sql, f"{key}: expected a top-N query"
+            order = sql.split("ORDER BY", 1)[1].split("LIMIT", 1)[0]
+            keys = self._order_keys(order)
+            assert keys[-len(tiebreakers) :] == tiebreakers, f"{key}: ORDER BY must end in {tiebreakers}: {order!r}"
+
+    def test_no_float_sum_rounding_in_sql(self, tmp_path):
         """ROUND(SUM(<float>), 0) flips on summation order; totals use integer tenths (L3)."""
-        for key, sql in self._catalog_sql().items():
+        for key, sql in self._catalog_sql(tmp_path).items():
             assert "ROUND(SUM(" not in sql, f"{key}: float-sum rounding must use integer tenths"
 
 

@@ -316,10 +316,19 @@ def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
             col("_arr_nc").mean().alias("_avg_arr"),
         )
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, lit(100.0) * col("cancelled_flights") / col("total_flights"), 2).alias(
                 "cancellation_rate_pct"
             ),
-            _round_half_away(ctx, lit(100.0) * col("ontime_flights") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("ontime_flights") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
         )
         .select(
@@ -610,10 +619,19 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .filter(col("total_scheduled") >= lit(100))
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, lit(100.0) * col("cancelled_count") / col("total_scheduled"), 2).alias(
                 "cancellation_rate_pct"
             ),
-            _round_half_away(ctx, lit(100.0) * col("ontime_count") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("ontime_count") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
             _round_half_away(ctx, col("_avg_dist"), 0).alias("distance_miles"),
         )
         .select(
@@ -631,6 +649,7 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(
             ["ontime_pct", "cancellation_rate_pct", "origin", "dest"],
             descending=[True, False, False, False],
+            nulls_last=True,
         )
         .limit(30)
     )
@@ -753,9 +772,18 @@ def day_of_week_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
-            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
         )
         .select(
             "day_of_week",
@@ -815,11 +843,20 @@ def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, lit(100.0) * col("cancelled_count") / col("total_flights"), 2).alias(
                 "cancellation_rate_pct"
             ),
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
-            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
         )
         .select(
             "month",
@@ -890,14 +927,23 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
             _round_half_away(ctx, lit(100.0) * col("_cancelled_sum") / col("total_flights"), 2).alias(
                 "cancellation_rate_pct"
             ),
-            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
         )
         .select("period", "total_flights", "avg_arr_delay", "cancellation_rate_pct", "ontime_pct")
-        .sort("avg_arr_delay", descending=True)
+        .sort("avg_arr_delay", descending=True, nulls_last=True)
     )
 
 
@@ -923,9 +969,18 @@ def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
-            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
         )
         .select(
             "hour_of_day",
@@ -966,12 +1021,21 @@ def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .filter(col("total_scheduled") >= lit(1000))
         .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
             _round_half_away(ctx, lit(100.0) * col("cancelled_flights") / col("total_scheduled"), 2).alias(
                 "cancellation_rate_pct"
             ),
             _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
             _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
-            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
             _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_route_distance_miles"),
         )
         .select(

@@ -149,8 +149,9 @@ QUERIES:
           ROUND(AVG(CASE WHEN f.late_aircraft_delay > 0 THEN f.late_aircraft_delay END), 2) AS avg_cascade_delay,
           -- Whole-minute total via exact integer tenths: float summation order
           -- varies by engine and run, so ROUND(float_sum, 0) flips whenever the
-          -- true total lands exactly on a half integer. Tenths of a minute are
-          -- exact integers, their sum is order-independent on every engine, and
+          -- true total lands exactly on a half integer. Late-aircraft delays
+          -- are tenth-of-a-minute granular, so their tenths are exact
+          -- integers, their sum is order-independent on every engine, and
           -- (tenths + 5) / 10 with truncation is half-up rounding.
           FLOOR(
               (
@@ -436,7 +437,7 @@ QUERIES:
               WHEN (f.month = 9 AND f.day_of_week = 1 AND f.day_of_month BETWEEN 1 AND 7) THEN 'Labor Day'
               ELSE 'Regular Day'
           END
-      ORDER BY avg_arr_delay DESC
+      ORDER BY avg_arr_delay DESC NULLS LAST
   time-of-day:
     id: '17'
     name: Hourly Congestion Pattern
