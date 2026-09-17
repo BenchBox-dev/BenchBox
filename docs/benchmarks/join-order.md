@@ -129,7 +129,10 @@ query_1a = queries.get_query("1a")
 ```
 
 The SQL text is imported from the Greg Rahn JOB query corpus pinned by the
-canonical build. Runtime platform adapters handle dialect translation.
+canonical build. The benchmark translates queries to the engine dialect via
+SQLGlot when a `dialect` is requested; platform adapters request translation
+automatically, so adapter runs execute translated SQL rather than the
+canonical text.
 
 ## Python API
 

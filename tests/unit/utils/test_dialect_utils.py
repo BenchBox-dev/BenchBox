@@ -430,6 +430,18 @@ class TestPostgresIdentifierQuoting:
         # ClickHouse also doesn't use quoting
         assert '"SR_RETURN_AMT"' not in result
 
+    def test_snowflake_no_identifier_quoting(self):
+        """Test that snowflake dialect disables identifier quoting.
+
+        Snowflake folds unquoted identifiers to UPPERCASE, matching unquoted
+        UPPER DDL; quoted lowercase would not resolve against it.
+        """
+        query = "SELECT note FROM company_type"
+        result = translate_sql_query(query, target_dialect="snowflake", identify=True)
+        assert '"company_type"' not in result
+        assert '"note"' not in result
+        assert "company_type" in result
+
     def test_duckdb_uses_identifier_quoting(self):
         """Test that duckdb dialect uses identifier quoting when requested."""
         query = "SELECT order FROM orders"  # 'order' is a reserved word

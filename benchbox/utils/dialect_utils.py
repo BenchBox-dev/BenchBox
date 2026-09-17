@@ -348,8 +348,10 @@ def translate_sql_query(
         # Some databases don't need identifier quoting:
         # - ClickHouse: case-sensitive without case-folding, lowercase schema matches unquoted lowercase
         # - PostgreSQL/DataFusion: unquoted identifiers are folded to lowercase by the engine
-        # Quoting preserves case which causes mismatches with lowercase schemas.
-        should_identify = identify and (tgt not in ("clickhouse", "postgres"))
+        # - Snowflake: unquoted identifiers are folded to UPPERCASE by the engine,
+        #   matching unquoted UPPER DDL; quoted lowercase would not resolve.
+        # Quoting preserves case which causes mismatches with folded schemas.
+        should_identify = identify and (tgt not in ("clickhouse", "postgres", "snowflake"))
         translated = sqlglot.transpile(processed_query, read=src, write=tgt, identify=should_identify)[0]
 
         # Built-in optional post-fix:
