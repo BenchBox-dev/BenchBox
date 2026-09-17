@@ -5467,10 +5467,15 @@
       "title": "Stop the Home smoke test asserting against the loading skeleton"
     },
     "explorer-index-read-model-hardware-and-executions": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-18T01:12:59Z",
+        "generation": "91c3b994e77846768bfc906a2041fc45",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e776c6070172aebb41b3df8"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Give the cohort index tables hardware columns and a bulk executions accessor"
     },
     "explorer-leaderboard-first-identity-unification": {
