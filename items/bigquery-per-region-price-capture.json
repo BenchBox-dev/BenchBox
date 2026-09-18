@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "Every BigQuery region in the table carries a captured value with a retrieval date, or is explicitly marked unsupported",
+    "No method: derived_from_announcement markers remain for captured regions",
+    "If a machine-readable source is found, BigQuery moves into the generator and this task records that instead",
+    "The regions added to the matcher are all covered"
+  ],
+  "context": "Requested explicitly as a follow-up when the derived-value approach was chosen. Plan: /Users/joe/.claude/plans/stateful-purring-axolotl.md, BigQuery section.",
+  "description": "Replace the derived BigQuery regional values with cited ones.\n\nOnly the US/EU/asia multi-region rate ($6.25/TiB) is directly citable today. cloud.google.com/bigquery/pricing renders a client-side region selector, so only the currently selected region's price appears in the page HTML - the other regions cannot be scraped with a plain fetch. The data correction therefore ships the remaining pinned regions as pinned x 1.25, derived from Google's announced uniform 25% uplift (effective 2023-07-05) and marked method: derived_from_announcement rather than presented as cited.\n\nCapture the real schedule by driving the region selector once per region - browser automation is the practical route. Record each captured value with its retrieval date and clear that region's derived flag.\n\nCover at minimum the regions already present in the table, plus the locations the region matcher was extended to handle: africa-south1, northamerica-south1, asia-southeast3, asia-southeast4, europe-north2, europe-west10, europe-west12.\n\nWorth checking during capture whether Google publishes these through the Cloud Billing Catalog API or the Cloud Platform SKUs page in a machine-readable form; if so, fold BigQuery into the generator instead and close this permanently rather than repeating a manual capture."
+}

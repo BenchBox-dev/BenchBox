@@ -1329,6 +1329,15 @@
       "status": "done",
       "title": "Bidirectional Sync and True-Up Releases for Public/Private Repos"
     },
+    "bigquery-per-region-price-capture": {
+      "claim": null,
+      "needs": [
+        "pricing-data-correct-all-tables"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Capture BigQuery per-region on-demand prices to replace derived values"
+    },
     "blind-spot-command-protocol-alignment-20260724": {
       "claim": null,
       "needs": [],
