@@ -636,22 +636,11 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
-        The structured JSON form is required by PrestoTrinoQueryPlanParser; the
-        shared plain-text ``get_query_plan_from_cursor`` helper cannot be used
-        here because it omits the ``(FORMAT JSON)`` option.
+        The structured JSON form is required by PrestoTrinoQueryPlanParser.
         """
-        from benchbox.platforms.base.sql_execution import join_explain_rows
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
-            plan_rows = cursor.fetchall()
-            return join_explain_rows(plan_rows)
-        except Exception as e:
-            self.logger.warning("Could not get query plan via EXPLAIN: %s", e)
-            return None
-        finally:
-            cursor.close()
+        return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)")
 
     def get_query_plan_parser(self):
         """Return the Presto/Trino parser (inherited by Presto and Starburst).

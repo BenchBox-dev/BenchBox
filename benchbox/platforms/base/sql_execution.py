@@ -52,7 +52,7 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
     return text or None
 
 
-def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
+def get_query_plan_from_cursor(connection: Any, query: str, explain_prefix: str = "EXPLAIN") -> str | None:
     """Get query execution plan via EXPLAIN on a DBAPI connection.
 
     Shared implementation for platforms that use the standard
@@ -61,6 +61,7 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     Args:
         connection: DBAPI connection.
         query: SQL query to explain.
+        explain_prefix: EXPLAIN variant, e.g. "EXPLAIN (FORMAT JSON)".
 
     Returns:
         Newline-joined plan rows, or ``None`` on failure.
@@ -75,7 +76,7 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     """
     cursor = connection.cursor()
     try:
-        cursor.execute(f"EXPLAIN {query}")
+        cursor.execute(f"{explain_prefix} {query}")
         plan_rows = cursor.fetchall()
         return join_explain_rows(plan_rows)
     except Exception as e:
