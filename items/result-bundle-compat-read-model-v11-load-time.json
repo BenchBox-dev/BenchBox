@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "Explorer read model projects tables/load_ms (and per_table_ms if decided) behind a version bump with forward-compatible policy",
+    "Seed-corpus unevenness addressed (regeneration note or NULL-tolerant views)",
+    "Compat tests updated; explorer renders new columns"
+  ],
+  "context": "Reconciliation rows P4 and per_table_ms (both DEFER). Implements the surfacing decision; stays closed if the decision is bundle-only.",
+  "description": "Implement the decided per-table load-time surfacing: project tables.*.load_ms (and phases.statistics.per_table_ms if in scope) into the Explorer DuckDB read model with a version bump, NULL-tolerant views for the partial seed corpus, and updated compat tests.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}

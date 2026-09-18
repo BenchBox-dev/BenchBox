@@ -13055,6 +13055,15 @@
       "status": "done",
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
+    "result-bundle-compat-read-model-v11-load-time": {
+      "claim": null,
+      "needs": [
+        "result-bundle-compat-decide-load-time-surfacing"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: implement read-model load-time projection"
+    },
     "result-bundle-compat-reconcile-review": {
       "claim": null,
       "needs": [
