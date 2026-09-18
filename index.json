@@ -12044,17 +12044,12 @@
       "title": "Define a retention/size policy for raw_explain_output stored on every captured plan"
     },
     "query-plan-capture-sideeffect-engine-policy": {
-      "claim": {
-        "expires_at": "2026-09-19T13:26:28Z",
-        "generation": "da3d28bacaa645da9df669f6cfa9dad1",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
-      },
+      "claim": null,
       "needs": [
         "query-plan-capture-canonical-isolation"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Define plan capture for side-effect engines (BigQuery) under the isolated-phase model"
     },
     "query-plan-capture-snowflake-join-condition-sorting": {
