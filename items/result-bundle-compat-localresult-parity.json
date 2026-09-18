@@ -3,7 +3,7 @@
     "localResult.ts version handling matches the Python result_schema_version_value() fallback semantics",
     "Hardcoded SUPPORTED_SCHEMA_VERSIONS no longer drifts independently (generated or pinned against schema_policy)"
   ],
-  "context": "Reconciliation 2199-P5 interaction row (DEFER, blocked on fix/result-schema-version-rename @ 7aeed9498). TS side of the shared-contract work.",
+  "context": "PR #2199 MERGED (ed3e39a9c, on develop as of 0a60c0b8c). Implement against the post-merge tree.",
   "description": "After PR #2199 merges, bring results-explorer localResult.ts to parity with the Python helper: full result_schema_version to version fallback semantics and no independently drifting hardcoded version set (generate from schema_policy.py or pin in CI).",
   "links": [
     "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
