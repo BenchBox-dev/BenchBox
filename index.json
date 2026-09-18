@@ -10957,17 +10957,12 @@
       "title": "Route price fallbacks and staleness into cost_status, and guard unverified regions"
     },
     "pricing-unit-contract-adr": {
-      "claim": {
-        "expires_at": "2026-09-19T16:45:18Z",
-        "generation": "e6fa203ac6d94cf6ae7be0489018473f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
-      },
+      "claim": null,
       "needs": [
         "pricing-region-params-athena-synapse"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Resolve the TB/TiB billing unit and record the contract decision"
     },
     "pricing-vendor-data-redistribution-check": {
