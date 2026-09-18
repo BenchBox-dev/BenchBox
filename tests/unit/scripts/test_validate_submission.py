@@ -292,6 +292,12 @@ class TestValidateBundle:
                     "statement_overhead_ms": {"samples": "five"},
                 }
             },
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "statement_overhead_ms": {"samples": -1, "min": -0.5},
+                }
+            },
         ],
     )
     def test_malformed_client_link_is_rejected(self, environment):

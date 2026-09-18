@@ -458,18 +458,29 @@ def _validate_environment_client_link(data: dict, vr: ValidationResult) -> None:
             vr.error(f"'environment.client_link.{key}' must be a string, got {value!r}")
 
     overhead = client_link.get("statement_overhead_ms")
-    if overhead is None:
-        return
+    if overhead is not None:
+        _validate_overhead_shape(overhead, vr)
+
+
+def _validate_overhead_shape(overhead: Any, vr: ValidationResult) -> None:
+    """Shape-check the ``statement_overhead_ms`` probe block when present."""
     if not isinstance(overhead, dict):
         vr.error("'environment.client_link.statement_overhead_ms' must be a dict")
         return
     samples = overhead.get("samples")
-    if samples is not None and (isinstance(samples, bool) or not isinstance(samples, int)):
-        vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be an int, got {samples!r}")
+    if samples is not None:
+        if isinstance(samples, bool) or not isinstance(samples, int):
+            vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be an int, got {samples!r}")
+        elif samples < 0:
+            vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be non-negative, got {samples!r}")
     for key in ("min", "median"):
         value = overhead.get(key)
-        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
             vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be a number, got {value!r}")
+        elif value < 0:
+            vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be non-negative, got {value!r}")
 
 
 def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
