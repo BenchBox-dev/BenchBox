@@ -446,5 +446,43 @@ def test_result_factory_build_enhanced_handles_non_dict_per_table_timings(base_b
     assert result.table_statistics["sales"] == {"rows": 100000}
 
 
+def test_result_factory_malformed_total_ms_degrades_to_zero(base_benchmark):
+    """None or non-numeric total_ms values must omit load_time_ms without raising."""
+
+    result = build_enhanced_benchmark_result(
+        benchmark=base_benchmark,
+        platform="duckdb",
+        query_results=[],
+        duration_seconds=1.0,
+        data_loading_time=1.0,
+        table_statistics={"a": 10, "b": 20, "c": 30},
+        per_table_timings={
+            "a": {"total_ms": None},
+            "b": {"total_ms": "n/a"},
+            "c": {"total_ms": 42.9},
+        },
+    )
+
+    assert result.table_statistics["a"] == {"rows": 10}
+    assert result.table_statistics["b"] == {"rows": 20}
+    assert result.table_statistics["c"] == {"rows": 30, "load_time_ms": 42}
+
+
+def test_result_factory_non_dict_timings_container_degrades_to_zero(base_benchmark):
+    """A truthy non-dict per_table_timings must not raise; all timings omitted."""
+
+    result = build_enhanced_benchmark_result(
+        benchmark=base_benchmark,
+        platform="duckdb",
+        query_results=[],
+        duration_seconds=1.0,
+        data_loading_time=1.0,
+        table_statistics={"a": 10},
+        per_table_timings="error",
+    )
+
+    assert result.table_statistics["a"] == {"rows": 10}
+
+
 if __name__ == "__main__":
     pytest.main(["-v"])

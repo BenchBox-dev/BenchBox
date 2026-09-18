@@ -1511,6 +1511,7 @@ class ResultCaptureMixin:
         tuning_validation_status,
         tuning_metadata_saved,
         requested_config_hash=None,
+        per_table_timings=None,
     ):
         """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
@@ -1568,6 +1569,7 @@ class ResultCaptureMixin:
             data_loading_time=loading_time,
             schema_creation_time=getattr(schema_creation_phase, "duration_ms", 0) / 1000.0,
             table_statistics=table_stats,
+            per_table_timings=per_table_timings,
             tunings_applied=tunings_applied_dict,
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,
@@ -1761,6 +1763,7 @@ class ResultCaptureMixin:
                         self.logger.warning(f"Could not get row count for {table_name}: {e}")
                         table_stats[table_name] = 0
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, None)
+        self._last_per_table_timings = None
         tuning_metadata_saved = False
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
@@ -1789,6 +1792,7 @@ class ResultCaptureMixin:
         _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
         quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        self._last_per_table_timings = per_table_timings
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
     def _check_validation_failure(self, validation_phase) -> bool:

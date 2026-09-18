@@ -341,7 +341,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         table_stats: dict[str, int] = {}
-        per_table_timings: dict[str, float] = {}
+        per_table_timings: dict[str, Any] = {}
 
         for table in self._resolve_table_names(benchmark):
             table_start = mono_time()
@@ -385,7 +385,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 table_stats[table] = row_count
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
-            per_table_timings[table] = elapsed_seconds(table_start)
+            per_table_timings[table] = {"total_ms": elapsed_seconds(table_start) * 1000}
 
         return table_stats, elapsed_seconds(start_time), per_table_timings
 

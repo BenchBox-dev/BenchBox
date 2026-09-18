@@ -329,11 +329,13 @@ class MySqlWireLifecycleMixin:
             if not self._validate_identifier(target_table) and not self._handle_invalid_load_table(
                 target_table, table_stats
             ):
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
             data_files = self._resolve_data_files(table_path)
             if not data_files:
                 self.logger.warning(f"Data file not found for {target_table}")
                 table_stats[target_table] = 0
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
 
             table_start = mono_time()
@@ -349,7 +351,12 @@ class MySqlWireLifecycleMixin:
                         table_rows = 0
                         break
             table_stats[target_table] = table_rows
-            per_table_timings[target_table] = {"rows": table_rows, "duration_seconds": elapsed_seconds(table_start)}
+            table_time = elapsed_seconds(table_start)
+            per_table_timings[target_table] = {
+                "rows": table_rows,
+                "duration_seconds": table_time,
+                "total_ms": table_time * 1000,
+            }
             self.log_verbose(f"Loaded {table_rows:,} rows into {target_table}")
 
         loading_time = elapsed_seconds(start_time)

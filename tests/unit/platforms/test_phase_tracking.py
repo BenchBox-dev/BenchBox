@@ -227,6 +227,37 @@ def test_data_loading_phase_uses_actual_per_table_timings_and_handles_zero_rows(
     assert empty_phase.per_table_stats["empty"].load_time_ms == 0
 
 
+def test_data_loading_phase_ignores_non_dict_per_table_timings():
+    """Non-dict timing values degrade to 0 instead of raising."""
+    phase = _Adapter()._create_enhanced_data_loading_phase(
+        {"orders": 3},
+        loading_time=0.4,
+        per_table_timings={"orders": 1.5},
+    )
+
+    assert phase.per_table_stats["orders"].load_time_ms == 0
+
+
+def test_data_loading_phase_malformed_total_ms_degrades_to_zero():
+    """None or non-numeric total_ms degrades to 0; non-dict containers are ignored."""
+    phase = _Adapter()._create_enhanced_data_loading_phase(
+        {"a": 1, "b": 2},
+        loading_time=0.4,
+        per_table_timings={"a": {"total_ms": None}, "b": {"total_ms": "n/a"}},
+    )
+    assert phase.per_table_stats["a"].load_time_ms == 0
+    assert phase.per_table_stats["b"].load_time_ms == 0
+
+    # A non-dict container carries no usable timings: same proportional fallback as None.
+    container_phase = _Adapter()._create_enhanced_data_loading_phase(
+        {"a": 1},
+        loading_time=0.4,
+        per_table_timings="error",
+    )
+    fallback_phase = _Adapter()._create_enhanced_data_loading_phase({"a": 1}, loading_time=0.4)
+    assert container_phase.per_table_stats["a"].load_time_ms == fallback_phase.per_table_stats["a"].load_time_ms
+
+
 def test_validation_phase_defaults_without_runtime_inputs():
     phase = _Adapter()._create_enhanced_validation_phase()
 

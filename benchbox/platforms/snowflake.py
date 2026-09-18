@@ -773,6 +773,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
         start_time = mono_time()
         table_stats = {}
+        per_table_timings: dict[str, Any] = {}
         total_time = 0.0
 
         cursor = connection.cursor()
@@ -791,7 +792,8 @@ class SnowflakeAdapter(PlatformAdapter):
 
                 if not valid_files:
                     self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name] = 0
+                    table_stats[table_name.upper()] = 0
+                    per_table_timings[table_name.upper()] = {"total_ms": 0}
                     continue
 
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -810,6 +812,7 @@ class SnowflakeAdapter(PlatformAdapter):
                         self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
 
                     load_time = elapsed_seconds(load_start)
+                    per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                     self.log_verbose(
                         f"✅ Loaded {actual_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                     )
@@ -817,6 +820,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 except Exception as e:
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                     table_stats[table_name.upper()] = 0
+                    per_table_timings[table_name.upper()] = {"total_ms": 0}
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -831,8 +835,7 @@ class SnowflakeAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-        # Snowflake doesn't provide detailed per-table timings yet
-        return table_stats, total_time, None
+        return table_stats, total_time, per_table_timings
 
     def validate_external_table_requirements(self) -> None:
         """Validate required cloud staging configuration for external table mode."""

@@ -1194,6 +1194,11 @@ class TestBigQueryAdapter:
             assert "CUSTOMER" in table_stats
             assert "NATION" in table_stats
 
+            # Per-table timings should cover every loaded table with total_ms
+            assert set(per_table_timings) == set(table_stats)
+            assert per_table_timings["CUSTOMER"]["total_ms"] >= 0
+            assert per_table_timings["NATION"]["total_ms"] >= 0
+
             # Verify load_table_from_file was called for each chunk (2 for customer, 1 for nation)
             assert mock_connection.load_table_from_file.call_count == 3
 
@@ -1256,6 +1261,10 @@ class TestBigQueryAdapter:
 
             # Verify load_table_from_file was called once
             assert mock_connection.load_table_from_file.call_count == 1
+
+            # Direct loads should report per-table wall-clock timings keyed by table
+            assert set(per_table_timings) == set(table_stats)
+            assert per_table_timings["NATION"]["total_ms"] >= 0
 
     def test_validate_database_compatibility_detects_empty_tables(self, dependencies_available):
         """Test that validation detects when more than half the tables are empty."""

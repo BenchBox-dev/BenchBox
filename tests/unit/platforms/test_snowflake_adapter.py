@@ -534,6 +534,65 @@ benchbox-fixture-key-material
             temp_path.unlink()
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_load_data_returns_per_table_timings(self, mock_snowflake):
+        """load_data should report per-table wall-clock timings keyed by table."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        mock_cursor.fetchall.side_effect = [
+            [(True, 100, 0, 0, "LOADED", None)],  # Copy results
+            [(100,)],  # Row count
+        ]
+        mock_cursor.fetchone.return_value = (100,)
+
+        mock_benchmark = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
+            f.write("1|test1|\n2|test2|\n")
+            temp_path = Path(f.name)
+
+        try:
+            mock_benchmark.tables = {"test_table": str(temp_path)}
+
+            adapter = SnowflakeAdapter(
+                account="test_account",
+                username="test_user",
+                password="test_pass",
+                warehouse="TEST_WH",
+                database="TEST_DB",
+            )
+
+            table_stats, _, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+
+            assert set(per_table_timings) == set(table_stats)
+            assert per_table_timings["TEST_TABLE"]["total_ms"] >= 0
+        finally:
+            temp_path.unlink()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_load_data_skip_uses_uppercase_keys_with_zero_timings(self, mock_snowflake):
+        """Skipped tables should use the same key casing with a zero timing entry."""
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = Mock()
+
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"ghost_table": "/nonexistent/path/ghost.tbl"}
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        table_stats, _, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+
+        assert table_stats == {"GHOST_TABLE": 0}
+        assert per_table_timings == {"GHOST_TABLE": {"total_ms": 0}}
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_validate_external_table_requirements_requires_staging_root(self, mock_snowflake):
         """External mode should require staging_root for Snowflake."""
         adapter = SnowflakeAdapter(
