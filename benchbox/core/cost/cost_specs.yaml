@@ -193,7 +193,37 @@ platform_config_requirements:
     required:
     - cloud
     - tier
+    - warehouse_type
     - workload_type
     - cluster_size_dbu_per_hour
     optional:
     - warehouse_size
+  databricks-df:
+    required:
+    - cloud
+    - tier
+    - warehouse_type
+    - workload_type
+    - cluster_size_dbu_per_hour
+    optional:
+    - warehouse_size
+  athena:
+    required:
+    - region
+    optional: []
+  synapse:
+    required:
+    - mode
+    - region
+    optional:
+    - dwu_level
+  fabric_dw:
+    required:
+    - region
+    - sku
+    optional: []
+  firebolt:
+    required:
+    - node_type
+    - node_count
+    optional: []
