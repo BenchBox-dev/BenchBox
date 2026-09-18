@@ -12090,15 +12090,10 @@
       "title": "Persist captured query plans for the TPC-H and TPC-DS power drivers"
     },
     "query-plan-capture-truncated-fingerprint-integrity": {
-      "claim": {
-        "expires_at": "2026-09-19T12:37:48Z",
-        "generation": "53052cfc16be478bbd8156cb05e62347",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:33761908c6a0620b6188afe2"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Handle depth-truncated plan fingerprint integrity cleanly in QueryPlanDAG.from_dict"
     },
     "query-plan-cli-visualization": {
