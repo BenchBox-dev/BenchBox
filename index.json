@@ -6239,8 +6239,8 @@
     },
     "first-live-cloud-benchmark-run-and-publish": {
       "claim": {
-        "expires_at": "2026-09-18T16:54:52Z",
-        "generation": "5dd1695d571c44d9a9c5718861f42a2d",
+        "expires_at": "2026-09-19T23:38:26Z",
+        "generation": "0162a37fc2574681ba269f669a908981",
         "renewals": 0,
         "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
       },
