@@ -11975,12 +11975,17 @@
       "title": "Implement or resolve query plan capture for QuestDB, Velox, Databend, MotherDuck, cuDF, Doris, and SingleStore"
     },
     "query-plan-capture-nightly-drift-docs-and-snowflake-coverage": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T12:40:05Z",
+        "generation": "24ab2093fe484b34bfa830517e6c503e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:33761908c6a0620b6188afe2"
+      },
       "needs": [
         "query-plan-capture-snowflake-join-condition-sorting"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Correct nightly CI -m documentation and add Snowflake live execute_query coverage"
     },
     "query-plan-capture-parser-live-validation": {
