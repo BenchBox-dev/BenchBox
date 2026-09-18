@@ -638,9 +638,10 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for an Athena query.
 
-        Athena is priced at $5.00 per TB of data scanned in verified regions;
-        other regions resolve as flagged fallbacks that cannot publish as
-        normalized cost. BenchBox derives cost from measured
+        Athena is priced per TB of data scanned from a regional table
+        ($5.00 in us-east-1/eu-west-1/ap-southeast-1/ap-northeast-1, $9.00
+        in sa-east-1); unlisted regions resolve as flagged fallbacks that
+        cannot publish as normalized cost. BenchBox derives cost from measured
         data_scanned_bytes plus its pricing table; legacy adapter-provided
         cost_usd is ignored when present.
 
@@ -688,9 +689,10 @@ class CostCalculator:
         """Calculate cost for an Azure Synapse Analytics query.
 
         Synapse has two modes:
-        - Serverless: $5.00 per TB of data processed in verified regions
-          (similar to Athena/BigQuery); other regions resolve as flagged
-          fallbacks that cannot publish as normalized cost
+        - Serverless: per-TB-of-data-processed pricing from a regional
+          table ($5.00 eastus/westeurope, $6.75 southeastasia, $5.50
+          canadacentral, $9.00 brazilsouth); unlisted regions resolve as
+          flagged fallbacks that cannot publish as normalized cost
         - Dedicated: DWU-hour based pricing (similar to Redshift)
 
         Expected resource_usage fields:
