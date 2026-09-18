@@ -440,10 +440,36 @@ def _validate_environment_client_link(data: dict, vr: ValidationResult) -> None:
         vr.error("'environment.client_link' must be a dict")
         return
 
-    for key in ("link_status", "source", "collection_error_message"):
+    collection_status = client_link.get("collection_status")
+    if collection_status is None:
+        vr.error("'environment.client_link.collection_status' is required when 'environment.client_link' is present")
+    elif not isinstance(collection_status, str):
+        vr.error(f"'environment.client_link.collection_status' must be a string, got {collection_status!r}")
+    elif collection_status not in {"available", "partial", "unavailable", "not_requested"}:
+        vr.warn(f"Unknown environment.client_link.collection_status: {collection_status!r}")
+
+    source = client_link.get("source")
+    if source is not None and not isinstance(source, str):
+        vr.error(f"'environment.client_link.source' must be a string, got {source!r}")
+
+    for key in ("client_region", "client_cloud", "collection_error_class", "collection_error_message"):
         value = client_link.get(key)
         if value is not None and not isinstance(value, str):
             vr.error(f"'environment.client_link.{key}' must be a string, got {value!r}")
+
+    overhead = client_link.get("statement_overhead_ms")
+    if overhead is None:
+        return
+    if not isinstance(overhead, dict):
+        vr.error("'environment.client_link.statement_overhead_ms' must be a dict")
+        return
+    samples = overhead.get("samples")
+    if samples is not None and (isinstance(samples, bool) or not isinstance(samples, int)):
+        vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be an int, got {samples!r}")
+    for key in ("min", "median"):
+        value = overhead.get(key)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
+            vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be a number, got {value!r}")
 
 
 def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
@@ -463,6 +489,12 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
         if not isinstance(entry, dict):
             vr.error(f"'tables.{name}' must be a dict")
             continue
+        rows = entry.get("rows")
+        if rows is not None:
+            if isinstance(rows, bool) or not isinstance(rows, (int, float)):
+                vr.error(f"'tables.{name}.rows' must be a number, got {rows!r}")
+            elif rows < 0:
+                vr.error(f"'tables.{name}.rows' must be non-negative, got {rows!r}")
         load_ms = entry.get("load_ms")
         if load_ms is None:
             continue
@@ -472,26 +504,32 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
             vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
 
 
-def _validate_platform_tuning(data: dict, vr: ValidationResult) -> None:
-    """Shape-check the optional ``platform.tuning`` block when present."""
+def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``platform.config`` clustering field when present.
+
+    The Databricks adapter records the resolved strategy at
+    ``platform.config.databricks_clustering_strategy`` (flattened out of
+    ``platform_info["configuration"]``); ``platform.tuning`` carries the
+    requested-tuning summary and never holds this key.
+    """
     platform = data.get("platform")
     if not isinstance(platform, dict):
         return
 
-    tuning = platform.get("tuning")
-    if tuning is None:
+    config = platform.get("config")
+    if config is None:
         return
-    if not isinstance(tuning, dict):
-        vr.error("'platform.tuning' must be a dict")
+    if not isinstance(config, dict):
+        vr.error("'platform.config' must be a dict")
         return
 
-    strategy = tuning.get("databricks_clustering_strategy")
+    strategy = config.get("databricks_clustering_strategy")
     if strategy is None:
         return
     if not isinstance(strategy, str):
-        vr.error(f"'platform.tuning.databricks_clustering_strategy' must be a string, got {strategy!r}")
+        vr.error(f"'platform.config.databricks_clustering_strategy' must be a string, got {strategy!r}")
     elif strategy not in {"z_order", "liquid_clustering", "liquid_clustering_auto", "none"}:
-        vr.warn(f"Unknown platform.tuning.databricks_clustering_strategy: {strategy!r}")
+        vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
@@ -867,7 +905,7 @@ def _validate_bundle(
     _validate_translation_section(data, vr)
     _validate_environment_client_link(data, vr)
     _validate_tables_block(data, vr)
-    _validate_platform_tuning(data, vr)
+    _validate_platform_config_clustering(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)

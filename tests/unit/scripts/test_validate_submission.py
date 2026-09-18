@@ -258,8 +258,16 @@ class TestValidateBundle:
     @pytest.mark.parametrize(
         "environment",
         [
-            {"client_link": {"link_status": "ok", "source": "probe"}},
-            {"client_link": {}},
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "source": "observed",
+                    "client_region": "us-east-1",
+                    "client_cloud": "aws",
+                    "statement_overhead_ms": {"samples": 5, "min": 1.42, "median": 1.68},
+                }
+            },
+            {"client_link": {"collection_status": "unavailable"}},
             {"other": 1},
         ],
     )
@@ -275,7 +283,15 @@ class TestValidateBundle:
         [
             "not-a-dict",
             {"client_link": "not-a-dict"},
-            {"client_link": {"link_status": 42}},
+            {"client_link": {}},
+            {"client_link": {"collection_status": 42}},
+            {"client_link": {"collection_status": "available", "client_region": 42}},
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "statement_overhead_ms": {"samples": "five"},
+                }
+            },
         ],
     )
     def test_malformed_client_link_is_rejected(self, environment):
@@ -284,6 +300,14 @@ class TestValidateBundle:
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
+
+    def test_unknown_collection_status_warns_only(self):
+        data = _minimal_bundle()
+        data["environment"] = {"client_link": {"collection_status": "future-status"}}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("collection_status" in warning for warning in vr.warnings)
 
     @pytest.mark.parametrize(
         "tables",
@@ -305,6 +329,8 @@ class TestValidateBundle:
         [
             "not-a-dict",
             {"orders": "not-a-dict"},
+            {"orders": {"rows": "many"}},
+            {"orders": {"rows": -1}},
             {"orders": {"load_ms": "fast"}},
             {"orders": {"load_ms": True}},
             {"orders": {"load_ms": -1}},
@@ -319,22 +345,22 @@ class TestValidateBundle:
 
     def test_unknown_clustering_strategy_warns_only(self):
         data = _minimal_bundle()
-        data["platform"]["tuning"] = {"databricks_clustering_strategy": "future-strategy"}
+        data["platform"]["config"] = {"databricks_clustering_strategy": "future-strategy"}
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
         assert any("databricks_clustering_strategy" in warning for warning in vr.warnings)
 
     @pytest.mark.parametrize(
-        "tuning",
+        "config",
         [
             "not-a-dict",
             {"databricks_clustering_strategy": 42},
         ],
     )
-    def test_malformed_platform_tuning_is_rejected(self, tuning):
+    def test_malformed_platform_config_clustering_is_rejected(self, config):
         data = _minimal_bundle()
-        data["platform"]["tuning"] = tuning
+        data["platform"]["config"] = config
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok

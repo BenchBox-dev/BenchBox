@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   block with per-table `load_ms` timings for bundle-level diagnostics
   (#2178).
 - **Databricks no-clustering default for untuned runs** - Untuned Databricks
-  runs record `platform.tuning.databricks_clustering_strategy` as `"none"`
+  runs record `platform.config.databricks_clustering_strategy` as `"none"`
   instead of leaving the strategy unresolved (#2177).
 - **Plan companion `plan_max_depth` threading** - CLI canonical commands
   thread `plan_max_depth` into the plans companion builder (#2122).

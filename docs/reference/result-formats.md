@@ -143,12 +143,22 @@ Consumer policy is intentionally split by use case:
 | `version` | string | Platform/driver version |
 | `deployment` | object | Optional normalized deployment metadata |
 | `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
+| `config` | object | Optional adapter configuration flattened out of `platform_info` (e.g. Databricks clustering strategy below) |
+| `tuning` | object | Optional requested-tuning summary (see `platform.tuning`) |
 
 Platform-specific extensions should stay inside the existing schema-v2 blocks
 where possible. Current canonical locations are `platform.*` for platform
 facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
 summaries, and `comparisons.*` for cross-engine comparison data. New top-level
 keys require a public-contract update and consumer tests.
+
+##### `platform.config` (optional)
+
+Adapter configuration recorded per run. The Databricks adapter records its
+resolved clustering strategy here as `databricks_clustering_strategy`:
+`"z_order"`, `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"`
+for untuned runs. Bundles predating this field omit it. (`platform.tuning`
+carries the requested-tuning summary and never holds this key.)
 
 ##### `platform.tuning` (optional)
 
@@ -165,7 +175,6 @@ what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-sem
 | `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
-| `databricks_clustering_strategy` | string | Databricks clustering strategy resolved for the run: `"z_order"`, `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"`. Untuned runs record `"none"`. Bundles predating this field omit it. |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
 | `source`, `hash` | string | **Legacy bridge keys**, kept for one schema generation so any external consumer of these documented keys keeps working (this is not the explorer ingest pipeline, which reads tuning facets from `data["config"]`, never from `platform.tuning`). `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
 

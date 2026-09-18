@@ -61,13 +61,13 @@ ALREADY_FIXED, DEFER, REBUT).
 
 | reviewer | severity | location | disposition | evidence | remediation |
 |---|---|---|---|---|---|
-| [muse] | Major | `benchbox/validation/bundle.py:64`, `benchbox/core/results/schema.py:111-124` | NARROW (P1: shape checks, not required-key expansion) | `REQUIRED_TOP_KEYS = ("version","run","benchmark","platform","summary","queries")` is minimal by design; `OPTIONAL_KEYS` already admits `environment/tables/...`; no `_validate_environment/_validate_tables/_validate_client_link` or `load_ms` shape check exists. Missing optional fields correctly pass; malformed ones also pass. | Add narrow shape validators for new optional extensions (`environment.client_link`, `tables.*.load_ms`, `platform.tuning` clustering) that fail on wrong type but allow absence; keep `REQUIRED_TOP_KEYS` unchanged. Target the post-rename key via `result_schema_version_value()` (see 2199-P1). Excluded scope re-homed: expanding `REQUIRED_TOP_KEYS` is killed — it would break the additive/optional contract, since presence of optional blocks is not a compat signal. |
+| [muse] | Major | `benchbox/validation/bundle.py:64`, `benchbox/core/results/schema.py:111-124` | NARROW (P1: shape checks, not required-key expansion) | `REQUIRED_TOP_KEYS = ("version","run","benchmark","platform","summary","queries")` is minimal by design; `OPTIONAL_KEYS` already admits `environment/tables/...`; no `_validate_environment/_validate_tables/_validate_client_link` or `load_ms` shape check exists. Missing optional fields correctly pass; malformed ones also pass. | Add narrow shape validators for new optional extensions (`environment.client_link`, `tables.*.load_ms`/`rows`, `platform.config` clustering) that fail on wrong type but allow absence; keep `REQUIRED_TOP_KEYS` unchanged. Correction 2026-09-18: the clustering field lives at `platform.config.databricks_clustering_strategy` (flattened out of `platform_info["configuration"]`), not `platform.tuning`, per external review of the implementation. Target the post-rename key via `result_schema_version_value()` (see 2199-P1). Excluded scope re-homed: expanding `REQUIRED_TOP_KEYS` is killed — it would break the additive/optional contract, since presence of optional blocks is not a compat signal. |
 | [muse] | Minor | `scripts/validate_corpus.py:28`, `results-data/validate_corpus.py:1-40` | ACCEPT (P2: delete orphan) | `scripts/validate_corpus.py:28` requires `manifest.json` fields (`result_id`,`submitted_at`,`query_count`) for a `manifest.json` the pipeline no longer emits; the file's only self-reference is its own usage line, while CI/workflows/tests invoke only `results-data/validate_corpus.py` (`.github/workflows/corpus-drift-check.yml:82`, `sync-results-data-to-published.yml:57`, `tests/unit/scripts/test_corpus_cohort_depth.py:35`). Dead code, not an active mis-gate. | Delete `scripts/validate_corpus.py` (or mark deprecated legacy) and remove any doc references; prove with `make compat-docs-check` or docs/link check plus the corpus-depth unit test. |
 | [muse] | Minor | `benchbox/platforms/databricks/adapter.py:354,367`, `benchbox/core/tuning/interface.py:1028` | DEFER (P3: provenance-cutoff design) | Default `"none"` (`interface.py:1028`, fallback `adapter.py:367`) conflates pre-fix absence with explicit post-fix `"none"`; no `tuning_policy_generation`/cutoff is stored, so readers cannot distinguish them. Blast radius is the Databricks untuned cohort, not all platforms. | Follow-on TODO: provenance/cutoff marker scheme for pre-fix Databricks bundles (candidate carrier: `export.benchbox_version`; do not design here). Docs cutoff note rides with the P7 docs remediation. |
 | [muse] | Minor | `benchbox/core/results/schema.py:1555-1572`, `benchbox/core/results/loader.py:276-279` | DEFER (P4: consume-vs-defer decision) | `024bfce05` produces per-table `load_ms` (`schema.py:1570-1572`) and `loader.py:278` extracts it, but `transformer.py` never reads `tables`, no explorer projection exists, and read-model v10 adds no `load_ms` view. Seed corpus: 47/365 bundles carry `load_ms` (forward-only rollout). | Follow-on TODO: scope explorer read-model v11 for per-table load time (project `tables`/`load_ms` with version bump) or explicitly keep `load_ms` bundle-only diagnostic. |
 | [muse] | Minor→Nit | `results-explorer/src/lib/localResult.ts:5`, `_project/scripts/explorer_pipeline/transformer.py:36,307`, `benchbox/core/results/schema_policy.py:183` | DEFER (P5: shared contract) | `SUPPORTED_SCHEMA_VERSIONS = {"2.0","2.1","2.2"}` hand-duplicates `EXPLORER_INPUT_SCHEMA_POLICY`; e2e fixtures hard-code `"2.2"`. Drift risk is currently caught by `test_check_explorer_compat.py`, so severity is Nit. | Follow-on TODO: shared Python/TS bundle-field contract test (generate the TS constant from `schema_policy.py` or a single `schema-versions.json`; keep the compat test). |
 | [muse] | Nit | `results-explorer/src/db.ts:89`, `_project/scripts/explorer_pipeline/contract.py:44`, `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` | REBUT (P6: parity check exists) | Draft claimed "no check"; the pin test spawns `explorer_publish.py build-contract` and asserts `contract.read_model_version == CURRENT_READ_MODEL_VERSION == _EXPECTED_FOR_TEST`. Both constants are 10 today. The check is test-time, not build-time, but it exists — the draft premise is factually wrong. | None. Optional hardening (generate `db.ts` constant at `npm run gen`) is not required; keep the pin test running in `pr-preflight`. |
-| [muse] | Minor | `CHANGELOG.md:8-22`, `docs/reference/result-formats.md:242-261` | ACCEPT (P7: docs + changelog) | `grep` for `2178|2177|2122|2030` in `CHANGELOG.md` is empty (`[Unreleased]` lacks all four); `result-formats.md` documents `environment.client_link` (lines 242–261) but `grep databricks_clustering_strategy` is empty and no Tables Block section exists (`tables` block is impl-defined in `schema.py:1555` only). | Backfill `CHANGELOG.md` under `[Unreleased]`; add Tables Block subsection (`tables.{table}.rows/load_ms`, absence-means-not-measured) and `platform.tuning` / `databricks_clustering_strategy` values; mirror clustering in `docs/platforms/databricks.md`. Prove with docs/link check. |
+| [muse] | Minor | `CHANGELOG.md:8-22`, `docs/reference/result-formats.md:242-261` | ACCEPT (P7: docs + changelog) | `grep` for `2178|2177|2122|2030` in `CHANGELOG.md` is empty (`[Unreleased]` lacks all four); `result-formats.md` documents `environment.client_link` (lines 242–261) but `grep databricks_clustering_strategy` is empty and no Tables Block section exists (`tables` block is impl-defined in `schema.py:1555` only). | Backfill `CHANGELOG.md` under `[Unreleased]`; add Tables Block subsection (`tables.{table}.rows/load_ms`, absence-means-not-measured) and `platform.config` / `databricks_clustering_strategy` values; mirror clustering in `docs/platforms/databricks.md`. Prove with docs/link check. |
 | [muse] | Nit | `benchbox/core/results/schema.py:1570`, `benchbox/core/results/loader.py:278-279`, `results-data/bundles/*.json` | NARROW (P8: one docs sentence) | Unevenness verified (47/365 carriers), but absence already is the sentinel: `loader.py:278` uses `stats.get("load_ms")` (tolerant) and `round(load_ms,1)` keeps explicit `0.0` distinguishable from missing. No zero-vs-missing confusion in the producer. | Document absence-means-not-measured in the new Tables Block (rides P7); optional seed-corpus regeneration note. Excluded scope re-homed: a code marker is killed — the reader already distinguishes both states. |
 | [muse] | — | reassurance paragraph | NARROW (caveat on footprint) | Additive/`.get()`-tolerant holds (`transformer.py` `.get()`, `localResult.ts` `stringOrNull`, `loader.py` tolerant); v10 bump with `warn-and-continue` policy substantiates the contract process. But "no live footprint" overstates: the v10 snapshot must be rebuilt to surface the new `client_*` columns — until then the explorer shows NULLs without crashing (forward-compatible by design). | Fold the rebuild note into the P7 docs remediation (`contract.py:44` v10). |
 | [muse] | Minor | `benchbox/core/results/schema.py:1044`, `benchbox/platforms/base/result_capture.py:1026-1036` | DEFER (new: companion truncation contract) | `plan_max_depth` threads only through `build_plans_payload()`/`QueryPlanDAG.to_dict(max_depth)` into `.plans.json`, never top-level (so `REQUIRED_TOP_KEYS` correctly ignores it), but truncation is silent — no `max_depth`/`truncated` marker and no `result-formats.md` companion documentation (`grep plan_max_depth docs/` empty). | Follow-on TODO with the P4 decision: document `plan_max_depth` companion semantics and surface a truncation marker, or explicitly defer. |
@@ -85,7 +85,7 @@ narrowing/rebuttal above (P1 severity, P6 existence of check, P8 marker);
 Per the validators binding: the submission validator's guaranteed invariant
 is required-top-level presence, not optional-block shape. Known false
 negatives: malformed `environment.client_link`, `tables.*.load_ms`, or
-`platform.tuning` clustering pass today. Maintenance trigger: any new
+`platform.config` clustering pass today. Maintenance trigger: any new
 optional bundle block ships without a shape validator unless this audit's
 P1 remediation is applied. The smaller sufficient solution is the NARROW
 remedy (shape validators for the three new extensions); expanding
@@ -123,5 +123,37 @@ for shape, not presence" — the P1 NARROW remedy implements exactly this.
 - Responder report: `[muse]` responded (Ship with caveats);
   `[agy]` failed (headless `command`-permission auto-denial, zero output);
   nothing dropped for worktree dirtiness.
+
+## 7. Implementation-review addendum (2026-09-18)
+
+The fixes above (commit `395c9b5`) were adversarially reviewed by an
+external panel: `[claude]` (`claude-sonnet-5`, high effort) responded with
+**Do not ship**; `[agy]` failed absent (same headless permission denial).
+All `[claude]` findings were verified against producer code and dispositioned:
+
+- Major, clustering bundle path (`platform.tuning` vs `platform.config`):
+  **ACCEPT** — the adapter writes the strategy inside
+  `platform_info["configuration"]`
+  (`benchbox/platforms/databricks/adapter.py:693-719`), which
+  `_extract_platform_config` flattens into `platform.config`
+  (`benchbox/core/results/schema.py:1731`), while `platform.tuning` comes
+  from `_build_tuning_summary` and never holds the key. Validator, docs,
+  CHANGELOG, and this audit corrected to `platform.config`.
+- Major, `client_link` phantom field (`link_status` vs `collection_status`):
+  **ACCEPT** — the producer dataclass is `ClientLinkEnvironment`
+  (`benchbox/core/results/environment.py:193-207`); the reviewed code had
+  taken the explorer read-model column name for the bundle field name.
+  Validator now checks `collection_status` (required when the block is
+  present), `source`, nullable region/cloud/error strings, and the
+  `statement_overhead_ms` shape; tests mirror the real contract.
+- Minor, unchecked `tables.{table}.rows`: **ACCEPT** — numeric check added.
+- Nit, re-run test count: **ACCEPT** — re-run recorded with the fix commit.
+
+Corpus-gate evidence (this fix commit):
+`uv run -- python scripts/validate_submission.py results-data/bundles/` →
+244 bundles, 51 errors, 2 warnings — byte-identical counts to the
+pre-change baseline, and zero errors mention `client_link`, `tables.*`,
+`platform.config`, or `databricks_clustering_strategy`. The new
+validators are silent on the entire real corpus.
 
 Recorded: `/Users/joe/Developer/BenchBox.wt-result-bundle-compat/_project/audits/result-bundle-downstream-compat-2026-09-18.md`

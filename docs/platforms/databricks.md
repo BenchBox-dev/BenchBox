@@ -192,7 +192,7 @@ VACUUM lineitem RETAIN 0 HOURS;
 ```
 
 The resolved strategy is recorded per run in the result bundle at
-`platform.tuning.databricks_clustering_strategy` (`"z_order"`,
+`platform.config.databricks_clustering_strategy` (`"z_order"`,
 `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"` for untuned
 runs); see `docs/reference/result-formats.md`.
 
