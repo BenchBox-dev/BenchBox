@@ -12,6 +12,7 @@ Prices are organized by platform, cloud provider, region, and resource type.
 """
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from importlib import resources
 from typing import Any, cast
@@ -102,65 +103,176 @@ def get_table_unit(table: str) -> str | None:
     return unit if isinstance(unit, str) else None
 
 
+@dataclass(frozen=True)
+class PriceResolution:
+    """The single result type for every price and quantity lookup.
+
+    This is the only lookup API: there is deliberately no float-returning
+    twin, so no caller can silently opt out of the fallback signal.
+    Quantity lookups (Fabric SKU CUs, Firebolt FBU rates, Databricks
+    warehouse DBU/hour) return this same type because they multiply into
+    compute_cost exactly like a price.
+
+    Attributes:
+        value: Resolved number, or None when even the fallback cell is absent.
+        table: Price-table label identifying the source data.
+        resolved_key: Key whose value was returned (the fallback key when
+            fallback_used is True and no key applied when the table is scalar).
+        fallback_used: True when the requested key was missing and a default
+            was returned instead. Resolving into a designed, deliberately
+            priced bucket (e.g. region tier "other") is NOT a fallback; a
+            catch-all guess (e.g. BigQuery unmatched location) IS.
+        unit: Billing unit for the value, where one applies.
+        reason: Human-readable explanation, set whenever fallback_used.
+    """
+
+    value: float | int | None
+    table: str
+    resolved_key: tuple[str, ...]
+    fallback_used: bool
+    unit: str | None = None
+    reason: str | None = None
+
+
+def _verified_regions(table: str) -> frozenset[str]:
+    """Return the lowercased verified-region set from a table's provenance."""
+    entry = PRICE_TABLE_PROVENANCE.get(table) or {}
+    regions = entry.get("verified_regions") or []
+    return frozenset(str(region).strip().lower() for region in regions)
+
+
+_ATHENA_VERIFIED_REGIONS = _verified_regions("athena_price_per_tb")
+_SYNAPSE_SERVERLESS_VERIFIED_REGIONS = _verified_regions("synapse_serverless_price_per_tb")
+
+# DBU consumption per hour by SQL warehouse size.
+# See https://docs.databricks.com/sql/admin/warehouse-types.html
+DATABRICKS_WAREHOUSE_DBU_PER_HOUR: dict[str, float] = {
+    "2X-Small": 1.0,
+    "X-Small": 2.0,
+    "Small": 4.0,
+    "Medium": 8.0,
+    "Large": 16.0,
+    "X-Large": 32.0,
+    "2X-Large": 64.0,
+    "3X-Large": 128.0,
+    "4X-Large": 256.0,
+}
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
 
 
-def get_athena_price_per_tb() -> float:
-    """Get the Athena price per TB of data scanned.
+def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
+    """Resolve the Athena price per TB of data scanned.
 
-    Athena has a flat rate of $5.00 per TB across all regions.
-
-    Returns:
-        Price per TB in USD
-    """
-    return ATHENA_PRICE_PER_TB
-
-
-def get_snowflake_credit_price(edition: str, cloud: str, region: str) -> float:
-    """Get the price per Snowflake credit.
+    The scalar $5.00 rate is verified only for the regions listed in the
+    table's provenance. An explicitly passed region outside that set is a
+    catch-all guess, so it flags fallback_used (interim guard until the
+    region-parameter work lands); omitting the region asserts nothing about
+    it and is not a fallback.
 
     Args:
-        edition: Snowflake edition (standard, enterprise, business_critical)
+        region: AWS region code, or "" when the caller asserts no region.
+
+    Returns:
+        PriceResolution for table "athena_price_per_tb".
+    """
+    table = "athena_price_per_tb"
+    unit = get_table_unit(table)
+    normalized = (region or "").strip().lower()
+    display = (region or "").strip()
+    if normalized and normalized not in _ATHENA_VERIFIED_REGIONS:
+        logger.warning(
+            f"Athena price for region '{display}' is unverified; using flat ${ATHENA_PRICE_PER_TB:.2f}/TB as fallback"
+        )
+        return PriceResolution(
+            value=ATHENA_PRICE_PER_TB,
+            table=table,
+            resolved_key=(),
+            fallback_used=True,
+            unit=unit,
+            reason=f"athena region '{display}' is outside the verified set; flat rate is a guess",
+        )
+    return PriceResolution(value=ATHENA_PRICE_PER_TB, table=table, resolved_key=(), fallback_used=False, unit=unit)
+
+
+def resolve_snowflake_credit_price(edition: str, cloud: str, region: str) -> PriceResolution:
+    """Resolve the price per Snowflake credit.
+
+    Args:
+        edition: Snowflake edition (standard, enterprise, business_critical, vps)
         cloud: Cloud provider (aws, azure, gcp)
         region: AWS region code (e.g., us-east-1, eu-west-1)
 
     Returns:
-        Price per credit in USD
+        PriceResolution for table "snowflake_credit_prices". A missing key
+        falls back to standard/aws/us and flags fallback_used; resolving
+        into the designed "other" tier bucket is not a fallback.
     """
-    edition = edition.lower().replace("-", "_").replace(" ", "_")
-    cloud = cloud.lower()
+    table = "snowflake_credit_prices"
+    edition = edition.strip().lower().replace("-", "_").replace(" ", "_")
+    cloud = cloud.strip().lower()
 
     # Determine region tier
     region_tier = _map_region_to_tier(region)
 
     # Get price from table
     try:
-        return SNOWFLAKE_CREDIT_PRICES[edition][cloud][region_tier]
+        return PriceResolution(
+            value=SNOWFLAKE_CREDIT_PRICES[edition][cloud][region_tier],
+            table=table,
+            resolved_key=(edition, cloud, region_tier),
+            fallback_used=False,
+        )
     except KeyError:
         # Fallback to standard/aws/us if not found
-        return SNOWFLAKE_CREDIT_PRICES.get("standard", {}).get("aws", {}).get("us", 2.00)
+        value = SNOWFLAKE_CREDIT_PRICES.get("standard", {}).get("aws", {}).get("us", 2.00)
+        logger.warning(
+            f"Unknown Snowflake edition/cloud '{edition}/{cloud}'; defaulting to standard/aws/us (${value:.2f}/credit)"
+        )
+        return PriceResolution(
+            value=value,
+            table=table,
+            resolved_key=("standard", "aws", "us"),
+            fallback_used=True,
+            reason=f"snowflake edition/cloud '{edition}/{cloud}' not in price table",
+        )
 
 
-def get_bigquery_price_per_tb(location: str) -> float:
-    """Get the BigQuery on-demand price per TB processed.
+def resolve_bigquery_price_per_tb(location: str) -> PriceResolution:
+    """Resolve the BigQuery on-demand price per TB processed.
 
     Args:
         location: BigQuery location/region (e.g., us-east1, EU, us)
 
     Returns:
-        Price per TB in USD
+        PriceResolution for table "bigquery_on_demand_prices". Any location
+        that reaches the "other" bucket is a catch-all guess, not a priced
+        region, so it flags fallback_used even though a number is returned.
     """
-    location = location.lower()
+    table = "bigquery_on_demand_prices"
+    unit = get_table_unit(table)
+    location = location.strip().lower()
+
+    def _hit(bucket: str, *, fallback_used: bool = False, reason: str | None = None) -> PriceResolution:
+        return PriceResolution(
+            value=BIGQUERY_ON_DEMAND_PRICES[bucket],
+            table=table,
+            resolved_key=(bucket,),
+            fallback_used=fallback_used,
+            unit=unit,
+            reason=reason,
+        )
 
     # Multi-region pricing (best rates)
     if location in ["us", "us-multi"]:
-        return BIGQUERY_ON_DEMAND_PRICES["us"]
+        return _hit("us")
     elif location in ["eu", "eu-multi"]:
-        return BIGQUERY_ON_DEMAND_PRICES["eu"]
+        return _hit("eu")
     elif location in ["asia", "asia-multi"]:
-        return BIGQUERY_ON_DEMAND_PRICES["asia"]
+        return _hit("asia")
 
     # US single regions (same as multi-region)
     us_single_regions = {
@@ -176,7 +288,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "northamerica-south1",  # Mexico
     }
     if location in us_single_regions or location.startswith("us-"):
-        return BIGQUERY_ON_DEMAND_PRICES["us-single"]
+        return _hit("us-single")
 
     # EU single regions
     eu_single_regions = {
@@ -195,7 +307,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "europe-west12",
     }
     if location in eu_single_regions or location.startswith("europe-"):
-        return BIGQUERY_ON_DEMAND_PRICES["eu-single"]
+        return _hit("eu-single")
 
     # Asia single regions
     asia_single_regions = {
@@ -212,71 +324,106 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "asia-southeast4",
     }
     if location in asia_single_regions or location.startswith("asia-"):
-        return BIGQUERY_ON_DEMAND_PRICES["asia-single"]
+        return _hit("asia-single")
 
     # Australia regions (higher pricing)
     australia_regions = {"australia-southeast1", "australia-southeast2"}
     if location in australia_regions or location.startswith("australia-"):
-        return BIGQUERY_ON_DEMAND_PRICES["australia"]
+        return _hit("australia")
 
     # South America regions (higher pricing)
     southamerica_regions = {"southamerica-east1", "southamerica-west1"}
     if location in southamerica_regions or location.startswith("southamerica-"):
-        return BIGQUERY_ON_DEMAND_PRICES["southamerica"]
+        return _hit("southamerica")
 
     # Middle East regions (higher pricing)
     middleeast_regions = {"me-west1", "me-central1", "me-central2"}
     if location in middleeast_regions or location.startswith("me-"):
-        return BIGQUERY_ON_DEMAND_PRICES["middleeast"]
+        return _hit("middleeast")
 
     # Africa regions (no dedicated bucket yet; priced at 'other' until
-    # per-region values are captured in bigquery-per-region-price-capture)
+    # per-region values are captured in bigquery-per-region-price-capture).
+    # This is a catch-all guess, not a priced region: flag it.
     africa_regions = {"africa-south1"}
     if location in africa_regions or location.startswith("africa-"):
-        return BIGQUERY_ON_DEMAND_PRICES["other"]
+        logger.warning(f"BigQuery location '{location}' has no priced bucket; using 'other' as fallback")
+        return _hit(
+            "other",
+            fallback_used=True,
+            reason=f"bigquery location '{location}' is unpriced; 'other' is a guess",
+        )
 
-    # Default to 'other' pricing for unknown regions
-    return BIGQUERY_ON_DEMAND_PRICES["other"]
+    # Default to 'other' pricing for unknown regions (a guess, not a price)
+    logger.warning(f"Unknown BigQuery location '{location}'; using 'other' pricing as fallback")
+    return _hit(
+        "other",
+        fallback_used=True,
+        reason=f"bigquery location '{location}' is unknown; 'other' is a guess",
+    )
 
 
-def get_redshift_node_price(node_type: str, region: str) -> float:
-    """Get the Redshift on-demand price per node-hour.
+def resolve_redshift_node_price(node_type: str, region: str) -> PriceResolution:
+    """Resolve the Redshift on-demand price per node-hour.
 
     Args:
         node_type: Redshift node type (e.g., dc2.large, ra3.4xlarge)
         region: AWS region code (e.g., us-east-1)
 
     Returns:
-        Price per node-hour in USD
+        PriceResolution for table "redshift_node_prices". An unknown node
+        type falls back to $1.00 and flags fallback_used; a known node in an
+        unknown region resolves into the designed "other" bucket, which is a
+        deliberately priced cell and NOT a fallback.
     """
-    node_type = node_type.lower()
-    region = region.lower()
+    table = "redshift_node_prices"
+    node_type = node_type.strip().lower()
+    region = region.strip().lower()
 
     # Get price from table
     try:
-        return REDSHIFT_NODE_PRICES[node_type][region]
+        return PriceResolution(
+            value=REDSHIFT_NODE_PRICES[node_type][region],
+            table=table,
+            resolved_key=(node_type, region),
+            fallback_used=False,
+        )
     except KeyError:
         # Try with 'other' fallback
         if node_type in REDSHIFT_NODE_PRICES:
-            return REDSHIFT_NODE_PRICES[node_type].get("other", 1.00)
+            return PriceResolution(
+                value=REDSHIFT_NODE_PRICES[node_type].get("other", 1.00),
+                table=table,
+                resolved_key=(node_type, "other"),
+                fallback_used=False,
+            )
         # Default fallback
-        return 1.00
+        logger.warning(f"Unknown Redshift node type '{node_type}'; defaulting to $1.00/node-hour")
+        return PriceResolution(
+            value=1.00,
+            table=table,
+            resolved_key=(node_type, region),
+            fallback_used=True,
+            reason=f"redshift node type '{node_type}' not in price table",
+        )
 
 
-def get_databricks_dbu_price(cloud: str, tier: str, workload_type: str) -> float:
-    """Get the Databricks DBU price.
+def resolve_databricks_dbu_price(cloud: str, tier: str, workload_type: str) -> PriceResolution:
+    """Resolve the Databricks DBU price.
 
     Args:
         cloud: Cloud provider (aws, azure, gcp)
         tier: Databricks tier (standard, premium, enterprise)
-        workload_type: Workload type (all_purpose, jobs, sql_warehouse, ml)
+        workload_type: Workload type (all_purpose, jobs, sql_warehouse, ml,
+            plus the emitted aliases serverless_sql and sql_compute)
 
     Returns:
-        Price per DBU in USD
+        PriceResolution for table "databricks_dbu_prices". A missing key
+        falls back to aws/premium/all_purpose and flags fallback_used.
     """
-    cloud = cloud.lower()
-    tier = tier.lower()
-    workload_type = workload_type.lower().replace("-", "_").replace(" ", "_")
+    table = "databricks_dbu_prices"
+    cloud = cloud.strip().lower()
+    tier = tier.strip().lower()
+    workload_type = workload_type.strip().lower().replace("-", "_").replace(" ", "_")
 
     # Aliases for the workload types production actually emits: extraction
     # reports serverless_sql for serverless warehouses and sql_compute for
@@ -288,25 +435,105 @@ def get_databricks_dbu_price(cloud: str, tier: str, workload_type: str) -> float
 
     # Get price from table
     try:
-        return DATABRICKS_DBU_PRICES[cloud][tier][workload_type]
+        return PriceResolution(
+            value=DATABRICKS_DBU_PRICES[cloud][tier][workload_type],
+            table=table,
+            resolved_key=(cloud, tier, workload_type),
+            fallback_used=False,
+        )
     except KeyError:
         # Fallback to aws/premium/all_purpose
-        return DATABRICKS_DBU_PRICES.get("aws", {}).get("premium", {}).get("all_purpose", 0.55)
+        value = DATABRICKS_DBU_PRICES.get("aws", {}).get("premium", {}).get("all_purpose", 0.55)
+        logger.warning(
+            f"Unknown Databricks key '{cloud}/{tier}/{workload_type}'; defaulting to aws/premium/all_purpose "
+            f"(${value:.2f}/DBU)"
+        )
+        return PriceResolution(
+            value=value,
+            table=table,
+            resolved_key=("aws", "premium", "all_purpose"),
+            fallback_used=True,
+            reason=f"databricks key '{cloud}/{tier}/{workload_type}' not in price table",
+        )
 
 
-def get_synapse_serverless_price_per_tb() -> float:
-    """Get the Azure Synapse Serverless SQL Pool price per TB.
+def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResolution:
+    """Resolve the DBU/hour rate for a Databricks SQL warehouse size.
 
-    Synapse Serverless has a flat rate of $5.00 per TB across all regions.
+    This is a quantity lookup, not a price, but it multiplies into
+    compute_cost exactly like one, so it returns the same result type. A
+    mistyped size must never silently price as X-Small (2.0 DBU/hour).
+
+    Args:
+        warehouse_size: Warehouse size label (e.g., "2X-Small", "Medium").
 
     Returns:
-        Price per TB in USD
+        PriceResolution with unit "DBU/hour". An unknown size keeps the
+        conservative 2.0 estimate so a per-query figure is still possible,
+        but flags fallback_used so it can never back a published total.
     """
-    return SYNAPSE_SERVERLESS_PRICE_PER_TB
+    table = "databricks_warehouse_dbu_per_hour"
+    normalized = warehouse_size.strip()
+    if normalized in DATABRICKS_WAREHOUSE_DBU_PER_HOUR:
+        return PriceResolution(
+            value=DATABRICKS_WAREHOUSE_DBU_PER_HOUR[normalized],
+            table=table,
+            resolved_key=(normalized,),
+            fallback_used=False,
+            unit="DBU/hour",
+        )
+    logger.warning(
+        f"Unknown Databricks warehouse size '{warehouse_size.strip()}'; defaulting to a conservative 2.0 DBU/hour"
+    )
+    return PriceResolution(
+        value=2.0,
+        table=table,
+        resolved_key=(normalized,),
+        fallback_used=True,
+        unit="DBU/hour",
+        reason=f"databricks warehouse size '{normalized}' not in size map",
+    )
 
 
-def get_synapse_dedicated_price(dwu_level: str, region: str) -> float:
-    """Get the Azure Synapse Dedicated SQL Pool price per DWU-hour.
+def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution:
+    """Resolve the Azure Synapse Serverless SQL Pool price per TB.
+
+    The scalar $5.00 rate is verified only for the regions listed in the
+    table's provenance. An explicitly passed region outside that set is a
+    catch-all guess, so it flags fallback_used (interim guard until the
+    region-parameter work lands); omitting the region asserts nothing about
+    it and is not a fallback.
+
+    Args:
+        region: Azure region code, or "" when the caller asserts no region.
+
+    Returns:
+        PriceResolution for table "synapse_serverless_price_per_tb".
+    """
+    table = "synapse_serverless_price_per_tb"
+    unit = get_table_unit(table)
+    normalized = (region or "").strip().lower()
+    display = (region or "").strip()
+    if normalized and normalized not in _SYNAPSE_SERVERLESS_VERIFIED_REGIONS:
+        logger.warning(
+            f"Synapse serverless price for region '{display}' is unverified; "
+            f"using flat ${SYNAPSE_SERVERLESS_PRICE_PER_TB:.2f}/TB as fallback"
+        )
+        return PriceResolution(
+            value=SYNAPSE_SERVERLESS_PRICE_PER_TB,
+            table=table,
+            resolved_key=(),
+            fallback_used=True,
+            unit=unit,
+            reason=f"synapse serverless region '{display}' is outside the verified set; flat rate is a guess",
+        )
+    return PriceResolution(
+        value=SYNAPSE_SERVERLESS_PRICE_PER_TB, table=table, resolved_key=(), fallback_used=False, unit=unit
+    )
+
+
+def resolve_synapse_dedicated_price(dwu_level: str, region: str) -> PriceResolution:
+    """Resolve the Azure Synapse Dedicated SQL Pool price per DWU-hour.
 
     Args:
         dwu_level: DWU level (e.g., dw100c, dw1000c, dw30000c)
@@ -315,11 +542,17 @@ def get_synapse_dedicated_price(dwu_level: str, region: str) -> float:
     Returns:
         Price per hour in USD for the specified DWU level
     """
-    dwu_level = dwu_level.lower()
+    table = "synapse_dedicated_dwu_prices"
+    dwu_level = dwu_level.strip().lower()
     region_tier = _map_region_to_tier(region)
 
     try:
-        return SYNAPSE_DEDICATED_DWU_PRICES[dwu_level][region_tier]
+        return PriceResolution(
+            value=SYNAPSE_DEDICATED_DWU_PRICES[dwu_level][region_tier],
+            table=table,
+            resolved_key=(dwu_level, region_tier),
+            fallback_used=False,
+        )
     except KeyError:
         # Fallback: try with "us" tier or default to DW100c US pricing
         if dwu_level in SYNAPSE_DEDICATED_DWU_PRICES:
@@ -329,65 +562,130 @@ def get_synapse_dedicated_price(dwu_level: str, region: str) -> float:
                     f"Regional pricing for Synapse {dwu_level} in tier '{region_tier}' not available; "
                     f"using US pricing as fallback"
                 )
-            return price
+            return PriceResolution(
+                value=price,
+                table=table,
+                resolved_key=(dwu_level, "us"),
+                fallback_used=True,
+                reason=f"synapse tier '{region_tier}' missing for {dwu_level}; US pricing is a guess",
+            )
         logger.warning(f"DWU level '{dwu_level}' not found in pricing table; defaulting to DW100c US pricing")
-        return SYNAPSE_DEDICATED_DWU_PRICES.get("dw100c", {}).get("us", 1.20)
+        return PriceResolution(
+            value=SYNAPSE_DEDICATED_DWU_PRICES.get("dw100c", {}).get("us", 1.20),
+            table=table,
+            resolved_key=("dw100c", "us"),
+            fallback_used=True,
+            reason=f"synapse DWU level '{dwu_level}' not in price table",
+        )
 
 
-def get_fabric_cu_price(region: str) -> float:
-    """Get the Microsoft Fabric Capacity Unit price per hour.
+def resolve_fabric_cu_price(region: str) -> PriceResolution:
+    """Resolve the Microsoft Fabric Capacity Unit price per hour.
 
     Args:
         region: Azure region code
 
     Returns:
-        Price per CU per hour in USD
+        PriceResolution for table "fabric_cu_prices". The "other" bucket is
+        a deliberately priced tier (currently the Sao Paulo rate), so unknown
+        regions resolving into it are NOT flagged as fallbacks.
     """
+    table = "fabric_cu_prices"
     region_tier = _map_region_to_tier(region)
-    return FABRIC_CU_PRICES.get(region_tier, FABRIC_CU_PRICES["other"])
+    if region_tier in FABRIC_CU_PRICES:
+        return PriceResolution(
+            value=FABRIC_CU_PRICES[region_tier],
+            table=table,
+            resolved_key=(region_tier,),
+            fallback_used=False,
+        )
+    return PriceResolution(
+        value=FABRIC_CU_PRICES["other"],
+        table=table,
+        resolved_key=("other",),
+        fallback_used=False,
+    )
 
 
-def get_fabric_sku_cu_count(sku: str) -> int:
-    """Get the number of Capacity Units for a Fabric SKU.
+def resolve_fabric_sku_cu_count(sku: str) -> PriceResolution:
+    """Resolve the number of Capacity Units for a Fabric SKU.
+
+    This is a quantity lookup, not a price, but it multiplies into
+    compute_cost exactly like one, so it returns the same result type. A
+    padded or unknown SKU must never silently price as F2 (2 CUs).
 
     Args:
         sku: Fabric SKU (e.g., f2, f64, f2048)
 
     Returns:
-        Number of Capacity Units for the SKU
+        PriceResolution with unit "CU". Unknown SKUs keep the F2 estimate
+        so a per-query figure is still possible, but flag fallback_used.
     """
-    sku = sku.lower()
-    cu_count = FABRIC_SKU_CU_MAP.get(sku)
+    table = "fabric_sku_cu_map"
+    normalized = sku.strip().lower()
+    cu_count = FABRIC_SKU_CU_MAP.get(normalized)
     if cu_count is not None:
-        return cu_count
-    logger.warning(f"Unknown Fabric SKU '{sku}'; defaulting to F2 (2 CUs)")
-    return 2
+        return PriceResolution(
+            value=cu_count,
+            table=table,
+            resolved_key=(normalized,),
+            fallback_used=False,
+            unit="CU",
+        )
+    logger.warning(f"Unknown Fabric SKU '{sku.strip()}'; defaulting to F2 (2 CUs)")
+    return PriceResolution(
+        value=2,
+        table=table,
+        resolved_key=(normalized,),
+        fallback_used=True,
+        unit="CU",
+        reason=f"fabric SKU '{normalized}' not in SKU map",
+    )
 
 
-def get_firebolt_fbu_rate(node_type: str) -> float:
-    """Get the FBU consumption rate per hour for a Firebolt node type.
+def resolve_firebolt_fbu_rate(node_type: str) -> PriceResolution:
+    """Resolve the FBU consumption rate per hour for a Firebolt node type.
+
+    This is a quantity lookup, not a price, but it multiplies into
+    compute_cost exactly like one, so it returns the same result type.
 
     Args:
         node_type: Node type (s, m, l, xl)
 
     Returns:
-        FBUs consumed per hour for the node type
+        PriceResolution with unit "FBU/hour". Unknown node types keep the
+        M estimate so a per-query figure is still possible, but flag
+        fallback_used.
     """
-    node_type = node_type.lower()
-    fbu_rate = FIREBOLT_NODE_FBU_RATES.get(node_type)
+    table = "firebolt_node_fbu_rates"
+    normalized = node_type.strip().lower()
+    fbu_rate = FIREBOLT_NODE_FBU_RATES.get(normalized)
     if fbu_rate is not None:
-        return fbu_rate
-    logger.warning(f"Unknown Firebolt node type '{node_type}'; defaulting to M (16 FBU/hour)")
-    return FIREBOLT_NODE_FBU_RATES["m"]
+        return PriceResolution(
+            value=fbu_rate,
+            table=table,
+            resolved_key=(normalized,),
+            fallback_used=False,
+            unit="FBU/hour",
+        )
+    logger.warning(f"Unknown Firebolt node type '{node_type.strip()}'; defaulting to M (16 FBU/hour)")
+    return PriceResolution(
+        value=FIREBOLT_NODE_FBU_RATES["m"],
+        table=table,
+        resolved_key=("m",),
+        fallback_used=True,
+        unit="FBU/hour",
+        reason=f"firebolt node type '{normalized}' not in rate table",
+    )
 
 
-def get_firebolt_fbu_price() -> float:
-    """Get the Firebolt price per FBU.
+def resolve_firebolt_fbu_price() -> PriceResolution:
+    """Resolve the Firebolt price per FBU.
 
     Returns:
-        Price per FBU in USD
+        PriceResolution for table "firebolt_fbu_price" (scalar, always known).
     """
-    return FIREBOLT_FBU_PRICE
+    return PriceResolution(value=FIREBOLT_FBU_PRICE, table="firebolt_fbu_price", resolved_key=(), fallback_used=False)
 
 
 def _map_region_to_tier(region: str) -> str:
@@ -402,7 +700,7 @@ def _map_region_to_tier(region: str) -> str:
     Returns:
         Pricing tier: us, eu, ap, ca, or other
     """
-    region = region.lower()
+    region = region.strip().lower()
 
     # US regions (AWS, Azure, GCP)
     us_regions = {

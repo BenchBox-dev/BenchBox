@@ -22,12 +22,12 @@ from benchbox.core.cost.pricing import (
     FIREBOLT_NODE_FBU_RATES,
     REDSHIFT_NODE_PRICES,
     SNOWFLAKE_CREDIT_PRICES,
-    get_bigquery_price_per_tb,
-    get_databricks_dbu_price,
-    get_fabric_sku_cu_count,
-    get_firebolt_fbu_rate,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
+    resolve_bigquery_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_fabric_sku_cu_count,
+    resolve_firebolt_fbu_rate,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
 )
 
 pytestmark = [
@@ -53,7 +53,7 @@ def _emitted_databricks_workload_types() -> set[str]:
 
 
 def _canonical_databricks_workload(workload_type: str) -> str:
-    """Mirror the serverless_sql/sql_compute aliases in pricing.get_databricks_dbu_price."""
+    """Mirror the serverless_sql/sql_compute aliases in pricing.resolve_databricks_dbu_price."""
     if workload_type == "serverless_sql":
         return "sql_serverless"
     if workload_type == "sql_compute":
@@ -73,7 +73,9 @@ def test_every_emitted_databricks_workload_resolves_without_fallback():
             for emitted in _emitted_databricks_workload_types():
                 canonical = _canonical_databricks_workload(emitted)
                 assert canonical in workloads, f"{emitted!r} (as {canonical!r}) missing for {cloud}/{tier}"
-                assert get_databricks_dbu_price(cloud, tier, emitted) == workloads[canonical]
+                resolution = resolve_databricks_dbu_price(cloud, tier, emitted)
+                assert resolution.value == workloads[canonical]
+                assert resolution.fallback_used is False
 
 
 def test_every_snowflake_edition_resolves_without_fallback():
@@ -81,34 +83,50 @@ def test_every_snowflake_edition_resolves_without_fallback():
     for edition, clouds in SNOWFLAKE_CREDIT_PRICES.items():
         for cloud in clouds:
             expected = SNOWFLAKE_CREDIT_PRICES[edition][cloud]["us"]
-            assert get_snowflake_credit_price(edition, cloud, "us-east-1") == expected
+            resolution = resolve_snowflake_credit_price(edition, cloud, "us-east-1")
+            assert resolution.value == expected
+            assert resolution.fallback_used is False
 
 
 def test_every_redshift_node_type_resolves_without_fallback():
     """Each priced node type resolves to its own cell, never the $1.00 default."""
     for node_type, regions in REDSHIFT_NODE_PRICES.items():
         expected = regions["us-east-1"]
-        assert get_redshift_node_price(node_type, "us-east-1") == expected
+        resolution = resolve_redshift_node_price(node_type, "us-east-1")
+        assert resolution.value == expected
+        assert resolution.fallback_used is False
 
 
 def test_bigquery_matcher_covers_current_locations():
-    """Locations Google lists today route to a bucket instead of silently hitting 'other'."""
-    assert get_bigquery_price_per_tb("africa-south1") == BIGQUERY_ON_DEMAND_PRICES["other"]
-    assert get_bigquery_price_per_tb("northamerica-south1") == BIGQUERY_ON_DEMAND_PRICES["us-single"]
+    """Locations Google lists today resolve to a priced bucket with a value.
+
+    africa-south1 has no priced bucket: it keeps the 'other' number but must
+    flag fallback_used, since that bucket is a catch-all guess, not a price.
+    """
+    africa = resolve_bigquery_price_per_tb("africa-south1")
+    assert africa.value == BIGQUERY_ON_DEMAND_PRICES["other"]
+    assert africa.fallback_used is True
+    mexico = resolve_bigquery_price_per_tb("northamerica-south1")
+    assert mexico.value == BIGQUERY_ON_DEMAND_PRICES["us-single"]
+    assert mexico.fallback_used is False
     for location in ["asia-southeast3", "asia-southeast4", "europe-north2", "europe-west10", "europe-west12"]:
-        assert get_bigquery_price_per_tb(location) > 0
+        assert resolve_bigquery_price_per_tb(location).value > 0
 
 
 def test_fabric_sku_map_is_fully_resolvable():
     """Every SKU in the map resolves to its own CU count."""
     for sku, cu_count in FABRIC_SKU_CU_MAP.items():
-        assert get_fabric_sku_cu_count(sku) == cu_count
+        resolution = resolve_fabric_sku_cu_count(sku)
+        assert resolution.value == cu_count
+        assert resolution.fallback_used is False
 
 
 def test_firebolt_node_types_are_fully_resolvable():
     """Every documented node type resolves to its own FBU rate."""
     for node_type, rate in FIREBOLT_NODE_FBU_RATES.items():
-        assert get_firebolt_fbu_rate(node_type) == rate
+        resolution = resolve_firebolt_fbu_rate(node_type)
+        assert resolution.value == rate
+        assert resolution.fallback_used is False
 
 
 def test_unknown_platform_yields_no_value():

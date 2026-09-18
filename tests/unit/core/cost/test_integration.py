@@ -11,9 +11,9 @@ from benchbox.core.cost.integration import (
     add_cost_estimation_to_results,
 )
 from benchbox.core.cost.pricing import (
-    get_databricks_dbu_price,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
+    resolve_databricks_dbu_price,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
 )
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
@@ -90,7 +90,7 @@ class TestAddCostEstimationToResults:
         normalized_cost = updated_results.cost_summary["normalized_cost"]
         assert normalized_cost["cost_status"] == "normalized"
         # (0.5 + 0.8) credits * standard/aws/us table rate
-        expected_total = str((0.5 + 0.8) * get_snowflake_credit_price("standard", "aws", "us-east-1"))
+        expected_total = str((0.5 + 0.8) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value)
         assert normalized_cost["normalized_cost_usd"] == expected_total
         assert normalized_cost["deployment"]["cloud_provider"] == "aws"
         assert normalized_cost["deployment"]["cloud_region"] == "us-east-1"
@@ -120,7 +120,7 @@ class TestAddCostEstimationToResults:
 
         assert "cost" in updated_results.query_results[0]
         # 0.5 credits * standard/aws/us table rate
-        expected = 0.5 * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        expected = 0.5 * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_missing_platform(self):
@@ -172,7 +172,7 @@ class TestAddCostEstimationToResults:
         updated_results = add_cost_estimation_to_results(results, platform_config)
 
         # Business critical table rate vs the standard rate
-        expected = 1.0 * get_snowflake_credit_price("business_critical", "aws", "us-east-1")
+        expected = 1.0 * resolve_snowflake_credit_price("business_critical", "aws", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_exception_gracefully(self):
@@ -453,7 +453,7 @@ class TestCalculatePhaseCosts:
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "power_test"
         # (0.5 + 0.8) credits * standard/aws/us table rate
-        expected = (0.5 + 0.8) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        expected = (0.5 + 0.8) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
@@ -490,7 +490,7 @@ class TestCalculatePhaseCosts:
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "throughput_test"
         # (0.3 + 0.4 + 0.5) credits * standard/aws/us table rate
-        expected = (0.3 + 0.4 + 0.5) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        expected = (0.3 + 0.4 + 0.5) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 3
 
@@ -515,7 +515,7 @@ class TestCalculatePhaseCosts:
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "all_queries"
         # (0.5 + 0.3) credits * standard/aws/us table rate
-        expected = (0.5 + 0.3) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        expected = (0.5 + 0.3) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
@@ -545,7 +545,7 @@ class TestCalculatePhaseCosts:
         # Only 1 query with valid resource_usage
         assert len(phase_costs) == 1
         assert phase_costs[0].query_count == 1
-        expected = 0.5 * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        expected = 0.5 * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
 
     def test_returns_empty_list_when_no_costs(self):
@@ -649,7 +649,7 @@ class TestMultiPlatformIntegration:
         updated_results = add_cost_estimation_to_results(results)
 
         # 1 hour * 2 nodes * dc2.large/us-east-1 table rate
-        expected = 1.0 * 2 * get_redshift_node_price("dc2.large", "us-east-1")
+        expected = 1.0 * 2 * resolve_redshift_node_price("dc2.large", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == pytest.approx(expected)
         assert updated_results.cost_summary["total_cost"] == pytest.approx(expected)
 
@@ -677,7 +677,7 @@ class TestMultiPlatformIntegration:
         updated_results = add_cost_estimation_to_results(results)
 
         # 0.5 hours * 2.0 DBU/hour * premium all-purpose table rate
-        expected_cost = 0.5 * 2.0 * get_databricks_dbu_price("aws", "premium", "all_purpose")
+        expected_cost = 0.5 * 2.0 * resolve_databricks_dbu_price("aws", "premium", "all_purpose").value
         assert abs(updated_results.query_results[0]["cost"] - expected_cost) < 0.001
         assert abs(updated_results.cost_summary["total_cost"] - expected_cost) < 0.001
 
