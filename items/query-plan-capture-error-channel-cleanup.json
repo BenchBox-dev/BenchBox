@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "MySqlWireLifecycleMixin.get_query_plan returns None on exception and logs warning",
+    "FabricWarehouseAdapter.get_query_plan returns None on exception and logs warning",
+    "QuestDBAdapter.get_query_plan returns None on exception and logs warning",
+    "Failure in get_query_plan records reason='explain_failed' instead of reason='parse_error' in result_capture.py",
+    "Unit tests verify None return and clean failure classification across all three adapters"
+  ],
+  "context": "Adversarial audit finding QPC-DEF-03. mysql_wire.py, fabric_warehouse.py, and questdb.py returned error strings ('Failed to get query plan: ...') instead of None, which bypassed the falsy check in result_capture.py and was passed to parsers, misclassifying database EXPLAIN failures as parse errors.",
+  "description": "Eliminate error strings as plan data in MySqlWireLifecycleMixin, FabricWarehouseAdapter, and QuestDBAdapter by logging exceptions and returning None instead of formatted error strings, ensuring EXPLAIN failures record as explain_failed rather than parse_error."
+}

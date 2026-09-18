@@ -11822,6 +11822,13 @@
       "status": "done",
       "title": "Add end-to-end test for --capture-plans: run → results.json → show-plan/compare-plans CLI"
     },
+    "query-plan-capture-error-channel-cleanup": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Clean error-channel return across MySQL-wire, Fabric Warehouse, and QuestDB adapters"
+    },
     "query-plan-capture-fingerprint-estimate-leak": {
       "claim": null,
       "needs": [],
