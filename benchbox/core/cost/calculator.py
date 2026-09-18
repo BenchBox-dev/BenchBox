@@ -26,13 +26,29 @@ from benchbox.core.cost.pricing import (
     get_snowflake_credit_price,
     get_synapse_dedicated_price,
     get_synapse_serverless_price_per_tb,
+    get_table_unit,
 )
 
 logger = logging.getLogger(__name__)
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
-# Conversion constants
-BYTES_PER_TB = 1024**4
+# Bytes per billed data unit, keyed by the per-table unit declared in
+# pricing_data.yaml. BigQuery bills per tebibyte (vendor-confirmed: its worked
+# example divides by 1099511627776). Athena and Synapse print "TB" with an
+# unconfirmed definition, so terabyte_unconfirmed resolves to the historical
+# divisor until follow-up contract work resolves it. Behavior-neutral by design.
+BYTES_PER_UNIT: dict[str, int] = {
+    "tebibyte": 1024**4,
+    "terabyte_unconfirmed": 1024**4,
+}
+
+
+def _byte_unit_for_table(table: str) -> tuple[str, int]:
+    """Return the declared (unit, divisor) pair for a byte-priced table."""
+    unit = get_table_unit(table)
+    if unit is None:
+        raise KeyError(f"No unit declared for price table {table!r} in pricing_data.yaml")
+    return unit, BYTES_PER_UNIT[unit]
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -403,7 +419,8 @@ class CostCalculator:
         price_per_tb = get_bigquery_price_per_tb(location)
 
         # Calculate cost
-        tb_processed = bytes_processed / BYTES_PER_TB
+        unit, bytes_per_unit = _byte_unit_for_table("bigquery_on_demand_prices")
+        tb_processed = bytes_processed / bytes_per_unit
         compute_cost = tb_processed * price_per_tb
 
         return QueryCost(
@@ -413,6 +430,7 @@ class CostCalculator:
                 "bytes_processed": bytes_processed,
                 "tb_processed": tb_processed,
                 "price_per_tb": price_per_tb,
+                "unit": unit,
                 "location": location,
             },
         )
@@ -566,7 +584,8 @@ class CostCalculator:
         price_per_tb = get_athena_price_per_tb()
 
         # Calculate cost
-        tb_scanned = data_scanned_bytes / BYTES_PER_TB
+        unit, bytes_per_unit = _byte_unit_for_table("athena_price_per_tb")
+        tb_scanned = data_scanned_bytes / bytes_per_unit
         compute_cost = tb_scanned * price_per_tb
 
         return QueryCost(
@@ -576,6 +595,7 @@ class CostCalculator:
                 "data_scanned_bytes": data_scanned_bytes,
                 "tb_scanned": tb_scanned,
                 "price_per_tb": price_per_tb,
+                "unit": unit,
                 "region": platform_config.get("region", "us-east-1"),
             },
         )
@@ -611,7 +631,8 @@ class CostCalculator:
                 return None
 
             price_per_tb = get_synapse_serverless_price_per_tb()
-            tb_processed = bytes_processed / BYTES_PER_TB
+            unit, bytes_per_unit = _byte_unit_for_table("synapse_serverless_price_per_tb")
+            tb_processed = bytes_processed / bytes_per_unit
             compute_cost = tb_processed * price_per_tb
 
             return QueryCost(
@@ -622,6 +643,7 @@ class CostCalculator:
                     "bytes_processed": bytes_processed,
                     "tb_processed": tb_processed,
                     "price_per_tb": price_per_tb,
+                    "unit": unit,
                     "region": region,
                 },
             )

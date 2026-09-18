@@ -1,8 +1,85 @@
 metadata:
   version: '2025.11'
-  last_updated: '2025-11-09'
   source: Cloud provider public pricing pages
   currency: USD
+  note: >-
+    The per-table provenance blocks below are authoritative. A previous
+    file-level last_updated ('2025-11-09') was removed: git log --follow
+    shows the values were authored in e0438e993 (initial release) and only
+    relocated Python->YAML in 8281615b0 with no value ever changed, so it
+    never described a refresh.
+provenance:
+  snowflake_credit_prices:
+    source: 'https://www.snowflake.com/pricing/'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us-east-1]
+  athena_price_per_tb:
+    source: 'https://aws.amazon.com/athena/pricing/'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us-east-1, eu-west-1, ap-southeast-1]
+  bigquery_on_demand_prices:
+    source: 'https://cloud.google.com/bigquery/pricing'
+    retrieved: '2026-09-18'
+    upstream_published: '2023-07-05'
+    method: derived_from_announcement
+    verified_regions: [us, eu, asia]
+  redshift_node_prices:
+    source: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRedshift/current/{region}/index.json'
+    retrieved: '2026-09-18'
+    upstream_published: '2026-09-11T12:45:05Z'
+    method: api
+    verified_regions: [us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2,
+      eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, sa-east-1]
+  databricks_dbu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [eastus]
+  synapse_serverless_price_per_tb:
+    source: 'Azure Synapse Analytics serverless SQL pool pricing page'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [eastus, westeurope]
+  synapse_dedicated_dwu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: api
+    verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  fabric_cu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: api
+    verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  fabric_sku_cu_map:
+    source: 'Microsoft Fabric capacity SKU documentation'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: []
+  firebolt_node_fbu_rates:
+    source: 'Firebolt engine specification documentation'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: []
+  firebolt_fbu_price:
+    source: 'https://docs.firebolt.io/managed-service/billing'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us]
+units:
+  bigquery_on_demand_prices: tebibyte
+  athena_price_per_tb: terabyte_unconfirmed
+  synapse_serverless_price_per_tb: terabyte_unconfirmed
 snowflake_credit_prices:
   standard:
     aws:

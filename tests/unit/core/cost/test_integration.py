@@ -10,6 +10,11 @@ from benchbox.core.cost.integration import (
     _extract_platform_config_from_results,
     add_cost_estimation_to_results,
 )
+from benchbox.core.cost.pricing import (
+    get_databricks_dbu_price,
+    get_redshift_node_price,
+    get_snowflake_credit_price,
+)
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
 pytestmark = [
@@ -84,7 +89,9 @@ class TestAddCostEstimationToResults:
         assert updated_results.cost_summary["currency"] == "USD"
         normalized_cost = updated_results.cost_summary["normalized_cost"]
         assert normalized_cost["cost_status"] == "normalized"
-        assert normalized_cost["normalized_cost_usd"] == "2.6"
+        # (0.5 + 0.8) credits * standard/aws/us table rate
+        expected_total = str((0.5 + 0.8) * get_snowflake_credit_price("standard", "aws", "us-east-1"))
+        assert normalized_cost["normalized_cost_usd"] == expected_total
         assert normalized_cost["deployment"]["cloud_provider"] == "aws"
         assert normalized_cost["deployment"]["cloud_region"] == "us-east-1"
         assert normalized_cost["deployment"]["warehouse_size"] == "MEDIUM"
@@ -112,8 +119,9 @@ class TestAddCostEstimationToResults:
         updated_results = add_cost_estimation_to_results(results)
 
         assert "cost" in updated_results.query_results[0]
-        # 0.5 credits * $2.00/credit = $1.00
-        assert updated_results.query_results[0]["cost"] == 1.0
+        # 0.5 credits * standard/aws/us table rate
+        expected = 0.5 * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_missing_platform(self):
         """Test graceful handling when platform is None."""
@@ -163,8 +171,9 @@ class TestAddCostEstimationToResults:
 
         updated_results = add_cost_estimation_to_results(results, platform_config)
 
-        # Business critical: $4.00/credit vs standard $2.00/credit
-        assert updated_results.query_results[0]["cost"] == 4.0
+        # Business critical table rate vs the standard rate
+        expected = 1.0 * get_snowflake_credit_price("business_critical", "aws", "us-east-1")
+        assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_exception_gracefully(self):
         """Test that exceptions during cost calculation don't crash."""
@@ -443,8 +452,9 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "power_test"
-        # 0.5 + 0.8 = 1.3 credits * $2.00 = $2.60
-        assert phase_costs[0].total_cost == 2.6
+        # (0.5 + 0.8) credits * standard/aws/us table rate
+        expected = (0.5 + 0.8) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
     def test_calculates_throughput_test_costs(self):
@@ -479,8 +489,9 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "throughput_test"
-        # 0.3 + 0.4 + 0.5 = 1.2 credits * $2.00 = $2.40
-        assert phase_costs[0].total_cost == 2.4
+        # (0.3 + 0.4 + 0.5) credits * standard/aws/us table rate
+        expected = (0.3 + 0.4 + 0.5) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 3
 
     def test_fallback_to_query_results(self):
@@ -503,8 +514,9 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "all_queries"
-        # 0.5 + 0.3 = 0.8 credits * $2.00 = $1.60
-        assert phase_costs[0].total_cost == 1.6
+        # (0.5 + 0.3) credits * standard/aws/us table rate
+        expected = (0.5 + 0.3) * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
     def test_handles_missing_resource_usage_in_phases(self):
@@ -533,7 +545,8 @@ class TestCalculatePhaseCosts:
         # Only 1 query with valid resource_usage
         assert len(phase_costs) == 1
         assert phase_costs[0].query_count == 1
-        assert phase_costs[0].total_cost == 1.0
+        expected = 0.5 * get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert phase_costs[0].total_cost == pytest.approx(expected)
 
     def test_returns_empty_list_when_no_costs(self):
         """Test returns empty list when no valid costs found."""
@@ -605,7 +618,10 @@ class TestMultiPlatformIntegration:
 
         updated_results = add_cost_estimation_to_results(results)
 
-        assert updated_results.query_results[0]["cost"] == 6.25  # $6.25/TiB
+        # Golden: 1 TiB * $6.25/TiB. Provenance: bigquery_on_demand_prices
+        # (cloud.google.com/bigquery/pricing, retrieved 2026-09-18). Update
+        # only when the vendor page changes.
+        assert updated_results.query_results[0]["cost"] == 6.25
         assert updated_results.cost_summary["total_cost"] == 6.25
 
     def test_redshift_integration(self):
@@ -632,9 +648,10 @@ class TestMultiPlatformIntegration:
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # 1 hour * 2 nodes * $0.25/node-hour = $0.50
-        assert updated_results.query_results[0]["cost"] == 0.50
-        assert updated_results.cost_summary["total_cost"] == 0.50
+        # 1 hour * 2 nodes * dc2.large/us-east-1 table rate
+        expected = 1.0 * 2 * get_redshift_node_price("dc2.large", "us-east-1")
+        assert updated_results.query_results[0]["cost"] == pytest.approx(expected)
+        assert updated_results.cost_summary["total_cost"] == pytest.approx(expected)
 
     def test_databricks_integration(self):
         """Test Databricks cost estimation integration."""
@@ -659,8 +676,8 @@ class TestMultiPlatformIntegration:
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # 0.5 hours * 2.0 DBU/hour * $0.55/DBU = $0.55
-        expected_cost = 0.5 * 2.0 * 0.55
+        # 0.5 hours * 2.0 DBU/hour * premium all-purpose table rate
+        expected_cost = 0.5 * 2.0 * get_databricks_dbu_price("aws", "premium", "all_purpose")
         assert abs(updated_results.query_results[0]["cost"] - expected_cost) < 0.001
         assert abs(updated_results.cost_summary["total_cost"] - expected_cost) < 0.001
 

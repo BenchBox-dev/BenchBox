@@ -3,6 +3,9 @@
 import pytest
 
 from benchbox.core.cost.pricing import (
+    BIGQUERY_ON_DEMAND_PRICES,
+    REDSHIFT_NODE_PRICES,
+    SNOWFLAKE_CREDIT_PRICES,
     _map_region_to_tier,
     get_bigquery_price_per_tb,
     get_redshift_node_price,
@@ -171,32 +174,28 @@ class TestRegionMapping:
 
 
 class TestSnowflakeRegionalPricing:
-    """Tests for Snowflake regional pricing variations."""
+    """Structural tests for Snowflake regional pricing tiers.
 
-    def test_us_region_pricing(self):
+    Exact cell values are pinned only by the cited goldens in
+    test_pricing_provenance.py; these tests check tier shape instead.
+    """
+
+    def _standard(self, region: str) -> float:
+        return get_snowflake_credit_price("standard", "aws", region)
+
+    def test_us_region_pricing_is_floor(self):
         """Test US region pricing is lowest."""
-        price_us = get_snowflake_credit_price("standard", "aws", "us-east-1")
-        assert price_us == 2.00
+        price_us = self._standard("us-east-1")
+        assert price_us > 0
+        for region in ["eu-west-1", "ap-southeast-1", "ca-central-1", "me-south-1"]:
+            assert price_us <= self._standard(region), f"US not floor vs {region}"
 
-    def test_eu_region_pricing_premium(self):
-        """Test EU regions have 20-25% premium."""
-        price_eu = get_snowflake_credit_price("standard", "aws", "eu-west-1")
-        assert price_eu == 2.50  # 25% premium
-
-    def test_ap_region_pricing_premium(self):
-        """Test AP regions have 20-30% premium."""
-        price_ap = get_snowflake_credit_price("standard", "aws", "ap-southeast-1")
-        assert price_ap == 2.60  # 30% premium
-
-    def test_canada_region_pricing(self):
-        """Test Canada region pricing."""
-        price_ca = get_snowflake_credit_price("standard", "aws", "ca-central-1")
-        assert price_ca == 2.20  # 10% premium
-
-    def test_middle_east_highest_pricing(self):
-        """Test Middle East regions have highest pricing."""
-        price_me = get_snowflake_credit_price("standard", "aws", "me-south-1")
-        assert price_me == 2.70  # 35% premium
+    def test_tier_ordering(self):
+        """Test regional premiums order US < Canada < EU < AP < other."""
+        assert self._standard("us-east-1") < self._standard("ca-central-1")
+        assert self._standard("ca-central-1") < self._standard("eu-west-1")
+        assert self._standard("eu-west-1") < self._standard("ap-southeast-1")
+        assert self._standard("ap-southeast-1") < self._standard("me-south-1")
 
     def test_consistent_across_clouds(self):
         """Test pricing consistent across AWS, Azure, GCP for same region tier."""
@@ -204,59 +203,55 @@ class TestSnowflakeRegionalPricing:
         price_azure = get_snowflake_credit_price("standard", "azure", "eastus")
         price_gcp = get_snowflake_credit_price("standard", "gcp", "us-central1")
 
-        assert price_aws == price_azure == price_gcp == 2.00
+        assert price_aws == price_azure == price_gcp > 0
 
 
 class TestBigQueryRegionalPricing:
-    """Tests for BigQuery regional pricing variations."""
+    """Structural tests for BigQuery regional pricing buckets.
 
-    def test_us_multi_region(self):
-        """Test US multi-region pricing."""
-        assert get_bigquery_price_per_tb("us") == 6.25
+    The $6.25 US value is pinned only by the cited golden in
+    test_pricing_provenance.py; these tests check bucket routing instead.
+    """
 
-    def test_eu_multi_region(self):
-        """Test EU multi-region pricing."""
-        assert get_bigquery_price_per_tb("eu") == 6.25
+    def test_multi_region_buckets_agree(self):
+        """Test US/EU/Asia multi-region pricing shares one bucket."""
+        price_us = get_bigquery_price_per_tb("us")
+        assert price_us > 0
+        assert get_bigquery_price_per_tb("eu") == price_us
+        assert get_bigquery_price_per_tb("asia") == price_us
 
-    def test_asia_multi_region(self):
-        """Test Asia multi-region pricing."""
-        assert get_bigquery_price_per_tb("asia") == 6.25
-
-    def test_us_single_regions(self):
+    def test_us_single_regions_match_multi_region(self):
         """Test US single region pricing matches multi-region."""
-        assert get_bigquery_price_per_tb("us-central1") == 6.25
-        assert get_bigquery_price_per_tb("us-east1") == 6.25
+        price_us = get_bigquery_price_per_tb("us")
+        assert get_bigquery_price_per_tb("us-central1") == price_us
+        assert get_bigquery_price_per_tb("us-east1") == price_us
 
-    def test_eu_single_regions(self):
-        """Test EU single region pricing (slight premium)."""
-        assert get_bigquery_price_per_tb("europe-west1") == 6.875
-        assert get_bigquery_price_per_tb("europe-north1") == 6.875
+    def test_eu_asia_single_regions_carry_premium(self):
+        """Test EU/Asia single regions cost more than multi-region."""
+        price_us = get_bigquery_price_per_tb("us")
+        for location in ["europe-west1", "europe-north1", "asia-southeast1", "asia-northeast1"]:
+            assert get_bigquery_price_per_tb(location) > price_us, location
 
-    def test_asia_single_regions(self):
-        """Test Asia single region pricing."""
-        assert get_bigquery_price_per_tb("asia-southeast1") == 6.875
-        assert get_bigquery_price_per_tb("asia-northeast1") == 6.875
+    def test_remote_buckets_carry_premium(self):
+        """Test Australia/South America/Middle East cost at least the US rate."""
+        price_us = get_bigquery_price_per_tb("us")
+        for location in ["australia-southeast1", "southamerica-east1", "me-west1"]:
+            assert get_bigquery_price_per_tb(location) >= price_us, location
 
-    def test_australia_premium_pricing(self):
-        """Test Australia regions have higher pricing."""
-        assert get_bigquery_price_per_tb("australia-southeast1") == 7.50
-
-    def test_south_america_premium_pricing(self):
-        """Test South America regions have higher pricing."""
-        assert get_bigquery_price_per_tb("southamerica-east1") == 7.8125
-
-    def test_middle_east_pricing(self):
-        """Test Middle East region pricing."""
-        assert get_bigquery_price_per_tb("me-west1") == 7.50
+    def test_bucket_boundaries(self):
+        """Test each remote bucket routes to its own table entry."""
+        assert get_bigquery_price_per_tb("australia-southeast1") == BIGQUERY_ON_DEMAND_PRICES["australia"]
+        assert get_bigquery_price_per_tb("southamerica-east1") == BIGQUERY_ON_DEMAND_PRICES["southamerica"]
+        assert get_bigquery_price_per_tb("me-west1") == BIGQUERY_ON_DEMAND_PRICES["middleeast"]
 
 
 class TestRedshiftRegionalPricing:
     """Tests for Redshift regional pricing variations."""
 
     def test_us_east_1_pricing(self):
-        """Test US East 1 pricing (typically lowest)."""
+        """Test US East 1 pricing routes to its own table cell."""
         price = get_redshift_node_price("dc2.large", "us-east-1")
-        assert price == 0.25
+        assert price == REDSHIFT_NODE_PRICES["dc2.large"]["us-east-1"]
 
     def test_different_regions_same_node_type(self):
         """Test that region affects pricing for same node type."""
@@ -325,8 +320,6 @@ class TestRegionalPricingAccuracy:
         tier = _map_region_to_tier("unknown-future-region")
         assert tier == "other"
 
-        # Should still get a price (not crash)
+        # Should still get a price (not crash), routed to the 'other' cell
         price = get_snowflake_credit_price("standard", "aws", "unknown-future-region")
-        assert price > 0
-        # Should be at higher end (other tier)
-        assert price >= 2.70  # 'other' tier pricing
+        assert price == SNOWFLAKE_CREDIT_PRICES["standard"]["aws"]["other"]

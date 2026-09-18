@@ -4,6 +4,13 @@ import pytest
 
 from benchbox.core.cost.calculator import CostCalculator, validate_resource_usage
 from benchbox.core.cost.models import QueryCost
+from benchbox.core.cost.pricing import (
+    get_athena_price_per_tb,
+    get_bigquery_price_per_tb,
+    get_databricks_dbu_price,
+    get_redshift_node_price,
+    get_snowflake_credit_price,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -29,10 +36,11 @@ class TestCostCalculator:
 
         assert cost is not None
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 1.0  # 0.5 credits * $2.00 per credit
+        price_per_credit = get_snowflake_credit_price("standard", "aws", "us-east-1")
+        assert cost.compute_cost == 0.5 * price_per_credit
         assert cost.currency == "USD"
         assert cost.pricing_details["credits_used"] == 0.5
-        assert cost.pricing_details["price_per_credit"] == 2.00
+        assert cost.pricing_details["price_per_credit"] == price_per_credit
 
     def test_bigquery_cost_calculation(self):
         """Test BigQuery cost calculation with bytes_processed."""
@@ -46,8 +54,9 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("bigquery", resource_usage, platform_config)
 
         assert cost is not None
-        assert cost.compute_cost == 6.25  # 1 TB * $6.25 per TB
-        assert cost.pricing_details["price_per_tb"] == 6.25
+        price_per_tb = get_bigquery_price_per_tb("us")
+        assert cost.compute_cost == price_per_tb  # 1 TiB * table rate
+        assert cost.pricing_details["price_per_tb"] == price_per_tb
 
     def test_athena_cost_ignores_adapter_supplied_cost_usd(self):
         """Athena cost is derived from bytes scanned, not adapter-supplied totals."""
@@ -61,7 +70,7 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("athena", resource_usage, {"region": "us-east-1"})
 
         assert cost is not None
-        assert cost.compute_cost == 5.0
+        assert cost.compute_cost == get_athena_price_per_tb()
         assert cost.pricing_details["data_scanned_bytes"] == 1024**4
         assert "source" not in cost.pricing_details
 
@@ -86,7 +95,8 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("redshift", resource_usage, platform_config)
 
         assert cost is not None
-        assert cost.compute_cost == 0.50  # 1 hour * 2 nodes * $0.25/node-hour
+        expected = 1.0 * 2 * get_redshift_node_price("dc2.large", "us-east-1")
+        assert cost.compute_cost == expected  # 1 hour * 2 nodes * table rate
         assert cost.pricing_details["node_type"] == "dc2.large"
         assert cost.pricing_details["node_count"] == 2
 
@@ -105,8 +115,8 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("databricks", resource_usage, platform_config)
 
         assert cost is not None
-        # 0.5 hours * 4 DBU/hour * $0.55/DBU = $1.10
-        expected_cost = 0.5 * 4.0 * 0.55
+        # 0.5 hours * 4 DBU/hour * premium all-purpose table rate
+        expected_cost = 0.5 * 4.0 * get_databricks_dbu_price("aws", "premium", "all_purpose")
         assert abs(cost.compute_cost - expected_cost) < 0.001
         assert cost.pricing_details["is_estimated"] is True
 
