@@ -13026,12 +13026,17 @@
       "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
     },
     "result-bundle-compat-followon-todos": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T16:45:23Z",
+        "generation": "0b6753eca30e4637938000e7b401e7fc",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
+      },
       "needs": [
         "result-bundle-compat-integrate-fixes"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Result-bundle compat: create TODO sequence for deferred follow-ons"
     },
     "result-bundle-compat-integrate-fixes": {
