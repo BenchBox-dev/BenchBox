@@ -13018,6 +13018,13 @@
       "status": "done",
       "title": "Restrict Primary/Foreign Key Configuration to tuning.yaml Only"
     },
+    "result-bundle-compat-databricks-provenance-cutoff": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: Databricks clustering provenance cutoff marker"
+    },
     "result-bundle-compat-decide-load-time-surfacing": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "Provenance/cutoff marker scheme chosen for pre-fix Databricks bundles (candidate carrier: export.benchbox_version)",
+    "Explorer facet treats absent requested_databricks_clustering_strategy on pre-cutoff bundles as unknown, not none",
+    "Cutoff documented in docs/usage/databricks-liquid-clustering.md; old bundles never rewritten"
+  ],
+  "context": "Reconciliation row P3 (DEFER). Design decision; do not rewrite old bundles.",
+  "description": "Design and implement a provenance/cutoff marker distinguishing pre-#2177 Databricks bundles (implicit Z-ORDER-capable, field absent) from post-fix explicit none. Evaluate export.benchbox_version as the carrier, update the explorer facet to show unknown for pre-cutoff absence, and document the cutoff.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
