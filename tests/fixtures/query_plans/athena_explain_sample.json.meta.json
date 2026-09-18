@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "Athena EXPLAIN (FORMAT JSON, Presto engine) documented shape",
+  "validated_against_live": false
+}

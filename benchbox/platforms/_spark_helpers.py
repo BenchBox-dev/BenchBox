@@ -192,10 +192,12 @@ def get_spark_query_plan(
     """
     log = logger or logging.getLogger(__name__)
     spark = connection
+    from benchbox.platforms.base.sql_execution import join_explain_rows
+
     try:
         result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
         plan_rows = result_df.collect()
-        return "\n".join([str(row[0]) for row in plan_rows])
+        return join_explain_rows(plan_rows)
     except Exception as e:
         log.warning("Could not get query plan via EXPLAIN: %s", e)
         return None

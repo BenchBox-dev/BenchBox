@@ -640,11 +640,13 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         shared plain-text ``get_query_plan_from_cursor`` helper cannot be used
         here because it omits the ``(FORMAT JSON)`` option.
         """
+        from benchbox.platforms.base.sql_execution import join_explain_rows
+
         cursor = connection.cursor()
         try:
             cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
             plan_rows = cursor.fetchall()
-            return "\n".join(str(row[0]) for row in plan_rows)
+            return join_explain_rows(plan_rows)
         except Exception as e:
             self.logger.warning("Could not get query plan via EXPLAIN: %s", e)
             return None

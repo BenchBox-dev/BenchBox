@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from benchbox.core.results.models import QueryExecution
@@ -11,6 +12,44 @@ from benchbox.core.results.query_execution import query_execution_to_legacy_dict
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
+
+
+def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
+    """Join raw EXPLAIN rows into plan text, robust to driver row shapes.
+
+    Drivers differ in how they chunk EXPLAIN output: a single row holding the
+    full text (Trino JSON), one row per plan line (ClickHouse text), or JSON
+    fragmented across rows. Cells may also arrive as decoded ``dict``/``list``
+    objects (JSON drivers), ``bytes``, or be padded with ``None``/extra
+    columns. All of those shapes must yield the same plan text — otherwise a
+    driver upgrade silently zeroes out capture while unit tests stay green.
+
+    Args:
+        plan_rows: Raw rows from ``cursor.fetchall()`` / ``collect()``.
+
+    Returns:
+        Joined plan text, or ``None`` when there is nothing to join.
+    """
+    if not plan_rows:
+        return None
+    parts: list[str] = []
+    for row in plan_rows:
+        if row is None:
+            continue
+        if isinstance(row, (list, tuple)):
+            cell = row[0] if len(row) > 0 else None
+        else:
+            cell = row
+        if cell is None:
+            continue
+        if isinstance(cell, (dict, list)):
+            parts.append(json.dumps(cell))
+        elif isinstance(cell, (bytes, bytearray)):
+            parts.append(bytes(cell).decode("utf-8", errors="replace"))
+        else:
+            parts.append(str(cell))
+    text = "\n".join(parts)
+    return text or None
 
 
 def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
@@ -38,7 +77,7 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     try:
         cursor.execute(f"EXPLAIN {query}")
         plan_rows = cursor.fetchall()
-        return "\n".join([str(row[0]) for row in plan_rows])
+        return join_explain_rows(plan_rows)
     except Exception as e:
         logger.warning("Could not get query plan via EXPLAIN: %s", e)
         return None

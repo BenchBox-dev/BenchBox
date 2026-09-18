@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "Trino distributed EXPLAIN (FORMAT JSON) fragment-keyed shape",
+  "validated_against_live": false
+}
