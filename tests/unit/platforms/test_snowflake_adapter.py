@@ -928,6 +928,44 @@ benchbox-fixture-key-material
         assert any("PURGE = TRUE" in sql for sql in execute_calls)
         assert execute_calls[-1] == "SELECT COUNT(*) FROM LINEITEM"
 
+    def test_load_table_from_stage_fallback_to_quoted_stage_when_not_authorized(self):
+        """Fallback to lowercase quoted stage and table name when uppercase stage reports does not exist."""
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
+        mock_cursor.fetchone.return_value = (10,)
+
+        # First PUT on @%LINEITEM raises, subsequent calls succeed
+        def mock_execute(sql):
+            if "@%LINEITEM" in sql:
+                raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
+
+        mock_cursor.execute.side_effect = mock_execute
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".tbl", delete=False) as f:
+            f.write(b"1|one|\n")
+            path = Path(f.name)
+
+        try:
+            row_count = adapter._load_table_from_stage(mock_cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert row_count == 10
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        # Should have tried @%LINEITEM first, then fallback to @"lineitem"
+        assert any(f"PUT file://{path.absolute()} @%LINEITEM" in sql for sql in execute_calls)
+        assert any(f'PUT file://{path.absolute()} @%"lineitem"' in sql for sql in execute_calls)
+        assert any('COPY INTO "lineitem"' in sql for sql in execute_calls)
+
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_olap(self, mock_snowflake):
         """Test OLAP benchmark configuration."""
@@ -1698,8 +1736,8 @@ class TestSnowflakeValidateSessionCacheControl:
         assert result["validated"] is True
         assert result["cache_disabled"] is True
 
-        # Verify the call args
         call_kwargs = mock_validate.call_args[1]
+        assert call_kwargs["query"] == "SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION"
         assert call_kwargs["setting_key"] == "USE_CACHED_RESULT"
         assert call_kwargs["disabled_value"] == "FALSE"
         assert call_kwargs["enabled_value"] == "TRUE"
@@ -1707,6 +1745,7 @@ class TestSnowflakeValidateSessionCacheControl:
         assert call_kwargs["platform_name"] == "Snowflake"
         assert call_kwargs["disable_result_cache"] is True
         assert call_kwargs["strict_validation"] is False
+        assert call_kwargs["value_column_index"] == 1
 
 
 class TestSnowflakeGetPlatformInfo:

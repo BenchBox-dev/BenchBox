@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, cast
@@ -74,6 +75,187 @@ def _select_databricks_warehouse(warehouses: list, very_verbose: bool, logger: l
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+_COMMIT_HASH_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
+
+_CURRENT_VERSION_KEYS = ("dbr_version", "dbsql_version", "u_build_hash", "r_build_hash")
+
+_ENGINE_VERSION_SOURCE_CURRENT_VERSION = "current_version"
+_ENGINE_VERSION_SOURCE_SQL_QUERY = "sql_query"
+
+
+def _sanitize_spark_engine_version(value: Any) -> str | None:
+    """Strip the commit-hash suffix from ``SELECT version()`` output.
+
+    Serverless warehouses return values like ``"4.2.0 0000...0"`` where the
+    second token is a 40-character placeholder hash. Naive ``split()[0]``
+    truncates legitimate multi-token versions such as ``"Runtime 14.3 LTS"``,
+    so only strip the suffix when it looks like a commit hash.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    parts = text.split()
+    if len(parts) == 1:
+        return parts[0]
+    if _COMMIT_HASH_RE.match(parts[1]):
+        return parts[0]
+    return text
+
+
+def _first_column(row: Any) -> Any:
+    """Extract the first column from a DB-API fetchone() result."""
+    if row is None:
+        return None
+    if isinstance(row, Mapping):
+        if len(row) == 1:
+            try:
+                return next(iter(row.values()))
+            except Exception:
+                return None
+        for key in ("version", "spark_version", "current_version()", "current_version"):
+            if key in row:
+                try:
+                    return row[key]
+                except Exception:
+                    continue
+        try:
+            return next(iter(row.values()))
+        except Exception:
+            return None
+    if isinstance(row, (tuple, list)):
+        if len(row) == 0:
+            return None
+        try:
+            return row[0]
+        except Exception:
+            return None
+    if isinstance(row, (str, bytes)):
+        return row
+    try:
+        return row[0]  # type: ignore[index]
+    except Exception:
+        return row
+
+
+def _unwrap_current_version_struct(row: Any) -> Any:
+    """Unwrap ``SELECT current_version()`` fetchone() result to its struct payload."""
+    if row is None:
+        return None
+    if isinstance(row, Mapping):
+        if any(key in row for key in _CURRENT_VERSION_KEYS):
+            return row
+        if len(row) == 1:
+            try:
+                return next(iter(row.values()))
+            except Exception:
+                return None
+        return row
+    if isinstance(row, (tuple, list)):
+        if len(row) == 0:
+            return None
+        # databricks.sql.types.Row is a tuple that matches field names with `in`;
+        # a plain tuple never does, so it falls through to row[0] below.
+        try:
+            if "dbsql_version" in row or "dbr_version" in row:  # type: ignore[operator]
+                return row
+        except Exception:
+            pass
+        try:
+            return row[0]
+        except Exception:
+            return None
+    as_dict = getattr(row, "asDict", None)
+    if callable(as_dict):
+        try:
+            result = as_dict()
+            if isinstance(result, Mapping):
+                return result
+        except Exception:
+            pass
+    return row
+
+
+def _clean_version_token(value: Any) -> str | None:
+    """Accept only real string versions; reject placeholders and mock objects."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    return text or None
+
+
+def _struct_fields_from_object(payload: Any) -> dict[str, Any] | None:
+    """Read version/hash fields from a Row-like object via mapping or attributes."""
+    values: dict[str, Any] = {}
+    for key in _CURRENT_VERSION_KEYS:
+        try:
+            try:
+                present = key in payload  # type: ignore[operator]
+            except Exception:
+                present = False
+            if present:
+                try:
+                    values[key] = payload[key]  # type: ignore[index]
+                except Exception:
+                    values[key] = getattr(payload, key, None)
+            else:
+                values[key] = getattr(payload, key, None)
+        except Exception:
+            values[key] = None
+    # Reject objects with no string content (e.g. unconfigured mocks)
+    if not any(isinstance(values.get(key), str) for key in _CURRENT_VERSION_KEYS):
+        return None
+    return values
+
+
+def _parse_current_version_payload(payload: Any) -> dict[str, str | None] | None:
+    """Normalize a ``current_version()`` struct to known version/hash keys."""
+    if payload is None or isinstance(payload, str):
+        return None
+    if isinstance(payload, (tuple, list)):
+        if len(payload) == 0:
+            return None
+        # Double-wrapped struct (e.g. Row inside Row): unwrap one more level
+        # only when the outer row does not itself carry version keys. As above,
+        # `in` matches field names only on Row, never on a plain tuple.
+        try:
+            if "dbsql_version" in payload or "dbr_version" in payload:  # type: ignore[operator]
+                pass
+            else:
+                payload = payload[0]
+                if payload is None or isinstance(payload, str):
+                    return None
+        except Exception:
+            try:
+                payload = payload[0]
+            except Exception:
+                return None
+            if payload is None or isinstance(payload, str):
+                return None
+    if isinstance(payload, Mapping):
+        data: dict[str, Any] = dict(payload)
+    else:
+        extracted = _struct_fields_from_object(payload)
+        if extracted is None:
+            return None
+        data = extracted
+    cleaned = {key: _clean_version_token(data.get(key)) for key in _CURRENT_VERSION_KEYS}
+    if not cleaned.get("dbsql_version") and not cleaned.get("dbr_version"):
+        if not cleaned.get("u_build_hash") and not cleaned.get("r_build_hash"):
+            return None
+    return cleaned
+
+
+def _select_databricks_platform_version(parsed: Mapping[str, Any] | None) -> str | None:
+    """Prefer DBSQL version on warehouses, DBR version on clusters."""
+    if not isinstance(parsed, Mapping):
+        return None
+    return _clean_version_token(parsed.get("dbsql_version")) or _clean_version_token(parsed.get("dbr_version"))
 
 
 class DatabricksAdapter(PlatformAdapter):
@@ -410,6 +592,81 @@ class DatabricksAdapter(PlatformAdapter):
                 logger.error(f"Databricks auto-detection failed: {e}")
             return None
 
+    def _resolve_databricks_engine_version(self, connection: Any) -> dict[str, Any]:
+        """Resolve the Databricks engine version from a live connection.
+
+        Probes ``SELECT current_version()`` first so SQL warehouses record the
+        DBSQL version (``dbsql_version``) and clusters record the runtime
+        version (``dbr_version``), with build hashes preserved. Falls back to
+        sanitized ``SELECT version()`` and then ``SELECT spark_version()`` for
+        older clusters, connectors, and fixtures without ``current_version()``.
+        """
+        fallback_hashes: dict[str, str] = {}
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute("SELECT current_version()")
+                parsed = _parse_current_version_payload(_unwrap_current_version_struct(cursor.fetchone()))
+                if parsed is not None:
+                    for key in ("u_build_hash", "r_build_hash"):
+                        if parsed.get(key):
+                            fallback_hashes[key] = str(parsed[key])
+                    selected = _select_databricks_platform_version(parsed)
+                    if selected:
+                        resolved: dict[str, Any] = {
+                            "platform_version": selected,
+                            "engine_version": selected,
+                            "engine_version_source": _ENGINE_VERSION_SOURCE_CURRENT_VERSION,
+                        }
+                        for key in _CURRENT_VERSION_KEYS:
+                            if parsed.get(key):
+                                resolved[key] = parsed[key]
+                        return resolved
+            finally:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+        except Exception as exc:
+            self.logger.debug(f"current_version() probe failed, falling back to version(): {exc}")
+        try:
+            cursor = connection.cursor()
+            try:
+                cursor.execute("SELECT version()")
+                sanitized = _sanitize_spark_engine_version(_first_column(cursor.fetchone()))
+                if sanitized:
+                    resolved = {
+                        "platform_version": sanitized,
+                        "engine_version": sanitized,
+                        "engine_version_source": _ENGINE_VERSION_SOURCE_SQL_QUERY,
+                    }
+                    resolved.update(fallback_hashes)
+                    return resolved
+                cursor.execute("SELECT spark_version() as version")
+                sanitized = _sanitize_spark_engine_version(_first_column(cursor.fetchone()))
+                if sanitized:
+                    resolved = {
+                        "platform_version": sanitized,
+                        "engine_version": sanitized,
+                        "engine_version_source": _ENGINE_VERSION_SOURCE_SQL_QUERY,
+                    }
+                    resolved.update(fallback_hashes)
+                    return resolved
+            finally:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+        except Exception as exc:
+            self.logger.debug(f"Could not query Databricks runtime version: {exc}")
+        degraded: dict[str, Any] = {
+            "platform_version": None,
+            "engine_version": None,
+            "engine_version_source": None,
+        }
+        degraded.update(fallback_hashes)
+        return degraded
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Databricks platform information.
 
@@ -471,27 +728,20 @@ class DatabricksAdapter(PlatformAdapter):
         except (ImportError, AttributeError):
             platform_info["client_library_version"] = None
 
-        # Try to get Databricks runtime version from connection
-        if connection:
-            try:
-                cursor = connection.cursor()
-                cursor.execute("SELECT version()")
-                result = cursor.fetchone()
-                if result:
-                    platform_info["platform_version"] = result[0]
-                else:
-                    # Try alternative query for Spark version
-                    cursor.execute("SELECT spark_version() as version")
-                    result = cursor.fetchone()
-                    platform_info["platform_version"] = result[0] if result else None
-                platform_info["engine_version"] = platform_info["platform_version"]
-                platform_info["engine_version_source"] = "sql_query"
-                cursor.close()
-            except Exception as e:
-                self.logger.debug(f"Could not query Databricks runtime version: {e}")
-                platform_info["platform_version"] = None
+        # Resolve the engine version: current_version() first for the true DBSQL/DBR
+        # version plus build hashes, with sanitized version() fallback.
+        if connection is not None:
+            resolved_version = self._resolve_databricks_engine_version(connection)
+            platform_info["platform_version"] = resolved_version.get("platform_version")
+            platform_info["engine_version"] = resolved_version.get("engine_version")
+            platform_info["engine_version_source"] = resolved_version.get("engine_version_source")
+            for detail_key in _CURRENT_VERSION_KEYS:
+                if resolved_version.get(detail_key) is not None:
+                    platform_info[detail_key] = resolved_version[detail_key]
         else:
             platform_info["platform_version"] = None
+            platform_info["engine_version"] = None
+            platform_info["engine_version_source"] = None
 
         # Try to get warehouse metadata using Databricks SDK (best effort)
         warehouse_id = self._warehouse_id_from_http_path(self.http_path)
@@ -2168,7 +2418,7 @@ class DatabricksAdapter(PlatformAdapter):
 
         return statement
 
-    def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
+    def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:  # noqa: C901
         """Get Databricks-specific metadata and system information."""
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
@@ -2191,14 +2441,38 @@ class DatabricksAdapter(PlatformAdapter):
             "skipped_layout_operations": list(self._skipped_layout_operations),
         }
 
+        try:
+            resolved_version = self._resolve_databricks_engine_version(connection)
+        except Exception as exc:
+            metadata["metadata_error"] = str(exc)
+            return metadata
+        for key in ("platform_version", "engine_version", "engine_version_source", *_CURRENT_VERSION_KEYS):
+            if resolved_version.get(key) is not None:
+                metadata[key] = resolved_version[key]
+        # Preserve the Spark engine string for diagnostics; sanitized so the
+        # 40-zero placeholder hash never leaks into stored metadata.
+        if resolved_version.get("engine_version_source") == _ENGINE_VERSION_SOURCE_CURRENT_VERSION:
+            try:
+                version_cursor = connection.cursor()
+                try:
+                    version_cursor.execute("SELECT version()")
+                    sanitized_spark = _sanitize_spark_engine_version(_first_column(version_cursor.fetchone()))
+                    metadata["spark_version"] = sanitized_spark if sanitized_spark else "unknown"
+                finally:
+                    try:
+                        version_cursor.close()
+                    except Exception:
+                        pass
+            except Exception as exc:
+                self.logger.debug(f"Could not query Databricks Spark version: {exc}")
+                metadata.setdefault("spark_version", "unknown")
+        else:
+            sanitized = resolved_version.get("engine_version")
+            metadata["spark_version"] = sanitized if sanitized else "unknown"
+
         cursor = connection.cursor()
 
         try:
-            # Get Spark version
-            cursor.execute("SELECT version()")
-            result = cursor.fetchone()
-            metadata["spark_version"] = result[0] if result else "unknown"
-
             # Get current catalog and schema
             cursor.execute("SELECT current_catalog(), current_schema()")
             result = cursor.fetchone()
@@ -2220,7 +2494,10 @@ class DatabricksAdapter(PlatformAdapter):
         except Exception as e:
             metadata["metadata_error"] = str(e)
         finally:
-            cursor.close()
+            try:
+                cursor.close()
+            except Exception:
+                pass
 
         return metadata
 

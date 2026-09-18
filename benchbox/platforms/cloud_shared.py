@@ -30,6 +30,7 @@ def validate_session_cache_control(
     disable_result_cache: bool,
     strict_validation: bool,
     adapter_logger: logging.Logger | None = None,
+    value_column_index: int = 0,
 ) -> dict[str, Any]:
     """Validate that session-level cache control settings were applied.
 
@@ -46,6 +47,7 @@ def validate_session_cache_control(
         disable_result_cache: Whether the adapter expects cache to be disabled.
         strict_validation: If True, raise ConfigurationError on mismatch.
         adapter_logger: Optional logger; falls back to module logger.
+        value_column_index: Index of the value column in the query result row (default: 0).
 
     Returns:
         Dict with ``validated``, ``cache_disabled``, ``settings``,
@@ -66,7 +68,7 @@ def validate_session_cache_control(
         row = cursor.fetchone()
 
         if row:
-            raw = str(row[0])
+            raw = str(row[value_column_index])
             actual_value = raw.lower() if normalize == "lower" else raw.upper()
             result["settings"][setting_key] = actual_value
 
