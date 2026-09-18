@@ -207,42 +207,75 @@ class TestSnowflakeRegionalPricing:
 
 
 class TestBigQueryRegionalPricing:
-    """Structural tests for BigQuery regional pricing buckets.
+    """Tests for BigQuery per-region pricing.
 
-    The $6.25 US value is pinned only by the cited golden in
-    test_pricing_provenance.py; these tests check bucket routing instead.
+    Values are captured from the vendor pricing page
+    (https://cloud.google.com/bigquery/pricing, retrieved 2026-09-18),
+    which embeds the full regional on-demand schedule in the page data.
     """
 
-    def test_multi_region_buckets_agree(self):
-        """Test US/EU/Asia multi-region pricing shares one bucket."""
-        price_us = get_bigquery_price_per_tb("us")
-        assert price_us > 0
-        assert get_bigquery_price_per_tb("eu") == price_us
-        assert get_bigquery_price_per_tb("asia") == price_us
+    def test_multi_region_pricing(self):
+        """Test multi-region pricing."""
+        assert get_bigquery_price_per_tb("us") == 6.25
+        assert get_bigquery_price_per_tb("eu") == 6.25
+        # Retained 2026-09-18 citation: the page publishes no Asia entry.
+        assert get_bigquery_price_per_tb("asia") == 6.25
 
-    def test_us_single_regions_match_multi_region(self):
-        """Test US single region pricing matches multi-region."""
-        price_us = get_bigquery_price_per_tb("us")
-        assert get_bigquery_price_per_tb("us-central1") == price_us
-        assert get_bigquery_price_per_tb("us-east1") == price_us
+    def test_multi_region_aliases(self):
+        """Test multi-region aliases resolve to the same bucket."""
+        assert get_bigquery_price_per_tb("us-multi") == 6.25
+        assert get_bigquery_price_per_tb("eu-multi") == 6.25
+        assert get_bigquery_price_per_tb("asia-multi") == 6.25
 
-    def test_eu_asia_single_regions_carry_premium(self):
-        """Test EU/Asia single regions cost more than multi-region."""
-        price_us = get_bigquery_price_per_tb("us")
-        for location in ["europe-west1", "europe-north1", "asia-southeast1", "asia-northeast1"]:
-            assert get_bigquery_price_per_tb(location) > price_us, location
+    def test_captured_single_region_values(self):
+        """Test a representative sample of captured per-region prices."""
+        expected = {
+            "us-east1": 6.25,
+            "us-west2": 8.4375,
+            "us-south1": 7.50,
+            "europe-west1": 7.50,
+            "europe-west2": 7.8125,
+            "europe-west10": 9.625,
+            "europe-west12": 8.0625,
+            "asia-southeast1": 8.4375,
+            "asia-east1": 7.1875,
+            "asia-northeast1": 7.50,
+            "australia-southeast1": 8.125,
+            "southamerica-east1": 11.25,
+            "southamerica-west1": 8.9375,
+            "me-central1": 7.59375,
+            "me-central2": 10.00,
+            "me-west1": 7.50,
+            # Regions added to the matcher by the pricing correction.
+            "africa-south1": 7.50,
+            "northamerica-south1": 6.8125,
+            "asia-southeast3": 7.50,
+            "asia-southeast4": 6.5625,
+            "europe-north2": 6.5625,
+        }
+        for location, price in expected.items():
+            assert get_bigquery_price_per_tb(location) == price, location
 
-    def test_remote_buckets_carry_premium(self):
-        """Test Australia/South America/Middle East cost at least the US rate."""
-        price_us = get_bigquery_price_per_tb("us")
-        for location in ["australia-southeast1", "southamerica-east1", "me-west1"]:
-            assert get_bigquery_price_per_tb(location) >= price_us, location
+    def test_every_table_region_resolves_to_its_captured_price(self):
+        """Test no table region is shadowed by routing logic."""
+        for region, price in BIGQUERY_ON_DEMAND_PRICES.items():
+            if region == "other":
+                continue
+            assert get_bigquery_price_per_tb(region) == price, region
+            assert get_bigquery_price_per_tb(region.upper()) == price, region
 
-    def test_bucket_boundaries(self):
-        """Test each remote bucket routes to its own table entry."""
-        assert get_bigquery_price_per_tb("australia-southeast1") == BIGQUERY_ON_DEMAND_PRICES["australia"]
-        assert get_bigquery_price_per_tb("southamerica-east1") == BIGQUERY_ON_DEMAND_PRICES["southamerica"]
-        assert get_bigquery_price_per_tb("me-west1") == BIGQUERY_ON_DEMAND_PRICES["middleeast"]
+    def test_unknown_and_unpublished_regions_resolve_to_other(self):
+        """Test locations with no published price fail high via 'other'."""
+        other = BIGQUERY_ON_DEMAND_PRICES["other"]
+        assert get_bigquery_price_per_tb("unknown-future-region") == other
+        # Listed in the page selector with no published on-demand table.
+        assert get_bigquery_price_per_tb("europe-west5") == other
+        assert get_bigquery_price_per_tb("us-central2") == other
+
+    def test_other_fails_high(self):
+        """Test the fallback is never cheaper than a known region."""
+        known = [price for region, price in BIGQUERY_ON_DEMAND_PRICES.items() if region != "other"]
+        assert BIGQUERY_ON_DEMAND_PRICES["other"] >= max(known)
 
 
 class TestRedshiftRegionalPricing:

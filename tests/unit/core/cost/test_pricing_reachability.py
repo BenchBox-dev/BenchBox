@@ -92,11 +92,20 @@ def test_every_redshift_node_type_resolves_without_fallback():
 
 
 def test_bigquery_matcher_covers_current_locations():
-    """Locations Google lists today route to a bucket instead of silently hitting 'other'."""
-    assert get_bigquery_price_per_tb("africa-south1") == BIGQUERY_ON_DEMAND_PRICES["other"]
-    assert get_bigquery_price_per_tb("northamerica-south1") == BIGQUERY_ON_DEMAND_PRICES["us-single"]
-    for location in ["asia-southeast3", "asia-southeast4", "europe-north2", "europe-west10", "europe-west12"]:
-        assert get_bigquery_price_per_tb(location) > 0
+    """Locations Google lists today resolve to captured prices, not the 'other' fallback."""
+    for location in [
+        "africa-south1",
+        "northamerica-south1",
+        "asia-southeast3",
+        "asia-southeast4",
+        "europe-north2",
+        "europe-west10",
+        "europe-west12",
+    ]:
+        # Each location has its own captured table entry, so the lookup
+        # cannot be silently served by the 'other' fallback.
+        assert location in BIGQUERY_ON_DEMAND_PRICES, location
+        assert get_bigquery_price_per_tb(location) == BIGQUERY_ON_DEMAND_PRICES[location], location
 
 
 def test_fabric_sku_map_is_fully_resolvable():
