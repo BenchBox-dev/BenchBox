@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "The AWS and Azure unit definitions are determined and cited, or the attempt is recorded as inconclusive with the resulting exposure stated",
+    "No terabyte_unconfirmed markers remain in pricing_data.yaml",
+    "billing_unit reflects the unit actually used per platform",
+    "An ADR exists under docs/development/adr/ and is listed in that directory's README index",
+    "The ADR states whether a bundle schema version bump is implied, with reasoning",
+    "benchbox/validation/bundle.py is updated in lockstep if the contract vocabulary changes",
+    "The BigQuery free-tier modelling choice is documented"
+  ],
+  "context": "Finding R8. Reviewers disagreed on severity - muse called it overstated, agy confirmed it - and muse's stated direction of error was backwards. Resolution recorded in the plan's adjudication section.",
+  "description": "Settle the unit question the provenance work deliberately encoded as terabyte_unconfirmed, and make the public contract state the truth.\n\nDetermine whether AWS (Athena) and Azure (Synapse serverless) mean 10^12 or 2^40 when they print \"TB\" / \"Terabytes\" for data scanned. Google is already settled: BigQuery bills per TiB, confirmed by its own pricing page, whose worked example divides billed bytes by 1099511627776. If AWS and Azure mean 10^12, Athena and Synapse costs rise about 9.95%, because dividing by 2^40 yields fewer units and therefore a lower cost than the vendor charges - the current code understates.\n\nThen change billing_unit on the public NormalizedCost contract from a single \"tb_scanned\" to a per-platform value (tib_scanned for BigQuery), so the contract stops asserting a unit the code does not use.\n\nThis is an output-contract change and needs an ADR: docs/development/adr/adr-<slug>.md, using the established shape (# ADR: Title, then Status / Date / Constrains bullets, then Context and Motivation, Rejected Alternatives), added to the index in docs/development/adr/README.md. The ADR should also decide whether a result-bundle schema bump beyond 2.2 is implied; the plan's assessment is that it is not, since no new top-level NormalizedCost field is added.\n\nAlso document, as part of the same change, that BenchBox charges BigQuery list rate from byte zero and does not model the first 1 TiB per month free tier. That is the right call for cross-platform comparability, but it is currently undisclosed and most benchmark runs scan under 1 TiB, so a reader could reasonably expect zero."
+}

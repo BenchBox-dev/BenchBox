@@ -10938,6 +10938,15 @@
       "status": "open",
       "title": "Route price fallbacks and staleness into cost_status, and guard unverified regions"
     },
+    "pricing-unit-contract-adr": {
+      "claim": null,
+      "needs": [
+        "pricing-region-params-athena-synapse"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Resolve the TB/TiB billing unit and record the contract decision"
+    },
     "pricing-vendor-data-redistribution-check": {
       "claim": null,
       "needs": [],
