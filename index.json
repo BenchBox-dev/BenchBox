@@ -10948,12 +10948,17 @@
       "title": "Give Athena and Synapse serverless real regional pricing"
     },
     "pricing-status-wiring-and-region-guard": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T14:48:26Z",
+        "generation": "7007ccbf840f47a18c2401d901603895",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
+      },
       "needs": [
         "pricing-failclosed-price-resolution"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Route price fallbacks and staleness into cost_status, and guard unverified regions"
     },
     "pricing-unit-contract-adr": {
