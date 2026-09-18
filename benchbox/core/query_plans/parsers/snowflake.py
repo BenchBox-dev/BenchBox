@@ -194,9 +194,9 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
                 kwargs["table_name"] = table
         elif logical_type == LogicalOperatorType.JOIN:
             kwargs["join_type"] = self._classify_join_type(operation, details)
-            condition = self._join_condition(node)
-            if condition:
-                kwargs["join_conditions"] = [condition]
+            conditions = self._join_condition(node)
+            if conditions:
+                kwargs["join_conditions"] = conditions
 
         physical_op = self._create_physical_operator(
             operation or "Unknown",
@@ -263,10 +263,11 @@ class SnowflakeQueryPlanParser(QueryPlanParser):
         return JoinType.INNER
 
     @staticmethod
-    def _join_condition(node: dict[str, Any]) -> str | None:
+    def _join_condition(node: dict[str, Any]) -> list[str] | None:
         expressions = node.get("expressions")
         if isinstance(expressions, list) and expressions:
-            return ", ".join(str(item).strip() for item in expressions if str(item).strip()) or None
+            conditions = [str(item).strip() for item in expressions if str(item).strip()]
+            return conditions or None
         if isinstance(expressions, str) and expressions.strip():
-            return expressions.strip()
+            return [expressions.strip()]
         return None
