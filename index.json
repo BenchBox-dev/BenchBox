@@ -10949,9 +10949,9 @@
     },
     "pricing-status-wiring-and-region-guard": {
       "claim": {
-        "expires_at": "2026-09-19T14:48:26Z",
-        "generation": "7007ccbf840f47a18c2401d901603895",
-        "renewals": 0,
+        "expires_at": "2026-09-19T15:21:32Z",
+        "generation": "1416aad194884616af25b199b6d8f9b4",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
       },
       "needs": [
