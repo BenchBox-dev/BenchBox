@@ -20,7 +20,7 @@ provenance:
     retrieved: unknown
     upstream_published: unknown
     method: manual
-    verified_regions: [us-east-1, eu-west-1, ap-southeast-1]
+    verified_regions: [us-east-1, eu-west-1, ap-southeast-1, ap-northeast-1, sa-east-1]
   bigquery_on_demand_prices:
     source: 'https://cloud.google.com/bigquery/pricing'
     retrieved: '2026-09-18'
@@ -67,7 +67,7 @@ provenance:
     retrieved: unknown
     upstream_published: unknown
     method: manual
-    verified_regions: [eastus, westeurope]
+    verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
   synapse_dedicated_dwu_prices:
     source: 'https://prices.azure.com/api/retail/prices'
     retrieved: '2026-09-18'
@@ -179,7 +179,12 @@ snowflake_credit_prices:
       ap: 7.8
       ca: 6.6
       other: 8.1
-athena_price_per_tb: 5.0
+athena_price_per_tb:
+  us-east-1: 5.0
+  eu-west-1: 5.0
+  ap-southeast-1: 5.0
+  ap-northeast-1: 5.0
+  sa-east-1: 9.0
 bigquery_on_demand_prices:
   us: 6.25
   eu: 6.25
@@ -426,7 +431,12 @@ databricks_dbu_prices:
       sql_pro: 0.55
       sql_serverless: 0.70
       ml: 0.65
-synapse_serverless_price_per_tb: 5.0
+synapse_serverless_price_per_tb:
+  eastus: 5.0
+  westeurope: 5.0
+  southeastasia: 6.75
+  canadacentral: 5.5
+  brazilsouth: 9.0
 synapse_dedicated_dwu_prices:
   dw100c:
     us: 1.51

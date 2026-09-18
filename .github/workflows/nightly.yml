@@ -399,14 +399,22 @@ jobs:
           fi
 
   cloud-live-plan-capture:
-    # Nightly-only live plan-capture verification for Snowflake and BigQuery.
+    # Nightly-only live plan-capture verification for Snowflake, BigQuery,
+    # Redshift, and MotherDuck.
     # The selected test classes run trivial SELECT 1 queries only (0 bytes
-    # scanned on BigQuery, per-second XS warehouse floor on Snowflake), so
-    # this job stays inside free-tier / trial budgets. Unlike the
-    # postgres-integration gate above, an all-skipped run stays green: until
-    # the cloud secrets below are configured, there are no credentials and
-    # every test skips. Never move this to pr.yml: PR-triggered cloud queries
-    # from arbitrary branches incur uncontrolled billing.
+    # scanned on BigQuery, per-second XS warehouse floor on Snowflake, trivial
+    # compute on Redshift and MotherDuck), so this job stays inside free-tier /
+    # trial budgets. Unlike the postgres-integration gate above, an all-skipped
+    # run stays green: until the cloud secrets below are configured, there are
+    # no credentials and every test skips. Never move this to pr.yml:
+    # PR-triggered cloud queries from arbitrary branches incur uncontrolled
+    # billing.
+    # Expected secret names match the env vars the conftest fixtures read:
+    # REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD,
+    # REDSHIFT_DATABASE (default "dev"), REDSHIFT_PORT (default "5439"),
+    # MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE (default "benchbox_test").
+    # Adding the secret values themselves is a repo-admin action outside the
+    # PR; do not echo secret values in any step.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -418,6 +426,13 @@ jobs:
       SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
       BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
       BIGQUERY_DATASET: ${{ secrets.BIGQUERY_DATASET }}
+      REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
+      REDSHIFT_PORT: ${{ secrets.REDSHIFT_PORT }}
+      REDSHIFT_USER: ${{ secrets.REDSHIFT_USER }}
+      REDSHIFT_PASSWORD: ${{ secrets.REDSHIFT_PASSWORD }}
+      REDSHIFT_DATABASE: ${{ secrets.REDSHIFT_DATABASE }}
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -432,7 +447,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv sync --group dev --extra snowflake --extra bigquery
+          uv sync --group dev --extra snowflake --extra bigquery --extra redshift --extra duckdb
 
       - name: Write GCP service account key to temp file
         # BigQuery needs a file-based credential. The secret must hold the raw
@@ -451,20 +466,23 @@ jobs:
             echo "No GCP service account key configured; BigQuery tests will skip."
           fi
 
-      - name: Run Snowflake and BigQuery plan-capture live tests
+      - name: Run Snowflake, BigQuery, Redshift, and MotherDuck plan-capture live tests
         run: |
           # Only the plan-capture classes are selected as node ids -- never the
           # whole live modules, which would also run the heavy TPC-H load /
-          # warehouse-cost tests and break the billing guardrails. The -m filter
-          # keeps selection to live-marked tests within those classes; it is not
-          # a backstop for drifted node ids (a renamed class fails loudly with
-          # exit code 4 instead of falling back to marker selection). Skipping
-          # without credentials comes from the modules' own skip conditions,
-          # which keep an unconfigured run green.
+          # S3 COPY / warehouse-cost tests and break the billing guardrails.
+          # The -m filter keeps selection to live-marked tests within those
+          # classes; it is not a backstop for drifted node ids (a renamed
+          # class fails loudly with exit code 4 instead of falling back to
+          # marker selection). Skipping without credentials comes from the
+          # modules' own skip conditions, which keep an unconfigured run
+          # green.
           uv run -- python -m pytest \
             "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture" \
             "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture" \
-            -m "live_snowflake or live_bigquery" --tb=short -v -p no:cacheprovider
+            "tests/integration/platforms/test_redshift_live.py::TestLiveRedshiftQueryPlanCapture" \
+            "tests/integration/platforms/test_motherduck_live.py::TestLiveMotherDuckQueryPlanCapture" \
+            -m "live_snowflake or live_bigquery or live_redshift or live_motherduck" --tb=short -v -p no:cacheprovider
 
   integration:
     runs-on: ubuntu-latest

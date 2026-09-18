@@ -1310,16 +1310,9 @@ class AthenaAdapter(PlatformAdapter):
         does not scan data or incur cost. If a given Athena engine version
         returns a non-JSON plan, the parser degrades gracefully (returns None).
         """
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join(str(row[0]) for row in plan_rows)
-        except Exception as e:
-            self.logger.warning("Could not get query plan via EXPLAIN: %s", e)
-            return None
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)")
 
     def get_query_plan_parser(self):
         """Return the Presto/Trino parser stamped as ``athena``.

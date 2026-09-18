@@ -1,4 +1,5 @@
 canonical_key_order:
+- result_schema_version
 - version
 - run
 - benchmark

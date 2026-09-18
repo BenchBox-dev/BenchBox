@@ -118,13 +118,13 @@ class ClickHouseAdapter(
         Returns the joined plan text, or ``None`` on any failure (e.g. ClickHouse
         < 20.6 without EXPLAIN support), so capture degrades gracefully.
         """
+        from benchbox.platforms.base.sql_execution import join_explain_rows
+
         try:
             result = connection.execute(f"EXPLAIN PLAN {query}")
             if not result:
                 return None
-            lines = [str(row[0]) if isinstance(row, (list, tuple)) else str(row) for row in result]
-            text = "\n".join(lines)
-            return text or None
+            return join_explain_rows(list(result))
         except Exception as e:
             self.logger.debug(f"Could not get ClickHouse query plan: {e}")
             return None

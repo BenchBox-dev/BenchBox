@@ -537,7 +537,8 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.2"
+        assert data["result_schema_version"] == "2.2"
+        assert "version" not in data
         assert data["benchmark"]["id"] == "tpch"
         assert data["benchmark"]["name"] == "TPC-H"
 
@@ -568,7 +569,8 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
-        assert data["version"] == "2.2"
+        assert data["result_schema_version"] == "2.2"
+        assert "version" not in data
         assert data["benchmark"]["name"] == "TPC-H"
         assert data["platform"]["name"] == "duckdb"
 
@@ -881,7 +883,7 @@ class TestResultExporter:
 
         # Corrupt baseline to simulate unsupported non-v2 shape (remove canonical version).
         baseline_data = json.loads(baseline_path.read_text())
-        del baseline_data["version"]
+        del baseline_data["result_schema_version"]
         baseline_data["schema_version"] = "1.1"
         baseline_path.write_text(json.dumps(baseline_data))
 

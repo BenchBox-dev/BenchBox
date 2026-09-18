@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "Trino EXPLAIN (FORMAT JSON) documented shape",
+  "validated_against_live": false
+}

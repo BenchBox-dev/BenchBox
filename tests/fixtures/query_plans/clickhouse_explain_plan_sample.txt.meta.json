@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "ClickHouse EXPLAIN PLAN documented text shape",
+  "validated_against_live": false
+}

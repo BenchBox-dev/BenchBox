@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "Spark EXPLAIN EXTENDED documented physical-plan shape",
+  "validated_against_live": false
+}
