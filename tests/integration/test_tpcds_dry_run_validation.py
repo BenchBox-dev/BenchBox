@@ -101,7 +101,7 @@ class TestTPCDSDryRunValidation:
         # Verify schema operation contains realistic DDL
         create_sql = create_queries[0]
         assert "test_table" in create_sql.lower(), "Should reference correct table name"
-        assert "INTEGER" in create_sql.upper() or "VARCHAR" in create_sql.upper(), "Should contain column definitions"
+        assert "ID" in create_sql.upper() and "NAME" in create_sql.upper(), "Should contain column definitions"
 
     def test_query_consistency_between_runs(self):
         """Test that dry-run produces consistent results for same parameters."""
