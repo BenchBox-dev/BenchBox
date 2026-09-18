@@ -15043,15 +15043,10 @@
       "title": "Snowflake clustering: classify ALTER TABLE CLUSTER BY and corroborate it against CLUSTERING_KEY"
     },
     "snowflake-clustering-key-live-verification-20260730": {
-      "claim": {
-        "expires_at": "2026-09-19T12:18:03Z",
-        "generation": "f1606c8691e445eeafc256612f018ae3",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Confirm against a live Snowflake which text INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY actually returns (LINEAR(A, B) vs (A, B)) and that a clustered table reaches applied_verified"
     },
     "snowflake-clustering-precheck-and-schema-filter-20260801": {
