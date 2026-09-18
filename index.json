@@ -10884,10 +10884,15 @@
       "title": "Close the platform config validation gaps for priced platforms"
     },
     "pricing-data-correct-all-tables": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T12:48:22Z",
+        "generation": "52da9a25428841049275c99fb682b0df",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Correct all cloud pricing tables against vendor list prices"
     },
     "pricing-docs-price-sync": {
