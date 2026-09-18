@@ -1,0 +1,4 @@
+{
+  "context": "Discovered while verifying the query-plan batch (PRs #2197/#2204): running tests/unit/platforms/test_spark_adapter.py as a whole file fails TestSparkAdapterRegistration::test_spark_in_platform_list, and tests running after it in the same single-process session fail too (presto athena parser test, dataframe lifecycle test). Proven pre-existing by running the identical combination against pristine origin/develop files, where the cascade is worse. CI's xdist distribution does not hit the combination, so CI stays green.",
+  "description": "test_spark_adapter.py pollutes the pytest session: something in the file mutates global state (platform registry, sys.modules, env, or cwd), failing its own registration test and poisoning tests that run after it in the same process. Passes alone; fails in-file and cascades to neighbors. Find and remove the global mutation (likely missing monkeypatch/teardown) so single-process runs are hermetic."
+}
