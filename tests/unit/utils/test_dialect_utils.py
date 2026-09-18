@@ -4,6 +4,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+from typing import Any, cast
+
 import pytest
 
 from benchbox.utils.dialect_utils import (
@@ -353,9 +355,10 @@ class TestTranslationScopeMetadata:
         assert summary["unique_queries_translated"] == 1
         assert summary["schema_statements_translated"] == 1
         assert summary["source_dialects"] == ["netezza", "standard"]
-        scopes = {entry["scope"] for entry in summary["outcomes"]}
+        outcome_entries = cast(list[dict[str, Any]], summary["outcomes"])
+        scopes = {entry["scope"] for entry in outcome_entries}
         assert scopes == {"schema_ddl", "workload_query"}
-        ddl_entry = next(entry for entry in summary["outcomes"] if entry["scope"] == "schema_ddl")
+        ddl_entry = next(entry for entry in outcome_entries if entry["scope"] == "schema_ddl")
         assert ddl_entry["source_dialect"] == "standard"
         assert ddl_entry["parser_grammar"] == "postgres"
         assert ddl_entry["count"] == 1
