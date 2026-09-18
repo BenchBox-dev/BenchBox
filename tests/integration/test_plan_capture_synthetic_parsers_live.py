@@ -22,6 +22,9 @@ pytestmark = [
 
 
 def _assert_live_plan(adapter, connection, query="SELECT 1"):
+    # Two EXPLAINs of a trivial query by design (get + capture); keep the
+    # query trivial — these modules cover provisioned engines only, never
+    # per-byte-billed ones.
     raw = adapter.get_query_plan(connection, query)
     assert raw is not None and raw.strip(), "get_query_plan returned empty plan text"
     plan, _ = adapter.capture_query_plan(connection, query, "live-validation")

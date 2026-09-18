@@ -640,7 +640,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
-        return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)")
+        return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)", logger=self.logger)
 
     def get_query_plan_parser(self):
         """Return the Presto/Trino parser (inherited by Presto and Starburst).

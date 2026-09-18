@@ -36,14 +36,22 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
     for row in plan_rows:
         if row is None:
             continue
-        if isinstance(row, (str, bytes, bytearray, dict)):
+        if isinstance(row, dict):
+            # A single-column mapping row (e.g. RealDictCursor-style
+            # {"plan": value}): the single value is the plan text, mirroring
+            # row[0] first-column semantics. A multi-key mapping has no column
+            # order to resolve, so it falls through to defensive serialization
+            # below rather than guessing a column.
+            values = list(row.values())
+            cell = values[0] if len(values) == 1 else row
+        elif isinstance(row, (str, bytes, bytearray)):
             cell = row
         else:
             try:
                 cell = row[0]
             except IndexError:
-                # Empty sequence row: nothing to join (historical
-                # ``len(row) > 0`` guard); the ``None`` check below skips it.
+                # Empty sequence row: nothing to join; the ``None`` check
+                # below skips it.
                 cell = None
             except (TypeError, KeyError):
                 cell = row
@@ -59,7 +67,12 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
     return text or None
 
 
-def get_query_plan_from_cursor(connection: Any, query: str, explain_prefix: str = "EXPLAIN") -> str | None:
+def get_query_plan_from_cursor(
+    connection: Any,
+    query: str,
+    explain_prefix: str = "EXPLAIN",
+    logger: logging.Logger | None = None,
+) -> str | None:
     """Get query execution plan via EXPLAIN on a DBAPI connection.
 
     Shared implementation for platforms that use the standard
@@ -69,9 +82,14 @@ def get_query_plan_from_cursor(connection: Any, query: str, explain_prefix: str 
         connection: DBAPI connection.
         query: SQL query to explain.
         explain_prefix: EXPLAIN variant, e.g. "EXPLAIN (FORMAT JSON)".
+        logger: Logger for the failure warning. Defaults to this module's
+            logger; adapters pass their own so the warning keeps its
+            platform identity in multi-platform runs.
 
     Returns:
-        Newline-joined plan rows, or ``None`` on failure.
+        Newline-joined plan rows, ``""`` when EXPLAIN returns no rows
+        (historical contract: only failures yield ``None``), or ``None``
+        on failure.
 
     On failure this returns ``None`` and logs the exception, rather than
     returning the error text AS the plan (qpc-05 / F4.2). Encoding the error in
@@ -81,13 +99,14 @@ def get_query_plan_from_cursor(connection: Any, query: str, explain_prefix: str 
     parser as though it were EXPLAIN output. A ``None`` return is treated as a
     clean capture failure by callers and simply skips best-effort display.
     """
+    log = logger or logging.getLogger(__name__)
     cursor = connection.cursor()
     try:
         cursor.execute(f"{explain_prefix} {query}")
         plan_rows = cursor.fetchall()
-        return join_explain_rows(plan_rows)
+        return join_explain_rows(plan_rows) or ""
     except Exception as e:
-        logger.warning("Could not get query plan via EXPLAIN: %s", e)
+        log.warning("Could not get query plan via EXPLAIN: %s", e)
         return None
     finally:
         cursor.close()

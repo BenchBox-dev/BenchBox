@@ -58,6 +58,20 @@ class TestJoinExplainRows:
 
         assert join_explain_rows([_Row(), ("line B",)]) == "line A\nline B"
 
+    def test_single_key_dict_row_yields_its_value(self):
+        # RealDictCursor-style single-column row: the value is the plan text,
+        # mirroring first-column semantics — not the serialized mapping.
+        assert join_explain_rows([{"QUERY PLAN": "Seq Scan on t"}]) == "Seq Scan on t"
+
+    def test_multi_key_dict_row_serializes_defensively(self):
+        import json
+
+        row = {"a": 1, "b": 2}
+        assert join_explain_rows([row]) == json.dumps(row)
+
+    def test_none_valued_single_key_dict_row_skipped(self):
+        assert join_explain_rows([{"QUERY PLAN": None}, {"QUERY PLAN": "Seq Scan"}]) == "Seq Scan"
+
 
 class _FakeCursor:
     def __init__(self, rows):
@@ -148,3 +162,27 @@ class TestAdapterRowShapes:
         per_line = adapter.get_query_plan(_FakeConn([(line,) for line in lines]), "SELECT 1")
         single = adapter.get_query_plan(_FakeConn([("\n".join(lines),)]), "SELECT 1")
         assert per_line == single
+
+    def test_databricks_empty_returns_none(self, monkeypatch):
+        # Databricks' historical contract: empty output is None (not "").
+        monkeypatch.setattr("benchbox.platforms.databricks.adapter.databricks", MagicMock(), raising=False)
+        from benchbox.platforms.databricks.adapter import DatabricksAdapter
+
+        adapter = DatabricksAdapter.__new__(DatabricksAdapter)
+        assert adapter.get_query_plan(_FakeConn([]), "SELECT 1") is None
+
+    def test_cursor_helper_empty_returns_empty_string(self):
+        # The shared cursor helper preserves the historical "" contract its
+        # DBAPI consumers (Athena, Presto/Trino, Firebolt, Synapse, ...) always
+        # had: only failures yield None.
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        assert get_query_plan_from_cursor(_FakeConn([]), "SELECT 1") == ""
+        assert get_query_plan_from_cursor(_FakeConn([("a",), ("b",)]), "SELECT 1") == "a\nb"
+
+    def test_presto_empty_returns_empty_string(self, monkeypatch):
+        monkeypatch.setattr("benchbox.platforms.presto.prestodb", MagicMock(), raising=False)
+        from benchbox.platforms.presto import PrestoAdapter
+
+        adapter = PrestoAdapter(capture_plans=True)
+        assert adapter.get_query_plan(_FakeConn([]), "SELECT 1") == ""

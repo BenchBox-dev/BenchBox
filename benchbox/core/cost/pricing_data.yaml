@@ -27,9 +27,31 @@ provenance:
   bigquery_on_demand_prices:
     source: 'https://cloud.google.com/bigquery/pricing'
     retrieved: '2026-09-18'
-    upstream_published: '2023-07-05'
-    method: derived_from_announcement
-    verified_regions: [us, eu, asia]
+    upstream_published: unknown
+    method: manual
+    note: >-
+      All 48 regional on-demand tables are embedded in the page data, so a
+      plain fetch plus parse captures the full schedule; no browser
+      automation is needed. The page selector lists europe-west5 and
+      us-central2 with no published on-demand table (they route to the
+      eu-single/us-single buckets), and no Asia multi-region entry; the
+      asia multi-region value below is the retained 2026-09-18 citation.
+      The Cloud Billing Catalog API also exposes these SKUs but requires
+      GCP authentication; the Cloud SKUs page renders client-side with no
+      price data in the HTML. Continental bucket entries (us-single and
+      friends) carry the pricing-correction values for locations with no
+      published table.
+    verified_regions: [us, eu, africa-south1, asia-east1, asia-east2,
+      asia-northeast1, asia-northeast2, asia-northeast3, asia-south1,
+      asia-south2, asia-southeast1, asia-southeast2, asia-southeast3,
+      asia-southeast4, australia-southeast1, australia-southeast2,
+      europe-central2, europe-north1, europe-north2, europe-southwest1,
+      europe-west1, europe-west2, europe-west3, europe-west4, europe-west6,
+      europe-west8, europe-west9, europe-west10, europe-west12, me-central1,
+      me-central2, me-west1, northamerica-northeast1, northamerica-northeast2,
+      northamerica-south1, southamerica-east1, southamerica-west1,
+      us-central1, us-east1, us-east4, us-east5, us-east7, us-south1,
+      us-west1, us-west2, us-west3, us-west4, us-west8]
     manual_review_due: '2026-12-17'
   # BEGIN GENERATED provenance.redshift_node_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   redshift_node_prices:
@@ -190,7 +212,53 @@ bigquery_on_demand_prices:
   australia: 7.5
   southamerica: 7.8125
   middleeast: 7.5
-  other: 6.875
+  africa-south1: 7.5
+  asia-east1: 7.1875
+  asia-east2: 8.75
+  asia-northeast1: 7.5
+  asia-northeast2: 7.5
+  asia-northeast3: 7.5
+  asia-south1: 7.5
+  asia-south2: 7.5
+  asia-southeast1: 8.4375
+  asia-southeast2: 7.5
+  asia-southeast3: 7.5
+  asia-southeast4: 6.5625
+  australia-southeast1: 8.125
+  australia-southeast2: 8.125
+  europe-central2: 8.125
+  europe-north1: 7.5
+  europe-north2: 6.5625
+  europe-southwest1: 7.8125
+  europe-west1: 7.5
+  europe-west2: 7.8125
+  europe-west3: 8.125
+  europe-west4: 7.5
+  europe-west6: 8.75
+  europe-west8: 7.8125
+  europe-west9: 7.8125
+  europe-west10: 9.625
+  europe-west12: 8.0625
+  me-central1: 7.59375
+  me-central2: 10.0
+  me-west1: 7.5
+  northamerica-northeast1: 6.5625
+  northamerica-northeast2: 6.5625
+  northamerica-south1: 6.8125
+  southamerica-east1: 11.25
+  southamerica-west1: 8.9375
+  us-central1: 6.25
+  us-east1: 6.25
+  us-east4: 6.25
+  us-east5: 6.25
+  us-east7: 6.25
+  us-south1: 7.5
+  us-west1: 6.25
+  us-west2: 8.4375
+  us-west3: 8.4375
+  us-west4: 6.25
+  us-west8: 6.25
+  other: 11.25
 redshift_node_prices:
   # BEGIN GENERATED redshift_node_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   dc2.large:

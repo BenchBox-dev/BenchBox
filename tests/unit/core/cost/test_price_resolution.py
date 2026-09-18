@@ -96,9 +96,8 @@ def test_designed_bucket_is_not_a_fallback():
 def test_catch_all_guess_is_a_fallback():
     """BigQuery 'other' is a guess, not a priced region."""
     africa = resolve_bigquery_price_per_tb("africa-south1")
-    assert africa.value == BIGQUERY_ON_DEMAND_PRICES["other"]
-    assert africa.fallback_used is True
-    assert africa.reason
+    assert africa.value == BIGQUERY_ON_DEMAND_PRICES["africa-south1"]
+    assert africa.fallback_used is False
     unknown = resolve_bigquery_price_per_tb("moon-central9")
     assert unknown.fallback_used is True
 
@@ -171,7 +170,7 @@ def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
     ("platform", "resource_usage", "platform_config"),
     [
         ("snowflake", {"credits_used": 1.0}, {"edition": "nonexistent", "cloud": "aws", "region": "us-east-1"}),
-        ("bigquery", {"bytes_processed": 1024**4}, {"location": "africa-south1"}),
+        ("bigquery", {"bytes_processed": 1024**4}, {"location": "moon-central9"}),
         ("redshift", {"execution_time_seconds": 3600.0}, {"node_type": "xx.mega", "node_count": 1}),
         (
             "databricks",

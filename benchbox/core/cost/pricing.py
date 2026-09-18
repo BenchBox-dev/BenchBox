@@ -296,6 +296,10 @@ def resolve_snowflake_credit_price(edition: str, cloud: str, region: str) -> Pri
 def resolve_bigquery_price_per_tb(location: str) -> PriceResolution:
     """Resolve the BigQuery on-demand price per TB processed.
 
+    Per-region values are captured from the vendor pricing page
+    (https://cloud.google.com/bigquery/pricing, retrieved 2026-09-18);
+    an exact table entry wins over the continental buckets below.
+
     Args:
         location: BigQuery location/region (e.g., us-east1, EU, us)
 
@@ -325,6 +329,12 @@ def resolve_bigquery_price_per_tb(location: str) -> PriceResolution:
         return _hit("eu")
     elif location in ["asia", "asia-multi"]:
         return _hit("asia")
+
+    # Captured per-region prices: an exact table entry is the most precise
+    # value for that location, so it wins over the continental buckets
+    # below. This is a priced cell, not a fallback.
+    if location in BIGQUERY_ON_DEMAND_PRICES:
+        return _hit(location)
 
     # US single regions (same as multi-region)
     us_single_regions = {
@@ -393,9 +403,8 @@ def resolve_bigquery_price_per_tb(location: str) -> PriceResolution:
     if location in middleeast_regions or location.startswith("me-"):
         return _hit("middleeast")
 
-    # Africa regions (no dedicated bucket yet; priced at 'other' until
-    # per-region values are captured in bigquery-per-region-price-capture).
-    # This is a catch-all guess, not a priced region: flag it.
+    # Africa regions beyond the captured entries (a catch-all guess, not a
+    # priced region: flag it).
     africa_regions = {"africa-south1"}
     if location in africa_regions or location.startswith("africa-"):
         logger.warning(f"BigQuery location '{location}' has no priced bucket; using 'other' as fallback")
