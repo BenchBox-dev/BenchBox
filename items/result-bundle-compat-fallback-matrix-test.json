@@ -4,7 +4,7 @@
     "Legacy-bundle acceptance preserved (old bundles still validate); missing-version behavior pinned",
     "Test references result_schema_version_value() as the single read path"
   ],
-  "context": "Reconciliation 2199-P1 interaction row (DEFER, blocked on fix/result-schema-version-rename @ 7aeed9498). Implement post-merge.",
+  "context": "PR #2199 MERGED (ed3e39a9c, on develop as of 0a60c0b8c). Implement against the post-merge tree.",
   "description": "After PR #2199 merges, add a fallback-matrix contract test for the renamed version key: bundles carrying result_schema_version, legacy version, older schema_version, and no version key must each resolve through result_schema_version_value() with legacy acceptance preserved.",
   "links": [
     "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
