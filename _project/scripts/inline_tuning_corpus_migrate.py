@@ -70,7 +70,11 @@ def migrate_bundle(bundle_path: Path, *, check: bool) -> list[str]:
     tuning_path = bundle_path.with_name(f"{bundle_path.stem}.tuning.json")
     applied_path = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
     tuning = _load(tuning_path)
+    if tuning is None and tuning_path.is_file():
+        raise SystemExit(f"Companion is not a JSON object: {tuning_path.name}")
     applied = _load(applied_path)
+    if applied is None and applied_path.is_file():
+        raise SystemExit(f"Companion is not a JSON object: {applied_path.name}")
     if tuning is None and applied is None:
         return []
 
