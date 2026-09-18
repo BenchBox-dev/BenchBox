@@ -237,6 +237,18 @@ class TestTruncationPreservation:
         assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
         assert not restored.is_fingerprint_trusted()
 
+    def test_from_dict_truncated_plan_without_fingerprint_is_not_trusted(self) -> None:
+        """A truncated tree with no stored fingerprint must not launder into
+        trusted RECOMPUTED: the fresh fingerprint covers only the partial tree."""
+        data = _chain("lineitem").to_dict(max_depth=1)
+        data.pop("plan_fingerprint")
+
+        restored = QueryPlanDAG.from_dict(data)
+
+        assert restored.truncated_at_depth is not None
+        assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
+        assert not restored.is_fingerprint_trusted()
+
     def test_from_dict_full_depth_has_no_truncation(self) -> None:
         plan = _chain("lineitem")
 

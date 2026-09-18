@@ -898,9 +898,12 @@ class QueryPlanDAG:
               STALE, or RECOMPUTED when ``refresh_on_mismatch`` is set.
             - A plan carrying depth-truncation markers
               (``plan.truncated_at_depth is not None``) is TRUNCATED, never
-              STALE: its stored full-tree fingerprint cannot match the
-              truncated tree by design, so the mismatch must not be
-              attributed to tampering. TRUNCATED is untrusted, like STALE.
+              STALE and never RECOMPUTED: its stored full-tree fingerprint
+              cannot match the truncated tree by design, so the mismatch must
+              not be attributed to tampering, and a freshly computed
+              fingerprint covers only the partial tree, so it must not be
+              trusted either. This holds whether or not a stored fingerprint
+              is present. TRUNCATED is untrusted, like STALE.
             - An ABSENT stored fingerprint is RECOMPUTED, never VERIFIED:
               deleting the field must not launder an unauthenticated plan into
               a trusted state (the old code let ``__post_init__`` mark a
@@ -943,14 +946,16 @@ class QueryPlanDAG:
         # as plain childless leaves, so record the shallowest cut on the plan.
         plan.truncated_at_depth = find_truncation_depth(logical_root_data)
 
-        if plan.truncated_at_depth is not None and stored_fingerprint is not None and verify_fingerprint:
-            # Intentional depth truncation drops subtrees, so the stored
-            # full-tree fingerprint cannot match the rehydrated tree. Mark
-            # TRUNCATED (untrusted) rather than STALE to avoid false
-            # tamper/corruption attribution. This takes precedence over
-            # refresh_on_mismatch: recomputing from the truncated tree would
-            # destroy the full-tree fingerprint and launder the plan into a
-            # trusted RECOMPUTED state.
+        if plan.truncated_at_depth is not None and verify_fingerprint:
+            # Intentional depth truncation drops subtrees, so no fingerprint
+            # can authenticate the full tree: a stored one cannot match the
+            # rehydrated tree, and a freshly computed one only covers the
+            # truncated remainder. Mark TRUNCATED (untrusted) rather than
+            # STALE to avoid false tamper/corruption attribution, and rather
+            # than RECOMPUTED to avoid laundering a partial tree into a
+            # trusted state. This takes precedence over refresh_on_mismatch:
+            # recomputing from the truncated tree would destroy the full-tree
+            # fingerprint.
             plan.fingerprint_integrity = FingerprintIntegrity.TRUNCATED
         elif stored_fingerprint is None:
             # __post_init__ computed a fresh v2 fingerprint and optimistically
