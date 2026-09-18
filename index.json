@@ -13019,10 +13019,15 @@
       "title": "Restrict Primary/Foreign Key Configuration to tuning.yaml Only"
     },
     "result-bundle-compat-dispatch-review": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T16:33:05Z",
+        "generation": "1064275b8e8344d8a11a25b313cf0498",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
     },
     "result-bundle-compat-followon-todos": {
