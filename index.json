@@ -13044,12 +13044,17 @@
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
     "result-bundle-compat-reconcile-review": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T16:38:09Z",
+        "generation": "b1bf751d6170492fabfc346ebdd2cf6d",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
+      },
       "needs": [
         "result-bundle-compat-dispatch-review"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Result-bundle compat: reconcile agy+muse findings with P1-P8"
     },
     "result-export-explicit-raw-config-egress-sentinel-gate": {
