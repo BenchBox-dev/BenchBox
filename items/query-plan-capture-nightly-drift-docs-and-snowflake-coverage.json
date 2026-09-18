@@ -1,0 +1,9 @@
+{
+  "acceptance": [
+    "nightly.yml comment accurately documents pytest node-id resolution and marker behavior",
+    "TestLiveSnowflakeQueryPlanCapture includes an execute_query('SELECT 1') test case verifying plan and fingerprint attachment on result_dict",
+    "Nightly workflow runs cleanly without errors"
+  ],
+  "context": "Adversarial audit findings QPC-DEF-05 and QPC-DEF-07. nightly.yml comment inaccurately claimed -m acts as a drift backstop for positional node IDs. Additionally, Snowflake live plan-capture tests only exercised capture_query_plan, leaving execute_query plan attachment unverified in live CI.",
+  "description": "Correct the inaccurate comment in nightly.yml regarding pytest -m backstop behavior, and add an execute_query live test to TestLiveSnowflakeQueryPlanCapture to verify full result assembly and plan attachment in Snowflake live CI."
+}
