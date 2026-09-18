@@ -10966,15 +10966,10 @@
       "title": "Resolve the TB/TiB billing unit and record the contract decision"
     },
     "pricing-vendor-data-redistribution-check": {
-      "claim": {
-        "expires_at": "2026-09-19T13:26:49Z",
-        "generation": "e30c766ff43d41fc92525e616094e385",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Confirm vendor pricing data may be redistributed in the BenchBox wheel"
     },
     "process-spend-versus-product-spend-decision": {
