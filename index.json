@@ -10882,6 +10882,15 @@
       "status": "open",
       "title": "Make unknown prices and quantities fail closed instead of defaulting silently"
     },
+    "pricing-gate-ungated-cost-consumers": {
+      "claim": null,
+      "needs": [
+        "pricing-status-wiring-and-region-guard"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Gate every cost consumer that reads total_cost without checking cost_status"
+    },
     "pricing-provenance-units-and-tests": {
       "claim": null,
       "needs": [

@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "Each listed consumer either checks cost_status or receives a value already guaranteed gated upstream",
+    "No unavailable-status run contributes to a platform ranking, savings figure, plot, or persisted cost row",
+    "Per-query cost is gated at the point it is stamped (integration.py:109-110), not only at each sink",
+    "optimizer.py suppresses recommendations derived from fallback prices and states why",
+    "A regression test covers at least one consumer per module listed",
+    "uv run -- pytest tests/unit/core/ -n 0 passes"
+  ],
+  "context": "Plan: /Users/joe/.claude/plans/stateful-purring-axolotl.md, finding R15 (widened after external review) and R14.",
+  "description": "Fail-closing at the NormalizedCost layer does not reach consumers that read the raw cost float, so a fallback-priced number still lands in the local database, in plots, and in platform rankings. Both external reviewers independently found comparison.py; agy additionally found the per-query path.\n\nVerified ungated consumers:\n- benchbox/core/results/database.py:361-364 - writes total_cost into the SQLite results table\n- benchbox/core/results/database.py:477 - persists per-query execution.cost\n- benchbox/core/visualization/result_plotter.py:256,271\n- benchbox/core/analysis/comparison.py:693-696 - ranks platforms by price/performance and computes potential savings from unverified numbers\n- benchbox/core/cost/tco.py:341 - base_annual_cost = total_cost * annual_runs\n- benchbox/core/results/normalizer.py:203\n\nUpstream of all of them, integration.py:109-110 stamps query_result[\"cost\"] per query regardless of resolution quality.\n\nAlso in scope, R14: optimizer.py has 20+ pricing call sites driving savings recommendations. Any recommendation built on a fallback price must be suppressed with a stated reason, not computed. Today an unknown node type makes current_price and us_east_price both $1.00, so the branch at optimizer.py:700-708 returns None and the recommendation vanishes silently - the right outcome reached by accident, for the wrong reason, and only in that one branch.\n\nThe principle: a cost that is not fit to publish is not fit to rank, plot, persist, or advise on."
+}
