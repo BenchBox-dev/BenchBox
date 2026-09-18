@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "Each applied fix checked with its narrowest proving check (e.g. pytest tests/unit/core/results/..., pytest tests/unit/scripts/explorer_pipeline/..., or docs/link check); pass/fail reported per fix",
+    "Only ACCEPT/NARROW small file-scoped items touched; design-decision items (read-model v11, provenance cutoff) moved to follow-on TODOs, not fixed inline",
+    "Nothing committed unless user separately asks; explicit-path staging (no git add -A) if edits staged",
+    "Work done in a write worktree (never primary clone) per worktree policy"
+  ],
+  "context": "Claim only after reconcile-review is done and its audit section names the ACCEPT/NARROW set. Candidates from draft (confirm against reconciliation, do not assume): delete-or-fix orphaned scripts/validate_corpus.py (P2); add Tables Block to docs/reference/result-formats.md + document databricks_clustering_strategy (P7); backfill CHANGELOG.md entries for #2178/#2177/#2122/#2030 (P7); extend benchbox/validation/bundle.py checks if accepted (P1). Design-decision items stay out: read-model v11 for per-table load time, provenance cutoff scheme for pre-fix Databricks bundles. Authority: shared-change-framework/SKILL.md; user phrasing accept-or-rebut+integrate authorizes these fixes without a second approval round (review-response.md).",
+  "description": "Goal: apply direct small file-scoped edits for every ACCEPT/NARROW item whose remediation needs no user design decision. Method per shared-change-framework/SKILL.md (explicit-path staging, no git add -A): edit in a write worktree created via make worktree-create + make agent-write-preflight, run narrowest proving check per file, report pass/fail per fix. Candidates (verify against reconciliation first): orphaned scripts/validate_corpus.py delete-or-fix (P2); Tables Block section in docs/reference/result-formats.md + databricks_clustering_strategy docs (P7); CHANGELOG.md backfills (P7); benchbox/validation/bundle.py check extension if accepted (P1). Out of scope inline: anything needing an undecided design (read-model v11 per-table load time, Databricks provenance cutoff) — moves to follow-on TODOs. Nothing committed unless user separately asks.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
