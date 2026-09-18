@@ -10891,6 +10891,15 @@
       "status": "open",
       "title": "Add per-table pricing provenance, explicit units, and non-tautological tests"
     },
+    "pricing-status-wiring-and-region-guard": {
+      "claim": null,
+      "needs": [
+        "pricing-failclosed-price-resolution"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Route price fallbacks and staleness into cost_status, and guard unverified regions"
+    },
     "process-spend-versus-product-spend-decision": {
       "claim": null,
       "needs": [],
