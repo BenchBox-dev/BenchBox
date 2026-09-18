@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Every changed value carries a vendor source URL and retrieval date in the commit message or the provenance block",
+    "No pricing value is introduced without either a cited vendor source or an explicit derived-from marker naming the derivation",
+    "ds2.* and databricks_dbu_prices.azure.enterprise are removed",
+    "A probe shows get_databricks_dbu_price('aws','premium','serverless_sql') resolves without KeyError",
+    "A probe shows get_redshift_node_price('rg.12xlarge','us-east-1') returns 9.128, not the 1.00 fallback",
+    "uv run -- pytest tests/unit/core/cost/ -n 0 passes with tests updated to the corrected values",
+    "make pr-preflight exits 0"
+  ],
+  "context": "Plan: /Users/joe/.claude/plans/stateful-purring-axolotl.md (PR A). Findings draft: ~/.todo-db/finding-drafts/benchbox/2026-09-18-080500-pricing-subsystem-reevaluation.md. Reviewed revision fb1e18f24. Full replacement tables with all regions are in the plan under \"Verified replacement data\".",
+  "description": "Replace the values in benchbox/core/cost/pricing_data.yaml, which have never been changed since initial release and are wrong on five of nine priced platforms.\n\nRedshift: replace the whole table from the AWS Price List API (errors -18%..+40%); delete retired ds2.xlarge/ds2.8xlarge; add ra3.large and the rg.large/xlarge/4xlarge/12xlarge family, whose absence causes a silent $1.00/node-hour fallback (rg.12xlarge real $9.128 = 89% underbill).\n\nBigQuery: $5.00 -> $6.25/TiB for the US/EU/asia multi-regions (confirmed on the vendor pricing page). Apply the announced uniform 25% uplift to remaining pinned regions, marked as derived rather than cited. Extend the region matcher to africa-south1, northamerica-south1, asia-southeast3/4, europe-north2, europe-west10/12.\n\nFirebolt: firebolt_fbu_price 0.0833 -> vendor range $0.23 (Standard US) to $0.42 (Enterprise non-US); pick and document the tier modelled.\n\nSynapse dedicated: non-uniform correction - us 1.20->1.51, eu 1.44->1.51, ap 1.56->1.81, other 1.68->2.42 per 100 DWU-hour; add the missing ca tier (1.33, which is cheaper than us).\n\nAzure Databricks: replace the synthesized aws x 1.1 block with Azure Retail Prices API values; delete the fictitious azure.enterprise tier; premium.all_purpose 0.60->0.55; premium.jobs 0.22->0.30 (0.22 is the retired Jobs Light SKU).\n\nDatabricks SQL: add the warehouse-type keys production actually emits - sql_classic 0.22, sql_pro 0.55, sql_serverless 0.70 - and wire integration.py's serverless_sql/sql_compute onto them. This is the data half of the Critical C1 defect.\n\nFabric: eu 0.20->0.22; other 0.20->0.28 so an unknown region is never cheaper than a known one.\n\nSnowflake: add the missing vps edition ($6.00/credit), which currently resolves silently to $2.00.\n\nLands first, before any mechanism change: adding keys and correcting values can only reduce the number of runs that fall back, so no cost coverage regresses.",
+  "links": [
+    "https://cloud.google.com/bigquery/pricing",
+    "https://docs.firebolt.io/managed-service/billing",
+    "https://cloud.google.com/blog/products/data-analytics/introducing-new-bigquery-pricing-editions"
+  ]
+}

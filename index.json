@@ -10865,6 +10865,13 @@
       "status": "done",
       "title": "Presto and Trino Platform Documentation"
     },
+    "pricing-data-correct-all-tables": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Correct all cloud pricing tables against vendor list prices"
+    },
     "process-spend-versus-product-spend-decision": {
       "claim": null,
       "needs": [],
