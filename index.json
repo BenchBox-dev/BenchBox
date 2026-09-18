@@ -10890,6 +10890,15 @@
       "status": "open",
       "title": "Correct all cloud pricing tables against vendor list prices"
     },
+    "pricing-docs-price-sync": {
+      "claim": null,
+      "needs": [
+        "pricing-data-correct-all-tables"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Sync documentation with corrected pricing and fix pre-existing drift"
+    },
     "pricing-failclosed-price-resolution": {
       "claim": null,
       "needs": [

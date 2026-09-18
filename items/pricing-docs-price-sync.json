@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "No documentation quotes a price that contradicts pricing_data.yaml",
+    "The README Snowflake EU figure is reconciled against the vendor value",
+    "Where a constant was replaced by a pointer to the table, the pointer resolves",
+    "A decision on the committed-bundle cost_model_version drift is recorded",
+    "make pr-preflight exits 0"
+  ],
+  "context": "Doc inventory from the plan's blast radius section. README drift is pre-existing, not introduced by this work.",
+  "description": "Documentation quotes specific prices that the data correction invalidates, and one figure is already wrong independently of this work.\n\nUpdate: benchbox/core/cost/README.md (pricing version examples at lines 92-93 and 196-197; price tables and formulas at 16-19, 214, 230-338, 396-415, 447-453, 532-542), docs/platforms/athena.md:13,135,159 (\"$5 per TB\"), docs/platforms/bigquery.md:187 (\"$5 per TB scanned\"), docs/reference/python-api/platforms/bigquery.rst:377 (code comment).\n\nFix the pre-existing drift found during review: README.md:241 states Snowflake standard EU at $2.40/credit while pricing_data.yaml:16 says 2.5. Neither figure was introduced by this work; reconcile against the vendor value.\n\nPrefer, where practical, replacing quoted constants with a pointer to the pricing table rather than restating numbers that will drift again. Every number a document repeats is a number that can go stale silently - the same failure this whole effort is correcting.\n\nNote that committed result bundles embed cost_model_version \"2025.11\" and will read as soft-stale once the version is bumped. Nothing cross-checks that value, so this is drift rather than breakage, but decide consciously whether to leave it."
+}
