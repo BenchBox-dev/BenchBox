@@ -526,14 +526,15 @@ def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResol
     """
     table = "databricks_warehouse_dbu_per_hour"
     normalized = warehouse_size.strip()
-    if normalized in DATABRICKS_WAREHOUSE_DBU_PER_HOUR:
-        return PriceResolution(
-            value=DATABRICKS_WAREHOUSE_DBU_PER_HOUR[normalized],
-            table=table,
-            resolved_key=(normalized,),
-            fallback_used=False,
-            unit="DBU/hour",
-        )
+    for size, dbu in DATABRICKS_WAREHOUSE_DBU_PER_HOUR.items():
+        if size.lower() == normalized.lower():
+            return PriceResolution(
+                value=dbu,
+                table=table,
+                resolved_key=(size,),
+                fallback_used=False,
+                unit="DBU/hour",
+            )
     logger.warning(
         f"Unknown Databricks warehouse size '{warehouse_size.strip()}'; defaulting to a conservative 2.0 DBU/hour"
     )

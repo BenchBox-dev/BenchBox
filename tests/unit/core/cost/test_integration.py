@@ -6,6 +6,7 @@ import pytest
 
 from benchbox.core.cost.calculator import CostCalculator
 from benchbox.core.cost.integration import (
+    _calculate_fallback_costs,
     _calculate_phase_costs,
     _extract_platform_config_from_results,
     add_cost_estimation_to_results,
@@ -517,6 +518,29 @@ class TestCalculatePhaseCosts:
         # (0.5 + 0.3) credits * standard/aws/us table rate
         expected = (0.5 + 0.3) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
+        assert phase_costs[0].query_count == 2
+
+    def test_fallback_with_object_query_results(self):
+        """Fallback path reads resource_usage off QueryExecution-like objects."""
+        from benchbox.core.cost.models import PhaseCost
+
+        platform_config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
+        calculator = CostCalculator()
+        phase_costs: list[PhaseCost] = []
+
+        _calculate_fallback_costs(
+            [
+                MagicMock(resource_usage={"credits_used": 0.5}),
+                MagicMock(resource_usage={"credits_used": 0.3}),
+            ],
+            "snowflake",
+            platform_config,
+            calculator,
+            phase_costs,
+        )
+
+        assert len(phase_costs) == 1
+        assert phase_costs[0].total_cost == 1.6
         assert phase_costs[0].query_count == 2
 
     def test_handles_missing_resource_usage_in_phases(self):
