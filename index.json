@@ -10920,9 +10920,9 @@
     },
     "pricing-generator-and-drift-guard": {
       "claim": {
-        "expires_at": "2026-09-19T16:01:05Z",
-        "generation": "79a53138e8f64bc5b294434af8f20498",
-        "renewals": 0,
+        "expires_at": "2026-09-19T16:44:35Z",
+        "generation": "b16ff3398ade46d7ba871eeeac8211ae",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
       },
       "needs": [
