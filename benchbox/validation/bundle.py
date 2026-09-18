@@ -19,9 +19,22 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from benchbox.core.results.schema_policy import PUBLIC_SUBMISSION_SCHEMA_POLICY
+    from benchbox.core.results.schema_policy import (
+        PUBLIC_SUBMISSION_SCHEMA_POLICY,
+        result_schema_version_value,
+    )
 except ImportError:  # pragma: no cover - exercised on the slim published-results branch.
     PUBLIC_SUBMISSION_SCHEMA_POLICY = None
+
+    def result_schema_version_value(data: dict[str, Any]) -> Any:
+        if not isinstance(data, dict):
+            return None
+        if "result_schema_version" in data:
+            return data.get("result_schema_version")
+        if "version" in data:
+            return data.get("version")
+        return data.get("schema_version")
+
 
 # Canonical provenance vocabulary. Import from the one source of truth when the
 # full package is present; fall back to inline literals on the slim
@@ -61,7 +74,7 @@ APPLIED_COMPANION_MAX_BYTES = 8 * 1024 * 1024
 # Schema-v2 required top-level keys
 # ---------------------------------------------------------------------------
 
-REQUIRED_TOP_KEYS = ("version", "run", "benchmark", "platform", "summary", "queries")
+REQUIRED_TOP_KEYS = ("result_schema_version", "run", "benchmark", "platform", "summary", "queries")
 REQUIRED_RUN_KEYS = {"id", "timestamp", "total_duration_ms"}
 REQUIRED_BENCHMARK_KEYS = {"id", "scale_factor"}
 REQUIRED_PLATFORM_KEYS = {"name"}
@@ -761,12 +774,18 @@ def _validate_bundle(
     """Run all validation checks on a parsed bundle dict."""
     _capture_metadata(data, vr)
 
+    version = result_schema_version_value(data)
     missing_top = set(REQUIRED_TOP_KEYS) - set(data.keys())
+    if version is not None:
+        missing_top.discard("result_schema_version")
+    else:
+        missing_top.add("result_schema_version")
+
     if missing_top:
         vr.error(f"Missing required top-level keys: {sorted(missing_top)}")
         return  # Can't continue without structure
 
-    _validate_version(data.get("version", ""), vr)
+    _validate_version(version, vr)
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
     _validate_platform_section(data.get("platform", {}), vr)
@@ -777,7 +796,7 @@ def _validate_bundle(
     )
     _validate_translation_section(data, vr)
     _validate_public_cost_section(data, vr)
-    _validate_queries_section(data.get("queries", []), data.get("version"), vr)
+    _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)
     _validate_validation_phase_consistency(data, vr)
 

@@ -33,7 +33,7 @@ from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata,
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
-from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
+from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY, result_schema_version_value
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 from benchbox.core.tuning.modes import is_canonical_mode
 from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
@@ -304,7 +304,7 @@ def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
 
 def _ensure_explorer_input_schema(data: dict[str, Any]) -> None:
     """Reject unsupported bundles before explorer field projection starts."""
-    decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(data.get("version"))
+    decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not decision.accepted:
         raise ValueError(decision.error_message())
 

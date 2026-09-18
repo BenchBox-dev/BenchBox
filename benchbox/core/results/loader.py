@@ -34,6 +34,7 @@ from benchbox.core.results.schema_policy import (
     LOADER_SCHEMA_POLICY,
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     is_loader_supported_result_schema,
+    result_schema_version_value,
 )
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -149,7 +150,7 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
     # Check schema version through the named runtime loader policy.
-    version_decision = LOADER_SCHEMA_POLICY.evaluate(data.get("version"))
+    version_decision = LOADER_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not version_decision.accepted:
         raise UnsupportedSchemaError(version_decision.error_message())
 
@@ -213,7 +214,7 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
 
 def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
     """Reject query extensions that predate their schema contract."""
-    version = str(data.get("version", ""))
+    version = str(result_schema_version_value(data) or "")
     if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
         return
 

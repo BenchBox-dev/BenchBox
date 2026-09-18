@@ -269,6 +269,30 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("Missing required top-level keys" in e for e in vr.errors)
 
+    def test_result_schema_version_accepted_without_legacy_version(self):
+        data = _minimal_bundle()
+        del data["version"]
+        data["result_schema_version"] = "2.2"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+
+    def test_missing_result_schema_version_and_legacy_version_rejected(self):
+        data = _minimal_bundle()
+        del data["version"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("Missing required top-level keys" in e and "result_schema_version" in e for e in vr.errors)
+
+    def test_both_result_schema_version_and_legacy_version_accepted(self):
+        data = _minimal_bundle()
+        data["result_schema_version"] = "2.2"
+        data["version"] = "2.2"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+
     def test_bad_version(self):
         data = _minimal_bundle()
         data["version"] = "1.0"

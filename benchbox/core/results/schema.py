@@ -44,6 +44,7 @@ from benchbox.core.results.schema_policy import (
     CURRENT_SCHEMA_VERSION,
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     RUNTIME_SCHEMA_POLICY,
+    result_schema_version_value,
 )
 from benchbox.validation.bundle import REQUIRED_TOP_KEYS
 
@@ -110,6 +111,7 @@ class SchemaV2Validator:
 
     REQUIRED_KEYS = REQUIRED_TOP_KEYS
     OPTIONAL_KEYS = (
+        "version",
         "environment",
         "tables",
         "errors",
@@ -131,13 +133,16 @@ class SchemaV2Validator:
 
     def validate(self, payload: dict[str, Any]) -> None:
         """Raise ``SchemaV2ValidationError`` when the payload lacks required structure."""
+        version = result_schema_version_value(payload)
         # Check top-level keys
-        missing_top = [key for key in self.REQUIRED_KEYS if key not in payload]
+        missing_top = [key for key in self.REQUIRED_KEYS if key not in payload and key != "result_schema_version"]
+        if version is None and "result_schema_version" in self.REQUIRED_KEYS:
+            missing_top.insert(0, "result_schema_version")
         if missing_top:
             raise SchemaV2ValidationError(f"schema v2.0 payload missing keys: {missing_top}")
 
         # Validate version using the named runtime policy.
-        version_decision = RUNTIME_SCHEMA_POLICY.evaluate(payload.get("version"))
+        version_decision = RUNTIME_SCHEMA_POLICY.evaluate(version)
         if not version_decision.accepted:
             raise SchemaV2ValidationError(version_decision.error_message())
 
@@ -180,7 +185,7 @@ class SchemaV2Validator:
         for index, query in enumerate(queries):
             if not isinstance(query, Mapping) or "row_count_validation" not in query:
                 continue
-            if payload.get("version") != ROW_COUNT_VALIDATION_SCHEMA_VERSION:
+            if version != ROW_COUNT_VALIDATION_SCHEMA_VERSION:
                 raise SchemaV2ValidationError(
                     f"queries[{index}].row_count_validation requires schema version "
                     f"{ROW_COUNT_VALIDATION_SCHEMA_VERSION}"
@@ -245,7 +250,7 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
 
     # Build the payload
     payload: dict[str, Any] = {
-        "version": SCHEMA_VERSION,
+        "result_schema_version": SCHEMA_VERSION,
         "run": order_dict(
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
@@ -1376,7 +1381,7 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 # file itself, not the run: the companion's own schema version and the run id
 # that its filename already carried. The bundle owns both at the top level, so
 # they are dropped from the inlined copy rather than duplicated.
-_TUNING_COMPANION_ENVELOPE_KEYS = frozenset({"version", "run_id"})
+_TUNING_COMPANION_ENVELOPE_KEYS = frozenset({"version", "result_schema_version", "run_id"})
 
 # Keys of the requested-tuning payload that the ``platform.tuning`` summary
 # already emits. Dropped from the inlined ``requested`` sub-block so one field

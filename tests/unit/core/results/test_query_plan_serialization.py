@@ -202,7 +202,8 @@ class TestSchemaV2ExportWithPlans:
         payload = build_result_payload(results)
 
         # v2.x schema version
-        assert payload["version"] == "2.2"
+        assert payload["result_schema_version"] == "2.2"
+        assert "version" not in payload
         # Should have compact queries array
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
@@ -564,7 +565,8 @@ class TestSchemaV2ExportWithPlans:
 
         # Main payload should have compact queries
         payload = build_result_payload(results)
-        assert payload["version"] == "2.2"
+        assert payload["result_schema_version"] == "2.2"
+        assert "version" not in payload
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
         assert payload["queries"][0]["ms"] == 350.0
@@ -620,7 +622,8 @@ class TestBackwardCompatibility:
         )
 
         payload_no_plans = build_result_payload(results_no_plans)
-        assert payload_no_plans["version"] == "2.2"
+        assert payload_no_plans["result_schema_version"] == "2.2"
+        assert "version" not in payload_no_plans
         plans_payload_none = build_plans_payload(results_no_plans)
         assert plans_payload_none is None
 
@@ -654,7 +657,8 @@ class TestBackwardCompatibility:
         )
 
         payload_with_plans = build_result_payload(results_with_plans)
-        assert payload_with_plans["version"] == "2.2"
+        assert payload_with_plans["result_schema_version"] == "2.2"
+        assert "version" not in payload_with_plans
         plans_payload = build_plans_payload(results_with_plans)
         assert plans_payload is not None
 
@@ -784,7 +788,8 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
-        assert payload["version"] == "2.2"
+        assert payload["result_schema_version"] == "2.2"
+        assert "version" not in payload
         assert payload["summary"]["queries"]["total"] == 0
         assert payload["summary"]["queries"]["passed"] == 0
         assert payload["summary"]["queries"]["failed"] == 0
@@ -865,7 +870,8 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
-        assert payload["version"] == "2.2"
+        assert payload["result_schema_version"] == "2.2"
+        assert "version" not in payload
         assert payload["platform"]["name"] == "duckdb"
         assert payload["platform"]["version"] == "1.0.1"
         assert payload["platform"]["driver_package"] == "duckdb"

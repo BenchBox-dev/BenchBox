@@ -219,8 +219,12 @@ def test_exporter_serializes_execution_phases(tmp_path):
     with open(json_path, encoding="utf-8") as f:
         payload = json.load(f)
 
-    # v2.0 schema has version, run, benchmark, platform, summary, queries
-    assert payload["version"] == "2.2"
+    # Result bundle schema version is result_schema_version
+    import benchbox
+
+    assert payload["result_schema_version"] == "2.2"
+    assert "version" not in payload
+    assert payload["export"]["benchbox_version"] == benchbox.__version__
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"
     assert payload["platform"]["name"] == "duckdb"
