@@ -456,9 +456,11 @@ jobs:
           # Only the plan-capture classes are selected as node ids -- never the
           # whole live modules, which would also run the heavy TPC-H load /
           # warehouse-cost tests and break the billing guardrails. The -m filter
-          # pins selection to live-marked tests as a backstop if the node ids
-          # ever drift; skipping without credentials comes from the modules'
-          # own skip conditions, which keep an unconfigured run green.
+          # keeps selection to live-marked tests within those classes; it is not
+          # a backstop for drifted node ids (a renamed class fails loudly with
+          # exit code 4 instead of falling back to marker selection). Skipping
+          # without credentials comes from the modules' own skip conditions,
+          # which keep an unconfigured run green.
           uv run -- python -m pytest \
             "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture" \
             "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture" \

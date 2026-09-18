@@ -337,3 +337,16 @@ class TestLiveSnowflakeQueryPlanCapture:
             assert plan1.plan_fingerprint == plan2.plan_fingerprint
         finally:
             adapter.close_connection(connection)
+
+    def test_execute_query_attaches_plan(self, live_snowflake_adapter_with_capture):
+        """execute_query must attach the captured plan and fingerprint to result_dict."""
+        adapter = live_snowflake_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            result = adapter.execute_query(connection, "SELECT 1", "q_exec", validate_row_count=False)
+            assert result["status"] == "SUCCESS"
+            assert result["query_plan"] is not None
+            assert result["plan_fingerprint"] == result["query_plan"].plan_fingerprint
+            assert result["plan_capture_time_ms"] is not None
+        finally:
+            adapter.close_connection(connection)
