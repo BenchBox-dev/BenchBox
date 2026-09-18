@@ -424,6 +424,76 @@ def _validate_translation_section(data: dict, vr: ValidationResult) -> None:
         vr.error(f"execution.translation.status={translation_status!r} is not accepted for public submissions")
 
 
+def _validate_environment_client_link(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``environment.client_link`` block when present."""
+    environment = data.get("environment")
+    if environment is None:
+        return
+    if not isinstance(environment, dict):
+        vr.error("'environment' must be a dict")
+        return
+
+    client_link = environment.get("client_link")
+    if client_link is None:
+        return
+    if not isinstance(client_link, dict):
+        vr.error("'environment.client_link' must be a dict")
+        return
+
+    for key in ("link_status", "source", "collection_error_message"):
+        value = client_link.get(key)
+        if value is not None and not isinstance(value, str):
+            vr.error(f"'environment.client_link.{key}' must be a string, got {value!r}")
+
+
+def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``tables`` block when present.
+
+    Absence means "not measured" and is always accepted; an explicit
+    ``load_ms: 0`` stays distinguishable from a missing key.
+    """
+    tables = data.get("tables")
+    if tables is None:
+        return
+    if not isinstance(tables, dict):
+        vr.error("'tables' must be a dict")
+        return
+
+    for name, entry in tables.items():
+        if not isinstance(entry, dict):
+            vr.error(f"'tables.{name}' must be a dict")
+            continue
+        load_ms = entry.get("load_ms")
+        if load_ms is None:
+            continue
+        if isinstance(load_ms, bool) or not isinstance(load_ms, (int, float)):
+            vr.error(f"'tables.{name}.load_ms' must be a number, got {load_ms!r}")
+        elif load_ms < 0:
+            vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
+
+
+def _validate_platform_tuning(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``platform.tuning`` block when present."""
+    platform = data.get("platform")
+    if not isinstance(platform, dict):
+        return
+
+    tuning = platform.get("tuning")
+    if tuning is None:
+        return
+    if not isinstance(tuning, dict):
+        vr.error("'platform.tuning' must be a dict")
+        return
+
+    strategy = tuning.get("databricks_clustering_strategy")
+    if strategy is None:
+        return
+    if not isinstance(strategy, str):
+        vr.error(f"'platform.tuning.databricks_clustering_strategy' must be a string, got {strategy!r}")
+    elif strategy not in {"z_order", "liquid_clustering", "liquid_clustering_auto", "none"}:
+        vr.warn(f"Unknown platform.tuning.databricks_clustering_strategy: {strategy!r}")
+
+
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Find normalized cost in current and transitional bundle shapes."""
     raw = data.get("normalized_cost")
@@ -795,6 +865,9 @@ def _validate_bundle(
         allow_partial_validation=allow_partial_validation,
     )
     _validate_translation_section(data, vr)
+    _validate_environment_client_link(data, vr)
+    _validate_tables_block(data, vr)
+    _validate_platform_tuning(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)

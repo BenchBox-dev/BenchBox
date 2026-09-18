@@ -191,6 +191,11 @@ ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey);
 VACUUM lineitem RETAIN 0 HOURS;
 ```
 
+The resolved strategy is recorded per run in the result bundle at
+`platform.tuning.databricks_clustering_strategy` (`"z_order"`,
+`"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"` for untuned
+runs); see `docs/reference/result-formats.md`.
+
 ### Photon Acceleration
 
 Photon is automatically enabled on SQL Warehouses:

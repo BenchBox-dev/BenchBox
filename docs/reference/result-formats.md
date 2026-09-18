@@ -165,6 +165,7 @@ what physically applied (see `docs/development/tuning-adr-001-trust-and-hash-sem
 | `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
+| `databricks_clustering_strategy` | string | Databricks clustering strategy resolved for the run: `"z_order"`, `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"`. Untuned runs record `"none"`. Bundles predating this field omit it. |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
 | `source`, `hash` | string | **Legacy bridge keys**, kept for one schema generation so any external consumer of these documented keys keeps working (this is not the explorer ingest pipeline, which reads tuning facets from `data["config"]`, never from `platform.tuning`). `source` is `"yaml"` when `tuning_source` is `explicit_file`/`auto_discovered`, else `"auto"`. `hash` mirrors `requested_config_hash`. Do not add new readers of these two keys - read `tuning_source`/`requested_config_hash` instead. |
 
@@ -258,7 +259,7 @@ Discloses the client execution location and connectivity characteristics relativ
 | `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
 | `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
 
-The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design.
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design. A published Explorer snapshot must be rebuilt after the v10 upgrade to surface the new `client_*` columns; older snapshots show NULLs for them without failing.
 
 ###### Example: Observed Cloud VM Run
 
@@ -299,6 +300,23 @@ A developer running BenchBox on a local workstation or laptop against a remote d
   }
 }
 ```
+
+#### Tables Block
+
+The optional top-level `tables` block records per-table load outcomes keyed
+by table name.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tables.{table}.rows` | number | Rows loaded into the table. |
+| `tables.{table}.load_ms` | number | Wall-clock load time for the table in milliseconds. |
+
+Absence of `load_ms` means "not measured" and is always accepted; an
+explicit `load_ms: 0` is a measured zero and stays distinguishable from a
+missing key. Seed-corpus coverage is partial (forward-only rollout), which is
+expected for an additive field. The Explorer read model does not project this
+block yet; it is bundle-level diagnostic data until a read-model decision
+lands.
 
 ### Query Execution Details
 

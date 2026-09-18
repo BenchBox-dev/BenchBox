@@ -250,6 +250,95 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("summary.validation='passed' contradicts" in error for error in vr.errors)
 
+    def test_absent_optional_extension_blocks_pass(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_minimal_bundle(), vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "environment",
+        [
+            {"client_link": {"link_status": "ok", "source": "probe"}},
+            {"client_link": {}},
+            {"other": 1},
+        ],
+    )
+    def test_well_formed_client_link_passes(self, environment):
+        data = _minimal_bundle()
+        data["environment"] = environment
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "environment",
+        [
+            "not-a-dict",
+            {"client_link": "not-a-dict"},
+            {"client_link": {"link_status": 42}},
+        ],
+    )
+    def test_malformed_client_link_is_rejected(self, environment):
+        data = _minimal_bundle()
+        data["environment"] = environment
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    @pytest.mark.parametrize(
+        "tables",
+        [
+            {"orders": {"rows": 10, "load_ms": 12.5}},
+            {"orders": {"rows": 10, "load_ms": 0}},
+            {"orders": {"rows": 10}},
+        ],
+    )
+    def test_well_formed_tables_block_passes(self, tables):
+        data = _minimal_bundle()
+        data["tables"] = tables
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "tables",
+        [
+            "not-a-dict",
+            {"orders": "not-a-dict"},
+            {"orders": {"load_ms": "fast"}},
+            {"orders": {"load_ms": True}},
+            {"orders": {"load_ms": -1}},
+        ],
+    )
+    def test_malformed_tables_block_is_rejected(self, tables):
+        data = _minimal_bundle()
+        data["tables"] = tables
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    def test_unknown_clustering_strategy_warns_only(self):
+        data = _minimal_bundle()
+        data["platform"]["tuning"] = {"databricks_clustering_strategy": "future-strategy"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("databricks_clustering_strategy" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "tuning",
+        [
+            "not-a-dict",
+            {"databricks_clustering_strategy": 42},
+        ],
+    )
+    def test_malformed_platform_tuning_is_rejected(self, tuning):
+        data = _minimal_bundle()
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
     def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         bundle_path = tmp_path / "tpch_result.json"
         payload = _minimal_bundle()
