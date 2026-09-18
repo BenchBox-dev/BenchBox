@@ -21,10 +21,10 @@ from typing import Any, Optional
 
 from benchbox.core.cost.models import BenchmarkCost
 from benchbox.core.cost.pricing import (
-    get_bigquery_price_per_tb,
-    get_databricks_dbu_price,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
+    resolve_bigquery_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
 )
 
 
@@ -379,8 +379,8 @@ class CostOptimizer:
         region = platform_config.get("region", "us-east-1")
 
         # Calculate current vs standard pricing
-        current_price = get_snowflake_credit_price(edition, cloud, region)
-        standard_price = get_snowflake_credit_price("standard", cloud, region)
+        current_price = resolve_snowflake_credit_price(edition, cloud, region).value
+        standard_price = resolve_snowflake_credit_price("standard", cloud, region).value
 
         if current_price <= standard_price:
             return None
@@ -398,7 +398,7 @@ class CostOptimizer:
         target_edition = "Standard"
         if edition == "business_critical":
             # Check if Enterprise is an option
-            enterprise_price = get_snowflake_credit_price("enterprise", cloud, region)
+            enterprise_price = resolve_snowflake_credit_price("enterprise", cloud, region).value
             enterprise_annual = annual_credits * enterprise_price
             enterprise_savings = current_annual - enterprise_annual
 
@@ -451,7 +451,7 @@ class CostOptimizer:
                 "edition": target_edition.lower(),
                 "price_per_credit": standard_price
                 if target_edition == "Standard"
-                else get_snowflake_credit_price("enterprise", cloud, region),
+                else resolve_snowflake_credit_price("enterprise", cloud, region).value,
             },
         )
 
@@ -474,7 +474,7 @@ class CostOptimizer:
         workload_type = platform_config.get("workload_type", "sql_warehouse")
 
         # Calculate current vs lower tier pricing
-        current_price = get_databricks_dbu_price(cloud, tier, workload_type)
+        current_price = resolve_databricks_dbu_price(cloud, tier, workload_type).value
 
         # Determine target tier
         if tier == "enterprise":
@@ -482,7 +482,7 @@ class CostOptimizer:
         else:
             target_tier = "standard"
 
-        target_price = get_databricks_dbu_price(cloud, target_tier, workload_type)
+        target_price = resolve_databricks_dbu_price(cloud, target_tier, workload_type).value
 
         if current_price <= target_price:
             return None
@@ -556,10 +556,10 @@ class CostOptimizer:
         edition = platform_config.get("edition", "standard")
 
         # Get current price
-        current_price = get_snowflake_credit_price(edition, cloud, region)
+        current_price = resolve_snowflake_credit_price(edition, cloud, region).value
 
         # Check US regions (typically cheapest)
-        us_price = get_snowflake_credit_price(edition, cloud, "us-east-1")
+        us_price = resolve_snowflake_credit_price(edition, cloud, "us-east-1").value
 
         if current_price <= us_price:
             return None
@@ -628,8 +628,8 @@ class CostOptimizer:
             return None
 
         location = platform_config.get("location", "")
-        current_price = get_bigquery_price_per_tb(location)
-        us_price = get_bigquery_price_per_tb("us")
+        current_price = resolve_bigquery_price_per_tb(location).value
+        us_price = resolve_bigquery_price_per_tb("us").value
 
         if current_price <= us_price:
             return None
@@ -697,8 +697,8 @@ class CostOptimizer:
         region = platform_config.get("region", "")
         node_type = platform_config.get("node_type", "dc2.large")
 
-        current_price = get_redshift_node_price(node_type, region)
-        us_east_price = get_redshift_node_price(node_type, "us-east-1")
+        current_price = resolve_redshift_node_price(node_type, region).value
+        us_east_price = resolve_redshift_node_price(node_type, "us-east-1").value
 
         if current_price <= us_east_price:
             return None
@@ -773,8 +773,8 @@ class CostOptimizer:
         # Check if using legacy DS2 nodes
         if node_type.startswith("ds2"):
             # RA3 nodes with managed storage are often more cost-effective
-            current_price = get_redshift_node_price(node_type, region)
-            ra3_price = get_redshift_node_price("ra3.xlplus", region)
+            current_price = resolve_redshift_node_price(node_type, region).value
+            ra3_price = resolve_redshift_node_price("ra3.xlplus", region).value
 
             # RA3 nodes have different performance characteristics
             # This is a rough comparison
@@ -848,8 +848,8 @@ class CostOptimizer:
         cloud = platform_config.get("cloud", "aws")
         tier = platform_config.get("tier", "premium")
 
-        current_price = get_databricks_dbu_price(cloud, tier, "all_purpose")
-        jobs_price = get_databricks_dbu_price(cloud, tier, "jobs")
+        current_price = resolve_databricks_dbu_price(cloud, tier, "all_purpose").value
+        jobs_price = resolve_databricks_dbu_price(cloud, tier, "jobs").value
 
         if jobs_price >= current_price:
             return None
@@ -1098,7 +1098,7 @@ class CostOptimizer:
         if bytes_processed == 0:
             # Try to estimate from cost
             location = platform_config.get("location", "us")
-            price_per_tb = get_bigquery_price_per_tb(location)
+            price_per_tb = resolve_bigquery_price_per_tb(location).value
             tb_processed = benchmark_cost.total_cost / price_per_tb
             bytes_processed = tb_processed * (1024**4)
 

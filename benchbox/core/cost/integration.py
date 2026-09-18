@@ -204,8 +204,8 @@ def _apply_cost_model_and_warnings(benchmark_cost: Any, platform: str, platform_
     from benchbox.core.cost.pricing import (
         PRICING_LAST_UPDATED,
         get_pricing_age_days,
-        get_redshift_node_price,
         is_pricing_stale,
+        resolve_redshift_node_price,
     )
 
     platform_lower = platform.lower()
@@ -214,11 +214,15 @@ def _apply_cost_model_and_warnings(benchmark_cost: Any, platform: str, platform_
         node_count = platform_config.get("node_count", "N")
         node_type = platform_config.get("node_type", "unknown")
         region = platform_config.get("region", "us-east-1")
-        price_per_node_hour = get_redshift_node_price(node_type, region)
+        resolution = resolve_redshift_node_price(node_type, region)
+        if resolution.fallback_used or resolution.value is None:
+            rate_text = "an unknown rate"
+        else:
+            rate_text = f"${resolution.value:.2f}/hour"
         benchmark_cost.warnings.append(
             f"Redshift costs show marginal per-query costs, not total cluster TCO. "
             f"Cluster idle time is excluded. For full cluster cost, calculate: "
-            f"cluster_runtime_hours × {node_count} nodes × ${price_per_node_hour:.2f}/hour."
+            f"cluster_runtime_hours × {node_count} nodes × {rate_text}."
         )
     elif platform_lower == "databricks":
         workload_type = platform_config.get("workload_type", "")
@@ -609,19 +613,10 @@ def _resolve_cloud_and_region(
         defaulted_fields.append("region")
 
 
-# DBU consumption per hour by SQL warehouse size.
-# See https://docs.databricks.com/sql/admin/warehouse-types.html
-_DATABRICKS_SIZE_TO_DBU: dict[str, float] = {
-    "2X-Small": 1.0,
-    "X-Small": 2.0,
-    "Small": 4.0,
-    "Medium": 8.0,
-    "Large": 16.0,
-    "X-Large": 32.0,
-    "2X-Large": 64.0,
-    "3X-Large": 128.0,
-    "4X-Large": 256.0,
-}
+# DBU consumption per hour by SQL warehouse size lives in pricing.py as
+# DATABRICKS_WAREHOUSE_DBU_PER_HOUR and is resolved through
+# resolve_databricks_warehouse_dbu_per_hour so unknown sizes flag
+# fallback_used instead of silently pricing as X-Small.
 
 
 def _resolve_databricks_compute(
@@ -649,8 +644,20 @@ def _resolve_databricks_compute(
 
     warehouse_size = _observed_or_requested(compute, "warehouse_size", "warehouse_size", defaulted_fields)
     if warehouse_size:
+        from benchbox.core.cost.pricing import resolve_databricks_warehouse_dbu_per_hour
+
         config["warehouse_size"] = warehouse_size
-        config["cluster_size_dbu_per_hour"] = _DATABRICKS_SIZE_TO_DBU.get(str(warehouse_size), 2.0)
+        resolution = resolve_databricks_warehouse_dbu_per_hour(str(warehouse_size))
+        config["cluster_size_dbu_per_hour"] = resolution.value
+        if resolution.fallback_used or resolution.value is None:
+            # An unmapped size keeps the conservative estimate so a per-query
+            # figure is still possible, but it must never back a published
+            # total: mark it defaulted like the no-metadata path below.
+            defaulted_fields.append("cluster_size_dbu_per_hour")
+            logger.warning(
+                f"Databricks warehouse size '{warehouse_size}' is not in the size map; "
+                f"using a conservative 2.0 DBU/hour estimate that cannot publish as normalized."
+            )
         return
 
     # No warehouse metadata at all: keep the conservative rate so a per-query

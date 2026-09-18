@@ -15,18 +15,19 @@ from benchbox.core.cost.models import BenchmarkCost, DeploymentMetadata, Normali
 from benchbox.core.cost.pricing import (
     CURRENCY,
     PRICING_VERSION,
-    get_athena_price_per_tb,
-    get_bigquery_price_per_tb,
-    get_databricks_dbu_price,
-    get_fabric_cu_price,
-    get_fabric_sku_cu_count,
-    get_firebolt_fbu_price,
-    get_firebolt_fbu_rate,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
-    get_synapse_dedicated_price,
-    get_synapse_serverless_price_per_tb,
+    PriceResolution,
     get_table_unit,
+    resolve_athena_price_per_tb,
+    resolve_bigquery_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_fabric_cu_price,
+    resolve_fabric_sku_cu_count,
+    resolve_firebolt_fbu_price,
+    resolve_firebolt_fbu_rate,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
+    resolve_synapse_dedicated_price,
+    resolve_synapse_serverless_price_per_tb,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,21 @@ def _byte_unit_for_table(table: str) -> tuple[str, int]:
     if unit is None:
         raise KeyError(f"No unit declared for price table {table!r} in pricing_data.yaml")
     return unit, BYTES_PER_UNIT[unit]
+
+
+def _stamp_price_unavailable(details: dict[str, Any], resolution: PriceResolution) -> None:
+    """Stamp a fallback lookup so the cost can never read as trustworthy.
+
+    The calculator still returns a QueryCost built on the fallback value:
+    returning None would make calculate_phase_cost sum the run to 0.0, which
+    reads as free and is worse than a flagged estimate.
+    """
+    if resolution.fallback_used or resolution.value is None:
+        details["price_unavailable"] = {
+            "table": resolution.table,
+            "resolved_key": list(resolution.resolved_key),
+            "reason": resolution.reason,
+        }
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -377,21 +393,26 @@ class CostCalculator:
         region = platform_config.get("region", "us-east-1")
 
         # Get credit price
-        price_per_credit = get_snowflake_credit_price(edition, cloud, region)
+        resolution = resolve_snowflake_credit_price(edition, cloud, region)
+        if resolution.value is None:
+            return None
+        price_per_credit = resolution.value
 
         # Calculate cost
         compute_cost = credits_used * price_per_credit
 
+        details: dict[str, Any] = {
+            "credits_used": credits_used,
+            "price_per_credit": price_per_credit,
+            "edition": edition,
+            "cloud": cloud,
+            "region": region,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "credits_used": credits_used,
-                "price_per_credit": price_per_credit,
-                "edition": edition,
-                "cloud": cloud,
-                "region": region,
-            },
+            pricing_details=details,
         )
 
     def _calculate_bigquery_cost(
@@ -416,23 +437,28 @@ class CostCalculator:
         location = platform_config.get("location", "us")
 
         # Get price per TB
-        price_per_tb = get_bigquery_price_per_tb(location)
+        resolution = resolve_bigquery_price_per_tb(location)
+        if resolution.value is None:
+            return None
+        price_per_tb = resolution.value
 
         # Calculate cost
         unit, bytes_per_unit = _byte_unit_for_table("bigquery_on_demand_prices")
         tb_processed = bytes_processed / bytes_per_unit
         compute_cost = tb_processed * price_per_tb
 
+        details = {
+            "bytes_processed": bytes_processed,
+            "tb_processed": tb_processed,
+            "price_per_tb": price_per_tb,
+            "unit": unit,
+            "location": location,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "bytes_processed": bytes_processed,
-                "tb_processed": tb_processed,
-                "price_per_tb": price_per_tb,
-                "unit": unit,
-                "location": location,
-            },
+            pricing_details=details,
         )
 
     def _calculate_redshift_cost(
@@ -476,22 +502,27 @@ class CostCalculator:
         region = platform_config.get("region", "us-east-1")
 
         # Get price per node-hour
-        price_per_node_hour = get_redshift_node_price(node_type, region)
+        resolution = resolve_redshift_node_price(node_type, region)
+        if resolution.value is None:
+            return None
+        price_per_node_hour = resolution.value
 
         # Calculate cost
         hours = execution_time_seconds / 3600.0
         compute_cost = hours * node_count * price_per_node_hour
 
+        details = {
+            "execution_time_seconds": execution_time_seconds,
+            "node_type": node_type,
+            "node_count": node_count,
+            "price_per_node_hour": price_per_node_hour,
+            "region": region,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "execution_time_seconds": execution_time_seconds,
-                "node_type": node_type,
-                "node_count": node_count,
-                "price_per_node_hour": price_per_node_hour,
-                "region": region,
-            },
+            pricing_details=details,
         )
 
     def _calculate_databricks_cost(
@@ -536,7 +567,10 @@ class CostCalculator:
         workload_type = platform_config.get("workload_type", "all_purpose")
 
         # Get DBU price
-        price_per_dbu = get_databricks_dbu_price(cloud, tier, workload_type)
+        resolution = resolve_databricks_dbu_price(cloud, tier, workload_type)
+        if resolution.value is None:
+            return None
+        price_per_dbu = resolution.value
 
         # Calculate cost (DBU cost only, not underlying cloud compute)
         compute_cost = dbu_consumed * price_per_dbu
@@ -549,6 +583,7 @@ class CostCalculator:
             "workload_type": workload_type,
             "is_estimated": is_estimated,
         }
+        _stamp_price_unavailable(details, resolution)
 
         if is_estimated:
             details["note"] = "DBU consumption estimated from execution time"
@@ -581,23 +616,29 @@ class CostCalculator:
             return None
 
         # Get price per TB
-        price_per_tb = get_athena_price_per_tb()
+        region = platform_config.get("region", "us-east-1")
+        resolution = resolve_athena_price_per_tb(region)
+        if resolution.value is None:
+            return None
+        price_per_tb = resolution.value
 
         # Calculate cost
         unit, bytes_per_unit = _byte_unit_for_table("athena_price_per_tb")
         tb_scanned = data_scanned_bytes / bytes_per_unit
         compute_cost = tb_scanned * price_per_tb
 
+        details = {
+            "data_scanned_bytes": data_scanned_bytes,
+            "tb_scanned": tb_scanned,
+            "price_per_tb": price_per_tb,
+            "unit": unit,
+            "region": region,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "data_scanned_bytes": data_scanned_bytes,
-                "tb_scanned": tb_scanned,
-                "price_per_tb": price_per_tb,
-                "unit": unit,
-                "region": platform_config.get("region", "us-east-1"),
-            },
+            pricing_details=details,
         )
 
     def _calculate_synapse_cost(
@@ -630,22 +671,27 @@ class CostCalculator:
             if bytes_processed is None:
                 return None
 
-            price_per_tb = get_synapse_serverless_price_per_tb()
+            resolution = resolve_synapse_serverless_price_per_tb(region)
+            if resolution.value is None:
+                return None
+            price_per_tb = resolution.value
             unit, bytes_per_unit = _byte_unit_for_table("synapse_serverless_price_per_tb")
             tb_processed = bytes_processed / bytes_per_unit
             compute_cost = tb_processed * price_per_tb
 
+            details = {
+                "mode": "serverless",
+                "bytes_processed": bytes_processed,
+                "tb_processed": tb_processed,
+                "price_per_tb": price_per_tb,
+                "unit": unit,
+                "region": region,
+            }
+            _stamp_price_unavailable(details, resolution)
             return QueryCost(
                 compute_cost=compute_cost,
                 currency=CURRENCY,
-                pricing_details={
-                    "mode": "serverless",
-                    "bytes_processed": bytes_processed,
-                    "tb_processed": tb_processed,
-                    "price_per_tb": price_per_tb,
-                    "unit": unit,
-                    "region": region,
-                },
+                pricing_details=details,
             )
         else:
             # Dedicated: DWU-hour based pricing
@@ -654,21 +700,26 @@ class CostCalculator:
                 return None
 
             dwu_level = platform_config.get("dwu_level", "dw100c")
-            price_per_hour = get_synapse_dedicated_price(dwu_level, region)
+            resolution = resolve_synapse_dedicated_price(dwu_level, region)
+            if resolution.value is None:
+                return None
+            price_per_hour = resolution.value
 
             hours = execution_time_seconds / 3600.0
             compute_cost = hours * price_per_hour
 
+            details = {
+                "mode": "dedicated",
+                "execution_time_seconds": execution_time_seconds,
+                "dwu_level": dwu_level,
+                "price_per_hour": price_per_hour,
+                "region": region,
+            }
+            _stamp_price_unavailable(details, resolution)
             return QueryCost(
                 compute_cost=compute_cost,
                 currency=CURRENCY,
-                pricing_details={
-                    "mode": "dedicated",
-                    "execution_time_seconds": execution_time_seconds,
-                    "dwu_level": dwu_level,
-                    "price_per_hour": price_per_hour,
-                    "region": region,
-                },
+                pricing_details=details,
             )
 
     def _calculate_fabric_cost(
@@ -703,15 +754,22 @@ class CostCalculator:
                 return None
 
             # Get CU count for the SKU
-            cu_count = get_fabric_sku_cu_count(sku)
+            sku_resolution = resolve_fabric_sku_cu_count(sku)
+            if sku_resolution.value is None:
+                return None
+            cu_count = sku_resolution.value
             cu_seconds = execution_time_seconds * cu_count
             is_estimated = True
         else:
+            sku_resolution = None
             is_estimated = False
 
         # Convert CU-seconds to CU-hours and calculate cost
         cu_hours = cu_seconds / 3600.0
-        price_per_cu_hour = get_fabric_cu_price(region)
+        price_resolution = resolve_fabric_cu_price(region)
+        if price_resolution.value is None:
+            return None
+        price_per_cu_hour = price_resolution.value
         compute_cost = cu_hours * price_per_cu_hour
 
         details: dict[str, Any] = {
@@ -722,6 +780,9 @@ class CostCalculator:
             "region": region,
             "is_estimated": is_estimated,
         }
+        if sku_resolution is not None:
+            _stamp_price_unavailable(details, sku_resolution)
+        _stamp_price_unavailable(details, price_resolution)
 
         if is_estimated:
             details["note"] = "CU consumption estimated from execution time and SKU"
@@ -764,19 +825,26 @@ class CostCalculator:
             node_count = platform_config.get("node_count", 1)
 
             # Get FBU rate per hour for the node type
-            fbu_per_hour = get_firebolt_fbu_rate(node_type)
+            rate_resolution = resolve_firebolt_fbu_rate(node_type)
+            if rate_resolution.value is None:
+                return None
+            fbu_per_hour = rate_resolution.value
 
             # Calculate FBUs: (hours * FBU/hour * nodes)
             hours = execution_time_seconds / 3600.0
             fbu_consumed = hours * fbu_per_hour * node_count
             is_estimated = True
         else:
+            rate_resolution = None
             is_estimated = False
             node_type = platform_config.get("node_type", "unknown")
             node_count = platform_config.get("node_count", 1)
 
         # Calculate cost
-        fbu_price = get_firebolt_fbu_price()
+        price_resolution = resolve_firebolt_fbu_price()
+        if price_resolution.value is None:
+            return None
+        fbu_price = price_resolution.value
         compute_cost = fbu_consumed * fbu_price
 
         details: dict[str, Any] = {
@@ -786,6 +854,9 @@ class CostCalculator:
             "node_count": node_count,
             "is_estimated": is_estimated,
         }
+        if rate_resolution is not None:
+            _stamp_price_unavailable(details, rate_resolution)
+        _stamp_price_unavailable(details, price_resolution)
 
         if is_estimated:
             details["note"] = "FBU consumption estimated from execution time and node configuration"
