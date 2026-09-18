@@ -33,6 +33,7 @@ from benchbox.core.analysis.statistics import (
     detect_outliers_iqr,
     welchs_t_test,
 )
+from benchbox.core.cost.models import published_total_cost
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.query_execution import (
     DURATION_CONSISTENCY_TOLERANCE_MS,
@@ -690,20 +691,21 @@ class PlatformComparison:
         query_counts = {}
 
         for result in self.results:
-            if result.cost_summary and "total_cost" in result.cost_summary:
-                total_cost = result.cost_summary["total_cost"]
-                if total_cost > 0:
-                    cost_data[result.platform] = total_cost
-                    query_counts[result.platform] = result.total_queries
+            # Unavailable-status runs contribute no ranking or savings
+            # figure: a fallback-priced number must not order platforms.
+            total_cost = published_total_cost(result.cost_summary)
+            if total_cost is not None and total_cost > 0:
+                cost_data[result.platform] = total_cost
+                query_counts[result.platform] = result.total_queries
 
-                    # Calculate queries per second
-                    # BenchmarkResults stores aggregate execution time in seconds
-                    # (both the lifecycle builder and the v2 loader use that unit).
-                    total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
-                    qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
+                # Calculate queries per second
+                # BenchmarkResults stores aggregate execution time in seconds
+                # (both the lifecycle builder and the v2 loader use that unit).
+                total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
+                qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
 
-                    # Performance per dollar (QPS / cost)
-                    perf_data[result.platform] = qps / total_cost if total_cost > 0 else 0
+                # Performance per dollar (QPS / cost)
+                perf_data[result.platform] = qps / total_cost if total_cost > 0 else 0
 
         if not cost_data:
             return None

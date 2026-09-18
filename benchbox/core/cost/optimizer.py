@@ -19,13 +19,31 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from benchbox.core.cost.models import BenchmarkCost
+from benchbox.core.cost.models import BenchmarkCost, unavailable_cost_warning
 from benchbox.core.cost.pricing import (
+    PriceResolution,
     resolve_bigquery_price_per_tb,
     resolve_databricks_dbu_price,
     resolve_redshift_node_price,
     resolve_snowflake_credit_price,
 )
+
+
+class _FallbackPriceSuppressed(Exception):
+    """Internal signal: a rule's pricing input fell back, so suppress the rule with a stated reason."""
+
+
+def _verified_price(resolution: PriceResolution, *, what: str) -> float:
+    """Return a resolved price, refusing fallback values.
+
+    Raises:
+        _FallbackPriceSuppressed: When the lookup used a fallback value or
+            resolved to nothing, stating the table and reason.
+    """
+    if resolution.value is None or resolution.fallback_used:
+        detail = resolution.reason or "no verified price"
+        raise _FallbackPriceSuppressed(f"{what}: fallback pricing used for {resolution.table} ({detail})")
+    return float(resolution.value)
 
 
 class OptimizationCategory(Enum):
@@ -309,7 +327,10 @@ class CostOptimizer:
             annual_runs: Expected number of benchmark runs per year
 
         Returns:
-            OptimizationReport with prioritized recommendations
+            OptimizationReport with prioritized recommendations. Rules whose
+            pricing inputs fall back are suppressed, not computed; each
+            suppression is recorded under
+            ``metadata["suppressed_rules"]`` as ``{"rule", "reason"}``.
         """
         platform_config = platform_config or {}
         platform = platform_config.get(
@@ -318,6 +339,27 @@ class CostOptimizer:
         )
 
         recommendations: list[Recommendation] = []
+        suppressed: list[dict[str, str]] = []
+
+        input_unavailable = unavailable_cost_warning(benchmark_cost.warnings)
+        if input_unavailable is not None:
+            # The run total itself is fallback-derived, so every rule builds
+            # on it: suppress all of them with the stated reason instead of
+            # computing savings from an unpublishable number.
+            suppressed = [{"rule": name, "reason": input_unavailable} for name, _ in self._rules]
+            return OptimizationReport(
+                recommendations=[],
+                total_potential_savings=0.0,
+                currency=benchmark_cost.currency,
+                platform=platform,
+                benchmark_cost=benchmark_cost,
+                metadata={
+                    "annual_runs": annual_runs,
+                    "rules_evaluated": len(self._rules),
+                    "recommendations_generated": 0,
+                    "suppressed_rules": suppressed,
+                },
+            )
 
         # Run all applicable rules
         for rule_name, rule_func in self._rules:
@@ -333,6 +375,8 @@ class CostOptimizer:
                         recommendations.extend(rec)
                     else:
                         recommendations.append(rec)
+            except _FallbackPriceSuppressed as exc:
+                suppressed.append({"rule": rule_name, "reason": str(exc)})
             except Exception:
                 # Skip rules that fail - don't break the entire analysis
                 pass
@@ -353,6 +397,7 @@ class CostOptimizer:
                 "annual_runs": annual_runs,
                 "rules_evaluated": len(self._rules),
                 "recommendations_generated": len(recommendations),
+                "suppressed_rules": suppressed,
             },
         )
 
@@ -379,8 +424,14 @@ class CostOptimizer:
         region = platform_config.get("region", "us-east-1")
 
         # Calculate current vs standard pricing
-        current_price = resolve_snowflake_credit_price(edition, cloud, region).value
-        standard_price = resolve_snowflake_credit_price("standard", cloud, region).value
+        current_price = _verified_price(
+            resolve_snowflake_credit_price(edition, cloud, region),
+            what=f"snowflake credit price for {edition}/{cloud}/{region}",
+        )
+        standard_price = _verified_price(
+            resolve_snowflake_credit_price("standard", cloud, region),
+            what=f"snowflake credit price for standard/{cloud}/{region}",
+        )
 
         if current_price <= standard_price:
             return None
@@ -398,7 +449,10 @@ class CostOptimizer:
         target_edition = "Standard"
         if edition == "business_critical":
             # Check if Enterprise is an option
-            enterprise_price = resolve_snowflake_credit_price("enterprise", cloud, region).value
+            enterprise_price = _verified_price(
+                resolve_snowflake_credit_price("enterprise", cloud, region),
+                what=f"snowflake credit price for enterprise/{cloud}/{region}",
+            )
             enterprise_annual = annual_credits * enterprise_price
             enterprise_savings = current_annual - enterprise_annual
 
@@ -449,9 +503,7 @@ class CostOptimizer:
             current_config={"edition": edition, "price_per_credit": current_price},
             recommended_config={
                 "edition": target_edition.lower(),
-                "price_per_credit": standard_price
-                if target_edition == "Standard"
-                else resolve_snowflake_credit_price("enterprise", cloud, region).value,
+                "price_per_credit": standard_price if target_edition == "Standard" else enterprise_price,
             },
         )
 
@@ -474,7 +526,10 @@ class CostOptimizer:
         workload_type = platform_config.get("workload_type", "sql_warehouse")
 
         # Calculate current vs lower tier pricing
-        current_price = resolve_databricks_dbu_price(cloud, tier, workload_type).value
+        current_price = _verified_price(
+            resolve_databricks_dbu_price(cloud, tier, workload_type),
+            what=f"databricks DBU price for {cloud}/{tier}/{workload_type}",
+        )
 
         # Determine target tier
         if tier == "enterprise":
@@ -482,7 +537,10 @@ class CostOptimizer:
         else:
             target_tier = "standard"
 
-        target_price = resolve_databricks_dbu_price(cloud, target_tier, workload_type).value
+        target_price = _verified_price(
+            resolve_databricks_dbu_price(cloud, target_tier, workload_type),
+            what=f"databricks DBU price for {cloud}/{target_tier}/{workload_type}",
+        )
 
         if current_price <= target_price:
             return None
@@ -556,10 +614,16 @@ class CostOptimizer:
         edition = platform_config.get("edition", "standard")
 
         # Get current price
-        current_price = resolve_snowflake_credit_price(edition, cloud, region).value
+        current_price = _verified_price(
+            resolve_snowflake_credit_price(edition, cloud, region),
+            what=f"snowflake credit price for {edition}/{cloud}/{region}",
+        )
 
         # Check US regions (typically cheapest)
-        us_price = resolve_snowflake_credit_price(edition, cloud, "us-east-1").value
+        us_price = _verified_price(
+            resolve_snowflake_credit_price(edition, cloud, "us-east-1"),
+            what=f"snowflake credit price for {edition}/{cloud}/us-east-1",
+        )
 
         if current_price <= us_price:
             return None
@@ -628,8 +692,14 @@ class CostOptimizer:
             return None
 
         location = platform_config.get("location", "")
-        current_price = resolve_bigquery_price_per_tb(location).value
-        us_price = resolve_bigquery_price_per_tb("us").value
+        current_price = _verified_price(
+            resolve_bigquery_price_per_tb(location),
+            what=f"bigquery price for location '{location}'",
+        )
+        us_price = _verified_price(
+            resolve_bigquery_price_per_tb("us"),
+            what="bigquery price for location 'us'",
+        )
 
         if current_price <= us_price:
             return None
@@ -697,8 +767,14 @@ class CostOptimizer:
         region = platform_config.get("region", "")
         node_type = platform_config.get("node_type", "dc2.large")
 
-        current_price = resolve_redshift_node_price(node_type, region).value
-        us_east_price = resolve_redshift_node_price(node_type, "us-east-1").value
+        current_price = _verified_price(
+            resolve_redshift_node_price(node_type, region),
+            what=f"redshift node price for {node_type}/{region}",
+        )
+        us_east_price = _verified_price(
+            resolve_redshift_node_price(node_type, "us-east-1"),
+            what=f"redshift node price for {node_type}/us-east-1",
+        )
 
         if current_price <= us_east_price:
             return None
@@ -773,8 +849,14 @@ class CostOptimizer:
         # Check if using legacy DS2 nodes
         if node_type.startswith("ds2"):
             # RA3 nodes with managed storage are often more cost-effective
-            current_price = resolve_redshift_node_price(node_type, region).value
-            ra3_price = resolve_redshift_node_price("ra3.xlplus", region).value
+            current_price = _verified_price(
+                resolve_redshift_node_price(node_type, region),
+                what=f"redshift node price for {node_type}/{region}",
+            )
+            ra3_price = _verified_price(
+                resolve_redshift_node_price("ra3.xlplus", region),
+                what=f"redshift node price for ra3.xlplus/{region}",
+            )
 
             # RA3 nodes have different performance characteristics
             # This is a rough comparison
@@ -848,8 +930,14 @@ class CostOptimizer:
         cloud = platform_config.get("cloud", "aws")
         tier = platform_config.get("tier", "premium")
 
-        current_price = resolve_databricks_dbu_price(cloud, tier, "all_purpose").value
-        jobs_price = resolve_databricks_dbu_price(cloud, tier, "jobs").value
+        current_price = _verified_price(
+            resolve_databricks_dbu_price(cloud, tier, "all_purpose"),
+            what=f"databricks DBU price for {cloud}/{tier}/all_purpose",
+        )
+        jobs_price = _verified_price(
+            resolve_databricks_dbu_price(cloud, tier, "jobs"),
+            what=f"databricks DBU price for {cloud}/{tier}/jobs",
+        )
 
         if jobs_price >= current_price:
             return None
@@ -1098,7 +1186,10 @@ class CostOptimizer:
         if bytes_processed == 0:
             # Try to estimate from cost
             location = platform_config.get("location", "us")
-            price_per_tb = resolve_bigquery_price_per_tb(location).value
+            price_per_tb = _verified_price(
+                resolve_bigquery_price_per_tb(location),
+                what=f"bigquery price for location '{location}'",
+            )
             tb_processed = benchmark_cost.total_cost / price_per_tb
             bytes_processed = tb_processed * (1024**4)
 

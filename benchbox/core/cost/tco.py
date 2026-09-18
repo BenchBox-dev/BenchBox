@@ -16,7 +16,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
-from benchbox.core.cost.models import BenchmarkCost
+from benchbox.core.cost.models import BenchmarkCost, unavailable_cost_warning
 
 
 class GrowthModel(Enum):
@@ -332,7 +332,15 @@ class TCOCalculator:
 
         Returns:
             TCOProjection with yearly breakdowns and total TCO
+
+        Raises:
+            ValueError: If the benchmark cost is marked unavailable (fallback
+                pricing, defaulted metadata, or stale tables). A cost that is
+                not fit to publish is not fit to project.
         """
+        unavailable = unavailable_cost_warning(benchmark_cost.warnings)
+        if unavailable is not None:
+            raise ValueError(f"cannot project TCO from an unavailable benchmark cost: {unavailable}")
         growth = growth_config or GrowthConfig()
         discount = discount_config or DiscountConfig()
         start = start_year or datetime.now().year

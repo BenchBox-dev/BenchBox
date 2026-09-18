@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.cost.models import published_total_cost
 from benchbox.core.labels import disambiguate_platform_labels
 from benchbox.core.results.loader import find_latest_result
 from benchbox.core.results.models import BenchmarkResults
@@ -268,7 +269,7 @@ class ResultPlotter:
             total_time_ms=total_ms,
             avg_time_ms=avg_ms,
             success_rate=success_rate,
-            cost_total=cost_summary.get("total_cost") if isinstance(cost_summary, dict) else None,
+            cost_total=published_total_cost(cost_summary),
             queries=queries,
             source_path=None,
             raw={},

@@ -124,7 +124,16 @@ def add_cost_estimation_to_results(
                     platform_config=platform_config,
                 )
                 if query_cost and isinstance(query_result, dict):
-                    query_result["cost"] = query_cost.compute_cost
+                    if "price_unavailable" in query_cost.pricing_details:
+                        # Gate at the stamp point: a fallback-priced figure
+                        # must not read as a trustworthy per-query cost
+                        # downstream. The estimate still flows into
+                        # phase/benchmark totals, where the normalized
+                        # contract marks the run unavailable.
+                        query_result["cost"] = None
+                        query_result["cost_status"] = "unavailable"
+                    else:
+                        query_result["cost"] = query_cost.compute_cost
 
         # Calculate phase-level costs
         phase_costs = _calculate_phase_costs(results, platform, platform_config, calculator)
