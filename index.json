@@ -13018,6 +13018,13 @@
       "status": "done",
       "title": "Restrict Primary/Foreign Key Configuration to tuning.yaml Only"
     },
+    "result-bundle-compat-decide-load-time-surfacing": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: decide per-table load-time surfacing vs bundle-only"
+    },
     "result-bundle-compat-dispatch-review": {
       "claim": null,
       "needs": [],
