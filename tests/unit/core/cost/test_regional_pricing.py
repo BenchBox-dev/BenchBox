@@ -229,7 +229,12 @@ class TestBigQueryRegionalPricing:
         assert resolve_bigquery_price_per_tb("asia-multi").value == price_us
 
     def test_captured_single_region_values(self):
-        """Test a representative sample of captured per-region prices."""
+        """Test a representative sample of captured per-region prices.
+
+        Golden values below cite provenance entry bigquery_on_demand_prices
+        (cloud.google.com/bigquery/pricing, retrieved 2026-09-18). Update
+        only when the vendor page changes.
+        """
         expected = {
             "us-east1": 6.25,
             "us-west2": 8.4375,
