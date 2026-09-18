@@ -129,3 +129,53 @@ class TestSnowflakeRegistry:
     def test_registry_returns_snowflake_parser(self):
         parser = get_parser_for_platform("snowflake")
         assert isinstance(parser, SnowflakeQueryPlanParser)
+
+
+class TestSnowflakeJoinConditionSorting:
+    def _join_payload(self, expressions):
+        return json.dumps(
+            {
+                "Operations": [
+                    [
+                        {"id": 0, "operation": "Result"},
+                        {
+                            "id": 1,
+                            "operation": "InnerJoin",
+                            "parentOperators": [0],
+                            "expressions": expressions,
+                        },
+                        {
+                            "id": 2,
+                            "operation": "TableScan",
+                            "parentOperators": [1],
+                            "objects": ["DB.A"],
+                        },
+                        {
+                            "id": 3,
+                            "operation": "TableScan",
+                            "parentOperators": [1],
+                            "objects": ["DB.B"],
+                        },
+                    ]
+                ]
+            }
+        )
+
+    def test_join_condition_returns_list_of_stripped_strings(self, parser):
+        conditions = SnowflakeQueryPlanParser._join_condition({"expressions": ["  a.id = b.id ", "a.type = b.type"]})
+        assert conditions == ["a.id = b.id", "a.type = b.type"]
+
+    def test_multi_condition_join_sets_list_directly(self, parser):
+        dag = parser.parse_explain_output("q", self._join_payload(["a.id = b.id", "a.type = b.type"]))
+        joins = [n for n in _collect(dag.logical_root) if n.operator_type == LogicalOperatorType.JOIN]
+        assert len(joins) == 1
+        assert joins[0].join_conditions == ["a.id = b.id", "a.type = b.type"]
+
+    def test_multi_condition_join_fingerprint_order_invariant(self, parser):
+        first = parser.parse_explain_output(
+            "q", self._join_payload(["a.id = b.id", "a.type = b.type"])
+        ).plan_fingerprint
+        second = parser.parse_explain_output(
+            "q", self._join_payload(["a.type = b.type", "a.id = b.id"])
+        ).plan_fingerprint
+        assert first == second
