@@ -915,14 +915,15 @@ def _dict_to_benchmark_results(data: dict[str, Any]) -> BenchmarkResults:
         BenchmarkResults instance
 
     Raises:
-        ValueError: If schema version is not v2.0
+        ValueError: If schema version is not supported for comparison.
     """
     from benchbox.core.results.loader import reconstruct_benchmark_results
+    from benchbox.core.results.schema_policy import is_loader_supported_result_schema, result_schema_version_value
 
     # Validate schema version
-    version = data.get("version")
-    if version != "2.0":
-        raise ValueError(f"Unsupported schema version: {version}. Only schema v2.0 is supported for comparison.")
+    version = result_schema_version_value(data)
+    if not is_loader_supported_result_schema(data):
+        raise ValueError(f"Unsupported schema version: {version}. Only schema v2 is supported for comparison.")
 
     return reconstruct_benchmark_results(data)
 

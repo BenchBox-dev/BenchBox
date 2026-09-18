@@ -58,7 +58,10 @@ from benchbox.core.results.schema import (
     build_tuning_payload,
     inline_tuning_artifacts,
 )
-from benchbox.core.results.schema_policy import is_loader_supported_result_schema
+from benchbox.core.results.schema_policy import (
+    is_loader_supported_result_schema,
+    result_schema_version_value,
+)
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 from benchbox.validation.bundle import COMPANION_SUFFIXES
@@ -337,9 +340,14 @@ class ResultExporter:
         inline_tuning_artifacts(payload, tuning_payload, applied_payload)
 
         # Add export metadata
+        from benchbox.utils.version import get_package_version
+
+        benchbox_version = get_package_version()
+
         payload["export"] = {
             "timestamp": datetime.now().isoformat(),
             "tool": self.EXPORTER_NAME,
+            "benchbox_version": benchbox_version,
             "anonymized": anonymized,
         }
 
@@ -907,7 +915,7 @@ class ResultExporter:
                 with open(json_file, encoding="utf-8") as handle:
                     data = json.load(handle)
 
-                version = data.get("version")
+                version = result_schema_version_value(data)
                 if not is_loader_supported_result_schema(data):
                     continue
 
@@ -982,8 +990,8 @@ class ResultExporter:
             with open(filepath, encoding="utf-8") as handle:
                 data = json.load(handle)
 
-            version = data.get("version", "unknown")
-            return {"data": data, "version": version, "filepath": filepath}
+            version = data.get("result_schema_version") or data.get("version") or "unknown"
+            return {"data": data, "version": version, "result_schema_version": version, "filepath": filepath}
 
         except Exception as exc:
             logger.error("Failed to load result from %s: %s", filepath, exc)
@@ -1011,8 +1019,8 @@ class ResultExporter:
 
         baseline_data = baseline_result["data"]
         current_data = current_result["data"]
-        baseline_version = baseline_result.get("version", "unknown")
-        current_version = current_result.get("version", "unknown")
+        baseline_version = baseline_result.get("result_schema_version") or baseline_result.get("version", "unknown")
+        current_version = current_result.get("result_schema_version") or current_result.get("version", "unknown")
 
         # Extract metrics using schema-agnostic normalizer
         perf_baseline = self._extract_performance_metrics(baseline_data)

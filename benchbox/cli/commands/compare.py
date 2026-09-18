@@ -37,6 +37,7 @@ from benchbox.core.results.loader import (
     load_result_file,
 )
 from benchbox.core.results.regression_policy import is_regression
+from benchbox.core.results.schema_policy import is_loader_supported_result_schema
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 
@@ -136,8 +137,8 @@ def _discover_result_files_with_metadata(
                 with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
 
-                # Validate it's a BenchBox v2.0 result file
-                if data.get("version") != "2.0":
+                # Validate it's a supported BenchBox result file
+                if not is_loader_supported_result_schema(data):
                     continue
 
                 # Also require benchmark section (distinguishes from manifests etc.)
