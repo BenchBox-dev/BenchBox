@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "Both functions accept a region and return the regional rate",
+    "A Sao Paulo Athena run is priced at $9.00/TB, not $5.00",
+    "The flat-rate claims are removed from both docstrings",
+    "The interim unverified-region guard is removed in the same change",
+    "Callers in calculator.py pass the region they already hold in platform_config",
+    "uv run -- pytest tests/unit/core/cost/ -n 0 passes"
+  ],
+  "context": "Finding R13. Raised as a live risk after deferral by both reviewers (muse NEW-3, agy R13). Plan: PR D.",
+  "description": "get_athena_price_per_tb() and get_synapse_serverless_price_per_tb() (pricing.py:69-77 and 236-244) take no region argument, and their docstrings assert a flat $5.00/TB rate across all regions. That claim is false: Sao Paulo is $9.00/TB for both, an 80% understatement, and Synapse serverless is also $6.75 in southeastasia and $5.50 in canadacentral.\n\nThis cannot be fixed by editing data - the functions structurally cannot express a region. Add a region parameter and replace the scalars with regional tables, then delete the false docstrings.\n\nAn interim calculator-level guard (marking unverified regions unavailable) should already be in place from the status-wiring work; this task replaces that guard with real prices. Remove the interim guard as part of this change so the two cannot drift.\n\nVerified data to use: Athena $5.00 in us-east-1/eu-west-1/ap-southeast-1/ap-northeast-1, $9.00 in sa-east-1. Synapse serverless $5.00 in eastus/westeurope, $6.75 southeastasia, $5.50 canadacentral, $9.00 brazilsouth. Both are available from the same public APIs the generator uses, so prefer generating them."
+}

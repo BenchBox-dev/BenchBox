@@ -10920,6 +10920,15 @@
       "status": "open",
       "title": "Add per-table pricing provenance, explicit units, and non-tautological tests"
     },
+    "pricing-region-params-athena-synapse": {
+      "claim": null,
+      "needs": [
+        "pricing-status-wiring-and-region-guard"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Give Athena and Synapse serverless real regional pricing"
+    },
     "pricing-status-wiring-and-region-guard": {
       "claim": null,
       "needs": [
