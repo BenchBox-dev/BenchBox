@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-13T20:33:23.568055+00:00",
+  "generated_at": "2026-09-18T12:14:38.405169+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -130,7 +130,7 @@
       "query_count": 24,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8ebbea231ce76387bc956ab0f6bccb54c73802eefab4739fd0cdaeec179fb35e"
+      "bundle_sha256": "3e4100a69a62dcb7611938127a78d8271ba6068a93b8eb5baef6c52aadd1d743"
     },
     {
       "file": "amplab_sf001_pandas_df_20260826_214354_23f0647f.json",
@@ -299,7 +299,7 @@
       "query_count": 129,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "4c4ae55e46f84f701a989fe24a00cc3d467211f75ccfbbc43d300176721d98a1"
+      "bundle_sha256": "11e7624a23dcba8f3c2ae1d69f40b82655b51a7c4630b108e6470aaf8c8791e6"
     },
     {
       "file": "duckdb-version-matrix/clickbench_sf10_duckdb_v1_0_0_median.json",
@@ -1131,7 +1131,7 @@
       "query_count": 339,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "34e0732e5c4e4ddd901ecd706a821a646276cc9a65844a3cf11cfa24be7ad48c"
+      "bundle_sha256": "23a50a5f90ddcbc8e5c23b46c6ccd0641c3c6c4274b6c4d8ae8531fca0cc229a"
     },
     {
       "file": "joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
@@ -1612,7 +1612,7 @@
       "query_count": 39,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c5b9c24cdf0963cbd05a57607e3f4e836af8649f3fa3aa702f674523c55f4c05"
+      "bundle_sha256": "951b52876416a094b78ccba52b9bb5ae5002b8b747f435c346d152409b9c4ff9"
     },
     {
       "file": "duckdb-version-matrix/ssb_sf10_duckdb_v1_0_0_median.json",
@@ -2509,7 +2509,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "88a7e7bcc3727ac32c1732039e0421d2cba1c7a7e32e20f546a7ccdd99b29615"
+      "bundle_sha256": "e5831deeb4e24618231411334d444ec37c86d1d3f7e889be070f627e16b0470c"
     },
     {
       "file": "tpch/duckdb/sf1.0/tpch_sf1_duckdb_sql_20260901_122950_dad309b3.json",
