@@ -199,6 +199,14 @@ def test_canonical_decimal_refuses_precision_loss():
         generator.canonical_decimal("not-a-number", min_places=2, max_places=4)
 
 
+def test_canonical_decimal_refuses_non_positive_rates():
+    """Zero and negative rates fail closed instead of rendering into tables."""
+    with pytest.raises(generator.PricingGeneratorError):
+        generator.canonical_decimal("0.00", min_places=2, max_places=4)
+    with pytest.raises(generator.PricingGeneratorError):
+        generator.canonical_decimal("-1.50", min_places=2, max_places=4)
+
+
 def test_plan_price_update_keeps_date_on_match():
     """Numerically equal fetches keep the recorded string (no false drift)."""
     assert generator.plan_price_update("0.30", "0.3000000000", min_places=2, max_places=4) is None
@@ -350,6 +358,24 @@ def test_refresh_with_unchanged_upstream_writes_nothing(scratch_copy, monkeypatc
     assert generator.run_refresh(evidence, pricing, today="2026-09-19") == 0
     assert evidence.read_bytes() == before_evidence
     assert pricing.read_bytes() == before_pricing
+
+
+def test_refresh_fails_closed_when_node_missing_from_offer(scratch_copy, monkeypatch):
+    """A node the upstream offer no longer lists aborts the refresh loudly."""
+    evidence, pricing = scratch_copy
+
+    def _missing_node_offer(url_template, region):
+        publication, products, terms = _recorded_aws_offer(url_template, region)
+        if "AmazonRedshift" in url_template:
+            omitted = next(iter(products))
+            del products[omitted]
+            del terms[omitted]
+        return publication, products, terms
+
+    monkeypatch.setattr(generator, "fetch_aws_region_offer", _missing_node_offer)
+    monkeypatch.setattr(generator, "fetch_azure_region_items", _recorded_azure_rows)
+    with pytest.raises(generator.PricingGeneratorError):
+        generator.run_refresh(evidence, pricing, today="2026-09-19")
 
 
 def test_refresh_records_moved_price_with_new_date(scratch_copy, monkeypatch):

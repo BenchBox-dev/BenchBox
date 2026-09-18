@@ -34,7 +34,10 @@ Modes:
   API and the Azure Retail Prices API, folds moved prices into the evidence
   file (unchanged prices keep their recorded retrieval date, so an unchanged
   upstream regenerates byte-identical output), then regenerates. Network only;
-  runs on a schedule, never in the PR-blocking path.
+  runs on a schedule, never in the PR-blocking path. Refresh only revisits
+  regions already recorded in the evidence file: a brand-new vendor region is
+  not auto-discovered (consistent with the individually-selected-values
+  license posture) and must be added to the evidence file by hand.
 
 Redistribution of the emitted vendor-derived values ships under the accepted
 project-owner risk recorded alongside the redistribution-check item, not
@@ -189,6 +192,8 @@ def canonical_decimal(raw: str, *, min_places: int, max_places: int) -> str:
         raise PricingGeneratorError(f"not a decimal: {raw!r}") from exc
     if not value.is_finite():
         raise PricingGeneratorError(f"not a finite decimal: {raw!r}")
+    if value <= 0:
+        raise PricingGeneratorError(f"not a positive rate: {raw!r}")
     quantum = Decimal(1).scaleb(-max_places)
     narrowed = value.quantize(quantum)
     if narrowed != value:
