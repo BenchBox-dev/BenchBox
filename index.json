@@ -10900,6 +10900,17 @@
       "status": "open",
       "title": "Gate every cost consumer that reads total_cost without checking cost_status"
     },
+    "pricing-generator-and-drift-guard": {
+      "claim": null,
+      "needs": [
+        "pricing-provenance-units-and-tests",
+        "pricing-gate-ungated-cost-consumers",
+        "pricing-vendor-data-redistribution-check"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Generate pricing data from vendor APIs and add a drift guard"
+    },
     "pricing-provenance-units-and-tests": {
       "claim": null,
       "needs": [
