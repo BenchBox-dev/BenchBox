@@ -10872,6 +10872,15 @@
       "status": "open",
       "title": "Correct all cloud pricing tables against vendor list prices"
     },
+    "pricing-provenance-units-and-tests": {
+      "claim": null,
+      "needs": [
+        "pricing-data-correct-all-tables"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Add per-table pricing provenance, explicit units, and non-tautological tests"
+    },
     "process-spend-versus-product-spend-decision": {
       "claim": null,
       "needs": [],
