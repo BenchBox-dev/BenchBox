@@ -280,14 +280,25 @@ class TestGetQueryPlan:
         assert "HashMatch" in plan
         assert "TableScan" in plan
 
-    def test_returns_error_message_on_exception(self, adapter):
+    def test_returns_none_on_exception(self, adapter):
         mock_cursor = MagicMock()
         mock_cursor.execute.side_effect = Exception("plan not available")
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
         plan = adapter.get_query_plan(mock_conn, "SELECT 1")
-        assert "Failed to get query plan" in plan
+        assert plan is None
+
+    def test_failed_explain_records_explain_failed(self, adapter):
+        adapter.capture_plans = True
+        mock_cursor = MagicMock()
+        mock_cursor.execute.side_effect = Exception("plan not available")
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+
+        plan, _ = adapter.capture_query_plan(mock_conn, "SELECT 1", "q-err-fabric")
+        assert plan is None
+        assert adapter.plan_capture_errors[-1]["reason"] == "explain_failed"
 
 
 # ---------------------------------------------------------------------------

@@ -818,7 +818,7 @@ class TestDorisQueryExecution:
         assert call_args.startswith("EXPLAIN VERBOSE")
 
     def test_get_query_plan_failure(self):
-        """Test query plan retrieval failure."""
+        """Test query plan retrieval failure returns None (explain_failed)."""
         try:
             adapter = DorisAdapter()
         except ImportError:
@@ -831,7 +831,7 @@ class TestDorisQueryExecution:
 
         plan = adapter.get_query_plan(mock_connection, "SELECT 1")
 
-        assert "Failed to get query plan" in plan
+        assert plan is None
 
 
 class TestDorisPlatformInfo:

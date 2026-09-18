@@ -207,11 +207,14 @@ class TestSnowflakeRegionalPricing:
 
 
 class TestBigQueryRegionalPricing:
-    """Tests for BigQuery per-region pricing.
+    """Tests for BigQuery per-region pricing with continental bucket fallback.
 
-    Values are captured from the vendor pricing page
+    Captured values come from the vendor pricing page
     (https://cloud.google.com/bigquery/pricing, retrieved 2026-09-18),
     which embeds the full regional on-demand schedule in the page data.
+    Locations with no published table fall back to continental buckets;
+    unknown locations fail high via 'other'. The $6.25 US value is pinned
+    only by the cited golden in test_pricing_provenance.py.
     """
 
     def test_multi_region_pricing(self):
@@ -264,18 +267,39 @@ class TestBigQueryRegionalPricing:
             assert get_bigquery_price_per_tb(region) == price, region
             assert get_bigquery_price_per_tb(region.upper()) == price, region
 
-    def test_unknown_and_unpublished_regions_resolve_to_other(self):
-        """Test locations with no published price fail high via 'other'."""
+    def test_unlisted_regions_route_to_buckets(self):
+        """Test locations with no published table use continental buckets."""
+        # Listed in the page selector with no published on-demand table.
+        assert get_bigquery_price_per_tb("europe-west5") == BIGQUERY_ON_DEMAND_PRICES["eu-single"]
+        assert get_bigquery_price_per_tb("us-central2") == BIGQUERY_ON_DEMAND_PRICES["us-single"]
+
+    def test_unknown_regions_resolve_to_other(self):
+        """Test unknown locations fail high via 'other'."""
         other = BIGQUERY_ON_DEMAND_PRICES["other"]
         assert get_bigquery_price_per_tb("unknown-future-region") == other
-        # Listed in the page selector with no published on-demand table.
-        assert get_bigquery_price_per_tb("europe-west5") == other
-        assert get_bigquery_price_per_tb("us-central2") == other
 
     def test_other_fails_high(self):
         """Test the fallback is never cheaper than a known region."""
         known = [price for region, price in BIGQUERY_ON_DEMAND_PRICES.items() if region != "other"]
         assert BIGQUERY_ON_DEMAND_PRICES["other"] >= max(known)
+
+    def test_us_single_regions_match_multi_region(self):
+        """Test US single region pricing matches multi-region."""
+        price_us = get_bigquery_price_per_tb("us")
+        assert get_bigquery_price_per_tb("us-central1") == price_us
+        assert get_bigquery_price_per_tb("us-east1") == price_us
+
+    def test_eu_asia_single_regions_carry_premium(self):
+        """Test EU/Asia single regions cost more than multi-region."""
+        price_us = get_bigquery_price_per_tb("us")
+        for location in ["europe-west1", "europe-north1", "asia-southeast1", "asia-northeast1"]:
+            assert get_bigquery_price_per_tb(location) > price_us, location
+
+    def test_remote_buckets_carry_premium(self):
+        """Test Australia/South America/Middle East cost at least the US rate."""
+        price_us = get_bigquery_price_per_tb("us")
+        for location in ["australia-southeast1", "southamerica-east1", "me-west1"]:
+            assert get_bigquery_price_per_tb(location) >= price_us, location
 
 
 class TestRedshiftRegionalPricing:

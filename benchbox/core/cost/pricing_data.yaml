@@ -30,11 +30,14 @@ provenance:
       All 48 regional on-demand tables are embedded in the page data, so a
       plain fetch plus parse captures the full schedule; no browser
       automation is needed. The page selector lists europe-west5 and
-      us-central2 with no published on-demand table, and no Asia
-      multi-region entry; the asia multi-region value below is the retained
-      2026-09-18 citation. The Cloud Billing Catalog API also exposes these
-      SKUs but requires GCP authentication; the Cloud SKUs page renders
-      client-side with no price data in the HTML.
+      us-central2 with no published on-demand table (they route to the
+      eu-single/us-single buckets), and no Asia multi-region entry; the
+      asia multi-region value below is the retained 2026-09-18 citation.
+      The Cloud Billing Catalog API also exposes these SKUs but requires
+      GCP authentication; the Cloud SKUs page renders client-side with no
+      price data in the HTML. Continental bucket entries (us-single and
+      friends) carry the pricing-correction values for locations with no
+      published table.
     verified_regions: [us, eu, africa-south1, asia-east1, asia-east2,
       asia-northeast1, asia-northeast2, asia-northeast3, asia-south1,
       asia-south2, asia-southeast1, asia-southeast2, asia-southeast3,
@@ -181,6 +184,12 @@ bigquery_on_demand_prices:
   us: 6.25
   eu: 6.25
   asia: 6.25
+  us-single: 6.25
+  eu-single: 6.875
+  asia-single: 6.875
+  australia: 7.5
+  southamerica: 7.8125
+  middleeast: 7.5
   africa-south1: 7.5
   asia-east1: 7.1875
   asia-east2: 8.75

@@ -374,13 +374,14 @@ class MySqlWireLifecycleMixin:
         connection: Any,
         query: str,
         explain_options: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str | None:
         cursor = connection.cursor()
         try:
             cursor.execute(f"{self._explain_query_prefix(explain_options)} {query}")
             return self._format_query_plan_rows(cursor.fetchall())
         except Exception as exc:
-            return f"Failed to get query plan: {exc}"
+            self.logger.warning(f"Failed to get query plan: {exc}")
+            return None
         finally:
             cursor.close()
 

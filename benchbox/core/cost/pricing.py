@@ -148,11 +148,14 @@ def get_bigquery_price_per_tb(location: str) -> float:
 
     Prices are captured per region from the vendor pricing page
     (https://cloud.google.com/bigquery/pricing, retrieved 2026-09-18),
-    which embeds the full regional schedule in the page data. The page
-    selector lists europe-west5 and us-central2 with no published
-    on-demand table, and publishes no Asia multi-region entry (the asia
-    table value is the retained 2026-09-18 citation). Unpublished and
-    unknown locations resolve to the 'other' fallback.
+    which embeds the full regional schedule in the page data. An exact
+    table entry wins; locations with no published table fall back to
+    continental buckets, and unknown locations resolve to the 'other'
+    fallback, which fails high. The page selector lists europe-west5
+    and us-central2 with no published on-demand table (they route to
+    the eu-single/us-single buckets), and publishes no Asia
+    multi-region entry (the asia table value is the retained 2026-09-18
+    citation).
 
     Args:
         location: BigQuery location/region (e.g., us-east1, EU, us)
@@ -170,9 +173,81 @@ def get_bigquery_price_per_tb(location: str) -> float:
     elif location in ["asia", "asia-multi"]:
         return BIGQUERY_ON_DEMAND_PRICES["asia"]
 
-    # Captured per-region prices; unknown or unpublished locations resolve
-    # to 'other', which fails high (it equals the highest captured price).
-    return BIGQUERY_ON_DEMAND_PRICES.get(location, BIGQUERY_ON_DEMAND_PRICES["other"])
+    # Captured per-region prices first: an exact table entry is the most
+    # precise value for that location.
+    if location in BIGQUERY_ON_DEMAND_PRICES:
+        return BIGQUERY_ON_DEMAND_PRICES[location]
+
+    # US single regions (same as multi-region)
+    us_single_regions = {
+        "us-central1",
+        "us-east1",
+        "us-east4",
+        "us-west1",
+        "us-west2",
+        "us-west3",
+        "us-west4",
+        "northamerica-northeast1",
+        "northamerica-northeast2",  # Canada
+        "northamerica-south1",  # Mexico
+    }
+    if location in us_single_regions or location.startswith("us-"):
+        return BIGQUERY_ON_DEMAND_PRICES["us-single"]
+
+    # EU single regions
+    eu_single_regions = {
+        "europe-central2",
+        "europe-north1",
+        "europe-north2",
+        "europe-southwest1",
+        "europe-west1",
+        "europe-west2",
+        "europe-west3",
+        "europe-west4",
+        "europe-west6",
+        "europe-west8",
+        "europe-west9",
+        "europe-west10",
+        "europe-west12",
+    }
+    if location in eu_single_regions or location.startswith("europe-"):
+        return BIGQUERY_ON_DEMAND_PRICES["eu-single"]
+
+    # Asia single regions
+    asia_single_regions = {
+        "asia-east1",
+        "asia-east2",  # Taiwan, Hong Kong
+        "asia-northeast1",
+        "asia-northeast2",
+        "asia-northeast3",  # Tokyo, Osaka, Seoul
+        "asia-south1",
+        "asia-south2",  # Mumbai, Delhi
+        "asia-southeast1",
+        "asia-southeast2",  # Singapore, Jakarta
+        "asia-southeast3",
+        "asia-southeast4",
+    }
+    if location in asia_single_regions or location.startswith("asia-"):
+        return BIGQUERY_ON_DEMAND_PRICES["asia-single"]
+
+    # Australia regions (higher pricing)
+    australia_regions = {"australia-southeast1", "australia-southeast2"}
+    if location in australia_regions or location.startswith("australia-"):
+        return BIGQUERY_ON_DEMAND_PRICES["australia"]
+
+    # South America regions (higher pricing)
+    southamerica_regions = {"southamerica-east1", "southamerica-west1"}
+    if location in southamerica_regions or location.startswith("southamerica-"):
+        return BIGQUERY_ON_DEMAND_PRICES["southamerica"]
+
+    # Middle East regions (higher pricing)
+    middleeast_regions = {"me-west1", "me-central1", "me-central2"}
+    if location in middleeast_regions or location.startswith("me-"):
+        return BIGQUERY_ON_DEMAND_PRICES["middleeast"]
+
+    # Default to 'other' pricing for unknown regions, which fails high
+    # ('other' equals the highest captured price).
+    return BIGQUERY_ON_DEMAND_PRICES["other"]
 
 
 def get_redshift_node_price(node_type: str, region: str) -> float:

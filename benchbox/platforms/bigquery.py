@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
 import time
@@ -55,6 +56,11 @@ except ImportError:
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+def _lazy_query_parser(module_name: str, class_name: str) -> Any:
+    """Import and instantiate a parser class without a top-level import cycle."""
+    return getattr(importlib.import_module(module_name), class_name)()
 
 
 class BigQueryAdapter(PlatformAdapter):
@@ -1586,6 +1592,8 @@ class BigQueryAdapter(PlatformAdapter):
                 if query_plan:
                     result_dict["query_plan"] = query_plan
                     result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                    if getattr(self, "normalize_plan_literals", False):
+                        result_dict["plan_fingerprint_normalized"] = query_plan.normalized_fingerprint
                 if plan_capture_time_ms is not None:
                     result_dict["plan_capture_time_ms"] = plan_capture_time_ms
 
@@ -1763,36 +1771,15 @@ class BigQueryAdapter(PlatformAdapter):
 
         return metadata
 
-    def get_query_plan(self, connection: Any, query: str) -> dict[str, Any]:
-        """Get query execution plan for analysis."""
-        try:
-            # Use dry run to get query plan without execution
-            job_config = bigquery.QueryJobConfig(dry_run=True)
-            # Note: Query dialect translation is now handled automatically by the base adapter
-            qualified_query = self._qualify_table_names(query)
-
-            query_job = connection.query(qualified_query, job_config=job_config)
-
-            return {
-                "bytes_processed": query_job.total_bytes_processed,
-                "estimated_cost": query_job.total_bytes_processed / (1024**4) * 5,  # Rough cost estimate
-                "query_plan": "Dry run completed",
-                "job_id": query_job.job_id,
-            }
-
-        except Exception as e:
-            return {"error": str(e)}
+    # No get_query_plan override: BigQuery has no EXPLAIN-text plan path and
+    # ResultCaptureMixin.get_query_plan already returns None, which is exactly
+    # this contract. Plans are harvested from the completed QueryJob via
+    # _capture_bq_plan; generic capture_query_plan degrades a None plan to
+    # explain_failed instead of crashing on .strip().
 
     def get_query_plan_parser(self):
-        """Get BigQuery query plan parser.
-
-        BigQuery captures plans from job statistics via ``_capture_bq_plan``
-        rather than the EXPLAIN-output path, but the parser is exposed here for
-        symmetry with the other adapters and for direct use.
-        """
-        from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
-
-        return BigQueryQueryPlanParser()
+        """Expose the BigQuery plan parser for symmetry with other adapters."""
+        return _lazy_query_parser("benchbox.core.query_plans.parsers.bigquery", "BigQueryQueryPlanParser")
 
     def _capture_bq_plan(self, job: Any, query_id: str) -> tuple[Any, float]:
         """Capture the structured plan from a completed BigQuery ``QueryJob``.
