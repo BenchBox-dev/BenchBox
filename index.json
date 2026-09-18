@@ -10892,9 +10892,9 @@
     },
     "pricing-docs-price-sync": {
       "claim": {
-        "expires_at": "2026-09-19T13:37:29Z",
-        "generation": "a83b43b4486048af8fc9d4ac63659f3d",
-        "renewals": 0,
+        "expires_at": "2026-09-19T13:59:01Z",
+        "generation": "276b0469d17f48e1822dd37494c9461b",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
       },
       "needs": [
