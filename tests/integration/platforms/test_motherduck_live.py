@@ -192,3 +192,54 @@ class TestLiveMotherDuckSpecificFeatures:
             assert len(result) > 0, "Expected at least one database in SHOW DATABASES"
         finally:
             live_motherduck_adapter.close_connection(connection)
+
+
+@pytest.fixture(scope="module")
+def capture_adapter(motherduck_credentials):
+    from benchbox.platforms.motherduck import MotherDuckAdapter
+
+    return MotherDuckAdapter(capture_plans=True, **motherduck_credentials)
+
+
+class TestLiveMotherDuckQueryPlanCapture:
+    """Live plan-capture verification against MotherDuck cloud (SELECT 1 only)."""
+
+    def test_get_query_plan_returns_text(self, capture_adapter):
+        connection = capture_adapter.create_connection()
+        try:
+            plan = capture_adapter.get_query_plan(connection, "SELECT 1")
+            assert plan is not None
+            assert isinstance(plan, str)
+            assert len(plan.strip()) > 0
+        finally:
+            capture_adapter.close_connection(connection)
+
+    def test_capture_query_plan_returns_dag(self, capture_adapter):
+        connection = capture_adapter.create_connection()
+        try:
+            plan, capture_ms = capture_adapter.capture_query_plan(connection, "SELECT 1", "q_test")
+            assert plan is not None, "Expected a QueryPlanDAG but got None"
+            assert capture_ms >= 0.0
+            assert plan.logical_root is not None
+        finally:
+            capture_adapter.close_connection(connection)
+
+    def test_capture_query_plan_has_fingerprint(self, capture_adapter):
+        connection = capture_adapter.create_connection()
+        try:
+            plan, _ = capture_adapter.capture_query_plan(connection, "SELECT 1", "q_fp")
+            assert plan is not None
+            assert plan.plan_fingerprint
+            assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+        finally:
+            capture_adapter.close_connection(connection)
+
+    def test_capture_query_plan_fingerprint_stable(self, capture_adapter):
+        connection = capture_adapter.create_connection()
+        try:
+            plan1, _ = capture_adapter.capture_query_plan(connection, "SELECT 1", "q_stable")
+            plan2, _ = capture_adapter.capture_query_plan(connection, "SELECT 1", "q_stable")
+            assert plan1 is not None and plan2 is not None
+            assert plan1.plan_fingerprint == plan2.plan_fingerprint
+        finally:
+            capture_adapter.close_connection(connection)

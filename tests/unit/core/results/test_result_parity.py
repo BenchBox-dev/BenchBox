@@ -392,7 +392,7 @@ def test_exported_sql_and_dataframe_bundles_share_cross_mode_contract(tmp_path):
     df_payload = _export_payload(tmp_path, _build_dataframe_export_parity_result(), "df-export-parity")
 
     required_top_level = {
-        "version",
+        "result_schema_version",
         "run",
         "benchmark",
         "platform",
@@ -407,7 +407,9 @@ def test_exported_sql_and_dataframe_bundles_share_cross_mode_contract(tmp_path):
     assert required_top_level.issubset(df_payload)
     assert set(sql_payload) - set(df_payload) <= {"tables"}
     assert set(df_payload) - set(sql_payload) <= {"tables"}
-    assert sql_payload["version"] == df_payload["version"]
+    assert sql_payload["result_schema_version"] == df_payload["result_schema_version"]
+    assert "version" not in sql_payload
+    assert "version" not in df_payload
     assert sql_payload["benchmark"] == df_payload["benchmark"]
 
     assert sql_payload["config"]["compression"] == df_payload["config"]["compression"]

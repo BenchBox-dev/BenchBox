@@ -16,7 +16,9 @@ from benchbox.core.cost.pricing import (
     CURRENCY,
     PRICING_VERSION,
     PriceResolution,
+    get_pricing_age_days,
     get_table_unit,
+    is_pricing_stale,
     resolve_athena_price_per_tb,
     resolve_bigquery_price_per_tb,
     resolve_databricks_dbu_price,
@@ -65,6 +67,31 @@ def _stamp_price_unavailable(details: dict[str, Any], resolution: PriceResolutio
             "resolved_key": list(resolution.resolved_key),
             "reason": resolution.reason,
         }
+
+
+def _fallback_price_tables(benchmark_cost: BenchmarkCost) -> dict[str, str | None]:
+    """Collect price tables whose queries were priced from a fallback lookup.
+
+    Scans ``phase_costs[*].query_costs[*].pricing_details`` for the
+    ``price_unavailable`` marker stamped by :func:`_stamp_price_unavailable`.
+    Returns one entry per table (the first recorded reason) so a multi-query
+    phase emits one warning per table, not one per query. This is the
+    calculator-level guard for unverified regions: Athena and Synapse
+    serverless resolve out-of-provenance regions as flagged fallbacks, so
+    their markers arrive here with no pricing.py change.
+    """
+    markers: dict[str, str | None] = {}
+    for phase in benchmark_cost.phase_costs or []:
+        for query_cost in phase.query_costs or []:
+            marker = query_cost.pricing_details.get("price_unavailable")
+            if not isinstance(marker, dict):
+                continue
+            table = marker.get("table")
+            if not isinstance(table, str) or not table or table in markers:
+                continue
+            reason = marker.get("reason")
+            markers[table] = reason if isinstance(reason, str) and reason else None
+    return markers
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -315,6 +342,16 @@ class CostCalculator:
             deployment.warehouse_size or deployment.cluster_size
         ):
             warnings.append("normalized cost unavailable: Databricks warehouse or cluster size metadata missing")
+        for table, reason in sorted(_fallback_price_tables(benchmark_cost).items()):
+            if reason:
+                warnings.append(f"normalized cost unavailable: fallback pricing used for {table} ({reason})")
+            else:
+                warnings.append(f"normalized cost unavailable: fallback pricing used for {table}")
+        if is_pricing_stale():
+            warnings.append(
+                f"normalized cost unavailable: pricing data is {get_pricing_age_days()} days old; "
+                "costs may be inaccurate"
+            )
         return warnings
 
     def calculate_query_cost(
@@ -601,15 +638,18 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for an Athena query.
 
-        Athena charges $5.00 per TB of data scanned. BenchBox derives cost
-        from measured data_scanned_bytes plus its pricing table; legacy
-        adapter-provided cost_usd is ignored when present.
+        Athena is priced per TB of data scanned from a regional table
+        ($5.00 in us-east-1/eu-west-1/ap-southeast-1/ap-northeast-1, $9.00
+        in sa-east-1); unlisted regions resolve as flagged fallbacks that
+        cannot publish as normalized cost. BenchBox derives cost from measured
+        data_scanned_bytes plus its pricing table; legacy adapter-provided
+        cost_usd is ignored when present.
 
         Expected resource_usage fields:
             - data_scanned_bytes: Bytes scanned by the query
 
         Expected platform_config fields:
-            - region: AWS region (for informational purposes; pricing is uniform)
+            - region: AWS region (pricing is verified per-region, not uniform)
         """
         data_scanned_bytes = resource_usage.get("data_scanned_bytes")
         if data_scanned_bytes is None:
@@ -649,7 +689,10 @@ class CostCalculator:
         """Calculate cost for an Azure Synapse Analytics query.
 
         Synapse has two modes:
-        - Serverless: $5.00 per TB of data processed (similar to Athena/BigQuery)
+        - Serverless: per-TB-of-data-processed pricing from a regional
+          table ($5.00 eastus/westeurope, $6.75 southeastasia, $5.50
+          canadacentral, $9.00 brazilsouth); unlisted regions resolve as
+          flagged fallbacks that cannot publish as normalized cost
         - Dedicated: DWU-hour based pricing (similar to Redshift)
 
         Expected resource_usage fields:

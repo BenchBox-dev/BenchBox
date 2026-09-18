@@ -136,6 +136,10 @@ def normalize_schema_version_value(raw_version: Any) -> tuple[str | None, str | 
 
 def result_schema_version_value(data: dict[str, Any]) -> Any:
     """Return the explicit result schema version from a bundle-like mapping."""
+    if not isinstance(data, dict):
+        return None
+    if "result_schema_version" in data:
+        return data.get("result_schema_version")
     if "version" in data:
         return data.get("version")
     return data.get("schema_version")
@@ -198,4 +202,4 @@ def detect_normalizer_schema_version(data: dict[str, Any]) -> str:
 
 def is_loader_supported_result_schema(data: dict[str, Any]) -> bool:
     """Return whether *data* is acceptable for runtime result loading."""
-    return LOADER_SCHEMA_POLICY.evaluate(data.get("version")).accepted
+    return LOADER_SCHEMA_POLICY.evaluate(result_schema_version_value(data)).accepted

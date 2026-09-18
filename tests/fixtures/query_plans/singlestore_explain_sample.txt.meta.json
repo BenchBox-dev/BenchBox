@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "SingleStore EXPLAIN documented chain-tree shape",
+  "validated_against_live": false
+}

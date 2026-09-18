@@ -71,7 +71,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     throw new LocalResultImportError("This file is not valid JSON.");
   }
   const bundle = objectOrError(parsed, "The JSON root must be an object.");
-  const version = requiredString(bundle.version, "version");
+  const version = requiredString(bundle.result_schema_version ?? bundle.version, "result_schema_version");
   if (!SUPPORTED_SCHEMA_VERSIONS.has(version)) {
     throw new LocalResultImportError(
       `Schema ${version} is not supported. Local preview accepts BenchBox result schemas 2.0, 2.1, and 2.2.`,

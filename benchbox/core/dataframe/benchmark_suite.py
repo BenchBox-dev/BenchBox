@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any
 
 from benchbox.core.dataframe.profiling import (
     MemoryTracker,
+    capture_query_plan,
 )
 from benchbox.core.tpch.dataframe_queries import get_tpch_dataframe_queries
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -632,6 +633,17 @@ class DataFrameBenchmarkSuite:
 
                 start_time = time.perf_counter()
                 result = query.execute(context, family)
+
+                # Capture the lazy plan once, before the first collect. A plan
+                # is a property of (query, schema, engine), so one capture per
+                # query suffices; capture failures degrade to None.
+                if i == 0 and self.config.capture_plans and query_plan is None:
+                    try:
+                        plan = capture_query_plan(result, platform_name)
+                        if plan is not None:
+                            query_plan = plan.plan_text
+                    except Exception as e:
+                        logger.debug(f"Could not capture DataFrame plan for {query_id}: {e}")
 
                 # Collect if lazy
                 if hasattr(result, "collect"):
