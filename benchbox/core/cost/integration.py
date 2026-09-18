@@ -721,9 +721,15 @@ def _resolve_databricks_compute(
         # A serverless warehouse is reported by the adapter as
         # warehouse_type="SERVERLESS" (raw PRO + enable_serverless_compute);
         # PRO and CLASSIC bill as provisioned SQL compute.
+        config["warehouse_type"] = warehouse_type
         config["workload_type"] = "serverless_sql" if str(warehouse_type).upper() == "SERVERLESS" else "sql_compute"
     else:
+        # No warehouse metadata to distinguish SQL compute from all-purpose.
+        # Keep the conservative mapping so a per-query estimate is still
+        # possible, but record it as defaulted: a SQL run priced at
+        # all-purpose rates must not publish as normalized.
         config["workload_type"] = "all_purpose"
+        defaulted_fields.append("workload_type")
 
     warehouse_size = _observed_or_requested(
         compute,
