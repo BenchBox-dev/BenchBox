@@ -13025,6 +13025,15 @@
       "status": "open",
       "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
     },
+    "result-bundle-compat-reconcile-review": {
+      "claim": null,
+      "needs": [
+        "result-bundle-compat-dispatch-review"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Result-bundle compat: reconcile agy+muse findings with P1-P8"
+    },
     "result-export-explicit-raw-config-egress-sentinel-gate": {
       "claim": null,
       "needs": [],

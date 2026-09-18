@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "Reconciliation table lists every [agy] and [muse] finding separately (never merged) alongside original P1-P8 as reviewer|severity|location|disposition|evidence|remediation",
+    "Exactly one disposition per finding: ACCEPT, NARROW, ALREADY_FIXED, DEFER(-blocked/-unverified), or REBUT, with required evidence; re-verified against current tree (not brief snapshot); reviewer disagreement preserved, not picked-a-side",
+    "New section appended to _project/audits/result-bundle-downstream-compat-2026-09-18.md (frontmatter date 2026-09-18, develop_sha ed4907010) following _project/audits/ convention",
+    "Every ACCEPT/ALREADY_FIXED/REBUT cites file:line or commit SHA per review-response.md"
+  ],
+  "context": "Depends on dispatch-review output (both reviewer result sets + responder/timeout report). Re-verify against current tree before dispositioning. Audit file is created by this item; follow existing _project/audits/ frontmatter/convention. Authority: shared-review-protocol/references/review-response.md.",
+  "description": "Goal: reconcile draft P1-P8 with the two independent reviewer result sets into dispositioned findings. Method per review-response.md: (1) Tabulate every [agy] and [muse] finding separately (never merged) alongside original P1-P8 as reviewer|severity|location|disposition|evidence|remediation. (2) Assign exactly one disposition per finding — ACCEPT, NARROW, ALREADY_FIXED, DEFER(-blocked or -unverified), or REBUT — with the evidence each requires; re-verify against current tree (not brief static snapshot); preserve disagreement between reviewers rather than picking a side. (3) Append reconciliation as new section of _project/audits/result-bundle-downstream-compat-2026-09-18.md created by this item (frontmatter date: 2026-09-18, develop_sha: ed4907010), following existing _project/audits/ convention. Inputs: Phase-1 reviewer outputs + responder status, draft P1-P8 text (see dispatch TODO), current tree. Does not apply fixes — triage only; ACCEPT/NARROW small file-scoped items go to integrate-fixes TODO, design-decision items go to follow-on TODOs.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
