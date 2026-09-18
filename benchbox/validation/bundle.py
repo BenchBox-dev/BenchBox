@@ -311,6 +311,47 @@ def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
         if normalized not in KNOWN_PLATFORMS:
             vr.warn(f"Unknown platform name: {pl_name!r}")
 
+    _validate_inline_applied_ledger(platform, vr)
+
+
+def _validate_inline_applied_ledger(platform: dict, vr: ValidationResult) -> None:
+    """Bound the applied-tuning ledger inlined at ``platform.tuning.applied``.
+
+    The ledger is carried inside the bundle as well as in the ``.applied.json``
+    companion. ``_validate_applied_companion_limits`` bounds the companion by
+    filename, so the inlined copy needs its own bounds here: the validator runs
+    on attacker-controlled PR JSON, and a hand-authored bundle can inline an
+    unbounded ledger while shipping no companion at all.
+
+    Both dimensions are bounded, because either alone is evadable. An entry cap
+    alone passes a handful of entries holding multi-megabyte strings; a byte cap
+    alone passes a million tiny entries. The serialized size is measured over
+    this block only, so it bounds what the inlining added rather than the whole
+    bundle.
+    """
+    tuning = platform.get("tuning")
+    if not isinstance(tuning, dict):
+        return
+    applied = tuning.get("applied")
+    if not isinstance(applied, dict):
+        return
+
+    for label, count in _oversized_applied_ledger_arrays(applied):
+        vr.error(
+            f"platform.tuning.applied.{label} exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit ({count} entries)"
+        )
+
+    try:
+        size = len(json.dumps(applied, separators=(",", ":")).encode("utf-8"))
+    except (TypeError, ValueError):
+        # Unserializable content is a shape problem owned by the producer; this
+        # gate gets no say in it and must not broaden rejection semantics.
+        return
+    if size > APPLIED_COMPANION_MAX_BYTES:
+        vr.error(
+            f"platform.tuning.applied exceeds the {APPLIED_COMPANION_MAX_BYTES}-byte limit ({size} bytes serialized)"
+        )
+
 
 def _validate_summary_section(
     summary: Any,
@@ -897,15 +938,45 @@ def _validate_applied_companion_limits(companion: Path, vr: ValidationResult) ->
         # Companion schema validation remains owned by its producer. This gate
         # only bounds inputs and must not broaden existing rejection semantics.
         return True
-    receipt = payload.get("receipt") if isinstance(payload, dict) else None
-    entries = receipt.get("entries") if isinstance(receipt, dict) else None
-    if isinstance(entries, list) and len(entries) > APPLIED_RECEIPT_MAX_ENTRIES:
+    if not isinstance(payload, dict):
+        return True
+    # Same array bounds the inlined copy gets. The file-size cap above stops the
+    # multi-megabyte-string shape; these stop the many-tiny-entries shape, which
+    # a byte cap alone lets through.
+    oversized = _oversized_applied_ledger_arrays(payload)
+    for label, count in oversized:
         vr.error(
             f"Applied receipt {companion.name} exceeds the {APPLIED_RECEIPT_MAX_ENTRIES}-entry limit "
-            f"({len(entries)} entries)"
+            f"at {label} ({count} entries)"
         )
-        return False
-    return True
+    return not oversized
+
+
+def _oversized_applied_ledger_arrays(applied: dict) -> list[tuple[str, int]]:
+    """Return every applied-ledger array that breaches the per-array entry cap.
+
+    Shared by the companion gate and the inlined-block gate so one ledger shape
+    cannot be bounded in one location and unbounded in the other.
+    """
+    receipt = applied.get("receipt") if isinstance(applied.get("receipt"), dict) else {}
+    drift = applied.get("drift_check") if isinstance(applied.get("drift_check"), dict) else {}
+    candidates = (
+        ("statements", applied.get("statements")),
+        ("dropped", applied.get("dropped")),
+        ("receipt.entries", receipt.get("entries")),
+        ("receipt.observed", receipt.get("observed")),
+        ("receipt.dropped", receipt.get("dropped")),
+        ("drift_check.errors", drift.get("errors")),
+        ("drift_check.warnings", drift.get("warnings")),
+        ("drift_check.configuration_mismatches", drift.get("configuration_mismatches")),
+        ("drift_check.missing_tables", drift.get("missing_tables")),
+        ("drift_check.extra_tables", drift.get("extra_tables")),
+    )
+    return [
+        (label, len(value))
+        for label, value in candidates
+        if isinstance(value, list) and len(value) > APPLIED_RECEIPT_MAX_ENTRIES
+    ]
 
 
 def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, vr: ValidationResult) -> None:

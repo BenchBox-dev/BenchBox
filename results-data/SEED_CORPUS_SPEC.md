@@ -136,7 +136,6 @@ results-data/
         sf{scale_factor}/
           {run_id}.json
           {run_id}.plans.json
-          {run_id}.tuning.json
 ```
 
 Scale-factor directory naming follows the raw CLI `--scale` value:
