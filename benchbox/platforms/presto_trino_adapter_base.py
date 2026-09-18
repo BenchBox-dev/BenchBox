@@ -459,7 +459,7 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         from benchbox.platforms.presto_trino_utils import execute_schema_statements
 
         start_time = mono_time()
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
         execute_schema_statements(
             schema_sql=schema_sql,
             connection=connection,

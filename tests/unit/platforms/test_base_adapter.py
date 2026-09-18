@@ -1182,7 +1182,7 @@ class TestConsolidatedFunctionality:
                     mock_benchmark.get_create_tables_sql.assert_called_with(
                         dialect="postgres", tuning_config=mock_tuning_config
                     )
-                    adapter.translate_sql.assert_called_with("original_sql", "duckdb")
+                    adapter.translate_sql.assert_called_with("original_sql", "standard")
                     assert result == "translated_sql"
 
         # Test fallback to legacy signature
@@ -1215,7 +1215,7 @@ class TestConsolidatedFunctionality:
                     assert calls[1].args == ()
                     assert calls[1].kwargs == {}
 
-                    adapter2.translate_sql.assert_called_with("fallback_sql_original", "duckdb")
+                    adapter2.translate_sql.assert_called_with("fallback_sql_original", "standard")
                     assert result == "fallback_sql"
 
     def test_get_constraint_configuration_helper(self):

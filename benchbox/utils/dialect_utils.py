@@ -4,6 +4,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import hashlib
 import re
 from collections import Counter
 from collections.abc import Iterator, Sequence
@@ -11,6 +12,34 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from typing import Callable
+
+#: Translation workload scopes. ``schema_ddl`` marks schema-creation DDL while
+#: ``workload_query`` marks benchmark query text (the default).
+SCHEMA_DDL_SCOPE = "schema_ddl"
+WORKLOAD_QUERY_SCOPE = "workload_query"
+
+
+def _resolve_translation_scope(scope: str | None) -> str:
+    """Return the effective workload scope, defaulting to benchmark queries."""
+    if scope is None:
+        return WORKLOAD_QUERY_SCOPE
+    if scope not in (SCHEMA_DDL_SCOPE, WORKLOAD_QUERY_SCOPE):
+        raise ValueError(f"Unknown SQL translation scope: {scope!r}")
+    return scope
+
+
+def _fingerprint_sql(sql: str) -> str:
+    """Return a stable content hash identifying one logical SQL statement.
+
+    Non-cryptographic dedup hash only (counting distinct statements per run),
+    never a security boundary; collision risk at benchmark scale is negligible.
+    """
+    return hashlib.sha1(" ".join(sql.split()).encode()).hexdigest()
+
+
+def translation_collection_active() -> bool:
+    """Return True when a translation context is collecting outcomes."""
+    return _SQL_TRANSLATION_OUTCOMES.get() is not None
 
 
 @dataclass(frozen=True)
@@ -27,10 +56,15 @@ class SqlTranslationOutcome:
     warning_category: str | None = None
     error_category: str | None = None
     message: str | None = None
+    scope: str | None = None
+    query_fingerprint: str | None = None
+
+    def __post_init__(self) -> None:
+        _resolve_translation_scope(self.scope)
 
     def to_dict(self) -> dict[str, object]:
         """Return a compact JSON-ready representation."""
-        return {key: value for key, value in asdict(self).items() if value is not None}
+        return {key: value for key, value in asdict(self).items() if value is not None and key != "query_fingerprint"}
 
 
 class SQLTranslationError(RuntimeError):
@@ -78,7 +112,14 @@ def summarize_sql_translation_outcomes(
     *,
     strict_mode: bool | None = None,
 ) -> dict[str, object] | None:
-    """Summarize translation outcomes for result-bundle execution metadata."""
+    """Summarize translation outcomes for result-bundle execution metadata.
+
+    Uniqueness counts distinct source texts within each scope: repeated
+    translation of the same logical query (preflight, iterations, metadata
+    capture) counts once, regardless of target dialect. Schema granularity
+    follows the translation call: one fingerprint per multi-statement block
+    on the adapter path, one per statement for per-statement callers.
+    """
     if not outcomes:
         return None
 
@@ -91,8 +132,11 @@ def summarize_sql_translation_outcomes(
         status = "success"
 
     grouped: dict[tuple[object, ...], dict[str, object]] = {}
+    group_fingerprints: dict[tuple[object, ...], set[str]] = {}
     for outcome in outcomes:
+        scope = _resolve_translation_scope(outcome.scope)
         key = (
+            scope,
             outcome.source_dialect,
             outcome.target_dialect,
             outcome.normalized_source_dialect,
@@ -106,12 +150,32 @@ def summarize_sql_translation_outcomes(
         entry = grouped.get(key)
         if entry is None:
             entry = outcome.to_dict()
+            entry["scope"] = scope
+            if outcome.normalized_source_dialect is not None:
+                entry["parser_grammar"] = outcome.normalized_source_dialect
             entry["count"] = 0
             grouped[key] = entry
+            group_fingerprints[key] = set()
         entry["count"] = int(entry["count"]) + 1
+        entry["calls"] = entry["count"]
+        if outcome.query_fingerprint is not None:
+            group_fingerprints[key].add(outcome.query_fingerprint)
+    for key, entry in grouped.items():
+        if group_fingerprints[key]:
+            entry["unique_queries"] = len(group_fingerprints[key])
 
     warning_categories = sorted({outcome.warning_category for outcome in outcomes if outcome.warning_category})
     error_categories = sorted({outcome.error_category for outcome in outcomes if outcome.error_category})
+    workload_fingerprints = {
+        outcome.query_fingerprint
+        for outcome in outcomes
+        if _resolve_translation_scope(outcome.scope) == WORKLOAD_QUERY_SCOPE and outcome.query_fingerprint is not None
+    }
+    schema_fingerprints = {
+        outcome.query_fingerprint
+        for outcome in outcomes
+        if _resolve_translation_scope(outcome.scope) == SCHEMA_DDL_SCOPE and outcome.query_fingerprint is not None
+    }
 
     summary: dict[str, object] = {
         "status": status,
@@ -120,6 +184,7 @@ def summarize_sql_translation_outcomes(
         "success_count": counts.get("success", 0),
         "fallback_count": counts.get("fallback", 0),
         "failed_count": counts.get("failed", 0),
+        "total_transpilation_calls": len(outcomes),
         "translators": sorted({outcome.translator for outcome in outcomes if outcome.translator}),
         "source_dialects": sorted({outcome.source_dialect for outcome in outcomes if outcome.source_dialect}),
         "target_dialects": sorted({outcome.target_dialect for outcome in outcomes if outcome.target_dialect}),
@@ -131,9 +196,14 @@ def summarize_sql_translation_outcomes(
                 str(item.get("target_dialect", "")),
                 str(item.get("warning_category", "")),
                 str(item.get("error_category", "")),
+                str(item.get("scope", "")),
             ),
         ),
     }
+    if workload_fingerprints:
+        summary["unique_queries_translated"] = len(workload_fingerprints)
+    if schema_fingerprints:
+        summary["schema_statements_translated"] = len(schema_fingerprints)
     if warning_categories:
         summary["warning_categories"] = warning_categories
     if error_categories:
@@ -256,8 +326,8 @@ def normalize_dialect_for_sqlglot(dialect: str) -> str:
         "greenplum": "postgres",  # Greenplum is PostgreSQL-based
         "vertica": "postgres",  # Vertica uses PostgreSQL-compatible SQL
         "datafusion": "postgres",  # DataFusion uses PostgreSQL-compatible SQL
-        "ansi": "postgres",  # ANSI SQL → PostgreSQL (defensive mapping, should not be used)
-        "standard": "postgres",  # Standard SQL → PostgreSQL (defensive mapping, should not be used)
+        "ansi": "postgres",  # ANSI standard SQL parses with the PostgreSQL grammar
+        "standard": "postgres",  # Standard SQL (schema DDL) parses with the PostgreSQL grammar
         # DuckDB, ClickHouse, BigQuery, Snowflake, Redshift already supported directly
     }
 
@@ -272,6 +342,7 @@ def translate_sql_query(
     pre_processors: list[Callable[[str], str]] | None = None,
     post_processors: list[Callable[[str], str]] | None = None,
     strict: bool | None = None,
+    scope: str | None = None,
 ) -> str:
     """Translate SQL query from source dialect to target dialect using SQLGlot.
 
@@ -293,6 +364,9 @@ def translate_sql_query(
         strict: When True, raise SQLTranslationError instead of returning the
             original query on translator import or translation failure. When
             omitted, the active sql_translation_context policy is used.
+        scope: Workload scope recorded on the outcome (``SCHEMA_DDL_SCOPE`` for
+            schema DDL, ``WORKLOAD_QUERY_SCOPE`` otherwise). Defaults to
+            benchmark queries.
 
     Returns:
         Translated SQL query text. Returns original query if translation fails.
@@ -313,6 +387,7 @@ def translate_sql_query(
 
     logger = logging.getLogger(__name__)
     strict_mode = current_sql_translation_strict_mode() if strict is None else strict
+    fingerprint = _fingerprint_sql(query) if translation_collection_active() else None
 
     try:
         import sqlglot
@@ -326,6 +401,8 @@ def translate_sql_query(
             warning_category=None if strict_mode else "translator_unavailable",
             error_category="translator_unavailable" if strict_mode else None,
             message="SQLGlot not available",
+            scope=scope,
+            query_fingerprint=fingerprint,
         )
         record_sql_translation_outcome(outcome)
         if strict_mode:
@@ -376,6 +453,8 @@ def translate_sql_query(
                 translator="sqlglot",
                 status="success",
                 strict_mode=strict_mode,
+                scope=scope,
+                query_fingerprint=fingerprint,
             )
         )
         return translated
@@ -392,6 +471,8 @@ def translate_sql_query(
             warning_category=None if strict_mode else "translation_failed",
             error_category="translation_failed" if strict_mode else None,
             message=str(e),
+            scope=scope,
+            query_fingerprint=fingerprint,
         )
         record_sql_translation_outcome(outcome)
         if strict_mode:

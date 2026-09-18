@@ -1130,7 +1130,7 @@ class DatabricksAdapter(PlatformAdapter):
             self.log_very_verbose(f"Set schema context to: {self.catalog}.{self.schema}")
 
             # Use common schema creation helper
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Debug: Log schema SQL generation results
             self.log_verbose(f"Received schema SQL from _create_schema_with_tuning: {len(schema_sql)} characters")

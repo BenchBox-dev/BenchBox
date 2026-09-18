@@ -27,6 +27,10 @@ from unittest.mock import patch
 import pytest
 
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
+from benchbox.utils.dialect_utils import (
+    sql_translation_context,
+    summarize_sql_translation_outcomes,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -177,6 +181,25 @@ class TestTranslateSqlMultiStatement:
         with patch("builtins.__import__", side_effect=raising_import):
             result = a.translate_sql(sql, source_dialect="duckdb")
         assert result == sql
+
+
+class TestTranslateSqlScopeMetadata:
+    """translate_sql() tags outcomes as schema DDL without caller effort."""
+
+    def test_mixin_translation_records_schema_scope_by_default(self):
+        """Identical DDL translated twice counts once as a schema statement."""
+        a = _Adapter(dialect="snowflake")
+        with sql_translation_context(strict=False) as outcomes:
+            a.translate_sql("CREATE TABLE t (id INTEGER)", source_dialect="standard")
+            a.translate_sql("CREATE TABLE t (id INTEGER)", source_dialect="standard")
+
+        assert len(outcomes) == 2
+        assert {o.scope for o in outcomes} == {"schema_ddl"}
+        summary = summarize_sql_translation_outcomes(outcomes, strict_mode=False)
+        assert summary is not None
+        assert summary["schema_statements_translated"] == 1
+        assert "unique_queries_translated" not in summary
+        assert summary["outcomes"][0]["scope"] == "schema_ddl"
 
 
 class TestTranslateSqlAdapterSnapshots:

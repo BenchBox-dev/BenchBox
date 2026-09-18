@@ -30,7 +30,13 @@ class DialectTranslationMixin:
         """Return the SQL dialect for this platform (for sqlglot translation)."""
         return self._dialect
 
-    def translate_sql(self, sql: str, source_dialect: str = "duckdb", strict: bool | None = None) -> str:
+    def translate_sql(
+        self,
+        sql: str,
+        source_dialect: str = "standard",
+        strict: bool | None = None,
+        scope: str | None = None,
+    ) -> str:
         """Translate SQL from source dialect to platform dialect using sqlglot.
 
         Delegates to the centralized dialect_utils pipeline, gaining dialect
@@ -40,30 +46,40 @@ class DialectTranslationMixin:
 
         Args:
             sql: SQL query or schema block (may contain multiple statements)
-            source_dialect: Source SQL dialect (default: duckdb)
+            source_dialect: Source SQL dialect (default: standard ANSI DDL)
             strict: When True, raise instead of falling back to the original SQL.
                 When omitted, the active sql_translation_context policy is used.
+            scope: Workload scope recorded on the outcome. Defaults to
+                ``SCHEMA_DDL_SCOPE`` since schema creation is the only
+                production caller.
 
         Returns:
             Translated SQL string, preserving multi-statement structure.
         """
+        from benchbox.utils.dialect_utils import SCHEMA_DDL_SCOPE
+
+        if scope is None:
+            scope = SCHEMA_DDL_SCOPE
         if not self.dialect or self.dialect == source_dialect:
             return sql
 
         from benchbox.utils.dialect_utils import (
             SQLTranslationError,
             SqlTranslationOutcome,
+            _fingerprint_sql,
             _fix_sqlite_unsupported_syntax,
             _query_has_group_or_order_by_all,
             _restore_group_order_by_all_keyword,
             current_sql_translation_strict_mode,
             normalize_dialect_for_sqlglot,
             record_sql_translation_outcome,
+            translation_collection_active,
         )
 
         strict_mode = current_sql_translation_strict_mode() if strict is None else strict
         src = normalize_dialect_for_sqlglot(source_dialect)
         tgt = normalize_dialect_for_sqlglot(self.dialect)
+        fingerprint = _fingerprint_sql(sql) if translation_collection_active() else None
 
         try:
             import sqlglot
@@ -90,6 +106,8 @@ class DialectTranslationMixin:
                     translator="sqlglot",
                     status="success",
                     strict_mode=strict_mode,
+                    scope=scope,
+                    query_fingerprint=fingerprint,
                 )
             )
             return ";\n\n".join(fixed) + ";"
@@ -106,6 +124,8 @@ class DialectTranslationMixin:
                 warning_category=None if strict_mode else "translator_unavailable",
                 error_category="translator_unavailable" if strict_mode else None,
                 message="SQLGlot not available",
+                scope=scope,
+                query_fingerprint=fingerprint,
             )
             record_sql_translation_outcome(outcome)
             if strict_mode:
@@ -124,6 +144,8 @@ class DialectTranslationMixin:
                 warning_category=None if strict_mode else "translation_failed",
                 error_category="translation_failed" if strict_mode else None,
                 message=str(e),
+                scope=scope,
+                query_fingerprint=fingerprint,
             )
             record_sql_translation_outcome(outcome)
             if strict_mode:

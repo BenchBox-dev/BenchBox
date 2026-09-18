@@ -880,8 +880,8 @@ class DuckDBAdapter(PlatformAdapter):
             f"Schema constraints - Primary keys: {enable_primary_keys}, Foreign keys: {enable_foreign_keys}"
         )
 
-        # Use common schema creation helper (no translation needed for DuckDB)
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        # Use common schema creation helper (standard ANSI DDL translated to DuckDB)
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         # For TPC-DS, remove foreign key constraints to avoid constraint violations during parallel loading
         benchmark_name = getattr(benchmark, "_name", "") or benchmark.__class__.__name__

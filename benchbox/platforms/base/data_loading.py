@@ -2977,12 +2977,13 @@ class SchemaHelpersMixin:
         config_str = str(sorted(sanitized_config.items()))
         return hashlib.md5(config_str.encode()).hexdigest()[:16]
 
-    def _create_schema_with_tuning(self, benchmark, source_dialect: str = "duckdb") -> str:
+    def _create_schema_with_tuning(self, benchmark, source_dialect: str = "standard") -> str:
         """Common schema creation logic with tuning support.
 
         Args:
             benchmark: Benchmark instance to get schema from
-            source_dialect: Source SQL dialect to translate from (default: "duckdb")
+            source_dialect: Source SQL dialect to translate from (default: "standard",
+                since benchmark schema generators emit ANSI standard SQL)
 
         Returns:
             SQL schema string ready for execution

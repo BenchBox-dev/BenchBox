@@ -620,7 +620,7 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         spark = connection
 
         try:
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
             # Capture table_format once: the bound method re-reads
             # self.table_format on each call, and pinning the format up front

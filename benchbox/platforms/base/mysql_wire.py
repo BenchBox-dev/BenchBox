@@ -246,7 +246,7 @@ class MySqlWireLifecycleMixin:
     def create_schema(self, benchmark: Any, connection: Any) -> float:
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
         cursor = connection.cursor()
