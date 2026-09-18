@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "FingerprintIntegrity defines TRUNCATED or explicitly documents UNVERIFIED handling for depth-truncated trees",
+    "QueryPlanDAG.from_dict does not label a depth-truncated plan as STALE when plan.truncated_at_depth is not None",
+    "is_fingerprint_trusted() returns False for truncated plans without falsely labeling them as corrupted/tampered",
+    "Unit tests in test_query_plan_models.py verify truncation round-trip and integrity state"
+  ],
+  "context": "Adversarial audit finding QPC-DEF-06. Plans serialized with intentional depth truncation (truncated_at_depth) falsely reload as FingerprintIntegrity.STALE in from_dict(verify_fingerprint=True) because the recomputed truncated tree does not match the stored full-tree fingerprint. STALE indicates tampering/corruption, producing false-positive tamper warnings.",
+  "description": "Fix QueryPlanDAG.from_dict() integrity verification so plans serialized with intentional max_depth truncation do not falsely land in FingerprintIntegrity.STALE. Introduce an explicit FingerprintIntegrity.TRUNCATED state (or set UNVERIFIED), ensuring untrusted status without false tamper attribution."
+}
