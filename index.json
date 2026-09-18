@@ -13080,6 +13080,13 @@
       "status": "done",
       "title": "Result-bundle compat: reconcile agy+muse findings with P1-P8"
     },
+    "result-bundle-compat-shared-field-contract-test": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: shared Python/TS bundle-field contract"
+    },
     "result-export-explicit-raw-config-egress-sentinel-gate": {
       "claim": null,
       "needs": [],

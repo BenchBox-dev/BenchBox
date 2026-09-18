@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "Single source of truth for accepted bundle schema versions shared by benchbox/core/results/schema_policy.py and results-explorer/src/lib/localResult.ts",
+    "Existing test_check_explorer_compat.py still passes; drift in either copy fails CI"
+  ],
+  "context": "Reconciliation row P5 (DEFER). Closes the P5/P6 triplication class with the read-model pin test kept as backstop.",
+  "description": "Create a shared Python/TS bundle-field contract closing the P5 triplication (transformer.py, localResult.ts SUPPORTED_SCHEMA_VERSIONS, e2e fixture literals): generate the TS constant from schema_policy.py at build (or a single schema-versions.json both sides read), keeping schema_policy as source of truth.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
