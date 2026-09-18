@@ -44,7 +44,6 @@ Retrieved on 2026-09-18.
 |---|---|---|
 | AWS Price List Bulk API user guide, `https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-the-aws-price-list-bulk-api.html` | Documents programmatic download of price list files from `pricing.us-east-1.amazonaws.com/offers/v1.0/aws/...` (unauthenticated bulk files) for consuming large amounts of product and pricing information. | Confirms the endpoint is published for programmatic consumption, but the guide grants no redistribution license. |
 | AWS Site Terms, `https://aws.amazon.com/terms/` | Grants only a limited license to access and make personal use of the AWS Site: the license "does not include any resale or commercial use of the AWS Site or its contents; any derivative use of the AWS Site or its contents", nor "any use of data mining, robots, or similar data gathering and extraction tools". The Site "may not be reproduced, duplicated, copied, sold, resold ... or otherwise exploited for any commercial purpose without express written consent or license of AWS." | The closest published AWS terms for unauthenticated reads lean against commercial redistribution and automated extraction; no separate price-data license was found. |
-| AWS Billing and Cost Management API Reference (Price List operations, e.g. `ListPriceLists`) | Boilerplate states use of the Price List API is subject to the Beta Service Participation terms of the AWS Service Terms (Section 1.10). | Subjects API use to beta terms, which grant no redistribution right and add at-will-change/discontinuation risk. |
 | Azure Retail Prices REST API overview, `https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices` | Describes an unauthenticated API to "get retail prices for all Azure services" and to "explore prices ... against different regions and different SKUs", framing the programmatic API as help to "create your own tools for internal analysis and price comparison across SKUs and regions". | Confirms the endpoint is published for programmatic use, framed around internal analysis; grants no redistribution license. |
 | Microsoft Terms of Use, `https://www.microsoft.com/en-us/legal/terms-of-use` (last updated 2022-02-07) | Covers services provided through Microsoft's "network of Web properties", including "developer tools ... and product information" (collectively "Services"). "Unless otherwise specified, the Services are for your personal and non-commercial use. You may not modify, copy, distribute, transmit, display, perform, reproduce, publish, license, create derivative works from, transfer, or sell any information, software, products or services obtained from the Services." | The closest published Microsoft terms for unauthenticated reads prohibit redistributing obtained information; no separate retail-prices license was found. |
 
@@ -109,6 +108,8 @@ Optional hardening remains useful, but it is not a generator blocker:
 - `pricing_data.yaml` may ship in the runtime wheel and in the repo with
   small-scale derived vendor values plus per-value provenance; bulk vendoring
   stays out of scope until a separate determination.
-- `DATA-LICENSE.md` and user-facing docs must continue to disclose the vendor
-  sources, retrieval dates, and the fact that BenchBox is accepting residual
-  redistribution risk rather than declaring redistribution cleared.
+- Per-value provenance records in `pricing_data.yaml` and user-facing docs
+  must disclose the vendor sources, retrieval dates, and the fact that
+  BenchBox is accepting residual redistribution risk rather than declaring
+  redistribution cleared. (No cost-module `DATA-LICENSE.md` exists yet; if
+  one is created it inherits this duty.)
