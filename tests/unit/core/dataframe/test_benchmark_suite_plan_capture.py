@@ -2,8 +2,9 @@
 
 The benchmark suite's ``capture_plans`` config and ``QueryBenchmarkResult.query_plan``
 field existed but the run path never populated them. These tests pin the wiring:
-a lazy frame's plan is captured once, from a separate untimed execute before the
-benchmark loop, so explain() cost never leaks into a measured iteration;
+for lazy platforms a plan is captured once, from a separate untimed execute
+before the benchmark loop, so explain() cost never leaks into a measured
+iteration; eager platforms skip capture entirely (no extra materialization);
 failures degrade to None, and ``capture_plans=False`` captures nothing.
 """
 
@@ -40,6 +41,7 @@ class _FakeLazy:
 class _FakeQuery:
     def __init__(self, frame):
         self._frame = frame
+        self.execute_calls = 0
 
     def get_impl_for_family(self, family):
         del family
@@ -47,6 +49,7 @@ class _FakeQuery:
 
     def execute(self, context, family):
         del context, family
+        self.execute_calls += 1
         return self._frame
 
 
@@ -68,37 +71,46 @@ def _make_suite(frame, **config_kwargs):
         **config_kwargs,
     )
     suite = DataFrameBenchmarkSuite(config=config)
-    suite._query_registry = _FakeRegistry(_FakeQuery(frame))
-    return suite
+    query = _FakeQuery(frame)
+    suite._query_registry = _FakeRegistry(query)
+    return suite, query
 
 
 class TestSuitePlanCapture:
     def test_plan_captured_once_before_any_collect(self):
         events: list = []
-        suite = _make_suite(_FakeLazy(events, "MY-PLAN"))
-        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars")
+        suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"))
+        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars-df")
         assert result.status == "SUCCESS"
         assert result.query_plan == "MY-PLAN"
         # One untimed capture up front (Polars capture issues two explains:
         # optimized + logical), then exactly one collect per measured
-        # iteration: capture cost touches no timed block.
+        # iteration. The execute count is the discriminator: an in-loop
+        # capture would run execute only twice (once per iteration), so a
+        # revert of the hoist fails this test.
         assert events == ["explain", "explain", "collect", "collect"]
+        assert query.execute_calls == 3
         assert len(result.execution_times_ms) == 2
 
     def test_capture_disabled_leaves_plan_none(self):
         events: list = []
-        suite = _make_suite(_FakeLazy(events, "MY-PLAN"), capture_plans=False)
-        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars")
+        suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"), capture_plans=False)
+        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars-df")
         assert result.status == "SUCCESS"
         assert result.query_plan is None
         assert events == ["collect", "collect"]
+        assert query.execute_calls == 2
 
-    def test_unsupported_platform_leaves_plan_none(self):
+    def test_eager_platform_skips_capture_without_extra_execute(self):
+        # pandas-df is not lazy-capable: no extra execute may fire, since it
+        # would be a full materialization that could never yield a plan.
         events: list = []
-        suite = _make_suite(_FakeLazy(events, "MY-PLAN"))
-        result = suite._benchmark_query("Q1", context=object(), family="pandas", platform_name="pandas")
+        suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"))
+        result = suite._benchmark_query("Q1", context=object(), family="pandas", platform_name="pandas-df")
         assert result.status == "SUCCESS"
         assert result.query_plan is None
+        assert events == ["collect", "collect"]
+        assert query.execute_calls == 2
 
     def test_capture_failure_degrades_to_none(self, monkeypatch):
         import benchbox.core.dataframe.benchmark_suite as suite_module
@@ -109,8 +121,9 @@ class TestSuitePlanCapture:
 
         monkeypatch.setattr(suite_module, "capture_query_plan", boom)
         events: list = []
-        suite = _make_suite(_FakeLazy(events, "MY-PLAN"))
-        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars")
+        suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"))
+        result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars-df")
         assert result.status == "SUCCESS"
         assert result.query_plan is None
         assert events == ["collect", "collect"]
+        assert query.execute_calls == 3

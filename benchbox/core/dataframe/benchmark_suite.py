@@ -630,8 +630,15 @@ class DataFrameBenchmarkSuite:
             # suffices; capture failures degrade to None. A separate execute
             # keeps explain() cost (e.g. a PySpark remote round-trip, or two
             # Polars optimizer passes) out of every measured iteration, matching
-            # the SQL platforms' post-execution capture pattern.
-            if self.config.capture_plans:
+            # the SQL platforms' post-execution capture pattern. The captured
+            # plan is static: engines with runtime-adaptive planning may run
+            # something different from what was explained.
+            capability = self.get_platform_capability(platform_name)
+            if self.config.capture_plans and (capability is None or capability.supports_lazy):
+                # Eager platforms (pandas, cudf) have no lazy plan to explain;
+                # skip them rather than paying a full extra materialization
+                # that could never yield a plan.
+                plan_frame = None
                 try:
                     plan_frame = query.execute(context, family)
                     plan = capture_query_plan(plan_frame, platform_name)
@@ -639,6 +646,8 @@ class DataFrameBenchmarkSuite:
                         query_plan = plan.plan_text
                 except Exception as e:
                     logger.debug(f"Could not capture DataFrame plan for {query_id}: {e}")
+                finally:
+                    del plan_frame
 
             # Benchmark iterations
             for i in range(self.config.benchmark_iterations):

@@ -69,6 +69,9 @@ class TestJoinExplainRows:
         row = {"a": 1, "b": 2}
         assert join_explain_rows([row]) == json.dumps(row)
 
+    def test_none_valued_single_key_dict_row_skipped(self):
+        assert join_explain_rows([{"QUERY PLAN": None}, {"QUERY PLAN": "Seq Scan"}]) == "Seq Scan"
+
 
 class _FakeCursor:
     def __init__(self, rows):
