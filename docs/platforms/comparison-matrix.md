@@ -201,11 +201,11 @@ TimescaleDB also supports a managed cloud deployment mode via TigerData (`timesc
 
 | Platform       | Compute Pricing    | Storage Pricing     | Data Transfer | Free Tier         |
 | -------------- | ------------------ | ------------------- | ------------- | ----------------- |
-| **BigQuery**   | $5/TB queried      | $20/TB/month        | $0.12/GB      | 1TB/month queries |
+| **BigQuery**   | $6.25/TiB queried  | $20/TB/month        | $0.12/GB      | 1TB/month queries |
 | **Snowflake**  | $2-40/credit/hour  | Included in compute | $0.023/GB     | 30-day trial      |
-| **Databricks** | $0.07-0.65/DBU     | Cloud storage       | $0.087/GB     | 14-day trial      |
+| **Databricks** | $0.15-0.65/DBU     | Cloud storage       | $0.087/GB     | 14-day trial      |
 | **Redshift**   | $0.25-16/hour      | $0.024/GB SSD       | $0.02/GB      | 2-month trial     |
-| **Synapse**    | $1.20-14/DWU/hour  | $0.023/GB           | $0.05/GB      | 30-day trial      |
+| **Synapse**    | $1.33+/DWU/hour    | $0.023/GB           | $0.05/GB      | 30-day trial      |
 | **Fabric DW**  | Capacity Units     | Included            | Included      | 60-day trial      |
 | **Athena**     | $5/TB scanned      | S3 pricing          | S3 pricing    | None              |
 | **Firebolt**   | Per-engine pricing | Included            | Included      | Free local mode   |
@@ -673,7 +673,7 @@ benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 
 | Platform | Typical Monthly Cost | Best For                   | Cost Basis    |
 | -------- | -------------------- | -------------------------- | ------------- |
-| BigQuery | $50-5000             | GCP workloads              | $5/TB queried |
+| BigQuery | $50-5000             | GCP workloads              | $6.25/TiB queried |
 | Athena   | $50-2000             | S3 data lake               | $5/TB scanned |
 | Firebolt | $100-3000            | High-performance analytics | Per-engine    |
 
