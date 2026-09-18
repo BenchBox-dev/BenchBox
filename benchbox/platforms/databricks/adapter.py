@@ -170,13 +170,19 @@ class DatabricksAdapter(PlatformAdapter):
         self._skipped_layout_operations = []
 
     def _resolve_databricks_clustering_strategy(self) -> str:
-        """Resolve clustering strategy and reject misleading mixed layout fields."""
+        """Resolve clustering strategy and reject misleading mixed layout fields.
+
+        A missing strategy means no clustering was requested ("none"): plain
+        Delta OPTIMIZE file compaction is independent of clustering and never
+        implies ZORDER BY. An explicit "z_order" request is still honored so
+        tuned templates keep working.
+        """
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)
         if platform_opts is None:
-            return "z_order"
+            return "none"
 
-        strategy = getattr(platform_opts, "databricks_clustering_strategy", "z_order")
+        strategy = getattr(platform_opts, "databricks_clustering_strategy", None) or "none"
         liquid_enabled = bool(getattr(platform_opts, "liquid_clustering_enabled", False))
         liquid_columns = list(getattr(platform_opts, "liquid_clustering_columns", []))
         z_order_enabled = bool(getattr(platform_opts, "z_ordering_enabled", False))
@@ -203,9 +209,9 @@ class DatabricksAdapter(PlatformAdapter):
             return "liquid_clustering"
         if strategy == "none":
             return strategy
-        if z_order_enabled:
+        if z_order_enabled or z_order_columns:
             return "z_order"
-        return "z_order"
+        return strategy if strategy == "z_order" else "none"
 
     def _record_layout_operation(
         self,

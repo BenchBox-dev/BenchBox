@@ -142,6 +142,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/profile.py",
     "benchbox/cli/commands/results.py",
     "benchbox/cli/commands/shell.py",
+    # databricks-clustering-strategy-default: build_baseline_unified_config now
+    # pins databricks_clustering_strategy="none" so untuned runs stop reporting
+    # a z_order strategy they never requested or applied. Function body only;
+    # no click decorator or command signature changed.
+    "benchbox/cli/tuning_runtime.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # pr-review-followup-1394: SingleStore credential setup is intentionally

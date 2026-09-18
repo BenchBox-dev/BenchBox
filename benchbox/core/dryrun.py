@@ -893,7 +893,7 @@ class DryRunExecutor:
     # Platform-specific fields to include in platform_optimizations, keyed by the
     # platform (lowercased database_config.type) that they are relevant to. These
     # fields carry a non-empty default (e.g. databricks_clustering_strategy defaults
-    # to "z_order") so they must be gated on platform rather than on truthiness alone,
+    # to "none") so they must be gated on platform rather than on truthiness alone,
     # or they show up as "enabled" for every platform.
     _PLATFORM_SPECIFIC_OPTIMIZATION_FIELDS: dict[str, str] = {
         "databricks_clustering_strategy": "databricks",

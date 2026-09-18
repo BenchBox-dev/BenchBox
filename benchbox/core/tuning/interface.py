@@ -1022,7 +1022,10 @@ class PlatformOptimizationConfiguration:
     z_ordering_columns: list[str] = field(default_factory=list)
     liquid_clustering_enabled: bool = False
     liquid_clustering_columns: list[str] = field(default_factory=list)
-    databricks_clustering_strategy: DatabricksClusteringStrategyType = "z_order"
+    # No clustering is requested unless stated: pair z_ordering_enabled/columns
+    # with databricks_clustering_strategy="z_order" (via from_dict inference or
+    # enable_platform_optimization), since "none" rejects layout fields.
+    databricks_clustering_strategy: DatabricksClusteringStrategyType = "none"
     physical_rendering_id: Optional[DatabricksPhysicalRenderingType] = None
     sorted_ingestion_mode: SortedIngestionModeType = "off"
     sorted_ingestion_method: SortedIngestionMethodType = "auto"
@@ -1154,8 +1157,10 @@ class PlatformOptimizationConfiguration:
         strategy = data.get("databricks_clustering_strategy")
         if strategy is None and (data.get("liquid_clustering_enabled", False) or data.get("liquid_clustering_columns")):
             strategy = "liquid_clustering"
-        if strategy is None:
+        if strategy is None and (data.get("z_ordering_enabled", False) or data.get("z_ordering_columns")):
             strategy = "z_order"
+        if strategy is None:
+            strategy = "none"
         return cls(
             z_ordering_enabled=data.get("z_ordering_enabled", False),
             z_ordering_columns=data.get("z_ordering_columns", []),
@@ -1261,6 +1266,7 @@ class UnifiedTuningConfiguration:
         """
         if optimization_type == TuningType.Z_ORDERING:
             self.platform_optimizations.z_ordering_enabled = True
+            self.platform_optimizations.databricks_clustering_strategy = "z_order"
             if "columns" in kwargs:
                 self.platform_optimizations.z_ordering_columns = kwargs["columns"]
         elif optimization_type == TuningType.LIQUID_CLUSTERING:
@@ -1287,6 +1293,9 @@ class UnifiedTuningConfiguration:
         """
         if optimization_type == TuningType.Z_ORDERING:
             self.platform_optimizations.z_ordering_enabled = False
+            self.platform_optimizations.z_ordering_columns = []
+            if self.platform_optimizations.databricks_clustering_strategy == "z_order":
+                self.platform_optimizations.databricks_clustering_strategy = "none"
         elif optimization_type == TuningType.LIQUID_CLUSTERING:
             self.platform_optimizations.liquid_clustering_enabled = False
         elif optimization_type == TuningType.AUTO_OPTIMIZE:
@@ -1461,5 +1470,19 @@ class UnifiedTuningConfiguration:
         if "table_tunings" in data:
             for table_name, table_data in data["table_tunings"].items():
                 instance.table_tunings[table_name] = TableTuning.from_dict(table_data)
+
+        # A template that names per-table clustering/distribution columns without
+        # stating a strategy still drives ZORDER BY in the executor, so infer
+        # "z_order" to keep the reported strategy consistent with what applies.
+        # An explicitly stated strategy is always respected.
+        platform_data = data.get("platform_optimizations", {})
+        if (
+            "databricks_clustering_strategy" not in platform_data
+            and instance.platform_optimizations.databricks_clustering_strategy == "none"
+            and any(
+                table_tuning.clustering or table_tuning.distribution for table_tuning in instance.table_tunings.values()
+            )
+        ):
+            instance.platform_optimizations.databricks_clustering_strategy = "z_order"
 
         return instance

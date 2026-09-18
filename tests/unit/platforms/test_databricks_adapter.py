@@ -1348,17 +1348,17 @@ class TestResolveClusteringStrategy:
                 access_token="tok",
             )
 
-    def test_default_is_z_order(self):
+    def test_default_is_none(self):
         adapter = self._make_adapter()
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
-            assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+            assert adapter._resolve_databricks_clustering_strategy() == "none"
 
-    def test_no_platform_opts_returns_z_order(self):
+    def test_no_platform_opts_returns_none(self):
         adapter = self._make_adapter()
         mock_config = Mock()
         mock_config.platform_optimizations = None
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
-            assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+            assert adapter._resolve_databricks_clustering_strategy() == "none"
 
     def test_liquid_enabled_rejects_z_order(self):
         adapter = self._make_adapter()
@@ -1427,6 +1427,16 @@ class TestResolveClusteringStrategy:
         mock_config.platform_optimizations = mock_opts
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=mock_config):
             assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+
+    def test_enable_then_disable_z_ordering_resolves_none(self):
+        from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
+
+        adapter = self._make_adapter()
+        config = UnifiedTuningConfiguration()
+        config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["event_time"])
+        config.disable_platform_optimization(TuningType.Z_ORDERING)
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=config):
+            assert adapter._resolve_databricks_clustering_strategy() == "none"
 
 
 class TestDeltaOperationsSql:

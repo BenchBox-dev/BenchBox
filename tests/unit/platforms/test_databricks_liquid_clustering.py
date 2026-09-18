@@ -344,8 +344,8 @@ def test_mcp_columns_alone_infer_liquid_clustering_at_the_resolver(_mock_databri
 
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
-def test_absent_mcp_clustering_options_keep_the_zorder_default(_mock_databricks_sql):
-    """The ZORDER fallback is correct when nothing was requested -- and only then."""
+def test_absent_mcp_clustering_options_resolve_to_none(_mock_databricks_sql):
+    """Nothing requested means no clustering: plain OPTIMIZE compaction never implies ZORDER BY."""
     adapter = DatabricksAdapter.from_config(
         {
             "benchmark": "tpch",
@@ -356,4 +356,12 @@ def test_absent_mcp_clustering_options_keep_the_zorder_default(_mock_databricks_
         }
     )
 
-    assert adapter._resolve_databricks_clustering_strategy() == "z_order"
+    assert adapter._resolve_databricks_clustering_strategy() == "none"
+    assert adapter.get_effective_tuning_configuration() is None
+
+    from benchbox.cli.tuning_runtime import build_baseline_unified_config
+
+    adapter.unified_tuning_configuration = build_baseline_unified_config()
+
+    assert adapter._resolve_databricks_clustering_strategy() == "none"
+    assert adapter.get_effective_tuning_configuration().platform_optimizations.databricks_clustering_strategy == "none"
