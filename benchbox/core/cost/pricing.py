@@ -164,38 +164,48 @@ DATABRICKS_WAREHOUSE_DBU_PER_HOUR: dict[str, float] = {
 # ============================================================================
 
 
-def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Athena price per TB of data scanned.
+def _resolve_verified_flat_rate(
+    *,
+    table: str,
+    region: str,
+    verified_regions: frozenset[str],
+    flat_value: float,
+    service_label: str,
+) -> PriceResolution:
+    """Resolve a scalar flat rate verified only for a provenance region set.
 
-    The scalar $5.00 rate is verified only for the regions listed in the
-    table's provenance. An explicitly passed region outside that set is a
-    catch-all guess, so it flags fallback_used (interim guard until the
-    region-parameter work lands); omitting the region asserts nothing about
-    it and is not a fallback.
-
-    Args:
-        region: AWS region code, or "" when the caller asserts no region.
-
-    Returns:
-        PriceResolution for table "athena_price_per_tb".
+    An explicitly passed region outside that set is a catch-all guess, so it
+    flags fallback_used (interim guard until the region-parameter work
+    lands); omitting the region asserts nothing about it and is not a
+    fallback.
     """
-    table = "athena_price_per_tb"
     unit = get_table_unit(table)
     normalized = (region or "").strip().lower()
     display = (region or "").strip()
-    if normalized and normalized not in _ATHENA_VERIFIED_REGIONS:
+    if normalized and normalized not in verified_regions:
         logger.warning(
-            f"Athena price for region '{display}' is unverified; using flat ${ATHENA_PRICE_PER_TB:.2f}/TB as fallback"
+            f"{service_label} price for region '{display}' is unverified; using flat ${flat_value:.2f}/TB as fallback"
         )
         return PriceResolution(
-            value=ATHENA_PRICE_PER_TB,
+            value=flat_value,
             table=table,
             resolved_key=(),
             fallback_used=True,
             unit=unit,
-            reason=f"athena region '{display}' is outside the verified set; flat rate is a guess",
+            reason=f"{service_label.lower()} region '{display}' is outside the verified set; flat rate is a guess",
         )
-    return PriceResolution(value=ATHENA_PRICE_PER_TB, table=table, resolved_key=(), fallback_used=False, unit=unit)
+    return PriceResolution(value=flat_value, table=table, resolved_key=(), fallback_used=False, unit=unit)
+
+
+def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
+    """Resolve the Athena price per TB of data scanned."""
+    return _resolve_verified_flat_rate(
+        table="athena_price_per_tb",
+        region=region,
+        verified_regions=_ATHENA_VERIFIED_REGIONS,
+        flat_value=ATHENA_PRICE_PER_TB,
+        service_label="Athena",
+    )
 
 
 def resolve_snowflake_credit_price(edition: str, cloud: str, region: str) -> PriceResolution:
@@ -497,39 +507,13 @@ def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResol
 
 
 def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Azure Synapse Serverless SQL Pool price per TB.
-
-    The scalar $5.00 rate is verified only for the regions listed in the
-    table's provenance. An explicitly passed region outside that set is a
-    catch-all guess, so it flags fallback_used (interim guard until the
-    region-parameter work lands); omitting the region asserts nothing about
-    it and is not a fallback.
-
-    Args:
-        region: Azure region code, or "" when the caller asserts no region.
-
-    Returns:
-        PriceResolution for table "synapse_serverless_price_per_tb".
-    """
-    table = "synapse_serverless_price_per_tb"
-    unit = get_table_unit(table)
-    normalized = (region or "").strip().lower()
-    display = (region or "").strip()
-    if normalized and normalized not in _SYNAPSE_SERVERLESS_VERIFIED_REGIONS:
-        logger.warning(
-            f"Synapse serverless price for region '{display}' is unverified; "
-            f"using flat ${SYNAPSE_SERVERLESS_PRICE_PER_TB:.2f}/TB as fallback"
-        )
-        return PriceResolution(
-            value=SYNAPSE_SERVERLESS_PRICE_PER_TB,
-            table=table,
-            resolved_key=(),
-            fallback_used=True,
-            unit=unit,
-            reason=f"synapse serverless region '{display}' is outside the verified set; flat rate is a guess",
-        )
-    return PriceResolution(
-        value=SYNAPSE_SERVERLESS_PRICE_PER_TB, table=table, resolved_key=(), fallback_used=False, unit=unit
+    """Resolve the Azure Synapse Serverless SQL Pool price per TB."""
+    return _resolve_verified_flat_rate(
+        table="synapse_serverless_price_per_tb",
+        region=region,
+        verified_regions=_SYNAPSE_SERVERLESS_VERIFIED_REGIONS,
+        flat_value=SYNAPSE_SERVERLESS_PRICE_PER_TB,
+        service_label="Synapse serverless",
     )
 
 
