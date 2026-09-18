@@ -435,9 +435,10 @@ jobs:
           uv sync --group dev --extra snowflake --extra bigquery
 
       - name: Write GCP service account key to temp file
-        # BigQuery needs a file-based credential. The secret content is never
-        # echoed, printed, or uploaded as an artifact; it lives only in a
-        # runner temp file with restrictive permissions for this job's run.
+        # BigQuery needs a file-based credential. The secret must hold the raw
+        # JSON key content (not base64); it is never echoed, printed, or
+        # uploaded as an artifact, living only in a runner temp file with
+        # restrictive permissions for this job's run.
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
         run: |
@@ -455,8 +456,9 @@ jobs:
           # Only the plan-capture classes are selected as node ids -- never the
           # whole live modules, which would also run the heavy TPC-H load /
           # warehouse-cost tests and break the billing guardrails. The -m filter
-          # is a secondary safety net so the classes still skip cleanly when
-          # credentials are absent.
+          # pins selection to live-marked tests as a backstop if the node ids
+          # ever drift; skipping without credentials comes from the modules'
+          # own skip conditions, which keep an unconfigured run green.
           uv run -- python -m pytest \
             "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture" \
             "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture" \

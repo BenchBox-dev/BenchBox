@@ -312,3 +312,33 @@ class TestBigQueryCapture:
         # A successful query whose job exposes no plan must not raise in non-strict
         # mode; the failure is recorded for observability instead.
         assert adapter.plan_capture_failures >= 1
+
+
+# ---------------------------------------------------------------------------
+# Snowflake get_query_plan real path (fake cursor, no cloud account)
+# ---------------------------------------------------------------------------
+
+
+def _snowflake_conn_with_cell(cell):
+    """Fake Snowflake connection whose EXPLAIN cursor yields one cell."""
+    conn = MagicMock()
+    cursor = conn.cursor.return_value
+    cursor.fetchone.return_value = (cell,) if cell is not None else None
+    return conn
+
+
+class TestSnowflakeGetQueryPlanPassthrough:
+    """Pin get_query_plan's observed live behavior.
+
+    Verified live: ``EXPLAIN USING JSON`` returns its plan in a TEXT column,
+    so the cell arrives as a JSON string and is returned unchanged.
+    """
+
+    def test_str_cell_passes_through(self, monkeypatch):
+        adapter = _make_snowflake(monkeypatch)
+        raw = _load("snowflake_explain_sample.json")
+        assert adapter.get_query_plan(_snowflake_conn_with_cell(raw), "SELECT 1") == raw
+
+    def test_null_row_returns_none(self, monkeypatch):
+        adapter = _make_snowflake(monkeypatch)
+        assert adapter.get_query_plan(_snowflake_conn_with_cell(None), "SELECT 1") is None
