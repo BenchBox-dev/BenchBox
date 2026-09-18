@@ -36,10 +36,13 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
     for row in plan_rows:
         if row is None:
             continue
-        if isinstance(row, (list, tuple)):
-            cell = row[0] if len(row) > 0 else None
-        else:
+        if isinstance(row, (str, bytes, bytearray, dict)):
             cell = row
+        else:
+            try:
+                cell = row[0]
+            except (TypeError, KeyError, IndexError):
+                cell = row
         if cell is None:
             continue
         if isinstance(cell, (dict, list)):

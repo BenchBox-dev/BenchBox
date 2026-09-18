@@ -49,6 +49,14 @@ class TestJoinExplainRows:
         assert join_explain_rows(None) is None
         assert join_explain_rows([(None,)]) is None
 
+    def test_subscriptable_non_tuple_row(self):
+        class _Row:
+            def __getitem__(self, index):
+                assert index == 0
+                return "line A"
+
+        assert join_explain_rows([_Row(), ("line B",)]) == "line A\nline B"
+
 
 class _FakeCursor:
     def __init__(self, rows):
