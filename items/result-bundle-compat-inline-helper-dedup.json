@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "Single result_schema_version_value() implementation serves both the full package and the slim published-results mirror",
+    "Slim-branch ImportError fallback covered by a test exercising the fallback path"
+  ],
+  "context": "Reconciliation 2199-P5 interaction row (DEFER, blocked on fix/result-schema-version-rename @ 7aeed9498). Python side of the shared-contract work.",
+  "description": "After PR #2199 merges, dedup the benchbox/validation/bundle.py ImportError inline fallback against schema_policy.result_schema_version_value() so one implementation serves both the full package and the slim published-results mirror, with a test exercising the fallback path.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
