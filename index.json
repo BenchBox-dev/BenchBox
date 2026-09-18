@@ -16032,10 +16032,15 @@
       "title": "Cover the real combined power->maintenance plan-capture checkpoint call site"
     },
     "test-spark-adapter-session-pollution": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T23:42:56Z",
+        "generation": "acaf67acc9c84a918e656ac6ebcb4e49",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Fix test_spark_adapter.py order-dependence and session pollution"
     },
     "test-suite-alignment-schema-v1-1-and-platform-enhancements": {
