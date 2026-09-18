@@ -10900,13 +10900,18 @@
       "title": "Sync documentation with corrected pricing and fix pre-existing drift"
     },
     "pricing-failclosed-price-resolution": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T14:20:20Z",
+        "generation": "9282a65764e744508da721e63796dac7",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
+      },
       "needs": [
         "pricing-data-correct-all-tables",
         "pricing-provenance-units-and-tests"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Make unknown prices and quantities fail closed instead of defaulting silently"
     },
     "pricing-gate-ungated-cost-consumers": {
