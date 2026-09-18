@@ -535,6 +535,11 @@ jobs:
         continue-on-error: true
         run: make oracle-coverage-map-check
 
+      - name: Pricing data drift check
+        id: guard-pricing-data
+        continue-on-error: true
+        run: make pricing-data-check
+
       - name: Public contract drift check
         id: guard-public-contract-drift
         continue-on-error: true

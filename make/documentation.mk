@@ -94,6 +94,14 @@ compat-docs-check:
 	uv run -- python scripts/generate_compat_docs.py --check
 	uv run -- python -m benchbox.sql_compat.inventory --output /tmp/benchbox-compat-inventory.jsonl --check-ddl-drift
 
+# Regenerate the vendor-derived pricing tables from the checked-in vendor evidence.
+pricing-data:
+	uv run -- python scripts/generate_pricing_data.py
+
+# Verify committed pricing tables match the vendor evidence without overwriting.
+pricing-data-check:
+	uv run -- python scripts/generate_pricing_data.py --check
+
 # Regenerate the contributor-facing platform inventory from the typed manifest.
 platform-manifest:
 	uv run -- python _project/scripts/platform_manifest.py
