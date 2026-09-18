@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "BigQueryAdapter.get_query_plan returns None with str | None type annotation",
+    "Calling adapter.capture_query_plan(conn, 'SELECT 1', 'q0') on BigQueryAdapter does not raise AttributeError",
+    "BigQueryAdapter.execute_query attaches plan_fingerprint_normalized when normalize_plan_literals=True",
+    "Unit tests in test_cloud_saas_plan_capture.py verify both fixes"
+  ],
+  "context": "Adversarial audit findings QPC-DEF-01 and QPC-DEF-02. BigQueryAdapter inherited generic capture_query_plan which passed get_query_plan's dict output to the parser, crashing on .strip(). Furthermore, execute_query omitted plan_fingerprint_normalized.",
+  "description": "Fix BigQueryAdapter.get_query_plan() to adhere to the base contract (str | None) by returning None instead of a dict, eliminating the AttributeError crash in generic capture_query_plan. Wire plan_fingerprint_normalized into BigQueryAdapter.execute_query when normalize_plan_literals is enabled."
+}
