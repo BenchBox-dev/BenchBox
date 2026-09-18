@@ -10918,6 +10918,13 @@
       "status": "open",
       "title": "Route price fallbacks and staleness into cost_status, and guard unverified regions"
     },
+    "pricing-vendor-data-redistribution-check": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Confirm vendor pricing data may be redistributed in the BenchBox wheel"
+    },
     "process-spend-versus-product-spend-decision": {
       "claim": null,
       "needs": [],

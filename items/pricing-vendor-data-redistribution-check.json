@@ -1,0 +1,9 @@
+{
+  "acceptance": [
+    "A determination is recorded under _project/decisions/ naming both APIs and their terms",
+    "If the determination is accepted risk rather than clearance, that is stated plainly, following the joinorder precedent",
+    "The determination states whether it covers redistribution in the wheel, in the repo, or both"
+  ],
+  "context": "Flagged in the plan under \"Open items to settle before implementation\". Precedent: _project/decisions/joinorder-canonical-data-licensing-2026-05-12.md",
+  "description": "pricing_data.yaml ships inside the runtime wheel. Before a generator starts pulling values from vendor APIs into that file, confirm the terms permit redistributing the derived values.\n\nSources in question: the AWS Price List API (pricing.us-east-1.amazonaws.com/offers/v1.0/aws/...) and the Azure Retail Prices API (prices.azure.com/api/retail/prices). Both are public and unauthenticated, which is suggestive but not dispositive.\n\nThe repo has a directly relevant precedent: _project/decisions/joinorder-canonical-data-licensing-2026-05-12.md, where re-hosting an upstream dataset was resolved as an explicit project-owner risk acceptance rather than a clean legal clearance. Follow that shape - reach a recorded determination, even if the determination is accepted risk.\n\nThis blocks the generator work, not the data correction: hand-transcribing a published list price into a config file is a different act from automatically mirroring a vendor's price feed."
+}
