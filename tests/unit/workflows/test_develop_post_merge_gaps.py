@@ -243,6 +243,7 @@ def test_push_drop_inventory_subject_set_matches_workflows() -> None:
         "develop-post-merge.yml",
         "docs.yml",
         "orphaned-commit-detector.yml",
+        "pricing-data-drift-check.yml",
         "publication-lane-docs.yml",
         "publication-lane-explorer.yml",
         "results-explorer-browser.yml",

@@ -40,6 +40,7 @@ Re-run the method when adding a new develop-push workflow.
 | --- | --- | --- | --- | --- | --- | --- |
 | `develop-post-merge.yml` | `develop`, all paths | hourly `17 * * * *` (slim gates only) | yes | Safety-critical — lint / fast-test / explorer-tokens / medium-test + mutation jobs | Tip re-gated ≤~1h via schedule; per-SHA gaps instrumented daily | **Covered** — see [`develop-post-merge-gaps.md`](develop-post-merge-gaps.md) |
 | `orphaned-commit-detector.yml` | bare `push:` (every branch, including develop) | daily `0 7 * * *` | yes | Safety-critical — stranded post-merge commits never reach develop | Schedule is the true backstop (push alone is structurally too early for the race); daily bounds detection | **Covered** — schedule primary; push is secondary/early signal |
+| `pricing-data-drift-check.yml` | `develop` + pricing generator/inputs path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — regenerated pricing tables vs vendor APIs | Weekly schedule + dispatch bound drift even if path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `sync-results-data-to-published.yml` | `develop` + `results-data/**` (and related validator paths) | **none** | yes | Safety-critical — only automated mirror of develop corpus → `published-results` | Dropped path-matched push leaves public corpus stale until human recovery | **Accepted risk** — daily `corpus-drift-check.yml` canary detects develop-ahead drift and recommends `gh workflow run sync-results-data-to-published.yml`; workflow retains write-heavy mirror on push/dispatch only (no schedule mutation of public branch) |
 | `results-explorer-browser.yml` | `release` + `develop` + explorer/`results-data` path filter | **none** | yes | Mixed — required PR gate (`Results Explorer browser gate`); develop push is post-merge tip re-build for path-matched merges | Dropped develop push can leave tip without a post-merge browser rebuild until the next matching push or dispatch | **Accepted risk** — pre-merge required check on every PR into develop is the primary safety property; develop push is additive tip verification; suite is expensive (Chromium full + smoke browsers) so no hourly schedule; recover with `gh workflow run results-explorer-browser.yml --ref develop` |
@@ -167,8 +168,9 @@ PY
 
 Expected subject set (names only):
 `develop-post-merge.yml`, `docs.yml`, `orphaned-commit-detector.yml`,
-`publication-lane-docs.yml`, `publication-lane-explorer.yml`, `results-explorer-browser.yml`,
-`submission-validator-drift-check.yml`, `sync-results-data-to-published.yml`.
+`pricing-data-drift-check.yml`, `publication-lane-docs.yml`, `publication-lane-explorer.yml`,
+`results-explorer-browser.yml`, `submission-validator-drift-check.yml`,
+`sync-results-data-to-published.yml`.
 
 ## Manual recovery cheatsheet
 
@@ -182,3 +184,4 @@ Expected subject set (names only):
 | Docs-lane artifact rebuild | `gh workflow run publication-lane-docs.yml --ref develop` |
 | Orphan scan | `gh workflow run orphaned-commit-detector.yml --ref develop` |
 | Validator drift | `gh workflow run submission-validator-drift-check.yml --ref develop` |
+| Pricing data drift | `gh workflow run pricing-data-drift-check.yml --ref develop` |
