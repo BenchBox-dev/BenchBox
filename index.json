@@ -10910,17 +10910,12 @@
       "title": "Make unknown prices and quantities fail closed instead of defaulting silently"
     },
     "pricing-gate-ungated-cost-consumers": {
-      "claim": {
-        "expires_at": "2026-09-19T15:27:50Z",
-        "generation": "27a1501ba119448a916f171faf9bf407",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
-      },
+      "claim": null,
       "needs": [
         "pricing-status-wiring-and-region-guard"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Gate every cost consumer that reads total_cost without checking cost_status"
     },
     "pricing-generator-and-drift-guard": {
