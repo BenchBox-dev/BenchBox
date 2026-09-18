@@ -13030,17 +13030,12 @@
       "title": "Result-bundle compat: create TODO sequence for deferred follow-ons"
     },
     "result-bundle-compat-integrate-fixes": {
-      "claim": {
-        "expires_at": "2026-09-19T16:41:28Z",
-        "generation": "2f1f661bd43e4b4d90a188b817e626ef",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [
         "result-bundle-compat-reconcile-review"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
     "result-bundle-compat-reconcile-review": {
