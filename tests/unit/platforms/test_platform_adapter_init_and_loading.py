@@ -1108,8 +1108,10 @@ class TestAthenaAdditionalCoverage:
         adapter._query_count = 4
 
         summary = adapter.get_cost_summary()
-        assert summary["total_cost_usd"] == 10.0
-        assert summary["average_cost_per_query_usd"] == 2.5
+        # Decimal TB per the unit contract: 2 * 2^40 bytes at $5.00/TB.
+        expected_total = (2 * (1024**4)) / (10**12) * 5.0
+        assert summary["total_cost_usd"] == pytest.approx(expected_total)
+        assert summary["average_cost_per_query_usd"] == pytest.approx(expected_total / 4)
 
         assert adapter._extract_table_name("CREATE TABLE MixedName (id INT)") == "mixedname"
         assert adapter._extract_table_name("SELECT 1") is None

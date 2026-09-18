@@ -98,7 +98,7 @@ open.
 Subtracting free-tier credit per run would make BenchBox numbers match one
 specific Google bill shape, at the cost of cross-platform comparability:
 the credit is monthly, account-level, and shared across all workloads, so
-no per-run attribution is principled. rejected in favor of list-rate-from-
+no per-run attribution is principled. Rejected in favor of list-rate-from-
 byte-zero, disclosed.
 
 ### 4. Bump the result-bundle schema to 2.3 for the new unit value
