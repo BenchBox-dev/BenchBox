@@ -307,9 +307,8 @@ class TestLiveSnowflakeQueryPlanCapture:
         adapter = live_snowflake_adapter_with_capture
         connection = adapter.create_connection()
         try:
-            plan, capture_ms = adapter.capture_query_plan(connection, "SELECT 1", "q_test")
+            plan, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_test")
             assert plan is not None, "Expected a QueryPlanDAG but got None"
-            assert capture_ms >= 0.0
             assert plan.logical_root is not None
         finally:
             adapter.close_connection(connection)

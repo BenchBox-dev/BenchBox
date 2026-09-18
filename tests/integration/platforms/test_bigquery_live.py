@@ -321,31 +321,48 @@ class TestLiveBigQueryQueryPlanCapture:
 
         return BigQueryAdapter(**{**bigquery_credentials, "capture_plans": True})
 
+    @staticmethod
+    def _connect(adapter):
+        """Create a connection with benchmark job config applied.
+
+        Disables the result cache (same as production benchmark runs): a
+        repeated SELECT 1 must execute for real so every run exposes full
+        job statistics for plan capture, instead of serving a cache hit.
+        """
+        connection = adapter.create_connection()
+        adapter.configure_for_benchmark(connection, "olap")
+        return connection
+
     def test_execute_query_with_capture_returns_plan(self, bigquery_credentials):
         """execute_query with capture enabled should attach a plan and fingerprint."""
         adapter = self._capture_adapter(bigquery_credentials)
-        connection = adapter.create_connection()
+        connection = self._connect(adapter)
         try:
             result = adapter.execute_query(connection, "SELECT 1", query_id="Q0", validate_row_count=False)
             assert result["status"] == "SUCCESS"
             assert result.get("query_plan") is not None
-            assert result.get("plan_fingerprint") is not None
-            assert len(result["plan_fingerprint"]) == 64  # SHA256 hex
+            fingerprint = result.get("plan_fingerprint")
+            assert fingerprint is not None
+            assert len(fingerprint) == 64  # SHA256 hex
             # SELECT 1 scans no tables, so capture must not incur scan billing.
-            assert result["job_statistics"]["bytes_processed"] == 0
+            job_stats = result.get("job_statistics") or {}
+            assert job_stats.get("bytes_processed") == 0
         finally:
             adapter.close_connection(connection)
 
     def test_plan_fingerprint_stable(self, bigquery_credentials):
         """Same query executed twice must produce identical fingerprints."""
         adapter = self._capture_adapter(bigquery_credentials)
-        connection = adapter.create_connection()
+        connection = self._connect(adapter)
         try:
             first = adapter.execute_query(connection, "SELECT 1", query_id="Q0", validate_row_count=False)
             second = adapter.execute_query(connection, "SELECT 1", query_id="Q0", validate_row_count=False)
             assert first["status"] == "SUCCESS"
             assert second["status"] == "SUCCESS"
-            assert first.get("plan_fingerprint") is not None
-            assert first["plan_fingerprint"] == second["plan_fingerprint"]
+            first_fingerprint = first.get("plan_fingerprint")
+            second_fingerprint = second.get("plan_fingerprint")
+            assert first_fingerprint is not None
+            assert second_fingerprint is not None
+            assert first_fingerprint == second_fingerprint
         finally:
             adapter.close_connection(connection)
