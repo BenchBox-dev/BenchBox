@@ -123,7 +123,7 @@ def publish_run(ctx, result_file, target, label, last, benchmark, platform, dry_
         console.print(f"  Label:   {label}")
         companion_count = _count_companions(source_path)
         if companion_count:
-            console.print(f"  + {companion_count} companion file(s) (.plans.json, .tuning.json)")
+            console.print(f"  + {companion_count} companion file(s)")
         return
 
     store = PublicationStore()

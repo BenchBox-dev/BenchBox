@@ -16,8 +16,8 @@ Coverage layers (R8 permanent invariant + expansion):
 * URI query/fragment credentials through platform-options sanitization and
   result export chokepoints.
 * MCP error scrubbing for assignment-form secrets.
-* Nested tuning companion identifiers (list-of-dicts FK tables) through the
-  public anonymizer and anonymized .tuning.json companion.
+* Nested tuning identifiers (list-of-dicts FK tables) through the public
+  anonymizer and the anonymized bundle's platform.tuning block.
 
 Do not reduce this to a key-name grep: construct adapters/results and inspect
 serialized outputs. Do not introduce SecretStr or a four-layer architecture.
@@ -458,8 +458,8 @@ def test_mcp_error_scrub_never_egress_credential_sentinels() -> None:
     assert clean["details"]["exception_message"] == benign
 
 
-def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> None:
-    """List-of-dicts FK companion shapes must not leak table/column identifiers.
+def test_nested_tuning_identifiers_never_egress(tmp_path: Path) -> None:
+    """List-of-dicts FK tuning shapes must not leak table/column identifiers.
 
     ``build_tuning_payload`` promotes top-level keys on ``tunings_applied``
     (``foreign_keys``, ``primary_keys``, …) into ``requested.constraints``.
@@ -483,7 +483,7 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
         "enabled": True,
         "tables": {_SWEEP_TABLE_GATE: [_SWEEP_COLUMN_GATE]},
     }
-    companion_payload = {
+    requested_payload = {
         "requested": {
             "constraints": {
                 "foreign_keys": foreign_keys_block,
@@ -494,7 +494,7 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
             }
         }
     }
-    anonymized = AnonymizationManager().anonymize_tuning_payload(companion_payload)
+    anonymized = AnonymizationManager().anonymize_tuning_payload(requested_payload)
     anonymized_blob = json.dumps(anonymized)
     for gate in (_SWEEP_TABLE_GATE, _SWEEP_COLUMN_GATE):
         assert gate not in anonymized_blob, f"anonymize_tuning_payload leaked {gate}"
@@ -532,32 +532,30 @@ def test_nested_tuning_companion_identifiers_never_egress(tmp_path: Path) -> Non
         tuning_source_file="examples/tunings/custom.yaml:0123456789abcdef",
     )
 
-    # Positive presence: private (unanonymized) companion retains the gates so
+    # Positive presence: the private (unanonymized) bundle retains the gates so
     # the anonymized half cannot pass by emitting an empty/missing structure.
+    # The requested tuning rides in the bundle's `platform.tuning.requested`
+    # block; it used to be a `.tuning.json` companion, which is no longer written.
     private_export = ResultExporter(output_dir=tmp_path / "private", anonymize=False).export_result(
         result, formats=["json"]
     )
-    private_tuning = tmp_path / "private" / f"{private_export['json'].stem}.tuning.json"
-    assert private_tuning.is_file(), "private export must emit .tuning.json when tunings_applied is set"
-    private_raw = private_tuning.read_text(encoding="utf-8")
-    private_payload = json.loads(private_raw)
-    assert "requested" in private_payload and "constraints" in private_payload["requested"]
-    assert "foreign_keys" in private_payload["requested"]["constraints"]
+    private_raw = private_export["json"].read_text(encoding="utf-8")
+    private_requested = json.loads(private_raw)["platform"]["tuning"]["requested"]
+    assert "constraints" in private_requested
+    assert "foreign_keys" in private_requested["constraints"]
     assert _SWEEP_TABLE_GATE in private_raw
     assert _SWEEP_COLUMN_GATE in private_raw
 
-    # Public export path: anonymized .tuning.json companion.
+    # Public export path: the anonymized bundle.
     exported = ResultExporter(output_dir=tmp_path / "export", anonymize=True).export_result(result, formats=["json"])
-    tuning_path = tmp_path / "export" / f"{exported['json'].stem}.tuning.json"
-    assert tuning_path.is_file(), "anonymized export must emit .tuning.json when tunings_applied is set"
-    tuning_raw = tuning_path.read_text(encoding="utf-8")
     primary_raw = exported["json"].read_text(encoding="utf-8")
     for gate in (_SWEEP_TABLE_GATE, _SWEEP_COLUMN_GATE):
-        assert gate not in tuning_raw, f"anonymized .tuning.json leaked {gate}"
         assert gate not in primary_raw, f"anonymized primary JSON leaked {gate}"
+    # The retired companions must not reappear alongside it.
+    for retired in (".tuning.json", ".applied.json"):
+        assert not (tmp_path / "export" / f"{exported['json'].stem}{retired}").exists()
 
-    public_payload = json.loads(tuning_raw)
-    public_constraints = public_payload["requested"]["constraints"]
+    public_constraints = json.loads(primary_raw)["platform"]["tuning"]["requested"]["constraints"]
     public_fk = public_constraints["foreign_keys"]
     assert public_fk["enabled"] is True
     assert public_fk["tables"][0]["table"].startswith("table_")

@@ -18,7 +18,6 @@ results-data/
   bundles/
     {run_id}.json            # primary result bundle (schema-v2)
     {run_id}.plans.json      # query plans (if captured)
-    {run_id}.tuning.json     # tuning config applied (if any)
   corpus-inventory.json      # generated inventory index
 ```
 

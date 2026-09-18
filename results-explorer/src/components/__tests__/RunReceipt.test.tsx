@@ -398,7 +398,7 @@ describe("RunReceipt", () => {
 // ---------------------------------------------------------------------------
 // ADR-1 applied-tuning receipt drill-down
 //
-// `applied_receipt` carries the `{stem}.applied.json` companion's `receipt`
+// `applied_receipt` carries the bundle's `platform.tuning.applied.receipt`
 // sub-object verbatim. The drill-down displays what the platform recorded; it
 // never recomputes a verdict or a corroboration decision. Every degraded shape
 // must leave the existing verified-state row exactly as it renders today.

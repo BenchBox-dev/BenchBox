@@ -8,10 +8,10 @@ configuration, and ``.applied.json`` for the executed statements. Every consumer
 implemented that stitch separately, and a bundle separated from its companions
 silently lost the answer.
 
-``platform.tuning`` now holds both sub-blocks, and the loader reads them. The
-companions are still written, so an inlined bundle and its companion must agree
-exactly -- including the redaction applied to each, which is the part that
-differs by export mode and must not regress.
+``platform.tuning`` now holds both sub-blocks, and the loader reads them.
+Nothing writes the companions any more, so the inlined block must carry exactly
+what they carried -- including the redaction each received, which differs by
+export mode and is applied outside the main anonymization walk.
 
 Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for
@@ -26,6 +26,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from benchbox.core.results import exporter as exporter_module
 from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.loader import load_result_file
 from benchbox.core.results.result_factory import build_enhanced_benchmark_result
@@ -88,25 +89,40 @@ def _tuned_result() -> object:
 
 
 def _export(tmp_path: Path, *, anonymize: bool) -> tuple[dict, dict, dict]:
-    """Export one tuned result and return (bundle, tuning companion, applied companion)."""
+    """Export one tuned result.
+
+    Returns the bundle plus the scrubbed requested-tuning and applied-ledger
+    payloads the exporter inlined. Those payloads used to be readable as
+    ``.tuning.json`` / ``.applied.json`` files; nothing writes them now, so they
+    are taken from the same builders the export path uses, which is what the
+    inlined block must still agree with.
+    """
     exporter = ResultExporter(output_dir=tmp_path, anonymize=anonymize)
     result = _tuned_result()
     result.output_filename = "run.json"
+    tuning = exporter._build_export_tuning_payload(result) or {}
+    applied = exporter._build_export_applied_payload(result) or {}
     exporter.export_result(result, formats=["json"])
 
     bundle = json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))
-    tuning = json.loads((tmp_path / "run.tuning.json").read_text(encoding="utf-8"))
-    applied = json.loads((tmp_path / "run.applied.json").read_text(encoding="utf-8"))
     return bundle, tuning, applied
 
 
+def _write_legacy_companions(tmp_path: Path, tuning: dict | None, applied: dict | None) -> None:
+    """Write the retired companions beside a bundle, as a pre-retirement export did."""
+    if tuning is not None:
+        (tmp_path / "run.tuning.json").write_text(json.dumps(tuning), encoding="utf-8")
+    if applied is not None:
+        (tmp_path / "run.applied.json").write_text(json.dumps(applied), encoding="utf-8")
+
+
 @pytest.mark.parametrize("anonymize", [True, False])
-class TestInlinedBlockMatchesCompanions:
+class TestInlinedBlockMatchesTheScrubbedPayloads:
     def test_requested_configuration_is_inlined(self, tmp_path: Path, anonymize: bool) -> None:
         bundle, tuning, _applied = _export(tmp_path, anonymize=anonymize)
 
         inlined = bundle["platform"]["tuning"]["requested"]
-        # The companion nests the configuration one level down; the inlined copy
+        # The payload nests the configuration one level down; the inlined copy
         # flattens it so the block is not `tuning.requested.requested`.
         assert inlined == tuning["requested"]
         assert bundle["platform"]["tuning"]["source_file"] == tuning["source_file"]
@@ -116,7 +132,7 @@ class TestInlinedBlockMatchesCompanions:
 
         inlined = bundle["platform"]["tuning"]["applied"]
         # The hash lives on the summary, which owns it; everything else matches
-        # the companion byte for byte.
+        # the scrubbed payload exactly.
         assert inlined == {k: v for k, v in applied.items() if k != "applied_ledger_hash"}
         assert bundle["platform"]["tuning"]["applied_ledger_hash"] == applied["applied_ledger_hash"]
 
@@ -128,7 +144,7 @@ class TestInlinedBlockMatchesCompanions:
         assert "applied_ledger_hash" not in tuning_block["applied"]
         assert "requested_config_hash" not in tuning_block["requested"]
         assert "validation_status" not in tuning_block["requested"]
-        # The companion's own envelope describes the file, not the run.
+        # The retired companion's envelope described the file, not the run.
         assert "version" not in tuning_block["requested"]
         assert "run_id" not in tuning_block["requested"]
 
@@ -198,7 +214,7 @@ class TestAppliedLedgerWithoutRequestedTuning:
         assert tuning_block["applied_ledger_hash"] == _APPLIED_LEDGER["applied_ledger_hash"]
         assert tuning_block["applied"]["status"] == "applied_unverified"
 
-        (tmp_path / "run.applied.json").unlink()
+        assert not (tmp_path / "run.applied.json").exists()
         loaded, _raw = load_result_file(tmp_path / "run.json")
         assert loaded.applied_ledger_hash == _APPLIED_LEDGER["applied_ledger_hash"]
         assert loaded.applied_tuning_ledger is not None
@@ -209,8 +225,8 @@ class TestLoaderReadsTheBundleAlone:
         """The point of inlining: a bundle separated from its companions still
         answers what was requested and what was applied."""
         _export(tmp_path, anonymize=False)
-        (tmp_path / "run.tuning.json").unlink()
-        (tmp_path / "run.applied.json").unlink()
+        assert not (tmp_path / "run.tuning.json").exists()
+        assert not (tmp_path / "run.applied.json").exists()
 
         result, _raw = load_result_file(tmp_path / "run.json")
 
@@ -226,16 +242,23 @@ class TestLoaderReadsTheBundleAlone:
         assert result.tunings_applied["table_tunings"]["LINEITEM"]["sorting"][0]["name"] == "l_orderkey"
 
     def test_companion_still_wins_for_a_legacy_bundle(self, tmp_path: Path) -> None:
-        """Bundles exported before inlining carry the companion only, and a
-        republished corpus bundle may ship the companion alone."""
-        _export(tmp_path, anonymize=False)
+        """Nothing writes the companions any more, but readers still accept them.
+
+        A bundle exported before inlining carries the sub-blocks nowhere but its
+        companions, and a republished corpus bundle may ship them alone. Both
+        must keep loading, so this reconstructs that shape rather than relying on
+        the exporter to produce it.
+        """
+        _bundle, tuning, applied = _export(tmp_path, anonymize=False)
         bundle_path = tmp_path / "run.json"
         bundle = json.loads(bundle_path.read_text(encoding="utf-8"))
 
-        # Strip the inlined sub-blocks to simulate a pre-inlining bundle.
+        # Strip the inlined sub-blocks to simulate a pre-inlining bundle, and put
+        # the evidence back where that generation kept it.
         del bundle["platform"]["tuning"]["requested"]
         del bundle["platform"]["tuning"]["applied"]
         bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+        _write_legacy_companions(tmp_path, tuning=tuning, applied=applied)
 
         result, _raw = load_result_file(bundle_path)
 
@@ -247,8 +270,6 @@ class TestLoaderReadsTheBundleAlone:
     def test_round_trip_export_preserves_the_inlined_tuning(self, tmp_path: Path) -> None:
         """Load a companion-less bundle and re-export it: the tuning survives."""
         _export(tmp_path, anonymize=False)
-        (tmp_path / "run.tuning.json").unlink()
-        (tmp_path / "run.applied.json").unlink()
         result, _raw = load_result_file(tmp_path / "run.json")
 
         second = tmp_path / "again"
@@ -275,10 +296,10 @@ class TestCompanionWinsFieldByField:
         verified.
         """
         _export(tmp_path, anonymize=False)
-        (tmp_path / "run.applied.json").unlink()
-        (tmp_path / "run.tuning.json").write_text(
-            json.dumps({"requested": {"table_tunings": {"LINEITEM": {"table_name": "LINEITEM"}}}}),
-            encoding="utf-8",
+        _write_legacy_companions(
+            tmp_path,
+            tuning={"requested": {"table_tunings": {"LINEITEM": {"table_name": "LINEITEM"}}}},
+            applied=None,
         )
 
         result, _raw = load_result_file(tmp_path / "run.json")
@@ -323,11 +344,9 @@ class TestBareStringIdentifiersAreHashed:
         ResultExporter(output_dir=tmp_path, anonymize=True).export_result(result, formats=["json"])
 
         bundle_text = (tmp_path / "run.json").read_text(encoding="utf-8")
-        companion_text = (tmp_path / "run.tuning.json").read_text(encoding="utf-8")
 
         for identifier in ("acme_orders", "customer_ssn_column", "revenue_bucket_column"):
             assert identifier not in bundle_text, f"{identifier} leaked into the public bundle"
-            assert identifier not in companion_text, f"{identifier} leaked into the public companion"
 
         requested = json.loads(bundle_text)["platform"]["tuning"]["requested"]
         clause = next(iter(requested["table_tunings"].values()))
@@ -342,3 +361,67 @@ class TestBareStringIdentifiersAreHashed:
         sorting = next(iter(bundle["platform"]["tuning"]["requested"]["table_tunings"].values()))["sorting"][0]
         assert sorting["type"] == "INTEGER"
         assert sorting["order"] == 1
+
+
+class TestCompanionsAreRetired:
+    @pytest.mark.parametrize("anonymize", [True, False])
+    def test_export_writes_no_tuning_or_applied_companion(self, tmp_path: Path, anonymize: bool) -> None:
+        _export(tmp_path, anonymize=anonymize)
+
+        written = sorted(path.name for path in tmp_path.iterdir())
+        assert written == ["run.json"]
+
+    def test_plans_companion_is_still_written(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Plans stay a separate file: execution DAGs are large and rarely read."""
+        monkeypatch.setattr(exporter_module, "build_plans_payload", lambda _result: {"queries": {"1": {}}})
+        result = _tuned_result()
+        result.output_filename = "run.json"
+        ResultExporter(output_dir=tmp_path, anonymize=False).export_result(result, formats=["json"])
+
+        assert (tmp_path / "run.plans.json").is_file()
+        assert not (tmp_path / "run.tuning.json").exists()
+        assert not (tmp_path / "run.applied.json").exists()
+
+
+class TestInlinedSourceFileKeepsItsPublicForm:
+    """A repo-relative template reference is public provenance, not a private path.
+
+    ``anonymize_tuning_payload`` made this exception while the value lived in a
+    ``.tuning.json`` companion. Inlining moved it under the generic public walk,
+    which hashes on the key name alone -- so a published bundle showed
+    ``path_<hash>`` where the readable reference belonged, and re-anonymizing a
+    stored bundle rewrote it, breaking the corpus fixed point.
+    """
+
+    def test_repo_relative_reference_survives_public_export(self, tmp_path: Path) -> None:
+        bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
+
+        assert bundle["platform"]["tuning"]["source_file"] == "examples/tunings/duckdb/tpch_tuned.yaml"
+
+    def test_public_export_is_a_fixed_point_for_the_reference(self, tmp_path: Path) -> None:
+        """Re-anonymizing a published bundle must not rewrite it."""
+        from benchbox.core.results.anonymization import AnonymizationConfig, AnonymizationManager
+
+        bundle, _tuning, _applied = _export(tmp_path, anonymize=True)
+        manager = AnonymizationManager(AnonymizationConfig.from_public_environ())
+
+        assert manager.anonymize_result_payload(bundle) == bundle
+
+    def test_an_absolute_path_is_still_hashed(self, tmp_path: Path) -> None:
+        """The exemption covers a normalized reference, not any path."""
+        benchmark = SimpleNamespace(benchmark_name="tpch", scale_factor=0.01, compliance_class=None)
+        result = build_enhanced_benchmark_result(
+            benchmark=benchmark,
+            platform="duckdb",
+            query_results=[],
+            tunings_applied={"primary_keys": {"enabled": True}},
+            tuning_config_hash="a" * 64,
+            tuning_source="explicit_file",
+            tuning_source_file="/Users/alice/private/custom.yaml",
+        )
+        result.output_filename = "run.json"
+        ResultExporter(output_dir=tmp_path, anonymize=True).export_result(result, formats=["json"])
+
+        raw = (tmp_path / "run.json").read_text(encoding="utf-8")
+        assert "alice" not in raw
+        assert json.loads(raw)["platform"]["tuning"]["source_file"].startswith("path_")

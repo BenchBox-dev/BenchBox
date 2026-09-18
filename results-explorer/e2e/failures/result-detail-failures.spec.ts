@@ -30,19 +30,19 @@ test.describe("ResultDetail failure paths", () => {
     await expect(errorBox).toBeVisible({ timeout: 20_000 });
   });
 
-  test("a failing tuning-config sidecar fetch surfaces a visible error", async ({ page }) => {
+  test("a failing tuning-config bundle fetch surfaces a visible error", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_TUNED_ID}`);
     await waitForShell(page);
     // Wait for the detail to render so the Tuning Config section is in
     // the DOM. The tuned fixture is the only bundle with has_tuning=true.
     // Routed through the shared helper so the cold-snapshot zero-row race
-    // is retried by re-navigation; the sidecar route below is installed
+    // is retried by re-navigation; the bundle route below is installed
     // afterwards and so is unaffected by those retries.
     await waitForDataElement(page, page.getByRole("heading", { name: /TPC-H result:\s+DuckDB/ }));
 
-    // Route the sidecar request to a 500 before the user expands the
-    // collapsed Tuning Config panel.
-    await page.route("**/*.tuning.json", (route) => route.fulfill({ status: 500, body: "simulated sidecar failure" }));
+    // The panel reads the tuning block out of the bundle itself now, so fail
+    // that fetch before the user expands the collapsed Tuning Config panel.
+    await page.route("**/bundles/*.json", (route) => route.fulfill({ status: 500, body: "simulated bundle failure" }));
 
     await page.getByRole("button", { name: /Show settings/ }).click();
     await expect(page.getByText(/Could not load tuning settings/)).toBeVisible();

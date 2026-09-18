@@ -221,13 +221,15 @@ while the connection remains open. When that status is `applied_unverified`
 and the adapter exposes an
 introspector (`get_tuning_introspector()`), run introspection guarded,
 corroborate, and upgrade to `applied_verified` iff the receipt corroborates.
-The receipt rides inside the existing `.applied.json` companion
-(`AppliedTuningLedger.to_payload(status=..., receipt=...)`) -- no new
-companion file, no new plumbing through the CODEOWNERS-locked
-`result_capture.py`.
+The receipt rides inside the applied ledger
+(`AppliedTuningLedger.to_payload(status=..., receipt=...)`), which the bundle
+carries at `platform.tuning.applied` -- no file of its own, and no new plumbing
+through the CODEOWNERS-locked `result_capture.py`. It shipped in a
+`.applied.json` companion until that was retired into the bundle; bundles
+published earlier still carry it there and are still read.
 
 The explorer ingests and renders receipt text verbatim, so public-export
-anonymization is the only publication gate for this companion. Anonymized
+anonymization is the only publication gate for the receipt. Anonymized
 exports therefore remove the top-level receipt `error`; every entry's
 `statement`, `reason`, `detail`, `diff`, and `evidence`; table, column, and
 index identifiers; observed catalog details; and both top-level and

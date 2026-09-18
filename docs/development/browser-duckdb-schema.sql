@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS results (
     -- run/query validation_status column below.
     tuning_validation_status VARCHAR,
     -- ADR-1 per-statement introspection receipt, carried verbatim from the
-    -- run's `{stem}.applied.json` companion as an opaque JSON string and
+    -- run's `platform.tuning.applied.receipt` as an opaque JSON string and
     -- rendered read-only by the RunReceipt drill-down. NULL when the run
     -- published no receipt (introspection did not run, or a legacy bundle).
     applied_receipt      VARCHAR,

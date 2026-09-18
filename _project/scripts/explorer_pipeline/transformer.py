@@ -628,32 +628,46 @@ def _tuning_validation_status(data: dict[str, Any]) -> str | None:
     return str(val) if val else None
 
 
-def _applied_receipt(bundle_path: Path) -> str | None:
-    """Ingest the per-statement introspection receipt from the applied companion.
+def _has_requested_tuning(bundle_data: dict[str, Any] | None) -> bool:
+    """Return True when the bundle carries a requested-tuning block of its own."""
+    if not isinstance(bundle_data, dict):
+        return False
+    platform = bundle_data.get("platform")
+    tuning = platform.get("tuning") if isinstance(platform, dict) else None
+    if not isinstance(tuning, dict):
+        return False
+    return bool(tuning.get("requested"))
 
-    The ``{stem}.applied.json`` companion sits next to the bundle (published
-    alongside it by ``benchbox.validation.bundle``). Its ``receipt`` sub-object
-    is the post-load introspection receipt that earns the ``applied_verified``
-    state: platform, corroboration verdict, summary, and one entry per applied
-    statement. It is taken **verbatim** and re-serialized canonically
-    (``sort_keys``, compact separators) so the stored string is deterministic;
-    nothing here is recomputed or derived, and the explorer renders it read-only.
 
-    ``None`` whenever the receipt is not available -- companion absent (the
-    common case: introspection did not run, or a legacy bundle), unreadable,
-    malformed JSON, not a JSON object, or carrying no ``receipt`` key. A broken
-    companion must never fail the build, so every failure degrades to ``None``.
-    Inputs beyond the public submission caps are the exception: already-published
-    legacy data is bounded defensively and stored with an explicit truncation
-    marker rather than being silently dropped.
+def _inline_applied_receipt(bundle_data: dict[str, Any] | None) -> Any:
+    """Return the receipt carried inside the bundle, or None when it has none."""
+    if not isinstance(bundle_data, dict):
+        return None
+    platform = bundle_data.get("platform")
+    tuning = platform.get("tuning") if isinstance(platform, dict) else None
+    applied = tuning.get("applied") if isinstance(tuning, dict) else None
+    if not isinstance(applied, dict):
+        return None
+    return applied.get("receipt")
+
+
+def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
+    """Return the receipt from a retired ``{stem}.applied.json`` companion.
+
+    Only bundles published before the ledger moved into ``platform.tuning``
+    still have one. Returns ``(value, already_serialized)``. The flag is what
+    distinguishes the byte-cap truncation marker, which this function serializes
+    itself so an oversized companion is never read into memory, from a receipt
+    that merely happens to be a JSON string -- an unexpected shape the caller
+    must redact rather than store verbatim.
     """
     companion = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
     try:
         companion_size = companion.stat().st_size
     except (OSError, ValueError):
-        return None
+        return None, False
     if companion_size > APPLIED_COMPANION_MAX_BYTES:
-        return json.dumps(
+        marker = json.dumps(
             {
                 "entries": [],
                 "original_byte_count": companion_size,
@@ -663,13 +677,41 @@ def _applied_receipt(bundle_path: Path) -> str | None:
             sort_keys=True,
             separators=(",", ":"),
         )
+        return marker, True
     try:
         payload = json.loads(companion.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return None
+        return None, False
     if not isinstance(payload, dict):
-        return None
-    receipt = payload.get("receipt")
+        return None, False
+    return payload.get("receipt"), False
+
+
+def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = None) -> str | None:
+    """Ingest the per-statement introspection receipt for a run.
+
+    The receipt is the post-load introspection record that earns the
+    ``applied_verified`` state: platform, corroboration verdict, summary, and one
+    entry per applied statement. It rides in the bundle at
+    ``platform.tuning.applied.receipt``. Bundles published before that block
+    existed carry it in a ``{stem}.applied.json`` companion instead, which is
+    still read when the bundle has none. It is taken **verbatim** and
+    re-serialized canonically (``sort_keys``, compact separators) so the stored
+    string is deterministic; nothing here is recomputed or derived, and the
+    explorer renders it read-only.
+
+    ``None`` whenever no receipt is available -- the common case, where
+    introspection did not run -- or when the source is unreadable, malformed, or
+    carries no ``receipt``. A broken input must never fail the build, so every
+    failure degrades to ``None``. Inputs beyond the public submission caps are
+    the exception: already-published legacy data is bounded defensively and
+    stored with an explicit truncation marker rather than being silently dropped.
+    """
+    receipt = _inline_applied_receipt(bundle_data)
+    if receipt is None:
+        receipt, already_serialized = _companion_applied_receipt(bundle_path)
+        if already_serialized:
+            return receipt
     if receipt is None:
         return None
     if isinstance(receipt, dict) and isinstance(receipt.get("entries"), list):
@@ -1467,7 +1509,7 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path),
+            applied_receipt=_applied_receipt(bundle_path, bundle_data),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1553,10 +1595,12 @@ class BundleTransformer:
         environment["statement_overhead_min_ms"] = _to_finite_float_or_none(stmt_min)
         environment["statement_overhead_median_ms"] = _to_finite_float_or_none(stmt_med)
 
-        # Detect companion files relative to bundle
+        # Plans are still a companion file; the requested tuning is not. It rides
+        # in `platform.tuning.requested`, with a retired `{stem}.tuning.json`
+        # companion recognized for bundles published before the move.
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
-        has_tuning = bundle_path.with_name(f"{stem}.tuning.json").exists()
+        has_tuning = _has_requested_tuning(bundle_data) or bundle_path.with_name(f"{stem}.tuning.json").exists()
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
@@ -1598,7 +1642,7 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path),
+            applied_receipt=_applied_receipt(bundle_path, bundle_data),
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),

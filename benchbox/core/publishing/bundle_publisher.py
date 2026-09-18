@@ -57,8 +57,10 @@ class BundlePublishResult:
 class BundlePublisher:
     """Publish schema-v2 result bundles and track publication metadata.
 
-    Operates on existing exported bundle files (`.json`, with optional
-    `.plans.json`` and ``.tuning.json`` companions). Does not re-serialize
+    Operates on existing exported bundle files (`.json`, with an optional
+    ``.plans.json`` companion, plus the retired ``.tuning.json`` /
+    ``.applied.json`` companions on bundles published before those moved into
+    the bundle's own ``platform.tuning`` block). Does not re-serialize
     results - delegates all format conversion to ``benchbox.core.results.exporter``.
 
     The destination can be:
@@ -104,9 +106,9 @@ class BundlePublisher:
     def publish(self, source_bundle: str | Path) -> BundlePublishResult:
         """Publish a schema-v2 result bundle to the configured destination.
 
-        Copies the primary bundle file and any companion files (.plans.json,
-        .tuning.json) to the destination, then records a publication entry
-        in the persistent store.
+        Copies the primary bundle file and any companion files that exist
+        beside it to the destination, then records a publication entry in the
+        persistent store.
 
         If the same bundle has already been published to this destination,
         the metadata record is updated rather than creating a duplicate.
