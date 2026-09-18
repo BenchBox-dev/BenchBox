@@ -11930,10 +11930,15 @@
       "title": "Add end-to-end test for --capture-plans: run → results.json → show-plan/compare-plans CLI"
     },
     "query-plan-capture-error-channel-cleanup": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T12:32:41Z",
+        "generation": "1967e3014f9d4d119699cda39da84c89",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:33761908c6a0620b6188afe2"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Clean error-channel return across MySQL-wire, Fabric Warehouse, and QuestDB adapters"
     },
     "query-plan-capture-fingerprint-estimate-leak": {
