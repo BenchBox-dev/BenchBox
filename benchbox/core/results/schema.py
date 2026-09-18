@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 import yaml
 
+from benchbox.core.cost.models import normalized_cost_allows_direct_total
 from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
@@ -624,21 +625,12 @@ def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None
 
 
 def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
-    """Return True when legacy direct cost totals can satisfy the public contract.
+    """Historic name for the bundle round-trip contract.
 
-    A genuinely missing normalized_cost block (legacy bundles produced before
-    the normalized_cost contract existed) means we have nothing to *reject*
-    — the direct total is the only signal available, so allow it. Only an
-    explicitly-rejected normalized_cost dict (e.g. ``cost_status="unavailable"``)
-    blocks emitting the direct total.
+    Delegates to the canonical :func:`benchbox.core.cost.models.normalized_cost_allows_direct_total`
+    so every cost consumer gates on one definition.
     """
-    if normalized_cost is None:
-        return True
-    if not isinstance(normalized_cost, dict):
-        return False
-    if normalized_cost.get("cost_status") not in {"normalized", "not_applicable_local"}:
-        return False
-    return normalized_cost.get("normalized_cost_usd") is not None
+    return normalized_cost_allows_direct_total(normalized_cost)
 
 
 def _add_provenance_section(payload: dict[str, Any], result: BenchmarkResults) -> None:

@@ -4,12 +4,75 @@ This module defines the data structures for representing costs at different
 levels of granularity: individual queries, benchmark phases, and complete benchmarks.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Literal, Optional
 
 CostScope = Literal["compute_only", "compute_plus_storage"]
 CostStatus = Literal["normalized", "not_applicable_local", "unavailable"]
+
+#: Warning prefix emitted by the normalized-cost evaluator whenever a run
+#: cannot publish a total (defaulted metadata, fallback pricing, stale
+#: tables). Object-level consumers (TCO, optimizer) key their fail-closed
+#: gate on this prefix because ``BenchmarkCost`` carries warnings but no
+#: status field.
+COST_UNAVAILABLE_WARNING_PREFIX = "normalized cost unavailable"
+
+#: Statuses whose direct totals may satisfy the public cost contract.
+_PUBLISHABLE_COST_STATUSES = frozenset({"normalized", "not_applicable_local"})
+
+
+def normalized_cost_allows_direct_total(normalized_cost: Mapping[str, Any] | None) -> bool:
+    """Return True when a direct cost total may satisfy the public contract.
+
+    A genuinely missing normalized_cost block (legacy results produced before
+    the contract existed) means there is nothing to *reject* -- the direct
+    total is the only signal available, so allow it. Only an explicitly
+    rejected block (e.g. ``cost_status="unavailable"``, or a publishable
+    status with no amount) blocks the direct total.
+    """
+    if normalized_cost is None:
+        return True
+    if not isinstance(normalized_cost, Mapping):
+        return False
+    if normalized_cost.get("cost_status") not in _PUBLISHABLE_COST_STATUSES:
+        return False
+    return normalized_cost.get("normalized_cost_usd") is not None
+
+
+def cost_status_of(cost_summary: Mapping[str, Any] | None) -> str | None:
+    """Return the normalized cost_status for a cost summary, if any."""
+    if not isinstance(cost_summary, Mapping):
+        return None
+    normalized = cost_summary.get("normalized_cost")
+    if not isinstance(normalized, Mapping):
+        return None
+    status = normalized.get("cost_status")
+    return status if isinstance(status, str) else None
+
+
+def published_total_cost(cost_summary: Mapping[str, Any] | None) -> float | None:
+    """Return the total cost fit to publish, or None when gated.
+
+    An unavailable-status run yields None so no caller can rank, plot,
+    persist, or project from a fallback-priced number. Summaries without a
+    normalized block pass their direct total through for legacy results that
+    predate the contract.
+    """
+    if not isinstance(cost_summary, Mapping):
+        return None
+    if not normalized_cost_allows_direct_total(cost_summary.get("normalized_cost")):
+        return None
+    return cost_summary.get("total_cost")
+
+
+def unavailable_cost_warning(warnings: list[str] | tuple[str, ...] | None) -> str | None:
+    """Return the first warning marking a cost unavailable, if any."""
+    for warning in warnings or []:
+        if isinstance(warning, str) and warning.startswith(COST_UNAVAILABLE_WARNING_PREFIX):
+            return warning
+    return None
 
 
 @dataclass(frozen=True)
