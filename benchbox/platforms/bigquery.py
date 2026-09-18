@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
 import time
@@ -55,6 +56,11 @@ except ImportError:
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+def _lazy_query_parser(module_name: str, class_name: str) -> Any:
+    """Import and instantiate a parser class without a top-level import cycle."""
+    return getattr(importlib.import_module(module_name), class_name)()
 
 
 class BigQueryAdapter(PlatformAdapter):
@@ -1765,27 +1771,15 @@ class BigQueryAdapter(PlatformAdapter):
 
         return metadata
 
-    def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Return None: BigQuery has no EXPLAIN-text plan path.
-
-        BigQuery plans are harvested from the completed ``QueryJob`` via
-        ``_capture_bq_plan``. Returning None keeps the ``str | None`` base
-        contract so generic ``capture_query_plan`` degrades to
-        ``explain_failed`` instead of crashing on ``.strip()``.
-        """
-
-        return None
+    # No get_query_plan override: BigQuery has no EXPLAIN-text plan path and
+    # ResultCaptureMixin.get_query_plan already returns None, which is exactly
+    # this contract. Plans are harvested from the completed QueryJob via
+    # _capture_bq_plan; generic capture_query_plan degrades a None plan to
+    # explain_failed instead of crashing on .strip().
 
     def get_query_plan_parser(self):
-        """Get BigQuery query plan parser.
-
-        BigQuery captures plans from job statistics via ``_capture_bq_plan``
-        rather than the EXPLAIN-output path, but the parser is exposed here for
-        symmetry with the other adapters and for direct use.
-        """
-        from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
-
-        return BigQueryQueryPlanParser()
+        """Expose the BigQuery plan parser for symmetry with other adapters."""
+        return _lazy_query_parser("benchbox.core.query_plans.parsers.bigquery", "BigQueryQueryPlanParser")
 
     def _capture_bq_plan(self, job: Any, query_id: str) -> tuple[Any, float]:
         """Capture the structured plan from a completed BigQuery ``QueryJob``.
