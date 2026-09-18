@@ -10872,6 +10872,16 @@
       "status": "open",
       "title": "Correct all cloud pricing tables against vendor list prices"
     },
+    "pricing-failclosed-price-resolution": {
+      "claim": null,
+      "needs": [
+        "pricing-data-correct-all-tables",
+        "pricing-provenance-units-and-tests"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make unknown prices and quantities fail closed instead of defaulting silently"
+    },
     "pricing-provenance-units-and-tests": {
       "claim": null,
       "needs": [
