@@ -13062,6 +13062,13 @@
       "status": "done",
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
+    "result-bundle-compat-plans-truncation-contract": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: plans-companion truncation contract"
+    },
     "result-bundle-compat-read-model-v11-load-time": {
       "claim": null,
       "needs": [

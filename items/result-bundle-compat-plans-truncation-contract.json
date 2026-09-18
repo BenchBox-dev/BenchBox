@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "plan_max_depth truncation semantics documented in docs/reference/result-formats.md companion section",
+    ".plans.json surfaces max_depth/truncated marker when truncation applied, or explicit deferral recorded",
+    "No change to main-bundle validation (plan_max_depth stays companion-only)"
+  ],
+  "context": "Reconciliation row for the new plan_max_depth finding (DEFER). Companion-surface contract, not main-bundle validation.",
+  "description": "Define the plans-companion truncation contract for plan_max_depth (#2122): document max-depth semantics in the result-formats companion section and surface a truncated/max_depth marker in .plans.json when truncation applied, so consumers can tell depth was applied.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}
