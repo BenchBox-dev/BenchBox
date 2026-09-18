@@ -13018,6 +13018,13 @@
       "status": "done",
       "title": "Restrict Primary/Foreign Key Configuration to tuning.yaml Only"
     },
+    "result-bundle-compat-dispatch-review": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
+    },
     "result-export-explicit-raw-config-egress-sentinel-gate": {
       "claim": null,
       "needs": [],
