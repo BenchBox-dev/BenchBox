@@ -1,8 +1,85 @@
 metadata:
   version: '2025.11'
-  last_updated: '2025-11-09'
   source: Cloud provider public pricing pages
   currency: USD
+  note: >-
+    The per-table provenance blocks below are authoritative. A previous
+    file-level last_updated ('2025-11-09') was removed: git log --follow
+    shows the values were authored in e0438e993 (initial release) and only
+    relocated Python->YAML in 8281615b0 with no value ever changed, so it
+    never described a refresh.
+provenance:
+  snowflake_credit_prices:
+    source: 'https://www.snowflake.com/pricing/'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us-east-1]
+  athena_price_per_tb:
+    source: 'https://aws.amazon.com/athena/pricing/'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us-east-1, eu-west-1, ap-southeast-1]
+  bigquery_on_demand_prices:
+    source: 'https://cloud.google.com/bigquery/pricing'
+    retrieved: '2026-09-18'
+    upstream_published: '2023-07-05'
+    method: derived_from_announcement
+    verified_regions: [us, eu, asia]
+  redshift_node_prices:
+    source: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRedshift/current/{region}/index.json'
+    retrieved: '2026-09-18'
+    upstream_published: '2026-09-11T12:45:05Z'
+    method: api
+    verified_regions: [us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2,
+      eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, sa-east-1]
+  databricks_dbu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [eastus]
+  synapse_serverless_price_per_tb:
+    source: 'Azure Synapse Analytics serverless SQL pool pricing page'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: [eastus, westeurope]
+  synapse_dedicated_dwu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: api
+    verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  fabric_cu_prices:
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: api
+    verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  fabric_sku_cu_map:
+    source: 'Microsoft Fabric capacity SKU documentation'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: []
+  firebolt_node_fbu_rates:
+    source: 'Firebolt engine specification documentation'
+    retrieved: unknown
+    upstream_published: unknown
+    method: manual
+    verified_regions: []
+  firebolt_fbu_price:
+    source: 'https://docs.firebolt.io/managed-service/billing'
+    retrieved: '2026-09-18'
+    upstream_published: unknown
+    method: manual
+    verified_regions: [us]
+units:
+  bigquery_on_demand_prices: tebibyte
+  athena_price_per_tb: terabyte_unconfirmed
+  synapse_serverless_price_per_tb: terabyte_unconfirmed
 snowflake_credit_prices:
   standard:
     aws:
@@ -61,233 +138,330 @@ snowflake_credit_prices:
       ap: 5.2
       ca: 4.4
       other: 5.4
+  vps:
+    aws:
+      us: 6.0
+      eu: 7.5
+      ap: 7.8
+      ca: 6.6
+      other: 8.1
+    azure:
+      us: 6.0
+      eu: 7.5
+      ap: 7.8
+      ca: 6.6
+      other: 8.1
+    gcp:
+      us: 6.0
+      eu: 7.5
+      ap: 7.8
+      ca: 6.6
+      other: 8.1
 athena_price_per_tb: 5.0
 bigquery_on_demand_prices:
-  us: 5.0
-  eu: 5.0
-  asia: 5.0
-  us-single: 5.0
-  eu-single: 5.5
-  asia-single: 5.5
-  australia: 6.0
-  southamerica: 6.25
-  middleeast: 6.0
-  other: 5.5
+  us: 6.25
+  eu: 6.25
+  asia: 6.25
+  us-single: 6.25
+  eu-single: 6.875
+  asia-single: 6.875
+  australia: 7.5
+  southamerica: 7.8125
+  middleeast: 7.5
+  other: 6.875
 redshift_node_prices:
   dc2.large:
     us-east-1: 0.25
     us-east-2: 0.25
-    us-west-1: 0.27
+    us-west-1: 0.33
     us-west-2: 0.25
-    eu-west-1: 0.28
+    eu-west-1: 0.30
     eu-west-2: 0.32
-    eu-central-1: 0.3
-    ap-southeast-1: 0.29
-    ap-southeast-2: 0.31
-    ap-northeast-1: 0.29
-    other: 0.3
+    eu-central-1: 0.324
+    ap-southeast-1: 0.33
+    ap-southeast-2: 0.33
+    ap-northeast-1: 0.314
+    other: 0.40
   dc2.8xlarge:
-    us-east-1: 6.4
-    us-east-2: 6.4
-    us-west-1: 6.9
-    us-west-2: 6.4
-    eu-west-1: 7.2
-    eu-west-2: 8.2
-    eu-central-1: 7.6
-    ap-southeast-1: 7.4
-    ap-southeast-2: 7.9
-    ap-northeast-1: 7.4
-    other: 7.5
+    us-east-1: 4.80
+    us-east-2: 4.80
+    us-west-1: 6.40
+    us-west-2: 4.80
+    eu-west-1: 5.60
+    eu-west-2: 5.88
+    eu-central-1: 6.048
+    ap-southeast-1: 6.40
+    ap-southeast-2: 6.40
+    ap-northeast-1: 6.095
+    other: 7.68
+  ra3.large:
+    us-east-1: 0.543
+    us-east-2: 0.543
+    us-west-1: 0.601
+    us-west-2: 0.543
+    eu-west-1: 0.601
+    eu-west-2: 0.632
+    eu-central-1: 0.649
+    ap-southeast-1: 0.652
+    ap-southeast-2: 0.652
+    ap-northeast-1: 0.639
+    other: 0.866
   ra3.xlplus:
     us-east-1: 1.086
     us-east-2: 1.086
-    us-west-1: 1.173
+    us-west-1: 1.202
     us-west-2: 1.086
-    eu-west-1: 1.217
-    eu-west-2: 1.304
-    eu-central-1: 1.282
-    ap-southeast-1: 1.26
-    ap-southeast-2: 1.347
-    ap-northeast-1: 1.26
-    other: 1.25
+    eu-west-1: 1.202
+    eu-west-2: 1.264
+    eu-central-1: 1.298
+    ap-southeast-1: 1.303
+    ap-southeast-2: 1.303
+    ap-northeast-1: 1.278
+    other: 1.731
   ra3.4xlarge:
-    us-east-1: 3.61
-    us-east-2: 3.61
-    us-west-1: 3.9
-    us-west-2: 3.61
-    eu-west-1: 4.05
-    eu-west-2: 4.34
-    eu-central-1: 4.26
-    ap-southeast-1: 4.19
-    ap-southeast-2: 4.48
-    ap-northeast-1: 4.19
-    other: 4.15
+    us-east-1: 3.26
+    us-east-2: 3.26
+    us-west-1: 3.606
+    us-west-2: 3.26
+    eu-west-1: 3.606
+    eu-west-2: 3.793
+    eu-central-1: 3.894
+    ap-southeast-1: 3.909
+    ap-southeast-2: 3.909
+    ap-northeast-1: 3.836
+    other: 5.195
   ra3.16xlarge:
-    us-east-1: 14.44
-    us-east-2: 14.44
-    us-west-1: 15.6
-    us-west-2: 14.44
-    eu-west-1: 16.2
-    eu-west-2: 17.36
-    eu-central-1: 17.04
-    ap-southeast-1: 16.76
-    ap-southeast-2: 17.92
-    ap-northeast-1: 16.76
-    other: 16.6
-  ds2.xlarge:
-    us-east-1: 0.85
-    us-east-2: 0.85
-    us-west-1: 0.92
-    us-west-2: 0.85
-    eu-west-1: 0.95
-    eu-west-2: 1.02
-    eu-central-1: 1.0
-    other: 1.0
-  ds2.8xlarge:
-    us-east-1: 6.8
-    us-east-2: 6.8
-    us-west-1: 7.35
-    us-west-2: 6.8
-    eu-west-1: 7.6
-    eu-west-2: 8.15
-    eu-central-1: 8.0
-    other: 8.0
+    us-east-1: 13.04
+    us-east-2: 13.04
+    us-west-1: 14.424
+    us-west-2: 13.04
+    eu-west-1: 14.424
+    eu-west-2: 15.174
+    eu-central-1: 15.578
+    ap-southeast-1: 15.636
+    ap-southeast-2: 15.636
+    ap-northeast-1: 15.347
+    other: 20.78
+  rg.large:
+    us-east-1: 0.3801
+    us-east-2: 0.3801
+    us-west-1: 0.4207
+    us-west-2: 0.3801
+    eu-west-1: 0.4207
+    eu-west-2: 0.4424
+    eu-central-1: 0.4543
+    ap-southeast-1: 0.4564
+    ap-southeast-2: 0.4564
+    ap-northeast-1: 0.4473
+    other: 0.6062
+  rg.xlarge:
+    us-east-1: 0.7602
+    us-east-2: 0.7602
+    us-west-1: 0.8414
+    us-west-2: 0.7602
+    eu-west-1: 0.8414
+    eu-west-2: 0.8848
+    eu-central-1: 0.9086
+    ap-southeast-1: 0.9121
+    ap-southeast-2: 0.9121
+    ap-northeast-1: 0.8946
+    other: 1.2117
+  rg.4xlarge:
+    us-east-1: 3.0427
+    us-east-2: 3.0427
+    us-west-1: 3.3656
+    us-west-2: 3.0427
+    eu-west-1: 3.3656
+    eu-west-2: 3.5401
+    eu-central-1: 3.6344
+    ap-southeast-1: 3.6484
+    ap-southeast-2: 3.6484
+    ap-northeast-1: 3.5803
+    other: 4.8487
+  rg.12xlarge:
+    us-east-1: 9.128
+    us-east-2: 9.128
+    us-west-1: 10.0968
+    us-west-2: 9.128
+    eu-west-1: 10.0968
+    eu-west-2: 10.6218
+    eu-central-1: 10.9046
+    ap-southeast-1: 10.9452
+    ap-southeast-2: 10.9452
+    ap-northeast-1: 10.7429
+    other: 14.546
 databricks_dbu_prices:
   aws:
     standard:
       all_purpose: 0.4
       jobs: 0.15
       sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.4
     premium:
       all_purpose: 0.55
       jobs: 0.2
       sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.55
     enterprise:
       all_purpose: 0.65
       jobs: 0.2
       sql_warehouse: 0.3
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.65
   azure:
     standard:
-      all_purpose: 0.44
-      jobs: 0.17
-      sql_warehouse: 0.24
-      ml: 0.44
+      all_purpose: 0.40
+      jobs: 0.15
+      sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
+      ml: 0.40
     premium:
-      all_purpose: 0.6
-      jobs: 0.22
-      sql_warehouse: 0.24
-      ml: 0.6
-    enterprise:
-      all_purpose: 0.71
-      jobs: 0.22
-      sql_warehouse: 0.33
-      ml: 0.71
+      all_purpose: 0.55
+      jobs: 0.30
+      sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
+      ml: 0.55
   gcp:
     standard:
       all_purpose: 0.4
       jobs: 0.15
       sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.4
     premium:
       all_purpose: 0.55
       jobs: 0.2
       sql_warehouse: 0.22
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.55
     enterprise:
       all_purpose: 0.65
       jobs: 0.2
       sql_warehouse: 0.3
+      sql_classic: 0.22
+      sql_pro: 0.55
+      sql_serverless: 0.70
       ml: 0.65
 synapse_serverless_price_per_tb: 5.0
 synapse_dedicated_dwu_prices:
   dw100c:
-    us: 1.2
-    eu: 1.44
-    ap: 1.56
-    other: 1.68
+    us: 1.51
+    eu: 1.51
+    ap: 1.81
+    ca: 1.33
+    other: 2.42
   dw200c:
-    us: 2.4
-    eu: 2.88
-    ap: 3.12
-    other: 3.36
+    us: 3.02
+    eu: 3.02
+    ap: 3.62
+    ca: 2.66
+    other: 4.84
   dw300c:
-    us: 3.6
-    eu: 4.32
-    ap: 4.68
-    other: 5.04
+    us: 4.53
+    eu: 4.53
+    ap: 5.43
+    ca: 3.99
+    other: 7.26
   dw400c:
-    us: 4.8
-    eu: 5.76
-    ap: 6.24
-    other: 6.72
+    us: 6.04
+    eu: 6.04
+    ap: 7.24
+    ca: 5.32
+    other: 9.68
   dw500c:
-    us: 6.0
-    eu: 7.2
-    ap: 7.8
-    other: 8.4
+    us: 7.55
+    eu: 7.55
+    ap: 9.05
+    ca: 6.65
+    other: 12.10
   dw1000c:
-    us: 12.0
-    eu: 14.4
-    ap: 15.6
-    other: 16.8
+    us: 15.10
+    eu: 15.10
+    ap: 18.10
+    ca: 13.30
+    other: 24.20
   dw1500c:
-    us: 18.0
-    eu: 21.6
-    ap: 23.4
-    other: 25.2
+    us: 22.65
+    eu: 22.65
+    ap: 27.15
+    ca: 19.95
+    other: 36.30
   dw2000c:
-    us: 24.0
-    eu: 28.8
-    ap: 31.2
-    other: 33.6
+    us: 30.20
+    eu: 30.20
+    ap: 36.20
+    ca: 26.60
+    other: 48.40
   dw2500c:
-    us: 30.0
-    eu: 36.0
-    ap: 39.0
-    other: 42.0
+    us: 37.75
+    eu: 37.75
+    ap: 45.25
+    ca: 33.25
+    other: 60.50
   dw3000c:
-    us: 36.0
-    eu: 43.2
-    ap: 46.8
-    other: 50.4
+    us: 45.30
+    eu: 45.30
+    ap: 54.30
+    ca: 39.90
+    other: 72.60
   dw5000c:
-    us: 60.0
-    eu: 72.0
-    ap: 78.0
-    other: 84.0
+    us: 75.50
+    eu: 75.50
+    ap: 90.50
+    ca: 66.50
+    other: 121.00
   dw6000c:
-    us: 72.0
-    eu: 86.4
-    ap: 93.6
-    other: 100.8
+    us: 90.60
+    eu: 90.60
+    ap: 108.60
+    ca: 79.80
+    other: 145.20
   dw7500c:
-    us: 90.0
-    eu: 108.0
-    ap: 117.0
-    other: 126.0
+    us: 113.25
+    eu: 113.25
+    ap: 135.75
+    ca: 99.75
+    other: 181.50
   dw10000c:
-    us: 120.0
-    eu: 144.0
-    ap: 156.0
-    other: 168.0
+    us: 151.00
+    eu: 151.00
+    ap: 181.00
+    ca: 133.00
+    other: 242.00
   dw15000c:
-    us: 180.0
-    eu: 216.0
-    ap: 234.0
-    other: 252.0
+    us: 226.50
+    eu: 226.50
+    ap: 271.50
+    ca: 199.50
+    other: 363.00
   dw30000c:
-    us: 360.0
-    eu: 432.0
-    ap: 468.0
-    other: 504.0
+    us: 453.00
+    eu: 453.00
+    ap: 543.00
+    ca: 399.00
+    other: 726.00
 fabric_cu_prices:
   us: 0.18
-  eu: 0.2
+  eu: 0.22
   ap: 0.22
-  other: 0.2
+  ca: 0.20
+  other: 0.28
 fabric_sku_cu_map:
   f2: 2
   f4: 4
@@ -305,4 +479,6 @@ firebolt_node_fbu_rates:
   m: 16.0
   l: 32.0
   xl: 64.0
-firebolt_fbu_price: 0.0833
+# Standard US tier ($0.23/FBU). Enterprise non-US runs up to $0.42/FBU;
+# per-region Firebolt tiers arrive with the generator (pricing-generator-and-drift-guard).
+firebolt_fbu_price: 0.23

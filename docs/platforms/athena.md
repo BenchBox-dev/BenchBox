@@ -10,7 +10,7 @@ Amazon Athena is AWS's serverless interactive query service for analyzing data d
 ## Features
 
 - **Serverless** - No infrastructure to manage, scales automatically
-- **Pay-per-query** - Charged based on data scanned ($5 per TB)
+- **Pay-per-query** - Charged based on data scanned (list price $5 per TB; `benchbox/core/cost/pricing_data.yaml` is the source of truth for estimates)
 - **S3 native** - Query data directly in S3 without data movement
 - **AWS Glue integration** - Uses Glue Data Catalog for metadata
 - **Multiple formats** - Parquet, ORC, JSON, CSV, Avro support
@@ -132,7 +132,7 @@ benchbox run --platform athena --benchmark tpch \
 
 ### Reduce Data Scanned
 
-Athena charges $5 per TB scanned. Optimize costs with:
+Athena charges per TB scanned (list price $5 per TB — see `benchbox/core/cost/pricing_data.yaml`, the source of truth for cost estimates). Optimize costs with:
 
 1. **Columnar formats** - Parquet/ORC scan only needed columns
 2. **Partitioning** - Partition by date/region for predicate pushdown
@@ -150,6 +150,8 @@ aws athena create-work-group \
 ```
 
 ### Cost Estimation
+
+Rough planning figures at the current list price (`benchbox/core/cost/pricing_data.yaml` is authoritative):
 
 | Scale Factor | Data Size | Est. Full Run Cost |
 |--------------|-----------|-------------------|

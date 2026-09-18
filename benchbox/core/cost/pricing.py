@@ -34,9 +34,17 @@ _PRICING_METADATA = cast("dict[str, str]", _PRICING_DATA["metadata"])
 
 # Pricing metadata
 PRICING_VERSION = _PRICING_METADATA["version"]  # Semantic versioning (YYYY.MM)
-PRICING_LAST_UPDATED = _PRICING_METADATA["last_updated"]  # ISO 8601 date
+# No file-level refresh date: a previous last_updated asserted a refresh that
+# never occurred, so pricing_data.yaml no longer carries one. The per-table
+# provenance blocks are authoritative; "unknown" marks that honestly here.
+PRICING_LAST_UPDATED: str = _PRICING_METADATA.get("last_updated", "unknown")
 PRICING_SOURCE = _PRICING_METADATA["source"]
-PRICING_VALIDATION_DATE = datetime.fromisoformat(PRICING_LAST_UPDATED)
+try:
+    PRICING_VALIDATION_DATE = (
+        datetime.fromisoformat(PRICING_LAST_UPDATED) if PRICING_LAST_UPDATED != "unknown" else None
+    )
+except ValueError:
+    PRICING_VALIDATION_DATE = None
 
 # Currency for all prices
 CURRENCY = _PRICING_METADATA["currency"]
@@ -60,6 +68,39 @@ FABRIC_CU_PRICES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["fab
 FABRIC_SKU_CU_MAP: dict[str, int] = cast("dict[str, int]", _PRICING_DATA["fabric_sku_cu_map"])
 FIREBOLT_NODE_FBU_RATES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["firebolt_node_fbu_rates"])
 FIREBOLT_FBU_PRICE = float(_PRICING_DATA["firebolt_fbu_price"])
+
+# Per-table provenance (source URL, retrieved date, upstream_published,
+# method, verified_regions) and per-table byte-unit declarations, both loaded
+# from pricing_data.yaml. Every price table must have a provenance entry;
+# every byte-priced table must declare a unit.
+PRICE_TABLE_PROVENANCE: dict[str, dict[str, Any]] = cast(
+    "dict[str, dict[str, Any]]", _PRICING_DATA.get("provenance", {})
+)
+PRICE_TABLE_UNITS: dict[str, str] = cast("dict[str, str]", _PRICING_DATA.get("units", {}))
+
+PROVENANCE_METHODS = frozenset({"api", "manual", "derived_from_announcement"})
+
+# Tables whose prices are quoted per scanned byte and therefore need a unit.
+BYTE_PRICED_TABLES = frozenset(
+    {
+        "bigquery_on_demand_prices",
+        "athena_price_per_tb",
+        "synapse_serverless_price_per_tb",
+    }
+)
+
+
+def get_table_provenance(table: str) -> dict[str, Any] | None:
+    """Return the provenance block for a price table, or None when absent."""
+    entry = PRICE_TABLE_PROVENANCE.get(table)
+    return dict(entry) if isinstance(entry, dict) else None
+
+
+def get_table_unit(table: str) -> str | None:
+    """Return the declared byte-unit for a price table, or None when absent."""
+    unit = PRICE_TABLE_UNITS.get(table)
+    return unit if isinstance(unit, str) else None
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -132,6 +173,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "us-west4",
         "northamerica-northeast1",
         "northamerica-northeast2",  # Canada
+        "northamerica-south1",  # Mexico
     }
     if location in us_single_regions or location.startswith("us-"):
         return BIGQUERY_ON_DEMAND_PRICES["us-single"]
@@ -140,6 +182,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
     eu_single_regions = {
         "europe-central2",
         "europe-north1",
+        "europe-north2",
         "europe-southwest1",
         "europe-west1",
         "europe-west2",
@@ -148,6 +191,8 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "europe-west6",
         "europe-west8",
         "europe-west9",
+        "europe-west10",
+        "europe-west12",
     }
     if location in eu_single_regions or location.startswith("europe-"):
         return BIGQUERY_ON_DEMAND_PRICES["eu-single"]
@@ -163,6 +208,8 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "asia-south2",  # Mumbai, Delhi
         "asia-southeast1",
         "asia-southeast2",  # Singapore, Jakarta
+        "asia-southeast3",
+        "asia-southeast4",
     }
     if location in asia_single_regions or location.startswith("asia-"):
         return BIGQUERY_ON_DEMAND_PRICES["asia-single"]
@@ -181,6 +228,12 @@ def get_bigquery_price_per_tb(location: str) -> float:
     middleeast_regions = {"me-west1", "me-central1", "me-central2"}
     if location in middleeast_regions or location.startswith("me-"):
         return BIGQUERY_ON_DEMAND_PRICES["middleeast"]
+
+    # Africa regions (no dedicated bucket yet; priced at 'other' until
+    # per-region values are captured in bigquery-per-region-price-capture)
+    africa_regions = {"africa-south1"}
+    if location in africa_regions or location.startswith("africa-"):
+        return BIGQUERY_ON_DEMAND_PRICES["other"]
 
     # Default to 'other' pricing for unknown regions
     return BIGQUERY_ON_DEMAND_PRICES["other"]
@@ -224,6 +277,14 @@ def get_databricks_dbu_price(cloud: str, tier: str, workload_type: str) -> float
     cloud = cloud.lower()
     tier = tier.lower()
     workload_type = workload_type.lower().replace("-", "_").replace(" ", "_")
+
+    # Aliases for the workload types production actually emits: extraction
+    # reports serverless_sql for serverless warehouses and sql_compute for
+    # provisioned (PRO/CLASSIC) SQL compute; both bill as Databricks SQL DBUs.
+    if workload_type == "serverless_sql":
+        workload_type = "sql_serverless"
+    elif workload_type == "sql_compute":
+        workload_type = "sql_pro"
 
     # Get price from table
     try:
@@ -504,12 +565,15 @@ def _map_region_to_tier(region: str) -> str:
     return "other"
 
 
-def get_pricing_age_days() -> int:
+def get_pricing_age_days() -> int | None:
     """Return number of days since pricing was last updated.
 
     Returns:
-        Number of days between now and PRICING_LAST_UPDATED
+        Number of days between now and PRICING_LAST_UPDATED, or None when
+        no file-level refresh date is known (per-table provenance applies).
     """
+    if PRICING_VALIDATION_DATE is None:
+        return None
     return (datetime.now() - PRICING_VALIDATION_DATE).days
 
 
@@ -520,6 +584,10 @@ def is_pricing_stale(threshold_days: int = 90) -> bool:
         threshold_days: Number of days after which pricing is considered stale (default: 90)
 
     Returns:
-        True if pricing age exceeds threshold, False otherwise
+        True if pricing age exceeds threshold, False otherwise. An unknown
+        refresh date is not stale: per-table provenance is authoritative.
     """
-    return get_pricing_age_days() > threshold_days
+    age_days = get_pricing_age_days()
+    if age_days is None:
+        return False
+    return age_days > threshold_days
