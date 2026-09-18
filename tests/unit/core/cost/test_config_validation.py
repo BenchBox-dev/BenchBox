@@ -246,6 +246,12 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 1
         assert "region" in warnings[0]
 
+        is_valid, warnings = validate_platform_config("synapse", {"region": "eastus"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "mode" in warnings[0]
+
     def test_fabric_dw_requires_region_and_sku(self):
         """Test Fabric DW configuration validation."""
         config = {"region": "eastus", "sku": "f64"}
@@ -260,6 +266,12 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 1
         assert "sku" in warnings[0]
 
+        is_valid, warnings = validate_platform_config("fabric_dw", {"sku": "f64"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "region" in warnings[0]
+
     def test_firebolt_requires_node_type_and_node_count(self):
         """Test Firebolt configuration validation."""
         config = {"node_type": "m", "node_count": 1}
@@ -273,6 +285,12 @@ class TestValidatePlatformConfig:
         assert is_valid is False
         assert len(warnings) == 1
         assert "node_count" in warnings[0]
+
+        is_valid, warnings = validate_platform_config("firebolt", {"node_count": 1})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "node_type" in warnings[0]
 
     def test_unknown_platform_always_valid(self):
         """Test that unknown platforms are considered valid."""
