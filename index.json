@@ -11966,10 +11966,15 @@
       "title": "Design and implement plan capture as an explicit isolated benchmark phase"
     },
     "query-plan-capture-misc-parser-live-validation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T13:25:53Z",
+        "generation": "f37859337b37474aad41be4a4fd10c96",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Validate the Databend / QuestDB / Doris / SingleStore plan parsers against real EXPLAIN output"
     },
     "query-plan-capture-misc-platforms": {
