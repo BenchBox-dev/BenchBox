@@ -11936,6 +11936,13 @@
       "status": "open",
       "title": "Define plan capture for side-effect engines (BigQuery) under the isolated-phase model"
     },
+    "query-plan-capture-snowflake-join-condition-sorting": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Enable deterministic join condition sorting in SnowflakeQueryPlanParser"
+    },
     "query-plan-capture-spark-databricks": {
       "claim": null,
       "needs": [],

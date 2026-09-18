@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "SnowflakeQueryPlanParser._join_condition returns list[str] of stripped condition strings",
+    "SnowflakeQueryPlanParser._build_operator sets kwargs['join_conditions'] to the list directly",
+    "LogicalOperator._structural_signature_obj sorts multi-condition joins deterministically",
+    "Unit tests in test_snowflake_parser.py verify list return and deterministic sorting of multi-condition joins"
+  ],
+  "context": "Adversarial audit finding QPC-DEF-04. SnowflakeQueryPlanParser joined all join condition expressions into a single string with ', ' and wrapped it in a 1-element list, defeating the set-sorting in LogicalOperator._structural_signature_obj.",
+  "description": "Refactor SnowflakeQueryPlanParser._join_condition to return a list of stripped condition strings rather than a single comma-joined string, enabling deterministic set sorting of multi-condition joins in LogicalOperator._structural_signature_obj."
+}
