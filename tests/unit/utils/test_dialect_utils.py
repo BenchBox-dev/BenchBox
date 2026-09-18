@@ -378,6 +378,38 @@ class TestTranslationScopeMetadata:
             translate_sql_query("SELECT 1", target_dialect="duckdb", scope="not_a_scope")
 
 
+class TestStandardSourceDdlSnapshots:
+    """Standard-source DDL parses with the postgres grammar, preserving lengths."""
+
+    DDL = "CREATE TABLE region (r_regionkey INTEGER NOT NULL, r_name VARCHAR(25) NOT NULL)"
+
+    def test_standard_source_preserves_lengths_bigquery(self):
+        with sql_translation_context(strict=False) as outcomes:
+            result = translate_sql_query(
+                self.DDL, target_dialect="bigquery", source_dialect="standard", scope="schema_ddl"
+            )
+        assert "INT64" in result
+        assert "STRING(25)" in result
+        assert outcomes[0].scope == "schema_ddl"
+        assert outcomes[0].normalized_source_dialect == "postgres"
+
+    def test_standard_source_preserves_lengths_duckdb(self):
+        with sql_translation_context(strict=False) as outcomes:
+            result = translate_sql_query(
+                self.DDL, target_dialect="duckdb", source_dialect="standard", scope="schema_ddl"
+            )
+        assert "TEXT(25)" in result
+        assert outcomes[0].scope == "schema_ddl"
+
+    def test_standard_source_preserves_lengths_snowflake(self):
+        with sql_translation_context(strict=False) as outcomes:
+            result = translate_sql_query(
+                self.DDL, target_dialect="snowflake", source_dialect="standard", scope="schema_ddl"
+            )
+        assert "VARCHAR(25)" in result or "CHAR(25)" in result
+        assert outcomes[0].scope == "schema_ddl"
+
+
 class TestIntegrationScenarios:
     """Test real-world integration scenarios."""
 

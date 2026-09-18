@@ -73,12 +73,13 @@ class DialectTranslationMixin:
             current_sql_translation_strict_mode,
             normalize_dialect_for_sqlglot,
             record_sql_translation_outcome,
+            translation_collection_active,
         )
 
         strict_mode = current_sql_translation_strict_mode() if strict is None else strict
         src = normalize_dialect_for_sqlglot(source_dialect)
         tgt = normalize_dialect_for_sqlglot(self.dialect)
-        fingerprint = _fingerprint_sql(sql)
+        fingerprint = _fingerprint_sql(sql) if translation_collection_active() else None
 
         try:
             import sqlglot

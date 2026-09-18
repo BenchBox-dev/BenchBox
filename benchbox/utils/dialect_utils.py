@@ -29,8 +29,17 @@ def _resolve_translation_scope(scope: str | None) -> str:
 
 
 def _fingerprint_sql(sql: str) -> str:
-    """Return a stable content hash identifying one logical SQL statement."""
+    """Return a stable content hash identifying one logical SQL statement.
+
+    Non-cryptographic dedup hash only (counting distinct statements per run),
+    never a security boundary; collision risk at benchmark scale is negligible.
+    """
     return hashlib.sha1(" ".join(sql.split()).encode()).hexdigest()
+
+
+def translation_collection_active() -> bool:
+    """Return True when a translation context is collecting outcomes."""
+    return _SQL_TRANSLATION_OUTCOMES.get() is not None
 
 
 @dataclass(frozen=True)
@@ -103,7 +112,14 @@ def summarize_sql_translation_outcomes(
     *,
     strict_mode: bool | None = None,
 ) -> dict[str, object] | None:
-    """Summarize translation outcomes for result-bundle execution metadata."""
+    """Summarize translation outcomes for result-bundle execution metadata.
+
+    Uniqueness counts distinct source texts within each scope: repeated
+    translation of the same logical query (preflight, iterations, metadata
+    capture) counts once, regardless of target dialect. Schema granularity
+    follows the translation call: one fingerprint per multi-statement block
+    on the adapter path, one per statement for per-statement callers.
+    """
     if not outcomes:
         return None
 
@@ -371,7 +387,7 @@ def translate_sql_query(
 
     logger = logging.getLogger(__name__)
     strict_mode = current_sql_translation_strict_mode() if strict is None else strict
-    fingerprint = _fingerprint_sql(query)
+    fingerprint = _fingerprint_sql(query) if translation_collection_active() else None
 
     try:
         import sqlglot
