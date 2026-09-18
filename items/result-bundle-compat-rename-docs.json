@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "result-formats.md declares result_schema_version (fallback chain), export.benchbox_version, and schema_specs.yaml canonical_key_order",
+    "CHANGELOG entry for the rename; no stale version-key references in bundle docs"
+  ],
+  "context": "Reconciliation 2199-P7 interaction row (DEFER, blocked on fix/result-schema-version-rename @ 7aeed9498). Implement post-merge.",
+  "description": "After PR #2199 merges, document the renamed top-level result_schema_version key (with the result_schema_version to version to schema_version fallback chain), the new export.benchbox_version field, and the schema_specs.yaml canonical_key_order in result-formats.md plus a CHANGELOG entry.",
+  "links": [
+    "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
+  ]
+}

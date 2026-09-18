@@ -13094,6 +13094,13 @@
       "status": "done",
       "title": "Result-bundle compat: reconcile agy+muse findings with P1-P8"
     },
+    "result-bundle-compat-rename-docs": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: docs for renamed key and benchbox_version"
+    },
     "result-bundle-compat-shared-field-contract-test": {
       "claim": null,
       "needs": [],
