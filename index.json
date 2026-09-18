@@ -11865,10 +11865,15 @@
       "title": "Implement query plan capture for ClickHouse local, server, and cloud adapters"
     },
     "query-plan-capture-cloud-live-redshift-motherduck": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T13:27:48Z",
+        "generation": "531d0b99d1744938837d721680fea5c9",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add CI secrets and nightly live plan capture verification for Redshift and MotherDuck"
     },
     "query-plan-capture-cloud-live-snowflake-bigquery": {
