@@ -625,6 +625,21 @@ class DataFrameBenchmarkSuite:
                     result = result.collect()
                 del result
 
+            # Capture the lazy plan once, outside any timed block. A plan is a
+            # property of (query, schema, engine), so one capture per query
+            # suffices; capture failures degrade to None. A separate execute
+            # keeps explain() cost (e.g. a PySpark remote round-trip, or two
+            # Polars optimizer passes) out of every measured iteration, matching
+            # the SQL platforms' post-execution capture pattern.
+            if self.config.capture_plans:
+                try:
+                    plan_frame = query.execute(context, family)
+                    plan = capture_query_plan(plan_frame, platform_name)
+                    if plan is not None:
+                        query_plan = plan.plan_text
+                except Exception as e:
+                    logger.debug(f"Could not capture DataFrame plan for {query_id}: {e}")
+
             # Benchmark iterations
             for i in range(self.config.benchmark_iterations):
                 if self.config.track_memory:
@@ -633,17 +648,6 @@ class DataFrameBenchmarkSuite:
 
                 start_time = time.perf_counter()
                 result = query.execute(context, family)
-
-                # Capture the lazy plan once, before the first collect. A plan
-                # is a property of (query, schema, engine), so one capture per
-                # query suffices; capture failures degrade to None.
-                if i == 0 and self.config.capture_plans and query_plan is None:
-                    try:
-                        plan = capture_query_plan(result, platform_name)
-                        if plan is not None:
-                            query_plan = plan.plan_text
-                    except Exception as e:
-                        logger.debug(f"Could not capture DataFrame plan for {query_id}: {e}")
 
                 # Collect if lazy
                 if hasattr(result, "collect"):

@@ -197,8 +197,10 @@ def get_spark_query_plan(
     try:
         result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
         plan_rows = result_df.collect()
-        # Empty output stays "" (historical contract: only exceptions yield
-        # None); join_explain_rows's None covers only the nothing-to-join case.
+        # Pinned historical contract (see test_empty_plan_returns_empty_string):
+        # empty output stays ""; only exceptions yield None. No production
+        # caller distinguishes the two (both are falsy downstream); the "" is
+        # kept for stability, not for an operational difference.
         return join_explain_rows(plan_rows) or ""
     except Exception as e:
         log.warning("Could not get query plan via EXPLAIN: %s", e)
