@@ -11989,10 +11989,15 @@
       "title": "Correct nightly CI -m documentation and add Snowflake live execute_query coverage"
     },
     "query-plan-capture-parser-live-validation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T13:22:53Z",
+        "generation": "3bfd2f86b8f7461ba61bd82969e739b7",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Track and validate plan parsers that were only tested against synthetic fixtures"
     },
     "query-plan-capture-phase-analyze-opt-in": {
