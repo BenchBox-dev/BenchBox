@@ -11842,15 +11842,10 @@
       "title": "Query Latency Histogram Visualization"
     },
     "query-plan-capture-bigquery-contract-and-normalization": {
-      "claim": {
-        "expires_at": "2026-09-19T12:19:04Z",
-        "generation": "34bcbacd75ea4132b387fe55f1b961ca",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:33761908c6a0620b6188afe2"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Harmonize BigQueryAdapter plan-capture contract and wire normalized fingerprint"
     },
     "query-plan-capture-canonical-isolation": {
