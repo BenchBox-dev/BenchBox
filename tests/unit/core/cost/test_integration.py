@@ -605,8 +605,8 @@ class TestMultiPlatformIntegration:
 
         updated_results = add_cost_estimation_to_results(results)
 
-        assert updated_results.query_results[0]["cost"] == 5.0  # $5.00/TB
-        assert updated_results.cost_summary["total_cost"] == 5.0
+        assert updated_results.query_results[0]["cost"] == 6.25  # $6.25/TiB
+        assert updated_results.cost_summary["total_cost"] == 6.25
 
     def test_redshift_integration(self):
         """Test Redshift cost estimation integration."""

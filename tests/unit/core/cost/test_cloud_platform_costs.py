@@ -67,10 +67,10 @@ class TestSynapseCostCalculation:
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 12.0  # 1 hour * $12.00/hour for DW1000c US
+        assert cost.compute_cost == 15.10  # 1 hour * $15.10/hour for DW1000c US
         assert cost.pricing_details["mode"] == "dedicated"
         assert cost.pricing_details["dwu_level"] == "dw1000c"
-        assert cost.pricing_details["price_per_hour"] == 12.0
+        assert cost.pricing_details["price_per_hour"] == 15.10
 
     def test_synapse_dedicated_minute_billing(self):
         """Test Synapse Dedicated with partial hour."""
@@ -86,8 +86,8 @@ class TestSynapseCostCalculation:
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 1/60 hour * $1.20/hour for DW100c US
-        expected = 60 / 3600 * 1.20
+        # 1/60 hour * $1.51/hour for DW100c US
+        expected = 60 / 3600 * 1.51
         assert abs(cost.compute_cost - expected) < 0.001
 
     def test_synapse_defaults_to_serverless(self):
@@ -182,9 +182,9 @@ class TestFabricCostCalculation:
         assert isinstance(cost_eu, QueryCost)
         assert isinstance(cost_ap, QueryCost)
 
-        # EU should be higher than US, AP higher than EU
+        # EU should be higher than US; EU and AP share the vendor rate ($0.22)
         assert cost_us.compute_cost < cost_eu.compute_cost
-        assert cost_eu.compute_cost < cost_ap.compute_cost
+        assert cost_eu.compute_cost <= cost_ap.compute_cost
 
     def test_fabric_missing_data_returns_none(self):
         """Test that missing required data returns None."""
@@ -207,8 +207,8 @@ class TestFireboltCostCalculation:
         cost = calculator.calculate_query_cost("firebolt", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 10 FBUs * $0.0833/FBU = $0.833
-        expected = 10.0 * 0.0833
+        # 10 FBUs * $0.23/FBU (Standard US tier) = $2.30
+        expected = 10.0 * 0.23
         assert abs(cost.compute_cost - expected) < 0.001
         assert cost.pricing_details["is_estimated"] is False
 
@@ -222,9 +222,9 @@ class TestFireboltCostCalculation:
         cost = calculator.calculate_query_cost("firebolt", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 1 hour * 16 FBU/hour (M node) * 1 node * $0.0833/FBU = $1.3328
+        # 1 hour * 16 FBU/hour (M node) * 1 node * $0.23/FBU (Standard US) = $3.68
         expected_fbu = 16.0  # M node = 16 FBU/hour
-        expected_cost = expected_fbu * 0.0833
+        expected_cost = expected_fbu * 0.23
         assert abs(cost.compute_cost - expected_cost) < 0.001
         assert cost.pricing_details["is_estimated"] is True
 
@@ -347,8 +347,8 @@ class TestPricingHelperFunctions:
         price_30000 = get_synapse_dedicated_price("dw30000c", "eastus")
 
         assert price_100 < price_1000 < price_30000
-        assert price_100 == 1.20  # DW100c US pricing
-        assert price_1000 == 12.00  # DW1000c US pricing
+        assert price_100 == 1.51  # DW100c US pricing
+        assert price_1000 == 15.10  # DW1000c US pricing
 
     def test_fabric_cu_price_by_region(self):
         """Test Fabric CU pricing varies by region."""
@@ -357,7 +357,7 @@ class TestPricingHelperFunctions:
         price_ap = get_fabric_cu_price("japaneast")
 
         assert price_us == 0.18
-        assert price_eu == 0.20
+        assert price_eu == 0.22
         assert price_ap == 0.22
 
     def test_fabric_sku_cu_count(self):
@@ -378,9 +378,9 @@ class TestPricingHelperFunctions:
         assert get_firebolt_fbu_rate("unknown") == 16.0
 
     def test_firebolt_fbu_price(self):
-        """Test Firebolt FBU price."""
+        """Test Firebolt FBU price (Standard US tier)."""
         price = get_firebolt_fbu_price()
-        assert price == 0.0833
+        assert price == 0.23
 
 
 class TestEdgeCases:
@@ -467,8 +467,8 @@ class TestEdgeCases:
             {"mode": "dedicated", "dwu_level": "dw100c", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 30 days * 24 hours/day * $1.20/hour
-        expected = 30 * 24 * 1.20
+        # 30 days * 24 hours/day * $1.51/hour
+        expected = 30 * 24 * 1.51
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_negative_execution_time_returns_none(self):
@@ -497,8 +497,8 @@ class TestEdgeCases:
             {"node_type": "m", "node_count": 1000},
         )
         assert isinstance(cost, QueryCost)
-        # 1 hour * 16 FBU/hour * 1000 nodes * $0.0833/FBU
-        expected = 16.0 * 1000 * 0.0833
+        # 1 hour * 16 FBU/hour * 1000 nodes * $0.23/FBU (Standard US)
+        expected = 16.0 * 1000 * 0.23
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_case_insensitive_platform_names(self):

@@ -132,6 +132,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "us-west4",
         "northamerica-northeast1",
         "northamerica-northeast2",  # Canada
+        "northamerica-south1",  # Mexico
     }
     if location in us_single_regions or location.startswith("us-"):
         return BIGQUERY_ON_DEMAND_PRICES["us-single"]
@@ -140,6 +141,7 @@ def get_bigquery_price_per_tb(location: str) -> float:
     eu_single_regions = {
         "europe-central2",
         "europe-north1",
+        "europe-north2",
         "europe-southwest1",
         "europe-west1",
         "europe-west2",
@@ -148,6 +150,8 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "europe-west6",
         "europe-west8",
         "europe-west9",
+        "europe-west10",
+        "europe-west12",
     }
     if location in eu_single_regions or location.startswith("europe-"):
         return BIGQUERY_ON_DEMAND_PRICES["eu-single"]
@@ -163,6 +167,8 @@ def get_bigquery_price_per_tb(location: str) -> float:
         "asia-south2",  # Mumbai, Delhi
         "asia-southeast1",
         "asia-southeast2",  # Singapore, Jakarta
+        "asia-southeast3",
+        "asia-southeast4",
     }
     if location in asia_single_regions or location.startswith("asia-"):
         return BIGQUERY_ON_DEMAND_PRICES["asia-single"]
@@ -181,6 +187,12 @@ def get_bigquery_price_per_tb(location: str) -> float:
     middleeast_regions = {"me-west1", "me-central1", "me-central2"}
     if location in middleeast_regions or location.startswith("me-"):
         return BIGQUERY_ON_DEMAND_PRICES["middleeast"]
+
+    # Africa regions (no dedicated bucket yet; priced at 'other' until
+    # per-region values are captured in bigquery-per-region-price-capture)
+    africa_regions = {"africa-south1"}
+    if location in africa_regions or location.startswith("africa-"):
+        return BIGQUERY_ON_DEMAND_PRICES["other"]
 
     # Default to 'other' pricing for unknown regions
     return BIGQUERY_ON_DEMAND_PRICES["other"]
@@ -224,6 +236,14 @@ def get_databricks_dbu_price(cloud: str, tier: str, workload_type: str) -> float
     cloud = cloud.lower()
     tier = tier.lower()
     workload_type = workload_type.lower().replace("-", "_").replace(" ", "_")
+
+    # Aliases for the workload types production actually emits: extraction
+    # reports serverless_sql for serverless warehouses and sql_compute for
+    # provisioned (PRO/CLASSIC) SQL compute; both bill as Databricks SQL DBUs.
+    if workload_type == "serverless_sql":
+        workload_type = "sql_serverless"
+    elif workload_type == "sql_compute":
+        workload_type = "sql_pro"
 
     # Get price from table
     try:

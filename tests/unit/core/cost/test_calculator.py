@@ -46,8 +46,8 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("bigquery", resource_usage, platform_config)
 
         assert cost is not None
-        assert cost.compute_cost == 5.0  # 1 TB * $5.00 per TB
-        assert cost.pricing_details["price_per_tb"] == 5.0
+        assert cost.compute_cost == 6.25  # 1 TB * $6.25 per TB
+        assert cost.pricing_details["price_per_tb"] == 6.25
 
     def test_athena_cost_ignores_adapter_supplied_cost_usd(self):
         """Athena cost is derived from bytes scanned, not adapter-supplied totals."""

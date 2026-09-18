@@ -212,42 +212,42 @@ class TestBigQueryRegionalPricing:
 
     def test_us_multi_region(self):
         """Test US multi-region pricing."""
-        assert get_bigquery_price_per_tb("us") == 5.00
+        assert get_bigquery_price_per_tb("us") == 6.25
 
     def test_eu_multi_region(self):
         """Test EU multi-region pricing."""
-        assert get_bigquery_price_per_tb("eu") == 5.00
+        assert get_bigquery_price_per_tb("eu") == 6.25
 
     def test_asia_multi_region(self):
         """Test Asia multi-region pricing."""
-        assert get_bigquery_price_per_tb("asia") == 5.00
+        assert get_bigquery_price_per_tb("asia") == 6.25
 
     def test_us_single_regions(self):
         """Test US single region pricing matches multi-region."""
-        assert get_bigquery_price_per_tb("us-central1") == 5.00
-        assert get_bigquery_price_per_tb("us-east1") == 5.00
+        assert get_bigquery_price_per_tb("us-central1") == 6.25
+        assert get_bigquery_price_per_tb("us-east1") == 6.25
 
     def test_eu_single_regions(self):
         """Test EU single region pricing (slight premium)."""
-        assert get_bigquery_price_per_tb("europe-west1") == 5.50
-        assert get_bigquery_price_per_tb("europe-north1") == 5.50
+        assert get_bigquery_price_per_tb("europe-west1") == 6.875
+        assert get_bigquery_price_per_tb("europe-north1") == 6.875
 
     def test_asia_single_regions(self):
         """Test Asia single region pricing."""
-        assert get_bigquery_price_per_tb("asia-southeast1") == 5.50
-        assert get_bigquery_price_per_tb("asia-northeast1") == 5.50
+        assert get_bigquery_price_per_tb("asia-southeast1") == 6.875
+        assert get_bigquery_price_per_tb("asia-northeast1") == 6.875
 
     def test_australia_premium_pricing(self):
         """Test Australia regions have higher pricing."""
-        assert get_bigquery_price_per_tb("australia-southeast1") == 6.00
+        assert get_bigquery_price_per_tb("australia-southeast1") == 7.50
 
     def test_south_america_premium_pricing(self):
         """Test South America regions have higher pricing."""
-        assert get_bigquery_price_per_tb("southamerica-east1") == 6.25
+        assert get_bigquery_price_per_tb("southamerica-east1") == 7.8125
 
     def test_middle_east_pricing(self):
         """Test Middle East region pricing."""
-        assert get_bigquery_price_per_tb("me-west1") == 6.00
+        assert get_bigquery_price_per_tb("me-west1") == 7.50
 
 
 class TestRedshiftRegionalPricing:
