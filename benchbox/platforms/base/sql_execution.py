@@ -41,7 +41,11 @@ def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
         else:
             try:
                 cell = row[0]
-            except (TypeError, KeyError, IndexError):
+            except IndexError:
+                # Empty sequence row: nothing to join (historical
+                # ``len(row) > 0`` guard); the ``None`` check below skips it.
+                cell = None
+            except (TypeError, KeyError):
                 cell = row
         if cell is None:
             continue

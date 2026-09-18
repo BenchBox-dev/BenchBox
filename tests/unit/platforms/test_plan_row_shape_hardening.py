@@ -48,6 +48,7 @@ class TestJoinExplainRows:
         assert join_explain_rows([]) is None
         assert join_explain_rows(None) is None
         assert join_explain_rows([(None,)]) is None
+        assert join_explain_rows([(), ("a",)]) == "a"
 
     def test_subscriptable_non_tuple_row(self):
         class _Row:
