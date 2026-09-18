@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from benchbox.core.cost.models import published_total_cost
 from benchbox.core.results.schema_policy import KNOWN_SCHEMA_V2_VERSIONS, detect_normalizer_schema_version
 
 
@@ -199,8 +200,10 @@ def _normalize_v2(
     failed_queries = queries_summary.get("failed", 0)
     success_rate = (passed_queries / total_queries) if total_queries > 0 else None
 
-    # Cost
-    cost_total = cost_block.get("total_usd") or cost_block.get("total_cost")
+    # Cost. Gate on the bundle's normalized block: an unavailable-status run
+    # yields no cost_total even when a direct total is present.
+    raw_total = cost_block.get("total_usd") or cost_block.get("total_cost")
+    cost_total = published_total_cost({"total_cost": raw_total, "normalized_cost": data.get("normalized_cost")})
 
     # Per-query details (v2.x uses top-level "queries" list with "id" and "ms")
     queries = []
@@ -279,8 +282,10 @@ def _normalize_v1(
     failed_queries = queries_block.get("failed", 0) if isinstance(queries_block, dict) else 0
     success_rate = queries_block.get("success_rate") if isinstance(queries_block, dict) else None
 
-    # Cost
-    cost_total = cost_block.get("total_cost") if isinstance(cost_block, dict) else None
+    # Cost. Gate on the bundle's normalized block, same as v2.x; v1.x bundles
+    # predate the block, so a missing one passes through.
+    raw_total = cost_block.get("total_cost") if isinstance(cost_block, dict) else None
+    cost_total = published_total_cost({"total_cost": raw_total, "normalized_cost": data.get("normalized_cost")})
 
     # Per-query details (v1.x uses results.queries.details with query_id and execution_time_ms)
     queries = []
