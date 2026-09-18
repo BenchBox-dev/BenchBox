@@ -186,7 +186,7 @@ def _resolve_regional_tb_rate(
     value = prices[default_region]
     logger.warning(
         f"{service_label} price for region '{display}' is unpriced; using {default_region} "
-        f"(${value:.2f}/{unit}) as fallback"
+        f"(${value:.2f}/TB) as fallback"
     )
     return PriceResolution(
         value=value,

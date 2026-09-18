@@ -60,6 +60,23 @@ def test_fallback_priced_databricks_serverless_run_is_unavailable() -> None:
     assert any("databricks_dbu_prices" in warning for warning in warnings)
 
 
+def test_fallback_priced_snowflake_run_is_unavailable() -> None:
+    """End-to-end probe: unknown Snowflake edition cannot publish as normalized."""
+    calculator = CostCalculator()
+    config = {"edition": "nonexistent", "cloud": "aws", "region": "us-east-1"}
+    query_cost = calculator.calculate_query_cost("snowflake", {"credits_used": 1.0}, config)
+    assert query_cost is not None
+    assert "price_unavailable" in query_cost.pricing_details
+
+    phase_cost = calculator.calculate_phase_cost("power_test", [query_cost])
+    benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "snowflake"})
+    normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost("snowflake", benchmark_cost, config)
+
+    assert normalized_cost.cost_status == "unavailable"
+    assert normalized_cost.normalized_cost_usd is None
+    assert any("snowflake_credit_prices" in warning for warning in warnings)
+
+
 def test_stale_pricing_table_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

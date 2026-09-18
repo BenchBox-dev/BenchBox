@@ -129,17 +129,18 @@ def test_unknown_keys_are_flagged():
     assert dwu.fallback_used is True and dwu.reason
 
 
-def test_athena_and_synapse_serverless_interim_region_guard():
-    """Unverified regions flag the flat rate; verified ones and omission do not."""
-    assert resolve_athena_price_per_tb().fallback_used is False
+def test_athena_and_synapse_serverless_regional_rates():
+    """Priced regions resolve clean; unlisted regions and omission flag fallback."""
     assert resolve_athena_price_per_tb("us-east-1").fallback_used is False
     assert resolve_athena_price_per_tb("eu-west-1").fallback_used is False
     sao_paulo = resolve_athena_price_per_tb("sa-east-1")
-    assert sao_paulo.value == 5.0 and sao_paulo.fallback_used is True
-    assert resolve_synapse_serverless_price_per_tb().fallback_used is False
+    assert sao_paulo.value == 9.0 and sao_paulo.fallback_used is False
+    assert resolve_athena_price_per_tb("moon-east-1").fallback_used is True
+    assert resolve_athena_price_per_tb().fallback_used is True
     assert resolve_synapse_serverless_price_per_tb("eastus").fallback_used is False
-    unverified = resolve_synapse_serverless_price_per_tb("brazilsouth")
-    assert unverified.value == 5.0 and unverified.fallback_used is True
+    brazil = resolve_synapse_serverless_price_per_tb("brazilsouth")
+    assert brazil.value == 9.0 and brazil.fallback_used is False
+    assert resolve_synapse_serverless_price_per_tb("moon-east-1").fallback_used is True
 
 
 def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
@@ -169,7 +170,7 @@ def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
         ),
         ("fabric_dw", {"execution_time_seconds": 3600.0}, {"sku": "f4096", "region": "eastus"}),
         ("firebolt", {"execution_time_seconds": 3600.0}, {"node_type": "xxl", "node_count": 1}),
-        ("athena", {"data_scanned_bytes": 1024**4}, {"region": "sa-east-1"}),
+        ("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"}),
         (
             "synapse",
             {"execution_time_seconds": 3600.0},
