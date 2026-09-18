@@ -12,6 +12,7 @@ Prices are organized by platform, cloud provider, region, and resource type.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import resources
@@ -197,8 +198,45 @@ def _resolve_regional_tb_rate(
     )
 
 
-def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Athena price per TB of data scanned.
+def _make_regional_tb_price_resolver(
+    *,
+    table: str,
+    prices: dict[str, float],
+    default_region: str,
+    service_label: str,
+    name: str,
+    doc: str,
+) -> Callable[[str], PriceResolution]:
+    """Build a named regional per-TB price resolver on the shared helper.
+
+    The per-service resolvers are single-delegation constructors with
+    identical bodies by design; building them through this factory keeps one
+    definition site so they cannot drift apart (or clone each other).
+    """
+
+    def _resolve(region: str = "") -> PriceResolution:
+        return _resolve_regional_tb_rate(
+            table=table,
+            region=region,
+            prices=prices,
+            default_region=default_region,
+            service_label=service_label,
+        )
+
+    _resolve.__name__ = name
+    _resolve.__qualname__ = name
+    _resolve.__module__ = __name__
+    _resolve.__doc__ = doc
+    return _resolve
+
+
+resolve_athena_price_per_tb = _make_regional_tb_price_resolver(
+    table="athena_price_per_tb",
+    prices=ATHENA_PRICE_PER_TB,
+    default_region="us-east-1",
+    service_label="Athena",
+    name="resolve_athena_price_per_tb",
+    doc="""Resolve the Athena price per TB of data scanned.
 
     Args:
         region: AWS region code (e.g., us-east-1, sa-east-1). Rates differ
@@ -208,14 +246,8 @@ def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
         PriceResolution for table "athena_price_per_tb". An omitted or
         unlisted region falls back to the us-east-1 rate and flags
         fallback_used.
-    """
-    return _resolve_regional_tb_rate(
-        table="athena_price_per_tb",
-        region=region,
-        prices=ATHENA_PRICE_PER_TB,
-        default_region="us-east-1",
-        service_label="Athena",
-    )
+    """,
+)
 
 
 def resolve_snowflake_credit_price(edition: str, cloud: str, region: str) -> PriceResolution:
@@ -515,8 +547,13 @@ def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResol
     )
 
 
-def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Azure Synapse Serverless SQL Pool price per TB.
+resolve_synapse_serverless_price_per_tb = _make_regional_tb_price_resolver(
+    table="synapse_serverless_price_per_tb",
+    prices=SYNAPSE_SERVERLESS_PRICE_PER_TB,
+    default_region="eastus",
+    service_label="Synapse serverless",
+    name="resolve_synapse_serverless_price_per_tb",
+    doc="""Resolve the Azure Synapse Serverless SQL Pool price per TB.
 
     Args:
         region: Azure region code (e.g., eastus, brazilsouth). Rates differ
@@ -527,14 +564,8 @@ def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution
         PriceResolution for table "synapse_serverless_price_per_tb". An
         omitted or unlisted region falls back to the eastus rate and flags
         fallback_used.
-    """
-    return _resolve_regional_tb_rate(
-        table="synapse_serverless_price_per_tb",
-        region=region,
-        prices=SYNAPSE_SERVERLESS_PRICE_PER_TB,
-        default_region="eastus",
-        service_label="Synapse serverless",
-    )
+    """,
+)
 
 
 def resolve_synapse_dedicated_price(dwu_level: str, region: str) -> PriceResolution:
