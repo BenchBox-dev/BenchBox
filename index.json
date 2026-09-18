@@ -13069,6 +13069,13 @@
       "status": "done",
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
+    "result-bundle-compat-localresult-parity": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: localResult.ts parity with version helper"
+    },
     "result-bundle-compat-plans-truncation-contract": {
       "claim": null,
       "needs": [],
