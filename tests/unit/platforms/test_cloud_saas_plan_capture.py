@@ -281,12 +281,78 @@ class TestBigQueryCapture:
         adapter = _make_bigquery(monkeypatch)
         assert isinstance(adapter.get_query_plan_parser(), BigQueryQueryPlanParser)
 
-    def test_get_query_plan_unchanged_returns_cost_dict(self, monkeypatch):
-        # The plan-capture path must NOT repurpose get_query_plan; it still
-        # returns a cost/dry-run dict (or an error dict), never a DAG.
+    def test_get_query_plan_returns_none_contract(self, monkeypatch):
+        # BigQuery has no EXPLAIN-text path; the base contract is str | None.
+        # Returning None keeps generic capture_query_plan on the
+        # explain_failed path instead of crashing on dict.strip().
+        import inspect
+
+        from benchbox.platforms.bigquery import BigQueryAdapter
+
         adapter = _make_bigquery(monkeypatch)
-        result = adapter.get_query_plan(MagicMock(), "SELECT 1")
-        assert isinstance(result, dict)
+        assert adapter.get_query_plan(MagicMock(), "SELECT 1") is None
+        annotation = inspect.signature(BigQueryAdapter.get_query_plan).return_annotation
+        assert annotation == "str | None"
+
+    def test_capture_query_plan_does_not_raise_attribute_error(self, monkeypatch):
+        adapter = _make_bigquery(monkeypatch)
+        plan, capture_ms = adapter.capture_query_plan(MagicMock(), "SELECT 1", "q0")
+        assert plan is None
+        assert capture_ms >= 0
+
+    def test_execute_query_attaches_normalized_fingerprint(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
+
+        monkeypatch.setattr(bq_module, "bigquery", MagicMock())
+        adapter = _make_bigquery(monkeypatch)
+        adapter.normalize_plan_literals = True
+        stages = json.loads(_load("bigquery_query_plan_sample.json"))
+
+        job = MagicMock()
+        job.result.return_value = [(1,)]
+        job.total_bytes_processed = 123
+        job.total_bytes_billed = 123
+        job.slot_millis = 1
+        job.created = None
+        job.started = None
+        job.ended = None
+        job.job_id = "job-1"
+        job.query_plan = stages
+
+        conn = MagicMock()
+        conn.query.return_value = job
+
+        result = adapter.execute_query(conn, "SELECT 1", "q1", validate_row_count=False)
+        assert result["status"] == "SUCCESS"
+        assert result["query_plan"] is not None
+        assert result["plan_fingerprint"] == result["query_plan"].plan_fingerprint
+        assert result["plan_fingerprint_normalized"] == result["query_plan"].normalized_fingerprint
+
+    def test_execute_query_omits_normalized_when_disabled(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
+
+        monkeypatch.setattr(bq_module, "bigquery", MagicMock())
+        adapter = _make_bigquery(monkeypatch)
+        adapter.normalize_plan_literals = False
+        stages = json.loads(_load("bigquery_query_plan_sample.json"))
+
+        job = MagicMock()
+        job.result.return_value = [(1,)]
+        job.total_bytes_processed = 123
+        job.total_bytes_billed = 123
+        job.slot_millis = 1
+        job.created = None
+        job.started = None
+        job.ended = None
+        job.job_id = "job-1"
+        job.query_plan = stages
+
+        conn = MagicMock()
+        conn.query.return_value = job
+
+        result = adapter.execute_query(conn, "SELECT 1", "q1", validate_row_count=False)
+        assert result["status"] == "SUCCESS"
+        assert "plan_fingerprint_normalized" not in result
 
     def test_capture_bq_plan_builds_dag(self, monkeypatch):
         adapter = _make_bigquery(monkeypatch)

@@ -1248,33 +1248,23 @@ class TestConfigureForBenchmark:
 
 
 class TestGetQueryPlan:
-    """Test get_query_plan dry-run path."""
+    """Test get_query_plan contract (no EXPLAIN-text path)."""
 
-    def test_returns_bytes_processed(self):
+    def test_returns_none_contract(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
-        mock_job = Mock()
-        mock_job.total_bytes_processed = 123456
-        mock_job.job_id = "dry-run-job"
-        mock_conn.query.return_value = mock_job
 
-        result = adapter.get_query_plan(mock_conn, "SELECT 1")
+        assert adapter.get_query_plan(mock_conn, "SELECT 1") is None
+        mock_conn.query.assert_not_called()
 
-        assert result["bytes_processed"] == 123456
-        assert "estimated_cost" in result
-        assert result["query_plan"] == "Dry run completed"
-
-    def test_error_returns_error_dict(self):
+    def test_error_path_still_returns_none(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
         mock_conn.query.side_effect = RuntimeError("dry run failed")
 
-        result = adapter.get_query_plan(mock_conn, "INVALID SQL")
-
-        assert "error" in result
-        assert "dry run failed" in result["error"]
+        assert adapter.get_query_plan(mock_conn, "INVALID SQL") is None
 
 
 # ---------------------------------------------------------------------------
