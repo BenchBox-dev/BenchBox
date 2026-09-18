@@ -335,9 +335,7 @@ def _render_region_table(table: str, section: dict, *, price_places: tuple[int, 
         raise PricingGeneratorError(f"{table} has no observed regions to render")
     lines = [f"{table}:"]
     for region, price in regions.items():
-        lines.append(
-            f"  {region}: {canonical_decimal(price, min_places=price_places[0], max_places=price_places[1])}"
-        )
+        lines.append(f"  {region}: {canonical_decimal(price, min_places=price_places[0], max_places=price_places[1])}")
     return lines
 
 

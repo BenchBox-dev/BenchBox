@@ -106,7 +106,9 @@ def _comparable_result(platform: str, cost_summary: dict | None):
 
 class TestPerQueryCostGatedAtStamp:
     def test_fallback_region_stamps_no_per_query_cost(self) -> None:
-        results = add_cost_estimation_to_results(_athena_results("sa-east-1"))
+        # sa-east-1 is a priced Athena region ($9.00/TB); moon-east-1 is unlisted
+        # and exercises the fallback path.
+        results = add_cost_estimation_to_results(_athena_results("moon-east-1"))
 
         stamped = results.query_results[0]
         assert stamped["cost"] is None
