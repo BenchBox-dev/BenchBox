@@ -12,6 +12,7 @@ Prices are organized by platform, cloud provider, region, and resource type.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from importlib import resources
@@ -53,7 +54,7 @@ CURRENCY = _PRICING_METADATA["currency"]
 SNOWFLAKE_CREDIT_PRICES: dict[str, dict[str, dict[str, float]]] = cast(
     "dict[str, dict[str, dict[str, float]]]", _PRICING_DATA["snowflake_credit_prices"]
 )
-ATHENA_PRICE_PER_TB = float(_PRICING_DATA["athena_price_per_tb"])
+ATHENA_PRICE_PER_TB: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["athena_price_per_tb"])
 BIGQUERY_ON_DEMAND_PRICES: dict[str, float] = cast("dict[str, float]", _PRICING_DATA["bigquery_on_demand_prices"])
 REDSHIFT_NODE_PRICES: dict[str, dict[str, float]] = cast(
     "dict[str, dict[str, float]]", _PRICING_DATA["redshift_node_prices"]
@@ -61,7 +62,9 @@ REDSHIFT_NODE_PRICES: dict[str, dict[str, float]] = cast(
 DATABRICKS_DBU_PRICES: dict[str, dict[str, dict[str, float]]] = cast(
     "dict[str, dict[str, dict[str, float]]]", _PRICING_DATA["databricks_dbu_prices"]
 )
-SYNAPSE_SERVERLESS_PRICE_PER_TB = float(_PRICING_DATA["synapse_serverless_price_per_tb"])
+SYNAPSE_SERVERLESS_PRICE_PER_TB: dict[str, float] = cast(
+    "dict[str, float]", _PRICING_DATA["synapse_serverless_price_per_tb"]
+)
 SYNAPSE_DEDICATED_DWU_PRICES: dict[str, dict[str, float]] = cast(
     "dict[str, dict[str, float]]", _PRICING_DATA["synapse_dedicated_dwu_prices"]
 )
@@ -134,16 +137,6 @@ class PriceResolution:
     reason: str | None = None
 
 
-def _verified_regions(table: str) -> frozenset[str]:
-    """Return the lowercased verified-region set from a table's provenance."""
-    entry = PRICE_TABLE_PROVENANCE.get(table) or {}
-    regions = entry.get("verified_regions") or []
-    return frozenset(str(region).strip().lower() for region in regions)
-
-
-_ATHENA_VERIFIED_REGIONS = _verified_regions("athena_price_per_tb")
-_SYNAPSE_SERVERLESS_VERIFIED_REGIONS = _verified_regions("synapse_serverless_price_per_tb")
-
 # DBU consumption per hour by SQL warehouse size.
 # See https://docs.databricks.com/sql/admin/warehouse-types.html
 DATABRICKS_WAREHOUSE_DBU_PER_HOUR: dict[str, float] = {
@@ -164,48 +157,97 @@ DATABRICKS_WAREHOUSE_DBU_PER_HOUR: dict[str, float] = {
 # ============================================================================
 
 
-def _resolve_verified_flat_rate(
+def _resolve_regional_tb_rate(
     *,
     table: str,
     region: str,
-    verified_regions: frozenset[str],
-    flat_value: float,
+    prices: dict[str, float],
+    default_region: str,
     service_label: str,
 ) -> PriceResolution:
-    """Resolve a scalar flat rate verified only for a provenance region set.
+    """Resolve a per-TB scanned-bytes rate from a region-keyed price table.
 
-    An explicitly passed region outside that set is a catch-all guess, so it
-    flags fallback_used (interim guard until the region-parameter work
-    lands); omitting the region asserts nothing about it and is not a
-    fallback.
+    A region with its own cell returns that cell's rate. An omitted or
+    unlisted region keeps the default region's rate so a per-query figure is
+    still possible, but flags fallback_used so it can never back a published
+    total.
     """
     unit = get_table_unit(table)
     normalized = (region or "").strip().lower()
     display = (region or "").strip()
-    if normalized and normalized not in verified_regions:
-        logger.warning(
-            f"{service_label} price for region '{display}' is unverified; using flat ${flat_value:.2f}/TB as fallback"
-        )
+    if normalized in prices:
         return PriceResolution(
-            value=flat_value,
+            value=prices[normalized],
             table=table,
-            resolved_key=(),
-            fallback_used=True,
+            resolved_key=(normalized,),
+            fallback_used=False,
             unit=unit,
-            reason=f"{service_label.lower()} region '{display}' is outside the verified set; flat rate is a guess",
         )
-    return PriceResolution(value=flat_value, table=table, resolved_key=(), fallback_used=False, unit=unit)
-
-
-def resolve_athena_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Athena price per TB of data scanned."""
-    return _resolve_verified_flat_rate(
-        table="athena_price_per_tb",
-        region=region,
-        verified_regions=_ATHENA_VERIFIED_REGIONS,
-        flat_value=ATHENA_PRICE_PER_TB,
-        service_label="Athena",
+    value = prices[default_region]
+    logger.warning(
+        f"{service_label} price for region '{display}' is unpriced; using {default_region} "
+        f"(${value:.2f}/TB) as fallback"
     )
+    return PriceResolution(
+        value=value,
+        table=table,
+        resolved_key=(default_region,),
+        fallback_used=True,
+        unit=unit,
+        reason=f"{service_label.lower()} region '{display}' is unpriced; {default_region} rate is a guess",
+    )
+
+
+def _make_regional_tb_price_resolver(
+    *,
+    table: str,
+    prices: dict[str, float],
+    default_region: str,
+    service_label: str,
+    name: str,
+    doc: str,
+) -> Callable[[str], PriceResolution]:
+    """Build a named regional per-TB price resolver on the shared helper.
+
+    The per-service resolvers are single-delegation constructors with
+    identical bodies by design; building them through this factory keeps one
+    definition site so they cannot drift apart (or clone each other).
+    """
+
+    def _resolve(region: str = "") -> PriceResolution:
+        return _resolve_regional_tb_rate(
+            table=table,
+            region=region,
+            prices=prices,
+            default_region=default_region,
+            service_label=service_label,
+        )
+
+    _resolve.__name__ = name
+    _resolve.__qualname__ = name
+    _resolve.__module__ = __name__
+    _resolve.__doc__ = doc
+    return _resolve
+
+
+resolve_athena_price_per_tb = _make_regional_tb_price_resolver(
+    table="athena_price_per_tb",
+    prices=ATHENA_PRICE_PER_TB,
+    default_region="us-east-1",
+    service_label="Athena",
+    name="resolve_athena_price_per_tb",
+    doc="""Resolve the Athena price per TB of data scanned.
+
+    Args:
+        region: AWS region code (e.g., us-east-1, sa-east-1). Rates differ
+            by region: Sao Paulo bills $9.00/TB against $5.00 elsewhere.
+
+    Returns:
+        PriceResolution for table "athena_price_per_tb". An omitted or
+        unlisted region falls back to the us-east-1 rate and flags
+        fallback_used.
+    """,
+)
 
 
 def resolve_snowflake_credit_price(edition: str, cloud: str, region: str) -> PriceResolution:
@@ -505,15 +547,25 @@ def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResol
     )
 
 
-def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution:
-    """Resolve the Azure Synapse Serverless SQL Pool price per TB."""
-    return _resolve_verified_flat_rate(
-        table="synapse_serverless_price_per_tb",
-        region=region,
-        verified_regions=_SYNAPSE_SERVERLESS_VERIFIED_REGIONS,
-        flat_value=SYNAPSE_SERVERLESS_PRICE_PER_TB,
-        service_label="Synapse serverless",
-    )
+resolve_synapse_serverless_price_per_tb = _make_regional_tb_price_resolver(
+    table="synapse_serverless_price_per_tb",
+    prices=SYNAPSE_SERVERLESS_PRICE_PER_TB,
+    default_region="eastus",
+    service_label="Synapse serverless",
+    name="resolve_synapse_serverless_price_per_tb",
+    doc="""Resolve the Azure Synapse Serverless SQL Pool price per TB.
+
+    Args:
+        region: Azure region code (e.g., eastus, brazilsouth). Rates differ
+            by region: $5.00 in eastus/westeurope, $6.75 in southeastasia,
+            $5.50 in canadacentral, $9.00 in brazilsouth.
+
+    Returns:
+        PriceResolution for table "synapse_serverless_price_per_tb". An
+        omitted or unlisted region falls back to the eastus rate and flags
+        fallback_used.
+    """,
+)
 
 
 def resolve_synapse_dedicated_price(dwu_level: str, region: str) -> PriceResolution:
