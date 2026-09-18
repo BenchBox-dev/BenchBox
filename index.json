@@ -17340,10 +17340,15 @@
       "title": "Diagnose ClickHouse TPC-DS SF=0.01 UAT runtime cap"
     },
     "uat-clickhouse-tpcds-sf001-runtime-performance": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T12:51:33Z",
+        "generation": "d58b7cb544594f459a6e01c1d74260d7",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:225e4d15f7cfca3ee2d16a8c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Diagnose and remove ClickHouse TPC-DS SF=0.01 runtime cap"
     },
     "uat-compose-project-name-overflows-container-id-limit": {
