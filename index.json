@@ -13039,6 +13039,13 @@
       "status": "done",
       "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
     },
+    "result-bundle-compat-fallback-matrix-test": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Result-bundle compat: version-key fallback-matrix contract test"
+    },
     "result-bundle-compat-followon-todos": {
       "claim": {
         "expires_at": "2026-09-19T16:45:23Z",
