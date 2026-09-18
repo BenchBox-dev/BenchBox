@@ -11758,12 +11758,17 @@
       "title": "Add CI secrets and nightly live plan capture verification for Redshift and MotherDuck"
     },
     "query-plan-capture-cloud-live-snowflake-bigquery": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T00:24:44Z",
+        "generation": "38b95b6532f74f49b2bc5c98c44c6a5e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b7cb750c8f5d5a96165aaddc"
+      },
       "needs": [
         "query-plan-capture-cloud-saas"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Add CI secrets and nightly live plan capture verification for Snowflake and BigQuery"
     },
     "query-plan-capture-cloud-saas": {
