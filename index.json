@@ -10891,17 +10891,12 @@
       "title": "Correct all cloud pricing tables against vendor list prices"
     },
     "pricing-docs-price-sync": {
-      "claim": {
-        "expires_at": "2026-09-19T13:59:01Z",
-        "generation": "276b0469d17f48e1822dd37494c9461b",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
-      },
+      "claim": null,
       "needs": [
         "pricing-data-correct-all-tables"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Sync documentation with corrected pricing and fix pre-existing drift"
     },
     "pricing-failclosed-price-resolution": {
