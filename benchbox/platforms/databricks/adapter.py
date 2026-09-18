@@ -2309,14 +2309,13 @@ class DatabricksAdapter(PlatformAdapter):
         SparkQueryPlanParser. Returns ``None`` on any failure so capture degrades
         gracefully.
         """
+        from benchbox.platforms.base.sql_execution import join_explain_rows
+
         cursor = connection.cursor()
         try:
             cursor.execute(f"EXPLAIN EXTENDED {query}")
             plan_rows = cursor.fetchall()
-            if not plan_rows:
-                return None
-            text = "\n".join(str(row[0]) for row in plan_rows)
-            return text or None
+            return join_explain_rows(plan_rows)
         except Exception as e:
             self.logger.debug(f"Could not get Databricks query plan: {e}")
             return None
