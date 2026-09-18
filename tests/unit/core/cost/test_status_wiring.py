@@ -119,10 +119,28 @@ def test_fresh_pricing_table_emits_no_staleness_warning() -> None:
     assert not any("days old" in warning for warning in warnings)
 
 
+def test_athena_sao_paulo_publishes_regional_rate() -> None:
+    """Sao Paulo Athena publishes $9.00/TB, not the $5.00 flat rate."""
+    calculator = CostCalculator()
+    query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 10**12}, {"region": "sa-east-1"})
+    assert query_cost is not None
+    assert query_cost.compute_cost == pytest.approx(9.0)
+
+    phase_cost = calculator.calculate_phase_cost("power_test", [query_cost])
+    benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "athena"})
+    normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+        "athena", benchmark_cost, {"region": "sa-east-1", "cloud": "aws"}
+    )
+
+    assert normalized_cost.cost_status == "normalized"
+    assert normalized_cost.normalized_cost_usd == pytest.approx(9.0)
+    assert not any("athena_price_per_tb" in warning for warning in warnings)
+
+
 def test_athena_unlisted_region_is_unavailable() -> None:
     """Unlisted-region Athena cannot publish the default rate as normalized."""
     calculator = CostCalculator()
-    query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"})
+    query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 10**12}, {"region": "moon-east-1"})
     assert query_cost is not None
     assert query_cost.compute_cost == pytest.approx(5.0)
 

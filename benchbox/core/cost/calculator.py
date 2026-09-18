@@ -36,13 +36,16 @@ logger = logging.getLogger(__name__)
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
 # Bytes per billed data unit, keyed by the per-table unit declared in
-# pricing_data.yaml. BigQuery bills per tebibyte (vendor-confirmed: its worked
-# example divides by 1099511627776). Athena and Synapse print "TB" with an
-# unconfirmed definition, so terabyte_unconfirmed resolves to the historical
-# divisor until follow-up contract work resolves it. Behavior-neutral by design.
+# pricing_data.yaml. BigQuery bills per tebibyte (vendor-confirmed: its pricing
+# page works an example as billed-bytes / 1099511627776). Athena and Synapse
+# serverless print a bare "TB" and neither vendor publishes the divisor, so
+# terabyte resolves to the SI decimal 10^12. See
+# docs/development/adr/adr-billing-unit-tb-tib-contract.md: the 2^40 reading
+# understated Athena/Synapse costs by ~9.95%, and the residual exposure if a
+# vendor means 2^40 is a ~9.95% overstatement, disclosed there.
 BYTES_PER_UNIT: dict[str, int] = {
     "tebibyte": 1024**4,
-    "terabyte_unconfirmed": 1024**4,
+    "terabyte": 10**12,
 }
 
 
@@ -264,9 +267,15 @@ class CostCalculator:
         )
 
     def _billing_unit(self, platform_lower: str, platform_config: dict[str, Any]) -> str:
+        # Scan-priced platforms report the unit actually billed: BigQuery is
+        # priced per tebibyte ("tib_scanned"); Athena and Synapse serverless
+        # print "TB", read as decimal terabytes ("tb_scanned"). See
+        # docs/development/adr/adr-billing-unit-tb-tib-contract.md.
         if platform_lower == "snowflake":
             return "credit"
-        if platform_lower in {"bigquery", "athena"}:
+        if platform_lower == "bigquery":
+            return "tib_scanned"
+        if platform_lower == "athena":
             return "tb_scanned"
         if platform_lower == "redshift":
             return "node_hour"
@@ -459,6 +468,10 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for a BigQuery query.
 
+        BigQuery on-demand is priced per tebibyte (2^40 bytes); BenchBox
+        charges list rate from byte zero and does not model the first-1-TiB
+        monthly free tier (see the cost README and the billing-unit ADR).
+
         Expected resource_usage fields:
             - bytes_processed: Bytes scanned by the query (use bytes_billed if available)
 
@@ -638,11 +651,13 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for an Athena query.
 
-        Athena is priced at $5.00 per TB of data scanned in verified regions;
-        other regions resolve as flagged fallbacks that cannot publish as
-        normalized cost. BenchBox derives cost from measured
-        data_scanned_bytes plus its pricing table; legacy adapter-provided
-        cost_usd is ignored when present.
+        Athena is priced per TB of data scanned from a regional table
+        ($5.00 in us-east-1/eu-west-1/ap-southeast-1/ap-northeast-1, $9.00
+        in sa-east-1); unlisted regions resolve as flagged fallbacks that
+        cannot publish as normalized cost. "TB" is read as decimal terabytes
+        (10^12 bytes) per the billing-unit ADR. BenchBox derives cost from
+        measured data_scanned_bytes plus its pricing table; legacy
+        adapter-provided cost_usd is ignored when present.
 
         Expected resource_usage fields:
             - data_scanned_bytes: Bytes scanned by the query
@@ -688,9 +703,11 @@ class CostCalculator:
         """Calculate cost for an Azure Synapse Analytics query.
 
         Synapse has two modes:
-        - Serverless: $5.00 per TB of data processed in verified regions
-          (similar to Athena/BigQuery); other regions resolve as flagged
-          fallbacks that cannot publish as normalized cost
+        - Serverless: per-TB-of-data-processed pricing from a regional
+          table ($5.00 eastus/westeurope, $6.75 southeastasia, $5.50
+          canadacentral, $9.00 brazilsouth); unlisted regions resolve as
+          flagged fallbacks that cannot publish as normalized cost. "TB" is
+          read as decimal terabytes (10^12 bytes) per the billing-unit ADR.
         - Dedicated: DWU-hour based pricing (similar to Redshift)
 
         Expected resource_usage fields:

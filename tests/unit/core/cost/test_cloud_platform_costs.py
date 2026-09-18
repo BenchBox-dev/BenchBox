@@ -27,8 +27,8 @@ class TestSynapseCostCalculation:
         """Test Synapse Serverless cost calculation with bytes_processed."""
         calculator = CostCalculator()
 
-        # 1 TB = 1024^4 bytes
-        bytes_per_tb = 1024**4
+        # 1 decimal TB = 10^12 bytes (Synapse "TB" reads as decimal per the billing-unit ADR)
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb}  # Exactly 1 TB
         platform_config = {"mode": "serverless", "region": "eastus"}
 
@@ -46,7 +46,7 @@ class TestSynapseCostCalculation:
         """Test Synapse Serverless with fractional TB."""
         calculator = CostCalculator()
 
-        bytes_per_tb = 1024**4
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb // 2}  # 0.5 TB
         platform_config = {"mode": "serverless", "region": "westus"}
 
@@ -97,7 +97,7 @@ class TestSynapseCostCalculation:
         """Test that Synapse defaults to serverless mode."""
         calculator = CostCalculator()
 
-        bytes_per_tb = 1024**4
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb}
         platform_config = {}  # No mode specified
 
@@ -428,8 +428,8 @@ class TestEdgeCases:
         """Test handling of very large byte values (petabyte scale)."""
         calculator = CostCalculator()
 
-        # 1 PB = 1024^5 bytes
-        petabyte = 1024**5
+        # 1 decimal PB = 10^15 bytes (Synapse "TB" reads as decimal per the billing-unit ADR)
+        petabyte = 10**15
 
         # Synapse serverless with 1 PB
         cost = calculator.calculate_query_cost(
@@ -438,8 +438,8 @@ class TestEdgeCases:
             {"mode": "serverless", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 1 PB = 1024 TB, so cost is 1024 * the table rate
-        expected = 1024 * resolve_synapse_serverless_price_per_tb().value
+        # 1 PB = 1000 TB, so cost is 1000 * the table rate
+        expected = 1000 * resolve_synapse_serverless_price_per_tb().value
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_fractional_byte_values(self):
@@ -453,7 +453,7 @@ class TestEdgeCases:
             {"mode": "serverless", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 1 byte should have minimal cost (1 / 1024^4 * 5)
+        # 1 byte should have minimal cost (1 / 10^12 * 5)
         assert cost.compute_cost < 0.00001
 
     def test_very_large_execution_time(self):

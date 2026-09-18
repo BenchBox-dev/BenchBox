@@ -70,18 +70,24 @@ def test_every_byte_priced_table_declares_unit(table):
     assert pricing.PRICE_TABLE_UNITS.get(table) in BYTES_PER_UNIT, f"missing unit for {table!r}"
 
 
-def test_units_are_behavior_neutral():
-    """Every declared unit resolves to the historical divisor, so costs are unchanged."""
+def test_units_resolve_to_defined_divisors():
+    """Every declared unit resolves to its contract divisor.
+
+    BigQuery bills per tebibyte (2^40, vendor-confirmed). Athena and Synapse
+    serverless print a bare "TB", read as decimal terabytes (10^12) per the
+    billing-unit ADR — deliberately NOT the historical 2^40 divisor, which
+    understated those platforms by ~9.95%.
+    """
     assert set(pricing.PRICE_TABLE_UNITS.values()) <= set(BYTES_PER_UNIT)
     assert BYTES_PER_UNIT["tebibyte"] == 1024**4
-    assert BYTES_PER_UNIT["terabyte_unconfirmed"] == 1024**4
+    assert BYTES_PER_UNIT["terabyte"] == 10**12
 
 
 def test_declared_units_match_expected_definitions():
-    """BigQuery is vendor-confirmed tebibyte; Athena/Synapse are unconfirmed flags."""
+    """BigQuery is vendor-confirmed tebibyte; Athena/Synapse are decimal terabytes."""
     assert pricing.PRICE_TABLE_UNITS["bigquery_on_demand_prices"] == "tebibyte"
-    assert pricing.PRICE_TABLE_UNITS["athena_price_per_tb"] == "terabyte_unconfirmed"
-    assert pricing.PRICE_TABLE_UNITS["synapse_serverless_price_per_tb"] == "terabyte_unconfirmed"
+    assert pricing.PRICE_TABLE_UNITS["athena_price_per_tb"] == "terabyte"
+    assert pricing.PRICE_TABLE_UNITS["synapse_serverless_price_per_tb"] == "terabyte"
 
 
 def test_metadata_no_longer_asserts_a_refresh_that_did_not_occur():

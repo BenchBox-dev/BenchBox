@@ -14,7 +14,7 @@ The cost estimation framework calculates compute costs for benchmark executions 
 | Platform | Cost Model | Pricing Basis | Accuracy |
 |----------|------------|---------------|----------|
 | **Snowflake** | Credit-based | Credits consumed × price per credit | ±10% |
-| **BigQuery** | Per-TB scanned | Data scanned (TB) × price per TB | ±10% |
+| **BigQuery** | Per-TiB scanned | Data scanned (TiB) × price per TiB | ±10% |
 | **Redshift** | Time-based | Execution time × node count × hourly rate | Marginal cost only* |
 | **Databricks** | DBU-based | Execution time × DBU/hour × price per DBU | ±15% |
 | **DuckDB** | Zero cost | Local execution | Exact ($0.00) |
@@ -293,6 +293,25 @@ config = {"location": "us"}
 # Cost = 1 TiB × $6.25 = $6.25
 ```
 
+**No free-tier modeling**: BenchBox charges the on-demand list rate from byte
+zero and does not model the first 1 TiB per month free tier. The credit is
+monthly and account-level, so no per-run attribution is principled, and
+modeling it would break cross-platform comparability. Most benchmark runs
+scan under 1 TiB, so do not read a BenchBox BigQuery figure as a Google bill.
+
+### Billing units (`NormalizedCost.billing_unit`)
+
+Scan-priced platforms report the unit actually billed, per
+`docs/development/adr/adr-billing-unit-tb-tib-contract.md`:
+
+- BigQuery: `tib_scanned` (tebibyte, 2^40 bytes — vendor-confirmed).
+- Athena and Synapse serverless: `tb_scanned` (decimal terabyte, 10^12
+  bytes — the SI reading of the bare "TB" both vendors print; neither
+  publishes a divisor).
+- Other platforms: `credit` (Snowflake), `node_hour` (Redshift),
+  `dbu` (Databricks), `dwu_hour` (Synapse dedicated), `cu_hour`
+  (Fabric), `fbu` (Firebolt).
+
 ### Redshift
 
 **Formula**: `(execution_time_seconds / 3600) × node_count × price_per_node_hour`
@@ -422,9 +441,9 @@ Total Cost: A + B + C (sum of all queries)
 - ✅ Accurate representation
 
 **BigQuery**:
-- Charged per TB scanned
+- Charged per TiB scanned
 - Concurrent queries scan data independently
-- Total cost = sum of data scanned × price per TB
+- Total cost = sum of data scanned × price per TiB
 - ✅ Accurate representation
 
 **Redshift** (dedicated cluster):
@@ -777,6 +796,8 @@ All errors are logged with platform/phase context for debugging.
 3. **On-Demand**: No reserved instance or savings plan discounts
 4. **Compute Only**: Storage, network, and other costs not included
 5. **Marginal Cost**: Dedicated clusters (Redshift, Databricks all-purpose) show per-query marginal cost, not total cluster TCO
+6. **No free tiers**: List rate from byte zero, including BigQuery's first 1 TiB/month (see BigQuery section)
+7. **Decimal TB for "TB"-printed scan pricing**: Athena and Synapse serverless divide by 10^12 bytes per the billing-unit ADR; BigQuery divides by 2^40
 
 ## Pricing Data Maintenance
 
