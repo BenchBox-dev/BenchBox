@@ -1233,14 +1233,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection: Any,
         query: str,
         explain_options: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str | None:
         """Get query execution plan using EXPLAIN.
 
         QuestDB supports EXPLAIN for query plans but with fewer options
         than standard PostgreSQL. The plan is returned as a ``QUERY PLAN`` text
-        column (one row per line). On failure returns an error string (which the
-        plan-capture parser rejects via its error-sentinel guard, so capture
-        degrades silently rather than fabricating a plan).
+        column (one row per line). On failure logs a warning and returns None
+        so capture records ``explain_failed`` rather than ``parse_error``.
         """
         query = _rewriter_rewrite(query)
         # In TPC-DS streaming paths a per-stream cursor is passed as
@@ -1261,7 +1260,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         except Exception as e:
             if _owns_cursor:
                 cursor.close()
-            return f"Failed to get query plan: {e}"
+            self.logger.warning(f"Failed to get query plan: {e}")
+            return None
 
     def get_query_plan_parser(self):
         """Get the QuestDB query plan parser."""

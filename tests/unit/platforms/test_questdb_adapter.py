@@ -211,7 +211,7 @@ class TestQuestDBAdapter:
         mock_cursor.execute.assert_called_with("EXPLAIN SELECT * FROM test WHERE id > 5")
 
     def test_get_query_plan_failure(self, questdb_stubs):
-        """Query plan failure should return error message."""
+        """Query plan failure returns None so capture records explain_failed."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.side_effect = Exception("EXPLAIN not supported")
@@ -221,7 +221,7 @@ class TestQuestDBAdapter:
 
         plan = adapter.get_query_plan(mock_conn, "SELECT 1")
 
-        assert "Failed to get query plan" in plan
+        assert plan is None
 
     def test_configure_for_benchmark(self, questdb_stubs):
         """Configure should not raise errors (QuestDB has no session-level settings)."""

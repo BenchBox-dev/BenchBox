@@ -797,7 +797,7 @@ class TestSingleStoreQueryExecution:
         assert "SELECT * FROM lineitem" in call_args
 
     def test_get_query_plan_error(self):
-        """Test get_query_plan returns error string on failure."""
+        """Test get_query_plan returns None on failure (explain_failed)."""
         adapter = SingleStoreAdapter()
 
         mock_connection = Mock()
@@ -807,7 +807,7 @@ class TestSingleStoreQueryExecution:
 
         plan = adapter.get_query_plan(mock_connection, "SELECT 1")
 
-        assert "Failed to get query plan" in plan
+        assert plan is None
 
 
 class TestSingleStorePlatformInfo:

@@ -1084,7 +1084,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
         insert_sql = f"INSERT INTO {table_name} VALUES {', '.join(value_rows)}"
         cursor.execute(insert_sql)
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan.
 
         Args:
@@ -1092,7 +1092,7 @@ class FabricWarehouseAdapter(PlatformAdapter):
             query: SQL query to analyze.
 
         Returns:
-            Query plan as string.
+            Query plan as string, or None when EXPLAIN fails.
         """
         cursor = connection.cursor()
         try:
@@ -1109,7 +1109,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 except Exception:
                     pass
         except Exception as e:
-            return f"Failed to get query plan: {e}"
+            self.logger.warning(f"Failed to get query plan: {e}")
+            return None
         finally:
             cursor.close()
 
