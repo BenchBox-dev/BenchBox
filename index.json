@@ -18490,10 +18490,15 @@
       "title": "Windows Nightly: exercise killpg branch with a portable SIGKILL sentinel"
     },
     "wire-plan-capture-for-dataframe-execution-path-in-benchbox-c": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T13:29:40Z",
+        "generation": "1914d245258f4a6e81b5ce2ccad880dc",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:90622063180a85f05202d738"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Wire plan capture for DataFrame execution path in benchbox/core/dataframe/profiling.py"
     },
     "wire-the-flightdata-cross-surface-gate": {
