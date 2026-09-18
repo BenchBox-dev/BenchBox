@@ -204,7 +204,38 @@ class TestTruncationPreservation:
         restored = QueryPlanDAG.from_dict(data)
 
         assert restored.truncated_at_depth == 2
-        assert restored.fingerprint_integrity == FingerprintIntegrity.STALE
+        assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
+
+    def test_from_dict_truncated_plan_is_not_stale(self) -> None:
+        """Intentional depth truncation must not be misattributed to tampering."""
+        data = _chain("lineitem").to_dict(max_depth=1)
+
+        restored = QueryPlanDAG.from_dict(data, verify_fingerprint=True)
+
+        assert restored.truncated_at_depth is not None
+        assert restored.fingerprint_integrity != FingerprintIntegrity.STALE
+        assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
+        assert not restored.is_fingerprint_trusted()
+
+    def test_from_dict_truncated_plan_survives_refresh_request(self) -> None:
+        """refresh_on_mismatch must not recompute (and launder) a truncated plan."""
+        data = _chain("lineitem").to_dict(max_depth=1)
+        stored = data["plan_fingerprint"]
+
+        restored = QueryPlanDAG.from_dict(data, refresh_on_mismatch=True)
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
+        assert restored.plan_fingerprint == stored
+        assert not restored.is_fingerprint_trusted()
+
+    def test_verify_fingerprint_marks_truncated_not_stale(self) -> None:
+        data = _chain("lineitem").to_dict(max_depth=1)
+
+        restored = QueryPlanDAG.from_dict(data)
+        assert restored.verify_fingerprint() is False
+
+        assert restored.fingerprint_integrity == FingerprintIntegrity.TRUNCATED
+        assert not restored.is_fingerprint_trusted()
 
     def test_from_dict_full_depth_has_no_truncation(self) -> None:
         plan = _chain("lineitem")
