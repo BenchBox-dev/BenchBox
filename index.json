@@ -10875,12 +10875,17 @@
       "title": "Presto and Trino Platform Documentation"
     },
     "pricing-config-validation-coverage": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-19T15:22:16Z",
+        "generation": "03ca9ea2626b4328a53808814f4d1f26",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:3d78b5b6fde4e62fbe1e3e7f"
+      },
       "needs": [
         "pricing-failclosed-price-resolution"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Close the platform config validation gaps for priced platforms"
     },
     "pricing-data-correct-all-tables": {
