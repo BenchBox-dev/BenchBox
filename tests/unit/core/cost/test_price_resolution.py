@@ -76,6 +76,8 @@ def test_every_lookup_strips_whitespace():
     assert resolve_snowflake_credit_price(" standard ", " aws ", " us-east-1 ").fallback_used is False
     assert resolve_databricks_dbu_price(" aws ", " premium ", " all_purpose ").fallback_used is False
     assert resolve_bigquery_price_per_tb(" us ").fallback_used is False
+    assert resolve_athena_price_per_tb(" us-east-1 ").fallback_used is False
+    assert resolve_synapse_serverless_price_per_tb(" eastus ").fallback_used is False
     assert resolve_synapse_dedicated_price(" dw100c ", " eastus ").fallback_used is False
     assert resolve_databricks_warehouse_dbu_per_hour(" Medium ").value == 8.0
 
@@ -129,17 +131,26 @@ def test_unknown_keys_are_flagged():
     assert dwu.fallback_used is True and dwu.reason
 
 
-def test_athena_and_synapse_serverless_interim_region_guard():
-    """Unverified regions flag the flat rate; verified ones and omission do not."""
-    assert resolve_athena_price_per_tb().fallback_used is False
-    assert resolve_athena_price_per_tb("us-east-1").fallback_used is False
+def test_athena_and_synapse_serverless_regional_rates():
+    """Priced regions return their own rate; omission and unknown regions flag."""
+    assert resolve_athena_price_per_tb("us-east-1").value == 5.0
     assert resolve_athena_price_per_tb("eu-west-1").fallback_used is False
+    assert resolve_athena_price_per_tb("ap-northeast-1").fallback_used is False
     sao_paulo = resolve_athena_price_per_tb("sa-east-1")
-    assert sao_paulo.value == 5.0 and sao_paulo.fallback_used is True
-    assert resolve_synapse_serverless_price_per_tb().fallback_used is False
-    assert resolve_synapse_serverless_price_per_tb("eastus").fallback_used is False
-    unverified = resolve_synapse_serverless_price_per_tb("brazilsouth")
-    assert unverified.value == 5.0 and unverified.fallback_used is True
+    assert sao_paulo.value == 9.0 and sao_paulo.fallback_used is False
+    assert sao_paulo.resolved_key == ("sa-east-1",)
+    assert resolve_synapse_serverless_price_per_tb("eastus").value == 5.0
+    assert resolve_synapse_serverless_price_per_tb("westeurope").fallback_used is False
+    southeastasia = resolve_synapse_serverless_price_per_tb("southeastasia")
+    assert southeastasia.value == 6.75 and southeastasia.fallback_used is False
+    canadacentral = resolve_synapse_serverless_price_per_tb("canadacentral")
+    assert canadacentral.value == 5.5 and canadacentral.fallback_used is False
+    brazil = resolve_synapse_serverless_price_per_tb("brazilsouth")
+    assert brazil.value == 9.0 and brazil.fallback_used is False
+    omitted = resolve_athena_price_per_tb()
+    assert omitted.value == 5.0 and omitted.fallback_used is True and omitted.reason
+    unknown = resolve_synapse_serverless_price_per_tb("moon-central9")
+    assert unknown.value == 5.0 and unknown.fallback_used is True and unknown.reason
 
 
 def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
@@ -169,7 +180,7 @@ def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
         ),
         ("fabric_dw", {"execution_time_seconds": 3600.0}, {"sku": "f4096", "region": "eastus"}),
         ("firebolt", {"execution_time_seconds": 3600.0}, {"node_type": "xxl", "node_count": 1}),
-        ("athena", {"data_scanned_bytes": 1024**4}, {"region": "sa-east-1"}),
+        ("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"}),
         (
             "synapse",
             {"execution_time_seconds": 3600.0},

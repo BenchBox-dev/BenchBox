@@ -23,6 +23,7 @@ from benchbox.core.cost.pricing import (
     resolve_redshift_node_price,
     resolve_snowflake_credit_price,
     resolve_synapse_dedicated_price,
+    resolve_synapse_serverless_price_per_tb,
 )
 
 pytestmark = [
@@ -149,11 +150,24 @@ def test_golden_databricks_sql_serverless():
     assert resolve_databricks_dbu_price("aws", "premium", "serverless_sql").value == 0.70
 
 
-def test_golden_athena_flat_rate():
-    """Golden: Athena $5.00 per unit scanned.
+def test_golden_athena_regional_rates():
+    """Golden: Athena $5.00/TB us-east-1, $9.00/TB sa-east-1.
 
-    Provenance: athena_price_per_tb (method manual, retrieved unknown).
-    Known gap: Sao Paulo bills $9.00 and this scalar cannot express a region
-    (deferred region-parameter work); the golden pins the verified US/EU rate.
+    Provenance: athena_price_per_tb (method manual, retrieved unknown;
+    regional rates verified against the AWS Athena pricing page).
     """
-    assert resolve_athena_price_per_tb().value == 5.0
+    assert resolve_athena_price_per_tb("us-east-1").value == 5.0
+    assert resolve_athena_price_per_tb("sa-east-1").value == 9.0
+
+
+def test_golden_synapse_serverless_regional_rates():
+    """Golden: Synapse serverless $5.00/TB eastus, $9.00/TB brazilsouth.
+
+    Provenance: synapse_serverless_price_per_tb (method manual, retrieved
+    unknown; regional rates verified against the Azure Synapse serverless
+    SQL pool pricing page).
+    """
+    assert resolve_synapse_serverless_price_per_tb("eastus").value == 5.0
+    assert resolve_synapse_serverless_price_per_tb("southeastasia").value == 6.75
+    assert resolve_synapse_serverless_price_per_tb("canadacentral").value == 5.5
+    assert resolve_synapse_serverless_price_per_tb("brazilsouth").value == 9.0

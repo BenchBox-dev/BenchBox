@@ -8,9 +8,9 @@ Covers the fail-closed status contract:
 - A Databricks serverless SQL config that resolves through a fallback price
   (azure/enterprise has no such tier) yields ``unavailable``, not the
   $4.40 normalized total the fallback used to publish.
-- Athena and Synapse serverless runs outside their verified region sets yield
-  ``unavailable`` rather than a flat $5.00/TB normalized cost; verified
-  regions stay normalized.
+- Athena and Synapse serverless runs in priced regions (including Sao Paulo
+  at $9.00/TB) publish as ``normalized``; only unlisted regions yield
+  ``unavailable`` via a flagged fallback.
 - A stale pricing table yields ``unavailable``, not a warnings-string alone.
 """
 
@@ -102,12 +102,12 @@ def test_fresh_pricing_table_emits_no_staleness_warning() -> None:
     assert not any("days old" in warning for warning in warnings)
 
 
-def test_athena_outside_verified_regions_is_unavailable() -> None:
-    """Sao Paulo Athena cannot publish the flat $5.00/TB rate as normalized."""
+def test_athena_sao_paulo_publishes_regional_rate() -> None:
+    """Sao Paulo Athena publishes $9.00/TB, not the $5.00 flat rate."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "sa-east-1"})
     assert query_cost is not None
-    assert query_cost.compute_cost == pytest.approx(5.0)
+    assert query_cost.compute_cost == pytest.approx(9.0)
 
     phase_cost = calculator.calculate_phase_cost("power_test", [query_cost])
     benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "athena"})
@@ -115,13 +115,31 @@ def test_athena_outside_verified_regions_is_unavailable() -> None:
         "athena", benchmark_cost, {"region": "sa-east-1", "cloud": "aws"}
     )
 
+    assert normalized_cost.cost_status == "normalized"
+    assert normalized_cost.normalized_cost_usd == pytest.approx(9.0)
+    assert not any("athena_price_per_tb" in warning for warning in warnings)
+
+
+def test_athena_unlisted_region_is_unavailable() -> None:
+    """An unpriced Athena region keeps a flagged fallback figure, unpublished."""
+    calculator = CostCalculator()
+    query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"})
+    assert query_cost is not None
+    assert query_cost.compute_cost == pytest.approx(5.0)
+
+    phase_cost = calculator.calculate_phase_cost("power_test", [query_cost])
+    benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "athena"})
+    normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+        "athena", benchmark_cost, {"region": "moon-east-1", "cloud": "aws"}
+    )
+
     assert normalized_cost.cost_status == "unavailable"
     assert normalized_cost.normalized_cost_usd is None
     assert any("athena_price_per_tb" in warning for warning in warnings)
 
 
-def test_synapse_serverless_outside_verified_regions_is_unavailable() -> None:
-    """Brazil Synapse serverless cannot publish the flat rate as normalized."""
+def test_synapse_serverless_brazil_publishes_regional_rate() -> None:
+    """Brazil Synapse serverless publishes $9.00/TB as normalized."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost(
         "synapse",
@@ -129,6 +147,7 @@ def test_synapse_serverless_outside_verified_regions_is_unavailable() -> None:
         {"mode": "serverless", "region": "brazilsouth"},
     )
     assert query_cost is not None
+    assert query_cost.compute_cost == pytest.approx(9.0)
 
     phase_cost = calculator.calculate_phase_cost("power_test", [query_cost])
     benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "synapse"})
@@ -138,9 +157,9 @@ def test_synapse_serverless_outside_verified_regions_is_unavailable() -> None:
         {"mode": "serverless", "region": "brazilsouth", "cloud": "azure"},
     )
 
-    assert normalized_cost.cost_status == "unavailable"
-    assert normalized_cost.normalized_cost_usd is None
-    assert any("synapse_serverless_price_per_tb" in warning for warning in warnings)
+    assert normalized_cost.cost_status == "normalized"
+    assert normalized_cost.normalized_cost_usd == pytest.approx(9.0)
+    assert not any("synapse_serverless_price_per_tb" in warning for warning in warnings)
 
 
 def test_verified_regions_stay_normalized() -> None:
@@ -208,7 +227,7 @@ def test_fallback_marker_emits_one_warning_per_table() -> None:
     """A multi-query phase with one fallback table emits a single warning."""
     calculator = CostCalculator()
     query_costs = [
-        calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "sa-east-1"})
+        calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"})
         for _ in range(3)
     ]
     assert all(query_cost is not None for query_cost in query_costs)
@@ -217,7 +236,7 @@ def test_fallback_marker_emits_one_warning_per_table() -> None:
         {"platform": "athena"},
     )
     normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
-        "athena", benchmark_cost, {"region": "sa-east-1", "cloud": "aws"}
+        "athena", benchmark_cost, {"region": "moon-east-1", "cloud": "aws"}
     )
 
     assert normalized_cost.cost_status == "unavailable"
