@@ -639,7 +639,7 @@ class AthenaAdapter(PlatformAdapter):
 
         try:
             # Get schema SQL using common helper with Trino dialect
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Split and execute statements
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
@@ -975,7 +975,7 @@ class AthenaAdapter(PlatformAdapter):
 
     def _build_external_table_statements(self, benchmark: Any) -> dict[str, str]:
         """Build CREATE EXTERNAL TABLE SQL statements keyed by normalized table name."""
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
         statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
         table_sql: dict[str, str] = {}
 

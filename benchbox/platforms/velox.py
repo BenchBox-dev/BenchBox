@@ -496,7 +496,7 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         spark = connection
 
         try:
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
             statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
             # Capture table_format once: the optimize lambda is called per
             # statement, and a hook that mutated self.table_format mid-loop

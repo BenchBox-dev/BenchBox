@@ -314,6 +314,70 @@ class TestSQLTranslation:
         assert summary["outcomes"][0]["count"] == 2
 
 
+class TestTranslationScopeMetadata:
+    """Scoped summaries separate schema DDL from repeated workload queries."""
+
+    def test_repeated_workload_queries_report_unique_count(self):
+        """Identical query text translated repeatedly counts once as unique."""
+        with sql_translation_context(strict=False) as outcomes:
+            for _ in range(3):
+                translate_sql_query("SELECT * FROM orders", target_dialect="duckdb", source_dialect="netezza")
+            translate_sql_query("SELECT * FROM lineitem", target_dialect="duckdb", source_dialect="netezza")
+
+        summary = summarize_sql_translation_outcomes(outcomes, strict_mode=False)
+
+        assert summary is not None
+        assert summary["attempt_count"] == 4
+        assert summary["total_transpilation_calls"] == 4
+        assert summary["unique_queries_translated"] == 2
+        assert "schema_statements_translated" not in summary
+        entry = summary["outcomes"][0]
+        assert entry["scope"] == "workload_query"
+        assert entry["parser_grammar"] == "postgres"
+        assert entry["normalized_source_dialect"] == "postgres"
+        assert entry["count"] == 4
+        assert entry["calls"] == 4
+        assert entry["unique_queries"] == 2
+
+    def test_schema_ddl_outcome_is_scoped_and_counted_separately(self):
+        """DDL tagged with the schema scope does not inflate unique queries."""
+        ddl = "CREATE TABLE region (r_regionkey INTEGER NOT NULL, r_name CHAR(25) NOT NULL)"
+        with sql_translation_context(strict=False) as outcomes:
+            translate_sql_query(ddl, target_dialect="bigquery", source_dialect="standard", scope="schema_ddl")
+            translate_sql_query("SELECT * FROM region", target_dialect="bigquery", source_dialect="netezza")
+
+        summary = summarize_sql_translation_outcomes(outcomes, strict_mode=False)
+
+        assert summary is not None
+        assert summary["attempt_count"] == 2
+        assert summary["unique_queries_translated"] == 1
+        assert summary["schema_statements_translated"] == 1
+        assert summary["source_dialects"] == ["netezza", "standard"]
+        scopes = {entry["scope"] for entry in summary["outcomes"]}
+        assert scopes == {"schema_ddl", "workload_query"}
+        ddl_entry = next(entry for entry in summary["outcomes"] if entry["scope"] == "schema_ddl")
+        assert ddl_entry["source_dialect"] == "standard"
+        assert ddl_entry["parser_grammar"] == "postgres"
+        assert ddl_entry["count"] == 1
+
+    def test_legacy_outcomes_without_scope_default_to_workload(self):
+        """Outcomes recorded before scope tagging still summarize cleanly."""
+        with sql_translation_context(strict=False) as outcomes:
+            translate_sql_query("SELECT 1", target_dialect="duckdb", source_dialect="netezza")
+
+        assert outcomes[0].scope is None
+        summary = summarize_sql_translation_outcomes(outcomes, strict_mode=False)
+
+        assert summary is not None
+        assert summary["outcomes"][0]["scope"] == "workload_query"
+        assert summary["unique_queries_translated"] == 1
+
+    def test_unknown_scope_is_rejected(self):
+        """Typos in scope names fail fast instead of corrupting summaries."""
+        with pytest.raises(ValueError, match="Unknown SQL translation scope"):
+            translate_sql_query("SELECT 1", target_dialect="duckdb", scope="not_a_scope")
+
+
 class TestIntegrationScenarios:
     """Test real-world integration scenarios."""
 

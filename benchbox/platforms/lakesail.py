@@ -504,7 +504,7 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
         spark = connection
 
         try:
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
             # Capture table_format once: see Velox.create_schema for rationale.
             fmt = self.table_format
