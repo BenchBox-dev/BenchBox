@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "All nine priced platforms have platform_config_requirements entries",
+    "A Databricks run with warehouse_size but no warehouse_type records the default in _defaulted_fields and does not publish as normalized",
+    "A test asserts that every platform with a calculator also has a config requirements entry, so a future platform cannot be added without one",
+    "uv run -- pytest tests/unit/core/cost/ -n 0 passes"
+  ],
+  "context": "Found by external review: R18 by agy (NEW-4), R19 by muse (NEW-1) and agy (NEW-6) independently. Both verified against code.",
+  "description": "Two silent-misconfiguration paths found by external review, both verified.\n\nR18: cost_specs.yaml:174-200 defines platform_config_requirements for only snowflake, bigquery, redshift and databricks. integration.py:45-47 returns (True, []) for any platform not in that mapping, so five of nine priced platforms - athena, synapse, fabric_dw, firebolt, databricks-df - bypass config validation entirely. Missing or malformed configuration for those platforms produces no warning at all. Add requirement entries for each, covering the fields their calculators actually read (region/location, mode and dwu_level for Synapse, sku for Fabric, node_type and node_count for Firebolt).\n\nR19: _extract_databricks_config sets workload_type = \"all_purpose\" whenever warehouse_type is absent (integration.py:469-470) without recording it in _defaulted_fields - even when warehouse_size is present, which is strong evidence the run was in fact a SQL warehouse. The result is a SQL run priced at all-purpose rates and published as normalized. Record the default in _defaulted_fields so it fails closed, and add warehouse_type to the Databricks required-config list.\n\nNote the wider pattern worth considering: validate_platform_config checks field presence but never field domain, so a workload_type of \"serverless_sql\" passes validation against a price table that cannot price it. That gap is what let the Critical C1 defect through; the reachability test is the primary guard, but domain validation would be a second."
+}
