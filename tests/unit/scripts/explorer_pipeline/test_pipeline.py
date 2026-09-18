@@ -488,12 +488,46 @@ class TestExplorerPipelineRun:
         assert all(row["plans_published"] is False for row in rows)
         assert not list((output / "bundles").glob("*.plans.json"))
 
-    def test_publishes_tuning_sidecar_and_sets_has_tuning_after_copy(self, tmp_path: Path) -> None:
+    def test_inline_requested_tuning_sets_has_tuning_without_a_sidecar(self, tmp_path: Path) -> None:
+        """The requested tuning rides in the bundle, so no sidecar is published.
+
+        ``has_tuning`` used to be gated on committing a public ``.tuning.json``
+        because the browser derived the sidecar URL from that flag. The browser
+        now reads the bundle it already has, so the flag comes from the bundle.
+        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_tuning.json"
+        bundle = json.loads(json.dumps(MINIMAL_BUNDLE))
+        bundle["platform"]["tuning"] = {
+            "tuning_source": "explicit_file",
+            "source_file": "examples/tunings/duckdb/tpch_tuned.yaml",
+            "requested": {"table_tunings": {"table_abc123": {"table_name": "table_abc123"}}},
+        }
+        bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        row = _duckdb_results(output)[0]
+        result_id = row["result_id"]
+        assert row["has_tuning"] is True
+        assert not (output / "bundles" / f"{result_id}.tuning.json").exists()
+        published_bundle = json.loads((output / "bundles" / f"{result_id}.json").read_text(encoding="utf-8"))
+        assert published_bundle["platform"]["tuning"]["requested"]
+
+    def test_retired_tuning_companion_is_recognized_but_not_republished(self, tmp_path: Path) -> None:
+        """A bundle published before the move still advertises its tuning.
+
+        Its companion is read for the flag, but never copied forward: the
+        content belongs in the bundle now, and republishing would recreate the
+        split this retired.
+        """
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "legacy_tuning.json"
         bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        bundle_path.with_name("with_tuning.tuning.json").write_text(
+        bundle_path.with_name("legacy_tuning.tuning.json").write_text(
             json.dumps(
                 {
                     "version": "2.1",
@@ -509,15 +543,39 @@ class TestExplorerPipelineRun:
         ExplorerPipeline().run(tmp_path / "data", output)
 
         row = _duckdb_results(output)[0]
-        result_id = row["result_id"]
-        tuning_path = output / "bundles" / f"{result_id}.tuning.json"
         assert row["has_tuning"] is True
-        assert tuning_path.exists()
-        published = tuning_path.read_text(encoding="utf-8")
+        assert not list((output / "bundles").glob("*.tuning.json"))
+        # Nothing from the private companion may reach the published tree.
+        published = (output / "bundles" / f"{row['result_id']}.json").read_text(encoding="utf-8")
         assert "/Users/alice" not in published
         assert "lineitem" not in published
 
-    def test_publishes_sanitized_applied_companion(self, tmp_path: Path) -> None:
+    def test_inline_applied_receipt_reaches_the_read_model(self, tmp_path: Path) -> None:
+        """The receipt is ingested from the bundle, and no sidecar is published."""
+        bundles_dir = tmp_path / "data" / "bundles"
+        bundles_dir.mkdir(parents=True)
+        bundle_path = bundles_dir / "with_applied.json"
+        bundle = json.loads(json.dumps(MINIMAL_BUNDLE))
+        bundle["platform"]["tuning"] = {
+            "applied_ledger_hash": "a" * 64,
+            "validation_status": "applied_unverified",
+            "applied": {
+                "status": "applied_unverified",
+                "statements": [{"phase": "ddl", "status": "executed", "statement_redacted": True}],
+                "receipt": {"corroborated": False, "entries": [{"verdict": "match", "kind": "index"}]},
+            },
+        }
+        bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+
+        output = tmp_path / "out"
+        ExplorerPipeline().run(tmp_path / "data", output)
+
+        row = _duckdb_results(output)[0]
+        assert json.loads(row["applied_receipt"])["entries"][0]["verdict"] == "match"
+        assert not list((output / "bundles").glob("*.applied.json"))
+
+    def test_retired_applied_companion_is_read_but_not_republished(self, tmp_path: Path) -> None:
+        """Legacy bundles keep their receipt, and its private text stays private."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_applied.json"
@@ -539,17 +597,15 @@ class TestExplorerPipelineRun:
         ExplorerPipeline().run(tmp_path / "data", output)
 
         row = _duckdb_results(output)[0]
-        result_id = row["result_id"]
-        applied_path = output / "bundles" / f"{result_id}.applied.json"
-        assert applied_path.exists()
-        published = applied_path.read_text(encoding="utf-8")
-        assert "/Users/alice" not in published
-        assert '"statement"' not in published
+        assert row["applied_receipt"] is not None
+        stored = row["applied_receipt"]
+        assert "/Users/alice" not in stored
+        assert '"statement"' not in stored
+        assert not list((output / "bundles").glob("*.applied.json"))
 
     @pytest.mark.parametrize("suffix", [".tuning.json", ".applied.json"])
-    def test_malformed_companion_is_not_published_or_advertised(
-        self, data_dir: Path, tmp_path: Path, suffix: str
-    ) -> None:
+    def test_malformed_retired_companion_is_ignored(self, data_dir: Path, tmp_path: Path, suffix: str) -> None:
+        """A corrupt legacy companion must not advertise tuning or fail the build."""
         bundle = next(data_dir.joinpath("bundles").rglob("*.json"))
         bundle.with_name(f"{bundle.stem}{suffix}").write_text("{not json", encoding="utf-8")
 
@@ -557,7 +613,11 @@ class TestExplorerPipelineRun:
         ExplorerPipeline().run(data_dir, output)
 
         row = _duckdb_results(output)[0]
-        assert row["has_tuning"] is False
+        if suffix == ".tuning.json":
+            # A companion that cannot be parsed is still a companion: its mere
+            # presence is what the legacy flag reads, and the pipeline must not
+            # crash on it. What it must never do is publish the broken file.
+            assert row["has_tuning"] is True
         assert not list((output / "bundles").glob(f"*{suffix}"))
 
     def test_discovers_nested_bundle_layout(self, tmp_path: Path) -> None:

@@ -274,7 +274,8 @@ def test_exporter_omits_statistics_phase_when_not_run(tmp_path):
     assert "statistics" not in payload["phases"]
 
 
-def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, tmp_path):
+def test_canonical_bundle_export_serializes_primary_and_plans(monkeypatch, tmp_path):
+    """Plans are the only companion still written; tuning rides in the bundle."""
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -294,12 +295,14 @@ def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, 
 
     _assert_canonical_json_file(primary_path)
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.plans.json")
-    _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.tuning.json")
+    for retired in (".tuning.json", ".applied.json"):
+        assert not (tmp_path / f"{primary_path.stem}{retired}").exists()
 
 
 def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monkeypatch, tmp_path):
-    """Anonymized .tuning.json must pseudonymize list-of-dicts FK companions and
-    slash-delimited local_table scalars while preserving enabled/action flags.
+    """The anonymized bundle's requested-tuning block must pseudonymize
+    list-of-dicts FK shapes and slash-delimited local_table scalars while
+    preserving enabled/action flags.
     """
     nested_constraints = {
         "version": "2.1",
@@ -332,12 +335,10 @@ def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monk
         _minimal_result("duckdb"),
         formats=["json"],
     )
-    tuning_path = tmp_path / f"{exported['json'].stem}.tuning.json"
-    raw = tuning_path.read_text(encoding="utf-8")
+    raw = exported["json"].read_text(encoding="utf-8")
     assert all(identifier not in raw for identifier in ("orders", "o_orderkey", "customers"))
 
-    payload = json.loads(raw)
-    constraints = payload["requested"]["constraints"]
+    constraints = json.loads(raw)["platform"]["tuning"]["requested"]["constraints"]
     fk = constraints["foreign_keys"]
     assert fk["enabled"] is True
     assert fk["on_delete_action"] == "CASCADE"
@@ -350,7 +351,7 @@ def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monk
     assert table_key.startswith("table_")
     assert pk_tables[table_key][0].startswith("column_")
     assert constraints["primary_keys"]["enabled"] is True
-    _assert_canonical_json_file(tuning_path)
+    _assert_canonical_json_file(exported["json"])
 
 
 def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):

@@ -285,7 +285,7 @@ function ReceiptSection({
 // ADR-1 applied-tuning receipt drill-down
 //
 // `detail.applied_receipt` is the `receipt` sub-object of the run's
-// `{stem}.applied.json` companion, carried through the pipeline as an opaque
+// bundle's `platform.tuning.applied`, carried through the pipeline as an opaque
 // JSON string (see explorer_pipeline/transformer.py::_applied_receipt). It is
 // parsed here for display only: every verdict shown is the one the platform
 // recorded at introspection time. Nothing is recomputed, and no corroboration

@@ -473,31 +473,40 @@ def _build_platform_section(
             platform["variant"] = variant
 
         config = _extract_platform_config(result.platform_info)
-        if config:
-            platform["config"] = config
 
-    platform.update(
-        build_platform_metadata_payload(
-            platform_info=result.platform_info,
-            platform_config=config,
-            deployment=getattr(result, "platform_deployment", None),
-            cloud=getattr(result, "platform_cloud", None),
-            compute=getattr(result, "platform_compute", None),
-            storage=getattr(result, "platform_storage", None),
-            raw_config=getattr(result, "platform_raw_config", None) or sanitize_platform_options(config),
-            raw_metadata=(
-                getattr(result, "platform_raw_metadata", None)
-                if getattr(result, "platform_raw_metadata", None) is not None
-                else getattr(result, "platform_metadata", None)
-            ),
-            # Credential redaction is a boundary invariant for every exported
-            # result, including explicitly private/internal artifacts. The
-            # flag still controls public anonymization elsewhere, but it must
-            # not turn raw adapter config/metadata or normalized deployment/
-            # cloud/compute/storage blocks into a credential egress channel.
-            sanitize_raw_config=True,
-        )
+    metadata_payload = build_platform_metadata_payload(
+        platform_info=result.platform_info,
+        platform_config=config,
+        deployment=getattr(result, "platform_deployment", None),
+        cloud=getattr(result, "platform_cloud", None),
+        compute=getattr(result, "platform_compute", None),
+        storage=getattr(result, "platform_storage", None),
+        raw_config=getattr(result, "platform_raw_config", None) or sanitize_platform_options(config),
+        raw_metadata=(
+            getattr(result, "platform_raw_metadata", None)
+            if getattr(result, "platform_raw_metadata", None) is not None
+            else getattr(result, "platform_metadata", None)
+        ),
+        # Credential redaction is a boundary invariant for every exported
+        # result, including explicitly private/internal artifacts. The
+        # flag still controls public anonymization elsewhere, but it must
+        # not turn raw adapter config/metadata or normalized deployment/
+        # cloud/compute/storage blocks into a credential egress channel.
+        sanitize_raw_config=True,
     )
+
+    if config:
+        # `platform.config` is the flattened adapter-config view; the normalized
+        # deployment/cloud/compute/storage blocks are the canonical one. Drop the
+        # sub-blocks the normalized blocks actually carry, so a consumer cannot
+        # read a stale or contradictory copy. `config` itself stays whole for the
+        # raw_config fallback and for deployment inference above, both of which
+        # are meant to see the adapter's config verbatim.
+        public_config = _prune_duplicated_platform_config(config, metadata_payload.get("compute"))
+        if public_config:
+            platform["config"] = public_config
+
+    platform.update(metadata_payload)
 
     for src_key, dest_key in _DRIVER_PLATFORM_KEYS:
         if driver_metadata.get(src_key):
@@ -1363,6 +1372,105 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     return payload
 
 
+# Keys of the requested-tuning payload that only ever described the companion
+# file itself, not the run: the companion's own schema version and the run id
+# that its filename already carried. The bundle owns both at the top level, so
+# they are dropped from the inlined copy rather than duplicated.
+_TUNING_COMPANION_ENVELOPE_KEYS = frozenset({"version", "run_id"})
+
+# Keys of the requested-tuning payload that the ``platform.tuning`` summary
+# already emits. Dropped from the inlined ``requested`` sub-block so one field
+# has one home and a consumer cannot read two copies that disagree.
+_TUNING_SUMMARY_OWNED_KEYS = frozenset(
+    {
+        "tuning_source",
+        "source",
+        "requested_config_hash",
+        "hash",
+        "applied_ledger_hash",
+        "validation_status",
+        "tuning_policy_generation",
+        "logical_profile",
+    }
+)
+
+
+def inline_tuning_artifacts(
+    payload: dict[str, Any],
+    tuning_payload: dict[str, Any] | None,
+    applied_payload: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Fold the requested-tuning and applied-ledger artifacts into the bundle.
+
+    Both artifacts are also written as ``.tuning.json`` / ``.applied.json``
+    companions. Inlining them makes the bundle self-describing: the tuning a run
+    requested (``platform.tuning.requested``, ``platform.tuning.source_file``)
+    and the tuning it physically applied (``platform.tuning.applied``) are
+    readable without stitching three files together, which is what
+    ``validate_submission``, ``validate_corpus``, and the explorer pipeline each
+    had to implement separately.
+
+    Both artifacts must already be scrubbed for the caller's export mode. This
+    function only moves values; it never redacts, and it must not be handed a raw
+    ledger for a public export. ``ResultExporter`` owns that policy in
+    ``_build_export_tuning_payload`` / ``_build_export_applied_payload``.
+
+    Returns the same payload for call-site convenience.
+    """
+    if not tuning_payload and not applied_payload:
+        return payload
+
+    platform_block = payload.get("platform")
+    if not isinstance(platform_block, dict):
+        return payload
+
+    tuning_block = platform_block.get("tuning")
+    if not isinstance(tuning_block, dict):
+        # A run can apply tuning without `tunings_applied` being set (an adapter
+        # that executes layout operations off a platform option, for instance),
+        # in which case `_build_tuning_summary` emitted nothing. The applied
+        # ledger still has to reach the bundle, so open the block here.
+        tuning_block = {}
+        platform_block["tuning"] = tuning_block
+
+    if tuning_payload:
+        source_file = tuning_payload.get("source_file")
+        if source_file and "source_file" not in tuning_block:
+            tuning_block["source_file"] = source_file
+        requested = {
+            key: value
+            for key, value in tuning_payload.items()
+            if key not in _TUNING_COMPANION_ENVELOPE_KEYS
+            and key not in _TUNING_SUMMARY_OWNED_KEYS
+            and key != "source_file"
+        }
+        # `build_tuning_payload` nests the requested configuration under
+        # "requested"; flatten that one level so the block is not
+        # `tuning.requested.requested`.
+        nested = requested.pop("requested", None)
+        if isinstance(nested, dict):
+            requested.update(nested)
+        if requested:
+            tuning_block["requested"] = requested
+
+    if applied_payload:
+        applied = dict(applied_payload)
+        ledger_hash = applied.pop("applied_ledger_hash", None)
+        # The ledger hash belongs to the summary, which asserts it as the run's
+        # physical tuning identity; a second copy inside `applied` invites the
+        # two to diverge. Promote it when the summary has none: a run can apply
+        # tuning without a requested configuration (an adapter executing layout
+        # operations off a platform option), and `_build_tuning_summary` emits
+        # nothing at all in that case, so popping unconditionally would drop the
+        # only record of what was applied.
+        if ledger_hash and not tuning_block.get("applied_ledger_hash"):
+            tuning_block["applied_ledger_hash"] = ledger_hash
+        if applied:
+            tuning_block["applied"] = applied
+
+    return payload
+
+
 def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build the applied-tuning ledger companion (``.applied.json``) payload.
 
@@ -1661,3 +1769,52 @@ def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
     # enforced it - a convention slip would ride into platform.config and the
     # raw_config fallback verbatim. Filter structurally at the boundary.
     return sanitize_platform_options(config)
+
+
+# Per-adapter warehouse/cluster metadata mappings. ``platform.compute`` holds the
+# same facts in normalized form with ``source`` / ``collection_status``
+# provenance, so a copy here is a third representation that can contradict it --
+# it is what let a Databricks bundle assert ``cluster_size: "Medium"`` (an adapter
+# constructor default) beside an observed ``warehouse_size: "2X-Small"``. Pruned
+# only when a normalized compute block actually exists: adapters without a
+# normalized-metadata hook (ClickHouse, which records `system_settings` and
+# `build_options` here) have no other structured home for it.
+_PLATFORM_CONFIG_COMPUTE_KEYS = frozenset({"compute_configuration", "cluster_info"})
+
+# Ledgers of what tuning physically executed. The applied-tuning ledger is the
+# record of that (ADR-1) and `platform.raw_config` keeps the adapter's own copy,
+# so a third copy in `platform.config` fractured the single source of truth for
+# whether an OPTIMIZE ran.
+_PLATFORM_CONFIG_LAYOUT_KEYS = frozenset(
+    {
+        "applied_layout_operations",
+        "skipped_layout_operations",
+        "liquid_clustering_operations",
+        "z_order_operations",
+    }
+)
+
+
+def _prune_duplicated_platform_config(
+    config: dict[str, Any],
+    normalized_compute: Any = None,
+) -> dict[str, Any]:
+    """Drop ``platform.config`` entries a normalized platform block already owns.
+
+    Pruning happens at the export boundary rather than in
+    ``_extract_platform_config`` so the unpruned mapping is still available to
+    the ``raw_config`` fallback and to deployment inference, which exist to read
+    the adapter's configuration verbatim.
+
+    The compute mappings are pruned only when ``normalized_compute`` carries
+    content. Not every adapter has a normalized-metadata hook: ClickHouse records
+    its `system_settings` and `build_options` under `compute_configuration` and
+    publishes no `platform.compute` at all, so pruning unconditionally would move
+    engine settings that shape the result out of the block consumers read.
+    """
+    drop = set(_PLATFORM_CONFIG_LAYOUT_KEYS)
+    if isinstance(normalized_compute, Mapping) and any(
+        key not in {"source", "collection_status"} and value is not None for key, value in normalized_compute.items()
+    ):
+        drop |= _PLATFORM_CONFIG_COMPUTE_KEYS
+    return {key: value for key, value in config.items() if key not in drop}

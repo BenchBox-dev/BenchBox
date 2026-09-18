@@ -25,14 +25,17 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
 The result JSON is written to `benchmark_runs/results/`.
 
-Optional companion files may be written next to the result JSON. Add
-`--capture-plans` on supported platforms to create `<result>.plans.json`.
-The `--tuning` flag accepts `notuning` (default), `tuned`, `auto`, or a
-path to a YAML config; use `tuned`, `auto`, or a YAML path only for
-intentionally tuned submissions, which create `<result>.tuning.json`
-when tuning clauses are applied. `benchbox submit` packages either
-companion automatically when it sits next to the result JSON, so missing
-companion files do not make a default submission incomplete.
+One optional companion file may be written next to the result JSON. Add
+`--capture-plans` on supported platforms to create `<result>.plans.json`;
+`benchbox submit` packages it automatically when it sits next to the result
+JSON, so a missing plans file does not make a default submission incomplete.
+
+The `--tuning` flag accepts `notuning` (default), `tuned`, `auto`, or a path to
+a YAML config; use `tuned`, `auto`, or a YAML path only for intentionally tuned
+submissions. Tuning needs no file of its own: the configuration a run requested
+and the ledger of what it applied are recorded inside the result JSON under
+`platform.tuning`. Older bundles carry `<result>.tuning.json` and
+`<result>.applied.json` companions instead, and those are still accepted.
 
 ### 2. Configure the public-submission salt
 
@@ -75,7 +78,6 @@ This creates a `submission/` directory containing:
 |------|-------------|
 | `bundle/<result>.json` | The canonical schema-v2 result bundle |
 | `bundle/<result>.plans.json` | Optional query execution plans from `--capture-plans` |
-| `bundle/<result>.tuning.json` | Optional tuning details from an intentionally tuned run |
 | `<result>.manifest.json` | Metadata: hash, benchmark, platform, contributor |
 | `CONTRIBUTING.md` | PR instructions (for reference) |
 

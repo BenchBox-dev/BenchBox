@@ -118,7 +118,7 @@ export interface DetailResult extends CostDeploymentFields {
   // ledger (treated as "unknown"). Distinct from validation_status (run/query).
   tuning_validation_status?: string | null;
   // ADR-1 per-statement introspection receipt, carried verbatim from the
-  // {stem}.applied.json companion's "receipt" sub-object as an opaque JSON
+  // bundle's platform.tuning.applied.receipt sub-object as an opaque JSON
   // string (see explorer_pipeline/transformer.py::_applied_receipt). The
   // explorer parses it only to display the recorded verdicts and NEVER
   // recomputes a verdict or a corroboration decision from it. Null/undefined

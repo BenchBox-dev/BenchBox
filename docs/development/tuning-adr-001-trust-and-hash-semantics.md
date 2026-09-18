@@ -316,6 +316,27 @@ but the manager exposes that degraded write and a later reuse without complete
 markers reports reduced drift coverage. None of these `drift_check` outcomes
 can contribute to `applied_verified`.
 
+## Addendum (2026-09-17): the ledger moved into the bundle
+
+The realized ledger described in §3 no longer ships as a `.applied.json`
+companion, and the requested configuration no longer ships as `.tuning.json`.
+Both now live in the result bundle under `platform.tuning`: `requested` for the
+configuration a run asked for, `applied` for the ledger of what it executed
+(status, statements, dropped intents, receipt, drift check). The hashes,
+`validation_status`, and `tuning_policy_generation` keep the places §3 gave
+them, on the `platform.tuning` summary.
+
+Nothing about the trust semantics changes. The two hashes remain distinct,
+`applied_verified` is still earned only by a corroborating receipt, and the
+ledger is still produced by the execution path rather than reconstructed from
+the requested config. What changes is the file layout: answering "what did this
+run request, and what did it apply?" required stitching three files, so a bundle
+separated from its companions silently lost the answer and every consumer
+reimplemented the stitch.
+
+Readers still accept both companions, so bundles exported before this keep
+loading unchanged; nothing writes them any more.
+
 ## References
 
 - `benchbox/platforms/base/adapter.py:743-747`

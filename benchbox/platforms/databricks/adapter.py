@@ -302,8 +302,14 @@ class DatabricksAdapter(PlatformAdapter):
             config.get("delta_auto_compact") if config.get("delta_auto_compact") is not None else True
         )
 
-        # Cluster settings
-        self.cluster_size = config.get("cluster_size") or "Medium"
+        # Cluster settings. No default: BenchBox connects to an existing SQL
+        # warehouse over `http_path` and never sizes one, so a value here is
+        # requested intent and nothing else. The former "Medium" fallback was
+        # published as the run's compute size and contradicted the warehouse the
+        # run actually used -- a 2X-Small serverless warehouse reported as
+        # Medium, and billed at 8 DBU/hour instead of 1. The observed size comes
+        # from the warehouses API into `platform.compute`.
+        self.cluster_size = config.get("cluster_size")
         self.auto_terminate_minutes = (
             config.get("auto_terminate_minutes") if config.get("auto_terminate_minutes") is not None else 30
         )

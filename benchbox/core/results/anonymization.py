@@ -59,6 +59,17 @@ _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
 # Omit the empty block rather than publishing a hollow object (e.g. client_host
 # that only held machine_id). Compact forms match ``_compact_key``.
 _PUBLIC_EMPTY_OPTIONAL_MAP_KEYS = frozenset({"clienthost"})
+# Where the requested-tuning template reference sits inside a bundle. Scoped as a
+# full key path so the exemption below cannot widen to any other `source_file`.
+_TUNING_SOURCE_FILE_PATH = ("platform", "tuning", "source_file")
+
+# Tuning clause keys whose values name columns. A first-party tuning config
+# renders each column as a `{"name": ...}` dict, but a hand-authored or
+# republished companion may write a bare string or list of strings, which the
+# structural walk cannot recognize as an identifier on its own.
+_TUNING_COLUMN_BEARING_KEYS = frozenset(
+    {"clustering", "partitioning", "sorting", "distribution", "columns", "indexes", "order_by", "bucketing"}
+)
 
 _MESSAGE_PATH_RE = re.compile(
     r"(?<![A-Za-z0-9_])("
@@ -616,7 +627,7 @@ class AnonymizationManager:
             }
         return self._anonymize_tuning_value(value)
 
-    def _anonymize_tuning_value(self, value: Any) -> Any:
+    def _anonymize_tuning_value(self, value: Any, *, column_context: bool = False) -> Any:
         if isinstance(value, dict):
             anonymized: dict[str, Any] = {}
             for key, child in value.items():
@@ -627,12 +638,20 @@ class AnonymizationManager:
                 elif key in {"column", "column_name", "name"}:
                     anonymized[key] = self._hash_public_identifier(str(child), "column")
                 else:
-                    anonymized[key] = self._anonymize_tuning_value(child)
+                    anonymized[key] = self._anonymize_tuning_value(
+                        child, column_context=key in _TUNING_COLUMN_BEARING_KEYS
+                    )
             return anonymized
-        if isinstance(value, list):
-            return [self._anonymize_tuning_value(item) for item in value]
-        if isinstance(value, tuple):
-            return [self._anonymize_tuning_value(item) for item in value]
+        if isinstance(value, (list, tuple)):
+            return [self._anonymize_tuning_value(item, column_context=column_context) for item in value]
+        # A first-party tuning config renders columns as `{"name": ...}` dicts,
+        # which the branch above hashes. A hand-authored or republished companion
+        # may instead write a bare string or a list of strings under a clause key
+        # -- `{"clustering": ["o_orderkey"]}` -- and those identifiers reached the
+        # public companion verbatim. They are hashed here so the clause key alone,
+        # not the value's shape, decides whether a value is an identifier.
+        if column_context and isinstance(value, str) and value:
+            return self._hash_public_identifier(value, "column")
         return value
 
     def _anonymize_public_value(self, value: Any, key_path: tuple[str, ...]) -> Any:
@@ -647,6 +666,18 @@ class AnonymizationManager:
                 child_path = (*key_path, str(key))
                 if self._is_secret_metadata_key(child_path):
                     child_value = PUBLIC_REDACTED_VALUE if child not in (None, "") else child
+                elif child_path == _TUNING_SOURCE_FILE_PATH and self._is_normalized_tuning_source_reference(child):
+                    # A repo-relative template reference is public provenance, not
+                    # a private path: it names a file in this repository and is
+                    # what a reader follows to see what a tuned run asked for.
+                    # The generic walk would path-hash it on the key name alone.
+                    # `anonymize_tuning_payload` made this exception while the
+                    # value lived in a `.tuning.json` companion; the value now
+                    # rides in the bundle, so the exception has to travel with it
+                    # -- and it must stay pinned to this one path, so a
+                    # `source_file` anywhere else is still hashed. Anything that
+                    # is not a normalized reference falls through and is hashed.
+                    child_value = child
                 else:
                     child_value = self._anonymize_public_value(child, child_path)
                 # After dropping identifier-only content (e.g. client_host with

@@ -53,6 +53,13 @@ from benchbox.validation.bundle import COMPANION_SUFFIXES, discover_bundles
 
 logger = logging.getLogger(__name__)
 
+# Companions the explorer republishes alongside a public bundle. Plans are the
+# only one left: the requested tuning and the applied ledger travel inside the
+# bundle's own `platform.tuning` block. `COMPANION_SUFFIXES` stays wider because
+# discovery and the content digest must still recognize the retired files on
+# bundles published before the move.
+PUBLISHED_COMPANION_SUFFIXES = (".plans.json",)
+
 
 class DuplicateResultIdError(Exception):
     """Two distinct published bundles derived the same ``result_id``.
@@ -278,9 +285,19 @@ def _manifest_trust_label(bundle_path: Path, default: str) -> str:
     return COMMUNITY_TRUST_LABEL
 
 
-def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager) -> str | None:
-    """Return the bounded applied receipt after public-path sanitization."""
-    receipt_json = _applied_receipt(bundle_path)
+def _public_applied_receipt(
+    bundle_path: Path,
+    bundle_data: dict[str, Any] | None,
+    anonymizer: AnonymizationManager,
+) -> str | None:
+    """Return the bounded applied receipt after public-path sanitization.
+
+    The receipt is read from the bundle's own ``platform.tuning.applied`` block,
+    falling back to a retired ``{stem}.applied.json`` companion for bundles
+    published before the move. Sanitization is unchanged either way: the public
+    path re-scrubs whatever it finds.
+    """
+    receipt_json = _applied_receipt(bundle_path, bundle_data)
     if receipt_json is None:
         return None
     try:
@@ -300,7 +317,7 @@ def _public_bundle_data(
     bundle_data: dict[str, Any],
     anonymizer: AnonymizationManager,
 ) -> tuple[dict[str, Any], str | None]:
-    """Sanitize a bundle and its companion before creating public read-model rows."""
+    """Sanitize a bundle and its applied receipt before creating public rows."""
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
@@ -311,7 +328,7 @@ def _public_bundle_data(
         raise PrivacyRejectionError(
             f"{bundle_path}: public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
         )
-    return public_bundle, _public_applied_receipt(bundle_path, anonymizer)
+    return public_bundle, _public_applied_receipt(bundle_path, bundle_data, anonymizer)
 
 
 # Type alias for the summary accumulator: (benchmark, scale_factor, phase) → rows
@@ -826,12 +843,16 @@ class ExplorerPipeline:
                     dest_bundle.write_bytes(public_raw)
 
                     # Publish only the validated, anonymized companions that
-                    # actually exist. Source-side ``has_tuning`` is not enough:
-                    # the browser derives the tuning URL from that flag, so it
-                    # must be set only after the public sidecar is committed.
-                    detail.has_tuning = False
+                    # actually exist. Plans are the only companion still
+                    # published; the requested tuning travels inside the public
+                    # bundle, so ``has_tuning`` is preserved from the source-side
+                    # read rather than being gated on a sidecar that no longer
+                    # gets written. The retired ``.tuning.json`` /
+                    # ``.applied.json`` are deliberately not republished: their
+                    # content is in the bundle, and copying them forward would
+                    # recreate the split this retired.
                     detail.plans_published = False
-                    for suffix in COMPANION_SUFFIXES:
+                    for suffix in PUBLISHED_COMPANION_SUFFIXES:
                         try:
                             public_companion = _public_companion_bytes(bundle_path, suffix, public_anonymizer)
                         except CompanionPrivacyError as exc:
@@ -847,8 +868,6 @@ class ExplorerPipeline:
                         companion_dest.write_bytes(public_companion)
                         if suffix == ".plans.json":
                             detail.plans_published = True
-                        elif suffix == ".tuning.json":
-                            detail.has_tuning = True
 
                     # Add the entry only after the public bundle has been copied
                     # successfully.  A privacy rejection must not leave a

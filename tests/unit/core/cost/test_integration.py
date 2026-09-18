@@ -36,9 +36,22 @@ class TestAddCostEstimationToResults:
     """Tests for add_cost_estimation_to_results function."""
 
     def test_adds_cost_summary_to_results(self):
-        """Test that cost_summary is added to BenchmarkResults."""
+        """Test that cost_summary is added to BenchmarkResults.
+
+        The warehouse size arrives through the normalized compute block marked
+        observed. A size read only from adapter configuration cannot reach
+        ``cost_status="normalized"``: ``SnowflakeAdapter`` defaults it to
+        "MEDIUM" when the user set nothing, so an unobserved configured size may
+        be a fabricated value and must not back a published total. See
+        ``test_configured_only_warehouse_size_does_not_publish_a_total``.
+        """
         results = create_test_results(
             benchmark_name="TPC-H",
+            platform_compute={
+                "warehouse_size": "MEDIUM",
+                "source": "observed",
+                "collection_status": "available",
+            },
             platform_info={
                 "platform_type": "snowflake",
                 "edition": "standard",
@@ -373,8 +386,17 @@ class TestExtractPlatformConfigFromResults:
         config = _extract_platform_config_from_results(results)
         assert config == {}
 
-    def test_uses_defaults_for_missing_fields(self):
-        """Test defaults are applied for missing config fields."""
+    def test_omits_unobservable_fields_and_records_them_as_defaulted(self):
+        """Missing cloud/region are recorded as defaulted, never invented.
+
+        Snowflake runs on all three providers, so neither the provider nor the
+        region can be derived from the platform's identity. Publishing a guess
+        would assert a deployment the run never observed, and it would not buy a
+        cost total either: each ``_defaulted_fields`` entry becomes a
+        normalized-cost warning, and any warning forces
+        ``cost_status="unavailable"``. ``edition`` keeps its "standard" default
+        because it selects a credit price rather than describing the deployment.
+        """
         results = create_test_results(
             benchmark_name="Test",
             platform="snowflake",
@@ -387,9 +409,10 @@ class TestExtractPlatformConfigFromResults:
 
         config = _extract_platform_config_from_results(results)
 
-        assert config["edition"] == "standard"  # Default
-        assert config["cloud"] == "aws"  # Default
-        assert config["region"] == "us-east-1"  # Default
+        assert config["edition"] == "standard"
+        assert "cloud" not in config
+        assert "region" not in config
+        assert config["_defaulted_fields"] == ["cloud", "edition", "region"]
 
 
 class TestCalculatePhaseCosts:

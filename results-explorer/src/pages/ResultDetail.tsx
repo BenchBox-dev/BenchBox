@@ -223,10 +223,10 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
     return rawSort.direction === "asc" ? "ascending" : "descending";
   }
 
-  // Derive tuning sidecar URL from bundle download URL.
-  const tuningUrl = detail.has_tuning && detail.bundle_download_url
-    ? detail.bundle_download_url.replace(/\.json$/, ".tuning.json")
-    : null;
+  // The tuning a run requested lives in the bundle, at platform.tuning. It used
+  // to be a `.tuning.json` sidecar derived from this URL; that file is no longer
+  // published, so the bundle itself is the source.
+  const tuningUrl = detail.has_tuning ? detail.bundle_download_url : null;
 
   function handleTuningExpand() {
     const willExpand = !tuningExpanded;
@@ -237,9 +237,9 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       tuningAbortRef.current = controller;
       fetch(tuningUrl, { signal: controller.signal })
         .then((r) => r.json() as Promise<Record<string, unknown>>)
-        .then((data) => {
+        .then((bundle) => {
           if (controller.signal.aborted) return;
-          setTuningData(data);
+          setTuningData(extractTuningBlock(bundle));
           setTuningLoading(false);
         })
         .catch((err: unknown) => {
@@ -594,6 +594,20 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
       </div>
     </div>
   );
+}
+
+function extractTuningBlock(bundle: Record<string, unknown>): Record<string, unknown> {
+  // `platform.tuning` holds the requested configuration and the applied ledger.
+  // A bundle published before they were folded in has only the summary fields,
+  // which are still worth showing, so an absent block is not an error.
+  const platform = bundle?.platform;
+  if (platform && typeof platform === "object" && !Array.isArray(platform)) {
+    const tuning = (platform as Record<string, unknown>).tuning;
+    if (tuning && typeof tuning === "object" && !Array.isArray(tuning)) {
+      return tuning as Record<string, unknown>;
+    }
+  }
+  return {};
 }
 
 function ResultMetricCard({
