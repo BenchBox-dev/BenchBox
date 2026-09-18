@@ -655,7 +655,9 @@ class TestMakefileCommands:
         aggregate = workflow["jobs"]["ci-required-result"]
 
         assert job["needs"] == "ci-paths"
-        assert "needs-code-ci == 'true'" in job["if"]
+        # Heavy-tier queue-only: correctness-gate is in the moved set, so it
+        # gates on heavy-needed (merge queue or carve-out), not needs-code-ci.
+        assert "heavy-needed == 'true'" in job["if"]
         assert "make test-correctness-gate" in _workflow_job_run_text(
             repo_root / ".github" / "workflows" / "pr.yml",
             "correctness-gate",

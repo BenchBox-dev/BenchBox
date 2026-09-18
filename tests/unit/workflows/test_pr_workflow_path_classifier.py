@@ -90,6 +90,7 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "SKILL_INTEGRITY_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
+        "HEAVY_NEEDED": "false",
         **env_overrides,
     }
     return run_posix_shell(
@@ -134,6 +135,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     # regressing the blind-spot remediation.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -174,6 +176,7 @@ def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
         SKILL_INTEGRITY_NEEDED="true",
         SKILL_INTEGRITY_RESULT="failure",
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -190,6 +193,7 @@ def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
 def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         TPCH_BINARY_FRAMING_RESULT="failure",
         LINT_RESULT="success",
@@ -207,6 +211,7 @@ def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
 def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         TPCH_BINARY_FRAMING_RESULT="success",
         LINT_RESULT="success",
@@ -223,6 +228,7 @@ def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
 def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -240,6 +246,7 @@ def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
 def test_ci_required_result_treats_explorer_vitest_skipped_as_success() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -268,6 +275,7 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     # it so a future cleanup that drops the clause is a deliberate choice.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -278,9 +286,7 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     )
 
     assert result.returncode == 0
-    assert (
-        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
-    )
+    assert "Code/infra PR; lint, fast tests, and the required heavy tier passed." in result.stdout
 
 
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
@@ -288,6 +294,7 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     # success, the aggregator returns success.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -298,14 +305,13 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     )
 
     assert result.returncode == 0
-    assert (
-        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
-    )
+    assert "Code/infra PR; lint, fast tests, and the required heavy tier passed." in result.stdout
 
 
 def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -321,6 +327,7 @@ def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
 def test_ci_required_result_fails_on_medium_test_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -507,13 +514,23 @@ def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
     expected_needed = {f"{group.replace('_', '-')}-needed" for group in groups}
     expected_needed.add("content-guard-needed")
     declared_needed = {key for key in declared_outputs if key.endswith("-needed")}
-    assert declared_needed == expected_needed, (
+    # `heavy-needed` is deliberately not a path-filter group emission: the
+    # heavy-tier decision combines the classifier outputs with the event
+    # name and the soundness carve-out in the dedicated heavy step, so it
+    # cannot come from write_github_output. It keeps its own mapping pin
+    # below instead of joining this lockstep.
+    assert declared_needed == expected_needed | {"heavy-needed"}, (
         "jobs.ci-paths.outputs `*-needed` keys must stay in lockstep with "
-        "path-filters.yml groups (plus core content-guard-needed). "
+        "path-filters.yml groups (plus core content-guard-needed and the "
+        "dedicated heavy-needed emission). "
         f"Missing declarations: {sorted(expected_needed - declared_needed)}; "
-        f"stale declarations (no classify emission behind them): "
+        f"stale declarations (no emission behind them): "
         f"{sorted(declared_needed - expected_needed)}. Either way the gated "
         "job's `if:` sees an empty string and silently skips (PR #952)."
+    )
+    heavy_actual = re.sub(r"\s+", "", str(declared_outputs["heavy-needed"]))
+    assert heavy_actual == "${{steps.heavy.outputs.heavy-needed}}", (
+        "jobs.ci-paths.outputs.heavy-needed must map steps.heavy.outputs.heavy-needed"
     )
 
     for key in sorted(expected_needed):
@@ -614,6 +631,7 @@ def test_ci_required_result_passes_when_packaging_jobs_skip() -> None:
     # and must still pass (matches the audit-sha pattern).
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -630,6 +648,7 @@ def test_ci_required_result_fails_on_parity_check_failure() -> None:
     # job fails must now fail the required gate (was non-blocking before).
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -647,6 +666,7 @@ def test_ci_required_result_passes_when_parity_check_skips() -> None:
     # the skipped-counts-as-pass contract the promotion preserves.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
