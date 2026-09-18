@@ -86,11 +86,9 @@ class SingleStoreQueryPlanParser(QueryPlanParser):
     def __init__(self):
         super().__init__("singlestore")
 
-    # qpc-13: the "Could not get query plan" producers now return None; the
-    # "Failed to get query plan" prefix (still emitted by the MySQL-wire
-    # helper outside this item's scope) is rejected here, and the retired
-    # "Could not" prefix stays rejected as defense so stray error text can
-    # never parse as a plan.
+    # Error-channel cleanup: EXPLAIN-failure producers now return None (capture
+    # records explain_failed), so these prefixes should no longer arrive here.
+    # Both stay rejected as defense so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
