@@ -116,16 +116,15 @@ def add_cost_estimation_to_results(
 
         # Calculate query-level costs and update query_results
         for query_result in results.query_results or []:
-            if isinstance(query_result, dict):
-                resource_usage = query_result.get("resource_usage")
-                if resource_usage:
-                    query_cost = calculator.calculate_query_cost(
-                        platform=platform,
-                        resource_usage=resource_usage,
-                        platform_config=platform_config,
-                    )
-                    if query_cost:
-                        query_result["cost"] = query_cost.compute_cost
+            resource_usage = _resource_usage_of(query_result)
+            if resource_usage:
+                query_cost = calculator.calculate_query_cost(
+                    platform=platform,
+                    resource_usage=resource_usage,
+                    platform_config=platform_config,
+                )
+                if query_cost and isinstance(query_result, dict):
+                    query_result["cost"] = query_cost.compute_cost
 
         # Calculate phase-level costs
         phase_costs = _calculate_phase_costs(results, platform, platform_config, calculator)
@@ -302,13 +301,20 @@ def canonical_cost_platform_key(results: BenchmarkResults) -> str:
     Returns an empty string when the result carries no platform identity at all.
     """
     platform_info = results.platform_info if isinstance(results.platform_info, Mapping) else {}
-    declared = platform_info.get("platform_type")
-    if not declared:
+    for key in ("platform_type", "platform_name", "name", "platform"):
+        declared = platform_info.get(key)
+        if declared:
+            return _normalize_platform_token(str(declared))
         nested = platform_info.get("configuration")
         if isinstance(nested, Mapping):
-            declared = nested.get("platform_type")
-    if declared:
-        return _normalize_platform_token(str(declared))
+            declared = nested.get(key)
+            if declared:
+                return _normalize_platform_token(str(declared))
+            inner = nested.get("configuration")
+            if isinstance(inner, Mapping):
+                declared = inner.get(key)
+                if declared:
+                    return _normalize_platform_token(str(declared))
     # getattr: this module is duck-typed throughout, and result-like objects
     # assembled by direct callers do not always carry every field.
     display_name = getattr(results, "platform", None)
@@ -331,7 +337,61 @@ def _normalize_platform_token(raw: str) -> str:
     canonical = aliases.get(token, token)
     # `fabric_dw` is the one registry key spelled with an underscore; every cost
     # table keys off that exact spelling.
-    return "fabric_dw" if canonical in {"fabric-dw", "fabric_dw"} else canonical
+    if canonical in {"fabric-dw", "fabric_dw"}:
+        return "fabric_dw"
+    if canonical in {"clickhouse-cloud", "clickhouse_cloud"}:
+        return "clickhouse_cloud"
+    return canonical
+
+
+def _collect_lookup_dicts(platform_info: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Collect candidate mappings to inspect for platform configuration."""
+    dicts: list[Mapping[str, Any]] = []
+    if isinstance(platform_info, Mapping):
+        dicts.append(platform_info)
+        cfg = platform_info.get("configuration")
+        if isinstance(cfg, Mapping):
+            dicts.append(cfg)
+            inner = cfg.get("configuration")
+            if isinstance(inner, Mapping):
+                dicts.append(inner)
+            compute_cfg = cfg.get("compute_configuration")
+            if isinstance(compute_cfg, Mapping):
+                dicts.append(compute_cfg)
+        compute_cfg_top = platform_info.get("compute_configuration")
+        if isinstance(compute_cfg_top, Mapping):
+            dicts.append(compute_cfg_top)
+        cluster_info = platform_info.get("cluster_info")
+        if isinstance(cluster_info, Mapping):
+            dicts.append(cluster_info)
+    return dicts
+
+
+def _resource_usage_of(query_result: Any) -> Any | None:
+    """Return resource_usage from a dict or QueryExecution boundary object."""
+    if isinstance(query_result, Mapping):
+        return query_result.get("resource_usage")
+    return getattr(query_result, "resource_usage", None)
+
+
+def _first_present(dicts: list[Mapping[str, Any]], keys: list[str]) -> Any | None:
+    """Return the first non-empty value for any key across lookup dicts in order.
+
+    Strings are stripped so padded metadata (``" US "``) cannot silently
+    misprice a lookup that lowercases but never strips.
+    """
+    for source in dicts:
+        for key in keys:
+            value = source.get(key)
+            if value is None:
+                continue
+            if isinstance(value, str):
+                stripped = value.strip()
+                if not stripped:
+                    continue
+                return stripped
+            return value
+    return None
 
 
 def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str, Any]:
@@ -362,6 +422,7 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
     # Common fields
     config["platform_type"] = platform_type
 
+    dicts = _collect_lookup_dicts(platform_info)
     config_section = platform_info.get("configuration")
     config_section = config_section if isinstance(config_section, Mapping) else {}
 
@@ -372,25 +433,34 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
         platform_info,
         config_section,
         defaulted_fields,
+        dicts=dicts,
     )
 
     compute = _effective_compute_block(normalized, platform_info)
 
     # Platform-specific extraction
     if platform_type == "snowflake":
-        config["edition"] = _value_or_default(platform_info, "edition", "standard", defaulted_fields)
+        edition = _first_present(dicts, ["edition"])
+        if edition is None:
+            defaulted_fields.append("edition")
+            edition = "standard"
+        config["edition"] = str(edition).strip().lower()
         warehouse_size = _observed_or_requested(
             compute,
             "warehouse_size",
             "warehouse_size",
             defaulted_fields,
-            fallback=config_section.get("warehouse_size"),
+            fallback=_first_present(dicts, ["warehouse_size"]),
         )
         if warehouse_size:
-            config["warehouse_size"] = warehouse_size
+            config["warehouse_size"] = str(warehouse_size).strip()
 
     elif platform_type == "bigquery":
-        location = normalized["cloud"].get("location") or config_section.get("location")
+        location = normalized["cloud"].get("location") or _first_present(
+            dicts, ["location", "dataset_location", "cloud_region"]
+        )
+        if location and isinstance(location, str):
+            location = location.strip()
         if location:
             config["location"] = location
         else:
@@ -400,23 +470,30 @@ def _extract_platform_config_from_results(results: BenchmarkResults) -> dict[str
         cluster_info = platform_info.get("cluster_info")
         cluster_info = cluster_info if isinstance(cluster_info, Mapping) else {}
         node_type = _observed_or_requested(
-            compute, "node_type", "node_type", defaulted_fields, fallback=cluster_info.get("node_type")
+            compute, "node_type", "node_type", defaulted_fields, fallback=_first_present(dicts, ["node_type"])
         )
         node_count = _observed_or_requested(
-            compute, "node_count", "node_count", defaulted_fields, fallback=cluster_info.get("number_of_nodes")
+            compute,
+            "node_count",
+            "node_count",
+            defaulted_fields,
+            fallback=_first_present(dicts, ["number_of_nodes", "num_nodes", "node_count"]),
         )
         if node_type:
-            config["node_type"] = node_type
+            config["node_type"] = str(node_type).strip()
         else:
             defaulted_fields.append("node_type")
-        if node_count:
-            config["node_count"] = node_count
+        if node_count is not None:
+            try:
+                config["node_count"] = int(node_count)
+            except (ValueError, TypeError):
+                config["node_count"] = node_count
         else:
             defaulted_fields.append("node_count")
 
-    elif platform_type in {"databricks", "databricks-df"}:
-        config["tier"] = platform_info.get("tier", "premium")
-        _resolve_databricks_compute(config, compute, config_section, defaulted_fields)
+    elif platform_type in {"databricks", "databricks-df", "databricks_df"}:
+        config["tier"] = str(_first_present(dicts, ["tier"]) or "premium").strip().lower()
+        _resolve_databricks_compute(config, compute, config_section, defaulted_fields, dicts=dicts)
 
     if defaulted_fields:
         config["_defaulted_fields"] = sorted(set(defaulted_fields))
@@ -467,6 +544,10 @@ def _effective_compute_block(
     """
     block = normalized["compute"]
     legacy = platform_info.get("compute_configuration")
+    if not isinstance(legacy, Mapping):
+        cfg = platform_info.get("configuration")
+        if isinstance(cfg, Mapping):
+            legacy = cfg.get("compute_configuration")
     if not isinstance(legacy, Mapping):
         return block
 
@@ -553,6 +634,8 @@ def _resolve_cloud_and_region(
     platform_info: Mapping[str, Any],
     config_section: Mapping[str, Any],
     defaulted_fields: list[str],
+    *,
+    dicts: list[Mapping[str, Any]] | None = None,
 ) -> None:
     """Resolve cloud provider and region without inventing a region.
 
@@ -569,24 +652,15 @@ def _resolve_cloud_and_region(
     self-hosted ClickHouse bundle in the corpus. An unobserved region is now
     recorded as defaulted and left out, so the published field stays null.
     """
+    lookup_dicts = dicts or _collect_lookup_dicts(platform_info)
     cloud_block = normalized["cloud"]
-    # Deliberately not `_observed_or_requested`: that helper enforces the sizing
-    # rule, where a non-observed value is an adapter constructor default and must
-    # not back a published total. Location metadata does not work that way.
-    # Adapters derive the provider from the workspace hostname or the platform's
-    # own identity and stamp the block `inferred`, and they omit a region they
-    # could not read rather than inventing one. Treating `inferred` as defaulted
-    # here made supplying correct metadata worse than supplying none: a fully
-    # observed Databricks run was marked `cloud`/`region` defaulted and pinned to
-    # `cost_status="unavailable"`, while a run with no cloud block at all resolved
-    # through the single-cloud map and stayed eligible. Presence is what counts.
     cloud = cloud_block.get("provider")
     if not cloud:
-        cloud = platform_info.get("cloud_provider") or platform_info.get("cloud")
-    if not cloud and platform_type in {"databricks", "databricks-df"}:
+        cloud = _first_present(lookup_dicts, ["cloud_provider", "cloud", "provider"])
+    if not cloud and platform_type in {"databricks", "databricks-df", "databricks_df"}:
         # Databricks encodes the provider in the workspace hostname; it has no
         # provider field of its own.
-        hostname = str(config_section.get("server_hostname") or platform_info.get("host") or "")
+        hostname = str(_first_present(lookup_dicts, ["server_hostname", "host", "hostname"]) or "").lower()
         if "azuredatabricks" in hostname:
             cloud = "azure"
         elif "gcp.databricks.com" in hostname:
@@ -596,27 +670,20 @@ def _resolve_cloud_and_region(
     if not cloud:
         cloud = _SINGLE_CLOUD_PLATFORMS.get(platform_type)
     if cloud:
-        config["cloud"] = cloud
+        config["cloud"] = str(cloud).strip().lower()
     else:
         defaulted_fields.append("cloud")
 
     region = (
         cloud_block.get("region")
         or cloud_block.get("location")
-        or platform_info.get("region")
-        or config_section.get("region")
+        or _first_present(lookup_dicts, ["region", "cloud_region", "location"])
         or normalized["deployment"].get("region")
     )
     if region:
-        config["region"] = region
+        config["region"] = str(region).strip()
     else:
         defaulted_fields.append("region")
-
-
-# DBU consumption per hour by SQL warehouse size lives in pricing.py as
-# DATABRICKS_WAREHOUSE_DBU_PER_HOUR and is resolved through
-# resolve_databricks_warehouse_dbu_per_hour so unknown sizes flag
-# fallback_used instead of silently pricing as X-Small.
 
 
 def _resolve_databricks_compute(
@@ -624,6 +691,8 @@ def _resolve_databricks_compute(
     compute: Mapping[str, Any],
     config_section: Mapping[str, Any],
     defaulted_fields: list[str],
+    *,
+    dicts: list[Mapping[str, Any]] | None = None,
 ) -> None:
     """Resolve Databricks workload type and warehouse size from observed compute.
 
@@ -633,7 +702,12 @@ def _resolve_databricks_compute(
     field to "Medium" whatever the warehouse is, which is how a 2X-Small
     serverless warehouse came to be billed as an 8 DBU/hour Medium.
     """
-    warehouse_type = compute.get("warehouse_type") or config_section.get("warehouse_type")
+    lookup_dicts = dicts or _collect_lookup_dicts(config_section)
+    warehouse_type = (
+        compute.get("warehouse_type")
+        or _first_present(lookup_dicts, ["warehouse_type"])
+        or config_section.get("warehouse_type")
+    )
     if warehouse_type:
         # A serverless warehouse is reported by the adapter as
         # warehouse_type="SERVERLESS" (raw PRO + enable_serverless_compute);
@@ -642,7 +716,13 @@ def _resolve_databricks_compute(
     else:
         config["workload_type"] = "all_purpose"
 
-    warehouse_size = _observed_or_requested(compute, "warehouse_size", "warehouse_size", defaulted_fields)
+    warehouse_size = _observed_or_requested(
+        compute,
+        "warehouse_size",
+        "warehouse_size",
+        defaulted_fields,
+        fallback=_first_present(lookup_dicts, ["warehouse_size"]),
+    )
     if warehouse_size:
         from benchbox.core.cost.pricing import resolve_databricks_warehouse_dbu_per_hour
 
@@ -806,16 +886,15 @@ def _calculate_fallback_costs(
     """Calculate costs from flat query_results when no execution_phases are available."""
     query_costs = []
     for query_result in query_results:
-        if isinstance(query_result, dict):
-            resource_usage = query_result.get("resource_usage")
-            if resource_usage:
-                qc = calculator.calculate_query_cost(
-                    platform=platform,
-                    resource_usage=resource_usage,
-                    platform_config=platform_config,
-                )
-                if qc:
-                    query_costs.append(qc)
+        resource_usage = _resource_usage_of(query_result)
+        if resource_usage:
+            qc = calculator.calculate_query_cost(
+                platform=platform,
+                resource_usage=resource_usage,
+                platform_config=platform_config,
+            )
+            if qc:
+                query_costs.append(qc)
     if query_costs:
         phase_cost = calculator.calculate_phase_cost("all_queries", query_costs)
         phase_costs.append(phase_cost)

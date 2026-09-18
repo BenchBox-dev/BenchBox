@@ -228,6 +228,9 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
     summary = _build_summary_section(
         result, query_times_ms, total_queries, successful_queries, failed_count, skipped_queries
     )
+    scan_bytes = _aggregate_scan_bytes(result)
+    if scan_bytes:
+        summary["cost"] = scan_bytes
     run = _build_run_section(result, query_times_ms, iterations_set, streams_set)
     benchmark = _build_benchmark_section(result)
     driver_metadata = _collect_driver_metadata(result)
@@ -273,7 +276,7 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
             ],
         ),
         "config": order_dict(config_block, CONFIG_KEY_ORDER),
-        "summary": order_dict(summary, ["queries", "timing", "data", "validation", "tpc_metrics"]),
+        "summary": order_dict(summary, ["queries", "timing", "data", "cost", "validation", "tpc_metrics"]),
         "phases": order_dict(phases_block, PHASE_KEY_ORDER),
         "queries": queries_list,
     }
@@ -347,6 +350,52 @@ def _build_query_results_section(
         queries_list.append(order_dict(entry, QUERY_KEY_ORDER))
 
     return query_times_ms, queries_list, errors_list, iterations_set, streams_set
+
+
+def _aggregate_scan_bytes(result: BenchmarkResults) -> dict[str, Any] | None:
+    """Aggregate query-billed byte totals from in-memory executions for summary visibility.
+
+    Compact schema-v2 query rows intentionally omit resource telemetry, so totals
+    are computed here before stripping and surfaced as ``summary.cost``. Supports
+    BigQuery (bytes_billed/bytes_processed), Athena (data_scanned_bytes), and
+    Synapse serverless (bytes_processed). Returns None when no execution carries
+    byte metrics, keeping bundles for local platforms byte-identical. Zero-byte
+    measurements (for example cache hits) are real observations and are emitted.
+    Totals cover every execution carrying byte metrics regardless of status,
+    matching the cost calculator's unfiltered phase collection.
+    """
+    total_billed = 0
+    total_scanned = 0
+    billed_seen = False
+    scanned_seen = False
+    # Normalize through the shared contract so legacy dicts and QueryExecution
+    # inputs share one resource_usage shape; row counts here are small.
+    for qr in result.query_results or []:
+        try:
+            execution = _normalize_query_result(qr)
+        except Exception:
+            continue
+        resource_usage = getattr(execution, "resource_usage", None)
+        if not isinstance(resource_usage, dict):
+            continue
+        billed = resource_usage.get("bytes_billed")
+        if isinstance(billed, (int, float)) and not isinstance(billed, bool) and billed >= 0:
+            total_billed += int(billed)
+            billed_seen = True
+        for key in ("bytes_processed", "data_scanned_bytes", "bytes_scanned"):
+            scanned = resource_usage.get(key)
+            if isinstance(scanned, (int, float)) and not isinstance(scanned, bool) and scanned >= 0:
+                total_scanned += int(scanned)
+                scanned_seen = True
+                break
+    if not billed_seen and not scanned_seen:
+        return None
+    totals: dict[str, Any] = {}
+    if billed_seen:
+        totals["total_bytes_billed"] = total_billed
+    if scanned_seen:
+        totals["total_bytes_scanned"] = total_scanned
+    return totals or None
 
 
 def _build_summary_section(
