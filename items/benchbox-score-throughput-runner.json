@@ -1,14 +1,14 @@
 {
   "acceptance": [
     "C logical streams use C independent database sessions and a versioned schedule with one outstanding query per session.",
-    "The measured interval includes all admitted in-flight work and only complete workload cycles can contribute.",
-    "The runner records completed work, active duration, per-session fairness, P50/P95/P99 latency, errors, cancellations, and client resource use.",
-    "Candidate score evidence uses complete repetitions, median atomic measures, published dispersion, and no selective replacement of failed streams or cycles.",
-    "A timed-out or leaked stream cannot be silently counted and cannot overlap a later scored phase without an explicit invalid outcome.",
-    "The default mix excludes JOB and full TPC-Havoc while supporting a bounded admitted advanced-function mix.",
-    "Official TPC throughput execution and metrics remain behaviorally separate."
+    "The measured interval includes all admitted in-flight work and only complete workload-family cycles can contribute.",
+    "The runner records completed work, active duration, fairness, P50/P95/P99 latency, status, cancellation, and separately attributable client/platform resource use.",
+    "The predeclared scored set uses complete repetitions and publishes all runs and dispersion; failed streams, cycles, or repetitions cannot be selectively replaced.",
+    "Timeout handling invokes a platform cancellation or isolation boundary and a bounded drain barrier; failed drain invalidates the repetition and quarantines its connection, pool, or execution context from later scored work.",
+    "An integration test proves a deliberately slow timed-out query issues no work after the deadline and cannot overlap a subsequent repetition.",
+    "The default mix excludes JOB and full TPC-Havoc while supporting a bounded admitted advanced-function mix; official TPC throughput remains separate."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Extend BenchBox's concurrent-stream infrastructure to execute deterministic finite batches across independent database sessions. Preserve one outstanding query per session, full result consumption, complete-cycle accounting, fairness and tail telemetry, and timeout containment.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
@@ -30,6 +30,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "8125ed71e104404c84e2adfe5b8f76bd",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:12:58Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "11a3ad7cf38845d2872c2bc3c9d1b545",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]

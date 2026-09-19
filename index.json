@@ -1270,7 +1270,6 @@
     "benchbox-score-throughput-runner": {
       "claim": null,
       "needs": [
-        "benchbox-score-advanced-oracles",
         "benchbox-score-manifest-schema"
       ],
       "priority": "high",
