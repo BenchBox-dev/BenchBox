@@ -49,6 +49,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.throughput.containment import check_phase_boundary
 from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
@@ -891,6 +892,27 @@ class TestDriversMixin:
         )
         for phase_key, phase_label, method_name in phases:
             if phase_key in requested_phases:
+                if phase_key == "maintenance":
+                    # Refuse measured maintenance work while throughput streams
+                    # are still outstanding, so it can neither overlap leaked
+                    # streams nor reuse their still-owned resources.
+                    boundary = check_phase_boundary(getattr(self, "_last_throughput_test_result", None))
+                    if not boundary.proceed:
+                        refusal = f"Maintenance Test refused: {boundary.reason}"
+                        console.print(f"[red]❌ {refusal}[/red]")
+                        all_results.append(
+                            {
+                                "query_id": "maintenance_test_contained",
+                                "execution_time_seconds": 0.0,
+                                "status": "FAILED",
+                                "rows_returned": 0,
+                                "error": refusal,
+                                "test_type": "maintenance",
+                                "contained": True,
+                                "outstanding_stream_ids": list(boundary.outstanding_stream_ids),
+                            }
+                        )
+                        continue
                 console.print(f"[cyan]Phase: {phase_label}[/cyan]")
                 all_results.extend(getattr(self, method_name)(benchmark, connection, run_config))
         return all_results
