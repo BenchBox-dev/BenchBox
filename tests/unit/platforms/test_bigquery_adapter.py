@@ -8,7 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -1719,6 +1719,159 @@ class TestBigQuerySqlGenerationHelpers:
         assert job_configs[0].field_delimiter == "|"
         assert job_configs[1].field_delimiter == "|"
 
+    @patch("benchbox.platforms.bigquery.time.sleep")
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_load_table_via_cloud_storage_retries_on_rate_limit_then_succeeds(
+        self, mock_bigquery, mock_sleep, dependencies_available
+    ):
+        from google.api_core.exceptions import TooManyRequests
+
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
+        mock_bigquery.SourceFormat.CSV = "CSV"
+        mock_bigquery.LoadJobConfig.side_effect = lambda **kwargs: Mock(**kwargs)
+
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+        bucket = Mock()
+        mock_connection = Mock()
+        mock_connection.dataset.return_value.table.return_value = Mock()
+
+        succeeding_job = Mock()
+        mock_connection.load_table_from_uri.side_effect = [
+            TooManyRequests("rate limit exceeded"),
+            TooManyRequests("rate limit exceeded"),
+            succeeding_job,
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk = Path(tmpdir) / "customer_0.dat"
+            chunk.write_text("1|alpha\n")
+
+            with patch.object(adapter, "_get_table_row_count", return_value=1):
+                row_count = adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
+
+        assert row_count == 1
+        assert mock_connection.load_table_from_uri.call_count == 3
+        succeeding_job.result.assert_called_once()
+        # time.sleep is patched at its process-global home, so a busy CI runner's
+        # own machinery (e.g. pytest-timeout's watchdog thread) can add unrelated
+        # calls; assert the retry-specific durations occurred rather than an exact
+        # total count.
+        mock_sleep.assert_any_call(2.5)
+        mock_sleep.assert_any_call(5.0)
+
+    @patch("benchbox.platforms.bigquery.time.sleep")
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_load_table_via_cloud_storage_repolls_same_job_on_polling_rate_limit(
+        self, mock_bigquery, mock_sleep, dependencies_available
+    ):
+        from google.api_core.exceptions import TooManyRequests
+
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
+        mock_bigquery.SourceFormat.CSV = "CSV"
+        mock_bigquery.LoadJobConfig.side_effect = lambda **kwargs: Mock(**kwargs)
+
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+        bucket = Mock()
+        mock_connection = Mock()
+        mock_connection.dataset.return_value.table.return_value = Mock()
+
+        accepted_job = Mock()
+        accepted_job.result.side_effect = [
+            TooManyRequests("polling rate limit exceeded"),
+            TooManyRequests("polling rate limit exceeded"),
+            None,
+        ]
+        mock_connection.load_table_from_uri.return_value = accepted_job
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk = Path(tmpdir) / "customer_0.dat"
+            chunk.write_text("1|alpha\n")
+
+            with patch.object(adapter, "_get_table_row_count", return_value=1):
+                row_count = adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
+
+        assert row_count == 1
+        # The accepted job may already be running server-side: exactly one
+        # submission, with retries re-polling it instead of appending a duplicate.
+        assert mock_connection.load_table_from_uri.call_count == 1
+        assert accepted_job.result.call_count == 3
+
+    @patch("benchbox.platforms.bigquery.time.sleep")
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_load_table_via_cloud_storage_raises_after_exhausting_retries(
+        self, mock_bigquery, mock_sleep, dependencies_available
+    ):
+        from google.api_core.exceptions import TooManyRequests
+
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
+        mock_bigquery.SourceFormat.CSV = "CSV"
+        mock_bigquery.LoadJobConfig.side_effect = lambda **kwargs: Mock(**kwargs)
+
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+        bucket = Mock()
+        mock_connection = Mock()
+        mock_connection.dataset.return_value.table.return_value = Mock()
+        mock_connection.load_table_from_uri.side_effect = TooManyRequests("rate limit exceeded")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk = Path(tmpdir) / "customer_0.dat"
+            chunk.write_text("1|alpha\n")
+
+            with pytest.raises(TooManyRequests):
+                adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
+
+        assert mock_connection.load_table_from_uri.call_count == 5
+        # See the comment in the retry-then-succeed test above re: exact call_count.
+        mock_sleep.assert_any_call(2.5)
+        mock_sleep.assert_any_call(5.0)
+        mock_sleep.assert_any_call(10.0)
+        mock_sleep.assert_any_call(20.0)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_load_table_via_cloud_storage_does_not_retry_other_errors(self, mock_bigquery, dependencies_available):
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
+        mock_bigquery.SourceFormat.CSV = "CSV"
+        mock_bigquery.LoadJobConfig.side_effect = lambda **kwargs: Mock(**kwargs)
+
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+        bucket = Mock()
+        mock_connection = Mock()
+        mock_connection.dataset.return_value.table.return_value = Mock()
+        mock_connection.load_table_from_uri.side_effect = ValueError("malformed schema")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk = Path(tmpdir) / "customer_0.dat"
+            chunk.write_text("1|alpha\n")
+
+            with pytest.raises(ValueError, match="malformed schema"):
+                adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
+
+        assert mock_connection.load_table_from_uri.call_count == 1
+
 
 # ===================================================================
 # SQL generation, config validation, and type mapping tests
@@ -2843,3 +2996,59 @@ class TestPlatformNameAndProperties:
     def test_internal_dialect_is_bigquery(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         assert adapter._dialect == "bigquery"
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestBigQueryTableResolution:
+    """Test BigQuery table casing resolution and uppercase conversion."""
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_convert_to_bigquery_table_uppercase_flag(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE customer (id INT64)", uppercase_table_name=True)
+        assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.CUSTOMER` (id INT64)"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_resolve_target_table_prefers_uppercase(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        conn = MagicMock()
+        dataset_ref = conn.dataset.return_value
+        table_ref_upper = dataset_ref.table.return_value
+        conn.get_table.return_value = MagicMock()
+
+        resolved_name, table_ref = adapter._resolve_target_table(conn, "customer")
+        assert resolved_name == "CUSTOMER"
+        conn.get_table.assert_called_once_with(table_ref_upper)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_resolve_target_table_falls_back_to_exact_case(self, mock_bigquery):
+        from google.cloud.exceptions import NotFound
+
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        conn = MagicMock()
+        dataset_ref = conn.dataset.return_value
+        table_upper = MagicMock()
+        table_lower = MagicMock()
+        dataset_ref.table.side_effect = lambda name: table_upper if name == "CUSTOMER" else table_lower
+
+        def fake_get_table(ref):
+            if ref is table_upper:
+                raise NotFound("table CUSTOMER not found")
+            return table_lower
+
+        conn.get_table.side_effect = fake_get_table
+        resolved_name, table_ref = adapter._resolve_target_table(conn, "customer")
+        assert resolved_name == "customer"
+        assert table_ref is table_lower
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_resolve_target_table_propagates_non_not_found_errors(self, mock_bigquery):
+        """A permission/network error must surface, not be mistaken for a missing table."""
+        from google.api_core.exceptions import Forbidden
+
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        conn = MagicMock()
+        conn.get_table.side_effect = Forbidden("caller lacks bigquery.tables.get permission")
+
+        with pytest.raises(Forbidden):
+            adapter._resolve_target_table(conn, "customer")

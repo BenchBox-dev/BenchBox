@@ -19,7 +19,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Optional
 
-from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.plan_capture_phase import (
+    propagate_query_execution_metadata,
+)
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.core.validation.query_validation import (
@@ -520,7 +522,7 @@ class TPCHThroughputTest:
                             # _plan_capture_key) so a combined power+throughput run can
                             # match this row by its exact key rather than the ambiguous
                             # public-id fallback in _attach_captured_plans.
-                            propagate_plan_capture_fields(result_dict, query_result)
+                            propagate_query_execution_metadata(result_dict, query_result)
 
                         if hasattr(connection, "commit"):
                             connection.commit()
