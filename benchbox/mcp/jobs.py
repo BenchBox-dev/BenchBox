@@ -112,7 +112,10 @@ class DurableJobRepository:
                     execution_id TEXT PRIMARY KEY,
                     principal_id TEXT NOT NULL,
                     state TEXT NOT NULL CHECK (
-                        state IN ('queued', 'running', 'publishing', 'completed', 'failed', 'cancelled')
+                        state IN (
+                            'queued', 'running', 'publishing', 'completed',
+                            'failed', 'cancelled', 'unknown'
+                        )
                     ),
                     request_json TEXT NOT NULL,
                     idempotency_key TEXT,
@@ -144,6 +147,67 @@ class DurableJobRepository:
                 connection.execute(
                     "ALTER TABLE mcp_benchmark_jobs ADD COLUMN lease_generation INTEGER NOT NULL DEFAULT 0"
                 )
+            self._migrate_state_check(connection)
+
+    @staticmethod
+    def _migrate_state_check(connection: sqlite3.Connection) -> None:
+        """Widen the state CHECK on pre-unknown databases so recovery can record unknown outcomes."""
+        definition = connection.execute("SELECT sql FROM sqlite_master WHERE name = 'mcp_benchmark_jobs'").fetchone()
+        if definition is None or definition[0] is None or "'unknown'" in definition[0]:
+            return
+        try:
+            DurableJobRepository._rebuild_state_table(connection)
+        except sqlite3.OperationalError:
+            definition = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE name = 'mcp_benchmark_jobs'"
+            ).fetchone()
+            if definition is not None and definition[0] is not None and "'unknown'" in definition[0]:
+                return  # A concurrent worker already migrated the shared database.
+            raise
+
+    @staticmethod
+    def _rebuild_state_table(connection: sqlite3.Connection) -> None:
+        """Rebuild the jobs table with the widened state CHECK, preserving rows by column name."""
+        connection.execute("ALTER TABLE mcp_benchmark_jobs RENAME TO mcp_benchmark_jobs_legacy")
+        connection.execute(
+            """
+            CREATE TABLE mcp_benchmark_jobs (
+                execution_id TEXT PRIMARY KEY,
+                principal_id TEXT NOT NULL,
+                state TEXT NOT NULL CHECK (
+                    state IN (
+                        'queued', 'running', 'publishing', 'completed',
+                        'failed', 'cancelled', 'unknown'
+                    )
+                ),
+                request_json TEXT NOT NULL,
+                idempotency_key TEXT,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                lease_owner TEXT,
+                lease_expires_at REAL,
+                lease_version INTEGER NOT NULL DEFAULT 1,
+                lease_generation INTEGER NOT NULL DEFAULT 0,
+                cancel_requested INTEGER NOT NULL DEFAULT 0,
+                artifact_path TEXT,
+                error_code TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                completed_at TEXT
+            )
+            """
+        )
+        legacy_columns = [
+            str(row["name"]) for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs_legacy)")
+        ]
+        names = ", ".join(legacy_columns)
+        connection.execute(f"INSERT INTO mcp_benchmark_jobs ({names}) SELECT {names} FROM mcp_benchmark_jobs_legacy")
+        connection.execute("DROP TABLE mcp_benchmark_jobs_legacy")
+        connection.execute(
+            "CREATE UNIQUE INDEX mcp_job_idempotency_idx"
+            " ON mcp_benchmark_jobs (principal_id, idempotency_key) WHERE idempotency_key IS NOT NULL"
+        )
+        connection.execute("CREATE INDEX mcp_job_queue_idx ON mcp_benchmark_jobs (state, created_at)")
+        connection.execute("CREATE INDEX mcp_job_owner_idx ON mcp_benchmark_jobs (principal_id, execution_id)")
 
     @staticmethod
     def _record(row: sqlite3.Row) -> JobRecord:
@@ -263,20 +327,27 @@ class DurableJobRepository:
         return self._record(claimed)
 
     def renew(self, execution_id: str, worker_id: str) -> bool:
-        """Renew a running or publishing lease owned by this worker."""
+        """Renew a live running or publishing lease owned by this worker.
+
+        A renewal after the lease already expired is refused so a stalled worker
+        cannot resurrect its own lease; the worker must treat the refusal as
+        losing the lease and stop before publication.
+        """
+        now = utc_now()
         with self._connect() as connection:
             changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
                 SET lease_expires_at = ?, lease_generation = lease_generation + 1, updated_at = ?
                 WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
-                  AND state IN ('running', 'publishing')
+                  AND state IN ('running', 'publishing') AND lease_expires_at > ?
                 """,
                 (
-                    utc_now().timestamp() + self.limits.lease_seconds,
-                    utc_now().isoformat(),
+                    now.timestamp() + self.limits.lease_seconds,
+                    now.isoformat(),
                     execution_id,
                     worker_id,
+                    now.timestamp(),
                 ),
             ).rowcount
         return changed == 1
@@ -330,7 +401,13 @@ class DurableJobRepository:
         return changed == 1
 
     def fail_attempt(self, execution_id: str, worker_id: str, error_code: str, *, retryable: bool = True) -> str | None:
-        """Retry an owned failure when budget remains, otherwise fail terminally."""
+        """Retry an owned failure when budget remains, otherwise fail terminally.
+
+        Only the lease owner may report, and only while it still owns the lease,
+        so a requeue here is safe: the reporting attempt already finished and
+        cannot still be executing database work. Expiry recovery without such a
+        report must use :meth:`recover`, which records ``unknown`` instead.
+        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -357,8 +434,15 @@ class DurableJobRepository:
             connection.commit()
         return next_state
 
-    def cancel(self, execution_id: str, principal_id: str) -> JobRecord | None:
-        """Cancel queued work immediately or request cancellation of leased work."""
+    def cancel(self, execution_id: str, principal_id: str) -> tuple[JobRecord, str] | None:
+        """Cancel an owned job and report how the request was honored.
+
+        Returns the current record with one of ``accepted`` (queued work
+        cancelled immediately), ``requested`` (the running attempt will stop at
+        the next safe boundary), or ``too_late`` (publication already committed
+        or the job is otherwise terminal, so nothing can be revoked). Returns
+        ``None`` when the job does not belong to the principal.
+        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -377,17 +461,21 @@ class DurableJobRepository:
                     """,
                     (now, now, execution_id),
                 )
+                outcome = "accepted"
             elif row["state"] == "running":
                 connection.execute(
                     "UPDATE mcp_benchmark_jobs SET cancel_requested = 1, updated_at = ? WHERE execution_id = ?",
                     (now, execution_id),
                 )
+                outcome = "requested"
+            else:
+                outcome = "too_late"
             updated = connection.execute(
                 "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (execution_id,)
             ).fetchone()
             connection.commit()
         assert updated is not None
-        return self._record(updated)
+        return self._record(updated), outcome
 
     def claim_expired(self, recovery_owner: str) -> JobRecord | None:
         """Transactionally fence and return the oldest expired lease."""
@@ -470,7 +558,17 @@ class DurableJobRepository:
         return self._record(fenced)
 
     def recover(self, job: JobRecord, *, published_artifact: Path | None = None) -> str | None:
-        """Recover one expired lease without allowing duplicate completion."""
+        """Recover one expired lease without allowing duplicate completion.
+
+        Retry is allowed only when the old attempt is proven quiescent: the
+        owner reported its own failure via :meth:`fail_attempt` (which runs only
+        after that attempt finished), cancellation was requested, the attempt
+        budget is exhausted, or the publication commit point already holds a
+        durable artifact. Otherwise the old attempt may still be executing
+        database work, so recovery records the terminal ``unknown`` outcome
+        instead of requeueing: the job is never claimed again and an operator
+        must inspect before resubmitting with a new idempotency key.
+        """
         now = utc_now().isoformat()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -487,18 +585,22 @@ class DurableJobRepository:
             if current["state"] == "publishing" and published_artifact is not None and published_artifact.is_file():
                 next_state = "completed"
                 artifact = str(published_artifact)
+                error_code = None
                 completed_at = now
             elif bool(current["cancel_requested"]):
                 next_state = "cancelled"
                 artifact = None
+                error_code = None
                 completed_at = now
-            elif current["attempts"] < self.limits.max_attempts:
-                next_state = "queued"
-                artifact = None
-                completed_at = None
-            else:
+            elif current["attempts"] >= self.limits.max_attempts:
                 next_state = "failed"
                 artifact = None
+                error_code = "worker_lease_expired"
+                completed_at = now
+            else:
+                next_state = "unknown"
+                artifact = None
+                error_code = "unknown_outcome"
                 completed_at = now
             changed = connection.execute(
                 """
@@ -511,7 +613,7 @@ class DurableJobRepository:
                 (
                     next_state,
                     artifact,
-                    "worker_lease_expired" if next_state == "failed" else None,
+                    error_code,
                     now,
                     completed_at,
                     job.execution_id,
@@ -531,7 +633,7 @@ class DurableJobRepository:
             rows = connection.execute(
                 """
                 SELECT * FROM mcp_benchmark_jobs
-                WHERE state IN ('completed', 'failed', 'cancelled')
+                WHERE state IN ('completed', 'failed', 'cancelled', 'unknown')
                   AND completed_at IS NOT NULL AND unixepoch(completed_at) <= ?
                 """,
                 (cutoff,),
@@ -544,7 +646,7 @@ class DurableJobRepository:
             changed = connection.execute(
                 """
                 DELETE FROM mcp_benchmark_jobs
-                WHERE execution_id = ? AND state IN ('completed', 'failed', 'cancelled')
+                WHERE execution_id = ? AND state IN ('completed', 'failed', 'cancelled', 'unknown')
                 """,
                 (execution_id,),
             ).rowcount
@@ -700,7 +802,11 @@ class DurableJobWorker:
             await self._run_job(job)
 
     def recover_expired(self) -> None:
-        """Resolve expired publishing artifacts before requeueing work."""
+        """Fence expired leases and finalize only what the old attempt proved.
+
+        Attempts that may still be executing are recorded ``unknown`` and never
+        retried automatically; see :meth:`DurableJobRepository.recover`.
+        """
         while True:
             recovery_owner = f"{self.worker_id}:recovery:{uuid.uuid4().hex}"
             job = self.repository.claim_expired(recovery_owner)
@@ -715,14 +821,21 @@ class DurableJobWorker:
             self.repository.recover(job, published_artifact=published)
 
     async def _run_job(self, job: JobRecord) -> None:
+        gate = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
+        if gate is None or gate.lease_owner != self.worker_id or gate.state != "running":
+            return  # Fenced or finalized before starting; recovery owns the outcome.
+        if gate.cancel_requested:
+            await anyio.to_thread.run_sync(self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled")
+            return
         staging, final_dir, response_path = self._job_paths(job)
         shutil.rmtree(staging, ignore_errors=True)
         staging.mkdir(parents=True, exist_ok=False)
+        lease_lost = anyio.Event()
         try:
             execution_error: Exception | None = None
             response: dict[str, Any] | None = None
             async with anyio.create_task_group() as task_group:
-                task_group.start_soon(self._heartbeat, job.execution_id)
+                task_group.start_soon(self._heartbeat, job.execution_id, lease_lost)
                 try:
                     try:
                         response = await anyio.to_thread.run_sync(self.executor, job, staging)
@@ -743,6 +856,11 @@ class DurableJobWorker:
                             await anyio.to_thread.run_sync(
                                 self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled"
                             )
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
+                        if lease_lost.is_set():
+                            # The lease lapsed mid-execution; recovery owns the
+                            # outcome. Never publish or report from a stale attempt.
                             shutil.rmtree(staging, ignore_errors=True)
                             return
                         if not await anyio.to_thread.run_sync(
@@ -771,16 +889,21 @@ class DurableJobWorker:
                     self.repository.complete, job.execution_id, self.worker_id, response_path
                 )
                 return
+            if lease_lost.is_set():
+                # The lease lapsed before the failure was reported; recovery
+                # owns the outcome, so a stale attempt must not requeue.
+                return
             logger.error("Durable MCP benchmark failed (%s)", type(exc).__name__)
             await anyio.to_thread.run_sync(
                 self.repository.fail_attempt, job.execution_id, self.worker_id, type(exc).__name__
             )
 
-    async def _heartbeat(self, execution_id: str) -> None:
+    async def _heartbeat(self, execution_id: str, lease_lost: anyio.Event) -> None:
         interval = max(0.05, min(self.repository.limits.lease_seconds / 3, 30.0))
         while True:
             await anyio.sleep(interval)
             if not await anyio.to_thread.run_sync(self.repository.renew, execution_id, self.worker_id):
+                lease_lost.set()
                 return
 
     def _publish_artifact(
@@ -904,7 +1027,7 @@ def _owned_job(repository: DurableJobRepository, execution_id: str, principal: P
 
 
 def _public_status(job: JobRecord) -> dict[str, Any]:
-    return {
+    status: dict[str, Any] = {
         "execution_id": job.execution_id,
         "status": job.state,
         "attempts": job.attempts,
@@ -914,6 +1037,12 @@ def _public_status(job: JobRecord) -> dict[str, Any]:
         "completed_at": job.completed_at,
         "error_code": job.error_code,
     }
+    if job.state == "unknown":
+        status["outcome_note"] = (
+            "A prior attempt lost its lease and may still have executed database work. "
+            "Inspect the target before resubmitting with a new idempotency key."
+        )
+    return status
 
 
 def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> None:
@@ -986,12 +1115,13 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
 
     @mcp.tool(annotations=CANCEL_ANNOTATIONS)
     async def cancel_benchmark(execution_id: str) -> dict[str, Any]:
-        """Cancel queued work or request cancellation at the next safe boundary."""
+        """Cancel queued work, request cancellation at the next safe boundary, or report it is too late."""
         principal = authenticated_principal()
-        job = await anyio.to_thread.run_sync(runtime.repository.cancel, execution_id, principal.principal_id)
-        if job is None:
+        outcome = await anyio.to_thread.run_sync(runtime.repository.cancel, execution_id, principal.principal_id)
+        if outcome is None:
             raise MCPError(JOB_NOT_FOUND, "Benchmark job not found")
-        return _public_status(job)
+        job, cancel_outcome = outcome
+        return {**_public_status(job), "cancel_outcome": cancel_outcome}
 
 
 __all__ = [
