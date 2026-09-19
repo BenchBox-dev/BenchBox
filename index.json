@@ -8506,6 +8506,15 @@
       "status": "done",
       "title": "Add localhost Streamable HTTP while preserving stdio MCP clients"
     },
+    "mcp-durable-admission-and-fairness": {
+      "claim": null,
+      "needs": [
+        "mcp-job-ownership-cancellation-fencing"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Enforce durable MCP admission limits against actual running work"
+    },
     "mcp-durable-benchmark-job-handles": {
       "claim": null,
       "needs": [

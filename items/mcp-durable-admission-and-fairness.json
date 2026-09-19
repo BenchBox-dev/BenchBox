@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Durable global and per-principal limits separately bound queued jobs, owned running attempts, and outstanding work whose row lease was lost but execution is not proven stopped.",
+    "Claim selection implements and documents a starvation-resistant fairness rule across principals while preserving each principal's required ordering.",
+    "Capacity is released only by a fenced transition that proves termination or transfers ownership under the safe-retry contract.",
+    "Submission and claim transactions remain correct across multiple worker processes, process crashes, lease renewal races, cancellation, and restart.",
+    "Metrics and operator status expose durable row counts separately from actual or uncertain running-work counts, including the reason capacity is quarantined.",
+    "Multiprocess tests prove global and per-principal limits, fairness under a noisy principal, no over-admission after lease loss, and eventual recovery after confirmed termination."
+  ],
+  "context": "Extend the existing durable SQLite coordination rather than adding a process-local scheduler. External TLS, deployment, rollback, and production-operator acceptance remain out of scope.",
+  "description": "Current queue admission counts durable rows, but ownership loss can make row state diverge from actual database work. Add durable global and per-principal queue and running limits, fair selection, and capacity accounting that includes outstanding old attempts.\n\nDecision boundary: admission must protect database capacity across processes and restarts. Process-local semaphores or a count of queued/running rows alone are insufficient. Fairness must be explicit and testable rather than an incidental ORDER BY timestamp.",
+  "links": [
+    "benchbox/mcp/jobs.py",
+    "benchbox/mcp/security.py",
+    "tests/integration/mcp/test_admission_control.py",
+    "tests/integration/mcp/test_multiworker_acceptance.py",
+    "mcp-http-auth-tenancy-admission-controls-v2"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:56:59Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "0cb30bdfd3684215b50389ac09405fda",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
