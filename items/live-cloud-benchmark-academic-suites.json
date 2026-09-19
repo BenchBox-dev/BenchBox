@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "SSB completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "AMPLab completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "JoinOrder completed at SF 1.0 on BigQuery, Databricks, Snowflake (3 bundles)",
+    "100% query pass rate across all runs",
+    "All 18 result bundles pass scripts/validate_submission.py with 0 errors"
+  ],
+  "context": "JoinOrder tests deep optimizer join-enumeration with up to 16 joins per query, while SSB provides standard star-schema comparison against TPC-H. AMPLab stresses group-by and regex filtering performance. Verify that all 113 JOB queries translate and execute without dialect parse errors on each warehouse platform.",
+  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to the Academic benchmark suites:\n- SSB (Star Schema Benchmark): 13 star-schema queries (SF 0.1, 1.0, 10.0)\n- AMPLab: 8 big data aggregation and scan queries (SF 0.1, 1.0)\n- JoinOrder (JOB): 113 complex multi-way join queries on IMDB schema (SF 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify all bundles pass benchbox.validation.bundle.validate_bundles and scripts/validate_submission.py."
+}
