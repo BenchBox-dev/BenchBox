@@ -8745,17 +8745,12 @@
       "title": "Secure remote MCP with authentication, tenant isolation, quotas, and admission control"
     },
     "mcp-job-ownership-cancellation-fencing": {
-      "claim": {
-        "expires_at": "2026-09-20T22:30:23Z",
-        "generation": "233bcfb9e1504b77aa53c598d7de2d99",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Fence MCP job ownership, cancellation, and publication races"
     },
     "mcp-landing-page-elevation": {
