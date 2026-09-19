@@ -13106,10 +13106,15 @@
       "title": "Result-bundle compat: docs for renamed key and benchbox_version"
     },
     "result-bundle-compat-shared-field-contract-test": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T00:20:39Z",
+        "generation": "e925e57c02464cf0b4e5b7853d32b0a9",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Result-bundle compat: shared Python/TS bundle-field contract"
     },
     "result-export-explicit-raw-config-egress-sentinel-gate": {
