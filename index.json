@@ -16191,17 +16191,12 @@
       "title": "Harden the testing correctness gate and close review follow-ups"
     },
     "throughput-adapter-session-capability-contract": {
-      "claim": {
-        "expires_at": "2026-09-20T20:52:08Z",
-        "generation": "af2c7beca4454fe1a4ca0c9808b553fe",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Define and prove per-stream adapter session capability"
     },
     "throughput-executor-nonblocking-shutdown": {
