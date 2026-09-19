@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "One-session runs use versioned query order, parameters, warmup, cache, and optional workload-gap policies.",
+    "Timing includes planning, execution, and full result consumption and excludes declared setup phases.",
+    "Every timing is joined to its rendered SQL, data state, oracle result, and cohort identity.",
+    "JOB and the qualified TPC-Havoc panel can run in Power while preserving their canonical dataset and equivalence contracts.",
+    "Failures invalidate score evidence and remain distinguishable from unsupported capabilities."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Build deterministic one-session orchestration for the admitted Power workload. Reuse the run service, monotonic timing, result capture, validation, and manifest contracts; record full result consumption and diagnostics without altering official TPC paths.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "benchbox/core/run_service.py",
+    "benchbox/core/results/"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:46:17Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "1fb4381625764b5b92e04974d1e07697",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}

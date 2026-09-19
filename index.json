@@ -1208,6 +1208,16 @@
       "status": "open",
       "title": "Define score manifests and cohort identity"
     },
+    "benchbox-score-power-runner": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-advanced-oracles",
+        "benchbox-score-manifest-schema"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Implement the cross-benchmark Power runner"
+    },
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],
