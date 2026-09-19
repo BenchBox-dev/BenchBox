@@ -3,6 +3,7 @@
     "C logical streams use C independent database sessions and a versioned schedule with one outstanding query per session.",
     "The measured interval includes all admitted in-flight work and only complete workload cycles can contribute.",
     "The runner records completed work, active duration, per-session fairness, P50/P95/P99 latency, errors, cancellations, and client resource use.",
+    "Candidate score evidence uses complete repetitions, median atomic measures, published dispersion, and no selective replacement of failed streams or cycles.",
     "A timed-out or leaked stream cannot be silently counted and cannot overlap a later scored phase without an explicit invalid outcome.",
     "The default mix excludes JOB and full TPC-Havoc while supporting a bounded admitted advanced-function mix.",
     "Official TPC throughput execution and metrics remain behaviorally separate."
@@ -21,6 +22,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "e60f0feaaa644e609dd297c5693e9eb5",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:54:43Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "8125ed71e104404c84e2adfe5b8f76bd",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
