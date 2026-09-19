@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Versioned fixture manifests cover duplicate timestamps and late arrivals, native arrays/structs/JSON, known statistical moments and quantiles, ties, nulls, irregular intervals, and non-unique time-varying keys.",
+    "Candidate S/M/L fixture datasets have deterministic generators, row counts, and content hashes.",
+    "Every admitted advanced capability has a mutation or construct-removal test that fails when the distinguishing behavior is removed or simplified.",
+    "Uncovered leaves are explicitly excluded with weight reallocation or moved to a named extension; none remain implicit.",
+    "Fixture and non-vacuity proof identities are consumable by the score manifest."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
+  "description": "Create deterministic companion datasets and mutation tests that make advanced SQL behavior observable across candidate size profiles. Cover window frames and ties, temporal and ASOF behavior, native nested values, statistical distributions, grouping operations, lateral/recursive constructs, and applied multi-stage analysis.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "docs/benchmarks/read-primitives.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:14:24Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "82566f2192614118930bed4daf25ec56",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}
