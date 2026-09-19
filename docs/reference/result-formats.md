@@ -47,7 +47,9 @@ benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 
 The JSON export is the canonical schema-v2 result bundle containing complete
 benchmark details. BenchBox currently writes schema version `"2.2"` in the
-top-level `version` field.
+top-level `result_schema_version` field. Readers accept
+`result_schema_version` -> `version` -> `schema_version` in that order, so
+bundles written before the rename keep loading.
 
 Consumer policy is intentionally split by use case:
 
@@ -63,7 +65,7 @@ Consumer policy is intentionally split by use case:
 
 ```json
 {
-  "version": "2.2",
+  "result_schema_version": "2.2",
   "run": {
     "id": "tpch-duckdb-20260521",
     "timestamp": "2026-05-21T14:30:21.123456Z",
@@ -126,7 +128,9 @@ Consumer policy is intentionally split by use case:
 #### Version
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
+| `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
+| `version` | string | Legacy key, accepted as a fallback when `result_schema_version` is absent. |
+| `schema_version` | string | Oldest key, accepted as a last-resort fallback for pre-rename bundles. |
 
 #### Benchmark Block
 | Field | Type | Description |
@@ -327,6 +331,21 @@ expected for an additive field. The Explorer read model does not project this
 block yet; it is bundle-level diagnostic data until a read-model decision
 lands.
 
+#### Export Block
+
+The `export` block records how and when the bundle file was written.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | Export time (ISO 8601). |
+| `tool` | string | Exporter name. |
+| `benchbox_version` | string | BenchBox package version that wrote the bundle. Useful as a provenance marker when bundle semantics change across releases. |
+| `anonymized` | boolean | Whether the payload passed the anonymization pass. |
+
+Emitted top-level keys follow `canonical_key_order` in
+`benchbox/core/results/schema_specs.yaml` (starting with
+`result_schema_version`).
+
 ### Query Execution Details
 
 Each query execution record contains:
@@ -519,9 +538,9 @@ export_ascii(
 ### Current Version: 2.2
 
 Schema v2.2 is the current producer version for BenchBox result bundles. It
-uses top-level `version`, `run`, `benchmark`, `platform`, `summary`, `queries`,
-and optional companion blocks such as `phases`, `environment`,
-`normalized_cost`, `validation`, and `comparisons`.
+uses top-level `result_schema_version`, `run`, `benchmark`, `platform`,
+`summary`, `queries`, and optional companion blocks such as `phases`,
+`environment`, `normalized_cost`, `validation`, and `comparisons`.
 
 Runtime loading and explorer generation intentionally accept only known v2
 minor versions (`"2.0"`, `"2.1"`, and `"2.2"`). The public submission validator accepts
@@ -534,7 +553,7 @@ compatibility path.
 
 | Version | Changes |
 |---------|---------|
-| 2.2 | Added bounded per-query `row_count_validation` evidence |
+| 2.2 | Added bounded per-query `row_count_validation` evidence; top-level version key renamed to `result_schema_version` with `version`/`schema_version` fallback reads |
 | 2.1 | Added typed result and companion metadata used by the previous producer |
 | 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |
 | 1.x | Legacy shape supported only by normalization helpers |
