@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DuckDB 2.0 preview compatibility** - BenchBox can parse the analyzed-plan
   JSON emitted by the DuckDB 2.0 alpha engine. A pinned nightly lane checks the
   preview package while stable DuckDB remains the default installation.
+- **Client-platform link locality disclosure** - Result bundles may carry an
+  optional `environment.client_link` block with client cloud/region locality
+  and statement-overhead probe metrics, projected into Explorer read model
+  v10 (#2030).
+- **Per-table load timings** - Result bundles may carry an optional `tables`
+  block with per-table `load_ms` timings for bundle-level diagnostics
+  (#2178).
+- **Databricks no-clustering default for untuned runs** - Untuned Databricks
+  runs record `platform.config.databricks_clustering_strategy` as `"none"`
+  instead of leaving the strategy unresolved (#2177).
+- **Plan companion `plan_max_depth` threading** - CLI canonical commands
+  thread `plan_max_depth` into the plans companion builder (#2122).
 
 ### Changed
 

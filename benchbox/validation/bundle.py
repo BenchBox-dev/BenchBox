@@ -424,6 +424,125 @@ def _validate_translation_section(data: dict, vr: ValidationResult) -> None:
         vr.error(f"execution.translation.status={translation_status!r} is not accepted for public submissions")
 
 
+def _validate_environment_client_link(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``environment.client_link`` block when present."""
+    environment = data.get("environment")
+    if environment is None:
+        return
+    if not isinstance(environment, dict):
+        vr.error("'environment' must be a dict")
+        return
+
+    client_link = environment.get("client_link")
+    if client_link is None:
+        return
+    if not isinstance(client_link, dict):
+        vr.error("'environment.client_link' must be a dict")
+        return
+
+    collection_status = client_link.get("collection_status")
+    if collection_status is None:
+        vr.error("'environment.client_link.collection_status' is required when 'environment.client_link' is present")
+    elif not isinstance(collection_status, str):
+        vr.error(f"'environment.client_link.collection_status' must be a string, got {collection_status!r}")
+    elif collection_status not in {"available", "partial", "unavailable", "not_requested"}:
+        vr.warn(f"Unknown environment.client_link.collection_status: {collection_status!r}")
+
+    source = client_link.get("source")
+    if source is not None and not isinstance(source, str):
+        vr.error(f"'environment.client_link.source' must be a string, got {source!r}")
+
+    for key in ("client_region", "client_cloud", "collection_error_class", "collection_error_message"):
+        value = client_link.get(key)
+        if value is not None and not isinstance(value, str):
+            vr.error(f"'environment.client_link.{key}' must be a string, got {value!r}")
+
+    overhead = client_link.get("statement_overhead_ms")
+    if overhead is not None:
+        _validate_overhead_shape(overhead, vr)
+
+
+def _validate_overhead_shape(overhead: Any, vr: ValidationResult) -> None:
+    """Shape-check the ``statement_overhead_ms`` probe block when present."""
+    if not isinstance(overhead, dict):
+        vr.error("'environment.client_link.statement_overhead_ms' must be a dict")
+        return
+    samples = overhead.get("samples")
+    if samples is not None:
+        if isinstance(samples, bool) or not isinstance(samples, int):
+            vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be an int, got {samples!r}")
+        elif samples < 0:
+            vr.error(f"'environment.client_link.statement_overhead_ms.samples' must be non-negative, got {samples!r}")
+    for key in ("min", "median"):
+        value = overhead.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be a number, got {value!r}")
+        elif value < 0:
+            vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be non-negative, got {value!r}")
+
+
+def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``tables`` block when present.
+
+    Absence means "not measured" and is always accepted; an explicit
+    ``load_ms: 0`` stays distinguishable from a missing key.
+    """
+    tables = data.get("tables")
+    if tables is None:
+        return
+    if not isinstance(tables, dict):
+        vr.error("'tables' must be a dict")
+        return
+
+    for name, entry in tables.items():
+        if not isinstance(entry, dict):
+            vr.error(f"'tables.{name}' must be a dict")
+            continue
+        rows = entry.get("rows")
+        if rows is not None:
+            if isinstance(rows, bool) or not isinstance(rows, (int, float)):
+                vr.error(f"'tables.{name}.rows' must be a number, got {rows!r}")
+            elif rows < 0:
+                vr.error(f"'tables.{name}.rows' must be non-negative, got {rows!r}")
+        load_ms = entry.get("load_ms")
+        if load_ms is None:
+            continue
+        if isinstance(load_ms, bool) or not isinstance(load_ms, (int, float)):
+            vr.error(f"'tables.{name}.load_ms' must be a number, got {load_ms!r}")
+        elif load_ms < 0:
+            vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
+
+
+def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> None:
+    """Shape-check the optional ``platform.config`` clustering field when present.
+
+    The Databricks adapter records the resolved strategy at
+    ``platform.config.databricks_clustering_strategy`` (flattened out of
+    ``platform_info["configuration"]``); ``platform.tuning`` carries the
+    requested-tuning summary and never holds this key.
+    """
+    platform = data.get("platform")
+    if not isinstance(platform, dict):
+        return
+
+    config = platform.get("config")
+    if config is None:
+        return
+    if not isinstance(config, dict):
+        vr.error("'platform.config' must be a dict")
+        return
+
+    strategy = config.get("databricks_clustering_strategy")
+    if strategy is None:
+        return
+    if not isinstance(strategy, str):
+        vr.error(f"'platform.config.databricks_clustering_strategy' must be a string, got {strategy!r}")
+    elif strategy not in {"z_order", "liquid_clustering", "liquid_clustering_auto", "none"}:
+        vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
+
+
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Find normalized cost in current and transitional bundle shapes."""
     raw = data.get("normalized_cost")
@@ -795,6 +914,9 @@ def _validate_bundle(
         allow_partial_validation=allow_partial_validation,
     )
     _validate_translation_section(data, vr)
+    _validate_environment_client_link(data, vr)
+    _validate_tables_block(data, vr)
+    _validate_platform_config_clustering(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)

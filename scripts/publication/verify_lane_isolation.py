@@ -103,6 +103,10 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # Deleted cloud setup script still appears in the changed-paths of the
     # removal, so it stays classified.
     "scripts/cloud-claude-setup.sh",
+    # Deleted orphaned corpus validator (only results-data/validate_corpus.py
+    # is invoked by CI/workflows/tests) still appears in the changed-paths
+    # of the removal, so it stays classified.
+    "scripts/validate_corpus.py",
     # CI/dev plumbing never read by lane artifact builds.
     "scripts/check_release_curation.py",
     "scripts/check_untracked_skill_mirrors.sh",

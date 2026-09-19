@@ -143,12 +143,22 @@ Consumer policy is intentionally split by use case:
 | `version` | string | Platform/driver version |
 | `deployment` | object | Optional normalized deployment metadata |
 | `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
+| `config` | object | Optional adapter configuration flattened out of `platform_info` (e.g. Databricks clustering strategy below) |
+| `tuning` | object | Optional requested-tuning summary (see `platform.tuning`) |
 
 Platform-specific extensions should stay inside the existing schema-v2 blocks
 where possible. Current canonical locations are `platform.*` for platform
 facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
 summaries, and `comparisons.*` for cross-engine comparison data. New top-level
 keys require a public-contract update and consumer tests.
+
+##### `platform.config` (optional)
+
+Adapter configuration recorded per run. The Databricks adapter records its
+resolved clustering strategy here as `databricks_clustering_strategy`:
+`"z_order"`, `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"`
+for untuned runs. Bundles predating this field omit it. (`platform.tuning`
+carries the requested-tuning summary and never holds this key.)
 
 ##### `platform.tuning` (optional)
 
@@ -258,7 +268,7 @@ Discloses the client execution location and connectivity characteristics relativ
 | `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
 | `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
 
-The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design.
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design. A published Explorer snapshot must be rebuilt after the v10 upgrade to surface the new `client_*` columns; older snapshots show NULLs for them without failing.
 
 ###### Example: Observed Cloud VM Run
 
@@ -299,6 +309,23 @@ A developer running BenchBox on a local workstation or laptop against a remote d
   }
 }
 ```
+
+#### Tables Block
+
+The optional top-level `tables` block records per-table load outcomes keyed
+by table name.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tables.{table}.rows` | number | Rows loaded into the table. |
+| `tables.{table}.load_ms` | number | Wall-clock load time for the table in milliseconds. |
+
+Absence of `load_ms` means "not measured" and is always accepted; an
+explicit `load_ms: 0` is a measured zero and stays distinguishable from a
+missing key. Seed-corpus coverage is partial (forward-only rollout), which is
+expected for an additive field. The Explorer read model does not project this
+block yet; it is bundle-level diagnostic data until a read-model decision
+lands.
 
 ### Query Execution Details
 
