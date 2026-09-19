@@ -1,13 +1,13 @@
 {
   "acceptance": [
-    "Fixtures cover event history, nested values, controlled distributions, ties, nulls, and irregular intervals at the candidate size profiles.",
-    "Oracle contracts support exact, ordered/unordered, numeric-tolerance, approximation-bound, valid-set, and semantic-equivalence outcomes.",
-    "Each scored advanced capability has a non-vacuity test that fails when its distinguishing construct is removed or simplified.",
-    "TPC-Havoc variants admitted to the panel are proven semantically equivalent to their canonical query.",
-    "Incorrect, skipped, timed-out, cancelled, or translation-failed queries are ineligible rather than reweighted."
+    "Typed contracts and evaluators cover exact, ordered/unordered, numeric-tolerance, approximation-bound, valid-set, and semantic-equivalence outcomes.",
+    "Cross-engine contracts define null ordering, NaN, timestamp/time-zone, collation, and nested-value equivalence where relevant.",
+    "Every outcome uses the manifest's evidence-status vocabulary and only passed evidence is scoreable.",
+    "Negative tests prove wrong values, order, tolerance, accuracy, and semantic variants fail closed.",
+    "The implementation is reusable by both Power and Throughput evidence paths."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
-  "description": "Add companion datasets and correctness oracles that make advanced SQL behavior observable. Cover ties and nulls in windows, irregular time series and true ASOF semantics, native nested values, controlled statistical distributions, grouping sets, and approximate-function accuracy.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
+  "description": "Implement the score correctness engine independently of benchmark fixtures. Support exact, ordered and unordered, numeric-tolerance, approximation-bound, valid-set, and semantic-equivalence outcomes, including canonical cross-engine semantics for nulls, NaN, timestamps, collation, and complex values.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
     "benchbox/core/expected_results/",
@@ -20,6 +20,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "d54c526ac7c54201a1cda3d889a14ec6",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:12:00Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "787769b444a641f2b2c711eeb3b39201",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]

@@ -1179,7 +1179,7 @@
       ],
       "priority": "high",
       "status": "open",
-      "title": "Build non-vacuous fixtures and score oracles"
+      "title": "Implement score oracle contracts and evaluators"
     },
     "benchbox-score-calculator": {
       "claim": null,
