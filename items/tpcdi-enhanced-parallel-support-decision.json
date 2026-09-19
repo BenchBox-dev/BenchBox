@@ -10,11 +10,8 @@
   "context": "The smallest likely solution is to reuse the canonical ETL orchestration or remove the extra surface. A new scheduler needs affirmative evidence, not feature-completeness preference.",
   "description": "After false-success containment, decide whether the enhanced TPC-DI parallel feature has a supported product role. The repository already has a canonical ETL path and a broad open tracker item about a documented but nonexistent public parallel API. Avoid sustaining a second scheduler without a demonstrated requirement.\n\nDecision boundary: choose exactly one outcome: route the public feature to canonical real transforms; rebuild a distinct scheduler only when a measured capability gap cannot be met by the canonical path; or deprecate and remove the enhanced surface. The decision must resolve the TPC-DI portion of decide-fate-of-documented-unimplemented-surfaces without changing that item's unrelated admin and explorer scopes.",
   "links": [
-    "benchbox/core/tpcdi/benchmark.py",
-    "benchbox/core/tpcdi/etl/parallel_batch_processor.py",
-    "docs/guides/tpc/tpc-di-deployment-guide.md",
-    "decide-fate-of-documented-unimplemented-surfaces",
-    "unify-tpcdi-sql-dataframe-execution-contract"
+    "https://github.com/BenchBox-dev/BenchBox/pull/2222",
+    "docs/development/adr/adr-tpcdi-enhanced-parallel-support-decision.md"
   ],
   "sessions": [
     {
