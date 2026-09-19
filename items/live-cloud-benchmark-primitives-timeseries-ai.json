@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "Primitives benchmarks completed on BigQuery, Databricks, Snowflake at supported scale factors",
+    "TSBS DevOps completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "Vector Search completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "AI Primitives completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "All generated bundles pass scripts/validate_submission.py with 0 errors"
+  ],
+  "context": "Tests non-OLAP and specialized capabilities on modern cloud warehouses: ACID transactions, write latency, metadata discovery, time series rollups, and vector search / AI function integration across cloud engines.",
+  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to Primitives, Time Series, and AI/ML specialized benchmark suites:\n- Read Primitives: 157 read pattern queries (SF 0.1)\n- Write Primitives: 112 write/update/delete operations (SF 0.1, 1.0)\n- Transaction Primitives: 23 transaction queries (SF 0.1, 1.0)\n- Metadata: 62 schema and catalog inspection queries (SF 1.0)\n- TSBS DevOps: 18 time-series aggregation queries (SF 0.1, 1.0, 10.0)\n- Vector Search: 6 vector similarity and ANN search queries (SF 0.1, 1.0, 10.0)\n- AI Primitives: 16 AI/ML built-in function queries (SF 0.1, 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify all operations execute and bundles validate cleanly."
+}
