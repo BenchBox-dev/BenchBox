@@ -99,5 +99,10 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2222",
+    "docs/development/adr/adr-tpcdi-enhanced-parallel-support-decision.md",
+    "docs/guides/tpc/tpc-di-deployment-guide.md"
+  ]
 }
