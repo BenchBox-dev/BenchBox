@@ -13067,15 +13067,10 @@
       "title": "Result-bundle compat: integrate fixes for accepted findings"
     },
     "result-bundle-compat-localresult-parity": {
-      "claim": {
-        "expires_at": "2026-09-20T00:16:25Z",
-        "generation": "a460a641b61947f18b668d767dd6389d",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: localResult.ts parity with version helper"
     },
     "result-bundle-compat-plans-truncation-contract": {
