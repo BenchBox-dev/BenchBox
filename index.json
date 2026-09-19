@@ -8635,12 +8635,17 @@
       "title": "Add localhost Streamable HTTP while preserving stdio MCP clients"
     },
     "mcp-durable-admission-and-fairness": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T23:05:07Z",
+        "generation": "8debc17e0932461db5c64dcd5fb0221a",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
+      },
       "needs": [
         "mcp-job-ownership-cancellation-fencing"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Enforce durable MCP admission limits against actual running work"
     },
     "mcp-durable-benchmark-job-handles": {
