@@ -8225,6 +8225,15 @@
       "status": "open",
       "title": "Run and publish live cloud benchmark results for ClickBench, CoffeeShop, and H2ODB (BigQuery, Databricks, Snowflake)"
     },
+    "live-cloud-benchmark-real-world-suites": {
+      "claim": null,
+      "needs": [
+        "first-live-cloud-benchmark-run-and-publish"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Run and publish live cloud benchmark results for NYC Taxi and Flight Data (BigQuery, Databricks, Snowflake)"
+    },
     "live-cloud-benchmark-tpcds-tpcdi": {
       "claim": null,
       "needs": [

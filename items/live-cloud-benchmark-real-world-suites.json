@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "NYC Taxi completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "Flight Data completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "100% query pass rate across all runs",
+    "All 18 result bundles pass scripts/validate_submission.py with 0 errors"
+  ],
+  "context": "Real-world datasets test real-life data types (timestamps, geo coordinates, nested string categoricals) and skew characteristics differing from synthetic TPC generators. Total 18 benchmark executions (9 NYC Taxi, 9 Flight Data).",
+  "description": "Expand live cloud benchmark runs across BigQuery, Databricks, and Snowflake to the Real-World domain benchmark suites:\n- NYC Taxi: 25 OLAP queries on taxi trip data covering temporal, geographic, and fare analysis (SF 0.1, 1.0, 10.0)\n- Flight Data: 20 OLAP queries on airline on-time performance and delay metrics (SF 0.1, 1.0, 10.0)\n\nExecute both benchmarks across all three cloud platforms at SF 0.1, 1.0, and 10.0.\nVerify 100% query execution and validate resulting bundles against repository gates."
+}
