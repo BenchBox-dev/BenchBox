@@ -479,6 +479,9 @@ class CostCalculator:
                 "cloud": cloud,
                 "region": region,
             }
+            execution_seconds = _execution_seconds_from_resource_usage(resource_usage)
+            if execution_seconds is not None:
+                details["execution_time_seconds"] = execution_seconds
             _stamp_price_unavailable(details, resolution)
             return QueryCost(
                 compute_cost=compute_cost,
@@ -512,8 +515,13 @@ class CostCalculator:
             "region": region,
             "note": "Warehouse credits estimated from measured execution time; warehouse idle time excluded",
         }
-        _stamp_price_unavailable(estimated_details, resolution)
+        # Stamp the size lookup first so the credit-price marker survives when
+        # both fall back: the marker holds one table, and the edition/price
+        # warning is the pinned one (unknown editions must name
+        # snowflake_credit_prices). Same price-stamped-last order as the
+        # Fabric and Synapse paths.
         _stamp_price_unavailable(estimated_details, size_resolution)
+        _stamp_price_unavailable(estimated_details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,

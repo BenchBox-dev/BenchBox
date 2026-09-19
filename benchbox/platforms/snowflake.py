@@ -1901,6 +1901,7 @@ _build_snowflake_config = make_registered_platform_config_builder(
         "username",
         "password",
         "role",
+        "edition",
         "authenticator",
         "private_key_path",
         "private_key_passphrase",

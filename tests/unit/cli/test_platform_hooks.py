@@ -420,6 +420,21 @@ class TestPlatformConfigBuilders:
         assert config.name == "Snowflake"
         assert config.driver_package == "snowflake-connector-python"
 
+    def test_snowflake_config_builder_forwards_edition(self, mock_credential_manager):
+        """The operator-supplied edition must survive config construction.
+
+        Normalized Snowflake cost requires the edition, which is not
+        service-observable; dropping it here silently pins every run to
+        cost_status unavailable.
+        """
+        from benchbox.platforms.snowflake import _build_snowflake_config
+
+        mock_credential_manager.get_platform_credentials.return_value = {}
+
+        config = _build_snowflake_config("snowflake", {"edition": "enterprise"}, {}, None)
+
+        assert config.options["edition"] == "enterprise"
+
     def test_redshift_config_builder_loads_credentials(self, mock_credential_manager):
         """Test Redshift config builder loads and merges credentials."""
         from benchbox.platforms.redshift import _build_redshift_config

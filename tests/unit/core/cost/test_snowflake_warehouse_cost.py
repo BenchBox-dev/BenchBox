@@ -14,8 +14,12 @@ from datetime import datetime
 import pytest
 
 from benchbox.core.cost.calculator import CostCalculator, validate_resource_usage
-from benchbox.core.cost.integration import add_cost_estimation_to_results
-from benchbox.core.cost.models import QueryCost
+from benchbox.core.cost.integration import (
+    _apply_cost_model_and_warnings,
+    _snowflake_phase_has_estimated_concurrent_cost,
+    add_cost_estimation_to_results,
+)
+from benchbox.core.cost.models import BenchmarkCost, PhaseCost, QueryCost
 from benchbox.core.cost.pricing import (
     resolve_snowflake_credit_price,
     resolve_snowflake_warehouse_credits_per_hour,
@@ -81,6 +85,28 @@ class TestSnowflakeWarehouseCreditsPerHour:
         resolution = resolve_snowflake_warehouse_credits_per_hour(size)
         assert resolution.fallback_used is False
         assert resolution.value is not None
+
+    @pytest.mark.parametrize(
+        ("alias", "expected"),
+        [
+            ("XS", 1.0),
+            ("S", 2.0),
+            ("M", 4.0),
+            ("L", 8.0),
+            ("XL", 16.0),
+            ("2XL", 32.0),
+            ("3XL", 64.0),
+            ("4XL", 128.0),
+            ("5XL", 256.0),
+            ("6XL", 512.0),
+            ("xl", 16.0),
+            (" 2xl ", 32.0),
+        ],
+    )
+    def test_shorthand_aliases_resolve(self, alias: str, expected: float) -> None:
+        resolution = resolve_snowflake_warehouse_credits_per_hour(alias)
+        assert resolution.fallback_used is False
+        assert resolution.value == expected
 
     def test_unknown_size_keeps_a_flagged_estimate(self) -> None:
         resolution = resolve_snowflake_warehouse_credits_per_hour("11X-Colossal")
@@ -182,6 +208,29 @@ class TestSnowflakeEstimation:
         assert isinstance(cost, QueryCost)
         marker = cost.pricing_details["price_unavailable"]
         assert marker["table"] == "snowflake_warehouse_credits_per_hour"
+
+    def test_both_fallbacks_name_the_credit_price_table(self) -> None:
+        """The marker holds one table; the pinned edition/price warning wins."""
+        calculator = CostCalculator()
+        cost = calculator.calculate_query_cost(
+            "snowflake",
+            {"execution_time_seconds": 60.0, "warehouse_size": "11X-Colossal"},
+            _config(edition="nonexistent"),
+        )
+        assert isinstance(cost, QueryCost)
+        marker = cost.pricing_details["price_unavailable"]
+        assert marker["table"] == "snowflake_credit_prices"
+
+    def test_metered_branch_keeps_reported_runtime(self) -> None:
+        calculator = CostCalculator()
+        cost = calculator.calculate_query_cost(
+            "snowflake",
+            {"credits_used": 0.5, "execution_time_seconds": 60.0},
+            _config(),
+        )
+        assert isinstance(cost, QueryCost)
+        assert cost.pricing_details["execution_time_seconds"] == 60.0
+        assert "credits_used_estimated" not in cost.pricing_details
 
 
 class TestSnowflakeNormalizedGate:
@@ -290,3 +339,77 @@ class TestSnowflakeResourceValidation:
         valid, warnings = validate_resource_usage("snowflake", {})
         assert not valid
         assert any("Missing at least one of" in warning for warning in warnings)
+
+
+def _benchmark_cost(concurrent_streams: int | None, estimated: bool) -> BenchmarkCost:
+    details: dict[str, object] = {"credits_used": 0.01}
+    if estimated:
+        details["credits_used_estimated"] = True
+    return BenchmarkCost(
+        total_cost=0.01,
+        phase_costs=[
+            PhaseCost(
+                phase_name="throughput_test",
+                total_cost=0.01,
+                query_count=2,
+                query_costs=[QueryCost(compute_cost=0.005, pricing_details=dict(details))],
+                concurrent_streams=concurrent_streams,
+            )
+        ],
+    )
+
+
+class TestSnowflakeEstimatedConcurrencyWarning:
+    def test_concurrent_estimated_run_warns(self) -> None:
+        assert _snowflake_phase_has_estimated_concurrent_cost(_benchmark_cost(4, True)) is True
+
+        cost = _benchmark_cost(4, True)
+        _apply_cost_model_and_warnings(cost, "snowflake", {})
+        assert cost.cost_model == "actual"
+        assert any("concurrent streams" in warning for warning in cost.warnings)
+
+    def test_sequential_estimated_run_does_not_warn(self) -> None:
+        assert _snowflake_phase_has_estimated_concurrent_cost(_benchmark_cost(1, True)) is False
+
+        cost = _benchmark_cost(1, True)
+        _apply_cost_model_and_warnings(cost, "snowflake", {})
+        assert not any("concurrent streams" in warning for warning in cost.warnings)
+
+    def test_concurrent_metered_run_does_not_warn(self) -> None:
+        """Metered credits attribute shared-warehouse cost exactly; no bias."""
+        assert _snowflake_phase_has_estimated_concurrent_cost(_benchmark_cost(4, False)) is False
+
+
+class TestSnowflakeNestedEditionShape:
+    def test_configuration_nested_edition_reaches_the_cost_model(self) -> None:
+        """Pin the adapter-realistic shape: edition under configuration.
+
+        The adapter reports operator config under
+        ``platform_info["configuration"]``; extraction must find the edition
+        there without a top-level copy.
+        """
+        results = _results(
+            platform_info={
+                "platform_type": "snowflake",
+                "cloud_provider": "aws",
+                "region": "us-east-1",
+                "configuration": {"edition": "enterprise", "warehouse_size": "Large"},
+            },
+            platform_compute={
+                "warehouse_size": "Large",
+                "warehouse_state": "STARTED",
+                "source": "observed",
+                "collection_status": "available",
+            },
+            query_results=[
+                {
+                    "query_id": "Q1",
+                    "resource_usage": {"execution_time_seconds": 60.0},
+                }
+            ],
+        )
+        add_cost_estimation_to_results(results)
+
+        normalized = (results.cost_summary or {})["normalized_cost"]
+        assert normalized["cost_status"] == "normalized"
+        assert normalized["deployment"]["warehouse_size"] == "Large"

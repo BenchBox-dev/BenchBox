@@ -177,6 +177,38 @@ def _normalize_warehouse_size_label(warehouse_size: str) -> str:
     return warehouse_size.strip().lower().replace("-", "").replace(" ", "").replace("_", "")
 
 
+# Common shorthand aliases operators type for Snowflake warehouse sizes.
+# Keys are raw labels; values are canonical map keys.
+_SNOWFLAKE_SIZE_ALIASES: dict[str, str] = {
+    "XS": "X-Small",
+    "S": "Small",
+    "M": "Medium",
+    "L": "Large",
+    "XL": "X-Large",
+    "2XL": "2X-Large",
+    "3XL": "3X-Large",
+    "4XL": "4X-Large",
+    "5XL": "5X-Large",
+    "6XL": "6X-Large",
+}
+
+
+def _snowflake_credits_by_normalized_label() -> dict[str, tuple[str, float]]:
+    """Build the normalized size lookup once: canonical label and aliases."""
+    table: dict[str, tuple[str, float]] = {}
+    for size, credits in SNOWFLAKE_WAREHOUSE_CREDITS_PER_HOUR.items():
+        table[_normalize_warehouse_size_label(size)] = (size, credits)
+    for alias, canonical in _SNOWFLAKE_SIZE_ALIASES.items():
+        table[_normalize_warehouse_size_label(alias)] = (
+            canonical,
+            SNOWFLAKE_WAREHOUSE_CREDITS_PER_HOUR[canonical],
+        )
+    return table
+
+
+_SNOWFLAKE_CREDITS_BY_LABEL = _snowflake_credits_by_normalized_label()
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -600,15 +632,15 @@ def resolve_snowflake_warehouse_credits_per_hour(warehouse_size: str) -> PriceRe
     """
     table = "snowflake_warehouse_credits_per_hour"
     normalized = _normalize_warehouse_size_label(warehouse_size)
-    for size, credits in SNOWFLAKE_WAREHOUSE_CREDITS_PER_HOUR.items():
-        if _normalize_warehouse_size_label(size) == normalized:
-            return PriceResolution(
-                value=credits,
-                table=table,
-                resolved_key=(size,),
-                fallback_used=False,
-                unit="credits/hour",
-            )
+    if normalized in _SNOWFLAKE_CREDITS_BY_LABEL:
+        size, credits = _SNOWFLAKE_CREDITS_BY_LABEL[normalized]
+        return PriceResolution(
+            value=credits,
+            table=table,
+            resolved_key=(size,),
+            fallback_used=False,
+            unit="credits/hour",
+        )
     logger.warning(
         f"Unknown Snowflake warehouse size '{warehouse_size.strip()}'; defaulting to a Medium 4.0 credits/hour"
     )

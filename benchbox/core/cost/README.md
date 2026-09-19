@@ -433,10 +433,12 @@ Total Cost: A + B + C (sum of all queries)
 #### Platform-Specific Behavior
 
 **Snowflake**:
-- Credits are consumed per query
-- Multiple concurrent queries = multiple credits consumed
-- Total cost = sum of credits × price per credit
-- ✅ Accurate representation
+- Metered `credits_used`: Snowflake attributes shared-warehouse cost across
+  concurrent queries exactly — ✅ Accurate representation
+- Runtime-estimated queries: each estimate prices exclusive warehouse use, so
+  concurrent streams sharing one warehouse sum above the warehouse's
+  wall-clock spend — ⚠️ disclosed in the bundle warnings; sequential runs
+  are exact
 
 **BigQuery**:
 - Charged per TB scanned
