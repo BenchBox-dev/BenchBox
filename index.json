@@ -1199,6 +1199,16 @@
       "status": "open",
       "title": "Define score capability and lineage matrices"
     },
+    "benchbox-score-concurrency-pilot": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-throughput-runner",
+        "benchbox-score-size-profile-pilot"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Qualify the score concurrency ladder"
+    },
     "benchbox-score-manifest-schema": {
       "claim": null,
       "needs": [

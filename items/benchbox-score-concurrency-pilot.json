@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Qualification covers C={1,2,4,8,16} for feasible profiles and C=32 for appropriate server-class systems.",
+    "Reports include throughput, latency percentiles, fairness, errors, resource pressure, and session-pool evidence.",
+    "A platform cannot publish a lower actual concurrency under a higher C label.",
+    "Recommended public concurrency points are supported by saturation and stability evidence.",
+    "The complete measured curve remains publishable next to any selected headline point."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Run the declared concurrency ladder against qualified dataset profiles. Identify saturation, instability, memory pressure, unfairness, and platform/session limitations; retain full curves and recommend display points instead of assuming S/C4, M/C8, and L/C16.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:46:45Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "b92f5db991034858b356fbf779c350f1",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}
