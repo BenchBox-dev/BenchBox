@@ -1230,7 +1230,9 @@
     "benchbox-score-manifest-schema": {
       "claim": null,
       "needs": [
-        "benchbox-score-capability-matrix"
+        "benchbox-score-advanced-oracles",
+        "benchbox-score-advanced-fixtures",
+        "benchbox-score-tpchavoc-equivalence"
       ],
       "priority": "high",
       "status": "open",

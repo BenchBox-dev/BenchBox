@@ -1,18 +1,21 @@
 {
   "acceptance": [
-    "A schema represents methodology version, capability profile, S/M/L dataset vector, workload blocks, weights, oracles, and reference vector.",
-    "The result identity binds BenchBox revision, platform/adapter/driver versions, rendered SQL and parameters, dataset hashes, hardware, OS, topology, tuning, cache, warmup, repetition, and result-consumption policy.",
-    "Throughput identity includes concurrency, session schedule, active interval, and per-session configuration.",
-    "Canonical serialization and content hashes make manifests replayable and tamper-evident.",
-    "Compatibility tests reject undeclared or non-comparable methodology changes."
+    "A schema represents score type, methodology version, capability profile, S/M/L dataset vector, score-specific members, blocks, effective leaf/lineage weights, oracles, and reference vector.",
+    "Evidence status is enumerated as passed, failed_correctness, skipped_unsupported, skipped_infrastructure, timed_out, cancelled, or translation_failed; only passed is scoreable.",
+    "The result identity binds BenchBox revision; platform, adapter, driver, renderer and generator versions; post-translation SQL and parameters; source objects, rows and dataset hashes; hardware, OS, topology, tuning, cache, warmup, repetition, result-consumption, and timing-source policy.",
+    "Client-link identity includes cloud/region and the statement-overhead probe; tuning identity attests to indexes, materialized structures, caches, or settings created specifically for the scored manifest.",
+    "Throughput identity includes concurrency, session schedule, active interval, per-session configuration, and client/platform resource-accounting topology.",
+    "Fixture hashes and non-vacuity proof identities are required for admitted advanced leaves.",
+    "Canonical serialization and content hashes make manifests replayable and tamper-evident; compatibility tests reject undeclared or non-comparable changes."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
-  "description": "Define the versioned score-methodology, dataset-profile, scored-query, schedule, and result-evidence schemas. The cohort identity must bind software, hardware, deployment, data, SQL, tuning, cache, warmup, result-consumption, and concurrency state.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
+  "description": "Define versioned score-methodology, score-specific member, dataset-profile, schedule, qualification, and result-evidence schemas after oracle and non-vacuity contracts exist. Cohort identity binds software, hardware, deployment, data, translated SQL, tuning, locality, cache, timing, repetition, and concurrency state.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
     "benchbox/core/manifest/",
     "benchbox/core/results/schema.py",
-    "docs/reference/public-contracts.md"
+    "docs/reference/public-contracts.md",
+    "docs/development/adr/adr-client-link-locality-disclosure.md"
   ],
   "sessions": [
     {
@@ -29,6 +32,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "e6235cfb247e4baf841b5840cbab68ad",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:15:10Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "67029552a45d4cd4bdc0d09c8ab3bf59",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
