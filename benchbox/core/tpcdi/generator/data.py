@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import random
 import time as time_module
 from pathlib import Path
 from typing import Any
@@ -15,7 +14,7 @@ from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path
 from benchbox.utils.compression_mixin import CompressionMixin
 
 from .dimensions import DimensionGenerationMixin
-from .facts import FactGenerationMixin
+from .facts import FACT_TRADE_GENERATION_ALGORITHM_VERSION, FactGenerationMixin
 from .manifest import ManifestMixin
 from .monitoring import ResourceMonitoringMixin
 
@@ -43,6 +42,7 @@ class TPCDIDataGenerator(
         buffer_size: int = 8192,
         max_workers: int | None = None,
         enable_progress: bool = True,
+        generation_seed: int = 42,
         *,
         verbose: int | bool = 0,
         quiet: bool = False,
@@ -57,6 +57,12 @@ class TPCDIDataGenerator(
             buffer_size: File I/O buffer size in bytes
             max_workers: Maximum number of worker threads for parallel processing
             enable_progress: Enable simple progress logging
+            generation_seed: Explicit seed for deterministic generation. The
+                default (42) preserves the historical seed value for legacy
+                callers; per-record FactTrade randomness derives from this
+                seed and is reproducible across worker counts. A different
+                seed produces a demonstrably different dataset. Recorded in
+                output metadata with the algorithm version.
             **kwargs: Additional arguments including compression options
         """
         # Initialize compression mixin
@@ -95,11 +101,14 @@ class TPCDIDataGenerator(
         self.base_accounts = 100000
         self.base_trades = 1000000
 
-        # Initialize random seed for reproducible data
-        random.seed(42)
+        # Explicit generation seed. The process-global random generator is
+        # never seeded or otherwise mutated here: deterministic FactTrade
+        # rows derive dedicated per-record RNGs from this seed, and
+        # FinancialDataPatterns owns a private instance below.
+        self.generation_seed = int(generation_seed)
 
         # Initialize realistic financial data patterns
-        self.financial_patterns = FinancialDataPatterns(seed=42)
+        self.financial_patterns = FinancialDataPatterns(seed=self.generation_seed)
 
         # Performance tracking
         self.generation_stats = {
@@ -300,6 +309,8 @@ class TPCDIDataGenerator(
             "chunk_size": self.chunk_size,
             "buffer_size": self.buffer_size,
             "max_workers": self.max_workers,
+            "generation_seed": self.generation_seed,
+            "generation_algorithm_version": FACT_TRADE_GENERATION_ALGORITHM_VERSION,
             "memory_threshold": self.memory_threshold,
             "enable_progress": self.enable_progress,
             "estimated_records": {

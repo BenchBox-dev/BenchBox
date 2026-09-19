@@ -3,11 +3,37 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from benchbox.utils.printing import emit
+
+# Version of the deterministic FactTrade row algorithm below. Bump when the
+# row layout or per-record randomness changes; the version is recorded in
+# output metadata so consumers can tell comparable datasets apart.
+FACT_TRADE_GENERATION_ALGORITHM_VERSION = 1
+
+
+def _trade_record_rng(generation_seed: int, trade_id: int) -> random.Random:
+    """Derive an independent RNG for one logical trade record.
+
+    The stream depends only on the generation seed and the stable logical
+    record identity (trade_id) -- never on worker count, chunk boundaries,
+    task completion order, or process scheduling. Each instance is used by a
+    single thread for a single record, so nothing mutable is shared across
+    workers and the process-global random generator is never touched.
+
+    Args:
+        generation_seed: Explicit generation seed from the generation request.
+        trade_id: Stable logical record identity (1-based trade sequence number).
+
+    Returns:
+        Dedicated random.Random instance for this record.
+    """
+    digest = hashlib.sha256(f"{generation_seed}:FactTrade:{trade_id}".encode()).digest()
+    return random.Random(int.from_bytes(digest[:8], "big"))
 
 
 class FactGenerationMixin:
@@ -42,54 +68,17 @@ class FactGenerationMixin:
                 chunk_rows = []
 
                 for i in range(chunk_start, chunk_end):
-                    trade_id = i
-                    sk_broker_id = random.randint(1, 100)
-                    sk_create_date_id = random.randint(1, 5844)  # Assuming DimDate has ~16 years
-                    sk_create_time_id = random.randint(1, 288)  # 24 hours * 12 (5-min intervals)
-                    sk_close_date_id = sk_create_date_id + random.randint(0, 5)
-                    sk_close_time_id = random.randint(1, 288)
-
-                    status = random.choices(["Completed", "Pending", "Cancelled"], weights=[0.8, 0.1, 0.1])[0]
-                    trade_type = random.choice(self._trade_types)
-                    cash_flag = random.choice([True, False])
-                    sk_security_id = random.randint(1, num_securities)
-                    sk_company_id = random.randint(1, num_companies)
-                    quantity = random.randint(1, 10000)
-                    bid_price = round(random.uniform(10.0, 500.0), 2)
-                    sk_customer_id = random.randint(1, num_customers)
-                    sk_account_id = random.randint(1, num_accounts)
-                    executed_by = f"Broker{random.randint(1, 100)}"
-                    trade_price = round(bid_price * random.uniform(0.98, 1.02), 2)
-                    fee = round(random.uniform(5.0, 50.0), 2)
-                    commission = round(trade_price * quantity * 0.001, 2)  # 0.1% commission
-                    tax = round(trade_price * quantity * 0.01, 2) if status == "Completed" else 0.0
-                    batch_id = 1
-
-                    row = [
-                        trade_id,
-                        sk_broker_id,
-                        sk_create_date_id,
-                        sk_create_time_id,
-                        sk_close_date_id,
-                        sk_close_time_id,
-                        status,
-                        trade_type,
-                        cash_flag,
-                        sk_security_id,
-                        sk_company_id,
-                        quantity,
-                        bid_price,
-                        sk_customer_id,
-                        sk_account_id,
-                        executed_by,
-                        trade_price,
-                        fee,
-                        commission,
-                        tax,
-                        batch_id,
-                    ]
-
-                    chunk_rows.append(row)
+                    rng = _trade_record_rng(self.generation_seed, i)
+                    chunk_rows.append(
+                        self._build_trade_row(
+                            i,
+                            rng,
+                            num_accounts,
+                            num_securities,
+                            num_customers,
+                            num_companies,
+                        )
+                    )
 
                 writer.writerows(chunk_rows)
                 # Simple progress logging
@@ -118,9 +107,11 @@ class FactGenerationMixin:
         if self.enable_progress:
             self.logger.info(f"Using parallel generation with {self.max_workers} workers")
 
-        # Split work among workers
-        chunk_size = max(self.chunk_size, num_trades // self.max_workers)
-        chunks = [(i, min(i + chunk_size, num_trades + 1)) for i in range(1, num_trades + 1, chunk_size)]
+        # Fixed logical partitions derived from chunk_size alone, never from
+        # worker count: every worker count (including more workers than
+        # partitions) schedules the same partitions, and per-record
+        # randomness makes even the partition boundaries irrelevant to content.
+        chunks = [(i, min(i + self.chunk_size, num_trades + 1)) for i in range(1, num_trades + 1, self.chunk_size)]
 
         # Generate chunks in parallel
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -170,60 +161,100 @@ class FactGenerationMixin:
         num_customers: int,
         num_companies: int,
     ) -> list[list]:
-        """Generate a chunk of trade data."""
+        """Generate a chunk of trade data.
+
+        Rows are built with the same deterministic per-record algorithm as
+        the serial path, so chunk boundaries and scheduling never affect
+        content.
+        """
         chunk_data = []
 
         for i in range(start_id, end_id):
-            trade_id = i
-            sk_broker_id = random.randint(1, 100)
-            sk_create_date_id = random.randint(1, 5844)
-            sk_create_time_id = random.randint(1, 288)
-            sk_close_date_id = sk_create_date_id + random.randint(0, 5)
-            sk_close_time_id = random.randint(1, 288)
-
-            status = random.choices(["Completed", "Pending", "Cancelled"], weights=[0.8, 0.1, 0.1])[0]
-            trade_type = random.choice(self._trade_types)
-            cash_flag = random.choice([True, False])
-            sk_security_id = random.randint(1, num_securities)
-            sk_company_id = random.randint(1, num_companies)
-            quantity = random.randint(1, 10000)
-            bid_price = round(random.uniform(10.0, 500.0), 2)
-            sk_customer_id = random.randint(1, num_customers)
-            sk_account_id = random.randint(1, num_accounts)
-            executed_by = f"Broker{random.randint(1, 100)}"
-            trade_price = round(bid_price * random.uniform(0.98, 1.02), 2)
-            fee = round(random.uniform(5.0, 50.0), 2)
-            commission = round(trade_price * quantity * 0.001, 2)
-            tax = round(trade_price * quantity * 0.01, 2) if status == "Completed" else 0.0
-            batch_id = 1
-
-            row = [
-                trade_id,
-                sk_broker_id,
-                sk_create_date_id,
-                sk_create_time_id,
-                sk_close_date_id,
-                sk_close_time_id,
-                status,
-                trade_type,
-                cash_flag,
-                sk_security_id,
-                sk_company_id,
-                quantity,
-                bid_price,
-                sk_customer_id,
-                sk_account_id,
-                executed_by,
-                trade_price,
-                fee,
-                commission,
-                tax,
-                batch_id,
-            ]
-
-            chunk_data.append(row)
+            rng = _trade_record_rng(self.generation_seed, i)
+            chunk_data.append(
+                self._build_trade_row(
+                    i,
+                    rng,
+                    num_accounts,
+                    num_securities,
+                    num_customers,
+                    num_companies,
+                )
+            )
 
         return chunk_data
+
+    def _build_trade_row(
+        self,
+        trade_id: int,
+        rng: random.Random,
+        num_accounts: int,
+        num_securities: int,
+        num_customers: int,
+        num_companies: int,
+    ) -> list:
+        """Build one FactTrade row from its dedicated per-record RNG.
+
+        This is the single deterministic row algorithm shared by serial and
+        parallel generation: identical (seed, trade_id, dimension sizes)
+        always yields an identical row.
+
+        Args:
+            trade_id: Stable logical record identity (1-based).
+            rng: Dedicated RNG derived from the generation seed and trade_id.
+            num_accounts: Account dimension size bound.
+            num_securities: Security dimension size bound.
+            num_customers: Customer dimension size bound.
+            num_companies: Company dimension size bound.
+
+        Returns:
+            The trade row as a list of column values.
+        """
+        sk_broker_id = rng.randint(1, 100)
+        sk_create_date_id = rng.randint(1, 5844)  # Assuming DimDate has ~16 years
+        sk_create_time_id = rng.randint(1, 288)  # 24 hours * 12 (5-min intervals)
+        sk_close_date_id = sk_create_date_id + rng.randint(0, 5)
+        sk_close_time_id = rng.randint(1, 288)
+
+        status = rng.choices(["Completed", "Pending", "Cancelled"], weights=[0.8, 0.1, 0.1])[0]
+        trade_type = rng.choice(self._trade_types)
+        cash_flag = rng.choice([True, False])
+        sk_security_id = rng.randint(1, num_securities)
+        sk_company_id = rng.randint(1, num_companies)
+        quantity = rng.randint(1, 10000)
+        bid_price = round(rng.uniform(10.0, 500.0), 2)
+        sk_customer_id = rng.randint(1, num_customers)
+        sk_account_id = rng.randint(1, num_accounts)
+        executed_by = f"Broker{rng.randint(1, 100)}"
+        trade_price = round(bid_price * rng.uniform(0.98, 1.02), 2)
+        fee = round(rng.uniform(5.0, 50.0), 2)
+        commission = round(trade_price * quantity * 0.001, 2)  # 0.1% commission
+        tax = round(trade_price * quantity * 0.01, 2) if status == "Completed" else 0.0
+        batch_id = 1
+
+        return [
+            trade_id,
+            sk_broker_id,
+            sk_create_date_id,
+            sk_create_time_id,
+            sk_close_date_id,
+            sk_close_time_id,
+            status,
+            trade_type,
+            cash_flag,
+            sk_security_id,
+            sk_company_id,
+            quantity,
+            bid_price,
+            sk_customer_id,
+            sk_account_id,
+            executed_by,
+            trade_price,
+            fee,
+            commission,
+            tax,
+            batch_id,
+        ]
 
     def _generate_factcashbalances_data(self) -> str:
         """Generate FactCashBalances data with realistic cash balance patterns."""

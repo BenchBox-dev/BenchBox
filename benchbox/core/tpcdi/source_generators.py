@@ -92,8 +92,11 @@ class TPCDISourceDataGenerator:
         self.base_tax_rates = 100
         self.base_market_prices = 1000000
 
-        # Initialize random seed for reproducible data
-        random.seed(42)
+        # NOTE: source-table methods below read the process-global RNG in a
+        # fixed serial order (worker-count independent) without reseeding it:
+        # seeding or mutating process-global random state is not allowed
+        # here. Deterministic per-record generation with an explicit seed
+        # lives in the FactTrade generator contract instead.
 
         # Reference data for realistic generation
         self._init_reference_data()
