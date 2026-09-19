@@ -16778,17 +16778,12 @@
       "title": "TPC Specification Compliance Issues ✅ COMPLETED"
     },
     "tpcdi-deterministic-generation-contract": {
-      "claim": {
-        "expires_at": "2026-09-20T19:50:29Z",
-        "generation": "d22bfb60adea4949b0d5751b0c0c2056",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Make TPC-DI generation reproducible across worker counts"
     },
     "tpcdi-enhanced-parallel-support-decision": {
