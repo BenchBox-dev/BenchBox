@@ -190,6 +190,13 @@ tuning structure), plus `requested_config_hash`, `tuning_policy_generation`,
 `tuning_source`, and `source_file` (a repo-relative path or
 `"<basename>:<content-hash>"` - never a raw local filesystem path).
 
+The `.plans.json` companion file (same base filename, `.plans.json` suffix)
+carries captured query plans keyed by query id. Tree depth is bounded by the
+run's `plan_max_depth` platform option (default 50): nodes beyond the bound
+are serialized as shallow markers carrying `truncated_at_depth`, and the
+payload top level always records the applied `max_depth` plus a `truncated`
+flag telling consumers whether any node was depth-truncated.
+
 #### Run Block
 | Field | Type | Description |
 |-------|------|-------------|

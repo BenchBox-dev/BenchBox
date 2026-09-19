@@ -1255,9 +1255,22 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         "run_id": result.execution_id,
         "plans_captured": len(rows_by_query_id),
         "capture_failures": result.plan_capture_failures or 0,
+        "max_depth": max_depth,
+        "truncated": _payload_has_truncation_marker(plans_by_query),
         "queries": plans_by_query,
         "errors": errors_list if errors_list else None,
     }
+
+
+def _payload_has_truncation_marker(node: Any) -> bool:
+    """Report whether a built plans payload contains depth truncation."""
+    if isinstance(node, dict):
+        if "truncated_at_depth" in node:
+            return True
+        return any(_payload_has_truncation_marker(value) for value in node.values())
+    if isinstance(node, list):
+        return any(_payload_has_truncation_marker(item) for item in node)
+    return False
 
 
 # "packaged_resource" is emitted by the packaged-template discovery tier
