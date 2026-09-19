@@ -1190,6 +1190,15 @@
       "status": "open",
       "title": "Define score capability and lineage matrices"
     },
+    "benchbox-score-manifest-schema": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-capability-matrix"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Define score manifests and cohort identity"
+    },
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],
