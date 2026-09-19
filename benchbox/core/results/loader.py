@@ -572,10 +572,14 @@ def _extract_cost_summary(
     """
     if not cost_section and not isinstance(scan_bytes_section, dict):
         return None
-    summary: dict[str, Any] = {
-        "total_cost": cost_section.get("total_usd"),
-        "cost_model": cost_section.get("model", "estimated"),
-    }
+    summary: dict[str, Any] = {}
+    if cost_section:
+        summary.update(
+            {
+                "total_cost": cost_section.get("total_usd"),
+                "cost_model": cost_section.get("model", "estimated"),
+            }
+        )
     if isinstance(normalized_cost_section, dict):
         summary["normalized_cost"] = normalized_cost_section
     if isinstance(scan_bytes_section, dict):

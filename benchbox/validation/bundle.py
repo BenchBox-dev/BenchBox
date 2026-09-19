@@ -977,7 +977,11 @@ def _validate_bundle(
     """Run all validation checks on a parsed bundle dict."""
     _capture_metadata(data, vr)
 
-    version = result_schema_version_value(data)
+    try:
+        version = result_schema_version_value(data)
+    except ValueError as exc:
+        vr.error(str(exc))
+        return
     missing_top = set(REQUIRED_TOP_KEYS) - set(data.keys())
     if version is not None:
         missing_top.discard("result_schema_version")

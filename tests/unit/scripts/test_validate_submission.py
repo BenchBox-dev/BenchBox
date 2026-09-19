@@ -1187,6 +1187,19 @@ class TestValidateBundles:
         assert not results[0].ok
         assert any("Invalid JSON" in e for e in results[0].errors)
 
+    def test_conflicting_schema_aliases_are_reported_per_bundle(self, tmp_path: Path):
+        bundle = tmp_path / "conflicting.json"
+        payload = _minimal_bundle()
+        payload["result_schema_version"] = "2.2"
+        payload["version"] = "2.1"
+        bundle.write_text(json.dumps(payload), encoding="utf-8")
+
+        results = validate_bundles([bundle])
+
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("must match" in error for error in results[0].errors)
+
     def test_nonexistent_file(self, tmp_path: Path):
         missing = tmp_path / "nope.json"
         results = validate_bundles([missing])

@@ -619,16 +619,19 @@ def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) 
 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
     """Add cost summary to payload if available."""
-    if result.cost_summary:
-        normalized_cost = result.cost_summary.get("normalized_cost")
-        if isinstance(normalized_cost, dict):
-            payload["normalized_cost"] = normalized_cost
-        cost_block: dict[str, Any] = {}
-        if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
-            cost_block["total_usd"] = result.cost_summary["total_cost"]
-        cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
-        if cost_block:
-            payload["cost"] = cost_block
+    if not result.cost_summary:
+        return
+    normalized_cost = result.cost_summary.get("normalized_cost")
+    if isinstance(normalized_cost, dict):
+        payload["normalized_cost"] = normalized_cost
+    if not ({"total_cost", "cost_model"} & result.cost_summary.keys()):
+        return
+    cost_block: dict[str, Any] = {}
+    if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
+        cost_block["total_usd"] = result.cost_summary["total_cost"]
+    cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
+    if cost_block:
+        payload["cost"] = cost_block
 
 
 def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
