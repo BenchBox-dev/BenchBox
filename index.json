@@ -16216,12 +16216,17 @@
       "title": "Give each throughput stream an independent DB session, not a shared connection's cursor"
     },
     "throughput-outstanding-work-containment": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T19:39:06Z",
+        "generation": "1a3ac3234e184c47b181e2869df74cf1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
+      },
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Contain timed-out throughput work before later phases or resource reuse"
     },
     "throughput-phase-corpus-expansion": {
