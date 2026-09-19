@@ -93,6 +93,7 @@ REFRESH_AUDIT_SCHEMA = "refresh_audit_v1"
 # exits non-zero listing gaps until every dimension passes; incomplete stays
 # incomplete, never provisionally green.
 PROCESS_ACCEPTANCE_SCHEMA = "pr_process_acceptance_v1"
+DEFAULT_ACCEPTANCE_PUBLISHED_REF = "origin/develop"
 BATCH_DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 # Full-required reasons that must stay separate counters: gate-timing loss vs
 # prior-head identity/binding failure. Conflating them hides which mechanism
@@ -1426,13 +1427,15 @@ def validate_process_acceptance(
     process_digest: str,
     process_relpath: str = "_project/analysis/pr-process-acceptance-baseline.json",
     acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
+    published_ref: str = DEFAULT_ACCEPTANCE_PUBLISHED_REF,
 ) -> list[str]:
     """Check the final acceptance record against the frozen preregistration.
 
     Binds criteria version + content digest, proves the frozen file existed
     verbatim at the recorded registration commit (freeze precedes dependent
-    implementation), rejects unreported cohort changes, and requires every
-    incident replay, cohort dimension, and efficiency target to pass.
+    implementation and the durable anchor predates the candidate branch),
+    rejects unreported cohort changes, and requires every incident replay,
+    cohort dimension, and efficiency target to pass.
     Returns failure strings; empty means accepted.
     """
 
@@ -1441,7 +1444,11 @@ def validate_process_acceptance(
         return [f"acceptance record schema must be {PROCESS_ACCEPTANCE_SCHEMA!r}"]
     if not isinstance(process, dict):
         return ["process baseline must be a JSON object"]
-    errors.extend(_check_acceptance_binding(acceptance, process, process_digest, process_relpath, acceptance_relpath))
+    errors.extend(
+        _check_acceptance_binding(
+            acceptance, process, process_digest, process_relpath, acceptance_relpath, published_ref
+        )
+    )
     errors.extend(_check_acceptance_cohort(acceptance, process))
     errors.extend(_check_acceptance_replays(acceptance, process))
     errors.extend(_check_acceptance_efficiency(acceptance, process))
@@ -1454,10 +1461,12 @@ def _check_acceptance_binding(
     process_digest: str,
     process_relpath: str,
     acceptance_relpath: str = "_project/analysis/pr-process-acceptance.json",
+    published_ref: str = DEFAULT_ACCEPTANCE_PUBLISHED_REF,
 ) -> list[str]:
     """Criteria binding plus freeze-before-implementation proof.
 
-    The durable registration commit must be an ancestor of HEAD while
+    The durable registration commit must be an ancestor of both HEAD and the
+    published protected base while
     original_commit preserves the freeze-only boundary (they coincide when
     no squash merge orphaned the freeze); both pointers must be full commit
     SHAs (refs are movable) and both pinned copies must match
@@ -1493,6 +1502,11 @@ def _check_acceptance_binding(
         errors.append("process file at the registration commit differs from the bound digest")
     if not _is_ancestor(reg_commit):
         errors.append("registration commit is not an ancestor of HEAD (freeze must precede implementation)")
+    if not _is_ancestor(reg_commit, published_ref):
+        errors.append(
+            f"registration commit is not an ancestor of published ref {published_ref} "
+            "(durable anchor must predate the candidate branch)"
+        )
     original = str(registration.get("original_commit") or "").lower()
     if not original:
         errors.append("acceptance must preserve its original freeze commit (registration.original_commit)")
