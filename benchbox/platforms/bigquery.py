@@ -44,6 +44,7 @@ try:
     import google.auth
 
     google_auth = google.auth  # Store reference for _load_credentials
+    from google.api_core.exceptions import TooManyRequests
     from google.cloud import bigquery, storage
     from google.cloud.exceptions import NotFound
     from google.oauth2 import service_account
@@ -1204,12 +1205,12 @@ class BigQueryAdapter(PlatformAdapter):
         try:
             connection.get_table(dataset_ref.table(table_name_upper))
             return table_name_upper, dataset_ref.table(table_name_upper)
-        except Exception:
+        except NotFound:
             # Fallback to exact case if table was created with lowercase or mixed case
             try:
                 connection.get_table(dataset_ref.table(table_name))
                 return table_name, dataset_ref.table(table_name)
-            except Exception:
+            except NotFound:
                 # If neither exists yet, default to uppercase
                 return table_name_upper, dataset_ref.table(table_name_upper)
 
@@ -1264,15 +1265,14 @@ class BigQueryAdapter(PlatformAdapter):
                     load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
                     load_job.result()
                     break
-                except Exception as e:
-                    if ("429" in str(e) or "rate limit" in str(e).lower()) and attempt < max_retries - 1:
-                        sleep_seconds = 2.5 * (attempt + 1)
-                        self.logger.warning(
-                            f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
-                        )
-                        time.sleep(sleep_seconds)
-                    else:
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
                         raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
 
         return self._get_table_row_count(connection, resolved_name)
 
@@ -1311,15 +1311,14 @@ class BigQueryAdapter(PlatformAdapter):
                         load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
                     load_job.result()
                     break
-                except Exception as e:
-                    if ("429" in str(e) or "rate limit" in str(e).lower()) and attempt < max_retries - 1:
-                        sleep_seconds = 2.5 * (attempt + 1)
-                        self.logger.warning(
-                            f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
-                        )
-                        time.sleep(sleep_seconds)
-                    else:
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
                         raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
 
         return self._get_table_row_count(connection, resolved_name)
 
