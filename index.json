@@ -2685,15 +2685,10 @@
       "title": "Consolidate overlapping concurrent executors and remove the non-executing stream stub"
     },
     "concurrency-outcome-and-ownership-contract": {
-      "claim": {
-        "expires_at": "2026-09-20T19:13:22Z",
-        "generation": "936d38324b1f427eab6eb5ee971d0987",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Define truthful concurrency outcomes and resource-ownership boundaries"
     },
     "concurrency-public-api-semantic-reconciliation": {
