@@ -65,7 +65,19 @@ class TestMockSysModules:
         imported inside the block, so a later datafusion import panicked with
         SetLoggerError (pyo3-log). Importing here, then re-importing after
         teardown, must be a no-op.
+
+        This only exercises the real eviction path when datafusion is not
+        already resident: under `-n auto`, an earlier test on the same worker
+        (e.g. anything touching the platform registry) may have imported it,
+        reducing the in-block import to a sys.modules cache hit that passes
+        under any implementation. Skip loudly in that case instead of
+        silently passing vacuous; the deterministic eviction semantics are
+        pinned by test_only_named_keys_restored, which does not depend on
+        ambient import state.
         """
+        if "datafusion" in sys.modules:
+            pytest.skip("datafusion already imported on this worker; eviction path not exercisable")
+        pytest.importorskip("datafusion")
         with _mock_sys_modules({"pyspark": MagicMock(), "pyspark.sql": MagicMock()}):
             import datafusion  # noqa: F401
 
@@ -825,6 +837,8 @@ class TestSparkAdapterImportError:
         with _mock_sys_modules({"pyspark": None, "pyspark.sql": None}):
             with pytest.raises(ImportError):
                 importlib.import_module("pyspark")
+            with pytest.raises(ImportError):
+                importlib.import_module("pyspark.sql")
 
 
 class TestSparkAdapterRegistration:
