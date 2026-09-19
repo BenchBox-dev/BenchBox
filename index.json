@@ -13099,15 +13099,10 @@
       "title": "Result-bundle compat: reconcile agy+muse findings with P1-P8"
     },
     "result-bundle-compat-rename-docs": {
-      "claim": {
-        "expires_at": "2026-09-20T00:21:09Z",
-        "generation": "a6d26fd69200479ca1b977f4e7b2520b",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: docs for renamed key and benchbox_version"
     },
     "result-bundle-compat-shared-field-contract-test": {
