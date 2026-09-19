@@ -1758,7 +1758,10 @@ class TestBigQuerySqlGenerationHelpers:
         assert row_count == 1
         assert mock_connection.load_table_from_uri.call_count == 3
         succeeding_job.result.assert_called_once()
-        assert mock_sleep.call_count == 2
+        # time.sleep is patched at its process-global home, so a busy CI runner's
+        # own machinery (e.g. pytest-timeout's watchdog thread) can add unrelated
+        # calls; assert the retry-specific durations occurred rather than an exact
+        # total count.
         mock_sleep.assert_any_call(2.5)
         mock_sleep.assert_any_call(5.0)
 
@@ -1793,7 +1796,11 @@ class TestBigQuerySqlGenerationHelpers:
                 adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
 
         assert mock_connection.load_table_from_uri.call_count == 5
-        assert mock_sleep.call_count == 4
+        # See the comment in the retry-then-succeed test above re: exact call_count.
+        mock_sleep.assert_any_call(2.5)
+        mock_sleep.assert_any_call(5.0)
+        mock_sleep.assert_any_call(10.0)
+        mock_sleep.assert_any_call(20.0)
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_table_via_cloud_storage_does_not_retry_other_errors(self, mock_bigquery, dependencies_available):
