@@ -151,6 +151,31 @@ DATABRICKS_WAREHOUSE_DBU_PER_HOUR: dict[str, float] = {
     "4X-Large": 256.0,
 }
 
+# Credit consumption per hour by Snowflake warehouse size.
+# See https://docs.snowflake.com/en/user-guide/warehouses-overview
+SNOWFLAKE_WAREHOUSE_CREDITS_PER_HOUR: dict[str, float] = {
+    "X-Small": 1.0,
+    "Small": 2.0,
+    "Medium": 4.0,
+    "Large": 8.0,
+    "X-Large": 16.0,
+    "2X-Large": 32.0,
+    "3X-Large": 64.0,
+    "4X-Large": 128.0,
+    "5X-Large": 256.0,
+    "6X-Large": 512.0,
+}
+
+
+def _normalize_warehouse_size_label(warehouse_size: str) -> str:
+    """Normalize a warehouse size label for map lookup.
+
+    Snowflake reports sizes as ``X-Small`` from SHOW WAREHOUSES, ``MEDIUM``
+    from adapter defaults, and occasionally unpunctuated variants. Lowercasing
+    and stripping separators keeps one map entry per size.
+    """
+    return warehouse_size.strip().lower().replace("-", "").replace(" ", "").replace("_", "")
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -554,6 +579,46 @@ def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResol
         fallback_used=True,
         unit="DBU/hour",
         reason=f"databricks warehouse size '{normalized}' not in size map",
+    )
+
+
+def resolve_snowflake_warehouse_credits_per_hour(warehouse_size: str) -> PriceResolution:
+    """Resolve the credits/hour rate for a Snowflake warehouse size.
+
+    This is a quantity lookup, not a price, but it multiplies into
+    compute_cost exactly like one, so it returns the same result type. Size
+    labels are normalized (case, hyphens, spaces) so ``MEDIUM`` and
+    ``Medium`` resolve identically.
+
+    Args:
+        warehouse_size: Warehouse size label (e.g., "X-Small", "MEDIUM").
+
+    Returns:
+        PriceResolution with unit "credits/hour". An unknown size keeps the
+        Medium 4.0 estimate so a per-query figure is still possible, but
+        flags fallback_used so it can never back a published total.
+    """
+    table = "snowflake_warehouse_credits_per_hour"
+    normalized = _normalize_warehouse_size_label(warehouse_size)
+    for size, credits in SNOWFLAKE_WAREHOUSE_CREDITS_PER_HOUR.items():
+        if _normalize_warehouse_size_label(size) == normalized:
+            return PriceResolution(
+                value=credits,
+                table=table,
+                resolved_key=(size,),
+                fallback_used=False,
+                unit="credits/hour",
+            )
+    logger.warning(
+        f"Unknown Snowflake warehouse size '{warehouse_size.strip()}'; defaulting to a Medium 4.0 credits/hour"
+    )
+    return PriceResolution(
+        value=4.0,
+        table=table,
+        resolved_key=(warehouse_size.strip(),),
+        fallback_used=True,
+        unit="credits/hour",
+        reason=f"snowflake warehouse size '{warehouse_size.strip()}' not in size map",
     )
 
 

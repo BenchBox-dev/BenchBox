@@ -72,6 +72,10 @@ class SnowflakeAdapter(PlatformAdapter):
         self.username = config.get("username")
         self.password = config.get("password")
         self.role = config.get("role")
+        # Account edition (standard, enterprise, business_critical, vps).
+        # The edition is not queryable from the service, so it stays unset
+        # unless the operator supplies it; normalized cost requires it.
+        self.edition = config.get("edition")
 
         # Authentication options
         self.authenticator = config.get("authenticator") or "snowflake"  # snowflake, oauth, etc.
@@ -219,6 +223,7 @@ class SnowflakeAdapter(PlatformAdapter):
                     "username",
                     "password",
                     "role",
+                    "edition",
                     "authenticator",
                     "private_key_path",
                     "private_key_passphrase",
@@ -264,6 +269,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 "database": self.database,
                 "schema": self.schema,
                 "role": self.role,
+                "edition": getattr(self, "edition", None),
                 "warehouse_size": getattr(self, "warehouse_size", None),
                 "auto_suspend": self.auto_suspend,
                 "auto_resume": self.auto_resume,
@@ -1252,7 +1258,12 @@ class SnowflakeAdapter(PlatformAdapter):
             # Include Snowflake-specific fields
             result_dict["translated_query"] = None  # Translation handled by base adapter
             result_dict["query_statistics"] = query_stats
-            # Map query_statistics to resource_usage for cost calculation
+            # Map query_statistics to resource_usage for cost calculation.
+            # The adapter-measured wall time is added alongside the
+            # server-side timings so the cost model can estimate warehouse
+            # credits even when query history is delayed or unavailable.
+            if isinstance(query_stats, dict):
+                query_stats = {**query_stats, "execution_time_seconds": execution_time}
             result_dict["resource_usage"] = query_stats
 
             # Log completion based on final status
@@ -1469,7 +1480,11 @@ class SnowflakeAdapter(PlatformAdapter):
                         "bytes_spilled_remote": result[8],
                         "rows_produced": result[9],
                         "rows_examined": result[10],
-                        "credits_used": result[11],
+                        # CREDITS_USED_CLOUD_SERVICES covers the cloud-services
+                        # layer only, not warehouse compute. It is reported
+                        # under a truthful key and never priced; warehouse cost
+                        # is estimated from execution time and warehouse size.
+                        "credits_used_cloud_services": result[11],
                         "warehouse_size": result[12],
                         "cluster_number": result[13],
                         "retrieval_attempts": attempt + 1,

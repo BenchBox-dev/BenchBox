@@ -28,6 +28,7 @@ from benchbox.core.cost.pricing import (
     resolve_firebolt_fbu_rate,
     resolve_redshift_node_price,
     resolve_snowflake_credit_price,
+    resolve_snowflake_warehouse_credits_per_hour,
     resolve_synapse_dedicated_price,
     resolve_synapse_serverless_price_per_tb,
 )
@@ -92,6 +93,27 @@ def _fallback_price_tables(benchmark_cost: BenchmarkCost) -> dict[str, str | Non
             reason = marker.get("reason")
             markers[table] = reason if isinstance(reason, str) and reason else None
     return markers
+
+
+def _execution_seconds_from_resource_usage(resource_usage: dict[str, Any]) -> float | None:
+    """Return measured query runtime in seconds, or None when absent.
+
+    Prefers adapter-measured ``execution_time_seconds``, then server-side
+    ``execution_time_ms``, then ``total_elapsed_time_ms`` (which includes
+    queueing and compilation). Non-numeric values fail closed to None.
+    """
+    seconds = resource_usage.get("execution_time_seconds")
+    if isinstance(seconds, bool) or seconds is None:
+        seconds = None
+    if seconds is None:
+        milliseconds = resource_usage.get("execution_time_ms")
+        if isinstance(milliseconds, bool) or milliseconds is None:
+            milliseconds = resource_usage.get("total_elapsed_time_ms")
+        if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
+            seconds = milliseconds / 1000.0
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool):
+        return float(seconds)
+    return None
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -412,18 +434,30 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for a Snowflake query.
 
+        Two paths, in order:
+
+        1. Explicit ``credits_used``: warehouse credits metered for the query.
+           Only genuine warehouse credits belong here; the cloud-services
+           figure from QUERY_HISTORY is reported separately as
+           ``credits_used_cloud_services`` and never priced.
+        2. Runtime estimation for provisioned warehouses: the query's measured
+           execution time multiplied by the warehouse size's credits/hour
+           rate. This is a marginal per-query cost: warehouse idle time
+           between queries and multi-cluster scaling are excluded.
+
         Expected resource_usage fields:
-            - credits_used: Number of credits consumed
+            - credits_used: Number of warehouse credits consumed, OR
+            - execution_time_seconds / execution_time_ms /
+              total_elapsed_time_ms: Measured query runtime for estimation
+            - warehouse_size: Per-query observed size (falls back to
+              platform_config)
 
         Expected platform_config fields:
             - edition: Snowflake edition (standard, enterprise, business_critical)
             - cloud: Cloud provider (aws, azure, gcp)
             - region: Region code
+            - warehouse_size: Warehouse size label (for estimation)
         """
-        credits_used = resource_usage.get("credits_used")
-        if credits_used is None:
-            return None
-
         # Get platform configuration
         edition = platform_config.get("edition", "standard")
         cloud = platform_config.get("cloud", "aws")
@@ -435,21 +469,55 @@ class CostCalculator:
             return None
         price_per_credit = resolution.value
 
-        # Calculate cost
-        compute_cost = credits_used * price_per_credit
+        credits_used = resource_usage.get("credits_used")
+        if credits_used is not None:
+            compute_cost = credits_used * price_per_credit
+            details: dict[str, Any] = {
+                "credits_used": credits_used,
+                "price_per_credit": price_per_credit,
+                "edition": edition,
+                "cloud": cloud,
+                "region": region,
+            }
+            _stamp_price_unavailable(details, resolution)
+            return QueryCost(
+                compute_cost=compute_cost,
+                currency=CURRENCY,
+                pricing_details=details,
+            )
 
-        details: dict[str, Any] = {
-            "credits_used": credits_used,
+        # Estimation path: measured runtime x warehouse credits/hour rate.
+        execution_seconds = _execution_seconds_from_resource_usage(resource_usage)
+        warehouse_size = resource_usage.get("warehouse_size") or platform_config.get("warehouse_size")
+        if execution_seconds is None or warehouse_size is None:
+            return None
+
+        size_resolution = resolve_snowflake_warehouse_credits_per_hour(str(warehouse_size))
+        if size_resolution.value is None:
+            return None
+        credits_per_hour = size_resolution.value
+
+        credits_used_estimated = (execution_seconds / 3600.0) * credits_per_hour
+        compute_cost = credits_used_estimated * price_per_credit
+
+        estimated_details: dict[str, Any] = {
+            "credits_used": credits_used_estimated,
+            "credits_used_estimated": True,
+            "execution_time_seconds": execution_seconds,
+            "warehouse_size": warehouse_size,
+            "credits_per_hour": credits_per_hour,
             "price_per_credit": price_per_credit,
             "edition": edition,
             "cloud": cloud,
             "region": region,
+            "note": "Warehouse credits estimated from measured execution time; warehouse idle time excluded",
         }
-        _stamp_price_unavailable(details, resolution)
+        _stamp_price_unavailable(estimated_details, resolution)
+        _stamp_price_unavailable(estimated_details, size_resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details=details,
+            pricing_details=estimated_details,
         )
 
     def _calculate_bigquery_cost(

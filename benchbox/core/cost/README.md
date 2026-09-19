@@ -234,15 +234,32 @@ storage_estimate = {
 
 ### Snowflake
 
-**Formula**: `credits_used × price_per_credit`
+**Formula**: `credits_used × price_per_credit`, or when metered credits are
+absent, `(execution_seconds / 3600) × credits_per_hour(warehouse_size) × price_per_credit`
 
-**Resource Usage Required**:
-- `credits_used` (required) - From Snowflake query history
+**Resource Usage Required** (one runtime signal):
+- `credits_used` - Metered warehouse credits for the query, when available.
+  QUERY_HISTORY only exposes `CREDITS_USED_CLOUD_SERVICES`, which covers the
+  cloud-services layer and is reported separately as
+  `credits_used_cloud_services`; it is never priced as warehouse compute.
+- `execution_time_seconds` / `execution_time_ms` / `total_elapsed_time_ms` -
+  Measured runtime used to estimate warehouse credits. Server-side execution
+  time is preferred; total elapsed includes queueing and compilation.
+- `warehouse_size` (optional per query) - Observed size, falling back to the
+  platform config.
+
+The estimate is a marginal per-query cost: warehouse idle time between queries
+and multi-cluster scaling are excluded.
 
 **Configuration Required**:
-- `edition` - standard | enterprise | business_critical
+- `edition` - standard | enterprise | business_critical | vps. The edition is
+  not queryable from the service, so the operator must set it
+  (`--platform-option edition=...`); normalized cost stays `unavailable`
+  without it.
 - `cloud` - aws | azure | gcp
 - `region` - e.g., us-east-1, eu-west-1
+- `warehouse_size` - e.g., X-Small, Medium (for estimation; read from observed
+  warehouse metadata when available)
 
 **Pricing** (list prices; the calculator reads
 [`pricing_data.yaml`](./pricing_data.yaml), which is the source of truth):

@@ -73,6 +73,7 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0 \
 | `database` | (auto) | Database name |
 | `schema` | PUBLIC | Schema name |
 | `role` | (default) | Snowflake role |
+| `edition` | (unset) | Account edition for cost modeling: `standard`, `enterprise`, `business_critical`, or `vps`. Not queryable from the service, so normalized cost stays `unavailable` until the operator sets it. |
 | `stage_name` | (auto) | Stage for data loading |
 | `stage_type` | user | Stage type: user, table, external |
 | `driver_version` | (latest) | Pin the Snowflake Python connector version (e.g. `3.12.0`) |
