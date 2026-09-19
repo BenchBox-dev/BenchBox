@@ -34,6 +34,7 @@ from benchbox.core.cost.integration import (
     add_cost_estimation_to_results,
     canonical_cost_platform_key,
 )
+from benchbox.core.cost.pricing import resolve_databricks_dbu_price
 from benchbox.core.results.models import BenchmarkResults
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -158,6 +159,33 @@ class TestDatabricksSizingFromNormalizedCompute:
         assert deployment["warehouse_size"] == "2X-Small"
         assert deployment["cluster_size"] == "1.0"
         assert deployment["cloud_region"] == "us-east-1"
+
+    def test_observed_serverless_run_with_runtime_publishes(self) -> None:
+        """Measured runtime plus observed sizing is sufficient for normalized.
+
+        The Databricks adapter reports ``execution_time_seconds`` per query,
+        so a fully observed run prices end to end with no metered DBU input.
+        """
+        results = _results(
+            platform_info={"name": "Databricks", "configuration": {"platform_type": "databricks"}},
+            platform_cloud={"provider": "aws", "region": "us-east-1", "source": "observed"},
+            platform_compute={
+                "warehouse_size": "2X-Small",
+                "warehouse_type": "SERVERLESS",
+                "source": "observed",
+                "collection_status": "available",
+            },
+            query_results=[
+                {"query_id": "Q1", "resource_usage": {"execution_time_seconds": 60.0}},
+            ],
+        )
+        add_cost_estimation_to_results(results)
+
+        normalized = (results.cost_summary or {})["normalized_cost"]
+        assert normalized["cost_status"] == "normalized"
+        price = resolve_databricks_dbu_price("aws", "premium", "serverless_sql").value
+        assert price is not None
+        assert float(normalized["normalized_cost_usd"]) == pytest.approx((60.0 / 3600.0) * 1.0 * price)
 
 
 class TestSnowflakeSizingFromNormalizedCompute:

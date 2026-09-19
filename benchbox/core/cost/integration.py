@@ -207,6 +207,23 @@ def _build_platform_details(platform: str, platform_config: dict[str, Any]) -> d
     return {k: v for k, v in platform_details.items() if v is not None}
 
 
+def _snowflake_phase_has_estimated_concurrent_cost(benchmark_cost: Any) -> bool:
+    """Return True when estimated queries ran on concurrent streams.
+
+    Runtime estimation prices each query as if it held the warehouse alone.
+    Queries overlapping on one warehouse (throughput streams) are therefore
+    overcounted in the summed total, unlike metered credits_used, which
+    Snowflake attributes across concurrent queries exactly.
+    """
+    for phase in benchmark_cost.phase_costs or []:
+        if (phase.concurrent_streams or 1) <= 1:
+            continue
+        for query_cost in phase.query_costs or []:
+            if query_cost.pricing_details.get("credits_used_estimated"):
+                return True
+    return False
+
+
 def _apply_cost_model_and_warnings(benchmark_cost: Any, platform: str, platform_config: dict[str, Any]) -> None:
     """Set cost model and add platform-specific warnings."""
     from benchbox.core.cost.pricing import (
@@ -242,7 +259,16 @@ def _apply_cost_model_and_warnings(benchmark_cost: Any, platform: str, platform_
             )
         else:
             benchmark_cost.cost_model = "actual"
-    elif platform_lower in ("snowflake", "bigquery", "duckdb", "clickhouse"):
+    elif platform_lower == "snowflake":
+        benchmark_cost.cost_model = "actual"
+        if _snowflake_phase_has_estimated_concurrent_cost(benchmark_cost):
+            benchmark_cost.warnings.append(
+                "Snowflake costs include runtime-estimated queries sharing a warehouse "
+                "across concurrent streams. Each estimate prices exclusive warehouse use, "
+                "so the summed total may exceed the warehouse's wall-clock spend; metered "
+                "credits_used attributes shared cost exactly."
+            )
+    elif platform_lower in ("bigquery", "duckdb", "clickhouse"):
         benchmark_cost.cost_model = "actual"
     else:
         benchmark_cost.cost_model = "estimated"

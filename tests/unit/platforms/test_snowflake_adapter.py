@@ -1077,6 +1077,9 @@ benchbox-fixture-key-material
         assert result["first_row"] == (1, "test")
         assert isinstance(result["execution_time_seconds"], float)
         assert result["query_statistics"] == {"snowflake_query_id": "test_query_id"}
+        # resource_usage carries the wall time for warehouse-credit estimation
+        # even when query history is delayed or unavailable.
+        assert result["resource_usage"]["execution_time_seconds"] == result["execution_time_seconds"]
 
         mock_cursor.execute.assert_any_call("ALTER SESSION SET QUERY_TAG = 'BenchBox_q1'")
         mock_cursor.execute.assert_any_call("SELECT * FROM test")
@@ -1152,8 +1155,34 @@ benchbox-fixture-key-material
         assert stats["bytes_scanned"] == 1024000
         assert stats["rows_produced"] == 10
         assert stats["warehouse_size"] == "MEDIUM"
+        # QUERY_HISTORY exposes cloud-services credits only; reporting them
+        # as warehouse credits_used once priced warehouse compute near $0.
+        assert stats["credits_used_cloud_services"] == 5.5
+        assert "credits_used" not in stats
 
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_edition_flows_to_platform_info_for_cost_model(self, mock_snowflake):
+        """The edition is operator-supplied and must reach platform_info."""
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            edition="enterprise",
+        )
+        assert adapter.edition == "enterprise"
+        assert adapter.get_platform_info(None)["configuration"]["edition"] == "enterprise"
+
+        defaulted = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+        )
+        assert defaulted.edition is None
+        assert defaulted.get_platform_info(None)["configuration"]["edition"] is None
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_platform_metadata(self, mock_snowflake):
