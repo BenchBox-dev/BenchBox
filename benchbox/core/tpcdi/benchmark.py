@@ -2269,6 +2269,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "finwire_records": phase1_results.get("finwire_records", 0),
                 "customer_mgmt_records": phase1_results.get("customer_mgmt_records", 0),
                 "success": phase1_results.get("success", False),
+                "error": phase1_results.get("error"),
             }
 
             # Phase 2: Enhanced SCD Type 2 Processing
@@ -2283,6 +2284,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "scd_records_processed": phase2_results.get("records_processed", 0),
                 "change_records_detected": phase2_results.get("changes_detected", 0),
                 "success": phase2_results.get("success", False),
+                "error": phase2_results.get("error"),
             }
 
             # Phase 3: Parallel Batch Processing (if enabled)
@@ -2298,6 +2300,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     "batches_processed": phase3_results.get("batches_processed", 0),
                     "parallel_workers": phase3_results.get("workers_used", 0),
                     "success": phase3_results.get("success", False),
+                    "outcome": phase3_results.get("outcome", "unknown"),
+                    "error": phase3_results.get("error"),
                 }
 
             # Phase 4: Incremental Data Loading
@@ -2312,6 +2316,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "incremental_batches": phase4_results.get("batches_loaded", 0),
                 "records_loaded": phase4_results.get("records_loaded", 0),
                 "success": phase4_results.get("success", False),
+                "error": phase4_results.get("error"),
             }
 
             # Phase 5: Data Quality Monitoring (if enabled)
@@ -2328,6 +2333,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     "quality_score": phase5_results.get("quality_score", 0.0),
                     "issues_detected": phase5_results.get("issues_detected", 0),
                     "success": phase5_results.get("success", False),
+                    "error": phase5_results.get("error"),
                 }
                 pipeline_results["quality_score"] = phase5_results.get("quality_score", 0.0)
 
@@ -2338,36 +2344,44 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 + phase4_results.get("records_loaded", 0)
             )
 
-            # Determine overall success - be more resilient to failures in advanced features
-            # For test environments, focus on core functionality rather than advanced ETL features
-            # Core phases that must succeed: phase2 (SCD processing) - essential functionality
-            core_phase_successes = [
-                phase2_results.get("success", False),
-            ]
-
-            # Optional phases - failure doesn't fail the entire pipeline
-            optional_phase_successes = [
-                phase1_results.get("success", False),  # Advanced FinWire/CustomerMgmt processing
-                phase4_results.get("success", False),  # Incremental loading
-            ]
+            # Fail closed: every explicitly requested (executed) phase must
+            # succeed. A disabled phase is not requested and is excluded; an
+            # executed phase that is failed, unavailable, timed out, or
+            # incomplete fails the pipeline rather than degrading silently.
+            executed_phases = {
+                "enhanced_data_processing": phase1_results.get("success", False),
+                "enhanced_scd_processing": phase2_results.get("success", False),
+                "incremental_loading": phase4_results.get("success", False),
+            }
             if enable_parallel_processing:
-                optional_phase_successes.append(phase3_results.get("success", False))
+                executed_phases["parallel_batch_processing"] = phase3_results.get("success", False)
             if enable_data_quality_monitoring:
-                optional_phase_successes.append(phase5_results.get("success", False))
+                executed_phases["data_quality_monitoring"] = phase5_results.get("success", False)
 
-            # Pipeline succeeds if core phases succeed
-            core_success = all(core_phase_successes)
-            optional_success_count = sum(optional_phase_successes)
-
-            pipeline_results["success"] = core_success
+            failed_phases = sorted(name for name, ok in executed_phases.items() if not ok)
+            pipeline_results["failed_phases"] = failed_phases
+            pipeline_results["success"] = not failed_phases
+            core_success = bool(phase2_results.get("success", False))
             pipeline_results["core_phases_success"] = core_success
-            pipeline_results["optional_phases_success"] = f"{optional_success_count}/{len(optional_phase_successes)}"
+            optional_names = [name for name in executed_phases if name != "enhanced_scd_processing"]
+            optional_success_count = sum(1 for name in optional_names if executed_phases[name])
+            pipeline_results["optional_phases_success"] = f"{optional_success_count}/{len(optional_names)}"
 
             end_time = datetime.now()
             pipeline_results["end_time"] = end_time.isoformat()
             pipeline_results["total_duration"] = elapsed_seconds(start_mono)
 
-            emit(f"✅ Enhanced ETL pipeline completed successfully in {pipeline_results['total_duration']:.2f} seconds")
+            if pipeline_results["success"]:
+                emit(
+                    f"✅ Enhanced ETL pipeline completed successfully in "
+                    f"{pipeline_results['total_duration']:.2f} seconds"
+                )
+            else:
+                pipeline_results["error"] = f"Requested phases failed or incomplete: {', '.join(failed_phases)}"
+                emit(
+                    f"❌ Enhanced ETL pipeline incomplete "
+                    f"({', '.join(failed_phases)}) in {pipeline_results['total_duration']:.2f} seconds"
+                )
 
         except Exception as e:
             if enable_error_recovery and self.error_recovery_manager:
@@ -2473,7 +2487,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     def _run_parallel_batch_processing(self) -> dict[str, Any]:
         """Run parallel batch processing."""
-        results = {"success": False, "batches_processed": 0, "workers_used": 0}
+        results: dict[str, Any] = {
+            "success": False,
+            "outcome": "incomplete",
+            "batches_processed": 0,
+            "workers_used": 0,
+        }
 
         try:
             if self.parallel_batch_processor:
@@ -2534,14 +2553,26 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
                 results["batches_processed"] = execution_result.get("tasks_completed", 0)
                 results["workers_used"] = min(self.max_workers, len(tasks))
-                results["success"] = execution_result.get("tasks_failed", 0) == 0
+                # Honor the scheduler's explicit outcome: success requires the
+                # scheduler to report success AND zero failed tasks. Either
+                # signal alone is insufficient.
+                scheduler_success = bool(execution_result.get("success", False))
+                tasks_failed = int(execution_result.get("tasks_failed", 0) or 0)
+                results["success"] = scheduler_success and tasks_failed == 0
+                results["outcome"] = str(execution_result.get("outcome", "unknown"))
 
                 if not results["success"]:
-                    results["error"] = f"Failed tasks: {execution_result.get('tasks_failed', 0)}"
+                    cause = execution_result.get("error_message") or (
+                        f"Failed tasks: {tasks_failed}" if tasks_failed else "Scheduler did not report success"
+                    )
+                    results["error"] = f"parallel_batch_processing: {cause}"
+            else:
+                results["error"] = "parallel_batch_processing: parallel batch processor unavailable"
 
         except Exception as e:
             emit(f"❌ Parallel batch processing failed: {e}")
-            results["error"] = str(e)
+            results["outcome"] = "failed"
+            results["error"] = f"parallel_batch_processing: {e}"
 
         return results
 
@@ -2723,7 +2754,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         with open(finwire_file, "w", encoding="utf-8") as f:
             # Generate Company Fundamental records (CMP)
             for i in range(num_companies):
-                pts = "20230101000000"
+                pts = "20230101000000 "  # 15-char PTS matching the FinWire record layouts
                 cmp_id = f"{i + 1:012d}"
                 company_name = f"Company_{i + 1:04d}".ljust(60)
                 industry = "Technology".ljust(50)
@@ -2736,7 +2767,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Generate Security Master records (SEC)
             for i in range(num_securities):
-                pts = "20230101000000"
+                pts = "20230101000000 "  # 15-char PTS matching the FinWire record layouts
                 symbol = f"SEC{i + 1:04d}".ljust(15)
                 issue = f"Security_{i + 1:04d} Inc".ljust(70)
                 status = "Active".ljust(10)
@@ -2749,7 +2780,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Generate Financial records (FIN)
             for i in range(num_financials):
-                pts = "20230101000000"
+                pts = "20230101000000 "  # 15-char PTS matching the FinWire record layouts
                 symbol = f"SEC{(i % num_securities) + 1:04d}".ljust(15)
                 quarter = "2023Q1".ljust(6)
                 revenue = str(1000000 + i * 10000).rjust(15)

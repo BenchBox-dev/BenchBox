@@ -438,6 +438,13 @@ class ParallelBatchProcessor:
                 worker = GenericTaskWorker()  # For generic task functions
             self.workers[worker.worker_id] = worker
 
+        # A function-carrying task must always have a worker that executes its
+        # function. Small pools would otherwise route such tasks to specialized
+        # workers that ignore the function yet report success.
+        if not any(isinstance(worker, GenericTaskWorker) for worker in self.workers.values()):
+            fallback = GenericTaskWorker()
+            self.workers[fallback.worker_id] = fallback
+
         # Start performance monitoring if enabled
         if self.config.enable_performance_monitoring:
             self._start_performance_monitoring()
@@ -450,7 +457,21 @@ class ParallelBatchProcessor:
 
         Returns:
             Task ID for tracking
+
+        Raises:
+            ValueError: If the task carries no function and its type has no
+                specialized worker, so it could never execute. Rejected before
+                any queue or bookkeeping mutation.
         """
+
+        if task.task_function is None and task.task_type not in (
+            "historical_load",
+            "incremental_load",
+        ):
+            raise ValueError(
+                f"Rejected non-executable task '{task.task_id}': no task_function "
+                f"and unsupported task_type '{task.task_type}'"
+            )
 
         with self.task_lock:
             # Set task timeout if not specified
@@ -628,11 +649,17 @@ class ParallelBatchProcessor:
 
             if stats["tasks_submitted"] == 0:
                 logger.warning("No tasks submitted for parallel execution")
-                stats["success"] = True
+                stats["success"] = False
+                stats["outcome"] = "incomplete"
+                stats["tasks_pending"] = 0
+                stats["timed_out"] = False
+                stats["failed_task_ids"] = []
+                stats["error_message"] = "No executable work was submitted for parallel execution"
                 return stats
 
-            # Process tasks with dependency resolution
-            self._process_tasks_with_dependencies(timeout_seconds)
+            # Process tasks with dependency resolution. A timeout here only
+            # bounds the dispatch loop; it never implies worker termination.
+            batch_timed_out = self._process_tasks_with_dependencies(timeout_seconds)
 
             # Collect results
             stats["tasks_completed"] = len([r for r in self.completed_tasks.values() if r.success])
@@ -646,7 +673,33 @@ class ParallelBatchProcessor:
                 stats["average_records_per_second"] = stats["total_records_processed"] / stats["total_execution_time"]
 
             stats["peak_memory_usage_mb"] = self.peak_memory_usage
-            stats["success"] = stats["tasks_failed"] == 0
+            # Fail closed: success requires every submitted task to reach a
+            # successful terminal result. Deriving success from tasks_failed
+            # alone would convert zero, partial, or timed-out work into
+            # apparent success.
+            submitted = stats["tasks_submitted"]
+            settled = stats["tasks_completed"] + stats["tasks_failed"]
+            stats["tasks_pending"] = submitted - settled
+            stats["timed_out"] = batch_timed_out
+            stats["failed_task_ids"] = sorted(
+                task_id for task_id, result in self.completed_tasks.items() if not result.success
+            )
+            if batch_timed_out:
+                stats["outcome"] = "timed_out"
+                stats["success"] = False
+                stats["error_message"] = (
+                    f"Parallel batch execution timed out with {stats['tasks_pending']} of {submitted} tasks unprocessed"
+                )
+            elif settled < submitted:
+                stats["outcome"] = "incomplete"
+                stats["success"] = False
+                stats["error_message"] = f"Only {settled} of {submitted} submitted tasks reached a terminal result"
+            elif stats["tasks_failed"] > 0:
+                stats["outcome"] = "failed"
+                stats["success"] = False
+            else:
+                stats["outcome"] = "completed"
+                stats["success"] = True
 
             # Include resource usage information for monitoring
             stats["resource_usage"] = {
@@ -673,18 +726,27 @@ class ParallelBatchProcessor:
             logger.error(f"Parallel batch execution failed: {str(e)}", exc_info=True)
             stats["error_message"] = str(e)
             stats["success"] = False
+            stats["outcome"] = "failed"
             return stats
 
-    def _process_tasks_with_dependencies(self, timeout_seconds: Optional[int]) -> None:
-        """Process tasks with dependency resolution."""
+    def _process_tasks_with_dependencies(self, timeout_seconds: Optional[int]) -> bool:
+        """Process tasks with dependency resolution.
+
+        Returns:
+            True when the dispatch loop stopped because the timeout elapsed
+            with work still undispatched; False otherwise. A True return only
+            bounds the caller wait -- already-running workers are unaffected.
+        """
 
         start_time = mono_time()
         processed_tasks = set()
+        timed_out = False
 
         while not self.task_queue.empty():
             # Check timeout
             if timeout_seconds and (elapsed_seconds(start_time)) > timeout_seconds:
                 logger.warning("Parallel batch execution timeout reached")
+                timed_out = True
                 break
 
             try:
@@ -712,6 +774,7 @@ class ParallelBatchProcessor:
 
         # Wait for all submitted futures to complete
         self._wait_for_completion()
+        return timed_out
 
     def _check_task_dependencies(self, task: BatchProcessingTask, processed_tasks: set) -> bool:
         """Check if task dependencies are satisfied."""
