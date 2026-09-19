@@ -13051,15 +13051,10 @@
       "title": "Result-bundle compat: create TODO sequence for deferred follow-ons"
     },
     "result-bundle-compat-inline-helper-dedup": {
-      "claim": {
-        "expires_at": "2026-09-20T00:12:17Z",
-        "generation": "e43d68e9c7c34683b6283c54d7e7e1d6",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: dedup bundle.py inline version helper"
     },
     "result-bundle-compat-integrate-fixes": {
