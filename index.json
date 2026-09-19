@@ -16164,6 +16164,15 @@
       "status": "done",
       "title": "Give each throughput stream an independent DB session, not a shared connection's cursor"
     },
+    "throughput-outstanding-work-containment": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Contain timed-out throughput work before later phases or resource reuse"
+    },
     "throughput-phase-corpus-expansion": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Throughput results expose whether work remains active, the affected stream/task identities, owned resources, and the last observable cleanup state.",
+    "A combined benchmark runner refuses to start maintenance or another measured phase and refuses to reuse or close affected shared resources while prior work is outstanding.",
+    "Timed-out or outstanding-work results omit invalid Throughput@Size and related metrics from public result artifacts rather than exporting a numeric sentinel as a valid measurement.",
+    "The normal healthy path and bounded timeout return remain bounded; no fix introduces an unbounded executor shutdown or join.",
+    "Tests use a controllable running query to prove the caller returns, the next phase is contained, queued work is cancelled, running work remains owned, and cleanup unblocks the boundary only after termination.",
+    "Adapters that support native query cancellation may use it, but unsupported adapters remain safe through containment and fail-closed status."
+  ],
+  "context": "Containment comes before any universal cancellation abstraction. Cooperative events stop only between queries; already-running database calls require adapter-native cancellation or continued ownership until completion.",
+  "description": "StreamRunner intentionally returns without waiting for already-running threads because Python cannot forcibly cancel them. That bounded response is useful, but a timeout result does not expose enough ownership state for combined runners to prevent maintenance, later measured phases, teardown, or connection reuse while queries are still active. Add an explicit outstanding-work outcome and enforce containment at every phase boundary.\n\nDecision boundary: preserve bounded timeout response. Do not add an unbounded join or claim that cooperative cancellation stops an in-flight database call. Prefer phase quarantine and resource ownership transfer until real termination is observed.",
+  "links": [
+    "benchbox/core/throughput/runner.py",
+    "benchbox/core/tpch/throughput_test.py",
+    "benchbox/core/tpcds/throughput_test.py",
+    "benchbox/core/tpcds/official_benchmark.py",
+    "tests/integration/test_tpch_throughput_test.py",
+    "tests/integration/test_tpcds_throughput_test.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:55:57Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "b4d01a0689c74f789a4a30a577157a63",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
