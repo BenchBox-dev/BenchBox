@@ -1634,10 +1634,15 @@ class BigQueryAdapter(PlatformAdapter):
         if match:
             table_name = match.group(1)
             rest = match.group(2)
+            # BigQuery table identifiers are case-sensitive: normalize the
+            # table segment to UPPERCASE to match the adapter-wide convention
+            # used by loads, validation, row counts, and query qualification.
+            # Project and dataset segments keep their configured case.
             if f"{self.dataset_id}." not in table_name:
-                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
+                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name.upper()}`"
             elif not table_name.startswith("`"):
-                qualified_table = f"`{table_name}`"
+                *qualifier, bare = table_name.split(".")
+                qualified_table = "`" + ".".join([*qualifier, bare.upper()]) + "`"
             else:
                 qualified_table = table_name
             statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
@@ -1655,6 +1660,48 @@ class BigQueryAdapter(PlatformAdapter):
 
         return statement
 
+    # Fallback table list when query parsing is unavailable. Covers TPC-H;
+    # parser-extracted names handle every other benchmark.
+    _FALLBACK_QUALIFY_TABLES = (
+        "REGION",
+        "NATION",
+        "CUSTOMER",
+        "SUPPLIER",
+        "PART",
+        "PARTSUPP",
+        "ORDERS",
+        "LINEITEM",
+    )
+
+    def _extract_unqualified_tables(self, query: str) -> list[str] | None:
+        """Return UPPERCASE names of unqualified tables referenced by the query.
+
+        Returns None when the query cannot be parsed, so the caller can fall
+        back to the static table list. CTE names and already-qualified
+        references are excluded.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return None
+        try:
+            tree = sqlglot.parse_one(query)
+        except Exception:
+            return None
+        if tree is None:
+            return None
+        cte_names = {cte.alias_or_name.upper() for cte in tree.find_all(exp.CTE)}
+        tables: list[str] = []
+        for table in tree.find_all(exp.Table):
+            if table.db or table.catalog:
+                continue
+            name = (table.name or "").upper()
+            if not name or name in cte_names or name in tables:
+                continue
+            tables.append(name)
+        return tables
+
     def _qualify_table_names(self, query: str) -> str:
         """Add full qualification to table names in query.
 
@@ -1662,25 +1709,21 @@ class BigQueryAdapter(PlatformAdapter):
         Queries processed by sqlglot with identify=True should skip this method to avoid
         conflicts with backtick-quoted identifiers. When default_dataset is configured,
         BigQuery automatically resolves unqualified table names.
+
+        Table names are extracted with a SQL parser so benchmarks beyond TPC-H
+        resolve; BigQuery table identifiers are case-sensitive, so every name
+        is normalized to UPPERCASE to match created tables. Falls back to the
+        static TPC-H list when parsing is unavailable.
         """
-        # Simple table name qualification - could be with proper SQL parsing
-        table_names = [
-            "REGION",
-            "NATION",
-            "CUSTOMER",
-            "SUPPLIER",
-            "PART",
-            "PARTSUPP",
-            "ORDERS",
-            "LINEITEM",
-        ]
+        import re
+
+        table_names = self._extract_unqualified_tables(query)
+        if table_names is None:
+            table_names = list(self._FALLBACK_QUALIFY_TABLES)
 
         for table_name in table_names:
             # Replace unqualified table names
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
-
-            # Simple replacement - in production would use proper SQL parser
-            import re
 
             pattern = rf"\b{table_name}\b"
             query = re.sub(pattern, qualified_name, query, flags=re.IGNORECASE)

@@ -867,6 +867,52 @@ benchbox-fixture-key-material
         assert adapter._get_file_format_for_table("orders", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_returns_none_without_sentinel(self, mock_snowflake):
+        """Falsy null markers keep the static CSV/TBL format choice (no new format)."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("lineitem.tbl.1")
+        ds = resolver_data_source("lineitem", file_path, {"csv_delimiter": "|", "csv_null_marker": ""})
+
+        assert adapter._ensure_preserve_file_format(mock_cursor, "lineitem", file_path, ds, NO_BENCHMARK) is None
+        mock_cursor.execute.assert_not_called()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_creates_per_dialect_format_for_sentinel(self, mock_snowflake):
+        """A truthy null-marker sentinel gets a format preserving empty strings."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("hits.csv.gz")
+        ds = resolver_data_source("hits", file_path, {"csv_delimiter": "|", "csv_null_marker": "__NULL__"})
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "hits", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "CREATE FILE FORMAT IF NOT EXISTS" in create_sql
+        assert "FIELD_DELIMITER = '|'" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = FALSE" in create_sql
+        assert "NULL_IF = ('__NULL__')" in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):
         """COPY INTO parsing should warn on failed files and malformed row counts."""
         adapter = SnowflakeAdapter(
@@ -1531,6 +1577,22 @@ class TestSnowflakeOptimizeTableDefinition:
         result = adapter._optimize_table_definition(stmt)
         # The method checks upper() for the starts-with, but replaces literal "CREATE TABLE"
         assert result == stmt
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_quoted_identifiers_uppercased_single_quotes_untouched(self, mock_snowflake):
+        """Quoted source-case names must fold to the uppercase convention.
+
+        DDL translation quotes identifiers, so without normalization a table
+        would be created as quoted lowercase while loads and validation
+        address the folded uppercase name.
+        """
+        adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
+        result = adapter._optimize_table_definition(
+            'CREATE TABLE "hits" ("WatchID" BIGINT NOT NULL, "note" VARCHAR DEFAULT \'keep "me" lower\')'
+        )
+        assert result == (
+            'CREATE OR REPLACE TABLE "HITS" ("WATCHID" BIGINT NOT NULL, "NOTE" VARCHAR DEFAULT \'keep "me" lower\')'
+        )
 
 
 class TestSnowflakeBuildCtasSortSql:

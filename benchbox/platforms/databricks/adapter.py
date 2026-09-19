@@ -1995,6 +1995,25 @@ class DatabricksAdapter(PlatformAdapter):
             dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
         ).delimiter
 
+    def _resolve_copy_dialect(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None):
+        """Resolve Databricks COPY INTO CSV dialect through the shared pipeline."""
+        from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+
+        dialect_source = data_source or DataSource(source_type="databricks_copy_into", tables={})
+        return resolve_csv_dialect(
+            dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
+        )
+
+    def _resolve_csv_null_marker(
+        self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None
+    ) -> str | None:
+        """Resolve Databricks COPY INTO null marker through the shared CSV dialect pipeline.
+
+        Returns None when the dialect carries no marker, in which case COPY INTO
+        keeps its default empty-field handling.
+        """
+        return self._resolve_copy_dialect(data_source, table_name, file_path, benchmark).null_marker
+
     def _get_column_list_for_table(self, benchmark, table_name: str) -> str:
         """Get explicit column mapping from benchmark schema for COPY INTO."""
         if not hasattr(benchmark, "get_schema"):
@@ -2049,10 +2068,25 @@ class DatabricksAdapter(PlatformAdapter):
             benchmark=benchmark,
         )
         column_list = self._get_column_list_for_table(benchmark, table_name)
+        # Mirror the dialect-path derivation in _resolve_file_uri_and_delimiter so
+        # the null marker resolves for the same file the delimiter came from.
+        if isinstance(file_path, list) and file_path:
+            null_dialect_path = Path(self._path_name(file_path[0]))
+        else:
+            null_dialect_path = Path(filename.replace(".*", ""))
+        null_marker = self._resolve_csv_null_marker(
+            data_source, table_name or null_dialect_path.stem, null_dialect_path, benchmark
+        )
+        format_options = f"'delimiter'='{delimiter}', 'header'='false'"
+        if null_marker:
+            # A truthy marker means only that literal is NULL, so empty fields
+            # stay empty strings. Falsy markers keep COPY INTO defaults.
+            sentinel = null_marker.replace("'", "''")
+            format_options += f", 'nullValue'='{sentinel}'"
 
         copy_sql = (
             f"COPY INTO {table_name_upper}{column_list} FROM '{file_uri}' "
-            f"FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='{delimiter}', 'header'='false')"
+            f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
         )
 
         if "*" in file_uri:

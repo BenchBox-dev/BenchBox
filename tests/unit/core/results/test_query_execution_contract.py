@@ -311,6 +311,14 @@ def test_compact_adapter_rejects_unknown_schema_fields() -> None:
     [
         {"first_row": (1,), "sql_text": "SELECT 1"},
         {
+            "job_id": "bquxjob_123",
+            "job_statistics": {"bytes_processed": 100, "slot_ms": 5},
+            "bytes_billed": 100,
+        },
+        {
+            "query_statistics": {"elapsed_ms": 12, "rows_produced": 3},
+        },
+        {
             "duration_microsecs": 900,
             "cpu_time_microsecs": 100,
             "bytes_returned": 8,

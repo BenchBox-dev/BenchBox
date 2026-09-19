@@ -23,6 +23,23 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 
+def _rewrite_snowflake_regex_groups(translated: str) -> str:
+    """Rewrite Q29's regex for Snowflake's regex engine.
+
+    Snowflake rejects ``(?:...)`` non-capturing groups (error 100048,
+    "no argument for repetition operator: ?"). Converting to a capturing
+    group renumbers the domain capture from group 1 to group 2, hence the
+    replacement becomes ``'\\\\2'``. Backslash counts are preserved:
+    Snowflake string literals halve them once, landing the regex engine on
+    ``\\.`` (literal dot) and the replacement on ``\\2`` (group reference).
+    Verified live: returns the bare domain (``example.com``).
+    """
+    bs = chr(92)
+    translated = translated.replace("(?:www" + bs * 2 + ".)?", "(www" + bs * 2 + ".)?")
+    translated = translated.replace("'" + bs * 2 + "1'", "'" + bs * 2 + "2'")
+    return translated
+
+
 class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGenerationMixin, BaseBenchmark):
     """ClickBench (ClickHouse Analytics Benchmark) implementation.
 
@@ -98,6 +115,8 @@ class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGen
             translated = sqlglot.transpile(  # type: ignore[attr-defined]
                 query, read="clickhouse", write=dialect.lower()
             )[0]
+            if dialect.lower() == "snowflake":
+                translated = _rewrite_snowflake_regex_groups(translated)
             return translated
         except ImportError:
             # sqlglot not available, return original query
@@ -205,6 +224,17 @@ class ClickBenchBenchmark(GeneratorOutputDirMixin, SimpleBenchmarkMixin, DataGen
     def csv_delimiter(self) -> str:
         """ClickBench uses pipe-delimited CSV files."""
         return "|"
+
+    @property
+    def csv_null_marker(self) -> str:
+        """Sentinel marking NULL fields so loaders preserve empty strings.
+
+        ClickBench declares every column NOT NULL and its queries filter on
+        empty strings (``<> ''``). Only this sentinel converts to NULL;
+        anything else — including empty fields — must load as-is. Mirrors the
+        ``nullstr='__NULL__'`` contract in get_csv_loading_config.
+        """
+        return "__NULL__"
 
     def get_csv_loading_config(self, table_name: str) -> list[str]:
         """Get CSV loading configuration for ClickBench tables.
