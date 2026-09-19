@@ -8253,12 +8253,17 @@
       "title": "Run and publish live cloud benchmark results for TPC variants and experimental suites (BigQuery, Databricks, Snowflake)"
     },
     "live-cloud-benchmark-tpcds-tpcdi": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T11:54:52Z",
+        "generation": "d80ba3dd3c1f445eb06600dffe1a5e2f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2152d1a549aa2ceb28fbbf4c"
+      },
       "needs": [
         "first-live-cloud-benchmark-run-and-publish"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Run and publish live cloud benchmark results for TPC-DS and TPC-DI (BigQuery, Databricks, Snowflake)"
     },
     "live-integration-tests-with-starburst-galaxy-w22-w24": {
