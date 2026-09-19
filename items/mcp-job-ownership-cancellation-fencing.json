@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "The durable state machine distinguishes cancellation requested, cancellation accepted, cancellation too late, ownership lost, work still running, publication committed, failed, and unknown outcome.",
+    "Lease generation or an equivalent fence protects every durable state transition and external side effect; a stale worker cannot publish, finalize, or overwrite a newer attempt.",
+    "Lease expiry does not requeue a job while the old attempt may still execute database work unless native interruption succeeds or an idempotent fenced retry contract is proven.",
+    "Cross-process cancellation reaches the owning worker; adapters with native interruption use it, while unsupported adapters retain ownership and report uncertain or outstanding work until termination.",
+    "begin_publication remains the explicit commit point: cancellation after it cannot revoke an artifact that is already being durably committed.",
+    "Fault-injection tests cover lease loss before execution, during a query, before publication, during publication, after publication, worker crash, cancel races, and safe versus refused retry."
+  ],
+  "context": "This is repository-level hardening, not external deployment acceptance. It must not revive or claim completion of mcp-stateless-external-deployment-acceptance-v2-4, which remains an operator-controlled post-release boundary.",
+  "description": "Durable MCP jobs use leases and may requeue work after ownership loss even though the old in-process executor or database query can still be running. Row state alone therefore does not prove that work stopped, and a replacement worker can duplicate database effects. Define a durable execution-ownership state machine, preserve the publication commit point, and expose uncertain outcomes safely.\n\nDecision boundary: cancellation accepted before publication may prevent publication; after begin_publication the result commit point is too late to revoke. Retry is allowed only when the previous attempt is proven quiescent or the operation is independently idempotent and fenced.",
+  "links": [
+    "benchbox/mcp/jobs.py",
+    "benchbox/mcp/security.py",
+    "tests/unit/mcp/test_durable_jobs.py",
+    "tests/integration/mcp/test_durable_jobs.py",
+    "tests/integration/mcp/test_multiworker_acceptance.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:56:49Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "40c5b867a825457e80f2ea927d35231c",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}

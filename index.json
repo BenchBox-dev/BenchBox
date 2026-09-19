@@ -8607,6 +8607,15 @@
       "status": "done",
       "title": "Secure remote MCP with authentication, tenant isolation, quotas, and admission control"
     },
+    "mcp-job-ownership-cancellation-fencing": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Fence MCP job ownership, cancellation, and publication races"
+    },
     "mcp-landing-page-elevation": {
       "claim": null,
       "needs": [],
