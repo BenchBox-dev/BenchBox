@@ -1,8 +1,9 @@
 {
   "acceptance": [
-    "One-session runs use versioned query order, parameters, warmup, cache, and optional workload-gap policies.",
+    "One-session runs use versioned query order, parameters, warmup, cache, repetition, and optional workload-gap policies.",
     "Timing includes planning, execution, and full result consumption and excludes declared setup phases.",
     "Every timing is joined to its rendered SQL, data state, oracle result, and cohort identity.",
+    "Candidate score evidence uses complete repetitions, median atomic measures, published dispersion, and no best-run selection.",
     "JOB and the qualified TPC-Havoc panel can run in Power while preserving their canonical dataset and equivalence contracts.",
     "Failures invalidate score evidence and remain distinguishable from unsupported capabilities."
   ],
@@ -20,6 +21,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "1fb4381625764b5b92e04974d1e07697",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:54:32Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "ebecf6f87b934f78af65ebb6cfbb784c",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
