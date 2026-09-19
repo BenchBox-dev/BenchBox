@@ -1172,6 +1172,13 @@
       "status": "done",
       "title": "BenchBox MCP Server for AI Agent Integration"
     },
+    "benchbox-score-workload-contracts": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Reconcile composite-score workload contracts"
+    },
     "benchbox-site-header-unification": {
       "claim": null,
       "needs": [],
