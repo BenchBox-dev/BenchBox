@@ -88,7 +88,6 @@ class TestTPCDIFullBenchmarkIntegration:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
             enable_error_recovery=True,
         )
@@ -145,7 +144,6 @@ class TestTPCDIFullBenchmarkIntegration:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=False,  # Skip for speed
             )
 
@@ -257,7 +255,6 @@ class TestTPCDIFullBenchmarkIntegration:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
         )
         performance_metrics["etl_pipeline_time"] = time.time() - start_time
@@ -393,7 +390,6 @@ class TestTPCDIFullBenchmarkIntegration:
         memory_measurements["after_data_gen"] = process.memory_info().rss / 1024 / 1024
 
         # ETL pipeline
-        benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite", enable_parallel_processing=True)
         memory_measurements["after_etl"] = process.memory_info().rss / 1024 / 1024
 
         # Calculate growth metrics
@@ -417,8 +413,16 @@ class TestTPCDIFullBenchmarkIntegration:
         )
 
     def test_parallel_processing_scalability(self, temp_dir, test_database):
-        """Test parallel processing scalability with different worker counts."""
-        worker_counts = [1, 2, 4]
+        """Enhanced ETL results must not vary with worker count.
+
+        The removed synthetic batch scheduler was the only enhanced-pipeline
+        consumer of ``max_workers``. Parallel TPC-DI ETL lives on the
+        canonical ``run_etl_pipeline`` path via ``enable_parallel`` (covered
+        by the canonical equivalence tests), so varying the worker count
+        here must change neither the results nor the phase set: this guards
+        against reintroducing worker-gated synthetic phases.
+        """
+        worker_counts = [1, 4]
         results = {}
 
         for workers in worker_counts:
@@ -432,38 +436,23 @@ class TestTPCDIFullBenchmarkIntegration:
 
             benchmark = TPCDIBenchmark(config=config)
 
-            # Measure parallel processing performance
-            start_time = time.time()
-
             benchmark.create_schema(test_database, "sqlite")
             benchmark.generate_data()
 
-            etl_results = benchmark.run_enhanced_etl_pipeline(
-                test_database, dialect="sqlite", enable_parallel_processing=True
-            )
-
-            execution_time = time.time() - start_time
+            etl_results = benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite")
 
             results[workers] = {
-                "execution_time_seconds": execution_time,
                 "etl_success": etl_results["success"],
-                "parallel_batches": etl_results["phases"]
-                .get("parallel_batch_processing", {})
-                .get("batches_processed", 0),
+                "records_processed": etl_results["total_records_processed"],
+                "phases": sorted(etl_results["phases"]),
             }
 
-        # Verify parallel processing works
         for workers, result in results.items():
             assert result["etl_success"], f"ETL failed with {workers} workers"
+            assert "parallel_batch_processing" not in result["phases"]
 
-        # With more workers, parallel batches should be processed
-        if results[max(worker_counts)]["parallel_batches"] > 0:
-            # More workers should not significantly increase execution time (within reason)
-            single_worker_time = results[1]["execution_time_seconds"]
-            multi_worker_time = results[max(worker_counts)]["execution_time_seconds"]
-
-            # Allow some overhead but expect parallel processing benefits or at least no major regression
-            assert multi_worker_time <= single_worker_time * 1.5, "Parallel processing shows significant regression"
+        assert results[1]["records_processed"] == results[4]["records_processed"]
+        assert results[1]["phases"] == results[4]["phases"]
 
     def test_benchmark_reproducibility(self, small_scale_config, test_database):
         """Test benchmark reproducibility - same inputs should produce same outputs."""
@@ -479,7 +468,6 @@ class TestTPCDIFullBenchmarkIntegration:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=False,  # Disable for reproducibility
             )
 
             runs.append(
@@ -723,7 +711,6 @@ class TestTPCDISpecificationValidation:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=True,
                 enable_error_recovery=True,
             )
@@ -919,7 +906,6 @@ class TestTPCDIPerformanceAndScalability:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=True,
             )
             etl_time = time.time() - start_time
@@ -1058,7 +1044,6 @@ class TestTPCDIPerformanceAndScalability:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
         )
         record_resources("etl_completed")
