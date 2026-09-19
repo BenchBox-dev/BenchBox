@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The reference vector scores exactly 1,000 within declared rounding.",
+    "Scaling every candidate atomic performance value by x scales the headline by x.",
+    "Query order and duplicated unweighted enumeration do not change the score.",
+    "Missing, invalid, or incorrect required evidence invalidates the applicable block and headline without redistributing weight.",
+    "Candidate ordering is independent of the chosen equivalent qualified reference.",
+    "Golden fixtures replay byte-for-byte equivalent score outputs and diagnostics."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Implement a pure calculator that consumes a frozen manifest, a matching reference vector, and admitted evidence. It must calculate atomic ratios, geometric block scores, and the 1,000-point headline without reading mutable registries or running benchmarks.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "benchbox/core/results/metrics.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:46:07Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "96b8c6d8b9cb4efc9b2d9ca62a831c5f",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}

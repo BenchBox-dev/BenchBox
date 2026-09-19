@@ -1181,6 +1181,15 @@
       "status": "open",
       "title": "Build non-vacuous fixtures and score oracles"
     },
+    "benchbox-score-calculator": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-manifest-schema"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Implement the replayable score calculator"
+    },
     "benchbox-score-capability-matrix": {
       "claim": null,
       "needs": [
