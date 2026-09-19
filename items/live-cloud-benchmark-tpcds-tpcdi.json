@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "TPC-DS runs completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, and Snowflake (9 bundles)",
+    "TPC-DI runs completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, and Snowflake (9 bundles)",
+    "100% query pass rate across all runs",
+    "All 18 result bundles pass scripts/validate_submission.py and validate_bundles with zero errors",
+    "Valid scan bytes and cost metrics populated for BigQuery bundles"
+  ],
+  "context": "Follows the initial cloud runs established in first-live-cloud-benchmark-run-and-publish. BigQuery adapter hotfixes for table casing, rate-limiting throttling (1s inter-chunk sleep), and query execution telemetry propagation are in place. TPC-DS at SF 10.0 involves 99 complex queries; monitor warehouse timeouts and API burst limits during execution.",
+  "description": "Expand live cloud benchmark execution beyond TPC-H to the remaining standard TPC analytical benchmarks: TPC-DS (99 complex decision support queries) and TPC-DI (data integration/ETL pipeline).\n\nExecute across all three cloud data warehouses (BigQuery, Databricks, Snowflake) at the established scale factors:\n- Scale factors: 0.1, 1.0, and 10.0\n- Target platforms:\n  * Google BigQuery (Serverless)\n  * Databricks SQL (Serverless 2X-Small)\n  * Snowflake (X-Small warehouse)\n- Expected runs: 18 total (9 TPC-DS runs, 9 TPC-DI runs).\n- Verification: Validate each generated bundle with benchbox.validation.bundle.validate_bundles and scripts/validate_submission.py. Ensure query success, power metrics, scan/billing metrics (BigQuery), and platform metadata are fully populated."
+}

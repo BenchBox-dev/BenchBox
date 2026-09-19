@@ -8207,6 +8207,15 @@
       "status": "done",
       "title": "Lint lane reports ALL guard failures in one CI round trip (no fail-fast between independent guards)"
     },
+    "live-cloud-benchmark-tpcds-tpcdi": {
+      "claim": null,
+      "needs": [
+        "first-live-cloud-benchmark-run-and-publish"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Run and publish live cloud benchmark results for TPC-DS and TPC-DI (BigQuery, Databricks, Snowflake)"
+    },
     "live-integration-tests-with-starburst-galaxy-w22-w24": {
       "claim": null,
       "needs": [],
