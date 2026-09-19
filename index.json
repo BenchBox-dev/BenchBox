@@ -16726,6 +16726,15 @@
       "status": "done",
       "title": "TPC Specification Compliance Issues ✅ COMPLETED"
     },
+    "tpcdi-deterministic-generation-contract": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make TPC-DI generation reproducible across worker counts"
+    },
     "tpcdi-memory-test-delta-refactor": {
       "claim": null,
       "needs": [],

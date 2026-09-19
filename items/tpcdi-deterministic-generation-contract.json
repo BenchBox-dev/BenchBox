@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "The public generation request accepts or derives an explicit seed and records the seed plus generation-algorithm version in output metadata.",
+    "Each logical record or fixed logical partition receives deterministic random input independent of worker count, task completion order, and process scheduling.",
+    "Serial and parallel generation use the same deterministic algorithm and produce byte-identical normalized output for the same inputs, seed, and algorithm version.",
+    "Tests compare worker counts 1, 2, several, and greater than logical partition count; repeated runs and reordered task completion produce identical results.",
+    "A different seed produces a demonstrably different dataset, while legacy callers receive a documented compatibility default.",
+    "No implementation uses module-global random.seed or shares a mutable RNG across workers."
+  ],
+  "context": "Worker-count invariance is the required property. Per-chunk RNG instances are insufficient if chunk boundaries themselves change with max_workers.",
+  "description": "TPC-DI parallel data generation partitions input according to max_workers and uses random generation inside those partitions. Reproducibility must not depend on how many workers happen to be available. Define a seed and logical-record partition contract shared by serial and parallel execution.\n\nDecision boundary: derive randomness from stable logical identities or fixed logical partitions, not scheduling order or worker/chunk boundaries. Do not seed or mutate Python's process-global random generator.",
+  "links": [
+    "benchbox/core/tpcdi/benchmark.py",
+    "benchbox/core/tpcdi/etl/parallel_batch_processor.py",
+    "tests/performance/test_tpcdi_scalability.py",
+    "tests/integration/test_tpcdi_phase3_benchmark.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:56:07Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "8e30e037c2bf41679815220b9880c16b",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
