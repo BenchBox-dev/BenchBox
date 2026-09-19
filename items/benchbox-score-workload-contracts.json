@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "A versioned inventory records declared, generated, runnable, and candidate-scored query IDs for every workload family.",
-    "TPC-Havoc generation failures are surfaced deterministically and cannot silently shrink a scored cohort.",
+    "A versioned inventory records declared, generated, runnable, excluded, and candidate-scored query IDs for every workload family.",
+    "Scored means runnable, dialect-supported, oracle-passing, and non-vacuous; exclusions use declared reason codes and never change a frozen denominator.",
+    "TPC-Havoc generation failures are surfaced deterministically, and generated IDs must equal the manifest's expected IDs.",
     "TPC-DS OBT, Read Primitives, and ClickBench documentation and registries agree with executable manifests.",
-    "Each workload records its dataset identity, source lineage, scale semantics, and Power/Throughput eligibility.",
-    "Focused tests fail on count drift, missing query IDs, duplicate IDs, or undeclared skips."
+    "Each workload records exact dataset identity, source lineage, scale semantics, generator version, and Power/Throughput eligibility.",
+    "Focused tests fail on count drift, missing or duplicate IDs, and additions to skip_on or equivalent mechanisms that are not declared in the manifest."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Create a machine-verifiable inventory for every candidate benchmark before selecting scored queries. Reconcile registry, documentation, generated, and runnable counts; remove silent omission from scored paths; and pin dataset and query lineage for TPC-H, TPC-DS, SSB, ClickBench, JOB, TPC-Havoc, TPC-H Skew, TPC-DS OBT, NYC Taxi, and Read Primitives.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
@@ -21,6 +22,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "ae23c212cfba42ffbbbff4d0584abbf4",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:11:26Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "0571f782e5904e4fb2116eb26e12cbc7",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
