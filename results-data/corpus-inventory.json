@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-19T12:02:14.246138+00:00",
+  "generated_at": "2026-09-19T21:17:54.825579+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -2889,45 +2889,6 @@
       "bundle_sha256": "57eefabaf08d5fa44a7d9315e94377f2e616a65de0200c4abadc82c2244d8546"
     },
     {
-      "file": "tpch_sf01_snowflake_sql_20260918_210250_74ad48c5.json",
-      "benchmark": "tpch",
-      "benchmark_name": "TPC-H",
-      "platform": "Snowflake",
-      "platform_version": "10.33.101",
-      "scale_factor": 0.1,
-      "timestamp": "2026-09-18T21:02:50.019401",
-      "query_count": 66,
-      "trust_label": "community-submission",
-      "funding": "unspecified",
-      "bundle_sha256": "62102f737385d0d7c9f0e0ceda0a0b67726d449a7bf5971c69c9754e60572d33"
-    },
-    {
-      "file": "tpch_sf1_snowflake_sql_20260918_211115_a2414fd7.json",
-      "benchmark": "tpch",
-      "benchmark_name": "TPC-H",
-      "platform": "Snowflake",
-      "platform_version": "10.33.101",
-      "scale_factor": 1.0,
-      "timestamp": "2026-09-18T21:11:15.563073",
-      "query_count": 66,
-      "trust_label": "community-submission",
-      "funding": "unspecified",
-      "bundle_sha256": "4002dcdd209a4059b07244d0bef48e8dc4f0a8514954e7494bf99526910aeffa"
-    },
-    {
-      "file": "tpch_sf10_snowflake_sql_20260918_212237_a730c19a.json",
-      "benchmark": "tpch",
-      "benchmark_name": "TPC-H",
-      "platform": "Snowflake",
-      "platform_version": "10.33.101",
-      "scale_factor": 10.0,
-      "timestamp": "2026-09-18T21:22:37.720796",
-      "query_count": 66,
-      "trust_label": "community-submission",
-      "funding": "unspecified",
-      "bundle_sha256": "d05360f9a1dd89650effeef9aa3915a5505a026b311b8e56014b70d14f574d04"
-    },
-    {
       "file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -3540,7 +3501,6 @@
       "Pandas v2.3.3",
       "Polars v1.40.0",
       "SQLite v3.53.1",
-      "Snowflake v10.33.101",
       "Spark v4.1.1"
     ],
     "tpch@sf1.0": [
@@ -3553,7 +3513,6 @@
       "Polars v1.40.0",
       "PySpark v4.1.1",
       "SQLite v3.53.1",
-      "Snowflake v10.33.101",
       "Spark v4.1.1"
     ],
     "tpch@sf10.0": [
@@ -3565,8 +3524,7 @@
       "DuckDB v1.3.2",
       "DuckDB v1.4.4",
       "DuckDB v1.5.5",
-      "DuckDB v1.6.0.dev365",
-      "Snowflake v10.33.101"
+      "DuckDB v1.6.0.dev365"
     ],
     "tpch_skew@sf0.01": [
       "ClickHouse Local",
@@ -3606,7 +3564,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 253,
+    "total_bundles": 250,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
@@ -3621,7 +3579,7 @@
       "tpcdi": 9,
       "tpcds": 22,
       "tpcds_obt": 3,
-      "tpch": 53,
+      "tpch": 50,
       "tpch_skew": 15,
       "tpchavoc": 9
     },
@@ -3639,16 +3597,15 @@
       "Polars": 28,
       "PySpark": 2,
       "SQLite": 23,
-      "Snowflake": 3,
       "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "community-submission": 9,
+      "community-submission": 6,
       "maintainer-run": 244
     },
     "by_funding": {
-      "unspecified": 253
+      "unspecified": 250
     }
   }
 }
