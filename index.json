@@ -2669,6 +2669,13 @@
       "status": "done",
       "title": "Consolidate overlapping concurrent executors and remove the non-executing stream stub"
     },
+    "concurrency-outcome-and-ownership-contract": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Define truthful concurrency outcomes and resource-ownership boundaries"
+    },
     "concurrency-testing-framework": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "An ADR defines each terminal and non-terminal outcome, including completed, failed, timed_out, cancel_requested, outstanding_work, publishing, and unknown, and states which outcomes may carry valid benchmark metrics.",
+    "A producer-to-consumer inventory names every in-scope scheduler, wrapper, combined runner, result serializer, and durable-job transition, with one owner for cancellation, resource cleanup, and final status publication.",
+    "The contract distinguishes bounded caller response from actual work termination; a returned timeout cannot imply that database work stopped.",
+    "The contract states when later phases or resource reuse are forbidden and defines the evidence required to lift that prohibition.",
+    "The decision reconciles the current throughput runner, TPC-DI enhanced pipeline, expected-results registry, execution-manager APIs, MCP durable jobs, and relevant open or completed tracker items without silently superseding them.",
+    "No implementation is permitted to claim universal cancellation, exactly-once execution, or production readiness unless the chosen contract and proving tests establish that property."
+  ],
+  "context": "Problem reframe: the core issue is not thread-count support. It is truthful status and exclusive ownership across asynchronous boundaries. Extend existing narrow state machines where possible; do not introduce a second orchestration framework. This item is the prerequisite for the implementation branches below.",
+  "description": "BenchBox has several concurrent execution paths, but they do not share a precise contract for completed, failed, timed-out, cancelled, still-running, publishing, and unknown outcomes. Define the smallest common vocabulary and ownership rules needed to prevent false success, invalid metrics, unsafe phase overlap, and duplicate durable work. This is a contract and decision item, not a broad executor rewrite.\n\nDecision boundary: adopt one shared outcome model only where the same semantics are real; otherwise define explicit adapters between narrower contracts. Record the choice in an ADR because it affects public result meaning and durable-job compatibility. Reconcile current code, documentation, and tracker decisions before implementation starts.",
+  "links": [
+    "benchbox/core/throughput/runner.py",
+    "benchbox/core/tpcdi/benchmark.py",
+    "benchbox/core/expected_results/registry.py",
+    "benchbox/utils/execution_manager.py",
+    "benchbox/mcp/jobs.py",
+    "docs/operations/mcp-production-readiness.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:55:18Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "7f83e0c50a934a6bb5a325bdb2eb7e92",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
