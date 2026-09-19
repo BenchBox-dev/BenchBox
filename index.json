@@ -2797,7 +2797,12 @@
       "title": "Compressed Data Generation Gaps (all benchmarks) ✅"
     },
     "concurrency-contract-proof-matrix": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T23:28:30Z",
+        "generation": "6b785e277cd843fe898c98c0723b89d6",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
+      },
       "needs": [
         "expected-results-singleflight-run-policy",
         "throughput-outstanding-work-containment",
@@ -2808,7 +2813,7 @@
         "mcp-durable-admission-and-fairness"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Prove concurrency contracts at unit, integration, adapter, and operator boundaries"
     },
     "concurrency-docs-alignment": {
