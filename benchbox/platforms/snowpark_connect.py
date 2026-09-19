@@ -370,20 +370,28 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
             else:
-                # For CSV/TBL files, use COPY INTO
+                # For CSV/TBL files, use COPY INTO as a full refresh: clear
+                # leftover stage files, re-upload, truncate the target, and
+                # COPY with FORCE so load history cannot skip the reload
+                # (parquet branch already overwrites via save_as_table).
+                try:
+                    session.sql(f"REMOVE @~/{table}/").collect()
+                except Exception as e:
+                    if "does not exist or not authorized" not in str(e):
+                        raise
                 for file_path in table_files:
                     stage_name = f"@~/{table}"
-                    session.sql(f"PUT file://{file_path} {stage_name}").collect()
+                    session.sql(f"PUT file://{file_path} {stage_name} OVERWRITE = TRUE").collect()
 
-                if self.force_recreate:
-                    # Full-refresh load: clear the target before COPY so a forced
-                    # rerun over existing data stays idempotent (parquet branch
-                    # already overwrites via save_as_table).
+                try:
                     session.sql(f"TRUNCATE TABLE {table}").collect()
+                except Exception as e:
+                    if "does not exist or not authorized" not in str(e):
+                        raise
 
                 # Create file format and COPY INTO
                 session.sql(
-                    f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|')"
+                    f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|') FORCE = TRUE"
                 ).collect()
 
                 count_result = session.sql(f"SELECT COUNT(*) FROM {table}").collect()

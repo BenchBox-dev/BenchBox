@@ -675,6 +675,9 @@ class SnowflakeAdapter(PlatformAdapter):
         2. Delete uploaded files
         3. Force expensive re-uploads
 
+        The gate saves DDL only: every load is still a full refresh
+        (truncate + COPY), so skipped DDL never means stale data.
+
         Args:
             benchmark: Benchmark instance
             connection: Snowflake connection
@@ -841,6 +844,9 @@ class SnowflakeAdapter(PlatformAdapter):
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                     table_stats[table_name.upper()] = 0
                     per_table_timings[table_name.upper()] = {"total_ms": 0}
+                    # Fail fast: loads are full refreshes, so a failed table
+                    # must abort the run instead of benchmarking a wiped table.
+                    raise
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -1019,39 +1025,58 @@ class SnowflakeAdapter(PlatformAdapter):
         data_source: DataSource | None = None,
         benchmark: Any = None,
     ) -> int:
-        """Upload table files to stage, COPY INTO target table, and return actual row count."""
+        """Upload table files to stage, COPY INTO target table, and return actual row count.
+
+        Every load is a full refresh: leftover stage files are removed, fresh
+        files uploaded, the resolved target truncated once per table, and COPY
+        runs with FORCE so Snowflake load history cannot silently skip the
+        reload. Reruns therefore report 1x row counts instead of appending.
+        """
         stage_name = f"@%{table_name_upper}"
         target_table = table_name_upper
         self.log_very_verbose(f"Using stage: {stage_name}")
+
+        # Stage hygiene: drop leftovers from interrupted runs so COPY loads
+        # exactly this invocation's files. Tolerate a missing stage.
+        try:
+            cursor.execute(f"REMOVE {stage_name}")
+        except Exception as e:
+            if "does not exist or not authorized" not in str(e):
+                raise
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_msg = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
             self.log_very_verbose(f"Uploading file{chunk_msg} with PUT: {file_path.name}")
             try:
-                cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+                cursor.execute(f"PUT file://{file_path.absolute()} {stage_name} OVERWRITE = TRUE")
             except Exception as e:
                 if "does not exist or not authorized" in str(e):
                     stage_name = f'@%"{table_name}"'
                     target_table = f'"{table_name}"'
-                    cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+                    cursor.execute(f"PUT file://{file_path.absolute()} {stage_name} OVERWRITE = TRUE")
                 else:
                     raise
 
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
         file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
-        if self.force_recreate:
-            # Full-refresh load: clear the resolved target once per table before
-            # COPY so a forced rerun over existing data stays idempotent instead
-            # of appending duplicates. Uses the PUT-fallback-resolved target.
-            self.log_very_verbose(f"Truncating {target_table} before COPY INTO (force recreate)")
+        # Full-refresh load: clear the PUT-fallback-resolved target once per
+        # table before COPY so reruns stay idempotent instead of appending.
+        # Tolerate a missing table on fresh schemas. TRUNCATE runs after PUT so
+        # a failed upload leaves the previous data intact.
+        try:
+            self.log_very_verbose(f"Truncating {target_table} before COPY INTO")
             cursor.execute(f"TRUNCATE TABLE {target_table}")
+        except Exception as e:
+            if "does not exist or not authorized" not in str(e):
+                raise
         copy_command = f"""
             COPY INTO {target_table}
             FROM {stage_name}
             FILE_FORMAT = (FORMAT_NAME = '{file_format}')
             ON_ERROR = 'CONTINUE'
             PURGE = TRUE
+            FORCE = TRUE
         """
         self.log_very_verbose(f"Executing COPY INTO for {target_table}")
         try:
@@ -1065,6 +1090,7 @@ class SnowflakeAdapter(PlatformAdapter):
                     FILE_FORMAT = (FORMAT_NAME = '{file_format}')
                     ON_ERROR = 'CONTINUE'
                     PURGE = TRUE
+                    FORCE = TRUE
                 """
                 cursor.execute(copy_command)
             else:

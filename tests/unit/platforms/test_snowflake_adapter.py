@@ -2563,27 +2563,39 @@ class TestSnowflakeParseResultsEdgeCases:
 
 
 class _StatefulSnowflakeCursor:
-    """Minimal stateful fake of a Snowflake cursor for double-load tests.
+    """Minimal stateful fake of a Snowflake cursor for reload tests.
 
-    Models table row counts across statements: PUT stages files, TRUNCATE
-    clears the target, COPY appends the staged rows (then purges the stage),
-    SELECT COUNT returns the live row count.
+    Models table rows, staged files, and COPY load history across statements:
+    REMOVE clears the stage, PUT stages files (same names replace, modelling
+    OVERWRITE), TRUNCATE clears the target, COPY appends staged rows only when
+    FORCE is set or the files are unseen (then purges the stage and records
+    history), SELECT COUNT returns the live row count.
     """
 
     ROWS_PER_FILE = 2
 
     def __init__(self, existing_rows=25):
         self.tables = {"LINEITEM": [1] * existing_rows}
-        self.staged: list[str] = []
+        self.staged: dict[str, list[int]] = {}
+        self.load_history: set[str] = set()
         self.statements: list[str] = []
         self._last_count = 0
+        self._last_copy_rows: list[tuple[str, int]] = []
+
+    @staticmethod
+    def _file_key(statement):
+        token = str(statement).split()[1]
+        return token.split("file://", 1)[1].split()[0].rsplit("/", 1)[-1]
 
     def execute(self, sql):
         statement = str(sql)
         self.statements.append(statement)
         upper = statement.strip().upper()
+        if upper.startswith("REMOVE "):
+            self.staged = {}
+            return
         if upper.startswith("PUT "):
-            self.staged.append(statement)
+            self.staged[self._file_key(statement)] = [1] * self.ROWS_PER_FILE
             return
         if upper.startswith("TRUNCATE TABLE"):
             target = statement.strip().split()[-1].strip().strip('"')
@@ -2592,8 +2604,12 @@ class _StatefulSnowflakeCursor:
         if "COPY INTO" in upper:
             idx = upper.index("COPY INTO") + len("COPY INTO")
             target = upper[idx:].strip().split()[0].strip().strip('"')
-            self.tables.setdefault(target.upper(), []).extend([1] * (len(self.staged) * self.ROWS_PER_FILE))
-            self.staged = []
+            force = "FORCE = TRUE" in upper or "FORCE=TRUE" in upper
+            fresh = [name for name in self.staged if force or name not in self.load_history]
+            self.tables.setdefault(target.upper(), []).extend([1] * (len(fresh) * self.ROWS_PER_FILE))
+            self._last_copy_rows = [(name, self.ROWS_PER_FILE if name in fresh else 0) for name in self.staged]
+            self.load_history.update(self.staged)
+            self.staged = {}
             return
         if upper.startswith("SELECT COUNT"):
             target = statement.strip().split()[-1].strip().strip('"').strip(";")
@@ -2603,17 +2619,14 @@ class _StatefulSnowflakeCursor:
             return
 
     def fetchall(self):
-        return [
-            [f"lineitem.tbl.{i}", "LOADED", None, self.ROWS_PER_FILE, None, None]
-            for i in range(max(len(self.staged), 1))
-        ]
+        return [[name, "LOADED", None, rows, None, None] for name, rows in self._last_copy_rows]
 
     def fetchone(self):
         return (self._last_count,)
 
 
-class TestSnowflakeForceRecreateIdempotentLoad:
-    """Forced Snowflake loads must be idempotent (no append duplicates)."""
+class TestSnowflakeIdempotentLoad:
+    """Snowflake loads must be idempotent full refreshes (no append duplicates)."""
 
     def _adapter(self, **kwargs):
         from benchbox.platforms.snowflake import SnowflakeAdapter
@@ -2658,8 +2671,8 @@ class TestSnowflakeForceRecreateIdempotentLoad:
         assert first_truncate < first_copy
         assert "TRUNCATE TABLE LINEITEM" in truncates[0]
 
-    def test_no_truncate_and_append_by_default(self, tmp_path):
-        """Without force_recreate, behavior is unchanged: no TRUNCATE, load appends."""
+    def test_default_load_is_full_refresh_not_append(self, tmp_path):
+        """Default loads are full refreshes: reruns report 1x with no flag."""
         adapter = self._adapter()
         assert adapter.force_recreate is False
         cursor = _StatefulSnowflakeCursor(existing_rows=25)
@@ -2671,9 +2684,13 @@ class TestSnowflakeForceRecreateIdempotentLoad:
             for path in files:
                 path.unlink()
 
-        assert not any(s.strip().upper().startswith("TRUNCATE TABLE") for s in cursor.statements)
-        assert first == 25 + 2 * len(files)
-        assert second == first + 2 * len(files)
+        assert first == 2 * len(files)
+        assert second == first
+        uppers = [s.strip().upper() for s in cursor.statements]
+        assert any(s.startswith("REMOVE ") for s in uppers)
+        assert any(s.startswith("PUT ") and "OVERWRITE = TRUE" in s for s in uppers)
+        assert any("COPY INTO" in s and "FORCE = TRUE" in s for s in uppers)
+        assert sum(s.startswith("TRUNCATE TABLE") for s in uppers) == 2
 
     def test_truncate_uses_quoted_fallback_target(self, tmp_path):
         """TRUNCATE must target the PUT-fallback-resolved (quoted) table."""
@@ -2740,3 +2757,121 @@ class TestSnowflakeForceRecreateIdempotentLoad:
             assert SnowflakeAdapter.from_config({**base, "force_recreate": True}).force_recreate is True
             assert SnowflakeAdapter.from_config({**base, "force": True}).force_recreate is True
             assert SnowflakeAdapter.from_config(dict(base)).force_recreate is False
+
+    def test_dirty_stage_leftovers_not_reloaded(self, tmp_path):
+        """Files left in the stage by an interrupted run are not re-ingested."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        cursor.staged = {"stale.tbl": [1] * 99}
+        files = self._tbl_files(tmp_path)
+        try:
+            count = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert count == 2 * len(files)
+        assert "stale.tbl" not in cursor.staged
+
+    def test_load_history_skips_seen_files_without_force(self):
+        """Prove the trap FORCE closes: unseen-history COPY of seen files loads 0."""
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+        cursor.staged = {"lineitem.tbl.1": [1, 1]}
+        cursor.load_history = {"lineitem.tbl.1"}
+        cursor.execute(
+            "COPY INTO LINEITEM FROM @%LINEITEM FILE_FORMAT = (FORMAT_NAME = 'X') ON_ERROR = 'CONTINUE' PURGE = TRUE"
+        )
+        cursor.execute("SELECT COUNT(*) FROM LINEITEM")
+        assert cursor.fetchone() == (0,)
+
+        cursor.staged = {"lineitem.tbl.1": [1, 1]}
+        cursor.execute(
+            "COPY INTO LINEITEM FROM @%LINEITEM FILE_FORMAT = (FORMAT_NAME = 'X')"
+            " ON_ERROR = 'CONTINUE' PURGE = TRUE FORCE = TRUE"
+        )
+        cursor.execute("SELECT COUNT(*) FROM LINEITEM")
+        assert cursor.fetchone() == (2,)
+
+    def test_failed_put_leaves_previous_data_and_raises(self, tmp_path):
+        """A failed upload aborts before TRUNCATE, leaving previous rows intact."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if str(sql).strip().upper().startswith("PUT "):
+                raise RuntimeError("network down")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            with pytest.raises(RuntimeError, match="network down"):
+                adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert cursor.tables["LINEITEM"] == [1] * 25
+        assert not any(s.strip().upper().startswith("TRUNCATE TABLE") for s in cursor.statements)
+
+    def test_failed_copy_raises(self, tmp_path):
+        """A failed COPY aborts the load instead of reporting a wiped table."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if "COPY INTO" in str(sql).upper():
+                raise RuntimeError("warehouse suspended")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            with pytest.raises(RuntimeError, match="warehouse suspended"):
+                adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+    def test_truncate_missing_table_tolerated(self, tmp_path):
+        """TRUNCATE on a fresh schema (no table yet) does not fail the load."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+        del cursor.tables["LINEITEM"]
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if str(sql).strip().upper().startswith("TRUNCATE TABLE"):
+                raise Exception("Table 'LINEITEM' does not exist or not authorized")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            count = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert count == 2
+
+    def test_load_data_fails_fast_on_table_error(self, tmp_path):
+        """load_data must raise instead of recording 0 rows for a wiped table."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"lineitem": str(path)}
+
+        adapter = self._adapter()
+        with patch.object(adapter, "_load_table_from_stage", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError, match="boom"):
+                adapter.load_data(mock_benchmark, mock_connection, tmp_path)

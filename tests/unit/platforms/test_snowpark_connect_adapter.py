@@ -610,12 +610,13 @@ class TestSnowparkConnectAdapterCLI:
         assert table_stats == {"lineitem": 3}
         statements = [str(call.args[0]) for call in mock_session.sql.call_args_list]
         assert any("TRUNCATE TABLE lineitem" in sql for sql in statements)
+        assert any("COPY INTO" in sql and "FORCE = TRUE" in sql for sql in statements)
         truncate_idx = next(i for sql in statements for i in [statements.index(sql)] if "TRUNCATE TABLE" in sql)
         copy_idx = next(i for i, sql in enumerate(statements) if "COPY INTO" in sql)
         assert truncate_idx < copy_idx
 
-    def test_load_data_csv_no_truncate_by_default(self, mock_snowpark, tmp_path):
-        """Default CSV loads are unchanged: no TRUNCATE."""
+    def test_load_data_csv_full_refresh_by_default(self, mock_snowpark, tmp_path):
+        """Default CSV loads are full refreshes: hygiene plus truncate and FORCE."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -633,8 +634,10 @@ class TestSnowparkConnectAdapterCLI:
         adapter.load_data(benchmark, mock_session, Path(tmp_path))
 
         statements = [str(call.args[0]) for call in mock_session.sql.call_args_list]
-        assert any("COPY INTO" in sql for sql in statements)
-        assert not any("TRUNCATE TABLE" in sql for sql in statements)
+        assert any(sql.startswith("REMOVE ") for sql in statements)
+        assert any("PUT " in sql and "OVERWRITE = TRUE" in sql for sql in statements)
+        assert any("TRUNCATE TABLE lineitem" in sql for sql in statements)
+        assert any("COPY INTO" in sql and "FORCE = TRUE" in sql for sql in statements)
 
 
 class TestSnowparkConnectAdapterTuning:
