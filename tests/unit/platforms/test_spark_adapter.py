@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib
 import os
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,6 +15,76 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@contextlib.contextmanager
+def _mock_sys_modules(replacements):
+    """Temporarily replace entries in ``sys.modules`` without evicting the rest.
+
+    Unlike ``patch.dict("sys.modules", ...)`` — which snapshots the ENTIRE
+    dict on entry and restores the snapshot on exit, evicting every module
+    imported inside the block — this only touches the named keys. Eviction is
+    fatal for native extension modules that cannot re-initialize in-process:
+    re-importing datafusion after eviction panics with ``SetLoggerError``
+    (pyo3-log), which broke every test running after this file's mock
+    fixtures in the same pytest process.
+    """
+    saved = {key: sys.modules[key] for key in replacements if key in sys.modules}
+    sys.modules.update(replacements)
+    try:
+        yield
+    finally:
+        for key in replacements:
+            sys.modules.pop(key, None)
+        sys.modules.update(saved)
+
+
+class TestMockSysModules:
+    """Pin _mock_sys_modules semantics: only named keys are touched."""
+
+    def test_only_named_keys_restored(self):
+        sentinel = object()
+        sys.modules["_spark_test_sentinel_present"] = sentinel
+        try:
+            with _mock_sys_modules({"_spark_test_sentinel_present": "mock", "_spark_test_sentinel_absent": "mock"}):
+                assert sys.modules["_spark_test_sentinel_present"] == "mock"
+                assert sys.modules["_spark_test_sentinel_absent"] == "mock"
+                # Modules imported inside the block must survive teardown.
+                sys.modules["_spark_test_imported_inside"] = object()
+            assert sys.modules["_spark_test_sentinel_present"] is sentinel
+            assert "_spark_test_sentinel_absent" not in sys.modules
+            assert "_spark_test_imported_inside" in sys.modules
+        finally:
+            sys.modules.pop("_spark_test_sentinel_present", None)
+            sys.modules.pop("_spark_test_imported_inside", None)
+
+    def test_native_modules_survive_mock_block(self):
+        """Modules imported under the mock must still import afterwards.
+
+        Regression test: patch.dict("sys.modules", ...) evicted everything
+        imported inside the block, so a later datafusion import panicked with
+        SetLoggerError (pyo3-log). Importing here, then re-importing after
+        teardown, must be a no-op.
+
+        This only exercises the real eviction path when datafusion is not
+        already resident: under `-n auto`, an earlier test on the same worker
+        (e.g. anything touching the platform registry) may have imported it,
+        reducing the in-block import to a sys.modules cache hit that passes
+        under any implementation. Skip loudly in that case instead of
+        silently passing vacuous; the deterministic eviction semantics are
+        pinned by test_only_named_keys_restored, which does not depend on
+        ambient import state.
+        """
+        if "datafusion" in sys.modules:
+            pytest.skip("datafusion already imported on this worker; eviction path not exercisable")
+        pytest.importorskip("datafusion")
+        with _mock_sys_modules({"pyspark": MagicMock(), "pyspark.sql": MagicMock()}):
+            import datafusion  # noqa: F401
+
+            assert "datafusion" in sys.modules
+        import datafusion  # noqa: F401  -- must not panic
+
+        assert "datafusion" in sys.modules
 
 
 class TestSparkAdapter:
@@ -34,8 +107,7 @@ class TestSparkAdapter:
         mock_session_class = MagicMock()
         mock_session_class.builder = mock_builder
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
@@ -373,8 +445,7 @@ class TestSparkAdapterExecution:
         mock_session_class = MagicMock()
         mock_session_class.builder = mock_builder
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
@@ -760,22 +831,14 @@ class TestSparkAdapterImportError:
 
     def test_missing_dependencies(self):
         """Test that missing dependencies raise ImportError."""
-        import sys
-
-        # Remove pyspark from modules if present
-        removed = {}
-        for mod in list(sys.modules.keys()):
-            if mod.startswith("pyspark"):
-                removed[mod] = sys.modules.pop(mod)
-
-        try:
-            with patch.dict("sys.modules", {"pyspark": None, "pyspark.sql": None}):
-                # This should raise ImportError due to missing dependencies
-                # The actual test depends on how the module handles missing deps
-                pass
-        finally:
-            # Restore modules
-            sys.modules.update(removed)
+        # A None entry in sys.modules makes `import pyspark` raise ImportError.
+        # _mock_sys_modules restores only these keys (unlike patch.dict on the
+        # whole dict, which would evict every module imported inside the block).
+        with _mock_sys_modules({"pyspark": None, "pyspark.sql": None}):
+            with pytest.raises(ImportError):
+                importlib.import_module("pyspark")
+            with pytest.raises(ImportError):
+                importlib.import_module("pyspark.sql")
 
 
 class TestSparkAdapterRegistration:
@@ -814,8 +877,7 @@ class TestSparkAdapterCliArguments:
         mock_session_class = MagicMock()
         mock_session_class.builder = MagicMock()
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
@@ -1027,8 +1089,7 @@ class TestSparkAdapterGetPlatformInfoLive:
         mock_session_class = MagicMock()
         mock_session_class.builder = MagicMock()
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
@@ -1089,8 +1150,7 @@ class TestSparkAdapterApplyTableTunings:
         mock_session_class = MagicMock()
         mock_session_class.builder = MagicMock()
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
@@ -1239,8 +1299,7 @@ class TestBuildSparkConfig:
         mock_session_class = MagicMock()
         mock_session_class.builder = MagicMock()
 
-        with patch.dict(
-            "sys.modules",
+        with _mock_sys_modules(
             {
                 "pyspark": MagicMock(),
                 "pyspark.sql": MagicMock(SparkSession=mock_session_class),
