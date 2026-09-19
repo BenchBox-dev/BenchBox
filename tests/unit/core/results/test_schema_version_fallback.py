@@ -17,6 +17,11 @@ from benchbox.core.results.loader import UnsupportedSchemaError, load_result_fil
 from benchbox.core.results.schema_policy import result_schema_version_value
 from tests.fixtures.result_dict_fixtures import make_v2_result_dict
 
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
 
 @pytest.mark.parametrize(
     ("bundle", "expected"),
