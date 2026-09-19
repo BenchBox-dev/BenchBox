@@ -13081,17 +13081,12 @@
       "title": "Result-bundle compat: plans-companion truncation contract"
     },
     "result-bundle-compat-read-model-v11-load-time": {
-      "claim": {
-        "expires_at": "2026-09-20T00:29:17Z",
-        "generation": "8e4569fb202047139909fcf533d55eb3",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [
         "result-bundle-compat-decide-load-time-surfacing"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: implement read-model load-time projection"
     },
     "result-bundle-compat-reconcile-review": {
