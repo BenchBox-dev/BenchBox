@@ -16787,12 +16787,17 @@
       "title": "Make TPC-DI generation reproducible across worker counts"
     },
     "tpcdi-enhanced-parallel-support-decision": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T20:52:42Z",
+        "generation": "f7b00dfe404f4ff8a3b569842e7b5a20",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
+      },
       "needs": [
         "tpcdi-parallel-phase-truthful-outcome"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Resolve the TPC-DI enhanced parallel surface against the canonical ETL path"
     },
     "tpcdi-memory-test-delta-refactor": {
