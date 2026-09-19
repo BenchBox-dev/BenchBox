@@ -1,13 +1,13 @@
 {
   "acceptance": [
     "One-session runs use versioned query order, parameters, warmup, cache, repetition, and optional workload-gap policies.",
-    "Timing includes planning, execution, and full result consumption and excludes declared setup phases.",
-    "Every timing is joined to its rendered SQL, data state, oracle result, and cohort identity.",
-    "Candidate score evidence uses complete repetitions, median atomic measures, published dispersion, and no best-run selection.",
-    "JOB and the qualified TPC-Havoc panel can run in Power while preserving their canonical dataset and equivalence contracts.",
-    "Failures invalidate score evidence and remain distinguishable from unsupported capabilities."
+    "A platform-specific cache-state procedure and verification evidence are recorded; an uncontrollable cold state is never claimed, and warm-only qualification is explicit.",
+    "Monotonic end-to-end timing includes planning, execution, and full result consumption; optional planning/execution/fetch components and non-overlapping setup/scored phase boundaries are recorded.",
+    "Every timing is joined to translated SQL, data state, oracle result, evidence status, and cohort identity.",
+    "The predeclared candidate set uses complete repetitions; an invalid repetition remains visible and invalidates the submission rather than being replaced selectively. Valid sets use median atomic measures and publish all runs and declared dispersion.",
+    "JOB and the qualified TPC-Havoc panel can run in Power while preserving canonical dataset and equivalence contracts."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Build deterministic one-session orchestration for the admitted Power workload. Reuse the run service, monotonic timing, result capture, validation, and manifest contracts; record full result consumption and diagnostics without altering official TPC paths.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
@@ -29,6 +29,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "ebecf6f87b934f78af65ebb6cfbb784c",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:12:43Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "441ae671b92d4d6bb69fe33bf977ff58",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]

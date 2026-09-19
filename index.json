@@ -1252,7 +1252,6 @@
     "benchbox-score-power-runner": {
       "claim": null,
       "needs": [
-        "benchbox-score-advanced-oracles",
         "benchbox-score-manifest-schema"
       ],
       "priority": "medium-high",
