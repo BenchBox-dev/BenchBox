@@ -15,12 +15,15 @@ provenance:
     upstream_published: unknown
     method: manual
     verified_regions: [us-east-1]
+    manual_review_due: '2026-12-17'
+  # BEGIN GENERATED provenance.athena_price_per_tb -- scripts/generate_pricing_data.py (do not hand-edit)
   athena_price_per_tb:
-    source: 'https://aws.amazon.com/athena/pricing/'
-    retrieved: unknown
-    upstream_published: unknown
-    method: manual
+    source: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonAthena/current/{region}/index.json'
+    retrieved: '2026-09-18'
+    upstream_published: '2026-09-11T12:44:08Z'
+    method: api
     verified_regions: [us-east-1, eu-west-1, ap-southeast-1, ap-northeast-1, sa-east-1]
+  # END GENERATED provenance.athena_price_per_tb
   bigquery_on_demand_prices:
     source: 'https://cloud.google.com/bigquery/pricing'
     retrieved: '2026-09-18'
@@ -49,37 +52,47 @@ provenance:
       northamerica-south1, southamerica-east1, southamerica-west1,
       us-central1, us-east1, us-east4, us-east5, us-east7, us-south1,
       us-west1, us-west2, us-west3, us-west4, us-west8]
+    manual_review_due: '2026-12-17'
+  # BEGIN GENERATED provenance.redshift_node_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   redshift_node_prices:
     source: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRedshift/current/{region}/index.json'
     retrieved: '2026-09-18'
     upstream_published: '2026-09-11T12:45:05Z'
     method: api
-    verified_regions: [us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2,
-      eu-central-1, ap-southeast-1, ap-southeast-2, ap-northeast-1, sa-east-1]
+    verified_regions: [us-east-1, us-east-2, us-west-1, us-west-2, eu-west-1, eu-west-2, eu-central-1,
+      ap-southeast-1, ap-southeast-2, ap-northeast-1, sa-east-1]
+  # END GENERATED provenance.redshift_node_prices
   databricks_dbu_prices:
     source: 'https://prices.azure.com/api/retail/prices'
     retrieved: unknown
     upstream_published: unknown
     method: manual
     verified_regions: [eastus]
+    manual_review_due: '2026-12-17'
+  # BEGIN GENERATED provenance.synapse_serverless_price_per_tb -- scripts/generate_pricing_data.py (do not hand-edit)
   synapse_serverless_price_per_tb:
-    source: 'Azure Synapse Analytics serverless SQL pool pricing page'
-    retrieved: unknown
+    source: 'https://prices.azure.com/api/retail/prices'
+    retrieved: '2026-09-18'
     upstream_published: unknown
-    method: manual
+    method: api
     verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  # END GENERATED provenance.synapse_serverless_price_per_tb
+  # BEGIN GENERATED provenance.synapse_dedicated_dwu_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   synapse_dedicated_dwu_prices:
     source: 'https://prices.azure.com/api/retail/prices'
     retrieved: '2026-09-18'
     upstream_published: unknown
     method: api
     verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  # END GENERATED provenance.synapse_dedicated_dwu_prices
+  # BEGIN GENERATED provenance.fabric_cu_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   fabric_cu_prices:
     source: 'https://prices.azure.com/api/retail/prices'
     retrieved: '2026-09-18'
     upstream_published: unknown
     method: api
     verified_regions: [eastus, westeurope, southeastasia, canadacentral, brazilsouth]
+  # END GENERATED provenance.fabric_cu_prices
   fabric_sku_cu_map:
     source: 'Microsoft Fabric capacity SKU documentation'
     retrieved: unknown
@@ -92,12 +105,14 @@ provenance:
     upstream_published: unknown
     method: manual
     verified_regions: []
+    manual_review_due: '2026-12-17'
   firebolt_fbu_price:
     source: 'https://docs.firebolt.io/managed-service/billing'
     retrieved: '2026-09-18'
     upstream_published: unknown
     method: manual
     verified_regions: [us]
+    manual_review_due: '2026-12-17'
 units:
   bigquery_on_demand_prices: tebibyte
   athena_price_per_tb: terabyte_unconfirmed
@@ -179,12 +194,14 @@ snowflake_credit_prices:
       ap: 7.8
       ca: 6.6
       other: 8.1
+# BEGIN GENERATED athena_price_per_tb -- scripts/generate_pricing_data.py (do not hand-edit)
 athena_price_per_tb:
   us-east-1: 5.0
   eu-west-1: 5.0
   ap-southeast-1: 5.0
   ap-northeast-1: 5.0
   sa-east-1: 9.0
+# END GENERATED athena_price_per_tb
 bigquery_on_demand_prices:
   us: 6.25
   eu: 6.25
@@ -243,6 +260,7 @@ bigquery_on_demand_prices:
   us-west8: 6.25
   other: 11.25
 redshift_node_prices:
+  # BEGIN GENERATED redshift_node_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   dc2.large:
     us-east-1: 0.25
     us-east-2: 0.25
@@ -363,6 +381,7 @@ redshift_node_prices:
     ap-southeast-2: 10.9452
     ap-northeast-1: 10.7429
     other: 14.546
+  # END GENERATED redshift_node_prices
 databricks_dbu_prices:
   aws:
     standard:
@@ -390,6 +409,7 @@ databricks_dbu_prices:
       sql_serverless: 0.70
       ml: 0.65
   azure:
+    # BEGIN GENERATED databricks.azure -- scripts/generate_pricing_data.py (do not hand-edit)
     standard:
       all_purpose: 0.40
       jobs: 0.15
@@ -406,6 +426,7 @@ databricks_dbu_prices:
       sql_pro: 0.55
       sql_serverless: 0.70
       ml: 0.55
+    # END GENERATED databricks.azure
   gcp:
     standard:
       all_purpose: 0.4
@@ -431,13 +452,16 @@ databricks_dbu_prices:
       sql_pro: 0.55
       sql_serverless: 0.70
       ml: 0.65
+# BEGIN GENERATED synapse_serverless_price_per_tb -- scripts/generate_pricing_data.py (do not hand-edit)
 synapse_serverless_price_per_tb:
   eastus: 5.0
   westeurope: 5.0
   southeastasia: 6.75
   canadacentral: 5.5
   brazilsouth: 9.0
+# END GENERATED synapse_serverless_price_per_tb
 synapse_dedicated_dwu_prices:
+  # BEGIN GENERATED synapse_dedicated_dwu_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   dw100c:
     us: 1.51
     eu: 1.51
@@ -534,12 +558,15 @@ synapse_dedicated_dwu_prices:
     ap: 543.00
     ca: 399.00
     other: 726.00
+  # END GENERATED synapse_dedicated_dwu_prices
 fabric_cu_prices:
+  # BEGIN GENERATED fabric_cu_prices -- scripts/generate_pricing_data.py (do not hand-edit)
   us: 0.18
   eu: 0.22
   ap: 0.22
   ca: 0.20
   other: 0.28
+  # END GENERATED fabric_cu_prices
 fabric_sku_cu_map:
   f2: 2
   f4: 4
