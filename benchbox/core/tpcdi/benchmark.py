@@ -348,19 +348,31 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
         from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+            BIGQUERY_EQ7_SQL,
             CLICKHOUSE_AQ6_SQL,
             CLICKHOUSE_AQ7_SQL,
             CLICKHOUSE_AQ8_SQL,
             CLICKHOUSE_AQ10_SQL,
             CLICKHOUSE_EQ7_SQL,
+            DATABRICKS_EQ7_SQL,
             DATAFUSION_AQ9_SQL,
             DATAFUSION_EQ7_SQL,
             DATAFUSION_VQ6_SQL,
             DORIS_EQ7_SQL,
+            SNOWFLAKE_EQ7_SQL,
             STARROCKS_EQ7_SQL,
         )
 
         variants: dict[str, dict[str, str]] = {
+            "bigquery": {
+                "EQ7": BIGQUERY_EQ7_SQL,
+            },
+            "databricks": {
+                "EQ7": DATABRICKS_EQ7_SQL,
+            },
+            "snowflake": {
+                "EQ7": SNOWFLAKE_EQ7_SQL,
+            },
             "clickhouse": {
                 "AQ6": CLICKHOUSE_AQ6_SQL,
                 "AQ7": CLICKHOUSE_AQ7_SQL,
@@ -409,7 +421,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     query_params.update(params)
                 return variant_sql.format(**query_params)
 
-            if platform == "clickhouse" and query_id == "EQ7" and params is not None:
+            if platform in ("bigquery", "clickhouse") and query_id == "EQ7" and params is not None:
                 query_params = self.query_manager.etl_queries._generate_default_params(query_id)
                 query_params.update(params)
                 default_params = self.query_manager.etl_queries._generate_default_params(query_id)
@@ -494,6 +506,17 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 query_text,
             )
 
+        elif target_dialect.lower() == "snowflake":
+            # Snowflake has no JULIANDAY function and rejects DATE('now').
+            # Rewrite DATE idioms here; JULIANDAY is rewritten after
+            # translation below (SQLGlot passes it through untouched, while
+            # the shared diff regex cannot handle nested function args).
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"DATEADD(day, -{m.group(1)}, CURRENT_DATE())",
+                query_text,
+            )
+            query_text = _DATE_NOW_RE.sub("CURRENT_DATE()", query_text)
+
         elif (
             "clickhouse" in target_dialect.lower()
             or "starrocks" in target_dialect.lower()
@@ -556,6 +579,23 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(
                 lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
                 query_text,
+            )
+
+        elif target_dialect.lower() == "snowflake":
+            # SQLGlot passes unknown JULIANDAY calls through for Snowflake.
+            # Rewrite diffs first (nesting-safe), then any surviving bare
+            # call as day-number arithmetic.
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)\s*-\s*JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"DATEDIFF(day, \2, \1)",
+                query_text,
+                flags=re.IGNORECASE,
+            )
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"(DATEDIFF(day, DATE '1970-01-01', \1) + 2440588)",
+                query_text,
+                flags=re.IGNORECASE,
             )
 
         return query_text
