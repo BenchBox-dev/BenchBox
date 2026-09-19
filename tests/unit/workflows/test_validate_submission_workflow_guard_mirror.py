@@ -51,12 +51,13 @@ def test_guard_step_binds_the_same_trust_signals_as_the_vendor_gate() -> None:
     assert env.get("PR_AUTHOR") == "${{ github.event.pull_request.user.login }}"
 
 
-def test_guard_step_still_covers_all_five_files() -> None:
+def test_guard_step_still_covers_all_six_files() -> None:
     script = _guard_step()["run"]
     for f in [
         "scripts/validate_submission.py",
         "benchbox/validation/bundle.py",
         "benchbox/core/results/query_status.py",
+        "benchbox/core/results/schema_policy.py",
         "scripts/generate_corpus_inventory.py",
         ".github/workflows/validate-submission.yml",
     ]:

@@ -14,26 +14,44 @@ import hashlib
 import importlib.util
 import json
 import re
+import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-try:
-    from benchbox.core.results.schema_policy import (
-        PUBLIC_SUBMISSION_SCHEMA_POLICY,
-        result_schema_version_value,
-    )
-except ImportError:  # pragma: no cover - exercised on the slim published-results branch.
-    PUBLIC_SUBMISSION_SCHEMA_POLICY = None
 
-    def result_schema_version_value(data: dict[str, Any]) -> Any:
-        if not isinstance(data, dict):
-            return None
-        if "result_schema_version" in data:
-            return data.get("result_schema_version")
-        if "version" in data:
-            return data.get("version")
-        return data.get("schema_version")
+def _load_schema_policy_helpers():
+    """Load version helpers without running results package initializers.
+
+    Prefers the canonical package import; on the slim published-results
+    branch mirror (which ships this module plus
+    ``benchbox/core/results/schema_policy.py`` without the installable
+    package) loads the helper straight from the mirrored file, mirroring
+    how ``_load_bundle_failed_query_count`` loads its policy. There is a
+    single implementation: no inline duplicate lives here.
+    """
+    try:
+        from benchbox.core.results.schema_policy import (
+            PUBLIC_SUBMISSION_SCHEMA_POLICY,
+            result_schema_version_value,
+        )
+
+        return PUBLIC_SUBMISSION_SCHEMA_POLICY, result_schema_version_value
+    except ImportError:
+        pass
+    helper_path = Path(__file__).resolve().parents[1] / "core" / "results" / "schema_policy.py"
+    spec = importlib.util.spec_from_file_location("_benchbox_schema_policy", helper_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load schema version policy from {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    # Register before exec: dataclass processing resolves types through
+    # sys.modules[module.__name__] and fails on an unregistered module.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.PUBLIC_SUBMISSION_SCHEMA_POLICY, module.result_schema_version_value
+
+
+PUBLIC_SUBMISSION_SCHEMA_POLICY, result_schema_version_value = _load_schema_policy_helpers()
 
 
 # Canonical provenance vocabulary. Import from the one source of truth when the

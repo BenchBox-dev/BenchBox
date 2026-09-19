@@ -272,6 +272,14 @@ def test_build_mirror_carries_shared_query_status_policy() -> None:
     assert "'benchbox/core/results/query_status.py'" in build
 
 
+def test_build_mirror_carries_shared_schema_policy() -> None:
+    """The slim validator's shared version-key policy must move with bundle.py."""
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert '"benchbox/core/results/schema_policy.py"' in workflow
+    build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
+    assert "'benchbox/core/results/schema_policy.py'" in build
+
+
 def test_drift_check_ignores_derived_inventory_difference() -> None:
     """A union mirror's archive-only bundles necessarily change its inventory."""
     workflow = yaml.safe_load(DRIFT_WORKFLOW_PATH.read_text(encoding="utf-8"))

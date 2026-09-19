@@ -26,7 +26,9 @@ name: Sync results-data to published-results
 # on the public corpus branch. Validator changes mirror both the thin
 # `scripts/validate_submission.py` entrypoint and its shared
 # `benchbox/validation/bundle.py` implementation plus the stdlib-only
-# `benchbox/core/results/query_status.py` failure policy.
+# `benchbox/core/results/query_status.py` failure policy and the stdlib-only
+# `benchbox/core/results/schema_policy.py` version-key policy it loads the
+# version helpers from (no inline duplicate lives in bundle.py).
 #
 # The mirror PR's author is this workflow's own GITHUB_TOKEN identity
 # (github-actions[bot]). GitHub does not start `pull_request`-triggered workflow
@@ -58,6 +60,7 @@ on:
       - "scripts/validate_submission.py"
       - "benchbox/validation/bundle.py"
       - "benchbox/core/results/query_status.py"
+      - "benchbox/core/results/schema_policy.py"
       - "scripts/generate_corpus_inventory.py"
   workflow_dispatch:
 
@@ -121,6 +124,7 @@ jobs:
             'results-data/README.md' 'results-data/validate_corpus.py' \
             'benchbox/validation/bundle.py' \
             'benchbox/core/results/query_status.py' \
+            'benchbox/core/results/schema_policy.py' \
             'scripts/validate_submission.py' 'scripts/generate_corpus_inventory.py')
 
           if [[ ${#DIFFED[@]} -eq 0 ]]; then
@@ -262,6 +266,7 @@ jobs:
             'results-data/validate_corpus.py'
             'benchbox/validation/bundle.py'
             'benchbox/core/results/query_status.py'
+            'benchbox/core/results/schema_policy.py'
             'scripts/validate_submission.py'
             'scripts/generate_corpus_inventory.py'
           )
@@ -299,7 +304,7 @@ jobs:
             exit 0
           fi
 
-          git add results-data scripts benchbox/validation benchbox/core/results/query_status.py || true
+          git add results-data scripts benchbox/validation benchbox/core/results/query_status.py benchbox/core/results/schema_policy.py || true
 
           # The heredoc body inherits the YAML block-scalar's 10-space
           # indentation — strip it before using the file as a commit message.
