@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "At least three materially different database systems complete the admitted Core pilot.",
+    "Alternative block weights and panels are compared against simple baselines and independent holdout workloads.",
+    "No benchmark exceeds 15%, no shared lineage exceeds 40%, independent real-data work is at least 25%, and advanced SQL is at least 15%.",
+    "Sensitivity analysis shows the headline does not collapse into one benchmark, capability, or platform.",
+    "The report selects or rejects each workload member and weight with reproducible evidence."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Run the candidate methodology on at least three materially different database systems. Use capability coverage, runtime budgets, correlation and sensitivity analysis, and holdout workloads to select membership and weights without tuning the score to DuckDB or one lineage.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:46:54Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "558fe29a05274abfb3fd5dfb0a07f05c",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}

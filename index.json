@@ -1218,6 +1218,19 @@
       "status": "open",
       "title": "Define score manifests and cohort identity"
     },
+    "benchbox-score-multisystem-pilot": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-calculator",
+        "benchbox-score-power-runner",
+        "benchbox-score-throughput-runner",
+        "benchbox-score-size-profile-pilot",
+        "benchbox-score-concurrency-pilot"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Calibrate score membership and weights across systems"
+    },
     "benchbox-score-power-runner": {
       "claim": null,
       "needs": [
