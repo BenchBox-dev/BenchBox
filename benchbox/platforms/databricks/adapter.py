@@ -2410,53 +2410,10 @@ class DatabricksAdapter(PlatformAdapter):
         return SparkQueryPlanParser()
 
     def _apply_tpcdi_databricks_rewrites(self, query: str) -> str:
-        """Rewrite TPC-DI SQL Server/SQLite idioms for Databricks.
+        """Databricks TPC-DI idioms via the shared cloud rewrite core."""
+        from benchbox.platforms.cloud_shared import rewrite_tpcdi_for_databricks
 
-        - BIT flag columns (IsCurrent, TT_IS_SELL, HolidayFlag) are BOOLEAN
-          in Databricks, so ``= 1``/``= 0`` comparisons become IS TRUE/FALSE.
-        - ``JULIANDAY(d)`` becomes ``(DATEDIFF(d, DATE '1970-01-01') +
-          2440588)`` (day-number arithmetic is preserved; differences are
-          exact since the constants cancel).
-        - ``DATE('now')`` becomes ``CURRENT_DATE()`` and
-          ``DATE('now', '-90 days')`` becomes the equivalent DATE_SUB.
-        """
-        query = re.sub(
-            r"\b(IsCurrent|TT_IS_SELL|HolidayFlag)(`?)\s*=\s*1\b",
-            r"\1\2 IS TRUE",
-            query,
-            flags=re.IGNORECASE,
-        )
-        query = re.sub(
-            r"\b(IsCurrent|TT_IS_SELL|HolidayFlag)(`?)\s*=\s*0\b",
-            r"\1\2 IS FALSE",
-            query,
-            flags=re.IGNORECASE,
-        )
-        # Iterate to fixpoint so nested forms such as
-        # JULIANDAY(DATE('now')) resolve inside-out.
-        for _ in range(3):
-            rewritten = re.sub(
-                r"DATE\s*\(\s*'now'\s*,\s*'-(\d+)\s+days?'\s*\)",
-                r"DATE_SUB(CURRENT_DATE(), \1)",
-                query,
-                flags=re.IGNORECASE,
-            )
-            rewritten = re.sub(
-                r"DATE\s*\(\s*'now'\s*\)",
-                "CURRENT_DATE()",
-                rewritten,
-                flags=re.IGNORECASE,
-            )
-            rewritten = re.sub(
-                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
-                r"(DATEDIFF(\1, DATE '1970-01-01') + 2440588)",
-                rewritten,
-                flags=re.IGNORECASE,
-            )
-            if rewritten == query:
-                break
-            query = rewritten
-        return query
+        return rewrite_tpcdi_for_databricks(query)
 
     def _normalize_databricks_query(self, query: str) -> str:
         """Apply Databricks execution normalizations (idempotent, no-op safe).
