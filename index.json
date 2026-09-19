@@ -8633,9 +8633,9 @@
     },
     "mcp-job-ownership-cancellation-fencing": {
       "claim": {
-        "expires_at": "2026-09-20T21:55:03Z",
-        "generation": "bd365a07a9bc49e6afcf7400c9c89d9c",
-        "renewals": 0,
+        "expires_at": "2026-09-20T22:30:23Z",
+        "generation": "233bcfb9e1504b77aa53c598d7de2d99",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
       },
       "needs": [
