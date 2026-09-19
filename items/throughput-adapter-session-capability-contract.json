@@ -10,12 +10,9 @@
   "context": "This extends the existing platform capability and manifest patterns. A platform-specific implementation is preferred when a unique session model makes a shared abstraction misleading.",
   "description": "Throughput correctness depends on independent streams seeing the same benchmark database, schema, credentials, catalog, and session settings without sharing an unsafe connection. The current create_connection shape does not state whether an adapter can create equivalent independent sessions, safely share an embedded engine, or cannot support throughput. Add an explicit capability contract and fail closed for unknown adapters.\n\nDecision boundary: deliberate inheritance is allowed when equivalence is proven. Do not require one implementation shape across embedded and server platforms, and do not infer support only because create_connection exists.",
   "links": [
-    "benchbox/platforms/base/connection_lifecycle.py",
-    "benchbox/core/contracts/platform_capabilities.py",
-    "benchbox/core/contracts/platform_capability_views.py",
-    "benchbox/core/throughput/runner.py",
-    "benchbox/platforms/pg_mooncake.py",
-    "tests/integration/test_local_platform_benchmark_matrix.py"
+    "https://github.com/BenchBox-dev/BenchBox/pull/2221",
+    "benchbox/platforms/base/connection_wrappers.py",
+    "tests/unit/platforms/test_throughput_session_capability_sweep.py"
   ],
   "sessions": [
     {
