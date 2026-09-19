@@ -10,12 +10,8 @@
   "context": "This is a follow-up reconciliation, not a repeat of concurrency-executor-consolidation. The earlier item addressed the non-executing stub and broad duplication; this item closes the remaining public semantic ambiguity visible in the current tree.",
   "description": "A completed consolidation item removed a fake-success stub, but the current tree still exposes ConcurrentQueryExecutor and PowerRunExecutor beside the canonical throughput StreamRunner and benchmark-specific power harnesses. Reassess each public or documented utility by behavior, not by the word executor, then route, adapt, deprecate, or remove it.\n\nDecision boundary: ConcurrentQueryExecutor may map to the supported throughput path only after its configuration, warmup, iteration, failure, statistics, and result semantics are inventoried. PowerRunExecutor must map to the canonical power-test harness or be retired; it must not be folded into StreamRunner merely to reduce class count.",
   "links": [
-    "benchbox/utils/execution_manager.py",
-    "benchbox/core/throughput/runner.py",
-    "benchbox/core/tpch/power_test.py",
-    "benchbox/core/tpcds/power_test.py",
-    "tests/unit/test_concurrency_executor_and_joinorder.py",
-    "concurrency-executor-consolidation"
+    "https://github.com/BenchBox-dev/BenchBox/pull/2224",
+    "docs/development/adr/adr-concurrency-public-api-reconciliation.md"
   ],
   "sessions": [
     {
