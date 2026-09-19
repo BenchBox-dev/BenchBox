@@ -93,3 +93,13 @@ Databricks platform metadata includes:
 - `resolved_databricks_clustering_strategy`
 - `applied_layout_operations`
 - `skipped_layout_operations`
+
+### Provenance cutoff
+
+Untuned runs made before the #2177 fix reported
+`databricks_clustering_strategy: "z_order"` while applying only plain
+OPTIMIZE compaction. `export.benchbox_version` (recorded since #2199)
+is the cutoff marker: a Databricks bundle without it that claims
+`"z_order"` outside any tuning context predates provenance and must be
+treated as unknown. Submission validation warns on that shape without
+failing it, and old bundles are never rewritten.

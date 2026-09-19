@@ -985,6 +985,24 @@ class TestCompanionMaxDepth:
         leaf = entry["plan"]["logical_root"]["children"][0]["children"][0]
         assert leaf["operator_id"] == "op_2"
 
+    def test_companion_marks_truncation_at_payload_level(self) -> None:
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, {"plan_max_depth": 1}))
+
+        assert payload is not None
+        assert payload["max_depth"] == 1
+        assert payload["truncated"] is True
+
+    def test_companion_untruncated_payload_level_marker(self) -> None:
+        from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, None))
+
+        assert payload is not None
+        assert payload["max_depth"] == DEFAULT_PLAN_MAX_DEPTH
+        assert payload["truncated"] is False
+
     def test_resolve_companion_max_depth_fallbacks(self) -> None:
         from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
         from benchbox.core.results.schema import _resolve_companion_max_depth

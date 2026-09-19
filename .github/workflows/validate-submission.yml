@@ -107,11 +107,12 @@ jobs:
           # Self-green defense: validator/workflow changes must not be in submission PR.
           # This guard is now advisory (execution already trusted via base checkout), but
           # retained for defense-in-depth and to surface misdirected PRs early.
-          # 5-file guard: scripts/validate_submission.py, benchbox/validation/bundle.py,
-          # benchbox/core/results/query_status.py, scripts/generate_corpus_inventory.py,
-          # and this workflow file itself.
+          # 6-file guard: scripts/validate_submission.py, benchbox/validation/bundle.py,
+          # benchbox/core/results/query_status.py,
+          # benchbox/core/results/schema_policy.py,
+          # scripts/generate_corpus_inventory.py, and this workflow file itself.
           #
-          # sync-results-data-to-published.yml mirrors these exact 5 files onto
+          # sync-results-data-to-published.yml mirrors these exact 6 files onto
           # published-results by design (see that workflow's header comment), so its
           # auto/results-mirror-* PRs legitimately touch this guard's file set. Waive
           # the guard for that trusted, unforgeable shape only - same TRUSTED_MIRROR
@@ -123,6 +124,7 @@ jobs:
             scripts/validate_submission.py \
             benchbox/validation/bundle.py \
             benchbox/core/results/query_status.py \
+            benchbox/core/results/schema_policy.py \
             scripts/generate_corpus_inventory.py \
             .github/workflows/validate-submission.yml \
             || true)

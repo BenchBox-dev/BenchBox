@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Result bundle version key renamed to `result_schema_version`** -
+  Producers emit the new key exclusively; readers accept
+  `result_schema_version`, legacy `version`, then `schema_version` via a
+  shared helper, and bundles record `export.benchbox_version` (#2199).
 - **BREAKING: Python 3.11 is now required.** BenchBox has removed Python 3.10
   support ahead of CPython's end-of-life date in October 2026. BenchBox plans
   to require Python 3.12 in its first release after Python 3.11 reaches end of

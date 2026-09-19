@@ -177,6 +177,48 @@ class TestValidateBundle:
         assert vr.ok
         assert len(vr.errors) == 0
 
+    def _databricks_bundle(self) -> dict:
+        data = _minimal_bundle()
+        data["platform"] = {"name": "databricks"}
+        return data
+
+    def test_pre_cutoff_untuned_z_order_warns(self):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "platform",
+        [
+            {
+                "name": "databricks",
+                "config": {"databricks_clustering_strategy": "z_order"},
+                "tuning": {"tuning_source": "explicit_file"},
+            },
+            {"name": "databricks", "config": {"databricks_clustering_strategy": "none"}},
+            {"name": "duckdb", "config": {"databricks_clustering_strategy": "z_order"}},
+        ],
+    )
+    def test_cutoff_warn_only_for_untuned_pre_provenance_z_order(self, platform):
+        data = _minimal_bundle()
+        data["platform"] = platform
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
+    def test_post_cutoff_z_order_does_not_warn(self):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["export"] = {"benchbox_version": "0.5.0"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
     def test_valid_schema_2_2_row_count_validation_passes(self):
         data = _minimal_bundle()
         data["version"] = "2.2"

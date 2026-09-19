@@ -169,6 +169,17 @@ def test_submission_self_green_guard_covers_shared_query_status_policy() -> None
     assert "benchbox/core/results/query_status.py" in guard
 
 
+def test_submission_self_green_guard_covers_shared_schema_policy() -> None:
+    submission = _load(WORKFLOWS / "validate-submission.yml")
+    steps = submission["jobs"]["validate"]["steps"]
+    guard = next(
+        step.get("run", "")
+        for step in steps
+        if step.get("name") == "Reject validator or workflow changes in a submission PR"
+    )
+    assert "benchbox/core/results/schema_policy.py" in guard
+
+
 def test_published_results_base_mirror_validation_runs_before_the_pr_is_opened() -> None:
     """Validation must happen before the PR exists, matching the chosen design.
 
