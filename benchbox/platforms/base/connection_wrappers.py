@@ -63,6 +63,37 @@ class StreamConnectionCapability(Enum):
     shared connection - regardless of whether the underlying engine actually
     models concurrency at the connection level.
 
+    Every concrete adapter exposed to throughput resolves through the platform
+    manifest to exactly one of these values: the manifest sweep test
+    (``tests/unit/platforms/test_throughput_session_capability_sweep.py``)
+    pins the resolved value per manifest key, so a new or reclassified adapter
+    fails in CI until its declaration is an explicit, reviewed decision.
+    Deliberate inheritance is allowed when equivalence is proven (e.g. a
+    wire-compatible subclass reusing a proven override); inferring support
+    merely because ``create_connection`` exists is not.
+
+    Equivalence dimensions (the per-stream session contract)
+    --------------------------------------------------------
+    An ``INDEPENDENT_CONNECTION`` stream session must reproduce everything the
+    setup connection carries that can affect measurement, and own nothing else:
+
+    1. database/catalog/schema identity (same database selected at connect,
+       same ``search_path``/current-schema state);
+    2. credentials (same user/role - the stream must not escalate or lose
+       visibility relative to the setup session);
+    3. transaction and isolation settings (e.g. autocommit mode);
+    4. session tuning (the ``SET`` statements ``create_connection`` applies,
+       plus the benchmark-type tuning ``configure_for_benchmark`` applies to
+       the shared connection - threaded per stream via the
+       ``benchmark_type`` argument, with subclass deltas reapplied through
+       ``PlatformAdapter._apply_stream_session_state``);
+    5. temporary object visibility (a stream's session-local objects - temp
+       tables, session variables - must be invisible to sibling streams,
+       which is what makes the sessions independent rather than shared);
+    6. cleanup ownership (each stream closes exactly the handle it opened in
+       its own ``finally`` block; shared-connection handles must never close
+       the underlying connection - see ``_NoCloseProxy``).
+
     Values:
         SHARED_CURSOR: (default) The adapter's single underlying connection is
             safe to share across concurrent stream threads via one cursor per
@@ -70,22 +101,36 @@ class StreamConnectionCapability(Enum):
             ``_NoCloseProxy`` for execute-only clients). This is the correct,
             documented fast path for embedded engines whose Python client is
             thread-safe at cursor level against one process-local database
-            (e.g. DuckDB - see docs/benchmarks/tpc-h.md). Streams are NOT
-            independent sessions in this mode: they share one connection's
-            server-side session state, and no new connections are opened.
+            (e.g. DuckDB - see docs/benchmarks/tpc-h.md), and for engines
+            whose session model is a process-wide singleton that cannot mint
+            independent sessions (e.g. Spark's ``getOrCreate`` session).
+            Streams are NOT independent sessions in this mode: they share one
+            connection's server-side session state, and no new connections
+            are opened.
         INDEPENDENT_CONNECTION: Each concurrent stream gets its OWN
             connection/session, returned by the adapter's
             ``new_stream_connection()`` override. Required for client/server
             engines whose driver does not support true concurrent statement
             execution across cursors of one connection (many DB-API drivers,
-            e.g. psycopg, Snowflake, Databricks SQL, Trino, serialize on the
+            e.g. psycopg, pymysql, serialize on the
             connection lock or raise), and where TPC throughput semantics
             model N independent user sessions rather than N cursors of one
-            session.
+            session. The override must satisfy all six equivalence dimensions
+            above; one-time database setup (extension/database/schema
+            creation) stays in ``create_connection`` and is not repeated per
+            stream.
+        UNSUPPORTED: The adapter cannot provide concurrent throughput streams
+            with a safe session model, so throughput must fail before stream
+            submission with an actionable error instead of silently sharing a
+            connection that cannot isolate streams. Declaring this is a
+            deliberate product statement, not a default: undeclared adapters
+            resolve to the documented default, and only an explicit
+            ``UNSUPPORTED`` declaration triggers the fail-closed rejection.
     """
 
     SHARED_CURSOR = "shared_cursor"
     INDEPENDENT_CONNECTION = "independent_connection"
+    UNSUPPORTED = "unsupported"
 
 
 _ISOLATION_REMEDIATION = {
@@ -125,6 +170,89 @@ def check_isolation_capability(
         f"but adapter '{adapter_class.__name__}' does not support isolated driver runtime binding "
         f"(capability: {capability.value}). {remediation}"
     )
+
+
+def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnectionCapability, bool]:
+    """Resolve an adapter's per-stream session capability and declaration site.
+
+    Walks the adapter's MRO for an explicit ``stream_connection_capability``
+    assignment. A value assigned anywhere below ``PlatformAdapter`` itself
+    (including deliberate inheritance from a proven intermediate ancestor,
+    e.g. a wire-compatible subclass reusing its parent's override) counts as
+    declared; falling through to the base default counts as undeclared.
+
+    Args:
+        adapter: Adapter instance or class to resolve.
+
+    Returns:
+        ``(capability, declared)`` where ``declared`` is True only when a
+        subclass in the MRO explicitly assigned the value.
+    """
+    from benchbox.platforms.base.adapter import PlatformAdapter
+
+    cls = adapter if isinstance(adapter, type) else type(adapter)
+    for klass in cls.__mro__:
+        if klass is PlatformAdapter:
+            break
+        if "stream_connection_capability" in klass.__dict__:
+            value = klass.__dict__["stream_connection_capability"]
+            if not isinstance(value, StreamConnectionCapability):
+                raise RuntimeError(
+                    f"Adapter '{cls.__name__}' declares stream_connection_capability={value!r}, "
+                    "which is not a StreamConnectionCapability. Declare one of SHARED_CURSOR, "
+                    "INDEPENDENT_CONNECTION, or UNSUPPORTED."
+                )
+            return value, True
+    return StreamConnectionCapability.SHARED_CURSOR, False
+
+
+def require_throughput_stream_capability(adapter: Any, *, platform_name: str) -> StreamConnectionCapability:
+    """Fail closed before stream submission when the session model is unsafe.
+
+    Called by the production throughput entry points
+    (``benchbox/platforms/base/execution.py``) after the shared connection is
+    established but before any stream is submitted. Raises ``RuntimeError``
+    with an actionable remediation when:
+
+    * the adapter explicitly declares ``UNSUPPORTED`` - throughput cannot run
+      safely on this engine, and silently sharing its connection would corrupt
+      session-local state between streams;
+    * the adapter declares ``INDEPENDENT_CONNECTION`` without overriding
+      ``new_stream_connection()`` - the base implementation raises for this
+      combination, so failing here (before submission, with the fix named)
+      is strictly earlier and clearer than failing on the first stream.
+
+    Args:
+        adapter: Adapter instance about to serve throughput streams.
+        platform_name: Human-readable platform name for the error message.
+
+    Returns:
+        The resolved capability when throughput may proceed.
+    """
+    from benchbox.platforms.base.adapter import PlatformAdapter
+
+    capability, _declared = resolve_stream_connection_capability(adapter)
+    if capability is StreamConnectionCapability.UNSUPPORTED:
+        raise RuntimeError(
+            f"Platform '{platform_name}' declares stream_connection_capability=UNSUPPORTED: "
+            "this engine cannot provide concurrent throughput streams with isolated sessions. "
+            "Throughput is refused before stream submission instead of silently sharing one "
+            "connection across streams. To support throughput, implement per-stream sessions via "
+            "PlatformAdapter.new_stream_connection() and declare INDEPENDENT_CONNECTION (see "
+            "StreamConnectionCapability equivalence dimensions); to keep throughput unavailable, "
+            "leave this declaration in place and run power/single-stream tests instead."
+        )
+    if capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
+        # Unoverridden access resolves to the identical base function object.
+        if type(adapter).new_stream_connection is PlatformAdapter.new_stream_connection:
+            raise RuntimeError(
+                f"Platform '{platform_name}' declares stream_connection_capability="
+                "INDEPENDENT_CONNECTION but does not override new_stream_connection() to open an "
+                "independent per-stream connection/session. Declaring the capability without the "
+                "override would fail on the first stream; fix the adapter (not the runner) by "
+                "overriding new_stream_connection() per the StreamConnectionCapability contract."
+            )
+    return capability
 
 
 class _NoCloseProxy:

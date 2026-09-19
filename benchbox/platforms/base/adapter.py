@@ -44,6 +44,8 @@ from benchbox.platforms.base.connection_wrappers import (
     _make_stream_cursor,
     _NoCloseProxy,  # noqa: F401 - re-exported for external imports
     check_isolation_capability,  # noqa: F401 - re-exported for external imports
+    require_throughput_stream_capability,  # noqa: F401 - re-exported for execution drivers
+    resolve_stream_connection_capability,  # noqa: F401 - re-exported for manifest sweep
 )
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
@@ -143,7 +145,9 @@ class PlatformAdapter(
     # per stream must set this to INDEPENDENT_CONNECTION *and* override
     # new_stream_connection() below - declaring the capability alone is not
     # enough, since the base new_stream_connection() raises for that value to
-    # fail fast instead of silently falling back to cursor sharing.
+    # fail fast instead of silently falling back to cursor sharing. Adapters
+    # that cannot serve concurrent streams at all declare UNSUPPORTED, which
+    # the throughput entry points refuse before stream submission.
     stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
     # Default in-container service port the adapter connects to in the reference
     # docker deployment (the container side of the compose `ports:` mapping).
@@ -696,7 +700,7 @@ class PlatformAdapter(
         if connection and hasattr(connection, "close"):
             connection.close()
 
-    def new_stream_connection(self, connection: Any) -> Any:
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         """Return a per-stream execution handle for one concurrent throughput
         (or connection-pool test) stream.
 
@@ -706,7 +710,13 @@ class PlatformAdapter(
         ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
         call this once per stream instead of unconditionally sharing one
         cursor, so the behavior is now a declared, overridable platform
-        capability rather than an implicit one-size-fits-all default.
+        capability rather than an implicit one-size-fits-all default. The
+        ``benchmark_type`` keyword (``"olap"`` for the TPC-H/TPC-DS throughput
+        drivers unless the caller overrides it via run config) lets
+        ``INDEPENDENT_CONNECTION`` overrides reproduce the benchmark-type
+        session tuning the shared connection carries - see equivalence
+        dimension 4 in ``StreamConnectionCapability``. The keyword is optional
+        so pre-existing overrides and test doubles keep working unchanged.
 
         Dispatches on ``stream_connection_capability``:
 
@@ -718,7 +728,8 @@ class PlatformAdapter(
           see docs/benchmarks/tpc-h.md). No new connections are opened, and
           closing the returned handle never closes the shared connection
           (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
-          only closes the cursor).
+          only closes the cursor). ``benchmark_type`` is ignored: the shared
+          connection already carries its tuning.
         - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
           engines whose driver does not support true concurrent statement
           execution across cursors of one connection) MUST override this
@@ -728,18 +739,30 @@ class PlatformAdapter(
           capability value instead of falling back to cursor sharing, so a
           subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
           fails loudly rather than silently reproducing the shared-session bug
-          this capability exists to fix.
+          this capability exists to fix. Overrides should apply
+          ``configure_for_benchmark(stream_conn, benchmark_type or "olap")``
+          (plus the ``_apply_stream_session_state`` hook for
+          connection-establishment state) so the stream session measures the
+          same tuning as the setup session.
+        - ``UNSUPPORTED``: never reaches this method - the throughput entry
+          points refuse via ``require_throughput_stream_capability`` before
+          any stream is submitted.
 
         Args:
             connection: The adapter's shared platform connection (as created by
                 ``create_connection``). Used as-is for ``SHARED_CURSOR``;
                 available for reference (e.g. to read connection parameters)
                 but not required for ``INDEPENDENT_CONNECTION`` overrides.
+            benchmark_type: Benchmark tuning vocabulary (e.g. ``"olap"``) for
+                per-stream session parity. Optional; overrides replay tuning
+                only when it is supplied, so callers that pass nothing keep
+                their previous behavior.
 
         Returns:
             A connection-like object suitable for one stream: either a cursor/
             proxy over the shared connection, or an independent connection.
         """
+        del benchmark_type  # SHARED_CURSOR reuses the already-tuned shared connection
         if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
             raise NotImplementedError(
                 f"{self.platform_name} declares stream_connection_capability="

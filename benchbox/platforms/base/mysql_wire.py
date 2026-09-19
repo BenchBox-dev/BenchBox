@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import Any, Callable
 
+from benchbox.platforms.base.connection_wrappers import StreamConnectionCapability
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
@@ -97,6 +98,14 @@ class MySqlWireConnectionWrapper:
 
 class MySqlWireLifecycleMixin:
     """Common database, schema, query-plan, and health plumbing."""
+
+    # MySQL-wire connections are per-connection sessions (server-side state
+    # such as ``@@session`` variables lives on the connection) and neither
+    # pymysql nor the SingleStore driver supports concurrent statement
+    # execution across cursors of one connection, so every throughput stream
+    # gets its own connection (Doris, SingleStore). See
+    # ``StreamConnectionCapability`` equivalence dimensions.
+    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     database_identifier_max_length = 128
     connection_operation_name = "MySQL-wire connection"
@@ -239,6 +248,39 @@ class MySqlWireLifecycleMixin:
                     "verify the server is running and connection settings are correct"
                 ) from exc
             raise
+
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        """Open an independent MySQL-wire connection for one throughput stream.
+
+        Connects straight through ``_connect_database`` (which selects the
+        benchmark database at connect time, preserving catalog identity)
+        instead of repeating ``create_connection``: the one-time setup there
+        (``handle_existing_database`` with its ``force_recreate`` drop path,
+        database creation) must run exactly once on the shared connection,
+        never per stream. The benchmark-type session tuning is still
+        reapplied per stream via ``configure_for_benchmark`` (Doris cache and
+        memory SETs, SingleStore query-cache/packet SETs - equivalence
+        dimension 4). The caller closes the returned connection in the
+        stream's own ``finally`` block (dimension 6).
+
+        Args:
+            connection: The adapter's shared platform connection. Not reused.
+            benchmark_type: Benchmark tuning vocabulary (replay skipped when
+                omitted).
+        """
+        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        conn = self._connect_database()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        finally:
+            cursor.close()
+        # Replay only when the caller supplies benchmark_type (the throughput
+        # drivers always do); other callers keep their previous behavior.
+        if benchmark_type is not None:
+            self.configure_for_benchmark(conn, benchmark_type)
+        return self._wrap_database_connection(conn)
 
     def _transform_schema_statement(self, stmt: str, benchmark: Any) -> str:
         return stmt
