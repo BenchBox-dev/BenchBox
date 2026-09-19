@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "TPC-H Skew completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "TPC-Havoc completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "TPC-H Data Vault completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "TPC-DS-OBT completed at SF 1.0 on BigQuery, Databricks, Snowflake (3 bundles)",
+    "100% query pass rate across all runs",
+    "All 30 result bundles pass scripts/validate_submission.py with 0 errors"
+  ],
+  "context": "TPC variants stress optimizer edge cases: skewed data distributions reveal whether cost-based optimizers handle data skew gracefully; TPC-Havoc tests nested subqueries and complex predicates; Data Vault evaluates enterprise modeling patterns; OBT tests denormalized analytical performance.",
+  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to the TPC variant and experimental benchmark suites:\n- TPC-H Skew: 22 queries on data with Zipfian/exponential/normal skew distributions (SF 0.1, 1.0, 10.0)\n- TPC-Havoc: 220 query variations stressing engine subquery and predicate evaluation (SF 0.1, 1.0, 10.0)\n- TPC-H Data Vault: 22 queries adapted for Hub-Link-Satellite data modeling (SF 0.1, 1.0, 10.0)\n- TPC-DS-OBT: 89 queries adapted for One Big Table / de-normalized denormalization (SF 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify 100% query pass rate and valid bundle structure."
+}
