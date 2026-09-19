@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Every concrete adapter exposed to throughput resolves through the platform manifest to one declared capability: shared embedded session, independent equivalent server session, or unsupported.",
+    "Unknown or ambiguous capability fails before stream submission with an actionable error; no adapter silently falls back to unsafe connection sharing.",
+    "The contract covers database/catalog/schema identity, credentials, transaction and isolation settings, session tuning, temporary object visibility, and cleanup ownership.",
+    "Contract tests prove distinct session identity where required, concurrent overlap rather than serialized execution, equivalent visible data and settings, and exactly-once cleanup.",
+    "Representative embedded, PostgreSQL-wire, MySQL-wire, cloud, Spark-like, and unsupported adapters receive focused integration or UAT coverage proportional to their declared behavior.",
+    "Adding a new throughput-capable adapter requires one manifest declaration and one reusable capability test, not changes scattered through benchmark runners."
+  ],
+  "context": "This extends the existing platform capability and manifest patterns. A platform-specific implementation is preferred when a unique session model makes a shared abstraction misleading.",
+  "description": "Throughput correctness depends on independent streams seeing the same benchmark database, schema, credentials, catalog, and session settings without sharing an unsafe connection. The current create_connection shape does not state whether an adapter can create equivalent independent sessions, safely share an embedded engine, or cannot support throughput. Add an explicit capability contract and fail closed for unknown adapters.\n\nDecision boundary: deliberate inheritance is allowed when equivalence is proven. Do not require one implementation shape across embedded and server platforms, and do not infer support only because create_connection exists.",
+  "links": [
+    "benchbox/platforms/base/connection_lifecycle.py",
+    "benchbox/core/contracts/platform_capabilities.py",
+    "benchbox/core/contracts/platform_capability_views.py",
+    "benchbox/core/throughput/runner.py",
+    "benchbox/platforms/pg_mooncake.py",
+    "tests/integration/test_local_platform_benchmark_matrix.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:56:17Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "2b08a95f32ca405ba296e4309b52b4f7",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}

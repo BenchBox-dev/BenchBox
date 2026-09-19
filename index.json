@@ -16148,6 +16148,15 @@
       "status": "done",
       "title": "Harden the testing correctness gate and close review follow-ups"
     },
+    "throughput-adapter-session-capability-contract": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Define and prove per-stream adapter session capability"
+    },
     "throughput-executor-nonblocking-shutdown": {
       "claim": null,
       "needs": [],
