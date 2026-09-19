@@ -1172,6 +1172,15 @@
       "status": "done",
       "title": "BenchBox MCP Server for AI Agent Integration"
     },
+    "benchbox-score-capability-matrix": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-workload-contracts"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Define score capability and lineage matrices"
+    },
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],
