@@ -3,7 +3,7 @@
     "Decision recorded (surface per-table load time in explorer vs keep bundle-only, covering load_ms and phases.statistics.per_table_ms)",
     "If surfacing: read-model version bump scope and projection columns named; if deferring: bundle-only status documented"
   ],
-  "context": "Reconciliation rows P4 and per_table_ms (both DEFER). Blocks the read-model v11 implementation TODO.",
+  "context": "DECISION (2026-09-18): keep bundle-only; do not surface in the read model. Rationale: only 47/355 seed bundles (13%) carry load_ms, so a projected column would be mostly NULL; load timings are run diagnostics, not comparison inputs, so near-zero leaderboard value; a v11 bump plus backfill/views would churn the read model for that. Revisit when regenerated corpus coverage passes 50% or when the next read-model bump for other reasons makes a projection cheap. per_table_ms rides the same decision.",
   "description": "Decide whether per-table load time (tables.*.load_ms from #2178 and phases.statistics.per_table_ms) should be surfaced in the Explorer read model or stay bundle-only diagnostic data. Consider query value vs read-model churn; record the decision and, if surfacing, the target read-model version and projection columns.",
   "links": [
     "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
