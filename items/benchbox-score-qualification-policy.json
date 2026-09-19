@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Numerical per-atom and per-block variance measures and limits are frozen before pilot measurements; the policy states sample counts and failure handling.",
+    "Resource gates cover peak memory, storage, spill, client CPU/memory, timeout rate, and minimum headroom for each profile class.",
+    "Thermal, power-mode, background-service, workload-gap, cache-state, and locality procedures are reproducible and auditable.",
+    "A failed threshold invalidates the profile or concurrency point rather than triggering post hoc threshold changes; a changed gate creates a new policy version and rerun.",
+    "Reference evaluation includes embedded and client-server candidates plus physical-unit replacement rules."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
+  "description": "Define and version numerical gates before any score qualification run. Cover correctness, timeout, variance, resource headroom, spill, thermal and power mode, background services, client saturation, locality, cache verification, reference candidates, and hardware-unit replacement.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "docs/development/adr/adr-client-link-locality-disclosure.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:14:43Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "548715e8766e468e91e616a36e22add7",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}

@@ -1267,6 +1267,15 @@
       "status": "open",
       "title": "Implement the cross-benchmark Power runner"
     },
+    "benchbox-score-qualification-policy": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-manifest-schema"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Preregister score qualification thresholds"
+    },
     "benchbox-score-size-profile-pilot": {
       "claim": null,
       "needs": [
