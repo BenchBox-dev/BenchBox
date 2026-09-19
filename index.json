@@ -2692,17 +2692,12 @@
       "title": "Define truthful concurrency outcomes and resource-ownership boundaries"
     },
     "concurrency-public-api-semantic-reconciliation": {
-      "claim": {
-        "expires_at": "2026-09-20T21:13:24Z",
-        "generation": "57e1b4239e8a433283ab59bfa07c52d2",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Reconcile concurrency utility APIs by benchmark semantics"
     },
     "concurrency-testing-framework": {
