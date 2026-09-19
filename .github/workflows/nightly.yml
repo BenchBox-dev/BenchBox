@@ -427,12 +427,12 @@ jobs:
       BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
       BIGQUERY_DATASET: ${{ secrets.BIGQUERY_DATASET }}
       REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
-      REDSHIFT_PORT: ${{ secrets.REDSHIFT_PORT }}
+      REDSHIFT_PORT: ${{ secrets.REDSHIFT_PORT || 5439 }}
       REDSHIFT_USER: ${{ secrets.REDSHIFT_USER }}
       REDSHIFT_PASSWORD: ${{ secrets.REDSHIFT_PASSWORD }}
       REDSHIFT_DATABASE: ${{ secrets.REDSHIFT_DATABASE }}
       MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
-      MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE }}
+      MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'benchbox_test' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

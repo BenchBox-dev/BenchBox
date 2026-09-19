@@ -255,6 +255,9 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
     # Build the payload
     payload: dict[str, Any] = {
         "result_schema_version": SCHEMA_VERSION,
+        # Keep the historical alias during the schema-v2 compatibility window;
+        # loaders require both aliases to agree when both are present.
+        "version": SCHEMA_VERSION,
         "run": order_dict(
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
@@ -365,6 +368,10 @@ def _aggregate_scan_bytes(result: BenchmarkResults) -> dict[str, Any] | None:
     Totals cover every execution carrying byte metrics regardless of status,
     matching the cost calculator's unfiltered phase collection.
     """
+    preserved = result.cost_summary.get("scan_bytes") if isinstance(result.cost_summary, Mapping) else None
+    if isinstance(preserved, Mapping) and preserved:
+        return dict(preserved)
+
     total_billed = 0
     total_scanned = 0
     billed_seen = False

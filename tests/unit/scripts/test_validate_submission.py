@@ -902,7 +902,7 @@ class TestValidateBundle:
         """A fictional billing_unit cannot back normalized cost."""
         data = _minimal_bundle()
         data["normalized_cost"] = _normalized_cost_block(cost="1.25")
-        data["normalized_cost"]["billing_unit"] = "instance_hour"
+        data["normalized_cost"]["billing_unit"] = "bogus_unit"
         data["cost"] = {"total_usd": 1.25, "model": "estimated"}
 
         vr = ValidationResult("test")

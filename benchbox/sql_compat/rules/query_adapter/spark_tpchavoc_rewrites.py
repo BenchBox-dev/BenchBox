@@ -86,21 +86,22 @@ _REWRITES = [
     ),
 ]
 
-for _qid, _slug, _reason in _REWRITES:
-    REGISTRY.register(
-        CompatibilityDecision(
-            rule_id=f"query_adapter.spark.tpchavoc.{_slug}",
-            action=CompatAction.REWRITE_QUERY,
-            support_level=SupportLevel.REWRITTEN,
-            failure_mode=FailureMode.UNSUPPORTED_FEATURE,
-            payload=RewriteQueryPayload(
-                transformer_id="spark_tpchavoc_query_transformer",
-                description=_reason,
+for _platform in ("spark", "velox", "lakesail"):
+    for _qid, _slug, _reason in _REWRITES:
+        REGISTRY.register(
+            CompatibilityDecision(
+                rule_id=f"query_adapter.{_platform}.tpchavoc.{_slug}",
+                action=CompatAction.REWRITE_QUERY,
+                support_level=SupportLevel.REWRITTEN,
+                failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+                payload=RewriteQueryPayload(
+                    transformer_id="spark_tpchavoc_query_transformer",
+                    description=_reason,
+                ),
+                reason=_reason,
             ),
-            reason=_reason,
-        ),
-        _P,
-        "spark",
-        benchmark=_B,
-        query_id=_qid,
-    )
+            _P,
+            _platform,
+            benchmark=_B,
+            query_id=_qid,
+        )

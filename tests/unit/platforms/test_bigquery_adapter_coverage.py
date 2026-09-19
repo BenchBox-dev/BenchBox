@@ -1250,13 +1250,13 @@ class TestConfigureForBenchmark:
 class TestGetQueryPlan:
     """Test get_query_plan contract (no EXPLAIN-text path)."""
 
-    def test_returns_none_contract(self):
+    def test_unconfigured_dry_run_job_returns_none(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
 
         assert adapter.get_query_plan(mock_conn, "SELECT 1") is None
-        mock_conn.query.assert_not_called()
+        mock_conn.query.assert_called_once()
 
     def test_error_path_still_returns_none(self):
         adapter = _make_adapter()

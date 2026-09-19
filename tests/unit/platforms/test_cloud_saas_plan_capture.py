@@ -281,18 +281,23 @@ class TestBigQueryCapture:
         adapter = _make_bigquery(monkeypatch)
         assert isinstance(adapter.get_query_plan_parser(), BigQueryQueryPlanParser)
 
-    def test_get_query_plan_returns_none_contract(self, monkeypatch):
-        # BigQuery has no EXPLAIN-text path; the base contract is str | None.
-        # Returning None keeps generic capture_query_plan on the
-        # explain_failed path instead of crashing on dict.strip().
-        import inspect
+    def test_get_query_plan_returns_dry_run_cost_estimate(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
 
-        from benchbox.platforms.bigquery import BigQueryAdapter
-
+        mock_bq = MagicMock()
+        mock_bq.QueryJobConfig.return_value = MagicMock()
+        monkeypatch.setattr(bq_module, "bigquery", mock_bq)
         adapter = _make_bigquery(monkeypatch)
-        assert adapter.get_query_plan(MagicMock(), "SELECT 1") is None
-        annotation = inspect.signature(BigQueryAdapter.get_query_plan).return_annotation
-        assert annotation == "str | None"
+        job = MagicMock(total_bytes_processed=1024)
+        connection = MagicMock()
+        connection.query.return_value = job
+
+        result = adapter.get_query_plan(connection, "SELECT 1")
+
+        assert result is not None
+        assert result["bytes_processed"] == 1024
+        assert "estimated_cost" in result
+        connection.query.assert_called_once()
 
     def test_capture_query_plan_does_not_raise_attribute_error(self, monkeypatch):
         adapter = _make_bigquery(monkeypatch)

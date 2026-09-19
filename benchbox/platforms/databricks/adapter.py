@@ -396,6 +396,12 @@ class DatabricksAdapter(PlatformAdapter):
         if strategy == "liquid_clustering" or liquid_enabled or liquid_columns:
             return "liquid_clustering"
         if strategy == "none":
+            table_tunings = getattr(effective_config, "table_tunings", {}) or {}
+            if isinstance(table_tunings, Mapping) and any(
+                getattr(tuning, "clustering", None) or getattr(tuning, "distribution", None)
+                for tuning in table_tunings.values()
+            ):
+                return "z_order"
             return strategy
         if z_order_enabled or z_order_columns:
             return "z_order"

@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 463
+**Total registered rules:** 485
 
 **Platforms covered:** 34
 
@@ -25,7 +25,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | duckdb | - | - | - | - | - | 26 | 26 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
-| lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
+| lakesail | 5 | 6 | 11 | - | 1 | 69 | 92 |
 | mysql | - | 1 | - | - | - | - | 1 |
 | pg-duckdb | 3 | - | - | - | - | 21 | 24 |
 | pg-mooncake | 6 | - | - | - | - | 17 | 23 |
@@ -45,7 +45,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | timescaledb | 3 | - | - | - | - | 19 | 22 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
-| velox | - | - | - | - | 1 | - | 1 |
+| velox | - | - | 11 | - | 1 | - | 12 |
 
 ## Rules by platform
 
@@ -294,6 +294,17 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q4_unsupported` |
 | query_source | benchmark=vector_search, query=Q5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q5_unsupported` |
 | query_source | benchmark=vector_search, query=Q6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q6_unsupported` |
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q09_scalar_group_by_first` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.lakesail.all.optimize_table_definition` |
 | execution_filter | benchmark=read_primitives, query=approx_quantiles_array | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
 | execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
@@ -680,4 +691,15 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q09_scalar_group_by_first` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.velox.all.optimize_table_definition` |

@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import math
 import re
 import sys
 from decimal import Decimal, InvalidOperation
@@ -237,6 +238,7 @@ NORMALIZED_COST_BILLING_UNITS = frozenset(
         "dwu_hour",
         "cu_hour",
         "fbu",
+        "instance_hour",
     }
 )
 DIRECT_COST_TOTAL_KEYS = ("total_usd", "total_cost")
@@ -517,6 +519,8 @@ def _validate_overhead_shape(overhead: Any, vr: ValidationResult) -> None:
             continue
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be a number, got {value!r}")
+        elif not math.isfinite(value):
+            vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be finite, got {value!r}")
         elif value < 0:
             vr.error(f"'environment.client_link.statement_overhead_ms.{key}' must be non-negative, got {value!r}")
 
@@ -542,6 +546,8 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
         if rows is not None:
             if isinstance(rows, bool) or not isinstance(rows, (int, float)):
                 vr.error(f"'tables.{name}.rows' must be a number, got {rows!r}")
+            elif not math.isfinite(rows):
+                vr.error(f"'tables.{name}.rows' must be finite, got {rows!r}")
             elif rows < 0:
                 vr.error(f"'tables.{name}.rows' must be non-negative, got {rows!r}")
         load_ms = entry.get("load_ms")
@@ -549,6 +555,8 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
             continue
         if isinstance(load_ms, bool) or not isinstance(load_ms, (int, float)):
             vr.error(f"'tables.{name}.load_ms' must be a number, got {load_ms!r}")
+        elif not math.isfinite(load_ms):
+            vr.error(f"'tables.{name}.load_ms' must be finite, got {load_ms!r}")
         elif load_ms < 0:
             vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
 

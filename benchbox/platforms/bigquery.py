@@ -1771,11 +1771,42 @@ class BigQueryAdapter(PlatformAdapter):
 
         return metadata
 
-    # No get_query_plan override: BigQuery has no EXPLAIN-text plan path and
-    # ResultCaptureMixin.get_query_plan already returns None, which is exactly
-    # this contract. Plans are harvested from the completed QueryJob via
-    # _capture_bq_plan; generic capture_query_plan degrades a None plan to
-    # explain_failed instead of crashing on .strip().
+    def get_query_plan(self, connection: Any, query: str) -> dict[str, Any] | None:
+        """Return BigQuery's dry-run bytes and estimated on-demand cost.
+
+        BigQuery exposes bytes processed through a dry-run job rather than an
+        EXPLAIN text result. Structured execution stages remain available from
+        the completed job through ``_capture_bq_plan``.
+        """
+        if bigquery is None:
+            return None
+        try:
+            translated_query = (
+                self._normalize_table_names_case(query) if "`" in query else self._qualify_table_names(query)
+            )
+            job_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False, use_legacy_sql=False)
+            if self.project_id and self.dataset_id:
+                job_config.default_dataset = f"{self.project_id}.{self.dataset_id}"
+            if self.maximum_bytes_billed:
+                job_config.maximum_bytes_billed = self.maximum_bytes_billed
+            query_job = connection.query(translated_query, job_config=job_config)
+            try:
+                bytes_processed = int(query_job.total_bytes_processed or 0)
+            except (TypeError, ValueError):
+                return None
+            from benchbox.core.cost.pricing import resolve_bigquery_price_per_tb
+
+            resolution = resolve_bigquery_price_per_tb(self.location)
+            estimated_cost = None
+            if resolution.value is not None:
+                estimated_cost = bytes_processed / (1024**4) * float(resolution.value)
+            return {
+                "bytes_processed": bytes_processed,
+                "estimated_cost": estimated_cost,
+                "pricing_fallback": resolution.fallback_used,
+            }
+        except Exception:
+            return None
 
     def get_query_plan_parser(self):
         """Expose the BigQuery plan parser for symmetry with other adapters."""

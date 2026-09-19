@@ -143,7 +143,7 @@ class SparkTPCHavocQueryTransformer:
         scalar is correlated on the GROUP BY keys, hence constant per group,
         so ``first()`` preserves semantics.
         """
-        tree = sqlglot.parse_one(query, read="duckdb")
+        tree = sqlglot.parse_one(query, read="spark")
         applied = False
         for select in tree.find_all(exp.Select):
             if not select.args.get("group"):
@@ -160,7 +160,7 @@ class SparkTPCHavocQueryTransformer:
         if not applied:
             return query
         self.transformations_applied.append("scalar_group_by_first")
-        return tree.sql(dialect="duckdb")
+        return tree.sql(dialect="spark")
 
     def _wrap_bare_scalars(self, node):  # type: ignore[no-untyped-def]
         """Wrap scalar-subquery nodes not already inside an aggregate.
@@ -201,7 +201,7 @@ class SparkTPCHavocQueryTransformer:
         With no GROUP BY the aggregate still computes a single group, so the
         accompanying ``HAVING`` keeps its semantics on Spark and DuckDB.
         """
-        tree = sqlglot.parse_one(query, read="duckdb")
+        tree = sqlglot.parse_one(query, read="spark")
         applied = False
         for select in tree.find_all(exp.Select):
             group = select.args.get("group")
@@ -213,11 +213,11 @@ class SparkTPCHavocQueryTransformer:
         if not applied:
             return query
         self.transformations_applied.append("group_by_empty_drop")
-        return tree.sql(dialect="duckdb")
+        return tree.sql(dialect="spark")
 
     def _rewrite_dual(self, query: str) -> str:
         """Give the ``(SELECT 1) AS dual`` leg an explicit column alias."""
-        tree = sqlglot.parse_one(query, read="duckdb")
+        tree = sqlglot.parse_one(query, read="spark")
         applied = False
         for subquery in tree.find_all(exp.Subquery):
             inner = subquery.this
@@ -232,7 +232,7 @@ class SparkTPCHavocQueryTransformer:
         if not applied:
             return query
         self.transformations_applied.append("dual_column_alias")
-        return tree.sql(dialect="duckdb")
+        return tree.sql(dialect="spark")
 
 
 __all__ = [

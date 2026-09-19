@@ -184,8 +184,8 @@ class TestValidatePlatformConfig:
         assert any("workload_type" in w for w in warnings)
         assert any("cluster_size_dbu_per_hour" in w for w in warnings)
 
-    def test_databricks_missing_warehouse_type(self):
-        """A Databricks config without warehouse_type cannot prove its workload mapping."""
+    def test_databricks_workload_type_does_not_require_warehouse_type(self):
+        """An already-resolved Databricks workload type is sufficient."""
         config = {
             "cloud": "aws",
             "tier": "premium",
@@ -195,9 +195,8 @@ class TestValidatePlatformConfig:
         }
         is_valid, warnings = validate_platform_config("databricks", config)
 
-        assert is_valid is False
-        assert len(warnings) == 1
-        assert "warehouse_type" in warnings[0]
+        assert is_valid is True
+        assert warnings == []
 
     def test_databricks_df_mirrors_databricks_requirements(self):
         """databricks-df bills through the same calculator, so it needs the same fields."""
