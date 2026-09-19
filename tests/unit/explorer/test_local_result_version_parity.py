@@ -1,0 +1,54 @@
+"""Drift guard: localResult.ts must track the canonical schema versions.
+
+Why a *test* and not a generated file: the explorer ships as a pre-built
+SPA and the canonical version set lives in
+``benchbox.core.results.schema_policy``. A code-gen step would add build
+coupling that doesn't pay for itself yet. A test is enough — it fires on
+develop the moment a schema version is added without updating the local
+preview gate, which is when the catch is needed. It also pins the
+``result_schema_version`` -> ``version`` -> ``schema_version`` read order
+to match ``result_schema_version_value()``.
+
+If a new canonical version appears here, update
+``SUPPORTED_SCHEMA_VERSIONS`` in ``results-explorer/src/lib/localResult.ts``.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import pytest
+
+from benchbox.core.results.schema_policy import KNOWN_SCHEMA_V2_VERSIONS
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+]
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+LOCAL_RESULT_TS = REPO_ROOT / "results-explorer" / "src" / "lib" / "localResult.ts"
+
+_VERSION_SET_RE = re.compile(r"const SUPPORTED_SCHEMA_VERSIONS = new Set\(\[(?P<versions>[^\]]*)\]\)")
+_VERSION_CHAIN_RE = re.compile(
+    r"bundle\.result_schema_version\s*\?\?\s*bundle\.version\s*\?\?\s*bundle\.schema_version"
+)
+
+
+def _source() -> str:
+    return LOCAL_RESULT_TS.read_text(encoding="utf-8")
+
+
+def test_supported_versions_match_canonical_set() -> None:
+    match = _VERSION_SET_RE.search(_source())
+    assert match is not None, "SUPPORTED_SCHEMA_VERSIONS declaration not found"
+    found = re.findall(r'"([^"]+)"', match.group("versions"))
+    assert sorted(found) == sorted(KNOWN_SCHEMA_V2_VERSIONS)
+
+
+def test_version_fallback_chain_matches_helper() -> None:
+    assert _VERSION_CHAIN_RE.search(_source()) is not None, (
+        "localResult.ts must read result_schema_version ?? version ?? schema_version, "
+        "mirroring result_schema_version_value()"
+    )

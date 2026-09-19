@@ -250,6 +250,24 @@ describe("local result import", () => {
     await expect(parseLocalResultText(JSON.stringify(bundle({ version })))).resolves.toBeTruthy();
   });
 
+  it("accepts the oldest schema_version key", async () => {
+    const text = JSON.stringify(bundle({ version: undefined, schema_version: "2.0" }));
+    await expect(parseLocalResultText(text)).resolves.toBeTruthy();
+  });
+
+  it("prefers result_schema_version over legacy keys", async () => {
+    const text = JSON.stringify(
+      bundle({ result_schema_version: "2.2", version: "2.0", schema_version: "2.0" }),
+    );
+    await expect(parseLocalResultText(text)).resolves.toBeTruthy();
+  });
+
+  it("rejects bundles with no version key at all", async () => {
+    await expect(
+      parseLocalResultText(JSON.stringify(bundle({ version: undefined }))),
+    ).rejects.toThrow("result_schema_version");
+  });
+
   it("rejects malformed and unsupported input with actionable errors", async () => {
     await expect(parseLocalResultText("not json")).rejects.toThrow("not valid JSON");
     await expect(parseLocalResultText(JSON.stringify(bundle({ version: "3.0" })))).rejects.toThrow(
