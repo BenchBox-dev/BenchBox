@@ -13035,15 +13035,10 @@
       "title": "Result-bundle compat: dispatch agy+muse adversarial review panel (P1-P8)"
     },
     "result-bundle-compat-fallback-matrix-test": {
-      "claim": {
-        "expires_at": "2026-09-20T00:00:10Z",
-        "generation": "d2ae4852f397431eae409739f8542bc8",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: version-key fallback-matrix contract test"
     },
     "result-bundle-compat-followon-todos": {
