@@ -1218,6 +1218,15 @@
       "status": "open",
       "title": "Implement the cross-benchmark Power runner"
     },
+    "benchbox-score-size-profile-pilot": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-power-runner"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Qualify score size profiles and reference feasibility"
+    },
     "benchbox-score-throughput-runner": {
       "claim": null,
       "needs": [
