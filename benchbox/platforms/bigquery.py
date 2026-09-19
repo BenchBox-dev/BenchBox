@@ -44,15 +44,31 @@ try:
     import google.auth
 
     google_auth = google.auth  # Store reference for _load_credentials
-    from google.api_core.exceptions import TooManyRequests
     from google.cloud import bigquery, storage
-    from google.cloud.exceptions import NotFound
     from google.oauth2 import service_account
 except ImportError:
     google_auth = None
     bigquery = None
     storage = None
     service_account = None
+
+# google-api-core/google-cloud-core (and thus NotFound/TooManyRequests) can be
+# present even when the heavier google-cloud-bigquery/google-cloud-storage
+# clients above are not (e.g. pulled in transitively by an unrelated
+# dependency), and vice versa. Resolve them independently so a table-casing
+# probe's `except NotFound`/`except TooManyRequests` clause always has a real
+# exception class to bind to, rather than depending on the combined import
+# above having fully succeeded.
+try:
+    from google.api_core.exceptions import TooManyRequests
+    from google.cloud.exceptions import NotFound
+except ImportError:
+
+    class NotFound(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
+
+    class TooManyRequests(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
 
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
