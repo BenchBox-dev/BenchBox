@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "The loader publishes either the result or the classified failure while holding the synchronization boundary before signaling waiters.",
+    "Every waiter observes the same published result or classified failure; no waiter can interpret an in-progress load as no answer set.",
+    "TPC-DS validation mode is supplied by run-scoped configuration and cannot leak between concurrent runs through module globals or cached objects.",
+    "Cached data is policy-independent, or a documented immutable policy identity is part of the key; tests prove concurrent exact, loose, skip, and disabled requests cannot contaminate one another.",
+    "Validation output distinguishes validated, no_answer_set, stream_not_reference_validated, provider_failed, and provider_timeout; a provider failure is never reported as a normal validation skip.",
+    "Fault-injection tests cover slow success, permanent absence, transient exception, timeout, retry, cache clearing, and multiple simultaneous waiters."
+  ],
+  "context": "This extends the existing expected-results registry rather than adding another cache. Preserve the documented TPC-DS seed limitations; this item changes concurrency and provenance, not the statistical validation policy.",
+  "description": "ExpectedResultsRegistry signals waiting threads before publishing a successful load or cached permanent failure. TPC-DS expected-result objects also incorporate module-global validation mode while the cache key contains only benchmark and scale factor. Concurrent runs can therefore observe a false miss or reuse an answer object built under another run's policy. Make single-flight publication atomic and keep validation policy outside policy-independent cached answer data.\n\nDecision boundary: cache immutable answer data by answer identity; apply validation policy at the requesting run boundary. Do not expand cache keys with mutable process-global state unless a narrower policy-independent cache is proven impossible.",
+  "links": [
+    "benchbox/core/expected_results/registry.py",
+    "benchbox/core/expected_results/tpcds_results.py",
+    "benchbox/core/expected_results/models.py",
+    "tests/unit/core/expected_results/test_thread_safety.py",
+    "universal-validation-mode-system-architectural-refactor"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:55:46Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "ac80011598c84e1091d2c3eef6ca0544",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}

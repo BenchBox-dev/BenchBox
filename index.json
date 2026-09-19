@@ -5086,6 +5086,15 @@
       "status": "done",
       "title": "Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB"
     },
+    "expected-results-singleflight-run-policy": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Make expected-results loading atomic and validation policy run-local"
+    },
     "explicit-tuning-file-resolution": {
       "claim": null,
       "needs": [],
