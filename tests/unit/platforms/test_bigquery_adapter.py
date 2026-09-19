@@ -8,7 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import logging
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -2843,3 +2843,47 @@ class TestPlatformNameAndProperties:
     def test_internal_dialect_is_bigquery(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         assert adapter._dialect == "bigquery"
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestBigQueryTableResolution:
+    """Test BigQuery table casing resolution and uppercase conversion."""
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_convert_to_bigquery_table_uppercase_flag(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE customer (id INT64)", uppercase_table_name=True)
+        assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.CUSTOMER` (id INT64)"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_resolve_target_table_prefers_uppercase(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        conn = MagicMock()
+        dataset_ref = conn.dataset.return_value
+        table_ref_upper = dataset_ref.table.return_value
+        conn.get_table.return_value = MagicMock()
+
+        resolved_name, table_ref = adapter._resolve_target_table(conn, "customer")
+        assert resolved_name == "CUSTOMER"
+        conn.get_table.assert_called_once_with(table_ref_upper)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_resolve_target_table_falls_back_to_exact_case(self, mock_bigquery):
+        from google.cloud.exceptions import NotFound
+
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        conn = MagicMock()
+        dataset_ref = conn.dataset.return_value
+        table_upper = MagicMock()
+        table_lower = MagicMock()
+        dataset_ref.table.side_effect = lambda name: table_upper if name == "CUSTOMER" else table_lower
+
+        def fake_get_table(ref):
+            if ref is table_upper:
+                raise NotFound("table CUSTOMER not found")
+            return table_lower
+
+        conn.get_table.side_effect = fake_get_table
+        resolved_name, table_ref = adapter._resolve_target_table(conn, "customer")
+        assert resolved_name == "customer"
+        assert table_ref is table_lower

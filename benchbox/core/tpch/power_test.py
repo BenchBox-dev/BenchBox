@@ -17,7 +17,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional
 
-from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.plan_capture_phase import (
+    propagate_query_execution_metadata,
+)
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
     set_reference_seed_context,
@@ -341,7 +343,7 @@ class TPCHPowerTest:
                             # _plan_capture_key) so it reaches the result bundle and
                             # so _attach_captured_plans can match this row by its
                             # exact key rather than the ambiguous public-id fallback.
-                            propagate_plan_capture_fields(result_dict, query_result)
+                            propagate_query_execution_metadata(result_dict, query_result)
 
                         # Count BEFORE commit (#1144 review): when
                         # rows_returned isn't available, _query_result_count
