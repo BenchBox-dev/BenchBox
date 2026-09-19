@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "ClickBench runs completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "CoffeeShop runs completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "H2ODB runs completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "100% query pass rate across all runs",
+    "All 21 result bundles pass scripts/validate_submission.py with 0 errors"
+  ],
+  "context": "Builds on first-live-cloud-benchmark-run-and-publish. ClickBench and H2ODB represent high-concurrency analytical and ML aggregation patterns. ClickBench SF 10 represents 100M rows / ~15 GB raw data. Ensure GCS/S3/Snowflake staging bucket permissions and table creation scripts handle wide schemas cleanly.",
+  "description": "Expand live cloud benchmark runs across BigQuery, Databricks, and Snowflake to the Industry benchmark suites:\n- ClickBench: 43 queries on web analytics hits data (SF 0.1, 1.0, 10.0)\n- CoffeeShop: 11 analytical queries on retail/coffee transactional schema (SF 0.1, 1.0)\n- H2ODB: 10 analytical queries for ML data preparation (SF 0.1, 1.0)\n\nExecute across all three platforms at the supported scale factors from {0.1, 1.0, 10.0}.\nCapture valid result bundles satisfying the cohort gate (results-data/validate_corpus.py and scripts/validate_submission.py)."
+}
