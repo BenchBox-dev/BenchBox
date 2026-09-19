@@ -1285,6 +1285,16 @@
       "status": "open",
       "title": "Implement the cross-benchmark Throughput runner"
     },
+    "benchbox-score-tpchavoc-equivalence": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-capability-matrix",
+        "benchbox-score-advanced-oracles"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Prove TPC-Havoc panel equivalence"
+    },
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],

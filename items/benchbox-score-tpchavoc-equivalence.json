@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The candidate panel has explicit transformation-family, lineage, runtime-budget, and capability mappings.",
+    "Every admitted variant passes semantic-equivalence evidence against its canonical query on deterministic fixtures and parameter streams.",
+    "Negative mutations prove the equivalence oracle rejects changed semantics.",
+    "Generation errors and missing IDs fail closed; generated and expected panel IDs match exactly.",
+    "The full 220-variant corpus remains a separately named diagnostic and cannot gain score weight through enumeration."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
+  "description": "Select the bounded TPC-Havoc score panel and prove every admitted variant semantically equivalent to its canonical TPC-H query under deterministic datasets and parameters. Preserve transformation-family coverage, runtime differentiation, and fail-closed generation.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "benchbox/core/tpchavoc/queries.py",
+    "docs/benchmarks/tpc-havoc.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:14:34Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "1d675d364b594d2cb4d205f6eb2548f9",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}
