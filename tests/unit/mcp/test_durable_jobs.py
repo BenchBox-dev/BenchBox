@@ -448,7 +448,7 @@ class TestDurableJobWindowsDirectoryFsync:
             assert "simulated" in str(exc)
 
 
-def test_stalled_renewal_is_refused_so_lease_cannot_resurrect(tmp_path: Path) -> None:
+def test_renew_trusts_ownership_not_wall_clock(tmp_path: Path) -> None:
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(lease_seconds=60))
     submitted, _ = repository.submit("tenant-a", _request())
     claimed = repository.claim("worker-a")
@@ -459,11 +459,20 @@ def test_stalled_renewal_is_refused_so_lease_cannot_resurrect(tmp_path: Path) ->
             "UPDATE mcp_benchmark_jobs SET lease_expires_at = ? WHERE execution_id = ?",
             (time.time() - 1.0, submitted.execution_id),
         )
+    # A wall-clock lapse alone never evicts a healthy owner; lapse detection
+    # belongs to the recovery-side monotonic observation mechanism, so a host
+    # clock step cannot falsely end an attempt.
+    assert repository.renew(submitted.execution_id, "worker-a") is True
+    with repository._connect() as connection:
+        connection.execute(
+            "UPDATE mcp_benchmark_jobs SET lease_owner = ? WHERE execution_id = ?",
+            ("worker-b", submitted.execution_id),
+        )
     assert repository.renew(submitted.execution_id, "worker-a") is False
-    assert repository.renew(submitted.execution_id, "worker-b") is False
+    assert repository.renew(submitted.execution_id, "worker-b") is True
 
 
-def test_stale_attempt_never_publishes_after_mid_run_lease_loss(tmp_path: Path) -> None:
+def test_stale_attempt_never_publishes_after_mid_run_lease_loss(tmp_path: Path, monkeypatch) -> None:
     limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
     repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
     workspaces = TenantWorkspaceProvider(tmp_path / "workspaces")
@@ -484,12 +493,15 @@ def test_stale_attempt_never_publishes_after_mid_run_lease_loss(tmp_path: Path) 
     with ThreadPoolExecutor(max_workers=1) as pool:
         running = pool.submit(anyio.run, worker._run_job, claimed)
         assert entered.wait(timeout=10)
+        # Impair the heartbeat at the repository seam: renewals are refused
+        # from here on, exactly as a fencing takeover refuses them.
+        monkeypatch.setattr(repository, "renew", lambda execution_id, worker_id: False)
+        anyio.run(anyio.sleep, 0.08)
         with repository._connect() as connection:
             connection.execute(
                 "UPDATE mcp_benchmark_jobs SET lease_expires_at = ? WHERE execution_id = ?",
                 (time.time() - 1.0, submitted.execution_id),
             )
-        anyio.run(anyio.sleep, 0.08)
         worker.recover_expired()
         anyio.run(anyio.sleep, 0.06)
         worker.recover_expired()
@@ -683,3 +695,81 @@ def test_migration_failure_still_raises_when_unmigrated(tmp_path: Path, monkeypa
     monkeypatch.setattr(DurableJobRepository, "_rebuild_state_table", staticmethod(racy_rebuild))
     with pytest.raises(sqlite3.OperationalError):
         DurableJobRepository(path, JobLimits())
+
+
+def test_exhausted_unreported_attempt_recovers_unknown_not_failed(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
+    submitted, _ = repository.submit("tenant-a", _request())
+    claimed = repository.claim("lost-worker")
+    assert claimed is not None and claimed.attempts == 1
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+    recovered = repository.get(submitted.execution_id)
+    # An exhausted budget proves nothing about termination: without an owner
+    # report the outcome stays unknown so no client treats it as safe to retry.
+    assert recovered is not None and recovered.state == "unknown"
+    assert recovered.error_code == "unknown_outcome"
+
+
+def test_stranded_legacy_migration_resumes_without_losing_jobs(tmp_path: Path) -> None:
+    path = tmp_path / "state.sqlite3"
+    _write_legacy_database(path)
+    legacy = sqlite3.connect(path)
+    legacy.execute("ALTER TABLE mcp_benchmark_jobs RENAME TO mcp_benchmark_jobs_legacy")
+    legacy.execute(
+        """
+        CREATE TABLE mcp_benchmark_jobs (
+            execution_id TEXT PRIMARY KEY,
+            principal_id TEXT NOT NULL,
+            state TEXT NOT NULL CHECK (
+                state IN (
+                    'queued', 'running', 'publishing', 'completed',
+                    'failed', 'cancelled', 'unknown'
+                )
+            ),
+            request_json TEXT NOT NULL,
+            idempotency_key TEXT,
+            attempts INTEGER NOT NULL DEFAULT 0,
+            lease_owner TEXT,
+            lease_expires_at REAL,
+            lease_version INTEGER NOT NULL DEFAULT 1,
+            lease_generation INTEGER NOT NULL DEFAULT 0,
+            cancel_requested INTEGER NOT NULL DEFAULT 0,
+            artifact_path TEXT,
+            error_code TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT
+        );
+        """
+    )
+    legacy.commit()
+    legacy.close()
+
+    repository = DurableJobRepository(path, JobLimits())
+    resumed = repository.get("mcp_job_legacy")
+    assert resumed is not None and resumed.state == "queued"
+    with repository._connect() as connection:
+        stranded = connection.execute(
+            "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
+        ).fetchone()
+    assert stranded is None
+
+
+def test_concurrent_initializers_migrate_legacy_database_once(tmp_path: Path) -> None:
+    path = tmp_path / "state.sqlite3"
+    _write_legacy_database(path)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        repositories = list(pool.map(lambda _: DurableJobRepository(path, JobLimits()), range(4)))
+    for repository in repositories:
+        assert repository.get("mcp_job_legacy") is not None
+    with repositories[0]._connect() as connection:
+        total = connection.execute("SELECT COUNT(*) FROM mcp_benchmark_jobs").fetchone()[0]
+        stranded = connection.execute(
+            "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
+        ).fetchone()
+    assert total == 1
+    assert stranded is None

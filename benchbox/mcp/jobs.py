@@ -152,26 +152,64 @@ class DurableJobRepository:
     @staticmethod
     def _migrate_state_check(connection: sqlite3.Connection) -> None:
         """Widen the state CHECK on pre-unknown databases so recovery can record unknown outcomes."""
-        definition = connection.execute("SELECT sql FROM sqlite_master WHERE name = 'mcp_benchmark_jobs'").fetchone()
-        if definition is None or definition[0] is None or "'unknown'" in definition[0]:
-            return
         try:
-            DurableJobRepository._rebuild_state_table(connection)
-        except sqlite3.OperationalError:
+            stranded = connection.execute(
+                "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
+            ).fetchone()
+            if stranded is not None:
+                DurableJobRepository._resume_state_migration(connection)
+                return
             definition = connection.execute(
                 "SELECT sql FROM sqlite_master WHERE name = 'mcp_benchmark_jobs'"
             ).fetchone()
-            if definition is not None and definition[0] is not None and "'unknown'" in definition[0]:
+            if definition is None or definition[0] is None or "'unknown'" in definition[0]:
+                return
+            DurableJobRepository._rebuild_state_table(connection)
+        except sqlite3.OperationalError:
+            if DurableJobRepository._migration_complete(connection):
                 return  # A concurrent worker already migrated the shared database.
+            raise
+
+    @staticmethod
+    def _migration_complete(connection: sqlite3.Connection) -> bool:
+        """Check whether another initializer already finished the state migration."""
+        stranded = connection.execute(
+            "SELECT name FROM sqlite_master WHERE name = 'mcp_benchmark_jobs_legacy'"
+        ).fetchone()
+        if stranded is not None:
+            return False
+        definition = connection.execute("SELECT sql FROM sqlite_master WHERE name = 'mcp_benchmark_jobs'").fetchone()
+        return definition is not None and definition[0] is not None and "'unknown'" in definition[0]
+
+    @staticmethod
+    def _resume_state_migration(connection: sqlite3.Connection) -> None:
+        """Finish a state migration interrupted after the rename, in one transaction."""
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            DurableJobRepository._copy_legacy_jobs(connection)
+            connection.commit()
+        except BaseException:
+            connection.rollback()
             raise
 
     @staticmethod
     def _rebuild_state_table(connection: sqlite3.Connection) -> None:
         """Rebuild the jobs table with the widened state CHECK, preserving rows by column name."""
-        connection.execute("ALTER TABLE mcp_benchmark_jobs RENAME TO mcp_benchmark_jobs_legacy")
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            connection.execute("ALTER TABLE mcp_benchmark_jobs RENAME TO mcp_benchmark_jobs_legacy")
+            DurableJobRepository._copy_legacy_jobs(connection)
+            connection.commit()
+        except BaseException:
+            connection.rollback()
+            raise
+
+    @staticmethod
+    def _copy_legacy_jobs(connection: sqlite3.Connection) -> None:
+        """Copy stranded legacy rows into the widened table and drop the legacy table."""
         connection.execute(
             """
-            CREATE TABLE mcp_benchmark_jobs (
+            CREATE TABLE IF NOT EXISTS mcp_benchmark_jobs (
                 execution_id TEXT PRIMARY KEY,
                 principal_id TEXT NOT NULL,
                 state TEXT NOT NULL CHECK (
@@ -200,14 +238,18 @@ class DurableJobRepository:
             str(row["name"]) for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs_legacy)")
         ]
         names = ", ".join(legacy_columns)
-        connection.execute(f"INSERT INTO mcp_benchmark_jobs ({names}) SELECT {names} FROM mcp_benchmark_jobs_legacy")
+        connection.execute(
+            f"INSERT OR IGNORE INTO mcp_benchmark_jobs ({names}) SELECT {names} FROM mcp_benchmark_jobs_legacy"
+        )
         connection.execute("DROP TABLE mcp_benchmark_jobs_legacy")
         connection.execute(
-            "CREATE UNIQUE INDEX mcp_job_idempotency_idx"
+            "CREATE UNIQUE INDEX IF NOT EXISTS mcp_job_idempotency_idx"
             " ON mcp_benchmark_jobs (principal_id, idempotency_key) WHERE idempotency_key IS NOT NULL"
         )
-        connection.execute("CREATE INDEX mcp_job_queue_idx ON mcp_benchmark_jobs (state, created_at)")
-        connection.execute("CREATE INDEX mcp_job_owner_idx ON mcp_benchmark_jobs (principal_id, execution_id)")
+        connection.execute("CREATE INDEX IF NOT EXISTS mcp_job_queue_idx ON mcp_benchmark_jobs (state, created_at)")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS mcp_job_owner_idx ON mcp_benchmark_jobs (principal_id, execution_id)"
+        )
 
     @staticmethod
     def _record(row: sqlite3.Row) -> JobRecord:
@@ -327,11 +369,15 @@ class DurableJobRepository:
         return self._record(claimed)
 
     def renew(self, execution_id: str, worker_id: str) -> bool:
-        """Renew a live running or publishing lease owned by this worker.
+        """Renew a running or publishing lease owned by this worker.
 
-        A renewal after the lease already expired is refused so a stalled worker
-        cannot resurrect its own lease; the worker must treat the refusal as
-        losing the lease and stop before publication.
+        Ownership is the fence: renewal succeeds only while this worker still
+        owns the lease, so a fenced worker learns it lost the lease and stops
+        before publication. Lapse detection stays wall-clock free at this
+        layer; expiry is decided by the recovery-side monotonic observation
+        mechanism in :meth:`claim_expired`, never by comparing a wall-clock
+        deadline here, so a host clock step cannot falsely evict a healthy
+        attempt.
         """
         now = utc_now()
         with self._connect() as connection:
@@ -340,14 +386,13 @@ class DurableJobRepository:
                 UPDATE mcp_benchmark_jobs
                 SET lease_expires_at = ?, lease_generation = lease_generation + 1, updated_at = ?
                 WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
-                  AND state IN ('running', 'publishing') AND lease_expires_at > ?
+                  AND state IN ('running', 'publishing')
                 """,
                 (
                     now.timestamp() + self.limits.lease_seconds,
                     now.isoformat(),
                     execution_id,
                     worker_id,
-                    now.timestamp(),
                 ),
             ).rowcount
         return changed == 1
@@ -562,12 +607,12 @@ class DurableJobRepository:
 
         Retry is allowed only when the old attempt is proven quiescent: the
         owner reported its own failure via :meth:`fail_attempt` (which runs only
-        after that attempt finished), cancellation was requested, the attempt
-        budget is exhausted, or the publication commit point already holds a
-        durable artifact. Otherwise the old attempt may still be executing
-        database work, so recovery records the terminal ``unknown`` outcome
-        instead of requeueing: the job is never claimed again and an operator
-        must inspect before resubmitting with a new idempotency key.
+        after that attempt finished), cancellation was requested, or the
+        publication commit point already holds a durable artifact. An
+        exhausted attempt budget proves nothing about termination, so an
+        unreported expired attempt records the terminal ``unknown`` outcome
+        even on its final attempt: the job is never claimed again and an
+        operator must inspect before resubmitting with a new idempotency key.
         """
         now = utc_now().isoformat()
         with self._connect() as connection:
@@ -591,11 +636,6 @@ class DurableJobRepository:
                 next_state = "cancelled"
                 artifact = None
                 error_code = None
-                completed_at = now
-            elif current["attempts"] >= self.limits.max_attempts:
-                next_state = "failed"
-                artifact = None
-                error_code = "worker_lease_expired"
                 completed_at = now
             else:
                 next_state = "unknown"
