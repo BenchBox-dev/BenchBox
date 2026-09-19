@@ -1276,9 +1276,16 @@ class BigQueryAdapter(PlatformAdapter):
 
             uri = f"gs://{self.storage_bucket}/{blob_name}"
             max_retries = 5
+            load_job = None
             for attempt in range(max_retries):
                 try:
-                    load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
                     load_job.result()
                     break
                 except TooManyRequests as e:
@@ -1321,10 +1328,17 @@ class BigQueryAdapter(PlatformAdapter):
                 time.sleep(1.0)
 
             max_retries = 5
+            load_job = None
             for attempt in range(max_retries):
                 try:
-                    with open(file_path, "rb") as source_file:
-                        load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        with open(file_path, "rb") as source_file:
+                            load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
                     load_job.result()
                     break
                 except TooManyRequests as e:

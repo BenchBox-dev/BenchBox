@@ -1767,6 +1767,49 @@ class TestBigQuerySqlGenerationHelpers:
 
     @patch("benchbox.platforms.bigquery.time.sleep")
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_load_table_via_cloud_storage_repolls_same_job_on_polling_rate_limit(
+        self, mock_bigquery, mock_sleep, dependencies_available
+    ):
+        from google.api_core.exceptions import TooManyRequests
+
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
+        mock_bigquery.SourceFormat.CSV = "CSV"
+        mock_bigquery.LoadJobConfig.side_effect = lambda **kwargs: Mock(**kwargs)
+
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+        bucket = Mock()
+        mock_connection = Mock()
+        mock_connection.dataset.return_value.table.return_value = Mock()
+
+        accepted_job = Mock()
+        accepted_job.result.side_effect = [
+            TooManyRequests("polling rate limit exceeded"),
+            TooManyRequests("polling rate limit exceeded"),
+            None,
+        ]
+        mock_connection.load_table_from_uri.return_value = accepted_job
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            chunk = Path(tmpdir) / "customer_0.dat"
+            chunk.write_text("1|alpha\n")
+
+            with patch.object(adapter, "_get_table_row_count", return_value=1):
+                row_count = adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
+
+        assert row_count == 1
+        # The accepted job may already be running server-side: exactly one
+        # submission, with retries re-polling it instead of appending a duplicate.
+        assert mock_connection.load_table_from_uri.call_count == 1
+        assert accepted_job.result.call_count == 3
+
+    @patch("benchbox.platforms.bigquery.time.sleep")
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_table_via_cloud_storage_raises_after_exhausting_retries(
         self, mock_bigquery, mock_sleep, dependencies_available
     ):
