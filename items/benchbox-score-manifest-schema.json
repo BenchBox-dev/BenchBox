@@ -1,7 +1,7 @@
 {
   "acceptance": [
     "A schema represents methodology version, capability profile, S/M/L dataset vector, workload blocks, weights, oracles, and reference vector.",
-    "The result identity binds BenchBox revision, platform/adapter/driver versions, rendered SQL and parameters, dataset hashes, hardware, OS, topology, tuning, cache, warmup, and result-consumption policy.",
+    "The result identity binds BenchBox revision, platform/adapter/driver versions, rendered SQL and parameters, dataset hashes, hardware, OS, topology, tuning, cache, warmup, repetition, and result-consumption policy.",
     "Throughput identity includes concurrency, session schedule, active interval, and per-session configuration.",
     "Canonical serialization and content hashes make manifests replayable and tamper-evident.",
     "Compatibility tests reject undeclared or non-comparable methodology changes."
@@ -21,6 +21,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "fb2efec94c3349c981181ee8936efdf9",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:54:18Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "e6235cfb247e4baf841b5840cbab68ad",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
