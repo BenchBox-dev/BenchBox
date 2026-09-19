@@ -2676,6 +2676,15 @@
       "status": "open",
       "title": "Define truthful concurrency outcomes and resource-ownership boundaries"
     },
+    "concurrency-public-api-semantic-reconciliation": {
+      "claim": null,
+      "needs": [
+        "concurrency-outcome-and-ownership-contract"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Reconcile concurrency utility APIs by benchmark semantics"
+    },
     "concurrency-testing-framework": {
       "claim": null,
       "needs": [],
