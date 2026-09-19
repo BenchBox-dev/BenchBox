@@ -16803,17 +16803,12 @@
       "title": "Refactor TPC-DI memory validation to check growth (delta) instead of absolute RSS"
     },
     "tpcdi-parallel-phase-truthful-outcome": {
-      "claim": {
-        "expires_at": "2026-09-20T19:16:43Z",
-        "generation": "0ec93b1ecb6b40de9785881c522ae1ec",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Make TPC-DI parallel phases fail closed on incomplete or failed work"
     },
     "tpcds-can-never-be-published-official-flag-not-wired": {
