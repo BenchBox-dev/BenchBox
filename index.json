@@ -13074,10 +13074,15 @@
       "title": "Result-bundle compat: localResult.ts parity with version helper"
     },
     "result-bundle-compat-plans-truncation-contract": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-20T00:26:22Z",
+        "generation": "7001af31f7b3433b8d06f3c1e163c700",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Result-bundle compat: plans-companion truncation contract"
     },
     "result-bundle-compat-read-model-v11-load-time": {
