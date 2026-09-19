@@ -14,26 +14,44 @@ import hashlib
 import importlib.util
 import json
 import re
+import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-try:
-    from benchbox.core.results.schema_policy import (
-        PUBLIC_SUBMISSION_SCHEMA_POLICY,
-        result_schema_version_value,
-    )
-except ImportError:  # pragma: no cover - exercised on the slim published-results branch.
-    PUBLIC_SUBMISSION_SCHEMA_POLICY = None
 
-    def result_schema_version_value(data: dict[str, Any]) -> Any:
-        if not isinstance(data, dict):
-            return None
-        if "result_schema_version" in data:
-            return data.get("result_schema_version")
-        if "version" in data:
-            return data.get("version")
-        return data.get("schema_version")
+def _load_schema_policy_helpers():
+    """Load version helpers without running results package initializers.
+
+    Prefers the canonical package import; on the slim published-results
+    branch mirror (which ships this module plus
+    ``benchbox/core/results/schema_policy.py`` without the installable
+    package) loads the helper straight from the mirrored file, mirroring
+    how ``_load_bundle_failed_query_count`` loads its policy. There is a
+    single implementation: no inline duplicate lives here.
+    """
+    try:
+        from benchbox.core.results.schema_policy import (
+            PUBLIC_SUBMISSION_SCHEMA_POLICY,
+            result_schema_version_value,
+        )
+
+        return PUBLIC_SUBMISSION_SCHEMA_POLICY, result_schema_version_value
+    except ImportError:
+        pass
+    helper_path = Path(__file__).resolve().parents[1] / "core" / "results" / "schema_policy.py"
+    spec = importlib.util.spec_from_file_location("_benchbox_schema_policy", helper_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot load schema version policy from {helper_path}")
+    module = importlib.util.module_from_spec(spec)
+    # Register before exec: dataclass processing resolves types through
+    # sys.modules[module.__name__] and fails on an unregistered module.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.PUBLIC_SUBMISSION_SCHEMA_POLICY, module.result_schema_version_value
+
+
+PUBLIC_SUBMISSION_SCHEMA_POLICY, result_schema_version_value = _load_schema_policy_helpers()
 
 
 # Canonical provenance vocabulary. Import from the one source of truth when the
@@ -543,6 +561,41 @@ def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> No
         vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
+def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
+    """Warn on Databricks ``z_order`` claims that predate provenance.
+
+    Before the #2177 fix, untuned runs reported ``"z_order"`` while
+    applying only plain OPTIMIZE compaction. ``export.benchbox_version``
+    (introduced in #2199, after the fix) is the cutoff marker: a bundle
+    without it that claims ``z_order`` outside any tuning context may be
+    a mislabeled untuned run, so readers must treat it as unknown. Tuned
+    runs (non-empty ``platform.tuning``) and post-cutoff bundles are
+    unaffected. Old bundles are never rewritten; warn only.
+    """
+    platform = data.get("platform")
+    if not isinstance(platform, dict):
+        return
+    if platform.get("name") != "databricks":
+        return
+    config = platform.get("config")
+    if not isinstance(config, dict):
+        return
+    if config.get("databricks_clustering_strategy") != "z_order":
+        return
+    tuning = platform.get("tuning")
+    if isinstance(tuning, dict) and tuning:
+        return
+    export = data.get("export")
+    if isinstance(export, dict) and export.get("benchbox_version"):
+        return
+    vr.warn(
+        "platform.config.databricks_clustering_strategy='z_order' on a Databricks "
+        "bundle without tuning context or export.benchbox_version predates the "
+        "clustering provenance cutoff and may mislabel plain OPTIMIZE compaction; "
+        "treat as unknown."
+    )
+
+
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Find normalized cost in current and transitional bundle shapes."""
     raw = data.get("normalized_cost")
@@ -917,6 +970,7 @@ def _validate_bundle(
     _validate_environment_client_link(data, vr)
     _validate_tables_block(data, vr)
     _validate_platform_config_clustering(data, vr)
+    _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)
