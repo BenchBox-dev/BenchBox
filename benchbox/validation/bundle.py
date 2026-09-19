@@ -561,6 +561,41 @@ def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> No
         vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
+def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
+    """Warn on Databricks ``z_order`` claims that predate provenance.
+
+    Before the #2177 fix, untuned runs reported ``"z_order"`` while
+    applying only plain OPTIMIZE compaction. ``export.benchbox_version``
+    (introduced in #2199, after the fix) is the cutoff marker: a bundle
+    without it that claims ``z_order`` outside any tuning context may be
+    a mislabeled untuned run, so readers must treat it as unknown. Tuned
+    runs (non-empty ``platform.tuning``) and post-cutoff bundles are
+    unaffected. Old bundles are never rewritten; warn only.
+    """
+    platform = data.get("platform")
+    if not isinstance(platform, dict):
+        return
+    if platform.get("name") != "databricks":
+        return
+    config = platform.get("config")
+    if not isinstance(config, dict):
+        return
+    if config.get("databricks_clustering_strategy") != "z_order":
+        return
+    tuning = platform.get("tuning")
+    if isinstance(tuning, dict) and tuning:
+        return
+    export = data.get("export")
+    if isinstance(export, dict) and export.get("benchbox_version"):
+        return
+    vr.warn(
+        "platform.config.databricks_clustering_strategy='z_order' on a Databricks "
+        "bundle without tuning context or export.benchbox_version predates the "
+        "clustering provenance cutoff and may mislabel plain OPTIMIZE compaction; "
+        "treat as unknown."
+    )
+
+
 def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
     """Find normalized cost in current and transitional bundle shapes."""
     raw = data.get("normalized_cost")
@@ -935,6 +970,7 @@ def _validate_bundle(
     _validate_environment_client_link(data, vr)
     _validate_tables_block(data, vr)
     _validate_platform_config_clustering(data, vr)
+    _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
     _validate_execution_consistency(data, vr)
