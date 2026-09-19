@@ -1,12 +1,12 @@
 {
   "acceptance": [
     "Qualification covers C={1,2,4,8,16} for feasible profiles and C=32 for appropriate server-class systems.",
-    "Reports include throughput, latency percentiles, fairness, errors, resource pressure, and session-pool evidence.",
+    "Reports include throughput, latency percentiles, fairness, errors, locality, platform pressure, session-pool evidence, and separately attributable client CPU/memory.",
+    "A point that breaches preregistered client-headroom gates is labeled client-limited and cannot be selected as a headline.",
     "A platform cannot publish a lower actual concurrency under a higher C label.",
-    "Recommended public concurrency points are supported by saturation and stability evidence.",
-    "The complete measured curve remains publishable next to any selected headline point."
+    "Recommended public points are supported by saturation and stability evidence, and the complete curve remains publishable."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Run the declared concurrency ladder against qualified dataset profiles. Identify saturation, instability, memory pressure, unfairness, and platform/session limitations; retain full curves and recommend display points instead of assuming S/C4, M/C8, and L/C16.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
@@ -18,6 +18,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "b92f5db991034858b356fbf779c350f1",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:15:34Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "fcc6ae96c84f4295b817bcdb201668b3",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]

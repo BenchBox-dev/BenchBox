@@ -1212,7 +1212,8 @@
       "claim": null,
       "needs": [
         "benchbox-score-throughput-runner",
-        "benchbox-score-size-profile-pilot"
+        "benchbox-score-size-profile-pilot",
+        "benchbox-score-qualification-policy"
       ],
       "priority": "medium-high",
       "status": "open",
