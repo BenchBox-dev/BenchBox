@@ -1218,6 +1218,15 @@
       "status": "open",
       "title": "Define score manifests and cohort identity"
     },
+    "benchbox-score-methodology-freeze": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-multisystem-pilot"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Freeze and qualify score methodology version 1"
+    },
     "benchbox-score-multisystem-pilot": {
       "claim": null,
       "needs": [

@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Final workload membership, capability profiles, size vectors, weights, concurrency points, cache/warmup policy, and variance thresholds are versioned and immutable.",
+    "Five fresh end-to-end reference runs pass every correctness, resource, and predeclared variance gate.",
+    "The physical reference identity and every software, hardware, data, SQL, and configuration hash are published.",
+    "Reference replacement and score-compatibility policies distinguish major from comparable minor changes.",
+    "Every ADR acceptance gate has linked evidence and the ADR status is updated through review."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Resolve the ADR's pilot hypotheses, freeze methodology version 1, and qualify the physical reference vector. Update the ADR from Proposed only after all gates have objective evidence.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:47:04Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "34fc5bc38e2f4b50ba2096399c2a05f0",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}
