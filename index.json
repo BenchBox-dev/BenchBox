@@ -16744,6 +16744,15 @@
       "status": "open",
       "title": "Make TPC-DI generation reproducible across worker counts"
     },
+    "tpcdi-enhanced-parallel-support-decision": {
+      "claim": null,
+      "needs": [
+        "tpcdi-parallel-phase-truthful-outcome"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Resolve the TPC-DI enhanced parallel surface against the canonical ETL path"
+    },
     "tpcdi-memory-test-delta-refactor": {
       "claim": null,
       "needs": [],

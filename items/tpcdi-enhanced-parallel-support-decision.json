@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A decision record identifies the supported user outcome, current callers, canonical ETL capabilities, and any concrete gap that requires separate scheduling.",
+    "If retained, every submitted task maps to a real transform with defined inputs, outputs, idempotency, failure semantics, and parity tests against the canonical ETL path.",
+    "If rebuilt, benchmark evidence demonstrates why the canonical path cannot meet the requirement and defines a maintenance owner and performance budget.",
+    "If deprecated or removed, the change names an owner, deprecation and removal versions, at least one beta compatibility cycle where applicable, migration instructions, and corrected deployment-guide examples.",
+    "The documented TPC-DI parallel API decision is reconciled with decide-fate-of-documented-unimplemented-surfaces; its other two surfaces remain untouched.",
+    "No placeholder or synthetic task may enter production data mutation under any selected outcome."
+  ],
+  "context": "The smallest likely solution is to reuse the canonical ETL orchestration or remove the extra surface. A new scheduler needs affirmative evidence, not feature-completeness preference.",
+  "description": "After false-success containment, decide whether the enhanced TPC-DI parallel feature has a supported product role. The repository already has a canonical ETL path and a broad open tracker item about a documented but nonexistent public parallel API. Avoid sustaining a second scheduler without a demonstrated requirement.\n\nDecision boundary: choose exactly one outcome: route the public feature to canonical real transforms; rebuild a distinct scheduler only when a measured capability gap cannot be met by the canonical path; or deprecate and remove the enhanced surface. The decision must resolve the TPC-DI portion of decide-fate-of-documented-unimplemented-surfaces without changing that item's unrelated admin and explorer scopes.",
+  "links": [
+    "benchbox/core/tpcdi/benchmark.py",
+    "benchbox/core/tpcdi/etl/parallel_batch_processor.py",
+    "docs/guides/tpc/tpc-di-deployment-guide.md",
+    "decide-fate-of-documented-unimplemented-surfaces",
+    "unify-tpcdi-sql-dataframe-execution-contract"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:56:27Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "d5214e719e504b978733d89215963074",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
