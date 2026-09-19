@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "The parallel wrapper propagates the scheduler's explicit success/failure outcome and cannot report success merely because tasks_failed is zero.",
+    "An explicitly requested phase that has no executable work, uses a synthetic placeholder, times out, or returns incomplete work makes the public pipeline outcome failed or incomplete.",
+    "The enhanced pipeline cannot print or serialize overall success when any explicitly requested phase is failed, unavailable, timed out, or incomplete.",
+    "Negative tests cover scheduler success=false with tasks_failed=0, zero tasks, rejected synthetic tasks, worker exceptions, timeout, and partial completion.",
+    "Failure paths preserve the original cause and phase identity in structured results; they do not mutate downstream state after rejection.",
+    "Existing successful canonical ETL behavior remains covered and does not become dependent on the enhanced parallel feature."
+  ],
+  "context": "Immediate safety containment. This does not decide whether the enhanced parallel surface should remain. That decision is owned by tpcdi-enhanced-parallel-support-decision after truthful failure behavior exists.",
+  "description": "The enhanced TPC-DI pipeline can convert a scheduler-level failure into apparent success: _run_parallel_batch_processing derives success from tasks_failed instead of honoring the scheduler's explicit success result, while the outer enhanced pipeline treats requested advanced phases as optional. Make every explicitly requested phase report failure or an explicit incomplete outcome when work is unavailable, rejected, timed out, or failed.\n\nDecision boundary: contain false success before changing the product-level support strategy. Reject synthetic or non-executable work before mutation; do not compensate by fabricating successful records or by weakening the meaning of pipeline success.",
+  "links": [
+    "benchbox/core/tpcdi/benchmark.py",
+    "benchbox/core/tpcdi/etl/parallel_batch_processor.py",
+    "tests/integration/test_tpcdi_phase3_benchmark.py",
+    "complete-tpc-di-implementation-phase-3-etl-pipeline-enhancement"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:55:34Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "64d8cd7f5d6c4336b61517d2996845eb",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
