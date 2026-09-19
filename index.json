@@ -13021,15 +13021,10 @@
       "title": "Result-bundle compat: Databricks clustering provenance cutoff marker"
     },
     "result-bundle-compat-decide-load-time-surfacing": {
-      "claim": {
-        "expires_at": "2026-09-20T00:28:26Z",
-        "generation": "f9f704e558f743a1aacaca202703d92a",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ace0a30867d429a9f65f7811"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Result-bundle compat: decide per-table load-time surfacing vs bundle-only"
     },
     "result-bundle-compat-dispatch-review": {
