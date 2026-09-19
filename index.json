@@ -2653,6 +2653,21 @@
       "status": "done",
       "title": "Compressed Data Generation Gaps (all benchmarks) ✅"
     },
+    "concurrency-contract-proof-matrix": {
+      "claim": null,
+      "needs": [
+        "expected-results-singleflight-run-policy",
+        "throughput-outstanding-work-containment",
+        "tpcdi-deterministic-generation-contract",
+        "throughput-adapter-session-capability-contract",
+        "tpcdi-enhanced-parallel-support-decision",
+        "concurrency-public-api-semantic-reconciliation",
+        "mcp-durable-admission-and-fairness"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Prove concurrency contracts at unit, integration, adapter, and operator boundaries"
+    },
     "concurrency-docs-alignment": {
       "claim": null,
       "needs": [

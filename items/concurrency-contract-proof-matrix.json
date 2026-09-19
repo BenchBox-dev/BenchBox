@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "A proof matrix maps every concurrency invariant to its producer, consumer, failure injection, test layer, supported platforms, and retained evidence.",
+    "Unit tests cover state transitions, synchronization publication order, validation-policy isolation, deterministic generation, metric suppression, and stale-owner fencing.",
+    "Integration tests cover phase containment with live outstanding work, multiprocess admission, lease loss, cancellation/publication races, restart, and unknown-outcome recovery.",
+    "Adapter UAT proves session identity, concurrent overlap, configuration equivalence, cleanup, and native cancellation only for adapters that claim those capabilities.",
+    "Negative controls demonstrate that each test fails when its protected invariant is deliberately violated; timing-only sleeps are not the sole synchronization oracle.",
+    "The final report separates repository verification, hosted CI, adapter UAT, and deferred operator-controlled external MCP acceptance; it makes no production-readiness claim without the external runbook evidence."
+  ],
+  "context": "This item is the only convergence point. It must not reopen implementation decisions unless evidence falsifies them; failures return to the owning prerequisite item. External MCP production acceptance stays deferred and operator-owned.",
+  "description": "Close the concurrency work with evidence at the boundary each claim depends on. Unit tests alone cannot prove phase isolation, multiprocess lease behavior, real session equivalence, or operator deployment. Build a traceable proof matrix and run the repository-verifiable portions without conflating them with deferred external acceptance.\n\nDecision boundary: a claim passes only at the lowest layer capable of falsifying it. Mock-based success cannot certify real database cancellation or adapter session equivalence, and local MCP tests cannot certify an external production deployment.",
+  "links": [
+    "tests/unit/core/expected_results/test_thread_safety.py",
+    "tests/unit/core/throughput/test_runner.py",
+    "tests/integration/test_tpch_throughput_test.py",
+    "tests/integration/test_tpcds_throughput_test.py",
+    "tests/integration/mcp/test_multiworker_acceptance.py",
+    "docs/operations/uat-framework.md",
+    "docs/operations/mcp-production-readiness.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:48b17171f0ceedd73e302e83",
+      "at": "2026-09-19T18:57:10Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "ebcab464ec99468188529b20018ad5b2",
+      "session_id": "3bd78941ed854abebd994eb0417ff0a8"
+    }
+  ]
+}
