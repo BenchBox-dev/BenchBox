@@ -113,10 +113,17 @@ provenance:
     method: manual
     verified_regions: [us]
     manual_review_due: '2026-12-17'
+# Byte-unit contract for the byte-priced tables above. `tebibyte` is 2^40
+# bytes (BigQuery: vendor-confirmed, its pricing page works an example in
+# bytes per TiB). `terabyte` is 10^12 bytes (SI decimal): Athena and Synapse
+# serverless print a bare "TB" and neither vendor publishes the divisor, so
+# BenchBox reads the printed unit at its standards-defined value. See
+# docs/development/adr/adr-billing-unit-tb-tib-contract.md for the vendor
+# evidence, the rejected 2^40 reading, and the residual exposure.
 units:
   bigquery_on_demand_prices: tebibyte
-  athena_price_per_tb: terabyte_unconfirmed
-  synapse_serverless_price_per_tb: terabyte_unconfirmed
+  athena_price_per_tb: terabyte
+  synapse_serverless_price_per_tb: terabyte
 snowflake_credit_prices:
   standard:
     aws:

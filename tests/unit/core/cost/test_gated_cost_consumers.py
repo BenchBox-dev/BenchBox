@@ -119,7 +119,8 @@ class TestPerQueryCostGatedAtStamp:
         results = add_cost_estimation_to_results(_athena_results("us-east-1"))
 
         stamped = results.query_results[0]
-        assert stamped["cost"] == pytest.approx(5.0)
+        # Decimal TB per the unit contract: 2^40 bytes at $5.00/TB.
+        assert stamped["cost"] == pytest.approx((1024**4) / (10**12) * 5.0)
         assert "cost_status" not in stamped
         assert results.cost_summary["normalized_cost"]["cost_status"] == "normalized"
 

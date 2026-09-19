@@ -119,7 +119,9 @@ def _minimal_bundle() -> dict:
 
 def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized") -> dict:
     """Return a minimal valid BenchBox normalized-cost provenance block."""
-    billing_unit = "instance_hour" if status == "normalized" else "not_applicable"
+    # "node_hour" matches this block's Redshift-like deployment and is in the
+    # NORMALIZED_COST_BILLING_UNITS vocabulary the bundle validator enforces.
+    billing_unit = "node_hour" if status == "normalized" else "not_applicable"
     pricing_region = "us-east-1" if status == "normalized" else "not_applicable"
     return {
         "normalized_cost_usd": cost,
@@ -871,6 +873,43 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("requires deployment metadata" in e for e in vr.errors)
+
+    def test_normalized_cost_accepts_tib_scanned(self):
+        """BigQuery's per-tebibyte unit is in the validator vocabulary."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "tib_scanned"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_normalized_cost_accepts_legacy_tb_scanned(self):
+        """Pre-ADR BigQuery bundles recorded as tb_scanned still validate."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "tb_scanned"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_normalized_cost_rejects_unit_outside_vocabulary(self):
+        """A fictional billing_unit cannot back normalized cost."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "instance_hour"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("concrete billing_unit" in e for e in vr.errors)
 
 
 # ---------------------------------------------------------------------------

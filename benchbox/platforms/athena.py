@@ -1226,9 +1226,14 @@ class AthenaAdapter(PlatformAdapter):
                     stream_id=stream_id,
                 )
 
-            # Calculate query cost (Athena charges $5 per TB scanned)
-            cost_per_tb = 5.0
-            cost = (data_scanned_bytes / (1024**4)) * cost_per_tb
+            # Client-side estimate only: core/cost recomputes the authoritative
+            # figure from raw bytes. Decimal TB and the region-aware rate come
+            # from the unit contract (decimal TB for Athena) via the central
+            # resolver, so this cannot drift from the published pricing.
+            from benchbox.core.cost.pricing import resolve_athena_price_per_tb
+
+            cost_per_tb = resolve_athena_price_per_tb(self.region or "us-east-1").value or 5.0
+            cost = (data_scanned_bytes / (10**12)) * cost_per_tb
 
             # Build result dict
             result_dict = self._build_query_result_with_validation(
@@ -1273,13 +1278,20 @@ class AthenaAdapter(PlatformAdapter):
         return result_dict
 
     def get_cost_summary(self) -> dict[str, Any]:
-        """Get cost summary for the benchmark run."""
-        cost_per_tb = 5.0
-        total_cost = (self._total_data_scanned_bytes / (1024**4)) * cost_per_tb
+        """Get cost summary for the benchmark run.
+
+        Client-side estimate only, in decimal TB per the unit contract;
+        core/cost recomputes the authoritative figure from raw bytes.
+        """
+        from benchbox.core.cost.pricing import resolve_athena_price_per_tb
+
+        cost_per_tb = resolve_athena_price_per_tb(self.region or "us-east-1").value or 5.0
+        total_tb = self._total_data_scanned_bytes / (10**12)
+        total_cost = total_tb * cost_per_tb
 
         return {
             "total_data_scanned_bytes": self._total_data_scanned_bytes,
-            "total_data_scanned_tb": self._total_data_scanned_bytes / (1024**4),
+            "total_data_scanned_tb": total_tb,
             "query_count": self._query_count,
             "cost_per_tb_usd": cost_per_tb,
             "total_cost_usd": total_cost,

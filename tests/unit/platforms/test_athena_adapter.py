@@ -373,17 +373,19 @@ class TestAthenaAdapter:
         adapter = AthenaAdapter(s3_bucket="test-bucket")
 
         # Simulate some queries
-        adapter._total_data_scanned_bytes = 1024**4  # 1 TB
+        adapter._total_data_scanned_bytes = 1024**4
         adapter._query_count = 10
 
         summary = adapter.get_cost_summary()
 
+        # Decimal TB per the unit contract: 2^40 bytes is ~1.0995 TB.
+        expected_tb = (1024**4) / (10**12)
         assert summary["total_data_scanned_bytes"] == 1024**4
-        assert summary["total_data_scanned_tb"] == 1.0
+        assert summary["total_data_scanned_tb"] == pytest.approx(expected_tb)
         assert summary["query_count"] == 10
         assert summary["cost_per_tb_usd"] == 5.0
-        assert summary["total_cost_usd"] == 5.0
-        assert summary["average_cost_per_query_usd"] == 0.5
+        assert summary["total_cost_usd"] == pytest.approx(expected_tb * 5.0)
+        assert summary["average_cost_per_query_usd"] == pytest.approx(expected_tb * 5.0 / 10)
 
     def test_from_config(self, mock_boto3, mock_pyathena, mock_aws_credentials):
         """Test adapter creation from config."""

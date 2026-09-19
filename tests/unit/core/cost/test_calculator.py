@@ -46,9 +46,9 @@ class TestCostCalculator:
         """Test BigQuery cost calculation with bytes_processed."""
         calculator = CostCalculator()
 
-        # 1 TB = 1024^4 bytes
-        bytes_per_tb = 1024**4
-        resource_usage = {"bytes_processed": bytes_per_tb}  # Exactly 1 TB
+        # 1 TiB = 1024^4 bytes (BigQuery bills per tebibyte)
+        bytes_per_tib = 1024**4
+        resource_usage = {"bytes_processed": bytes_per_tib}  # Exactly 1 TiB
         platform_config = {"location": "us"}
 
         cost = calculator.calculate_query_cost("bigquery", resource_usage, platform_config)
@@ -63,16 +63,27 @@ class TestCostCalculator:
         calculator = CostCalculator()
 
         resource_usage = {
-            "data_scanned_bytes": 1024**4,
+            "data_scanned_bytes": 10**12,  # Exactly 1 decimal TB
             "cost_usd": 999.0,
         }
 
         cost = calculator.calculate_query_cost("athena", resource_usage, {"region": "us-east-1"})
 
         assert cost is not None
-        assert cost.compute_cost == resolve_athena_price_per_tb().value
-        assert cost.pricing_details["data_scanned_bytes"] == 1024**4
+        assert cost.compute_cost == resolve_athena_price_per_tb("us-east-1").value
+        assert cost.pricing_details["data_scanned_bytes"] == 10**12
         assert "source" not in cost.pricing_details
+
+    def test_athena_cost_uses_decimal_terabyte(self):
+        """Athena divides by 10^12: one tebibyte of scan costs ~9.95% over list."""
+        calculator = CostCalculator()
+
+        cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "us-east-1"})
+
+        assert cost is not None
+        price_per_tb = resolve_athena_price_per_tb("us-east-1").value
+        assert cost.compute_cost == (1024**4 / 10**12) * price_per_tb
+        assert cost.pricing_details["unit"] == "terabyte"
 
     def test_athena_resource_usage_requires_data_scanned_bytes(self):
         """Athena validation rejects legacy cost_usd without measured scanned bytes."""
@@ -276,3 +287,53 @@ class TestCostCalculator:
         assert normalized_cost.cost_status == "unavailable"
         assert normalized_cost.normalized_cost_usd is None
         assert any("region metadata was defaulted" in warning for warning in warnings)
+
+
+class TestBillingUnitContract:
+    """NormalizedCost.billing_unit reports the unit actually billed per platform.
+
+    Regression cover for the billing-unit ADR: BigQuery is priced per
+    tebibyte, so it must not share Athena/Synapse's decimal-terabyte label.
+    """
+
+    @staticmethod
+    def _normalized_billing_unit(platform, platform_config):
+        calculator = CostCalculator()
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
+        benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": platform})
+        normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+            platform, benchmark_cost, platform_config
+        )
+        assert warnings == []
+        assert normalized_cost.cost_status == "normalized"
+        return normalized_cost.billing_unit
+
+    def test_bigquery_reports_tib_scanned(self):
+        assert self._normalized_billing_unit("bigquery", {"location": "us", "cloud": "gcp"}) == "tib_scanned"
+
+    def test_athena_reports_tb_scanned(self):
+        assert self._normalized_billing_unit("athena", {"region": "us-east-1", "cloud": "aws"}) == "tb_scanned"
+
+    def test_synapse_serverless_reports_tb_scanned(self):
+        assert (
+            self._normalized_billing_unit("synapse", {"mode": "serverless", "region": "eastus", "cloud": "azure"})
+            == "tb_scanned"
+        )
+
+    def test_synapse_dedicated_reports_dwu_hour(self):
+        assert (
+            self._normalized_billing_unit(
+                "synapse",
+                {"mode": "dedicated", "region": "eastus", "cloud": "azure", "dwu_level": "dw100c"},
+            )
+            == "dwu_hour"
+        )
+
+    def test_snowflake_reports_credit(self):
+        assert (
+            self._normalized_billing_unit(
+                "snowflake",
+                {"edition": "standard", "cloud": "aws", "region": "us-east-1", "warehouse_size": "MEDIUM"},
+            )
+            == "credit"
+        )
