@@ -1,12 +1,13 @@
 {
   "acceptance": [
     "Core and Full taxonomies cover the ADR's relational, window, statistical, approximate, semi-structured, temporal, recursive, lateral, grouping, and applied-analysis requirements.",
-    "Every candidate scored query maps to at least one capability leaf and exactly one declared source-lineage group.",
+    "Every candidate scored query maps to at least one capability leaf and one declared root lineage; related lineages are summed across every block for the effective-weight audit.",
+    "Each proposed leaf is assigned to a fixture, explicitly excluded with weight reallocation, or moved to a separately named extension before freeze.",
     "The matrix reports uncovered, duplicate, and overrepresented capability leaves.",
     "A candidate TPC-Havoc panel covers distinct transformation families without weighting duplicate variants.",
-    "The candidate block weights satisfy the ADR guardrails and remain marked provisional."
+    "One explicit leaf/lineage allocation demonstrates across-block arithmetic for the <=40% lineage, <=15% benchmark, >=25% real-data, and >=15% advanced-SQL guardrails; all weights remain provisional."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Define analytics-core-v1 and analytics-full-v1 as versioned capability taxonomies. Map candidate queries to capability leaves and source-lineage groups, identify gaps, and produce a candidate TPC-Havoc and advanced-function panel under explicit coverage and runtime budgets.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
@@ -20,6 +21,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "43b1641d4a5946ee969eebbc4010ed25",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:11:44Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "f3bb4393f4ac4e4e94a212bf54736f19",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
