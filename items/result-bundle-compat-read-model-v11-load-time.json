@@ -4,7 +4,7 @@
     "Seed-corpus unevenness addressed (regeneration note or NULL-tolerant views)",
     "Compat tests updated; explorer renders new columns"
   ],
-  "context": "Reconciliation rows P4 and per_table_ms (both DEFER). Implements the surfacing decision; stays closed if the decision is bundle-only.",
+  "context": "Closed without implementation per the surfacing decision in result-bundle-compat-decide-load-time-surfacing (bundle-only; revisit at 50% corpus coverage or next opportunistic read-model bump). No code changed for this item.",
   "description": "Implement the decided per-table load-time surfacing: project tables.*.load_ms (and phases.statistics.per_table_ms if in scope) into the Explorer DuckDB read model with a version bump, NULL-tolerant views for the partial seed corpus, and updated compat tests.",
   "links": [
     "_project/audits/result-bundle-downstream-compat-2026-09-18.md"
