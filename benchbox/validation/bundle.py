@@ -219,6 +219,26 @@ NORMALIZED_COST_REQUIRED_KEYS = {
 }
 NORMALIZED_COST_SCOPES = {"compute_only", "compute_plus_storage"}
 NORMALIZED_COST_STATUSES = {"normalized", "not_applicable_local", "unavailable"}
+
+# Concrete billing_unit vocabulary the cost calculator can emit for normalized
+# cost. Scan-priced platforms report the unit actually billed: BigQuery is
+# priced per tebibyte ("tib_scanned"); Athena and Synapse serverless print
+# "TB", read as decimal terabytes ("tb_scanned"). See
+# docs/development/adr/adr-billing-unit-tb-tib-contract.md. Legacy bundles
+# that recorded BigQuery as "tb_scanned" stay valid: the value remains in the
+# vocabulary, so no result-bundle schema bump is implied.
+NORMALIZED_COST_BILLING_UNITS = frozenset(
+    {
+        "tib_scanned",
+        "tb_scanned",
+        "credit",
+        "node_hour",
+        "dbu",
+        "dwu_hour",
+        "cu_hour",
+        "fbu",
+    }
+)
 DIRECT_COST_TOTAL_KEYS = ("total_usd", "total_cost")
 TOP_LEVEL_DIRECT_COST_KEYS = ("cost_usd",)
 
@@ -679,8 +699,11 @@ def _validate_normalized_cost_block(
         vr.error("normalized_cost.cost_status 'not_applicable_local' requires normalized_cost_usd of 0")
     if cost_status == "unavailable" and cost_value is not None:
         vr.error("normalized_cost.cost_status 'unavailable' must not include normalized_cost_usd")
-    if cost_status == "normalized" and billing_unit in {"unknown", "not_applicable"}:
-        vr.error("normalized_cost.cost_status 'normalized' requires a concrete billing_unit")
+    if cost_status == "normalized" and billing_unit not in NORMALIZED_COST_BILLING_UNITS:
+        vr.error(
+            "normalized_cost.cost_status 'normalized' requires a concrete billing_unit "
+            f"in {sorted(NORMALIZED_COST_BILLING_UNITS)}; got {billing_unit!r}"
+        )
     if cost_status == "normalized" and pricing_region in {"unknown", "not_applicable"}:
         vr.error("normalized_cost.cost_status 'normalized' requires a concrete pricing_region")
 
