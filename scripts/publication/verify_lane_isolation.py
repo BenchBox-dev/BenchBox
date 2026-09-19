@@ -56,6 +56,7 @@ SHARED_BUILD_INPUTS: tuple[str, ...] = (
     "benchbox/",
     "pyproject.toml",
     "uv.lock",
+    "scripts/generate_pricing_data.py",
     "scripts/publication/verify_lane_isolation.py",
 )
 
