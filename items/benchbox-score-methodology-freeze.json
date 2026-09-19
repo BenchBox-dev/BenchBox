@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "Final workload membership, capability profiles, size vectors, weights, concurrency points, cache/warmup policy, and variance thresholds are versioned and immutable.",
-    "Five fresh end-to-end reference runs pass every correctness, resource, and predeclared variance gate.",
-    "The physical reference identity and every software, hardware, data, SQL, and configuration hash are published.",
-    "Reference replacement and score-compatibility policies distinguish major from comparable minor changes.",
+    "Final membership, capability profiles, size vectors, effective weights, concurrency points, cache/warmup policy, and numerical qualification thresholds are versioned and immutable.",
+    "Five fresh end-to-end reference runs pass every preregistered correctness, resource, locality, client-headroom, thermal, timeout, and variance gate.",
+    "The physical reference identity, hardware-unit continuity policy, and every software, hardware, data, translated-SQL, configuration, and manifest hash are published.",
+    "Policy declares how benchmark-specific tuning is attested, labeled, compared, and admitted or excluded from default rankings.",
+    "Reference replacement and score compatibility distinguish proportional equivalent recalibration from non-proportional major-version changes.",
     "Every ADR acceptance gate has linked evidence and the ADR status is updated through review."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Resolve the ADR's pilot hypotheses, freeze methodology version 1, and qualify the physical reference vector. Update the ADR from Proposed only after all gates have objective evidence.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
@@ -18,6 +19,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "34fc5bc38e2f4b50ba2096399c2a05f0",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:13:45Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "2baf852b13cd4cf7b44abeb515d2a637",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]
