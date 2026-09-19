@@ -212,40 +212,45 @@ class SnowflakeAdapter(PlatformAdapter):
         """Create Snowflake adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
-        return cls(
-            **build_adapter_config(
-                config,
-                platform="snowflake",
-                fields=[
-                    "account",
-                    "warehouse",
-                    "schema",
-                    "username",
-                    "password",
-                    "role",
-                    "edition",
-                    "authenticator",
-                    "private_key_path",
-                    "private_key_passphrase",
-                    "warehouse_size",
-                    "auto_suspend",
-                    "auto_resume",
-                    "multi_cluster_warehouse",
-                    "query_tag",
-                    "timezone",
-                    "file_format",
-                    "compression",
-                    "staging_root",
-                    "iceberg_external_volume",
-                    "iceberg_catalog",
-                    "delta_table_format",
-                    "disable_result_cache",
-                    "strict_validation",
-                    "suppress_nondeterministic_errors",
-                    "modify_warehouse_settings",
-                ],
-            )
+        adapter_config = build_adapter_config(
+            config,
+            platform="snowflake",
+            fields=[
+                "account",
+                "warehouse",
+                "schema",
+                "username",
+                "password",
+                "role",
+                "edition",
+                "authenticator",
+                "private_key_path",
+                "private_key_passphrase",
+                "warehouse_size",
+                "auto_suspend",
+                "auto_resume",
+                "multi_cluster_warehouse",
+                "query_tag",
+                "timezone",
+                "file_format",
+                "compression",
+                "staging_root",
+                "iceberg_external_volume",
+                "iceberg_catalog",
+                "delta_table_format",
+                "disable_result_cache",
+                "strict_validation",
+                "suppress_nondeterministic_errors",
+                "modify_warehouse_settings",
+                "force_recreate",
+            ],
         )
+        # build_adapter_config only forwards listed fields: map the canonical
+        # --force flag through so forced runs actually reach the adapter instead
+        # of silently falling back to the base default (False).
+        if "force_recreate" not in adapter_config and config.get("force", False):
+            adapter_config["force_recreate"] = True
+        return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Snowflake platform information.
@@ -677,6 +682,9 @@ class SnowflakeAdapter(PlatformAdapter):
         Returns:
             True if all expected tables exist with data, False otherwise
         """
+        if self.force_recreate:
+            self.log_verbose("Force recreate enabled - schema creation required")
+            return False
         try:
             cursor = connection.cursor()
 
@@ -1032,6 +1040,12 @@ class SnowflakeAdapter(PlatformAdapter):
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
         file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+        if self.force_recreate:
+            # Full-refresh load: clear the resolved target once per table before
+            # COPY so a forced rerun over existing data stays idempotent instead
+            # of appending duplicates. Uses the PUT-fallback-resolved target.
+            self.log_very_verbose(f"Truncating {target_table} before COPY INTO (force recreate)")
+            cursor.execute(f"TRUNCATE TABLE {target_table}")
         copy_command = f"""
             COPY INTO {target_table}
             FROM {stage_name}

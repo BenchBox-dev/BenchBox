@@ -375,6 +375,12 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                     stage_name = f"@~/{table}"
                     session.sql(f"PUT file://{file_path} {stage_name}").collect()
 
+                if self.force_recreate:
+                    # Full-refresh load: clear the target before COPY so a forced
+                    # rerun over existing data stays idempotent (parquet branch
+                    # already overwrites via save_as_table).
+                    session.sql(f"TRUNCATE TABLE {table}").collect()
+
                 # Create file format and COPY INTO
                 session.sql(
                     f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|')"
@@ -658,6 +664,13 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         ]:
             if key in config:
                 params[key] = config[key]
+
+        # Forward the recreate flag so forced runs stay idempotent instead of
+        # silently falling back to the base default (False).
+        if "force_recreate" in config:
+            params["force_recreate"] = config["force_recreate"]
+        elif config.get("force", False):
+            params["force_recreate"] = True
 
         return cls(**params)
 

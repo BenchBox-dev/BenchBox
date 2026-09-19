@@ -2560,3 +2560,183 @@ class TestSnowflakeParseResultsEdgeCases:
         with patch.object(adapter.logger, "warning") as mock_warn:
             adapter._parse_copy_results([["orders.csv.gz", "LOADED", None, 100, None, None]])
         mock_warn.assert_not_called()
+
+
+class _StatefulSnowflakeCursor:
+    """Minimal stateful fake of a Snowflake cursor for double-load tests.
+
+    Models table row counts across statements: PUT stages files, TRUNCATE
+    clears the target, COPY appends the staged rows (then purges the stage),
+    SELECT COUNT returns the live row count.
+    """
+
+    ROWS_PER_FILE = 2
+
+    def __init__(self, existing_rows=25):
+        self.tables = {"LINEITEM": [1] * existing_rows}
+        self.staged: list[str] = []
+        self.statements: list[str] = []
+        self._last_count = 0
+
+    def execute(self, sql):
+        statement = str(sql)
+        self.statements.append(statement)
+        upper = statement.strip().upper()
+        if upper.startswith("PUT "):
+            self.staged.append(statement)
+            return
+        if upper.startswith("TRUNCATE TABLE"):
+            target = statement.strip().split()[-1].strip().strip('"')
+            self.tables[target.upper()] = []
+            return
+        if "COPY INTO" in upper:
+            idx = upper.index("COPY INTO") + len("COPY INTO")
+            target = upper[idx:].strip().split()[0].strip().strip('"')
+            self.tables.setdefault(target.upper(), []).extend([1] * (len(self.staged) * self.ROWS_PER_FILE))
+            self.staged = []
+            return
+        if upper.startswith("SELECT COUNT"):
+            target = statement.strip().split()[-1].strip().strip('"').strip(";")
+            self._last_count = len(self.tables.get(target.upper(), []))
+            return
+        if upper.startswith("SHOW TABLES LIKE"):
+            return
+
+    def fetchall(self):
+        return [
+            [f"lineitem.tbl.{i}", "LOADED", None, self.ROWS_PER_FILE, None, None]
+            for i in range(max(len(self.staged), 1))
+        ]
+
+    def fetchone(self):
+        return (self._last_count,)
+
+
+class TestSnowflakeForceRecreateIdempotentLoad:
+    """Forced Snowflake loads must be idempotent (no append duplicates)."""
+
+    def _adapter(self, **kwargs):
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            return SnowflakeAdapter(
+                account="test_account",
+                username="test_user",
+                password="test_pass",
+                warehouse="TEST_WH",
+                database="TEST_DB",
+                schema="PUBLIC",
+                **kwargs,
+            )
+
+    def _tbl_files(self, tmp_path):
+        paths = []
+        for i in (1, 2):
+            path = tmp_path / f"lineitem.tbl.{i}"
+            path.write_bytes(b"1|one|\n")
+            paths.append(path)
+        return paths
+
+    def test_double_load_stable_count_with_truncate_before_copy(self, tmp_path):
+        """With force_recreate, a second load must not change the row count."""
+        adapter = self._adapter(force_recreate=True)
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        files = self._tbl_files(tmp_path)
+        try:
+            first = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+            second = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert first == 2 * len(files)
+        assert second == first
+        truncates = [s for s in cursor.statements if s.strip().upper().startswith("TRUNCATE TABLE")]
+        assert len(truncates) == 2  # once per table load, not once per chunk file
+        first_truncate = cursor.statements.index(truncates[0])
+        first_copy = next(i for i, s in enumerate(cursor.statements) if "COPY INTO" in s.upper())
+        assert first_truncate < first_copy
+        assert "TRUNCATE TABLE LINEITEM" in truncates[0]
+
+    def test_no_truncate_and_append_by_default(self, tmp_path):
+        """Without force_recreate, behavior is unchanged: no TRUNCATE, load appends."""
+        adapter = self._adapter()
+        assert adapter.force_recreate is False
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        files = self._tbl_files(tmp_path)
+        try:
+            first = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+            second = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert not any(s.strip().upper().startswith("TRUNCATE TABLE") for s in cursor.statements)
+        assert first == 25 + 2 * len(files)
+        assert second == first + 2 * len(files)
+
+    def test_truncate_uses_quoted_fallback_target(self, tmp_path):
+        """TRUNCATE must target the PUT-fallback-resolved (quoted) table."""
+        adapter = self._adapter(force_recreate=True)
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+
+        def _execute(sql):
+            if "@%LINEITEM" in str(sql):
+                raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
+            _StatefulSnowflakeCursor.execute(cursor, sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert any('TRUNCATE TABLE "lineitem"' in s for s in cursor.statements)
+        truncate_idx = next(i for i, s in enumerate(cursor.statements) if "TRUNCATE TABLE" in s)
+        copy_idx = next(i for i, s in enumerate(cursor.statements) if "COPY INTO" in s.upper())
+        assert truncate_idx < copy_idx
+
+    def test_should_skip_schema_creation_returns_false_when_forced(self):
+        """Forced runs must not skip DDL even when tables exist with data."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [(None, "LINEITEM"), (25,)]
+
+        adapter = self._adapter(force_recreate=True)
+        with patch.object(adapter, "_get_expected_tables", return_value=["lineitem"]):
+            assert adapter._should_skip_schema_creation(Mock(), mock_connection) is False
+        mock_cursor.execute.assert_not_called()
+
+    def test_should_skip_schema_creation_unchanged_when_not_forced(self):
+        """Default runs still skip DDL when tables exist with data."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [(None, "LINEITEM"), (25,)]
+
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_expected_tables", return_value=["lineitem"]):
+            assert adapter._should_skip_schema_creation(Mock(), mock_connection) is True
+
+    def test_from_config_forwards_force_recreate(self):
+        """Production construction via from_config must preserve the flag."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        base = {
+            "account": "a",
+            "username": "u",
+            "password": "p",
+            "warehouse": "WH",
+            "database": "DB",
+            "schema": "PUBLIC",
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+        }
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            assert SnowflakeAdapter.from_config({**base, "force_recreate": True}).force_recreate is True
+            assert SnowflakeAdapter.from_config({**base, "force": True}).force_recreate is True
+            assert SnowflakeAdapter.from_config(dict(base)).force_recreate is False
