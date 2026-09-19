@@ -5111,17 +5111,12 @@
       "title": "Expand seed corpus to SF 0.1 cohorts for TPC-H and SSB"
     },
     "expected-results-singleflight-run-policy": {
-      "claim": {
-        "expires_at": "2026-09-20T19:28:22Z",
-        "generation": "08bca49814ed416cbdfa85e32980aa15",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c155b76ea647aae9b1cd0a5c"
-      },
+      "claim": null,
       "needs": [
         "concurrency-outcome-and-ownership-contract"
       ],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Make expected-results loading atomic and validation policy run-local"
     },
     "explicit-tuning-file-resolution": {
