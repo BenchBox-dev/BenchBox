@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Explorer views show headline, block, workload, correctness, variance, reference, and full concurrency-curve evidence.",
+    "The complete cohort key and methodology version are visible and used for comparison filtering.",
+    "Invalid, missing, unsupported, or non-comparable results cannot appear as valid ranked scores.",
+    "Documentation states that BenchBox scores are synthetic and are not official TPC metrics.",
+    "Existing benchmark-specific and official TPC metrics remain available without semantic changes.",
+    "Publication tests prevent provisional or unqualified methodology versions from reaching public score surfaces."
+  ],
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "description": "Add a separate Results Explorer and documentation surface for qualified BenchBox-Power and BenchBox-Throughput scores. Do not reinterpret the existing meta-leaderboard or expose provisional pilot results as headline scores.",
+  "links": [
+    "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md",
+    "docs/development/benchbox-results-platform-strategy.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T22:47:14Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "9e261f9307534f238e2163c7ff7a3d5c",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    }
+  ]
+}
