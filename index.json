@@ -1218,6 +1218,16 @@
       "status": "open",
       "title": "Implement the cross-benchmark Power runner"
     },
+    "benchbox-score-throughput-runner": {
+      "claim": null,
+      "needs": [
+        "benchbox-score-advanced-oracles",
+        "benchbox-score-manifest-schema"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Implement the cross-benchmark Throughput runner"
+    },
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],
