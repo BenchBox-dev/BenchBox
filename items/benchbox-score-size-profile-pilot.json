@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "Each workload member has a measured resource and runtime report for every feasible profile.",
-    "Fixed ClickBench and JOB datasets remain explicitly fixed inside the versioned vectors.",
-    "Each accepted profile declares resource headroom and rejects infeasible members rather than silently reducing scale.",
-    "Three exploratory runs characterize variance and thermal or order effects.",
+    "Each workload member has a measured resource, cache-sensitivity, runtime, locality, and variance report for every feasible profile.",
+    "Fixed ClickBench and JOB datasets remain immutable inside the versioned vectors and their distinct cache/variance behavior is reported rather than treated as scalable.",
+    "Each accepted profile passes the preregistered resource-headroom, correctness, timeout, thermal, and variance gates; infeasible members are not silently reduced.",
+    "Three exploratory runs characterize variance and thermal or order effects without changing the preregistered gates.",
     "The report states which profiles, if any, the M4 16 GB DuckDB candidate can qualify and why."
   ],
-  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. The ADR's numerical weights, size vectors, concurrency points, and M4 reference are pilot hypotheses until the methodology-freeze item closes.",
+  "context": "Implements the proposed cross-benchmark score architecture. Preserve official TPC metrics as separate outputs. Numerical weights, size vectors, concurrency points, thresholds, and the M4 reference remain pilot hypotheses until methodology freeze.",
   "description": "Run exploratory Power qualification for the proposed S, M, and L dataset vectors. Measure data generation/load cost, storage, peak memory, spill, client overhead, runtime, timeout rate, and variance. Evaluate the Mac mini M4 16 GB plus DuckDB as a reference candidate rather than assuming it qualifies.",
   "links": [
     "docs/development/adr/adr-cross-benchmark-power-throughput-scores.md"
@@ -18,6 +18,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "5bc7bf98cd434d13b194f55fad2f39af",
+      "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:c2a7624da45f94458644c779",
+      "at": "2026-09-19T23:15:23Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "2e69f55282674ecc9e423e35b7a1e731",
       "session_id": "3d4c46ec8f9046f49aa437cffb5ba71f"
     }
   ]

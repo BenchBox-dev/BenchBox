@@ -1281,7 +1281,8 @@
     "benchbox-score-size-profile-pilot": {
       "claim": null,
       "needs": [
-        "benchbox-score-power-runner"
+        "benchbox-score-power-runner",
+        "benchbox-score-qualification-policy"
       ],
       "priority": "medium-high",
       "status": "open",
