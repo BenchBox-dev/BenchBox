@@ -1,0 +1,15 @@
+{
+  "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf10_bigquery_sql_20260918_204223_f4a77c96.json",
+  "bundle_hash": "ad3f00afa25b65bf4391c6830996de39b168c20d919324b49ad15ce55f34d9da",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "phase": 2,
+  "platform": "BigQuery",
+  "result_source": "community",
+  "scale_factor": 10.0,
+  "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.4.0",
+  "submitted_at": "2026-09-19T12:00:33.758848+00:00",
+  "submitted_by": "Joe Harris"
+}
