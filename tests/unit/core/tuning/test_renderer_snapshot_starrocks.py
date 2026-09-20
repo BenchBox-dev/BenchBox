@@ -94,21 +94,20 @@ class TestStarRocksPreviewExecutionParity:
         table_tunings = {"lineitem": table_tuning}
 
         preview = _preview_clauses(table_tuning)
-        assert preview.partition_by == "l_shipdate"
+        assert preview.partition_by == "PARTITION BY (l_shipdate)"
         assert preview.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
-        assert preview.order_by == "l_linenumber"
+        assert preview.order_by == "ORDER BY (l_linenumber)"
         assert preview.additional_clauses == []
 
         adapter = _HostAdapter()
         statement = "CREATE TABLE lineitem (l_orderkey INT, l_linenumber INT, l_shipdate DATE)"
         rendered = adapter._optimize_table_definition(statement, table_tunings)
 
-        # Execution renders the preview fields with its clause wrappers; only
-        # distribute_by is verbatim by contract (partition/order stay bare
-        # column lists on StarRocks — a known remaining gap, not asserted).
-        assert f"PARTITION BY ({preview.partition_by})" in rendered
+        # Every preview field is rendered SQL by contract, so execution uses
+        # each verbatim -- preview and execution render identical strings.
+        assert preview.partition_by in rendered
         assert preview.distribute_by in rendered
-        assert f"ORDER BY ({preview.order_by})" in rendered
+        assert preview.order_by in rendered
 
         # No duplicate DISTRIBUTED BY, and StarRocks clause order is preserved.
         assert rendered.count("DISTRIBUTED BY") == 1
@@ -229,9 +228,14 @@ class TestStarRocksDryRunEntryParity:
         entry = _build_table_ddl_entry(preview)
         ddl_clauses = entry["ddl_clauses"] or ""
 
+        # No stray bare column lines: every clause is fully rendered.
         assert "l_orderkey" not in ddl_clauses.splitlines()
+        assert "l_shipdate" not in ddl_clauses.splitlines()
+        assert "l_linenumber" not in ddl_clauses.splitlines()
         assert ddl_clauses.count("DISTRIBUTED BY") == 1
+        assert "PARTITION BY (l_shipdate)" in ddl_clauses
         assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in ddl_clauses
+        assert "ORDER BY (l_linenumber)" in ddl_clauses
 
         adapter = _HostAdapter()
         statement = "CREATE TABLE lineitem (l_orderkey INT, l_linenumber INT, l_shipdate DATE)"
