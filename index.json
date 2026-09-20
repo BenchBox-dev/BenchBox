@@ -10565,15 +10565,10 @@
       "title": "Pin BenchBox CI to provenance-aware skill-sync"
     },
     "pin-reproducible-external-source-contracts-for-nyctaxi-and-f": {
-      "claim": {
-        "expires_at": "2026-09-21T03:31:29Z",
-        "generation": "0fde6622e49549c695f87b89274bd367",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Pin reproducible external-source contracts for nyctaxi and flightdata before any stable promotion"
     },
     "placeholder-rows-fetch-safety": {
