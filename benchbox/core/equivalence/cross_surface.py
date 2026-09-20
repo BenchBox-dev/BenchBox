@@ -617,8 +617,13 @@ def count_executed_cells(
     return coverage
 
 
-def _arrow_dtype_category(dtype: Any) -> str:
-    """Map an Arrow dtype to a coarse comparison category."""
+def _dtype_category(dtype: Any) -> str:
+    """Map an Arrow or Polars dtype to a coarse comparison category.
+
+    One spelling table covers both engines: their spellings are disjoint and
+    no spelling maps to different categories per engine, so a single pass
+    classifies both (widths and engine spellings ignored).
+    """
     text = str(dtype).lower()
     if text.startswith(("int", "uint")):
         return "integer"
@@ -628,39 +633,15 @@ def _arrow_dtype_category(dtype: Any) -> str:
         return "decimal"
     if text in ("string", "large_string", "utf8", "large_utf8", "string_view", "utf8_view"):
         return "string"
-    if text == "bool":
+    if text in ("bool", "boolean"):
         return "boolean"
-    if text.startswith(("date", "timestamp", "time", "duration", "interval", "month_day_nano")):
+    if text.startswith(("date", "timestamp", "datetime", "time", "duration", "interval", "month_day_nano")):
         return "temporal"
-    if text.startswith(("list", "large_list", "fixed_size_list", "struct", "map")):
+    if text.startswith(("list", "large_list", "fixed_size_list", "array", "struct", "map")):
         return "nested"
     if text == "null":
         return "null"
     if text.startswith(("binary", "large_binary")):
-        return "binary"
-    return f"other:{text}"
-
-
-def _polars_dtype_category(dtype: Any) -> str:
-    """Map a Polars dtype to the same coarse comparison categories."""
-    text = str(dtype).lower()
-    if text.startswith(("int", "uint")):
-        return "integer"
-    if text.startswith("float"):
-        return "float"
-    if text.startswith("decimal"):
-        return "decimal"
-    if text in ("string", "string_view"):
-        return "string"
-    if text == "boolean":
-        return "boolean"
-    if text.startswith(("date", "datetime", "time", "duration")):
-        return "temporal"
-    if text.startswith(("list", "array", "struct")):
-        return "nested"
-    if text == "null":
-        return "null"
-    if text.startswith("binary"):
         return "binary"
     return f"other:{text}"
 
@@ -674,7 +655,10 @@ def _dtype_categories_equivalent(reference: str, candidate: str) -> bool:
     """
     if reference == candidate:
         return True
-    return {reference, candidate} == {"decimal", "float"}
+    # Ordered, not symmetric: only a SQL decimal legitimately arrives as a
+    # frame float. The reverse (SQL float, frame decimal) is the wrong-dtype
+    # regression this cell exists to catch, so a set comparison would mask it.
+    return reference == "decimal" and candidate == "float"
 
 
 def _frame_polars_categories(result: Any) -> list[str] | None:
@@ -693,7 +677,7 @@ def _frame_polars_categories(result: Any) -> list[str] | None:
     if schema is None:
         return None
     values = schema.values() if hasattr(schema, "values") else schema
-    return [_polars_dtype_category(dtype) for dtype in values]
+    return [_dtype_category(dtype) for dtype in values]
 
 
 def find_cross_surface_dtype_divergences(
@@ -740,7 +724,7 @@ def find_cross_surface_dtype_divergences(
         except Exception as exc:
             divergences.append(SurfaceDivergence(query_id=query_id, cell="reference", detail=f"error: {exc}"))
             continue
-        reference_categories = [_arrow_dtype_category(field.type) for field in reference_schema]
+        reference_categories = [_dtype_category(field.type) for field in reference_schema]
         query = dataframe_query(query_id)
         for backend in backends:
             key = f"{query_id}_{backend}"

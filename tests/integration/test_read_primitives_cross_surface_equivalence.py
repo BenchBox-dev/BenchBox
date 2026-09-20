@@ -99,9 +99,14 @@ def test_read_primitives_expression_frame_dtypes_match_sql(tmp_path):
     equal-looking values passes the gate above silently. This dtype cell
     compares per-column dtype categories instead. Pandas frames are out of
     scope (numpy/object dtypes carry no type signal; value comparison remains
-    their guard). Classified value-divergence cells and vacuous
-    (legitimately-empty) queries are skipped by the caller - an empty frame
-    cannot carry dtypes.
+    their guard). Classified value-divergence cells are skipped by the caller.
+    Legitimately-empty selective filters are NOT skipped: empty Arrow tables
+    and empty Polars frames retain their declared source-column schemas, so a
+    loader regression (e.g. Decimal/String becoming Null) stays detectable
+    with zero rows. Only json_extract_nested is skipped: its frame columns are
+    computed by JSON extraction over zero rows, which Polars infers as Null -
+    an empty-input inference artifact, not a loader regression - while DuckDB
+    still declares the JSON function's string output type.
     """
     gate = GATES["read_primitives"]
     data = gate.build(gate.scale_factor, tmp_path)
@@ -118,7 +123,9 @@ def test_read_primitives_expression_frame_dtypes_match_sql(tmp_path):
             contexts=contexts,
             backends=("expression",),
             skip_keys=frozenset(gate.known_divergences),
-            skip_query_ids=frozenset(gate.legitimately_empty),
+            # Only the computed-over-empty JSON query is skipped (see
+            # docstring); the selective filters compare schemas with zero rows.
+            skip_query_ids=frozenset({"json_extract_nested"}),
         )
     finally:
         connection.close()

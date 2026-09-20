@@ -66,6 +66,7 @@ def _run(conn, dataframe_query, **kwargs):
 def test_equivalence_map_accepts_only_documented_pairs():
     assert _dtype_categories_equivalent("string", "string")
     assert _dtype_categories_equivalent("decimal", "float")
+    assert not _dtype_categories_equivalent("float", "decimal")
     assert not _dtype_categories_equivalent("string", "null")
     assert not _dtype_categories_equivalent("temporal", "string")
     assert not _dtype_categories_equivalent("integer", "string")
