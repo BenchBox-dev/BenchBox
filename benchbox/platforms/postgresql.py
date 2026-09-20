@@ -104,7 +104,12 @@ def _postgres_copy_sql(
     force_csv: bool = False,
 ) -> str:
     escaped_delim = dialect.delimiter.replace("'", "''")
-    if dialect.null_marker is not None and not force_csv:
+    # FORMAT text performs no quote parsing: a quoted empty ("") loads as two
+    # literal quote characters instead of an empty string. Quoted dialects
+    # (csv_quote declared, e.g. ClickBench) therefore use FORMAT csv, which
+    # parses quoted empties as empty strings while the NULL marker still maps
+    # only the bare sentinel to NULL.
+    if dialect.null_marker is not None and not force_csv and dialect.quote is None:
         escaped_null = dialect.null_marker.replace("'", "''")
         return (
             f"COPY {qualified_table} FROM STDIN WITH (FORMAT text, DELIMITER '{escaped_delim}', NULL '{escaped_null}')"

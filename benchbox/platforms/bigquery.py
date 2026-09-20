@@ -1714,6 +1714,11 @@ class BigQueryAdapter(PlatformAdapter):
         resolve; BigQuery table identifiers are case-sensitive, so every name
         is normalized to UPPERCASE to match created tables. Falls back to the
         static TPC-H list when parsing is unavailable.
+
+        Only occurrences in table position (after FROM / JOIN or a
+        comma-separated FROM item) are rewritten: string literals and comments
+        are masked first, so same-named columns, aliases, and literal text are
+        left alone.
         """
         import re
 
@@ -1721,12 +1726,30 @@ class BigQueryAdapter(PlatformAdapter):
         if table_names is None:
             table_names = list(self._FALLBACK_QUALIFY_TABLES)
 
+        # Blank string literals and comments length-preservingly so matches
+        # found in the masked copy align with the original query.
+        literal_pattern = r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/"
+
+        def _mask(text: str) -> str:
+            return re.sub(literal_pattern, lambda match: " " * len(match.group(0)), text, flags=re.DOTALL)
+
+        masked = _mask(query)
+
         for table_name in table_names:
             # Replace unqualified table names
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
 
-            pattern = rf"\b{table_name}\b"
-            query = re.sub(pattern, qualified_name, query, flags=re.IGNORECASE)
+            pattern = rf"(\bFROM\s+|\bJOIN\s+|,\s*)({re.escape(table_name)})\b"
+            segments: list[str] = []
+            last = 0
+            for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
+                name_start, name_end = match.span(2)
+                segments.append(query[last:name_start])
+                segments.append(qualified_name)
+                last = name_end
+            segments.append(query[last:])
+            query = "".join(segments)
+            masked = _mask(query)
 
         return query
 

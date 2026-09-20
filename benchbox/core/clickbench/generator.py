@@ -415,5 +415,9 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         """Write manifest describing generated ClickBench dataset."""
         # The __NULL__ sentinel is the load contract: only that literal maps
         # to NULL so empty strings survive into NOT NULL columns (mirrors
-        # ClickBenchBenchmark.csv_null_marker and the DuckDB nullstr).
-        write_delimited_manifest(self, "clickbench", table_paths, self._table_row_counts, null_marker="__NULL__")
+        # ClickBenchBenchmark.csv_null_marker and the DuckDB nullstr). Fields
+        # are quote-aware (empty strings emit as "") so loaders must parse
+        # quoting; declared here for quote-capable loaders (PostgreSQL COPY).
+        write_delimited_manifest(
+            self, "clickbench", table_paths, self._table_row_counts, null_marker="__NULL__", quote='"'
+        )

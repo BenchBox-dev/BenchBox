@@ -96,6 +96,24 @@ class TestBigQueryQualifyTableNames:
             result = adapter._qualify_table_names("SELECT * FROM lineitem")
         assert result == "SELECT * FROM `my-proj.my_dataset.LINEITEM`"
 
+    def test_string_literal_matching_table_is_not_qualified(self):
+        """Quoted literal text must survive qualification unchanged."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT * FROM hits WHERE note = 'hits'")
+        assert result == "SELECT * FROM `my-proj.my_dataset.HITS` WHERE note = 'hits'"
+
+    def test_select_column_matching_table_is_not_qualified(self):
+        """A selected column sharing the table name is not a table reference."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT orders FROM orders")
+        assert result == "SELECT orders FROM `my-proj.my_dataset.ORDERS`"
+
+    def test_comma_separated_from_items_are_qualified(self):
+        """Legacy comma joins qualify every table item."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT * FROM customer, orders")
+        assert result == "SELECT * FROM `my-proj.my_dataset.CUSTOMER`, `my-proj.my_dataset.ORDERS`"
+
 
 class TestBigQueryGenerateTuningClause:
     def test_none_returns_empty(self):

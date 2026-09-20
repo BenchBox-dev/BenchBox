@@ -753,6 +753,48 @@ class TestPostgreSQLDataLoading:
         assert "HEADER" not in copy_sql
         assert "NULL '__BENCHBOX_NO_NULL__'" in copy_sql
 
+    def test_copy_sql_quoted_dialect_uses_csv_with_null_marker(self, postgres_stubs, tmp_path):
+        """csv_quote declared + explicit null marker → FORMAT csv, not text.
+
+        FORMAT text performs no quote parsing, so a quoted empty ("") would
+        load as two literal quote characters instead of an empty string
+        (ClickBench predicate corruption). FORMAT csv parses quoted empties
+        as empty strings while only the bare sentinel maps to NULL.
+        """
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        dat_file = tmp_path / "hits.dat"
+        dat_file.write_text('1|""|bar\n2|__NULL__|baz\n')
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"hits": dat_file},
+            table_metadata={
+                "hits": {
+                    "csv_has_header": False,
+                    "csv_delimiter": "|",
+                    "csv_null_marker": "__NULL__",
+                    "csv_quote": '"',
+                }
+            },
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "FORMAT text" not in copy_sql
+        assert "HEADER" not in copy_sql
+        assert "NULL '__NULL__'" in copy_sql
+
     def test_load_data_converts_parquet_to_csv_copy(self, postgres_stubs, tmp_path):
         """Parquet-backed benchmarks are converted to CSV before PostgreSQL COPY."""
         mock_conn = Mock()
