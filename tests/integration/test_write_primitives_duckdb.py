@@ -1401,6 +1401,41 @@ class TestWritePrimitivesSCD2DuckDB:
         assert result.status == "SUCCESS"
         conn.close()
 
+    def test_scd2_ops_succeed_and_legacy_merge_skipped_under_duckdb_platform_key(self, scd2_env):
+        """Shipped #931 skip path: portable SCD2 runs, legacy MERGE INTO skips."""
+        write_bench, conn = scd2_env
+        for op_id in (
+            "merge_scd_type2_basic",
+            "merge_scd_type2_no_change",
+            "merge_scd_type2_new_keys_only",
+        ):
+            result = write_bench.execute_operation(op_id, conn, platform_key="duckdb")
+            assert result.status == "SUCCESS", result.error
+            assert result.success is True
+            assert result.validation_passed is True
+        for op_id in (
+            "merge_simple_upsert_small",
+            "merge_overlap_50pct",
+            "merge_conditional_update",
+        ):
+            result = write_bench.execute_operation(op_id, conn, platform_key="duckdb")
+            assert result.status == "SKIPPED", result.error
+            assert result.success is True
+            assert "MERGE INTO" in (result.skip_reason or "")
+
+    def test_sequential_scd2_ops_without_reset_restore_dim_to_seed(self, scd2_env):
+        """Production no-reset path: per-op cleanup restores the seed dimension."""
+        write_bench, conn = scd2_env
+        for op_id in (
+            "merge_scd_type2_basic",
+            "merge_scd_type2_no_change",
+            "merge_scd_type2_new_keys_only",
+        ):
+            result = write_bench.execute_operation(op_id, conn, platform_key="duckdb")
+            assert result.status == "SUCCESS", result.error
+            assert self._current_state(conn) == (50, 50, 0)
+        assert self._current_state(conn) == (50, 50, 0)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
