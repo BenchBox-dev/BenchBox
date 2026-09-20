@@ -21,6 +21,7 @@ from typing import Any
 
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.throughput.containment import await_quiescence
 from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     APPLIED_VERIFIED,
@@ -286,6 +287,7 @@ class PlatformAdapter(
         self._reset_plan_capture_stats()
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
+        self._post_measurement_contained = False
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -298,6 +300,7 @@ class PlatformAdapter(
         self._reset_plan_capture_stats()
         self._client_link_metadata = None
         self._link_probe_timed_out = False
+        self._post_measurement_contained = False
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -998,16 +1001,14 @@ class PlatformAdapter(
             # succeeded. Its wall time is excluded from the published run
             # duration below so the probe never inflates the number it
             # exists to contextualise.
-            probe_start = mono_time()
-            self._collect_client_link_metadata(connection, run_config)
-            probe_elapsed_s = elapsed_seconds(probe_start)
+            probe_elapsed_s = self._collect_post_measurement_metadata(connection, run_config)
 
             # Get queries for definitions - pass canonical slug so dialect selection
             # doesn't have to infer benchmark family from object internals.
             queries = self._get_dialect_queries(
                 benchmark,
                 benchmark_slug=run_config.get("benchmark_name", ""),
-                connection=connection,
+                connection=None if self._post_measurement_contained else connection,
             )
             stream_id = "standard"
             self._extract_query_definitions(benchmark, queries, stream_id)
@@ -1028,7 +1029,9 @@ class PlatformAdapter(
                 query_results, query_executions, run_config, setup_phase
             )
 
-            platform_info, normalized_metadata = self._collect_platform_metadata(connection)
+            platform_info, normalized_metadata = self._collect_platform_metadata(
+                None if self._post_measurement_contained else connection
+            )
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
             total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -1148,8 +1151,61 @@ class PlatformAdapter(
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
-                self.close_connection(self.connection)
-                self.connection = None
+                self._close_run_connection()
+
+    def _defer_connection_close_until_quiescent(self, connection: Any, throughput_result: Any) -> None:
+        """Close a measurement connection only after timed-out work terminates."""
+        if throughput_result is None:
+            self.close_connection(connection)
+            return
+
+        def _close_when_quiescent() -> None:
+            while not await_quiescence(throughput_result, timeout=1.0):
+                pass
+            try:
+                self.close_connection(connection)
+            except Exception as exc:  # noqa: BLE001 - deferred cleanup must not crash a worker
+                self.logger.warning("Deferred benchmark connection cleanup failed: %r", exc)
+
+        threading.Thread(
+            target=_close_when_quiescent,
+            name="benchbox-throughput-connection-cleanup",
+            daemon=True,
+        ).start()
+
+    def _collect_post_measurement_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> float:
+        """Collect link metadata unless throughput work still owns the connection."""
+        if self._post_measurement_contained:
+            self._client_link_metadata = {
+                "collection_status": "unavailable",
+                "source": "unavailable",
+                "client_region": None,
+                "client_cloud": None,
+                "statement_overhead_ms": None,
+                "collection_error_class": "OutstandingThroughputWork",
+                "collection_error_message": (
+                    "Post-measurement metadata collection was skipped because a timed-out "
+                    "throughput worker still owns benchmark resources."
+                ),
+            }
+            self._link_probe_timed_out = True
+            return 0.0
+
+        probe_start = mono_time()
+        self._collect_client_link_metadata(connection, run_config)
+        return elapsed_seconds(probe_start)
+
+    def _close_run_connection(self) -> None:
+        """Close or defer the run connection according to containment state."""
+        connection = self.connection
+        if self._post_measurement_contained:
+            self._defer_connection_close_until_quiescent(
+                connection,
+                getattr(self, "_last_throughput_test_result", None),
+            )
+        else:
+            self.close_connection(connection)
+        self.connection = None
 
     def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
         """Probe statement overhead and discover client region post-benchmark.
