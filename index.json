@@ -13247,9 +13247,9 @@
     },
     "restore-corpus-coverage-after-20260823-trust-cut-def727": {
       "claim": {
-        "expires_at": "2026-09-21T04:56:33Z",
-        "generation": "1635ca3fa9f5444da13bd1d245665c77",
-        "renewals": 0,
+        "expires_at": "2026-09-21T05:38:05Z",
+        "generation": "deef0c463e93461f8eabcbd434c31eab",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
       },
       "needs": [],
