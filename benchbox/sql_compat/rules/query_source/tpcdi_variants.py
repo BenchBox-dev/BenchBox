@@ -356,6 +356,20 @@ DATAFUSION_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TR
 DORIS_EQ7_SQL = STARROCKS_EQ7_SQL
 CLICKHOUSE_EQ7_SQL = STARROCKS_EQ7_SQL
 
+# BigQuery enforces subquery scope strictly (like the MySQL-compatible
+# engines), so it uses the same derived-table EQ7 rewrite, with boolean
+# literals rendered for its native BOOLEAN columns.
+BIGQUERY_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
+
+# Databricks (Spark SQL) likewise rejects cross-referencing sibling subquery
+# aliases and enforces strict BOOLEAN typing, so it uses the same
+# derived-table EQ7 rewrite with boolean literals.
+DATABRICKS_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
+
+# Snowflake rejects cross-referencing sibling subquery aliases but accepts
+# ``= 1`` flag comparisons, so it uses the derived-table EQ7 rewrite as-is.
+SNOWFLAKE_EQ7_SQL = STARROCKS_EQ7_SQL
+
 for _query_id, _variant_sql, _reason in (
     (
         "AQ9",
@@ -463,6 +477,24 @@ REGISTRY.register(
 
 REGISTRY.register(
     CompatibilityDecision(
+        rule_id="query_source.bigquery.tpcdi.eq7_derived_table_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="bigquery",
+            variant_sql=BIGQUERY_EQ7_SQL,
+        ),
+        reason="BigQuery rejects cross-referencing sibling subquery aliases; wrap UNION ALL in derived table",
+    ),
+    _P,
+    "bigquery",
+    benchmark=_B,
+    query_id="EQ7",
+)
+
+REGISTRY.register(
+    CompatibilityDecision(
         rule_id="query_source.doris.tpcdi.eq7_derived_table_variant",
         action=CompatAction.SELECT_VARIANT,
         support_level=SupportLevel.REWRITTEN,
@@ -475,6 +507,42 @@ REGISTRY.register(
     ),
     _P,
     "doris",
+    benchmark=_B,
+    query_id="EQ7",
+)
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.databricks.tpcdi.eq7_derived_table_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="databricks",
+            variant_sql=DATABRICKS_EQ7_SQL,
+        ),
+        reason="Databricks rejects cross-referencing sibling subquery aliases; wrap UNION ALL in derived table",
+    ),
+    _P,
+    "databricks",
+    benchmark=_B,
+    query_id="EQ7",
+)
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.snowflake.tpcdi.eq7_derived_table_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="snowflake",
+            variant_sql=SNOWFLAKE_EQ7_SQL,
+        ),
+        reason="Snowflake rejects cross-referencing sibling subquery aliases; wrap UNION ALL in derived table",
+    ),
+    _P,
+    "snowflake",
     benchmark=_B,
     query_id="EQ7",
 )

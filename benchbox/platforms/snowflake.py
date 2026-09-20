@@ -1195,13 +1195,25 @@ class SnowflakeAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and performance tracking."""
+        """Execute query with detailed timing and performance tracking.
+
+        Accepts either a connection or an already-open cursor: the TPC power
+        harness passes a per-stream cursor through the facade, which has no
+        ``cursor()`` method of its own.
+        """
         self.log_operation_start("Snowflake query execution", query_id)
         self.log_very_verbose(f"Executing query {query_id}: {query[:100]}...")
 
         start_time = mono_time()
 
-        cursor = connection.cursor()
+        own_cursor = False
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            own_cursor = True
+            stats_connection = connection
+        else:
+            cursor = connection
+            stats_connection = getattr(connection, "connection", connection)
 
         try:
             # Set query tag for tracking
@@ -1209,7 +1221,9 @@ class SnowflakeAdapter(PlatformAdapter):
             cursor.execute(f"ALTER SESSION SET QUERY_TAG = '{self.query_tag}_{query_id}'")
 
             # Execute the query
-            # Note: Query dialect translation is now handled automatically by the base adapter
+            # Note: Query dialect translation is now handled automatically by the base adapter.
+            # Zero-divisor guard is a no-op unless the query divides.
+            query = self._safeguard_snowflake_division(query)
             self.log_verbose(f"Executing query {query_id} on Snowflake")
             cursor.execute(query)
             result = cursor.fetchall()
@@ -1218,7 +1232,7 @@ class SnowflakeAdapter(PlatformAdapter):
             actual_row_count = len(result) if result else 0
 
             # Get query history for performance metrics
-            query_stats = self._get_query_statistics(connection, query_id)
+            query_stats = self._get_query_statistics(stats_connection, query_id)
 
             # Validate row count if enabled and benchmark type is provided
             validation_result = None
@@ -1287,7 +1301,8 @@ class SnowflakeAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            cursor.close()
+            if own_cursor:
+                cursor.close()
 
         # Capture and merge the structured query plan (SUCCESS-guarded in the
         # helper). Deliberately outside the try: with strict_plan_capture=True a
@@ -1302,8 +1317,14 @@ class SnowflakeAdapter(PlatformAdapter):
 
         Snowflake has no plain ``EXPLAIN`` that yields a parseable tree; the
         JSON form returns a single VARIANT cell describing the operator graph.
+        Accepts a connection or an already-open cursor.
         """
-        cursor = connection.cursor()
+        own_cursor = False
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            own_cursor = True
+        else:
+            cursor = connection
         try:
             cursor.execute(f"EXPLAIN USING JSON {query}")
             row = cursor.fetchone()
@@ -1314,7 +1335,8 @@ class SnowflakeAdapter(PlatformAdapter):
             self.logger.debug(f"Could not get query plan: {e}")
             return None
         finally:
-            cursor.close()
+            if own_cursor:
+                cursor.close()
 
     def get_query_plan_parser(self):
         """Get Snowflake query plan parser."""
@@ -1325,23 +1347,65 @@ class SnowflakeAdapter(PlatformAdapter):
     def _optimize_table_definition(self, statement: str) -> str:
         """Optimize table definition for Snowflake.
 
-        Makes tables idempotent by using CREATE OR REPLACE TABLE.
+        Makes tables idempotent by using CREATE OR REPLACE TABLE, and
+        uppercases quoted identifiers. DDL translation quotes source-case
+        names, so TPC-DS tables would otherwise be created as quoted
+        lowercase ("store_sales") while queries, COPY targets, and
+        validation probes reference the folded uppercase name
+        (STORE_SALES). Uppercasing quoted identifiers keeps both spellings
+        resolving to the same table. Single-quoted string literals are
+        left untouched.
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE (defense-in-depth)
+        # Ensure idempotency with OR REPLACE (defense-in-depth), unless the
+        # statement already has IF NOT EXISTS (OR REPLACE + IF NOT EXISTS
+        # is a Snowflake syntax error).
         if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            if "IF NOT EXISTS" not in statement.upper():
+                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
 
-        # Snowflake automatically optimizes most aspects, but we can add clustering keys
-        # This is a simplified heuristic - in production would be more sophisticated
-        if "CLUSTER BY" not in statement.upper():
-            # Include clustering on first column (simple heuristic)
-            # Snowflake will auto-cluster in most cases anyway
-            pass
+        import re
+
+        statement = re.sub(r'"([^"]+)"', lambda m: m.group(0).upper(), statement)
 
         return statement
+
+    def _safeguard_snowflake_division(self, query: str) -> str:
+        """Route ``/`` divisors through ``NULLIF(divisor, 0)`` (NULL on zero divisor).
+
+        Snowflake raises division-by-zero instead of yielding NULL,
+        which turns degenerate subscale ratios (e.g. TPC-DS Q90 at SF 0.1,
+        0/0) into hard query failures. NULLIF is a no-op for non-zero
+        divisors, and queries without a division are returned unchanged.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="snowflake")
+        except Exception as e:
+            self.log_very_verbose(f"Division safeguard skipped (unparseable Snowflake SQL): {e}")
+            return query
+        if not any(isinstance(node, exp.Div) for node in tree.walk()):
+            return query
+
+        def to_nullif_divisor(node: exp.Expression) -> exp.Expression:
+            if isinstance(node, exp.Div):
+                return exp.Div(
+                    this=node.this.copy(),
+                    expression=exp.Anonymous(
+                        this="NULLIF",
+                        expressions=[node.expression.copy(), exp.Literal.number(0)],
+                    ),
+                )
+            return node
+
+        return tree.transform(to_nullif_divisor).sql(dialect="snowflake")
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables using Snowflake SHOW TABLES command.
@@ -1388,15 +1452,29 @@ class SnowflakeAdapter(PlatformAdapter):
             accessible_tables = []
             inaccessible_tables = []
 
+            # Resolve each table to its stored identifier: DDL translation
+            # quotes source-case names, so TPC-DS tables live as
+            # quoted lowercase ("call_center") while table_stats keys are
+            # uppercase. Probe the quoted stored name; fall back to the
+            # unquoted key (which Snowflake folds to uppercase).
+            actual_names = {name.lower(): name for name in self._get_existing_tables(connection)}
+
             cursor = connection.cursor()
             for table_name in table_stats:
-                try:
-                    # Try a simple SELECT to verify table is accessible
-                    # table_stats has uppercase keys from Snowflake
-                    cursor.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
-                    cursor.fetchone()  # Consume the result to prevent resource leaks
-                    accessible_tables.append(table_name)
-                except Exception:
+                stored = actual_names.get(table_name.lower())
+                candidates = [f'"{stored}"'] if stored else []
+                candidates.append(table_name)
+                probed = False
+                for candidate in candidates:
+                    try:
+                        cursor.execute(f"SELECT 1 FROM {candidate} LIMIT 1")
+                        cursor.fetchone()  # Consume the result to prevent resource leaks
+                        accessible_tables.append(table_name)
+                        probed = True
+                        break
+                    except Exception:
+                        continue
+                if not probed:
                     inaccessible_tables.append(table_name)
 
             if inaccessible_tables:

@@ -62,6 +62,7 @@ the capability) adds one more class below:
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 from typing import Any
@@ -73,8 +74,11 @@ from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     StreamConnectionCapability,
 )
+from benchbox.platforms.doris import DorisAdapter
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.platforms.postgresql import PostgreSQLAdapter
+from benchbox.platforms.singlestore import SingleStoreAdapter
+from benchbox.platforms.sqlite import SQLiteAdapter
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .platforms.conftest import skip_unless_docker_service
@@ -383,5 +387,235 @@ class TestPostgreSQLIndependentConnectionIsolatesSessions:
             finally:
                 stream_a.close()
                 stream_b.close()
+        finally:
+            shared_connection.close()
+
+    def test_stream_session_replays_setup_tuning(self, postgresql_adapter) -> None:
+        """A stream session must measure the same tuning as the setup session.
+
+        Equivalence dimension 4 with a real engine: the stream connection
+        opened by ``new_stream_connection`` must carry the adapter GUCs
+        (``work_mem`` differs from the server default) AND the benchmark-type
+        tuning (``random_page_cost = 1.1`` differs from the PostgreSQL
+        default of 4.0 and is applied only via ``configure_for_benchmark``).
+        The stream is opened exactly the way the production throughput
+        factory opens it - with the run's benchmark type - because replay
+        happens only for callers that supply one.
+        """
+        shared_connection = postgresql_adapter.create_connection()
+        try:
+            stream_connection = postgresql_adapter.new_stream_connection(shared_connection, benchmark_type="olap")
+            stream = PlatformAdapterConnection(stream_connection, postgresql_adapter)
+            try:
+                work_mem = stream.connection.execute("SHOW work_mem").fetchone()[0]
+                assert work_mem == "256MB", f"stream work_mem not replayed: {work_mem!r}"
+                page_cost = stream.connection.execute("SHOW random_page_cost").fetchone()[0]
+                assert page_cost == "1.1", f"stream missing OLAP tuning replay: random_page_cost={page_cost!r}"
+            finally:
+                stream.close()
+        finally:
+            shared_connection.close()
+
+
+class TestSQLiteSharedCursorConcurrentUse:
+    """Real SQLiteAdapter (explicit SHARED_CURSOR): concurrent cursor reads
+    are safe and cleanup never kills the shared connection.
+
+    Proven envelope (deliberately narrow): throughput streams issue
+    concurrent SELECTs. Concurrent uncoordinated WRITES on cursors of one
+    sqlite3 connection intermittently raise ``OperationalError`` at C-level
+    overlap, so overlapping writes are outside the shared tier's proven
+    envelope - production throughput never issues them (writes belong to the
+    single-stream load path and the maintenance path, not to concurrent
+    throughput streams).
+    """
+
+    def test_concurrent_read_streams_share_safely_and_close_cleanly(self, tmp_path) -> None:
+        adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
+        assert adapter.stream_connection_capability is StreamConnectionCapability.SHARED_CURSOR
+
+        shared_connection = adapter.create_connection()
+        try:
+            setup = _stream_wrapper(adapter, shared_connection)
+            try:
+                setup.execute("CREATE TABLE probe (value INTEGER)")
+                for value in range(10):
+                    setup.execute(f"INSERT INTO probe VALUES ({value})")
+            finally:
+                setup.close()
+
+            barrier = threading.Barrier(2)
+            errors: dict[str, BaseException] = {}
+            counts: dict[str, list[int]] = {}
+
+            def run(name: str) -> None:
+                try:
+                    wrapper = _stream_wrapper(adapter, shared_connection)
+                    try:
+                        # Rendezvous: both stream threads alive at once, so
+                        # the reads below overlap instead of running
+                        # sequentially.
+                        barrier.wait(timeout=30)
+                        counts[name] = [wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()[0] for _ in range(5)]
+                    finally:
+                        # Closing one stream's cursor must not disturb the
+                        # sibling stream (dimension 6 for the shared tier).
+                        wrapper.close()
+                except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                    errors[name] = exc
+
+            threads = [threading.Thread(target=run, args=(name,)) for name in ("a", "b")]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=60)
+
+            assert not errors, f"concurrent shared-cursor read streams raised: {errors}"
+            assert counts == {"a": [10] * 5, "b": [10] * 5}, f"shared-cursor streams mismeasured: {counts}"
+            # The shared connection survives both stream closes and still
+            # serves the same data (one shared session).
+            assert shared_connection.execute("SELECT COUNT(*) FROM probe").fetchone()[0] == 10
+        finally:
+            shared_connection.close()
+
+
+class TestMySQLWireIndependentConnections:
+    """Doris + SingleStore via MySqlWireLifecycleMixin (INDEPENDENT_CONNECTION).
+
+    Declaration checks run without Docker; live behavior (distinct sessions,
+    temp-table isolation, tuning replay, close ownership) is gated on the
+    same Docker services as the platform live tests and skips cleanly
+    otherwise.
+    """
+
+    def test_declares_independent_with_mixin_override(self) -> None:
+        pytest.importorskip("pymysql")
+        for adapter_cls in (DorisAdapter, SingleStoreAdapter):
+            assert adapter_cls.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION, (
+                adapter_cls.__name__
+            )
+            assert adapter_cls.new_stream_connection is not PlatformAdapter.new_stream_connection, adapter_cls.__name__
+
+    @pytest.fixture
+    def doris_adapter(self):
+        pymysql = pytest.importorskip("pymysql")
+        port = int(os.getenv("DORIS_HOST_PORT", "19031"))
+        skip_unless_docker_service("localhost", port, platform="Doris")
+        try:
+            conn = pymysql.connect(host="localhost", port=port, user="root", password="", autocommit=True)
+            try:
+                conn.cursor().execute("CREATE DATABASE IF NOT EXISTS benchbox_test")
+            finally:
+                conn.close()
+        except Exception:
+            pytest.skip(f"Doris not reachable at localhost:{port}")
+        adapter = DorisAdapter(
+            host="localhost",
+            port=port,
+            username="root",
+            password="",
+            database="benchbox_test",
+        )
+        adapter.skip_database_management = True
+        return adapter
+
+    @pytest.fixture
+    def singlestore_adapter(self):
+        singlestoredb = pytest.importorskip("singlestoredb")
+        port = int(os.getenv("SINGLESTORE_HOST_PORT", "13306"))
+        skip_unless_docker_service("localhost", port, platform="SingleStore")
+        password = os.getenv("SINGLESTORE_PASSWORD", "benchbox")
+        try:
+            conn = singlestoredb.connect(host="localhost", port=port, user="root", password=password)
+            try:
+                conn.cursor().execute("CREATE DATABASE IF NOT EXISTS benchbox_test")
+            finally:
+                conn.close()
+        except Exception:
+            pytest.skip(f"SingleStore not reachable at localhost:{port}")
+        adapter = SingleStoreAdapter(
+            host="localhost",
+            port=port,
+            username="root",
+            password=password,
+            database="benchbox_test",
+        )
+        adapter.skip_database_management = True
+        return adapter
+
+    @pytest.mark.docker_integration
+    @pytest.mark.live_integration
+    @pytest.mark.live_doris
+    @pytest.mark.slow
+    def test_doris_streams_are_independent_sessions(self, doris_adapter) -> None:
+        self._prove_wire_sessions_are_independent(doris_adapter, dialect="doris")
+
+    @pytest.mark.docker_integration
+    @pytest.mark.live_integration
+    @pytest.mark.slow
+    def test_singlestore_streams_are_independent_sessions(self, singlestore_adapter) -> None:
+        self._prove_wire_sessions_are_independent(singlestore_adapter, dialect="singlestore")
+
+    @staticmethod
+    def _prove_wire_sessions_are_independent(adapter: PlatformAdapter, *, dialect: str) -> None:
+        """Distinct connection ids, temp-table isolation, tuning replay, safe close."""
+        shared_connection = adapter.create_connection()
+        try:
+            # Opened the way the production throughput factory opens streams
+            # (with the run's benchmark type) so the tuning-replay assertion
+            # below exercises the production path, not a bare call.
+            raw_a = adapter.new_stream_connection(shared_connection, benchmark_type="olap")
+            raw_b = adapter.new_stream_connection(shared_connection, benchmark_type="olap")
+            try:
+                cursor_a = raw_a.cursor()
+                cursor_b = raw_b.cursor()
+                try:
+                    # Dimension 1/2: distinct server sessions on the same database.
+                    cursor_a.execute("SELECT CONNECTION_ID()")
+                    cursor_b.execute("SELECT CONNECTION_ID()")
+                    id_a = cursor_a.fetchone()[0]
+                    id_b = cursor_b.fetchone()[0]
+                    assert id_a != id_b, "streams share one server session"
+
+                    # Dimension 5: a TEMPORARY table is connection-scoped on
+                    # the MySQL wire, so it must be invisible to the sibling.
+                    cursor_a.execute("CREATE TEMPORARY TABLE stream_local (value INT)")
+                    cursor_a.execute("INSERT INTO stream_local VALUES (42)")
+                    sibling_error: Exception | None = None
+                    try:
+                        cursor_b.execute("SELECT COUNT(*) FROM stream_local")
+                        cursor_b.fetchall()
+                    except Exception as exc:
+                        sibling_error = exc
+                    assert sibling_error is not None, f"{dialect} sibling stream saw another session's TEMPORARY table"
+                    assert "stream_local" in str(sibling_error).lower()
+                finally:
+                    cursor_a.close()
+                    cursor_b.close()
+
+                # Dimension 4: the stream session replays benchmark tuning.
+                # Doris disables its SQL cache per stream exactly like the
+                # setup connection (a cached stream would mismeasure).
+                if dialect == "doris":
+                    check = raw_a.cursor()
+                    try:
+                        check.execute("SHOW VARIABLES LIKE 'enable_sql_cache'")
+                        row = check.fetchone()
+                        assert row is not None and str(row[1]).lower() in ("false", "0", "off"), (
+                            f"doris stream did not replay cache tuning: {row!r}"
+                        )
+                    finally:
+                        check.close()
+            finally:
+                raw_a.close()
+                raw_b.close()
+            # Dimension 6: closing both streams leaves the shared connection
+            # usable - per-stream handles own exactly their own session.
+            cursor = shared_connection.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                assert cursor.fetchone()[0] == 1
+            finally:
+                cursor.close()
         finally:
             shared_connection.close()

@@ -1269,8 +1269,9 @@ class DatabricksAdapter(PlatformAdapter):
         """Upload local data files to Unity Catalog Volume using Databricks Files API.
 
         For sharded files (e.g., customer.tbl.1.zst, customer.tbl.2.zst, ...),
-        this method will find and upload ALL chunk files, returning a wildcard pattern
-        for COPY INTO to use.
+        this method will find and upload ALL chunk files, returning exact
+        per-file URIs (COPY INTO rejects mid-path globs, so the loader issues
+        one COPY INTO per shard file).
 
         Args:
             data_files: Dictionary of table_name -> local file path (may be first chunk only)
@@ -1278,7 +1279,7 @@ class DatabricksAdapter(PlatformAdapter):
             data_dir: Base data directory (for resolving relative paths)
 
         Returns:
-            Dictionary mapping table names to UC Volume file URIs (with wildcards for sharded tables)
+            Dictionary mapping table names to UC Volume file URIs (lists of exact URIs for sharded tables)
 
         Raises:
             ImportError: If databricks-sdk not available
@@ -1382,7 +1383,12 @@ class DatabricksAdapter(PlatformAdapter):
         workspace: Any,
         upload_root: Path,
     ) -> Any:
-        """Upload exactly one file for a table, auto-expanding to sharded chunks if detected."""
+        """Upload exactly one file for a table, auto-expanding to sharded chunks if detected.
+
+        Always returns exact file URIs: COPY INTO does not accept mid-path
+        globs, so a wildcard pattern is only used for logging and the loader
+        issues one COPY INTO per shard file.
+        """
         is_sharded, _pattern, chunk_files = self._detect_sharded_files(local_path, table_name)
         if is_sharded and chunk_files:
             sharded_entries = self._build_uc_upload_entries(chunk_files, upload_root)
@@ -1392,9 +1398,9 @@ class DatabricksAdapter(PlatformAdapter):
             )
             wildcard = self._detect_manifest_wildcard(sharded_targets)
             if wildcard:
-                uri = self._join_uri_path(f"dbfs:{volume_path}", wildcard)
-                self.log_verbose(f"Uploaded {len(chunk_files)} chunks for {table_name}, using wildcard: {uri}")
-                return uri
+                self.log_verbose(
+                    f"Uploaded {len(chunk_files)} chunks for {table_name} (shard pattern {wildcard}; loading per-file)"
+                )
             return [self._join_uri_path(f"dbfs:{volume_path}", rp) for rp in sharded_targets]
         return self._upload_single_file(local_path, volume_path, uc_volume_path, workspace, remote_path=remote_path)
 
@@ -1406,7 +1412,12 @@ class DatabricksAdapter(PlatformAdapter):
         uc_volume_path: str,
         workspace: Any,
     ) -> Any:
-        """Upload multiple files for a table; returns wildcard URI or list of URIs."""
+        """Upload multiple files for a table; returns the list of exact file URIs.
+
+        A wildcard pattern is only used for logging: COPY INTO does not accept
+        mid-path globs, so callers always receive exact URIs and the loader
+        issues one COPY INTO per shard file.
+        """
         wildcard = self._detect_manifest_wildcard([rp for _lp, rp in upload_entries])
         uploaded_uris: list[str] = []
         for local_path, remote_path in upload_entries:
@@ -1414,11 +1425,9 @@ class DatabricksAdapter(PlatformAdapter):
             if uri is not None:
                 uploaded_uris.append(uri)
         if wildcard:
-            wildcard_uri = self._join_uri_path(f"dbfs:{volume_path}", wildcard)
             self.log_verbose(
-                f"Uploaded {len(uploaded_uris)} files for {table_name}, using wildcard pattern: {wildcard_uri}"
+                f"Uploaded {len(uploaded_uris)} files for {table_name} (shard pattern {wildcard}; loading per-file)"
             )
-            return wildcard_uri
         return uploaded_uris or None
 
     def _resolve_uc_manifest_path(self, data_dir: Path) -> Path:
@@ -1679,7 +1688,9 @@ class DatabricksAdapter(PlatformAdapter):
     def _get_remote_file_uris_from_manifest(self, uc_volume_path: str, remote_manifest: dict) -> dict[str, Any]:
         """Build UC Volume file URI map per table from manifest entries.
 
-        For sharded tables, return a wildcard pattern like customer.tbl.*.zst
+        Multi-file tables map to a list of exact file URIs. COPY INTO does
+        not accept mid-path globs, so no wildcard URIs are produced; the
+        loader issues one COPY INTO per shard file.
         """
         mapping: dict[str, Any] = {}
         tables = remote_manifest.get("tables") or {}
@@ -1694,16 +1705,15 @@ class DatabricksAdapter(PlatformAdapter):
             names = [str(e.get("path")) for e in entries if e.get("path")]
             if not names:
                 continue
-            wildcard = self._detect_manifest_wildcard(names)
-            if wildcard:
-                mapping[table] = self._join_uri_path(uc_volume_path.rstrip("/"), wildcard)
-            else:
-                mapping[table] = [self._join_uri_path(uc_volume_path.rstrip("/"), name) for name in names]
+            mapping[table] = [self._join_uri_path(uc_volume_path.rstrip("/"), name) for name in names]
         return mapping
 
     @staticmethod
     def _is_manifest_shard_name(name: str) -> bool:
         """Check if a filename looks like a TPC shard (e.g. customer.tbl.1, lineitem.tbl.3.zst).
+
+        Also recognizes the dsdgen underscore-chunk style
+        (e.g. customer_demographics_5_10.dat.gz, store_sales_1_4.tbl).
 
         Note: names with purely numeric stems (e.g. "123.parquet") will match
         the trailing-digit heuristic. This is acceptable because such names do
@@ -1713,7 +1723,28 @@ class DatabricksAdapter(PlatformAdapter):
         compression_exts_nodot = {ext.lstrip(".") for ext in COMPRESSION_EXTENSIONS}
         if len(parts) >= 4 and parts[-1] in compression_exts_nodot and parts[-2].isdigit():
             return True
-        return len(parts) >= 2 and parts[-1].isdigit()
+        if len(parts) >= 2 and parts[-1].isdigit():
+            return True
+        return DatabricksAdapter._underscore_chunk_base(Path(name).name) is not None
+
+    @staticmethod
+    def _underscore_chunk_base(filename: str) -> tuple[str, str] | None:
+        """Split a dsdgen underscore-chunk name into (base, dotted extension).
+
+        Matches ``<base>_<index>_<total>.<ext>[.<compression>]``, e.g.
+        ``customer_demographics_5_10.dat.gz`` -> ``("customer_demographics",
+        ".dat.gz")``. Returns None when the stem has no numeric index/total
+        suffix.
+        """
+        import re
+
+        stem = Path(filename).name
+        suffixes = "".join(Path(filename).suffixes)
+        stem_no_ext = stem[: -len(suffixes)] if suffixes else stem
+        match = re.fullmatch(r"(.+)_(\d+)_(\d+)", stem_no_ext)
+        if not match:
+            return None
+        return match.group(1), suffixes
 
     @staticmethod
     def _manifest_pattern_for_name(name: str) -> tuple[str, str]:
@@ -1722,6 +1753,9 @@ class DatabricksAdapter(PlatformAdapter):
             return ".".join(parts[:-2]), "." + parts[-1]
         if len(parts) >= 2 and parts[-1].isdigit():
             return ".".join(parts[:-1]), ""
+        underscore = DatabricksAdapter._underscore_chunk_base(Path(name).name)
+        if underscore is not None:
+            return underscore
         stem = Path(name).stem
         return stem, Path(name).suffix
 
@@ -1986,6 +2020,34 @@ class DatabricksAdapter(PlatformAdapter):
         delimiter = self._resolve_csv_delimiter(data_source, table_name or dialect_path.stem, dialect_path, benchmark)
         return file_uri, filename, delimiter
 
+    def _expand_copy_sources(self, file_path: Any, stage_root: str, file_uri: str) -> list[str]:
+        """Expand a COPY INTO source into exact per-file URIs.
+
+        COPY INTO does not accept mid-path glob patterns, so a wildcard URI
+        produced for a shard-compatible file set is expanded back into one
+        exact URI per shard (COPY INTO appends, so one statement per file
+        loads the full table). Non-wildcard sources pass through unchanged.
+        """
+        if "*" not in file_uri:
+            return [file_uri]
+        entries = self._normalize_table_file_inputs(file_path)
+        sources = []
+        for entry in entries:
+            entry_str = str(entry)
+            if "*" in entry_str:
+                continue
+            if entry_str.startswith("dbfs:/Volumes/"):
+                sources.append(entry_str)
+            else:
+                sources.append(f"{stage_root}/{self._path_name(entry)}")
+        if not sources:
+            raise ValueError(
+                "Databricks COPY INTO does not accept glob patterns: "
+                f"no expandable shard files for source '{file_uri}'. "
+                "Upload paths must resolve to exact file URIs."
+            )
+        return sources
+
     def _resolve_csv_delimiter(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None) -> str:
         """Resolve Databricks COPY INTO delimiter through the shared CSV dialect pipeline."""
         from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
@@ -2049,18 +2111,19 @@ class DatabricksAdapter(PlatformAdapter):
             benchmark=benchmark,
         )
         column_list = self._get_column_list_for_table(benchmark, table_name)
+        copy_sources = self._expand_copy_sources(file_path, stage_root, file_uri)
+        if len(copy_sources) > 1:
+            self.log_verbose(f"Loading {table_name_upper} from {len(copy_sources)} shard files")
 
-        copy_sql = (
-            f"COPY INTO {table_name_upper}{column_list} FROM '{file_uri}' "
-            f"FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='{delimiter}', 'header'='false')"
-        )
-
-        if "*" in file_uri:
-            self.log_verbose(f"Loading {table_name_upper} from wildcard pattern: {file_uri}")
-
-        copy_start = mono_time()
-        cursor.execute(copy_sql)
-        copy_time = elapsed_seconds(copy_start)
+        copy_time = 0.0
+        for source_uri in copy_sources:
+            copy_sql = (
+                f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
+                f"FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='{delimiter}', 'header'='false')"
+            )
+            copy_start = mono_time()
+            cursor.execute(copy_sql)
+            copy_time += elapsed_seconds(copy_start)
 
         cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
         row_count = cursor.fetchone()[0]
@@ -2216,12 +2279,22 @@ class DatabricksAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and profiling."""
+        """Execute query with detailed timing and profiling.
+
+        Accepts either a DB-API connection or an already-open cursor: the TPC
+        power harness passes a per-stream cursor through the facade, which has
+        no ``cursor()`` method of its own.
+        """
         start_time = mono_time()
         self.log_verbose(f"Executing query {query_id}")
         self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
-        cursor = connection.cursor()
+        own_cursor = False
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            own_cursor = True
+        else:
+            cursor = connection
 
         try:
             # Schema context is already set in create_connection() and persists for the session
@@ -2229,7 +2302,14 @@ class DatabricksAdapter(PlatformAdapter):
             # (Each USE statement = 1 extra round-trip to Databricks)
 
             # Execute the query
-            # Note: Query dialect translation is now handled automatically by the base adapter
+            # Note: Query dialect translation is now handled automatically by the base adapter.
+            # Execution normalizations (duplicate output names, zero-divisor
+            # semantics) are no-ops unless their trigger is present.
+            # TPC-DI uses SQL Server/SQLite idioms (BIT flag literals,
+            # JULIANDAY, DATE('now')) that Databricks rejects; rewrite first.
+            if re.sub(r"[^a-z0-9]", "", (benchmark_type or "").lower()).startswith("tpcdi"):
+                query = self._apply_tpcdi_databricks_rewrites(query)
+            query = self._normalize_databricks_query(query)
             cursor.execute(query)
             result = cursor.fetchall()
 
@@ -2291,7 +2371,8 @@ class DatabricksAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            cursor.close()
+            if own_cursor:
+                cursor.close()
 
         # Plan capture routes through the shared chokepoint, outside the try so a
         # strict-mode PlanCaptureError propagates rather than being swallowed. For
@@ -2327,6 +2408,123 @@ class DatabricksAdapter(PlatformAdapter):
         from benchbox.core.query_plans.parsers.spark import SparkQueryPlanParser
 
         return SparkQueryPlanParser()
+
+    def _apply_tpcdi_databricks_rewrites(self, query: str) -> str:
+        """Databricks TPC-DI idioms via the shared cloud rewrite core."""
+        from benchbox.platforms.cloud_shared import rewrite_tpcdi_for_databricks
+
+        return rewrite_tpcdi_for_databricks(query)
+
+    def _normalize_databricks_query(self, query: str) -> str:
+        """Apply Databricks execution normalizations (idempotent, no-op safe).
+
+        - Duplicate top-level output names (e.g. TPC-DS Q39/Q64 selecting
+          ``syear``/``cnt`` from both sides of a self-join) are rejected by
+          Spark with "Can't unify schema with duplicate field names"; later
+          duplicates gain a numeric suffix. Skipped when the rewrite would be
+          unsafe (top-level star, bare ORDER BY/GROUP BY reference to a
+          duplicate name).
+        - ``/`` divisions route through ``try_divide``, which returns NULL on
+          a zero divisor where Databricks would otherwise raise
+          DIVIDE_BY_ZERO (e.g. TPC-DS Q90 at subscale).
+        """
+        query = self._deduplicate_output_aliases(query)
+        return self._safeguard_databricks_division(query)
+
+    @staticmethod
+    def _order_group_bare_refs(scope, column_cls) -> set:
+        """Bare column names referenced by ORDER BY / GROUP BY."""
+        order_group = []
+        if scope.args.get("order"):
+            order_group.extend(scope.args["order"].expressions)
+        if scope.args.get("group"):
+            order_group.extend(scope.args["group"].expressions)
+        bare_refs = set()
+        for node in order_group:
+            for col in node.find_all(column_cls):
+                if not col.table:
+                    bare_refs.add(col.name.lower())
+        return bare_refs
+
+    def _deduplicate_output_aliases(self, query: str) -> str:
+        """Suffix duplicate top-level output names (``name_2``, ``name_3`` ...)."""
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="databricks")
+        except Exception:
+            return query
+        scope = tree if isinstance(tree, exp.Select) else None
+        if scope is None:
+            return query
+        selects = scope.expressions
+        if any(isinstance(e, exp.Star) or (isinstance(e, exp.Column) and e.is_star) for e in selects):
+            return query
+
+        seen: dict[str, int] = {}
+        totals: dict[str, int] = {}
+        for e in selects:
+            name = e.output_name if isinstance(e, exp.Alias) else (e.name if isinstance(e, exp.Column) else "")
+            if not name:
+                continue
+            totals[name.lower()] = totals.get(name.lower(), 0) + 1
+
+        renames = {key for key, total in totals.items() if total > 1}
+        if not renames:
+            return query
+
+        # Bail out when ORDER BY / GROUP BY references a duplicate bare name.
+        if self._order_group_bare_refs(scope, exp.Column) & renames:
+            return query
+
+        for index, e in enumerate(selects):
+            if isinstance(e, exp.Alias):
+                key = e.output_name.lower()
+            elif isinstance(e, exp.Column):
+                key = e.name.lower()
+            else:
+                continue
+            if key not in renames:
+                continue
+            seen[key] = seen.get(key, 0) + 1
+            if seen[key] == 1:
+                continue
+            new_name = f"{e.output_name if isinstance(e, exp.Alias) else e.name}_{seen[key]}"
+            if isinstance(e, exp.Alias):
+                e.set("alias", exp.to_identifier(new_name, quoted=e.args["alias"].args.get("quoted", False)))
+            else:
+                selects[index] = exp.alias_(e.copy(), new_name)
+        return tree.sql(dialect="databricks")
+
+    def _safeguard_databricks_division(self, query: str) -> str:
+        """Route ``/`` divisions through ``try_divide`` (NULL on zero divisor)."""
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="databricks")
+        except Exception as e:
+            self.log_very_verbose(f"Division safeguard skipped (unparseable Databricks SQL): {e}")
+            return query
+        if not any(isinstance(node, exp.Div) for node in tree.walk()):
+            return query
+
+        def to_try_divide(node: exp.Expression) -> exp.Expression:
+            if isinstance(node, exp.Div):
+                return exp.Anonymous(
+                    this="TRY_DIVIDE",
+                    expressions=[node.this.copy(), node.expression.copy()],
+                )
+            return node
+
+        return tree.transform(to_try_divide).sql(dialect="databricks")
 
     def _fix_databricks_sql_syntax(self, sql: str) -> str:
         """Transform SQL syntax for Databricks compatibility.
@@ -2388,9 +2586,11 @@ class DatabricksAdapter(PlatformAdapter):
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE
+        # Ensure idempotency with OR REPLACE, unless the statement already has
+        # IF NOT EXISTS (CREATE OR REPLACE ... IF NOT EXISTS is a syntax error).
         if "CREATE TABLE" in statement.upper() and "OR REPLACE" not in statement.upper():
-            statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            if "IF NOT EXISTS" not in statement.upper():
+                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
 
         # Default to DELTA format when unspecified
         if "USING" not in statement.upper():

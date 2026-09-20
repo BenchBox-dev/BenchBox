@@ -54,6 +54,8 @@ from benchbox.core.tpch.platform_power import _power_query_result, _power_test_e
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
+    open_stream_connection,
+    require_throughput_stream_capability,
 )
 from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
@@ -293,6 +295,17 @@ class TestDriversMixin:
                 f"[green]Running TPC-DS Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
+            # Fail closed before stream submission when the adapter's session
+            # model cannot serve concurrent streams (UNSUPPORTED declaration
+            # or INDEPENDENT_CONNECTION without an override) - see
+            # require_throughput_stream_capability. This runs before the
+            # factory below is ever called, so no stream work starts.
+            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            # Benchmark tuning vocabulary for per-stream session parity
+            # (equivalence dimension 4); defaults to "olap" like the tuning
+            # phase's configure_for_benchmark call.
+            benchmark_type = run_config.get("benchmark_type", "olap")
+
             # Create connection factory that wraps the platform adapter connection.
             # new_stream_connection() dispatches on stream_connection_capability:
             # SHARED_CURSOR (default) returns a thread-safe cursor of this one
@@ -302,7 +315,7 @@ class TestDriversMixin:
             # a brand-new connection/session per stream - see
             # PlatformAdapter.new_stream_connection() for the full contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
@@ -435,10 +448,15 @@ class TestDriversMixin:
                 f"[green]Running TPC-H Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
+            # Fail closed before stream submission - see the require call in
+            # _execute_tpcds_throughput_test above for the capability contract.
+            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            benchmark_type = run_config.get("benchmark_type", "olap")
+
             # See new_stream_connection() docstring / connection_factory comment
             # in _execute_tpcds_throughput_test above for the capability contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpch"
