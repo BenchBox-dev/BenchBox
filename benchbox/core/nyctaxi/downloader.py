@@ -14,8 +14,11 @@ from __future__ import annotations
 
 import contextlib
 import csv
+import hashlib
+import json
 import logging
 import os
+import re
 import tempfile
 import urllib.request
 from datetime import datetime, timedelta
@@ -40,6 +43,10 @@ _DOWNLOADER_SPECS = _load_downloader_specs()
 TLC_BASE_URL = _DOWNLOADER_SPECS["tlc_base_url"]
 SCALE_FACTOR_SAMPLE_DIVISOR = float(_DOWNLOADER_SPECS["scale_factor_sample_divisor"])
 
+_PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
+PINNED_SOURCE_YEAR = int(_PINNED_SOURCE.get("year", 2019))
+PINNED_SOURCE_MONTHS = [int(month) for month in _PINNED_SOURCE.get("months", list(range(1, 13)))]
+
 # Complete NYC TLC Taxi Zone data (all 265 zones)
 # Source: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
 TAXI_ZONES_DATA = [tuple(row) for row in _DOWNLOADER_SPECS["taxi_zones"]]
@@ -54,7 +61,7 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         self,
         scale_factor: float = 1.0,
         output_dir: Union[str, Path] | None = None,
-        year: int = 2019,
+        year: int | None = None,
         months: list[int] | None = None,
         seed: int | None = None,
         verbose: int | bool = 0,
@@ -66,8 +73,10 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "nyctaxi_data"
-        self.year = year
-        self.months = months or self._default_months(year)
+        # An omitted year resolves to the pinned source contract year, never to
+        # "latest available": the default window must not slide with new TLC data.
+        self.year = PINNED_SOURCE_YEAR if year is None else year
+        self.months = months or self._default_months(self.year)
         self.seed = seed
         self.rng = np.random.default_rng(seed)
         self.force_redownload = force_redownload
@@ -85,9 +94,71 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
                 SCALE_FACTOR_SAMPLE_DIVISOR,
             )
         self._table_row_counts: dict[str, int] = {}
+        # Per-month synthetic-fallback provenance (review: a run whose rows
+        # are all synthetic must not be presented as TLC-backed).
+        self._synthetic_fallback_months: list[str] = []
+        # Observed SHA-256 of each successfully downloaded remote parquet, so
+        # the persisted contract pins which bytes were ingested.
+        self._content_hashes: dict[str, str] = {}
 
     def _default_months(self, year: int) -> list[int]:
-        return list(range(1, 13))
+        return list(PINNED_SOURCE_MONTHS)
+
+    def source_contract(self) -> dict[str, Any]:
+        """Pinned reproducible source contract for the configured window.
+
+        Returns the exact remote file set this downloader will read, so runs
+        record which source snapshot they came from and reviewers can see a
+        source change as a contract change.
+        """
+        return {
+            "source": "nyc-tlc",
+            "base_url": TLC_BASE_URL,
+            "year": self.year,
+            "months": list(self.months),
+            "urls": [f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet" for month in self.months],
+            "taxi_zones_url": _DOWNLOADER_SPECS["taxi_zones_url"],
+        }
+
+    def source_contract_id(self) -> str:
+        """Stable identifier for :meth:`source_contract`.
+
+        Persisted alongside generated data so a later pin change (year,
+        months, URLs) rejects the stale cache instead of silently reusing
+        the previous corpus.
+        """
+        canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _contract_sidecar_path(self, output_path: Path) -> Path:
+        return output_path.with_name(f"_{output_path.stem}_source_contract.json")
+
+    def _read_persisted_contract_id(self, output_path: Path) -> str | None:
+        try:
+            persisted = json.loads(self._contract_sidecar_path(output_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        contract_id = persisted.get("source_contract_id")
+        return contract_id if isinstance(contract_id, str) else None
+
+    def _write_contract_sidecar(self, output_path: Path) -> None:
+        sidecar = {
+            "source_contract": self.source_contract(),
+            "source_contract_id": self.source_contract_id(),
+            # Observed SHA-256 of each ingested remote file: pins which bytes
+            # the corpus came from (a provider-side byte change surfaces as a
+            # new manifest on the next fresh generation).
+            "content_hashes": dict(self._content_hashes),
+            "synthetic_months": list(self._synthetic_fallback_months),
+        }
+        self._contract_sidecar_path(output_path).write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
+
+    def _record_synthetic_fallback(self, url: str) -> None:
+        """Record that *url*'s month fell back to synthetic rows."""
+        match = re.search(r"(\d{4})-(\d{2})", url)
+        label = f"{match.group(1)}-{match.group(2)}" if match else url
+        if label not in self._synthetic_fallback_months:
+            self._synthetic_fallback_months.append(label)
 
     def download(self) -> Path:
         """Download and process one NYC Taxi trip table."""
@@ -99,8 +170,21 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         output_path = self.output_dir / self.get_compressed_filename(self._OUTPUT_FILENAME)
 
         if output_path.exists() and not self.force_redownload:
-            self.log_verbose(self._SKIP_EXISTING_MESSAGE)
-            return output_path
+            persisted_id = self._read_persisted_contract_id(output_path)
+            if persisted_id is None:
+                self.log_verbose(self._SKIP_EXISTING_MESSAGE)
+                return output_path
+            if persisted_id != self.source_contract_id():
+                self.logger.warning(
+                    "Existing %s was generated under a different source contract "
+                    "(%s...); regenerating for the current pin (%s...).",
+                    output_path.name,
+                    persisted_id[:12],
+                    self.source_contract_id()[:12],
+                )
+            else:
+                self.log_verbose(self._SKIP_EXISTING_MESSAGE)
+                return output_path
 
         self.log_verbose(f"Downloading {self._DOWNLOAD_LOG_LABEL} data for {self.year}")
         self.log_verbose(f"  Months: {self.months}")
@@ -128,6 +212,7 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
 
         self._table_row_counts[self._TABLE_NAME] = total_rows
         self.log_verbose(f"  {self._TABLE_NAME}: {total_rows} rows total")
+        self._write_contract_sidecar(output_path)
         return output_path
 
     def _process_parquet_file(self, url: str, writer: csv.writer, start_trip_id: int) -> int:
@@ -136,18 +221,22 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
             import pyarrow.parquet as pq
         except ImportError:
             self.logger.warning("pyarrow not installed, using synthetic data")
+            self._record_synthetic_fallback(url)
             return self._generate_synthetic_month(writer, start_trip_id)
 
         fd, tmp_name = tempfile.mkstemp(suffix=".parquet")
         os.close(fd)
         try:
             urllib.request.urlretrieve(url, tmp_name)
+            with open(tmp_name, "rb") as handle:
+                self._content_hashes[url] = hashlib.sha256(handle.read()).hexdigest()
             table = pq.read_table(tmp_name)
             df = table.to_pandas()
         except Exception as e:
             self.logger.warning(f"Download failed: {e}, using synthetic data")
             with contextlib.suppress(OSError):
                 os.unlink(tmp_name)
+            self._record_synthetic_fallback(url)
             return self._generate_synthetic_month(writer, start_trip_id)
         with contextlib.suppress(OSError):
             os.unlink(tmp_name)
@@ -248,13 +337,24 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         writer.writerow([trip_id, *[values.get(column, "0.00") for column in type(self)._COLUMN_PROVIDER()]])
 
     def get_download_stats(self) -> dict:
+        # Provenance follows the actual rows: any synthetic fallback month is
+        # reported instead of presenting the run as TLC-backed.
+        synthetic = list(self._synthetic_fallback_months)
+        if synthetic and len(synthetic) >= len(self.months):
+            source = "synthetic"
+        elif synthetic:
+            source = "nyc-tlc-synthetic-mixed"
+        else:
+            source = "nyc-tlc"
         stats = {
+            "source": source,
             "scale_factor": self.scale_factor,
             "sample_rate": self.sample_rate,
             "year": self.year,
             "months": self.months,
             "seed": self.seed,
             "row_counts": dict(self._table_row_counts),
+            "synthetic_months": synthetic,
         }
         return {"taxi_type": self._STATS_TAXI_TYPE, **stats} if self._STATS_TAXI_TYPE is not None else stats
 
