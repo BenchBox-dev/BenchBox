@@ -27,7 +27,7 @@ from benchbox.core.errors import PlanCaptureError
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
 
-from .base import DriverIsolationCapability, PlatformAdapter
+from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
 from .base.ddl_helpers import strip_foreign_keys
 
 if TYPE_CHECKING:
@@ -531,6 +531,14 @@ class DuckDBAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
     plan_capture_phase_eligible = True
+    # DuckDB's Python client is documented thread-safe at cursor level against
+    # one process-local database
+    # (https://duckdb.org/docs/stable/guides/python/multiple_threads), so
+    # concurrent throughput streams share cursors of the single connection
+    # instead of opening N connections (which the TPC-DI work explicitly
+    # forbids for embedded DuckDB). Proven by
+    # tests/integration/test_throughput_session_isolation.py.
+    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
     def platform_name(self) -> str:

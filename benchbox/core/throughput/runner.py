@@ -89,6 +89,14 @@ excluded from ``result.stream_results`` (and therefore from TTT and
 contributes to ``result.streams_executed`` and ``result.errors``, exactly
 as before. What changes here is only how long ``execute()`` itself blocks
 before returning, not what gets counted.
+
+**Containment** (see ``benchbox/core/throughput/containment.py``): the
+timeout path additionally records *which* streams are still running
+(``result.outstanding_stream_ids``), which queued streams were cancelled
+before dispatch (``result.cancelled_stream_ids``), and the last observable
+cleanup state. Combined runners refuse the next measured phase while work
+is outstanding and release the boundary only after
+``await_quiescence()`` observes termination.
 """
 
 from __future__ import annotations
@@ -132,6 +140,43 @@ class _RunnerConfig(Protocol):
 
 class StreamRunner:
     """Concurrent-stream executor shared by TPC-H and TPC-DS throughput tests."""
+
+    @staticmethod
+    def _finalize_tentatively_cancelled(
+        result: ThroughputResult,
+        tentatively_cancelled: list[tuple[concurrent.futures.Future[ThroughputStreamResult], int]],
+        record_completed: Callable[[concurrent.futures.Future[ThroughputStreamResult], int], None],
+        leaked_error: Callable[[int], str],
+        logger: logging.Logger,
+    ) -> dict[int, concurrent.futures.Future[ThroughputStreamResult]]:
+        """Verify post-shutdown what happened to queued-at-deadline futures.
+
+        Returns the subset still owned by running workers (race-window
+        dispatches), keyed by stream id for termination observation.
+        """
+        still_owned: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
+        for queued_future, queued_stream_id in tentatively_cancelled:
+            if queued_future.cancelled():
+                result.streams_executed += 1
+                result.cancelled_stream_ids.append(queued_stream_id)
+                result.outstanding_notes.append(
+                    f"Stream {queued_stream_id} cancelled before dispatch; it never executed."
+                )
+            elif queued_future.done():
+                record_completed(queued_future, queued_stream_id)
+            else:
+                # Dispatched in the race window despite shutdown: still
+                # owned by its worker until it terminates.
+                result.streams_executed += 1
+                result.outstanding_stream_ids.append(queued_stream_id)
+                still_owned[queued_stream_id] = queued_future
+                error_msg = leaked_error(queued_stream_id)
+                result.errors.append(error_msg)
+                result.outstanding_notes.append(
+                    f"Stream {queued_stream_id} started after the deadline; worker still running."
+                )
+                logger.warning(error_msg)
+        return still_owned
 
     @staticmethod
     def execute(
@@ -267,6 +312,27 @@ class StreamRunner:
 
             pending = set(future_to_stream_id.keys())
 
+            # Streams still active at the deadline, split by what can still be
+            # proven about them. Running futures are leaked (abandoned, still
+            # owned by their workers); queued futures are cancelled by the
+            # shutdown below, verified after it runs.
+            outstanding_futures: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
+            tentatively_cancelled: list[tuple[concurrent.futures.Future[ThroughputStreamResult], int]] = []
+
+            def _leaked_error(timed_out_stream_id: int) -> str:
+                return (
+                    f"Stream {timed_out_stream_id} timed out after {timeout}s and has not completed. "
+                    "Python cannot forcibly cancel a running thread, so this stream's worker "
+                    "may still be executing queries and holding its database connection in "
+                    "the background (leaked)"
+                    + (
+                        "; cooperative cancellation has been signalled and the stream should stop before its next query"
+                        if cooperative_cancel
+                        else ""
+                    )
+                    + "."
+                )
+
             try:
                 # NOTE: `timeout` bounds this as_completed() call as a whole,
                 # not any individual future.result() call. Passing it to
@@ -290,7 +356,9 @@ class StreamRunner:
                 # each such stream's worker may still be executing queries
                 # and holding its database connection in the background
                 # (leaked) -- unless cooperative cancellation is enabled,
-                # which signals the stream's loop to stop soon.
+                # which signals the stream's loop to stop soon. Futures that
+                # never started running are NOT leaked: they are cancelled by
+                # the shutdown below and verified after it runs.
                 for future in list(pending):
                     stream_id = future_to_stream_id[future]
 
@@ -304,26 +372,43 @@ class StreamRunner:
                     if cooperative_cancel:
                         cancel_events[stream_id].set()
 
-                    result.streams_executed += 1
-                    error_msg = (
-                        f"Stream {stream_id} timed out after {timeout}s and has not completed. "
-                        "Python cannot forcibly cancel a running thread, so this stream's worker "
-                        "may still be executing queries and holding its database connection in "
-                        "the background (leaked)"
-                        + (
-                            "; cooperative cancellation has been signalled and the stream should "
-                            "stop before its next query"
-                            if cooperative_cancel
-                            else ""
+                    if future.running():
+                        # Still executing: abandoned, not killed. Ownership
+                        # stays with the worker until it terminates; the
+                        # result records the outstanding stream so phase
+                        # boundaries can contain it (see containment.py).
+                        result.streams_executed += 1
+                        result.outstanding_stream_ids.append(stream_id)
+                        outstanding_futures[stream_id] = future
+                        error_msg = _leaked_error(stream_id)
+                        result.errors.append(error_msg)
+                        result.outstanding_notes.append(
+                            f"Stream {stream_id} worker still running at timeout"
+                            + (
+                                "; cooperative cancellation signalled"
+                                if cooperative_cancel
+                                else "; no cooperative cancellation (cancel_on_timeout=False)"
+                            )
+                            + "."
                         )
-                        + "."
-                    )
-                    result.errors.append(error_msg)
-                    # Always surfaced -- NOT gated on config.verbose. A leaked
-                    # background stream can keep consuming CPU/DB connections
-                    # and skew a subsequent phase's timing, so this must not
-                    # be silent even in non-verbose runs.
-                    logger.warning(error_msg)
+                        # Always surfaced -- NOT gated on config.verbose. A leaked
+                        # background stream can keep consuming CPU/DB connections
+                        # and skew a subsequent phase's timing, so this must not
+                        # be silent even in non-verbose runs.
+                        logger.warning(error_msg)
+                    else:
+                        # Queued but never dispatched: shutdown below cancels
+                        # it before it can start (verified after shutdown, so
+                        # a future that races into running is reclassified as
+                        # outstanding rather than silently dropped).
+                        tentatively_cancelled.append((future, stream_id))
+                        queued_msg = (
+                            f"Stream {stream_id} timed out after {timeout}s without starting: "
+                            f"it was still queued behind running streams and is cancelled "
+                            f"before dispatch so it never executes."
+                        )
+                        result.errors.append(queued_msg)
+                        logger.warning(queued_msg)
                     pending.discard(future)
         finally:
             # wait=False: never block this method's return on a still-running
@@ -348,6 +433,21 @@ class StreamRunner:
             # unaffected. See the module docstring "Non-blocking shutdown"
             # section.
             executor.shutdown(wait=False, cancel_futures=True)
+
+            # Finalize the queued-stream classification now that shutdown has
+            # attempted cancellation. Every pending future still contributes
+            # exactly one streams_executed count, as before.
+            outstanding_futures.update(
+                StreamRunner._finalize_tentatively_cancelled(
+                    result, tentatively_cancelled, _record_completed_future, _leaked_error, logger
+                )
+            )
+
+            # Hand termination observation to the result. The futures are
+            # in-process only (never serialized); containment.py reads them
+            # to prove termination before releasing a phase boundary.
+            result._outstanding_futures = outstanding_futures  # type: ignore[attr-defined]
+            result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
 
     @staticmethod
     def compute_metrics(

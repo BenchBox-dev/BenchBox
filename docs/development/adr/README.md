@@ -17,3 +17,4 @@ Architecture Decision Records
 - [ADR: Client-to-Platform Locality Disclosure and Statement Overhead Probe](adr-client-link-locality-disclosure.md)
 - [ADR: Scan billing units — decimal terabytes for Athena/Synapse, tebibytes for BigQuery](adr-billing-unit-tb-tib-contract.md)
 - [ADR: Cross-benchmark power and throughput scores](adr-cross-benchmark-power-throughput-scores.md)
+- [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
