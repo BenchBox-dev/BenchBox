@@ -266,6 +266,14 @@ class TestDuckLakeSchemaRewrite:
         )
         assert adapter.operation_platform_key == "ducklake"
 
+    def test_operation_platform_fallback_key_resolves_duckdb(self, tmp_path):
+        """Missing ducklake catalog entries inherit the shared duckdb dialect's."""
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        assert adapter.operation_platform_fallback_key == "duckdb"
+
     def test_ducklake_pk_capability_bypasses_lock_and_ddl(self):
         from benchbox.core.write_primitives.benchmark import _pk_lock_bypass_required
         from benchbox.core.write_primitives.schema import _supports_primary_keys

@@ -281,6 +281,14 @@ class DuckLakeAdapter(DuckDBAdapter):
     # capability lookups must resolve "ducklake", not "duckdb".
     operation_platform_key = "ducklake"
 
+    # Shared-dialect fallback for catalog override lookups: DuckLake reuses
+    # DuckDB's SQL dialect unchanged (see class docstring), so an override
+    # entry missing under "ducklake" resolves from "duckdb" instead of
+    # dropping to the catalog default (e.g. the duckdb null overrides that
+    # skip DuckDB's unsupported SAVEPOINT operations). Engine-true "ducklake"
+    # entries (e.g. PK capability decisions) still win.
+    operation_platform_fallback_key = "duckdb"
+
     # Declared explicitly (not just inherited from DuckDBAdapter) because
     # test_plan_capture_phase_eligibility.py requires every concrete
     # registered adapter to state this on its own class body. DuckLake reuses
@@ -843,15 +851,19 @@ class DuckLakeAdapter(DuckDBAdapter):
                 "and tuning configuration). Use --force or a fresh catalog."
             )
 
-    def _rewrite_schema_statement(self, statement: str) -> str:
-        """Drop PRIMARY KEY constraints the DuckLake engine rejects.
+    def ducklake_strip_primary_keys(self, statement: str) -> str:
+        """Strip PRIMARY KEY/UNIQUE constraints DuckLake rejects.
 
-        DuckLake shares the DuckDB SQL dialect but does not implement
-        PRIMARY KEY/UNIQUE constraints, so the dialect-emitted clauses must
-        be stripped before execution (same adapter-level precedent as Trino
-        and Firebolt).
+        Registered as the ``ddl_optimize.ducklake.all.strip_primary_keys``
+        REWRITE_DDL transformer (see
+        benchbox.sql_compat.rules.ddl_optimize.ducklake_ddl_rewrites);
+        :meth:`_rewrite_schema_statement` routes execution through it.
         """
         return strip_primary_keys(statement)
+
+    def _rewrite_schema_statement(self, statement: str) -> str:
+        """See :meth:`ducklake_strip_primary_keys` (registered DDL rewrite)."""
+        return self.ducklake_strip_primary_keys(statement)
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
         """Create benchmark tables and persist their benchmark/run identity."""

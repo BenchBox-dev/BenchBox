@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 468
+**Total registered rules:** 469
 
 **Platforms covered:** 35
 
@@ -23,7 +23,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
-| ducklake | - | - | - | 2 | - | - | 2 |
+| ducklake | - | - | - | 2 | 1 | - | 3 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
@@ -276,6 +276,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.transaction_primitives.pk_lock_table_unsupported` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.write_primitives.pk_lock_table_unsupported` |
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.ducklake.all.strip_primary_keys` |
 
 ### fabric_dw
 
