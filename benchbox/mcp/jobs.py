@@ -330,10 +330,8 @@ class DurableJobRepository:
             "INSERT INTO mcp_job_order (name, value) VALUES (?, 0) ON CONFLICT (name) DO NOTHING",
             (name,),
         )
-        row = connection.execute(
-            "UPDATE mcp_job_order SET value = value + 1 WHERE name = ? RETURNING value",
-            (name,),
-        ).fetchone()
+        connection.execute("UPDATE mcp_job_order SET value = value + 1 WHERE name = ?", (name,))
+        row = connection.execute("SELECT value FROM mcp_job_order WHERE name = ?", (name,)).fetchone()
         assert row is not None
         return int(row[0])
 

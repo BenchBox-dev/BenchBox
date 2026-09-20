@@ -24,6 +24,19 @@ def _request(scale: float = 0.01) -> dict[str, object]:
     return {"platform": "duckdb", "benchmark": "tpch", "scale_factor": scale}
 
 
+def test_job_order_uses_sqlite_compatibility_statements(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    statements: list[str] = []
+    with repository._connect() as connection:
+        connection.set_trace_callback(statements.append)
+        connection.execute("BEGIN IMMEDIATE")
+        assert repository._next_order(connection, "enqueue") == 1
+        assert repository._next_order(connection, "enqueue") == 2
+        connection.commit()
+
+    assert not any("RETURNING" in statement.upper() for statement in statements)
+
+
 def test_job_submission_is_tenant_owned_and_idempotent(tmp_path: Path) -> None:
     repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     first, created = repository.submit("tenant-a", _request(), idempotency_key="request-1")
