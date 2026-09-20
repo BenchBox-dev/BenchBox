@@ -132,6 +132,19 @@ def declared_temporal_columns(
     return temporal_columns
 
 
+def dialect_preserves_empty_strings(null_marker: str | None) -> bool:
+    """True when the SQL dialect loads empty CSV fields as ``""``, not NULL.
+
+    Only ``""`` maps empty fields to NULL (TPC ``.tbl``/``.dat``, JoinOrder,
+    ...). Both ``None`` (no NULL conversion) and a non-empty sentinel (only
+    that literal maps to NULL, e.g. ClickBench's ``__NULL__``) preserve empty
+    strings, so DataFrame readers - which surface an empty text field as
+    null/NaN regardless of dialect - must restore ``""`` post-read to match
+    the SQL reference.
+    """
+    return null_marker != ""
+
+
 def resolve_empty_string_restore_columns(
     string_columns: list[str] | None,
     null_marker: str | None,
@@ -140,17 +153,17 @@ def resolve_empty_string_restore_columns(
     """Return declared string columns whose empty CSV fields must be restored to ``""``.
 
     This is the single shared decision step behind every DataFrame adapter's
-    empty-string/null CSV coercion: ``null_marker is None`` means the resolved
-    CSV dialect keeps empty fields as empty strings (e.g. ClickBench), but many
+    empty-string/null CSV coercion (see :func:`dialect_preserves_empty_strings`):
+    when the resolved CSV dialect keeps empty fields as empty strings, many
     reader libraries still surface an empty text field as null/NaN regardless
     of dialect. Declared string columns need ``""`` restored post-read so the
     DataFrame surface matches the SQL reference (e.g. DuckDB, which keeps
     ``""``).
 
-    Returns an empty list -- meaning "no coercion needed" -- when ``null_marker``
-    is not ``None`` (the dialect already treats empty as SQL NULL, e.g. the
-    TPC-style ``""`` marker / JoinOrder, so existing NULLs must be preserved) or
-    when there are no declared string columns for this table.
+    Returns an empty list -- meaning "no coercion needed" -- when the dialect
+    maps empty fields to SQL NULL (``null_marker == ""``, e.g. the TPC-style
+    ``.tbl``/``.dat`` marker / JoinOrder, so existing NULLs must be preserved)
+    or when there are no declared string columns for this table.
 
     Args:
         string_columns: Declared string/text columns for this table (from
@@ -164,7 +177,7 @@ def resolve_empty_string_restore_columns(
         The subset of ``string_columns`` that are present in
         ``available_columns`` and need empty-field restoration, or ``[]``.
     """
-    if null_marker is not None or not string_columns:
+    if not dialect_preserves_empty_strings(null_marker) or not string_columns:
         return []
     available = set(available_columns)
     return [column for column in string_columns if column in available]

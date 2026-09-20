@@ -386,7 +386,8 @@ class PandasDataFrameAdapter(PandasFamilyAdapter[PandasDF]):
         df = _coerce_date_columns(df, date_columns)
 
         # Restore "" on declared text columns when the SQL loader's dialect keeps
-        # empty fields as empty strings (null_marker is None, e.g. ClickBench):
+        # empty fields as empty strings (null_marker is None, or a non-empty
+        # sentinel like ClickBench's "__NULL__" where only the sentinel is NULL):
         # pandas reads an empty field as NaN, which would surface as None where
         # the DuckDB SQL reference emits "". Skipped when null_marker == "" (empty
         # -> NULL, e.g. JoinOrder), preserving that surface's NULLs. Shared step:

@@ -85,7 +85,11 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # v6: inferred TIME columns (time32/time64) are now cast to string before the
 # Parquet write. Pre-v6 caches may embed INT32 TIME(MILLIS,false), which Spark
 # rejects on read (PARQUET_TYPE_ILLEGAL), so they must be regenerated.
-DATAFRAME_CACHE_VERSION = "v6"
+# v7: dialects with a non-empty NULL sentinel (e.g. ClickBench's __NULL__,
+# where only the sentinel is NULL) now keep empty string fields as '' instead
+# of NULL. Pre-v7 caches for such dialects embed NULL where the SQL surface
+# emits '', so they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v7"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -392,10 +396,12 @@ class FormatConverter:
                 read as strings.
             null_marker: CSV null marker matching the SQL loader's resolved
                 dialect. ``""`` (default) converts empty string fields to NULL,
-                preserving prior behavior; ``None`` keeps empty fields as empty
-                strings so a string column materializes the same way the DuckDB
-                SQL reference does (its ``nullstr`` sentinel never matches an
-                empty field), instead of emitting NULL where SQL emits "".
+                preserving prior behavior; ``None`` (no NULL conversion) or a
+                non-empty sentinel (only that literal is NULL, e.g. ClickBench's
+                ``__NULL__``) keeps empty fields as empty strings so a string
+                column materializes the same way the DuckDB SQL reference does
+                (its ``nullstr`` sentinel never matches an empty field), instead
+                of emitting NULL where SQL emits "".
 
         Returns:
             Tuple of (conversion status, row count)
@@ -433,11 +439,15 @@ class FormatConverter:
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
 
             # When the SQL loader's dialect keeps empty fields as empty strings
-            # (null_marker is None), do the same here so the DataFrame surface
-            # does not emit NULL where the SQL surface emits "".
+            # (no NULL conversion, or a non-empty sentinel where only the
+            # sentinel is NULL), do the same here so the DataFrame surface
+            # does not emit NULL where the SQL surface emits "". Only "" maps
+            # empty fields to NULL.
+            from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
+
             convert_options = pv.ConvertOptions(
                 auto_dict_encode=True,
-                strings_can_be_null=null_marker is not None,
+                strings_can_be_null=not dialect_preserves_empty_strings(null_marker),
                 column_types=arrow_column_types,
             )
 
