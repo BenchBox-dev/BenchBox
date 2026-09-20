@@ -8547,15 +8547,10 @@
       "title": "Make pinned skill-sync CI verification Linux-compatible"
     },
     "make-platform-capabilities-entirely-test-derived": {
-      "claim": {
-        "expires_at": "2026-09-21T04:31:00Z",
-        "generation": "1e7f86ad859344eab8567785515dc524",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Make platform capabilities entirely test-derived"
     },
     "make-todo-db-shadow-cutover-portable": {
