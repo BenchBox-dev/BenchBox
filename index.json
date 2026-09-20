@@ -1,10 +1,15 @@
 {
   "items": {
     "a-dedicated-dtype-asserting-cross-surface-gate-cell-compare": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T02:45:48Z",
+        "generation": "bedd7853ed6d47f8916bf6a1041de4e3",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "A dedicated DTYPE-asserting cross-surface gate cell (compare each loaded column's dtype, not just its values, against the SQL reference)."
     },
     "abfs-scheme-classifies-as-local-and-provider-strings-diverge": {
