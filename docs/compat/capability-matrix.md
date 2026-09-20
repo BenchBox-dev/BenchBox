@@ -4,9 +4,9 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 488
+**Total registered rules:** 491
 
-**Platforms covered:** 34
+**Platforms covered:** 35
 
 ## Phase coverage by platform
 
@@ -23,6 +23,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
+| ducklake | - | - | - | 2 | 1 | - | 3 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 5 | 6 | 11 | - | 1 | 69 | 92 |
@@ -268,6 +269,14 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=write_primitives, query=merge_upsert_with_delete | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_upsert_with_delete` |
 | execution_filter | benchmark=write_primitives, query=merge_with_cte_source | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_cte_source` |
 | execution_filter | benchmark=write_primitives, query=merge_with_join_condition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_join_condition` |
+
+### ducklake
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| schema_emit | benchmark=transaction_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.transaction_primitives.pk_lock_table_unsupported` |
+| schema_emit | benchmark=write_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.write_primitives.pk_lock_table_unsupported` |
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.ducklake.all.strip_primary_keys` |
 
 ### fabric_dw
 

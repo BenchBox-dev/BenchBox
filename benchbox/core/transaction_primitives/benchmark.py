@@ -697,7 +697,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             ValueError: If connection is invalid
             RuntimeError: If staging tables not initialized
         """
-        operation, platform_key, sql_override = self._prepare_operation(operation_id, connection, **kwargs)
+        operation, platform_key, fallback_key, sql_override = self._prepare_operation(
+            operation_id, connection, **kwargs
+        )
         platform_name = str(kwargs.get("platform_name") or "").lower()
 
         try:
@@ -724,16 +726,14 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     skip_reason=skip_reason,
                 )
 
-            # Resolve effective SQL respecting platform overrides
+            # Resolve effective SQL respecting platform overrides (engine key
+            # first, shared-dialect fallback second - see _lookup_platform_override).
+            found_override, override = self._lookup_platform_override(
+                getattr(operation, "platform_overrides", None), platform_key, fallback_key
+            )
             if sql_override is not None:
                 write_sql_raw = sql_override
-            elif (
-                platform_key
-                and hasattr(operation, "platform_overrides")
-                and operation.platform_overrides
-                and platform_key in operation.platform_overrides
-            ):
-                override = operation.platform_overrides[platform_key]
+            elif found_override:
                 if override is None:
                     skip_reason = f"Operation '{operation_id}' is unsupported on platform '{platform_key}'."
                     self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")

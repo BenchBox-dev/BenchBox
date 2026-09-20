@@ -31,9 +31,9 @@ from benchbox.sql_compat.registry import REGISTRY
 
 
 # Rule_id slugs covered by pk_capability_txn.py (transaction_primitives benchmark).
-# Original 4 register under .pk_lock_table_unsupported; the 8 INFORMATIONAL
+# Original 4 plus ducklake register under .pk_lock_table_unsupported; the 8 INFORMATIONAL
 # cloud-DW groups added in w5 register under .pk_not_enforced.
-_EXPECTED_LOCK_TABLE_DIALECTS = ("datafusion", "clickhouse", "starrocks", "doris")
+_EXPECTED_LOCK_TABLE_DIALECTS = ("datafusion", "clickhouse", "starrocks", "doris", "ducklake")
 _EXPECTED_INFORMATIONAL_DIALECTS = (
     "snowflake",
     "redshift",
@@ -61,7 +61,7 @@ def test_pk_capability_txn_rules_registered():
     assert not missing, f"Missing PK rules: {sorted(missing)}"
 
 
-@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris"])
+@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris", "ducklake"])
 def test_pk_txn_rule_action_is_rewrite_ddl(platform: str):
     ctx = CompatibilityContext(
         platform=platform,
@@ -100,7 +100,7 @@ def test_starrocks_txn_rule_is_registry_backed():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris"])
+@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris", "ducklake"])
 def test_lock_platforms_have_rewrite_ddl_rule(platform: str):
     """All authoritative lock-table unsupported platforms have REWRITE_DDL rules in registry."""
     ctx = CompatibilityContext(

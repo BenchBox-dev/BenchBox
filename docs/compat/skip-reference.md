@@ -4,9 +4,9 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 350
+**Total rules:** 352
 
-**Platforms with rules:** 21
+**Platforms with rules:** 22
 
 ## Will not run
 
@@ -431,6 +431,13 @@ Benchmarks that **run end-to-end** but with documented internal gaps - either an
 |---|---|---|---|---|
 | INFORMATIONAL | benchmark=transaction_primitives | schema_emit | Doris does not enforce standard SQL PRIMARY KEY uniqueness; skip lock table DDL | `schema_emit.doris.transaction_primitives.pk_lock_table_unsupported` |
 | INFORMATIONAL | benchmark=write_primitives | schema_emit | Doris does not enforce standard SQL PRIMARY KEY uniqueness; skip lock table DDL | `schema_emit.doris.write_primitives.pk_lock_table_unsupported` |
+
+### ducklake
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_DDL_FRAGMENT | benchmark=transaction_primitives | schema_emit | DuckLake rejects PRIMARY KEY syntax; skip lock table DDL and omit PK clauses | `schema_emit.ducklake.transaction_primitives.pk_lock_table_unsupported` |
+| SKIPPED_DDL_FRAGMENT | benchmark=write_primitives | schema_emit | DuckLake rejects PRIMARY KEY syntax; skip lock table DDL and omit PK clauses | `schema_emit.ducklake.write_primitives.pk_lock_table_unsupported` |
 
 ### presto
 

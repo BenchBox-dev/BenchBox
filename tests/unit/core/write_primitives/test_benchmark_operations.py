@@ -258,3 +258,49 @@ class TestEffectiveWriteSqlSkipOrder:
         effective_sql, skip_reason = wp._get_effective_write_sql(op, platform_key="datafusion")
         assert effective_sql is None
         assert skip_reason is not None and "unsupported on platform 'datafusion'" in skip_reason
+
+
+# ---------------------------------------------------------------------------
+# _get_effective_write_sql fallback key (shared-dialect override inheritance)
+# ---------------------------------------------------------------------------
+class TestEffectiveWriteSqlFallbackKey:
+    def _op(self, **kw):
+        base = {
+            "id": "op1",
+            "category": "insert",
+            "write_sql": "INSERT INTO t VALUES (1)",
+            "platform_overrides": {},
+            "aggregate_state": None,
+            "file_dependencies": [],
+        }
+        base.update(kw)
+        return SimpleNamespace(**base)
+
+    def test_fallback_null_override_skips(self, wp: WritePrimitivesBenchmark):
+        op = self._op(platform_overrides={"duckdb": None})
+        sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake", platform_fallback_key="duckdb")
+        assert sql is None
+        assert reason is not None and "ducklake" in reason
+
+    def test_fallback_string_override_used(self, wp: WritePrimitivesBenchmark):
+        op = self._op(platform_overrides={"duckdb": "INSERT INTO t VALUES (2)"})
+        sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake", platform_fallback_key="duckdb")
+        assert (sql, reason) == ("INSERT INTO t VALUES (2)", None)
+
+    def test_engine_entry_wins_over_fallback(self, wp: WritePrimitivesBenchmark):
+        op = self._op(platform_overrides={"ducklake": "INSERT INTO t VALUES (3)", "duckdb": None})
+        sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake", platform_fallback_key="duckdb")
+        assert (sql, reason) == ("INSERT INTO t VALUES (3)", None)
+
+    def test_duckdb_merge_gate_applies_via_fallback(self, wp: WritePrimitivesBenchmark):
+        """Bundled-DuckDB MERGE rejection applies to DuckLake (same engine)."""
+        op = self._op(write_sql="MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = 1")
+        sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake", platform_fallback_key="duckdb")
+        assert sql is None
+        assert reason is not None and "DuckDB" in reason
+
+    def test_no_fallback_preserves_exact_match(self, wp: WritePrimitivesBenchmark):
+        """Without a fallback key the old exact-match behavior is unchanged."""
+        op = self._op(platform_overrides={"duckdb": "INSERT INTO t VALUES (2)"})
+        sql, reason = wp._get_effective_write_sql(op, platform_key="ducklake")
+        assert (sql, reason) == ("INSERT INTO t VALUES (1)", None)

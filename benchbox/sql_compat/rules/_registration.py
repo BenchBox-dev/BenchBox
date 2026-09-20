@@ -57,6 +57,17 @@ _PK_UNSUPPORTED_RULES: tuple[tuple[str, str, SupportLevel, FailureMode, bool, bo
         "DataFusion does not support PRIMARY KEY syntax; skip lock table DDL",
     ),
     (
+        "ducklake",
+        "pk_lock_table_unsupported",
+        SupportLevel.SKIPPED_DDL_FRAGMENT,
+        FailureMode.SYNTAX_ERROR,
+        False,
+        False,
+        None,
+        "DuckLake does not accept PRIMARY KEY/UNIQUE constraints in CREATE TABLE",
+        "DuckLake rejects PRIMARY KEY syntax; skip lock table DDL and omit PK clauses",
+    ),
+    (
         "clickhouse",
         "pk_lock_table_unsupported",
         SupportLevel.REWRITTEN,
