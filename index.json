@@ -6861,10 +6861,15 @@
       "title": "FK-aware table DROP ordering: schema recreation fails on DuckDB when FK constraints were applied"
     },
     "fk-drop-ordering-caller-txn-test-red": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T02:32:51Z",
+        "generation": "5a29e38429254ec98e5c445eef0c6d78",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Red test: CTAS caller-transaction preservation test fails on develop"
     },
     "flight-data-benchmark": {
