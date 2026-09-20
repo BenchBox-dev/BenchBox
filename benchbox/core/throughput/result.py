@@ -103,3 +103,19 @@ class ThroughputResult:
     query_throughput: float = 0.0
     success: bool = True
     errors: list[str] = field(default_factory=list)
+    # Outstanding-work ownership state, populated by StreamRunner.execute()
+    # when the timeout deadline elapses with streams still active. All plain
+    # data so results stay serializable; worker-thread handles live
+    # separately (see StreamRunner and containment.await_quiescence).
+    outstanding_stream_ids: list[int] = field(default_factory=list)
+    cancelled_stream_ids: list[int] = field(default_factory=list)
+    outstanding_notes: list[str] = field(default_factory=list)
+    # Last observable cleanup state: "complete" (nothing outstanding),
+    # "outstanding" (timed-out work may still be executing), or "quiesced"
+    # (termination observed after the fact via await_quiescence).
+    cleanup_state: str = "complete"
+
+    @property
+    def has_outstanding_work(self) -> bool:
+        """Whether timed-out work may still be executing and owning resources."""
+        return bool(self.outstanding_stream_ids)
