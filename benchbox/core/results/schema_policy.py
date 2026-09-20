@@ -138,6 +138,11 @@ def result_schema_version_value(data: dict[str, Any]) -> Any:
     """Return the explicit result schema version from a bundle-like mapping."""
     if not isinstance(data, dict):
         return None
+    if "result_schema_version" in data and "version" in data:
+        result_version, result_problem = normalize_schema_version_value(data.get("result_schema_version"))
+        legacy_version, legacy_problem = normalize_schema_version_value(data.get("version"))
+        if result_problem is None and legacy_problem is None and result_version != legacy_version:
+            raise ValueError("result_schema_version and version must match when both are present")
     if "result_schema_version" in data:
         return data.get("result_schema_version")
     if "version" in data:
