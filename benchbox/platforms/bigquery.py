@@ -1187,7 +1187,7 @@ class BigQueryAdapter(PlatformAdapter):
                     f"--scale {scale_factor} --compression gzip\n\n"
                     f"Or use uncompressed data (larger files, slower uploads):\n\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
-                    f"--scale {scale_factor} --no-compression\n"
+                    f"--scale {scale_factor} --compression none\n"
                 )
 
     def _create_storage_bucket(self) -> Any:
@@ -1680,6 +1680,53 @@ class BigQueryAdapter(PlatformAdapter):
         else:
             if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
                 statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+
+        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
+        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
+        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
+        # NUMERIC and inherits its limits.
+        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
+            precision, scale = int(match.group(2)), int(match.group(3))
+            if scale > 9 or precision > 38:
+                return f"BIGNUMERIC({precision},{scale})"
+            return match.group(0)
+
+        statement = re.sub(
+            r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            _decimal_to_bignumeric,
+            statement,
+            flags=re.IGNORECASE,
+        )
+
+        # BigQuery rejects enforced PRIMARY KEY; it only supports informational
+        # NOT ENFORCED table constraints. Convert inline column PRIMARY KEYs
+        # (e.g. JoinOrder's `id INTEGER PRIMARY KEY`) to a table constraint.
+        _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
+        pk_cols = [
+            name
+            for name in re.findall(
+                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
+                r"PRIMARY\s+KEY(?!\s*\()",
+                rest if match else statement,
+                flags=re.IGNORECASE | re.MULTILINE,
+            )
+            if name.upper() not in _pk_keywords
+        ]
+        if match:
+            rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
+            if pk_cols:
+                depth = 0
+                for i, ch in enumerate(rest):
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            rest = rest[:i] + f", PRIMARY KEY ({', '.join(pk_cols)}) NOT ENFORCED" + rest[i:]
+                            break
+            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+        else:
+            statement = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", statement, flags=re.IGNORECASE)
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in statement.upper() and self.partitioning_field:

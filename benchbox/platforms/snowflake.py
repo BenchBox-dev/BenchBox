@@ -1046,6 +1046,24 @@ class SnowflakeAdapter(PlatformAdapter):
             error_msg = str(row[5]) if len(row) > 5 and row[5] else "No error message provided"
             self.logger.warning(f"File {file_name} status: {status}, loaded {loaded} rows. Error: {error_msg}")
 
+    def _count_existing_rows(self, cursor: Any, target_table: str, table_name: str) -> int:
+        """Return the row count of an already-created target table, else 0."""
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+        except Exception:
+            try:
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+            except Exception:
+                return 0
+        try:
+            row = cursor.fetchone()
+        except Exception:
+            return 0
+        try:
+            return int(row[0]) if row else 0
+        except (ValueError, TypeError):
+            return 0
+
     def _load_table_from_stage(
         self,
         cursor: Any,
@@ -1059,6 +1077,15 @@ class SnowflakeAdapter(PlatformAdapter):
         stage_name = f"@%{table_name_upper}"
         target_table = table_name_upper
         self.log_very_verbose(f"Using stage: {stage_name}")
+
+        # Idempotent reruns: schema creation is skipped when tables already
+        # hold data, so the load must also be skipped or every rerun appends
+        # a full duplicate copy (observed as exactly 2x/3x row counts when
+        # two agents share a deterministic database name).
+        existing_rows = self._count_existing_rows(cursor, target_table, table_name)
+        if existing_rows > 0:
+            self.logger.info(f"Skipping load for {target_table}: already holds {existing_rows:,} rows")
+            return existing_rows
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_msg = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1075,13 +1102,23 @@ class SnowflakeAdapter(PlatformAdapter):
 
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
-        file_format = self._ensure_preserve_file_format(cursor, table_name, valid_files[0], ds, bm)
-        if file_format is None:
-            file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the
+        # CSV named formats: load with an inline Parquet format. Column
+        # matching is a COPY-level parameter (MATCH_BY_COLUMN_NAME), not a
+        # FILE_FORMAT option; case-insensitive matching bridges UPPERCASE
+        # tables and lowercase Parquet fields.
+        is_parquet = str(valid_files[0]).lower().endswith(".parquet")
+        if is_parquet:
+            file_format_clause = "FILE_FORMAT = (TYPE = 'PARQUET') MATCH_BY_COLUMN_NAME = 'CASE_INSENSITIVE'"
+        else:
+            file_format = self._ensure_preserve_file_format(cursor, table_name, valid_files[0], ds, bm)
+            if file_format is None:
+                file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+            file_format_clause = f"FILE_FORMAT = (FORMAT_NAME = '{file_format}')"
         copy_command = f"""
             COPY INTO {target_table}
             FROM {stage_name}
-            FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+            {file_format_clause}
             ON_ERROR = 'CONTINUE'
             PURGE = TRUE
         """
@@ -1094,7 +1131,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 copy_command = f"""
                     COPY INTO {target_table}
                     FROM {stage_name}
-                    FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+                    {file_format_clause}
                     ON_ERROR = 'CONTINUE'
                     PURGE = TRUE
                 """

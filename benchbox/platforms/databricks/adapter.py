@@ -2100,6 +2100,26 @@ class DatabricksAdapter(PlatformAdapter):
             self.log_very_verbose(f"Could not get column list for {table_name}: {e}")
         return ""
 
+    def _parquet_cast_select(self, cursor: Any, table_name_upper: str) -> str:
+        """Build a SELECT list casting Parquet fields to the Delta column types.
+
+        Reads the target types from DESCRIBE TABLE so Parquet/Delta type
+        mismatches (e.g. int64 fields into INT columns) load without a
+        DELTA_FAILED_TO_MERGE_FIELDS error. Partition-metadata rows emitted
+        by DESCRIBE are skipped.
+        """
+        cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
+        items = []
+        for row in cursor.fetchall():
+            col = str(row[0]) if len(row) > 0 else ""
+            dtype = str(row[1]) if len(row) > 1 else ""
+            if not col or col.startswith("#") or not dtype or dtype.startswith("#"):
+                continue
+            items.append(f"CAST(`{col}` AS {dtype}) AS `{col}`")
+        if not items:
+            raise RuntimeError(f"DESCRIBE TABLE {table_name_upper} returned no columns for Parquet cast SELECT")
+        return ", ".join(items)
+
     def _load_single_table(
         self,
         cursor,
@@ -2150,12 +2170,30 @@ class DatabricksAdapter(PlatformAdapter):
         if len(copy_sources) > 1:
             self.log_verbose(f"Loading {table_name_upper} from {len(copy_sources)} shard files")
 
+        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the CSV
+        # COPY path. Parquet field types need not match the Delta DDL (IMDb
+        # integers are int64 while the schema says INTEGER/INT), so load
+        # through a SELECT that casts every field to the target column type
+        # read from DESCRIBE TABLE. Column lists and CSV format options apply
+        # to delimited text only.
+        is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
+        parquet_select = ""
+        if is_parquet:
+            self.log_very_verbose(f"Using PARQUET file format for {table_name_upper}")
+            parquet_select = self._parquet_cast_select(cursor, table_name_upper)
+
         copy_time = 0.0
         for source_uri in copy_sources:
-            copy_sql = (
-                f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
-                f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
-            )
+            if is_parquet:
+                copy_sql = (
+                    f"COPY INTO {table_name_upper} FROM (SELECT {parquet_select} FROM '{source_uri}') "
+                    f"FILEFORMAT = PARQUET"
+                )
+            else:
+                copy_sql = (
+                    f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                )
             copy_start = mono_time()
             cursor.execute(copy_sql)
             copy_time += elapsed_seconds(copy_start)

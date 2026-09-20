@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 466
+**Total registered rules:** 467
 
 **Platforms covered:** 34
 
@@ -13,7 +13,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | 1 | - | 2 | 1 | - | 4 |
+| bigquery | - | 2 | - | 2 | 1 | - | 5 |
 | clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
@@ -59,6 +59,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.bigquery.h2odb.q9_percentile_window_variant` |
 | query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.bigquery.tpcdi.eq7_derived_table_variant` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.write_primitives.pk_not_enforced` |

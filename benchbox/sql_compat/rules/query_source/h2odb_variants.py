@@ -1,9 +1,9 @@
 """H2O DB query variant rules for Phase.QUERY_SOURCE.
 
 Q9 uses PERCENTILE_CONT … WITHIN GROUP (ORDER BY …) which is not supported
-by SQLite, ClickHouse, or StarRocks. Each platform requires a platform-native rewrite.
-The SQL constants below are also imported by H2OBenchmark.get_queries() as
-the legacy-path fallback (OFF/SHADOW modes).
+by SQLite, ClickHouse, StarRocks, or BigQuery. Each platform requires a
+platform-native rewrite. The SQL constants below are also imported by
+H2OBenchmark.get_queries() as the legacy-path fallback (OFF/SHADOW modes).
 """
 
 from __future__ import annotations
@@ -51,6 +51,19 @@ SELECT
 FROM "trips"
 GROUP BY "passenger_count"
 ORDER BY "passenger_count";
+"""
+
+# BigQuery: no WITHIN GROUP ordered-set aggregates; PERCENTILE_CONT is a
+# window function taking (value_expression, percentile) with the grouping
+# expressed as PARTITION BY. DISTINCT collapses the per-row window output to
+# one row per passenger_count.
+BIGQUERY_Q9_SQL = """
+SELECT DISTINCT
+    passenger_count,
+    PERCENTILE_CONT(fare_amount, 0.5) OVER (PARTITION BY passenger_count) as median_fare_amount,
+    PERCENTILE_CONT(fare_amount, 0.9) OVER (PARTITION BY passenger_count) as p90_fare_amount
+FROM trips
+ORDER BY passenger_count;
 """
 
 # MySQL/SingleStore: PERCENTILE_CONT WITHIN GROUP is supported but SQLGlot adds a
@@ -113,6 +126,25 @@ REGISTRY.register(
     ),
     _P,
     "starrocks",
+    benchmark=_B,
+    query_id="Q9",
+)
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.bigquery.h2odb.q9_percentile_window_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.SYNTAX_ERROR,
+        payload=SelectVariantPayload(
+            variant_key="bigquery",
+            variant_sql=BIGQUERY_Q9_SQL,
+        ),
+        reason="BigQuery does not parse ANSI PERCENTILE_CONT WITHIN GROUP syntax; use the native "
+        "PERCENTILE_CONT(value, percentile) OVER (PARTITION BY …) window form",
+    ),
+    _P,
+    "bigquery",
     benchmark=_B,
     query_id="Q9",
 )
