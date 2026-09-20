@@ -13239,15 +13239,10 @@
       "title": "Corpus is down to 9 bundles across 3 cohorts after the 2026-08-23 trust cut; seed lane no longer matches anything checked in"
     },
     "restore-corpus-coverage-after-20260823-trust-cut-def726": {
-      "claim": {
-        "expires_at": "2026-09-21T04:50:21Z",
-        "generation": "5991df9b291c436bafd8145f7a5c86f3",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Defer metadata_primitives >=3-platform admission"
     },
     "restore-corpus-coverage-after-20260823-trust-cut-def727": {
