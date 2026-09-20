@@ -1079,6 +1079,19 @@ class DataFrameDataLoader:
             data_dir or Path(first_path).parent,
             source_files,
         )
+        # Fold the resolved per-table CSV dialect into the cache key: manifest
+        # dialect metadata (delimiter/header/NULL marker) changes how bytes are
+        # interpreted without touching the CSV files, so file stats alone would
+        # reuse stale Parquet indefinitely. Resolution is cheap (one small
+        # manifest read) and falls back exactly as conversion does.
+        table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
+        dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
+        dialect_key = "|".join(
+            f"{table}:{dialects[table].delimiter}:{dialects[table].has_header}:"
+            f"{dialects[table].null_marker}:{dialects[table].normalize_booleans}"
+            for table in sorted(dialects)
+        )
+        source_hash = hashlib.md5(f"{source_hash}:{dialect_key}".encode()).hexdigest()[:12]
 
         # Include write_config in cache key if it affects output
         if effective_write_config and not effective_write_config.is_default():

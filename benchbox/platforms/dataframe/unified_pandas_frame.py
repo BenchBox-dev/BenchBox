@@ -483,11 +483,15 @@ class UnifiedPandasGroupBy(Generic[DF]):
         # Merge positional dict arg with kwargs
         agg_spec = args[0] if args and isinstance(args[0], dict) else kwargs
 
+        # Forward the groupby kwargs (e.g. dropna=False): without them the
+        # adapter regroups with native defaults and NULL groups vanish even
+        # though the wrapper was constructed to keep them.
         result = self._adapter.groupby_agg(
             self._df,
             self._by,
             agg_spec,
             as_index=self._as_index,
+            **self._kwargs,
         )
         return UnifiedPandasFrame(result, self._adapter)
 
