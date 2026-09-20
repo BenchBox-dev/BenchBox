@@ -153,10 +153,10 @@ def _benchmark_gate_records() -> list[BaselineRecord]:
 
     records: list[BaselineRecord] = []
     for platform_key in sorted(PlatformRegistry.get_platform_names()):
-        caps = PlatformRegistry.get_platform_capabilities(platform_key)
-        if caps is None or not caps.unsupported_benchmarks:
+        unsupported = PlatformRegistry.get_unsupported_benchmarks(platform_key)
+        if not unsupported:
             continue
-        for benchmark in sorted(caps.unsupported_benchmarks):
+        for benchmark in sorted(unsupported):
             records.append(
                 _rec(
                     platform_key,

@@ -1119,9 +1119,7 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
     if not s.platform_key or not s.benchmark:
         return
 
-    caps = PlatformRegistry.get_platform_capabilities(s.platform_key)
-    unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", None) if caps else None
-    block_reason: str | None = unsupported_benchmarks.get(s.benchmark) if unsupported_benchmarks else None
+    block_reason = PlatformRegistry.get_benchmark_block_reason(s.platform_key, s.benchmark)
 
     if block_reason is None:
         return
