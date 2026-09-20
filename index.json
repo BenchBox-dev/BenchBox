@@ -14568,15 +14568,10 @@
       "title": "Rewrite explorer transformer to use typed models throughout"
     },
     "rewrite-generator-tests-to-use-real-tpc-binary-integration-l": {
-      "claim": {
-        "expires_at": "2026-09-21T04:45:22Z",
-        "generation": "2de4b81edead4d74b0fc168ad5f13258",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Rewrite generator tests to use real TPC binary (integration-level)"
     },
     "rewrite-tuning-wizard-tests-to-use-real-unifiedtuningconfigu": {
