@@ -591,7 +591,7 @@ def test_retry_is_allowed_only_for_quiescent_owner_reports(tmp_path: Path) -> No
     assert repository.fail_attempt(lost.execution_id, "stranger", "late") is None
 
 
-def test_unknown_outcome_participates_in_retention(tmp_path: Path) -> None:
+def test_unknown_outcome_requires_quiescence_before_retention(tmp_path: Path) -> None:
     limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2, retention_seconds=3600)
     repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
     worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
@@ -609,9 +609,36 @@ def test_unknown_outcome_participates_in_retention(tmp_path: Path) -> None:
             ("2000-01-01T00:00:00+00:00", submitted.execution_id),
         )
     expired = repository.expired_terminal()
+    assert expired == []
+    assert repository.delete_terminal(submitted.execution_id) is False
+    assert repository.attest_quiescence(submitted.execution_id, "stranger") is False
+    assert repository.attest_quiescence(submitted.execution_id, "lost-worker") is True
+    expired = repository.expired_terminal()
     assert [job.execution_id for job in expired] == [submitted.execution_id]
     assert repository.delete_terminal(submitted.execution_id) is True
     assert repository.get(submitted.execution_id) is None
+
+
+def test_quiescence_attestation_survives_a_later_recovery_fence(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_running=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    first, _ = repository.submit("tenant-a", _request())
+    second, _ = repository.submit("tenant-b", _request())
+    assert repository.claim("worker-a") is not None
+
+    # The executor returned after its heartbeat failed, but before recovery
+    # durably fenced the attempt.
+    assert repository.attest_quiescence(first.execution_id, "worker-a") is True
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+
+    recovered = repository.get(first.execution_id)
+    assert recovered is not None and recovered.state == "unknown"
+    assert recovered.quiesced_at is not None
+    replacement = repository.claim("worker-b")
+    assert replacement is not None and replacement.execution_id == second.execution_id
 
 
 def test_legacy_database_migrates_state_check_for_unknown(tmp_path: Path) -> None:
@@ -695,6 +722,137 @@ def test_migration_failure_still_raises_when_unmigrated(tmp_path: Path, monkeypa
     monkeypatch.setattr(DurableJobRepository, "_rebuild_state_table", staticmethod(racy_rebuild))
     with pytest.raises(sqlite3.OperationalError):
         DurableJobRepository(path, JobLimits())
+
+
+def test_submit_enforces_global_and_per_principal_queued_bounds(tmp_path: Path) -> None:
+    limits = JobLimits(queue_limit=2, max_queued_per_principal=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    repository.submit("tenant-a", _request())
+    with pytest.raises(MCPError, match="for this principal$"):
+        repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    with pytest.raises(MCPError, match="queue is full$"):
+        repository.submit("tenant-c", _request())
+
+
+def test_claim_enforces_global_running_bound_including_unknown(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2, max_running=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    first, _ = repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    assert repository.claim("worker-a") is not None
+    assert repository.claim("worker-b") is None
+
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+    lost = repository.get(first.execution_id)
+    assert lost is not None and lost.state == "unknown"
+    # The unproven attempt still holds the single running slot.
+    assert repository.claim("worker-b") is None
+    summary = repository.capacity_summary()
+    assert summary["outstanding"] == 1
+    assert summary["queued"] == 1
+
+
+def test_claim_enforces_per_principal_running_bound(tmp_path: Path) -> None:
+    limits = JobLimits(max_running=4, max_running_per_principal=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    repository.submit("tenant-a", _request())
+    repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    assert repository.claim("worker-a") is not None
+    claimed = repository.claim("worker-b")
+    assert claimed is not None and claimed.principal_id == "tenant-b"
+    assert repository.claim("worker-c") is None
+
+
+def test_claim_serves_least_recently_served_principal_first(tmp_path: Path) -> None:
+    limits = JobLimits(max_running=8, max_running_per_principal=8)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    noisy = [repository.submit("tenant-noisy", _request())[0].execution_id for _ in range(4)]
+    quiet, _ = repository.submit("tenant-quiet", _request())
+    order = []
+    for worker in ("worker-1", "worker-2", "worker-3", "worker-4", "worker-5"):
+        claimed = repository.claim(worker)
+        assert claimed is not None
+        order.append(claimed.principal_id)
+    # The noisy principal wins the opening tie by oldest job, then the
+    # never-served quiet principal jumps ahead of the backlog.
+    assert order[:2] == ["tenant-noisy", "tenant-quiet"]
+    assert set(order[2:]) == {"tenant-noisy"}
+    # Each principal's own jobs still run oldest-first.
+    noisy_claimed = [
+        job.execution_id
+        for job in (repository.get(execution_id) for execution_id in noisy)
+        if job is not None and job.state == "running"
+    ]
+    assert noisy_claimed == noisy[:4]
+
+
+def test_claim_fairness_and_fifo_ignore_wall_clock_rollback(tmp_path: Path, monkeypatch) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from benchbox.mcp import jobs
+
+    times = iter(
+        [
+            datetime(2026, 1, 3, tzinfo=timezone.utc),
+            datetime(2026, 1, 2, tzinfo=timezone.utc),
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            datetime(2025, 12, 31, tzinfo=timezone.utc),
+            datetime(2025, 12, 30, tzinfo=timezone.utc),
+            datetime(2025, 12, 29, tzinfo=timezone.utc),
+        ]
+    )
+    monkeypatch.setattr(jobs, "utc_now", lambda: next(times))
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=3, max_running_per_principal=3))
+    first, _ = repository.submit("tenant-a", _request())
+    second, _ = repository.submit("tenant-a", _request())
+    quiet, _ = repository.submit("tenant-b", _request())
+
+    claimed_first = repository.claim("worker-1")
+    claimed_quiet = repository.claim("worker-2")
+    claimed_second = repository.claim("worker-3")
+
+    assert claimed_first is not None and claimed_first.execution_id == first.execution_id
+    assert claimed_quiet is not None and claimed_quiet.execution_id == quiet.execution_id
+    assert claimed_second is not None and claimed_second.execution_id == second.execution_id
+
+
+def test_capacity_summary_names_quarantine_reason(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    assert repository.claim("lost-worker") is not None
+    worker = DurableJobWorker(repository, TenantWorkspaceProvider(tmp_path / "workspaces"))
+    worker.recover_expired()
+    anyio.run(anyio.sleep, 0.06)
+    worker.recover_expired()
+    summary = repository.capacity_summary()
+    assert summary["limits"]["max_running"] == limits.max_running
+    assert summary["states"]["unknown"] == 1
+    assert summary["states"]["queued"] == 1
+    assert len(summary["quarantined"]) == 1
+    entry = summary["quarantined"][0]
+    assert entry["reason"] == "unknown_outcome"
+    assert entry["principal_id"] == "tenant-a"
+    assert summary["per_principal"]["tenant-a"] == {"queued": 0, "outstanding": 1}
+    assert summary["per_principal"]["tenant-b"] == {"queued": 1, "outstanding": 0}
+
+
+def test_concurrent_claims_from_separate_handles_admit_exactly_one(tmp_path: Path) -> None:
+    limits = JobLimits(max_running=1)
+    first = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    second = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    first.submit("tenant-a", _request())
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        winners = list(
+            pool.map(lambda worker: first.claim(worker) if worker == "a" else second.claim(worker), ("a", "b"))
+        )
+    assert sum(1 for claimed in winners if claimed is not None) == 1
 
 
 def test_exhausted_unreported_attempt_recovers_unknown_not_failed(tmp_path: Path) -> None:

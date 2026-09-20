@@ -21,6 +21,7 @@ def write_security_config(
     *,
     tokens: dict[str, tuple[str, tuple[str, ...]]],
     admission: dict[str, object] | None = None,
+    jobs: dict[str, object] | None = None,
 ) -> Path:
     """Write a digest-only test policy and return its path."""
     policy = {
@@ -45,6 +46,8 @@ def write_security_config(
     }
     if admission is not None:
         policy["admission"] = admission
+    if jobs is not None:
+        policy["jobs"] = jobs
     path = tmp_path / "security.json"
     path.write_text(json.dumps(policy), encoding="utf-8")
     return path

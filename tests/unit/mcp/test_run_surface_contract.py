@@ -39,6 +39,7 @@ EXPECTED_TOOLS = {
 }
 EXPECTED_REMOTE_TOOLS = {
     "cancel_benchmark",
+    "get_benchmark_capacity",
     "get_benchmark_result",
     "get_benchmark_status",
     "start_benchmark",

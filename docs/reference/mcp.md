@@ -226,6 +226,7 @@ Authenticated remote mode additionally registers:
 | `get_benchmark_status` | durable execution | No | Read owned job state, attempts, cancellation, and timestamps. |
 | `get_benchmark_result` | durable execution | No | Read the owned result after atomic publication. |
 | `cancel_benchmark` | durable execution | Yes | Cancel queued work or request cancellation at the next safe worker boundary. |
+| `get_benchmark_capacity` | durable execution | No | Read queue depth, running capacity, owned usage, and quarantined jobs. |
 
 ### Run Surface Contract
 

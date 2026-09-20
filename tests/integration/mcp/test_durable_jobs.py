@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -292,5 +296,160 @@ def test_tenant_job_tools_are_remote_only_and_cross_tenant_fail_closed(tmp_path:
             for tool_name in ("get_benchmark_status", "cancel_benchmark", "get_benchmark_result"):
                 with pytest.raises(MCPError, match="not found"):
                     await client_b.call_tool(tool_name, {"execution_id": execution_id})
+
+    anyio.run(exercise)
+
+
+def test_no_overadmission_after_lease_loss_until_confirmed_termination(tmp_path: Path, monkeypatch) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2, max_running=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    workspaces = TenantWorkspaceProvider(tmp_path / "workspaces")
+    entered = threading.Event()
+    release = threading.Event()
+
+    def blocking_executor(job, staging: Path):
+        entered.set()
+        assert release.wait(timeout=10)
+        result = staging / "benchmark.json"
+        result.write_text(json.dumps({"execution_id": job.execution_id}), encoding="utf-8")
+        return {"mcp_metadata": {"execution_id": job.execution_id, "result_file": str(result)}}
+
+    first, _ = repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    worker = DurableJobWorker(repository, workspaces, executor=blocking_executor, worker_id="worker-a")
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        running = pool.submit(anyio.run, worker._run_job, claimed)
+        assert entered.wait(timeout=10)
+        # Impair the heartbeat at the repository seam so recovery can observe
+        # a stable expired lease, exactly as a fencing takeover refuses renewals.
+        monkeypatch.setattr(repository, "renew", lambda execution_id, worker_id: False)
+        cancelled = repository.cancel(first.execution_id, "tenant-a")
+        assert cancelled is not None and cancelled[1] == "requested"
+        anyio.run(anyio.sleep, 0.08)
+        with repository._connect() as connection:
+            connection.execute(
+                "UPDATE mcp_benchmark_jobs SET lease_expires_at = ? WHERE execution_id = ?",
+                (time.time() - 1.0, first.execution_id),
+            )
+        worker.recover_expired()
+        anyio.run(anyio.sleep, 0.06)
+        worker.recover_expired()
+        lost = repository.get(first.execution_id)
+        assert lost is not None and lost.state == "unknown"
+        assert lost.error_code == "cancellation_unconfirmed"
+        # The lost attempt still holds the only running slot: no over-admission.
+        assert repository.claim("worker-b") is None
+        release.set()
+        running.result(timeout=30)
+
+    # The fenced executor's return creates a distinct durable quiescence proof.
+    quiesced = repository.get(first.execution_id)
+    assert quiesced is not None and quiesced.quiesced_at is not None
+    assert repository.capacity_summary()["outstanding"] == 0
+
+    # Retention may purge only after that proof exists.
+    with repository._connect() as connection:
+        connection.execute(
+            "UPDATE mcp_benchmark_jobs SET completed_at = ? WHERE execution_id = ?",
+            ("2000-01-01T00:00:00+00:00", first.execution_id),
+        )
+    worker.purge_expired()
+    assert repository.get(first.execution_id) is None
+    rerun = DurableJobWorker(repository, workspaces, executor=_executor, worker_id="worker-b")
+    claimed = repository.claim("worker-b")
+    assert claimed is not None
+    anyio.run(rerun._run_job, claimed)
+    completed = repository.get(claimed.execution_id)
+    assert completed is not None and completed.state == "completed"
+
+
+def _spawn_claim(db_path: str, worker_id: str, outcome: multiprocessing.Queue) -> None:
+    """Claim from a fresh process; the target must stay import-safe for spawn."""
+    from benchbox.mcp.jobs import DurableJobRepository
+    from benchbox.mcp.security import JobLimits
+
+    repository = DurableJobRepository(Path(db_path), JobLimits(max_running=1))
+    outcome.put(repository.claim(worker_id) is not None)
+
+
+def test_multiprocess_claims_respect_global_running_limit(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1))
+    repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    context = multiprocessing.get_context("spawn")
+    outcomes: multiprocessing.Queue = context.Queue()
+    processes = [
+        context.Process(target=_spawn_claim, args=(str(tmp_path / "state.sqlite3"), worker, outcomes))
+        for worker in ("proc-a", "proc-b")
+    ]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=60)
+        assert process.exitcode == 0
+    assert sorted(outcomes.get(timeout=10) for _ in processes) == [False, True]
+
+
+def test_fairness_state_is_shared_across_worker_handles(tmp_path: Path) -> None:
+    first = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    second = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
+    first.submit("tenant-a", _request())
+    first.submit("tenant-a", _request())
+    second.submit("tenant-b", _request())
+    assert second.claim("worker-x") is not None
+    served = second.claim("worker-y")
+    assert served is not None and served.principal_id == "tenant-b"
+
+
+def test_benchmark_capacity_tool_is_tenant_scoped(tmp_path: Path) -> None:
+    token_a = "tenant-a-capacity-token"
+    token_b = "tenant-b-capacity-token"
+    config = write_security_config(
+        tmp_path,
+        tokens={
+            token_a: ("tenant-a", ("benchbox:read", "benchbox:execute")),
+            token_b: ("tenant-b", ("benchbox:read",)),
+        },
+        jobs={"poll_seconds": 30, "lease_seconds": 3600},
+    )
+    state_db = tmp_path / "security.sqlite3"
+    direct = DurableJobRepository(state_db, JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2))
+
+    async def exercise() -> None:
+        async with authenticated_http_client(config, token_a) as (client_a, _):
+            tools = {tool.name for tool in (await client_a.list_tools()).tools}
+            assert "get_benchmark_capacity" in tools
+            started = json.loads(
+                (
+                    await client_a.call_tool(
+                        "start_benchmark",
+                        {"platform": "duckdb", "benchmark": "tpch", "scale_factor": 0.01},
+                    )
+                )
+                .content[0]
+                .text
+            )
+            lost_execution_id = started["execution_id"]
+            assert direct.claim("lost-worker") is not None
+            fence = DurableJobWorker(direct, TenantWorkspaceProvider(tmp_path / "fence-workspaces"))
+            fence.recover_expired()
+            await anyio.sleep(0.06)
+            fence.recover_expired()
+            lost = direct.get(lost_execution_id)
+            assert lost is not None and lost.state == "unknown"
+            capacity = json.loads((await client_a.call_tool("get_benchmark_capacity", {})).content[0].text)
+            assert capacity["states"]["unknown"] == 1
+            assert capacity["outstanding"] == 1
+            assert capacity["owned"] == {"queued": 0, "outstanding": 1}
+            assert [entry["execution_id"] for entry in capacity["quarantined"]] == [lost_execution_id]
+            assert all("principal_id" not in entry for entry in capacity["quarantined"])
+        async with authenticated_http_client(config, token_b) as (client_b, _):
+            other = json.loads((await client_b.call_tool("get_benchmark_capacity", {})).content[0].text)
+            assert other["owned"] == {"queued": 0, "outstanding": 0}
+            assert other["quarantined"] == []
+            assert "per_principal" not in other
+            assert "tenant-a" not in json.dumps(other)
 
     anyio.run(exercise)

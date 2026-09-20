@@ -77,6 +77,9 @@ class JobLimits(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     queue_limit: int = Field(default=32, ge=1, le=100_000)
+    max_queued_per_principal: int = Field(default=8, ge=1, le=100_000)
+    max_running: int = Field(default=8, ge=1, le=10_000)
+    max_running_per_principal: int = Field(default=2, ge=1, le=10_000)
     lease_seconds: float = Field(default=60.0, gt=0.0, le=86_400.0)
     poll_seconds: float = Field(default=0.25, gt=0.0, le=30.0)
     max_attempts: int = Field(default=2, ge=1, le=10)
@@ -515,6 +518,7 @@ READ_ONLY_TOOLS = frozenset(
         "generate_chart",
         "get_benchmark_status",
         "get_benchmark_result",
+        "get_benchmark_capacity",
     }
 )
 READ_METHODS = frozenset(
