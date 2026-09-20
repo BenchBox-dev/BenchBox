@@ -255,6 +255,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
+        original_generation_seed = self.data_generator.generation_seed
         if seed is not None:
             self.data_generator.generation_seed = int(seed)
 
@@ -266,8 +267,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if invalid_tables:
             raise ValueError(f"Invalid table names: {invalid_tables}")
 
-        self.tables = self.data_generator.generate_data(tables)
-        return list(self.tables.values())
+        try:
+            self.tables = self.data_generator.generate_data(tables)
+            return list(self.tables.values())
+        finally:
+            # A request override must not change the benchmark instance's
+            # configured seed for a later generation request.
+            self.data_generator.generation_seed = original_generation_seed
 
     def get_query(
         self,

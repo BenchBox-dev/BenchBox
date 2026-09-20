@@ -164,5 +164,7 @@ class TestPublicRequestPlumbing:
 
         monkeypatch.setattr(benchmark.data_generator, "generate_data", _generate_stub)
         benchmark.generate_data(tables=["DimDate"], seed=11)
-        assert benchmark.data_generator.generation_seed == 11
+        # An explicit seed is request-scoped; a reused benchmark keeps its
+        # configured seed for the next request.
+        assert benchmark.data_generator.generation_seed == 9
         assert calls["tables"] == ["DimDate"]

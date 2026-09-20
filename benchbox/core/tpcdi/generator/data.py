@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import time as time_module
 from pathlib import Path
 from typing import Any
@@ -103,9 +104,10 @@ class TPCDIDataGenerator(
 
         # Explicit generation seed. The process-global random generator is
         # never seeded or otherwise mutated here: deterministic FactTrade
-        # rows derive dedicated per-record RNGs from this seed, and
-        # FinancialDataPatterns owns a private instance below.
+        # rows derive dedicated per-record RNGs from this seed, and all other
+        # table generators use the generator-owned RNG below.
         self.generation_seed = int(generation_seed)
+        self._rng = random.Random(self.generation_seed)
 
         # Initialize realistic financial data patterns
         self.financial_patterns = FinancialDataPatterns(seed=self.generation_seed)
@@ -237,6 +239,9 @@ class TPCDIDataGenerator(
         original_output_dir = self.output_dir
         self.output_dir = output_dir
         try:
+            # Reset per request so repeated generation with the same seed does
+            # not depend on prior table generation in this process.
+            self._rng = random.Random(self.generation_seed)
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
             if self.enable_progress:

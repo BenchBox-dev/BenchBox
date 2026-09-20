@@ -269,18 +269,18 @@ class FactGenerationMixin:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):
-                sk_customer_id = random.randint(1, num_customers)
-                sk_account_id = random.randint(1, num_accounts)
-                sk_date_id = random.randint(1, 5844)  # Date range
+                sk_customer_id = self._rng.randint(1, num_customers)
+                sk_account_id = self._rng.randint(1, num_accounts)
+                sk_date_id = self._rng.randint(1, 5844)  # Date range
 
                 # Generate realistic cash balance based on customer tier
                 customer_tier = self.financial_patterns.generate_customer_tier()
                 if customer_tier == 1:
-                    cash_balance = round(random.uniform(10000, 500000), 2)
+                    cash_balance = round(self._rng.uniform(10000, 500000), 2)
                 elif customer_tier == 2:
-                    cash_balance = round(random.uniform(1000, 50000), 2)
+                    cash_balance = round(self._rng.uniform(1000, 50000), 2)
                 else:
-                    cash_balance = round(random.uniform(100, 10000), 2)
+                    cash_balance = round(self._rng.uniform(100, 10000), 2)
 
                 batch_id = 1
 
@@ -312,12 +312,12 @@ class FactGenerationMixin:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):
-                sk_customer_id = random.randint(1, num_customers)
-                sk_account_id = random.randint(1, num_accounts)
-                sk_security_id = random.randint(1, num_securities)
-                sk_company_id = random.randint(1, num_companies)
-                sk_date_id = random.randint(1, 5844)
-                sk_time_id = random.randint(1, 288)
+                sk_customer_id = self._rng.randint(1, num_customers)
+                sk_account_id = self._rng.randint(1, num_accounts)
+                sk_security_id = self._rng.randint(1, num_securities)
+                sk_company_id = self._rng.randint(1, num_companies)
+                sk_date_id = self._rng.randint(1, 5844)
+                sk_time_id = self._rng.randint(1, 288)
 
                 # Generate realistic current price and holdings
                 current_price = round(self.financial_patterns.generate_security_price(), 2)
@@ -363,9 +363,9 @@ class FactGenerationMixin:
             security_prices = {}
 
             for _i in range(num_records):
-                sk_security_id = random.randint(1, num_securities)
-                sk_company_id = random.randint(1, num_companies)
-                sk_date_id = random.randint(1, 5844)
+                sk_security_id = self._rng.randint(1, num_securities)
+                sk_company_id = self._rng.randint(1, num_companies)
+                sk_date_id = self._rng.randint(1, 5844)
 
                 # Generate or evolve security price
                 if sk_security_id not in security_prices:
@@ -378,18 +378,18 @@ class FactGenerationMixin:
                     security_prices[sk_security_id] = base_price
 
                 close_price = round(base_price, 2)
-                day_high = round(base_price * random.uniform(1.0, 1.05), 2)
-                day_low = round(base_price * random.uniform(0.95, 1.0), 2)
+                day_high = round(base_price * self._rng.uniform(1.0, 1.05), 2)
+                day_low = round(base_price * self._rng.uniform(0.95, 1.0), 2)
 
                 # Generate other market metrics
-                pe_ratio = round(random.uniform(5, 50), 2) if random.random() > 0.1 else None
-                dividend_yield = round(random.uniform(0, 0.08), 4)
+                pe_ratio = round(self._rng.uniform(5, 50), 2) if self._rng.random() > 0.1 else None
+                dividend_yield = round(self._rng.uniform(0, 0.08), 4)
 
                 # 52-week high/low (simplified)
-                fifty_two_week_high = round(close_price * random.uniform(1.1, 2.0), 2)
-                fifty_two_week_low = round(close_price * random.uniform(0.5, 0.9), 2)
-                sk_52week_high_date = random.randint(1, 5844)
-                sk_52week_low_date = random.randint(1, 5844)
+                fifty_two_week_high = round(close_price * self._rng.uniform(1.1, 2.0), 2)
+                fifty_two_week_low = round(close_price * self._rng.uniform(0.5, 0.9), 2)
+                sk_52week_high_date = self._rng.randint(1, 5844)
+                sk_52week_low_date = self._rng.randint(1, 5844)
 
                 dividend_per_share = round(close_price * dividend_yield / 4, 4)  # Quarterly
                 volume = self.financial_patterns.generate_trading_volume()
@@ -431,12 +431,12 @@ class FactGenerationMixin:
             writer = csv.writer(f, delimiter="|")
 
             for _i in range(num_records):
-                sk_customer_id = random.randint(1, num_customers)
-                sk_security_id = random.randint(1, num_securities)
-                sk_date_placed = random.randint(1, 5844)
+                sk_customer_id = self._rng.randint(1, num_customers)
+                sk_security_id = self._rng.randint(1, num_securities)
+                sk_date_placed = self._rng.randint(1, 5844)
 
                 # Some watches are removed (30% chance)
-                sk_date_removed = random.randint(sk_date_placed, 5844) if random.random() < 0.3 else None
+                sk_date_removed = self._rng.randint(sk_date_placed, 5844) if self._rng.random() < 0.3 else None
 
                 batch_id = 1
 
