@@ -14554,10 +14554,15 @@
       "title": "Rewrite architecture.md around the new contract map"
     },
     "rewrite-cli-setup-tests-to-use-real-config-files-instead-of": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T04:39:42Z",
+        "generation": "970e7d9f0f1d4c29a1ae4d62ff17c838",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Rewrite CLI setup tests to use real config files instead of 54 patches"
     },
     "rewrite-explorer-transformer-to-use-typed-models-throughout": {
