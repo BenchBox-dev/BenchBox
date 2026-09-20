@@ -207,8 +207,15 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if scale_factor <= 0:
             raise ValueError(f"scale_factor must be positive, got {scale_factor}")
 
-        # Single shared validator - no silent rounding.
-        self.compliance_class = validate_tpch_scale(scale_factor, official=official)
+        # Single shared validator - no silent rounding. Genuine TPC-H runs only:
+        # derived benchmarks (TPC-Havoc, TPC-H Skew) inherit this __init__ but
+        # are variant/robustness studies outside TPC-H methodology, so they stay
+        # unclassified (None) instead of being stamped unofficial (which would
+        # exclude their results from default rankings).
+        if type(self) is TPCHBenchmark:
+            self.compliance_class = validate_tpch_scale(scale_factor, official=official)
+        else:
+            self.compliance_class = None
 
         # Validate parallel parameter
         if not isinstance(parallel, int):

@@ -80,7 +80,14 @@ class TPCHOfficialBenchmark:
             verbose: Enable verbose logging
             **kwargs: Additional benchmark configuration options
         """
-        self.benchmark = TPCHBenchmark(scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **kwargs)
+        # The wrapper's contract is official runs: default official=True for the
+        # inner benchmark (mirrors TPCDSOfficialBenchmark) so an SF=1
+        # official-wrapper run classifies as official, not UNOFFICIAL_NONSTANDARD.
+        benchmark_kwargs = dict(kwargs)
+        benchmark_kwargs.setdefault("official", True)
+        self.benchmark = TPCHBenchmark(
+            scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **benchmark_kwargs
+        )
 
         self.config = TPCHOfficialBenchmarkConfig(
             scale_factor=scale_factor,

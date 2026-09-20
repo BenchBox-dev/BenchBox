@@ -36,20 +36,12 @@ OFFICIAL_SCALE_POINTS: frozenset[float] = frozenset(
 
 
 def classify_tpch_run(scale_factor: float, *, official: bool = False) -> TpchComplianceClass:
-    """Return the compliance class for a TPC-H run at *scale_factor*.
+    """Compliance class for a TPC-H run; shared official-scale shape, TPC-H points/enum."""
+    from benchbox.core.tpc_patterns import classify_official_scale_run
 
-    Args:
-        scale_factor: The requested TPC-H scale factor (> 0).
-        official: True when the caller is running in ``--official`` mode.
-
-    Returns:
-        The appropriate :class:`TpchComplianceClass` value.
-    """
-    if scale_factor < 1.0:
-        return TpchComplianceClass.UNOFFICIAL_SUBSCALE
-    if official and scale_factor in OFFICIAL_SCALE_POINTS:
-        return TpchComplianceClass.OFFICIAL
-    return TpchComplianceClass.UNOFFICIAL_NONSTANDARD
+    return classify_official_scale_run(
+        scale_factor, official=official, scale_points=OFFICIAL_SCALE_POINTS, compliance_enum=TpchComplianceClass
+    )
 
 
 def validate_tpch_scale(
