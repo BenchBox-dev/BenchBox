@@ -25,10 +25,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import re
 from typing import Any
-
-from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
 
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -75,6 +72,8 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
     unavailable_catalog_marker = "does not exist on the Trino server"
     default_username = "trino"
     table_format_choices = ("memory", "hive", "iceberg", "delta")
+    # Hive and Iceberg connectors accept an explicit format declaration.
+    ddl_format_property_formats = ("hive", "iceberg")
     target_dialect = "trino"
     from_config_optional_fields = (*PrestoTrinoAdapterBase.from_config_optional_fields, "timezone", "encoding")
     extra_config_defaults = {"timezone": None, "encoding": None}
@@ -186,36 +185,6 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
 
         except Exception as e:
             raise RuntimeError(f"Failed to drop Trino schema {catalog}.{schema}: {e}") from e
-
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Trino.
-
-        Trino table creation syntax depends on the connector/catalog being used.
-        For memory catalog, minimal syntax is needed.
-        For Hive/Iceberg, we can add format specifications.
-        """
-        if not statement.upper().startswith("CREATE TABLE"):
-            return statement
-
-        # Trino CREATE TABLE syntax does not include PRIMARY KEY constraints.
-        # BenchBox workloads load immutable benchmark data, so the constraint is
-        # metadata only and can be stripped for all Trino catalogs.
-        statement = strip_primary_keys(statement)
-
-        # For memory catalog, remove any Trino-incompatible syntax
-        # Memory catalog doesn't support WITH properties for the most part
-
-        if self.table_format == "memory":
-            # Memory catalog: simple CREATE TABLE without WITH clause or NOT NULL
-            statement = strip_with_properties(statement)
-            statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
-
-        elif self.table_format in ("iceberg", "hive"):
-            # Add table format specification if not present
-            if "WITH" not in statement.upper():
-                statement += " WITH (format = 'PARQUET')"
-
-        return statement
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Trino-specific tuning clauses for CREATE TABLE statements.

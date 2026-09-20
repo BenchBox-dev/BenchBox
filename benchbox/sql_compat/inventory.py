@@ -141,6 +141,10 @@ _FILE_STEM_TO_PLATFORM_KEY: dict[str, str] = {
 # instead of the helper module's private file stem.
 _DDL_HELPER_PLATFORM_KEYS: dict[tuple[str, str], tuple[str, ...]] = {
     ("_spark_helpers.py", "optimize_spark_table_definition"): ("lakesail", "spark", "velox"),
+    # Shared Presto/Trino base-class hook: one _optimize_table_definition
+    # serves both governed platforms (each keeps its own registered
+    # DDL_OPTIMIZE transformer, resolved via the aliases below).
+    ("presto_trino_adapter_base.py", "_optimize_table_definition"): ("presto", "trino"),
 }
 _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
