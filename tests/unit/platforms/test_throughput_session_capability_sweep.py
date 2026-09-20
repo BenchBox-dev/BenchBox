@@ -3,8 +3,8 @@
 Every concrete adapter exposed to throughput (each platform manifest entry
 with SQL support and a runtime adapter registration) resolves through
 :func:`resolve_stream_connection_capability` to exactly one declared
-``StreamConnectionCapability`` through an adapter declaration or the reviewed
-exact-class compatibility registry. This test pins that resolution per manifest
+``StreamConnectionCapability`` through its canonical manifest declaration.
+This test pins that resolution per manifest
 key in ``throughput_session_capability_snapshot.json`` so a new adapter, a
 changed declaration, or a newly importable adapter fails in CI until its
 classification is an explicit, reviewed decision - the fail-closed gate for
@@ -66,16 +66,6 @@ def _sql_adapter_keys() -> list[str]:
     )
 
 
-def _declaration_site(adapter_cls: type) -> str | None:
-    for klass in adapter_cls.__mro__:
-        if klass is PlatformAdapter:
-            break
-        if "stream_connection_capability" in klass.__dict__:
-            return f"{klass.__module__}.{klass.__name__}"
-    _capability, declared = resolve_stream_connection_capability(adapter_cls)
-    return "reviewed-shared-cursor-registry" if declared else None
-
-
 def _resolve_entry(key: str) -> dict[str, object]:
     try:
         adapter_cls = PlatformRegistry.get_adapter_class(key)
@@ -90,7 +80,7 @@ def _resolve_entry(key: str) -> dict[str, object]:
         "status": "resolved",
         "capability": capability.value,
         "declared": declared,
-        "declaration_site": _declaration_site(adapter_cls),
+        "declaration_site": "benchbox.core.platform_manifest",
         "adapter": f"{adapter_cls.__module__}.{adapter_cls.__name__}",
     }
     if capability is StreamConnectionCapability.UNSUPPORTED:
@@ -179,4 +169,4 @@ class TestThroughputSessionCapabilitySweep:
                 continue
             adapter_cls = PlatformRegistry.get_adapter_class(record["key"])
             with pytest.raises(RuntimeError, match="UNSUPPORTED"):
-                require_throughput_stream_capability(adapter_cls(), platform_name=record["key"])
+                require_throughput_stream_capability(adapter_cls, platform_name=record["key"])

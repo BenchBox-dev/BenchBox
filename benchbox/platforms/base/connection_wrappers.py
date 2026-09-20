@@ -65,9 +65,8 @@ class StreamConnectionCapability(Enum):
     shared connection - regardless of whether the underlying engine actually
     models concurrency at the connection level.
 
-    Every concrete adapter exposed to throughput resolves through an adapter
-    declaration or the exact-class reviewed compatibility registry to exactly
-    one of these values: the manifest sweep test
+    Every concrete adapter exposed to throughput resolves through the platform
+    manifest to exactly one of these values: the manifest sweep test
     (``tests/unit/platforms/test_throughput_session_capability_sweep.py``)
     pins the resolved value per manifest key, so a new or reclassified adapter
     fails in CI until its declaration is an explicit, reviewed decision.
@@ -135,49 +134,6 @@ class StreamConnectionCapability(Enum):
     UNSUPPORTED = "unsupported"
 
 
-# These adapters retain the pre-contract shared-cursor behavior deliberately.
-# The allowlist is exact-class keyed so a newly added adapter or subclass is
-# unknown and fails closed until its session model is reviewed. Adapters with
-# class-level declarations are resolved before this compatibility registry.
-_REVIEWED_SHARED_CURSOR_ADAPTERS = frozenset(
-    {
-        "benchbox.platforms.athena.AthenaAdapter",
-        "benchbox.platforms.aws.athena_spark_adapter.AthenaSparkAdapter",
-        "benchbox.platforms.aws.emr_serverless_adapter.EMRServerlessAdapter",
-        "benchbox.platforms.aws.glue_adapter.AWSGlueAdapter",
-        "benchbox.platforms.azure.fabric_spark_adapter.FabricSparkAdapter",
-        "benchbox.platforms.azure.synapse_spark_adapter.SynapseSparkAdapter",
-        "benchbox.platforms.azure_synapse.AzureSynapseAdapter",
-        "benchbox.platforms.bigquery.BigQueryAdapter",
-        "benchbox.platforms.clickhouse.adapter.ClickHouseAdapter",
-        "benchbox.platforms.clickhouse_cloud.ClickHouseCloudAdapter",
-        "benchbox.platforms.clickhouse_local.ClickHouseLocalAdapter",
-        "benchbox.platforms.clickhouse_server.ClickHouseServerAdapter",
-        "benchbox.platforms.databend.adapter.DatabendAdapter",
-        "benchbox.platforms.databricks.adapter.DatabricksAdapter",
-        "benchbox.platforms.databricks.dataframe_adapter.DatabricksDataFrameAdapter",
-        "benchbox.platforms.datafusion.DataFusionAdapter",
-        "benchbox.platforms.fabric_lakehouse.FabricLakehouseAdapter",
-        "benchbox.platforms.fabric_warehouse.FabricWarehouseAdapter",
-        "benchbox.platforms.firebolt.FireboltAdapter",
-        "benchbox.platforms.gcp.dataproc_adapter.DataprocAdapter",
-        "benchbox.platforms.gcp.dataproc_serverless_adapter.DataprocServerlessAdapter",
-        "benchbox.platforms.influxdb.adapter.InfluxDBAdapter",
-        "benchbox.platforms.lakesail.LakeSailAdapter",
-        "benchbox.platforms.motherduck.MotherDuckAdapter",
-        "benchbox.platforms.onehouse.quanton_adapter.QuantonAdapter",
-        "benchbox.platforms.presto.PrestoAdapter",
-        "benchbox.platforms.redshift.RedshiftAdapter",
-        "benchbox.platforms.snowflake.SnowflakeAdapter",
-        "benchbox.platforms.snowpark_connect.SnowparkConnectAdapter",
-        "benchbox.platforms.starburst.StarburstAdapter",
-        "benchbox.platforms.starrocks.adapter.StarRocksAdapter",
-        "benchbox.platforms.trino.TrinoAdapter",
-        "benchbox.platforms.velox.VeloxAdapter",
-    }
-)
-
-
 _ISOLATION_REMEDIATION = {
     DriverIsolationCapability.NOT_APPLICABLE: (
         "This platform has no versioned driver package. Driver version isolation is not applicable."
@@ -220,23 +176,29 @@ def check_isolation_capability(
 def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnectionCapability, bool]:
     """Resolve an adapter's per-stream session capability and declaration site.
 
-    Walks the adapter's MRO for an explicit ``stream_connection_capability``
-    assignment. A value assigned anywhere below ``PlatformAdapter`` itself
-    (including deliberate inheritance from a proven intermediate ancestor,
-    e.g. a wire-compatible subclass reusing its parent's override) counts as
-    declared. Exact classes in the reviewed shared-cursor registry also count
-    as declared; falling through to the base default counts as undeclared.
+    Manifest-registered adapters resolve from their canonical manifest entry.
+    Non-manifest test or extension adapters may declare the capability on a
+    class below ``PlatformAdapter``; otherwise they remain undeclared.
 
     Args:
         adapter: Adapter instance or class to resolve.
 
     Returns:
-        ``(capability, declared)`` where ``declared`` is True only when a
-        subclass in the MRO explicitly assigned the value.
+        ``(capability, declared)`` where ``declared`` is true for a manifest
+        adapter or an explicit non-manifest class declaration.
     """
+    from benchbox.core.platform_manifest import PLATFORM_MANIFEST
     from benchbox.platforms.base.adapter import PlatformAdapter
 
     cls = adapter if isinstance(adapter, type) else type(adapter)
+    for entry in PLATFORM_MANIFEST:
+        spec = entry.adapter
+        if (
+            spec is not None
+            and spec.class_name == cls.__name__
+            and (cls.__module__ == spec.module or cls.__module__.startswith(f"{spec.module}."))
+        ):
+            return StreamConnectionCapability(spec.stream_connection_capability), True
     for klass in cls.__mro__:
         if klass is PlatformAdapter:
             break
@@ -249,9 +211,6 @@ def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnection
                     "INDEPENDENT_CONNECTION, or UNSUPPORTED."
                 )
             return value, True
-    qualified_name = f"{cls.__module__}.{cls.__name__}"
-    if qualified_name in _REVIEWED_SHARED_CURSOR_ADAPTERS:
-        return StreamConnectionCapability.SHARED_CURSOR, True
     return StreamConnectionCapability.SHARED_CURSOR, False
 
 
