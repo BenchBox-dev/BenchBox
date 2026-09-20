@@ -13246,10 +13246,15 @@
       "title": "Defer metadata_primitives >=3-platform admission"
     },
     "restore-corpus-coverage-after-20260823-trust-cut-def727": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T04:56:33Z",
+        "generation": "1635ca3fa9f5444da13bd1d245665c77",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Defer write_primitives >=3-platform admission"
     },
     "restore-legacy-drops-the-findings-domain": {
