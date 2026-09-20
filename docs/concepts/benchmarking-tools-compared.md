@@ -5,13 +5,19 @@
 ```{tags} concept, comparison, olap, oltp
 ```
 
-A comprehensive comparison of open-source database benchmarking tools, their strengths, trade-offs, and when to use each.
+A practical comparison of open-source database benchmarking tools, their
+trade-offs, and the workloads each one targets.
 
 ## Overview
 
-No single benchmarking tool covers all use cases. OLTP vs OLAP, Java vs Python, TPC-only vs custom workloads, each tool makes different trade-offs. Understanding these trade-offs matters because picking the wrong tool wastes time, produces irrelevant results, or locks you into a narrow platform subset.
+No single benchmarking tool covers every use case. The first choice is usually
+the workload: transaction processing, analytical queries, or an end-to-end
+data pipeline. Language, supported platforms, and benchmark selection come
+next.
 
-This page compares four major open-source tools: **HammerDB**, **BenchBase**, **LakeBench**, and **BenchBox**. All are actively maintained, all are free, and each dominates a specific niche.
+This page compares four open-source tools: **HammerDB**, **BenchBase**,
+**LakeBench**, and **BenchBox**. Check each project's current release and
+documentation before choosing one; support changes over time.
 
 ## The Four Contenders
 
@@ -53,8 +59,8 @@ This page compares four major open-source tools: **HammerDB**, **BenchBase**, **
 | ------------------- | ------------------------------------------------------------------ |
 | **Language**        | Python (100%), uv/pip-installable                                  |
 | **Focus**           | Broad OLAP analytics across platform spectrum                      |
-| **Platforms**       | 26+ (DuckDB, Snowflake, BigQuery, Databricks, Polars, etc.)        |
-| **Benchmarks**      | 18 (TPC-H, TPC-DS, TPC-DI, SSB, ClickBench, plus originals)        |
+| **Platforms**       | Registry-backed SQL and DataFrame adapters                          |
+| **Benchmarks**      | Registry-backed standards, academic, industry, and focused workloads |
 | **Unique strength** | Platform breadth, embedded data generation, DataFrame benchmarking |
 
 ## OLTP vs OLAP: The Fundamental Split
@@ -83,10 +89,10 @@ Running TPC-H on a tool optimized for TPC-C (or vice versa) produces misleading 
 | **Primary workload**   | OLTP                | OLTP                | OLAP + ELT             | OLAP                                      |
 | **Language**           | Tcl                 | Java                | Python                 | Python                                    |
 | **Install complexity** | Medium (binaries)   | Medium (Maven/Java) | Low (pip)              | Low (uv/pip)                              |
-| **Database breadth**   | 6 enterprise DBs    | 7 SQL DBs           | 5 Spark/DF engines     | 26+ platforms                             |
-| **Benchmark count**    | 2 (TPROC-C/H)       | 18+                 | 4                      | 18                                        |
+| **Database breadth**   | Enterprise databases | SQL databases       | Spark and DataFrame engines | Local, cloud, distributed SQL, and DataFrame adapters |
+| **Benchmark scope**    | TPROC-C and TPROC-H | Transaction and research workloads | ELT and analytical workloads | Standards, industry, real-world, and focused primitives |
 | **Cloud DW support**   | Limited (Redshift)  | Spanner only        | Fabric/Synapse         | Snowflake, BigQuery, Databricks, Redshift |
-| **DataFrame support**  | No                  | No                  | Partial (Polars, Daft) | Full (8 libraries)                        |
+| **DataFrame support**  | No                  | No                  | Selected engines       | Registry-backed native adapters           |
 | **TPC compliance**     | Derived (TPROC-*)   | Derived             | No                     | No                                        |
 | **Active development** | Yes (v5.0 Apr 2025) | Yes (CalVer 2023+)  | Yes                    | Yes                                       |
 | **License**            | GPL v3              | Apache 2.0          | MIT                    | MIT                                       |
@@ -127,18 +133,21 @@ Running TPC-H on a tool optimized for TPC-C (or vice versa) produces misleading 
 
 - Comparing **cloud data warehouses** (Snowflake vs BigQuery vs Databricks)
 - Benchmarking **embedded analytics** (DuckDB, DataFusion, SQLite)
-- **Benchmarking DataFrame libraries**, BenchBox is the only tool with full DataFrame support:
+- Benchmarking DataFrame libraries through native APIs:
   - Polars, Pandas, PySpark DataFrame, DataFusion, Dask, cuDF (GPU)
   - Native DataFrame API translations (not SQL-over-DataFrame)
   - Side-by-side SQL vs DataFrame comparisons on the same data
-- You need **benchmark variety** (22 benchmarks, TPC standards + industry + real-world + time-series + AI/ML)
+- You need benchmark variety across TPC standards, academic, industry,
+  real-world, time-series, primitive, and AI/ML workloads
 - Your team prefers **Python tooling**
 - Evaluating the **full OLAP platform spectrum** in one framework
 
 **Avoid when**: Running OLTP transactional benchmarks.
 
 ```{note}
-**DataFrame support is unique to BenchBox.** HammerDB and BenchBase are SQL-only. LakeBench has partial support (Polars, Daft) but is Spark-focused. If you need to benchmark Polars vs Pandas vs DuckDB, BenchBox is the only option.
+BenchBox can run native DataFrame workloads as well as SQL workloads. Check the
+current adapter metadata before assuming that a particular benchmark supports
+both paths.
 ```
 
 ## Combining Tools
@@ -174,9 +183,9 @@ benchbox compare -p duckdb -p postgresql --scale 10
 | ----------------------------- | ----------------------------------------------------------------------------- |
 | **Streaming benchmarks**      | Kafka, Flink, Spark Streaming, none of the four has mature support             |
 | **Graph databases**           | Neo4j, Neptune, BenchBase has theoretical extensibility but no implementations |
-| **Vector search**             | Emerging AI/ML workloads, all tools lag behind                                 |
+| **Vector search**             | Coverage varies and remains less mature than established SQL workloads          |
 | **Real-time mixed workloads** | HTAP (hybrid transactional/analytical) benchmarks are nascent                 |
-| **Cost modeling**             | Only BenchBox and LakeBench attempt cost estimation; both are incomplete      |
+| **Cost modeling**             | Capabilities vary; verify the evidence and pricing inputs for each tool        |
 
 ## Decision Tree
 
@@ -185,8 +194,8 @@ Is your primary workload OLTP (transactional)?
 ├── Yes → Is it academic research?
 │         ├── Yes → BenchBase
 │         └── No  → HammerDB
-└── No (OLAP/analytics) → Do you need DataFrame benchmarking?
-                          ├── Yes → BenchBox (only option with full DataFrame support)
+└── No (OLAP/analytics) → Do you need native DataFrame benchmarking?
+                          ├── Yes → Compare BenchBox and LakeBench against the required API
                           └── No  → Is it Spark lakehouse ELT?
                                     ├── Yes → LakeBench
                                     └── No  → BenchBox
@@ -194,17 +203,17 @@ Is your primary workload OLTP (transactional)?
 
 ## Key Takeaways
 
-1. **Workload type** is the primary discriminator, don't force an OLTP tool on OLAP work
-2. **DataFrame support** is unique to BenchBox in this comparison; if you need to benchmark Polars, Pandas, or other DataFrame libraries, BenchBox currently provides this capability
-3. **Platform coverage** matters, check if your target database is supported
-4. **Language preference** is secondary but affects integration and maintenance
-5. **Combining tools** is often the right answer for comprehensive evaluation
+1. Choose the tool that matches your workload type.
+2. Check whether it supports the platform and execution API you need.
+3. Treat language and packaging as operating constraints, not benchmark quality.
+4. Use more than one tool when your evaluation spans transaction processing,
+   analytical queries, and data pipelines.
 
 ## Get Started with BenchBox
 
 ```bash
-uv add benchbox
-benchbox run --platform duckdb --benchmark tpch --scale 0.1
+uv add benchbox --extra duckdb
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.1
 ```
 
 ## References

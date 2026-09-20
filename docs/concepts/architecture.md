@@ -44,6 +44,24 @@ BenchBox is built on three core principles:
 └────────────────────────────────────┘
 ```
 
+## Repository map
+
+The repository separates the installable product from its documentation,
+tests, examples, and project operations:
+
+| Path | Purpose |
+| --- | --- |
+| `benchbox/` | Python package, benchmark implementations, platform adapters, CLI, and result model |
+| `docs/` | User guides, concepts, reference material, design records, and contributor documentation |
+| `tests/` | Unit, integration, end-to-end, performance, and live test suites |
+| `examples/` | Runnable examples, notebooks, tuning files, and workflow patterns |
+| `results-explorer/` | Browser application for published benchmark results |
+| `results-data/` | Public result corpus and its validation metadata |
+| `_project/` | Repository operations, audits, and project tooling; not part of the public Python API |
+
+This map describes ownership boundaries rather than every directory. Use the
+linked component documentation below for implementation details.
+
 ## Core Components
 
 ### 1. Benchmark Layer

@@ -1,6 +1,6 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# BenchBox CLI - Quick Reference
+# BenchBox CLI quick reference
 
 ```{tags} beginner, cli, reference
 ```
@@ -121,6 +121,23 @@ uv run -- benchbox run \
 uv run -- benchbox results --limit 1
 ```
 
+BenchBox stores generated data and results under `benchmark_runs/` by default.
+Use `--output PATH` to choose another local or supported remote root. For a
+remote root, BenchBox adds the benchmark and scale suffix just as it does for a
+local directory:
+
+```bash
+uv run -- benchbox run \
+  --platform databricks \
+  --benchmark tpch \
+  --scale 0.01 \
+  --output dbfs:/Volumes/workspace/raw/source/
+# Data root: dbfs:/Volumes/workspace/raw/source/tpch_sf01
+```
+
+Supported remote schemes depend on the installed platform and storage extras.
+Preview a run with `--dry-run` before it writes data.
+
 ## Exporting Results
 
 Re-export existing benchmark results in different formats without re-running:
@@ -219,6 +236,24 @@ uv run -- benchbox setup --platform databricks
 # 5. Verify everything is ready
 uv run -- benchbox platforms check databricks
 ```
+
+### Platform-specific options
+
+Adapters expose special settings through repeatable
+`--platform-option KEY=VALUE` arguments. Inspect the platform guide before
+using them; credentials belong in the environment or the setup workflow, not
+in committed command files.
+
+```bash
+uv run -- benchbox run \
+  --platform clickhouse \
+  --benchmark tpch \
+  --platform-option mode=local \
+  --platform-option secure=true
+```
+
+See [platform-specific configuration](../reference/cli/configuration.md#platform-specific-options)
+for the supported keys.
 
 ## Interactive SQL Shell
 

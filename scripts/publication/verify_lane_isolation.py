@@ -119,6 +119,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # Repository guidance and release notes are linked from the site but are
     # not read while assembling any publication artifact.
     "README.md",
+    "DISCLAIMER.md",
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "examples/",

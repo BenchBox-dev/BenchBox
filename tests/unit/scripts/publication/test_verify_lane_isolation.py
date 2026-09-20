@@ -47,6 +47,7 @@ def test_classify_path_identifies_correct_lanes() -> None:
 
     # Unclassified / root paths
     assert classify_path("README.md") == set()
+    assert classify_path("DISCLAIMER.md") == set()
     assert classify_path("pyproject.toml") == set()
     assert classify_path("") == set()
 
@@ -169,6 +170,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "scripts/pr_refresh_certification.py",
         "scripts/queue_certification.py",
         "README.md",
+        "DISCLAIMER.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
         "examples/features/README.md",
@@ -214,6 +216,7 @@ def test_determine_affected_lanes() -> None:
     assert determine_affected_lanes(["pyproject.toml"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["uv.lock"]) == {"site", "explorer", "corpus"}
     assert determine_affected_lanes(["CONTRIBUTING.md"]) == set()
+    assert determine_affected_lanes(["DISCLAIMER.md"]) == set()
 
     # Non-lane inputs affect no lanes
     assert (

@@ -1,5 +1,11 @@
 # BenchBox Cloud Platform Notebooks
 
+This page is the canonical notebook catalog. It is reached from the root
+README's examples guide, which avoids maintaining a second platform list.
+
+Start with a local notebook if you are new to BenchBox. Cloud notebooks need
+the matching package extra, credentials, and access to a running service.
+
 This directory contains **production-ready** Jupyter notebooks that demonstrate comprehensive benchmarking of major cloud data platforms using BenchBox. Each notebook is fully documented with 25-38 cells covering installation, authentication, benchmarking, platform-specific features, performance analysis, and troubleshooting.
 
 ## Available Platforms
@@ -325,7 +331,7 @@ Each notebook includes:
 - **Working examples** you can copy and modify
 
 ### General Help
-- **BenchBox Documentation**: https://github.com/joeharris76/benchbox
+- **BenchBox Documentation**: https://github.com/BenchBox-dev/benchbox
 - **Platform Documentation**:
   - [Databricks Docs](https://docs.databricks.com/)
   - [BigQuery Docs](https://cloud.google.com/bigquery/docs)
