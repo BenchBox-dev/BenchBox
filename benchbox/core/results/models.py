@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from benchbox.core.results.environment import (
     NormalizedExecutionEnvironment,
@@ -317,6 +317,13 @@ class ThroughputStream:
     error_message: str | None = None
 
 
+class ThroughputOutstandingWork(TypedDict):
+    """Phase-level evidence about throughput workers after phase completion."""
+
+    stream_ids: list[int]
+    cleanup_state: str
+
+
 @dataclass
 class ThroughputTestPhase:
     start_time: str
@@ -328,6 +335,7 @@ class ThroughputTestPhase:
     throughput_at_size: float | None
     success: bool = True
     errors: list[str] = field(default_factory=list)
+    outstanding_work: ThroughputOutstandingWork | None = None
 
 
 @dataclass

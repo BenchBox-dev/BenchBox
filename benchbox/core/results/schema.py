@@ -1033,6 +1033,11 @@ def _throughput_phase_payload(throughput: Any) -> dict[str, Any]:
     }
     if throughput.errors:
         payload["errors"] = list(throughput.errors)
+    if throughput.outstanding_work is not None:
+        payload["outstanding_work"] = {
+            "stream_ids": list(throughput.outstanding_work["stream_ids"]),
+            "cleanup_state": throughput.outstanding_work["cleanup_state"],
+        }
     return payload
 
 

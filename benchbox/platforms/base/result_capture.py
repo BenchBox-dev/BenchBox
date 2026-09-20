@@ -1663,6 +1663,19 @@ class ResultCaptureMixin:
         duration_ms = int(float(getattr(throughput_result, "total_time", 0.0)) * 1000)
         end_time_iso = throughput_result.end_time or datetime.now().isoformat()
         phase_success = throughput_result_succeeded(throughput_result)
+        raw_outstanding_stream_ids = getattr(throughput_result, "outstanding_stream_ids", None)
+        outstanding_stream_ids = (
+            list(raw_outstanding_stream_ids) if isinstance(raw_outstanding_stream_ids, (list, tuple)) else []
+        )
+        cleanup_state = getattr(throughput_result, "cleanup_state", "complete")
+        if not isinstance(cleanup_state, str):
+            cleanup_state = "complete"
+        outstanding_work = None
+        if outstanding_stream_ids or cleanup_state != "complete":
+            outstanding_work = {
+                "stream_ids": outstanding_stream_ids,
+                "cleanup_state": cleanup_state,
+            }
 
         return ThroughputTestPhase(
             start_time=throughput_result.start_time,
@@ -1674,6 +1687,7 @@ class ResultCaptureMixin:
             throughput_at_size=(getattr(throughput_result, "throughput_at_size", None) if phase_success else None),
             success=phase_success,
             errors=list(getattr(throughput_result, "errors", []) or []),
+            outstanding_work=outstanding_work,
         )
 
     @staticmethod
