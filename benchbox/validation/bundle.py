@@ -157,6 +157,7 @@ KNOWN_PLATFORMS = {
     # Core
     "duckdb",
     "datafusion",
+    "ducklake",
     "polars",
     "sqlite",
     "motherduck",
