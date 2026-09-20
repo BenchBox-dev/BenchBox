@@ -1576,7 +1576,7 @@ class TestBigQuerySqlGenerationHelpers:
 
         converted = adapter._convert_to_bigquery_table("CREATE TABLE orders (id INT64)")
 
-        assert converted.startswith("CREATE OR REPLACE TABLE `test-project.test_dataset.orders` (id INT64)")
+        assert converted.startswith("CREATE OR REPLACE TABLE `test-project.test_dataset.ORDERS` (id INT64)")
         assert "PARTITION BY DATE(order_date)" in converted
         assert "CLUSTER BY customer_id, order_id" in converted
 
@@ -1960,14 +1960,14 @@ class TestConvertToBigqueryTable:
         """Table name in backticks is correctly parsed and qualified without double backticks."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE `orders` (id INT64)")
-        assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.orders` (id INT64)"
+        assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.ORDERS` (id INT64)"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_already_qualified_table_name(self, mock_bigquery):
         """Table name already containing dataset qualification is not double-qualified."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE `my_ds.orders` (id INT64)")
-        assert result == "CREATE OR REPLACE TABLE `my_ds.orders` (id INT64)"
+        assert result == "CREATE OR REPLACE TABLE `my_ds.ORDERS` (id INT64)"
 
 
 @pytest.mark.usefixtures("dependencies_available")
@@ -2030,6 +2030,13 @@ class TestNormalizeTableNamesCase:
         assert "`TABLE123`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_normalizes_mixed_case_tpcdi_identifiers(self, mock_bigquery):
+        """Mixed-case TPC-DI names resolve to the UPPERCASE schema tables."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._normalize_table_names_case("SELECT * FROM `DimCustomer` WHERE `BatchID` = 1")
+        assert result == "SELECT * FROM `DIMCUSTOMER` WHERE `BATCHID` = 1"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_change_for_already_uppercase(self, mock_bigquery):
         """Already-uppercase identifiers remain unchanged."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -2038,6 +2045,55 @@ class TestNormalizeTableNamesCase:
         assert "`CUSTOMER`" in result
         # uppercase identifiers don't match the lowercase-only regex
         assert result == query
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestApplyTpcdiBigqueryRewrites:
+    """Test _apply_tpcdi_bigquery_rewrites dialect normalization."""
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_flag_literals_become_boolean(self, mock_bigquery):
+        """BIT flag comparisons use TRUE/FALSE; integer columns untouched."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM DimCustomer WHERE IsCurrent = 1 AND BatchID = 1")
+        assert "IsCurrent = TRUE" in result
+        assert "BatchID = 1" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_quoted_flag_literals_become_boolean(self, mock_bigquery):
+        """Backtick-quoted flags (post-sqlglot) rewrite with quotes intact."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM `DIMCUSTOMER` WHERE `ISCURRENT` = 1")
+        assert result == "SELECT * FROM `DIMCUSTOMER` WHERE `ISCURRENT` = TRUE"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_julianday_and_now_rewritten(self, mock_bigquery):
+        """SQLite date idioms map to BigQuery equivalents."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._apply_tpcdi_bigquery_rewrites("SELECT JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))")
+        assert "JULIANDAY" not in result
+        assert "DATE('now')" not in result
+        assert "UNIX_DATE" in result
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestSafeguardDivisionByZero:
+    """Test _safeguard_division_by_zero SAFE_DIVIDE normalization."""
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_division_routed_through_safe_divide(self, mock_bigquery):
+        """A zero divisor returns NULL instead of raising on BigQuery."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._safeguard_division_by_zero("SELECT a / b FROM `T`")
+        assert "SAFE_DIVIDE" in result
+        assert " / " not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_query_without_division_unchanged(self, mock_bigquery):
+        """Division-free queries pass through byte-identical."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "SELECT a FROM `T` WHERE b = 1"
+        assert adapter._safeguard_division_by_zero(query) == query
 
 
 @pytest.mark.usefixtures("dependencies_available")

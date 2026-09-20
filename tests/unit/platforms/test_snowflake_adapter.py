@@ -1086,6 +1086,28 @@ benchbox-fixture-key-material
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_execute_query_accepts_stream_cursor(self, mock_snowflake):
+        """TPC power harness passes a per-stream cursor without cursor()."""
+        mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        with patch.object(adapter, "_get_query_statistics") as mock_stats:
+            mock_stats.return_value = {}
+            result = adapter.execute_query(mock_cursor, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        mock_cursor.execute.assert_any_call("SELECT 1")
+        mock_cursor.close.assert_not_called()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_failure(self, mock_snowflake):
         """Test query execution failure."""
         mock_connection = Mock()
@@ -1703,7 +1725,11 @@ class TestSnowflakeValidateDataIntegrity:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # Each fetchone succeeds (table accessible)
+        # SHOW TABLES reports uppercase names; each fetchone succeeds
+        mock_cursor.fetchall.return_value = [
+            ("2024-01-01", "LINEITEM", "DB", "PUBLIC"),
+            ("2024-01-01", "ORDERS", "DB", "PUBLIC"),
+        ]
         mock_cursor.fetchone.return_value = (1,)
 
         status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"LINEITEM": 1000, "ORDERS": 500})
@@ -1713,10 +1739,28 @@ class TestSnowflakeValidateDataIntegrity:
         assert "ORDERS" in details["accessible_tables"]
         assert details["constraints_enabled"] is True
 
-        # Verify the SQL used
+        # Verify the SQL used (quoted stored names first)
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
-        assert "SELECT 1 FROM LINEITEM LIMIT 1" in execute_calls
-        assert "SELECT 1 FROM ORDERS LIMIT 1" in execute_calls
+        assert 'SELECT 1 FROM "lineitem" LIMIT 1' in execute_calls
+        assert 'SELECT 1 FROM "orders" LIMIT 1' in execute_calls
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_quoted_lowercase_tables_accessible(self, mock_snowflake):
+        """Quoted lowercase TPC-DS tables probe by stored name, not folded uppercase."""
+        adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("2024-01-01", "call_center", "DB", "PUBLIC")]
+        mock_cursor.fetchone.return_value = (1,)
+
+        status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"CALL_CENTER": 100})
+
+        assert status == "PASSED"
+        assert "CALL_CENTER" in details["accessible_tables"]
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert 'SELECT 1 FROM "call_center" LIMIT 1' in execute_calls
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_failed_when_table_inaccessible(self, mock_snowflake):
@@ -1726,8 +1770,9 @@ class TestSnowflakeValidateDataIntegrity:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # First table succeeds, second fails
-        mock_cursor.execute.side_effect = [None, Exception("Table not found")]
+        mock_cursor.fetchall.return_value = []
+        # Every probe fails
+        mock_cursor.execute.side_effect = Exception("Table not found")
         mock_cursor.fetchone.return_value = (1,)
 
         status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"LINEITEM": 1000, "ORDERS": 500})
