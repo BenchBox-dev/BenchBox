@@ -13,7 +13,7 @@ BenchBox has several concurrent execution paths with narrower, disagreeing statu
 | `benchbox/core/throughput/runner.py` (`StreamRunner`) | `streams_executed` / `streams_successful` / `errors`; timeout via `as_completed(pending, timeout=...)`; opt-in cooperative cancel (`cancel_on_timeout`, `_stream_cancel_events`); `shutdown(wait=False, cancel_futures=True)` | Timeout returns bounded but leaked worker threads keep running; timeout text does not expose owned resources or cleanup state for phase boundaries |
 | `benchbox/core/tpcdi/benchmark.py` enhanced pipeline + `etl/parallel_batch_processor.py` | Scheduler stats `success` / `tasks_completed` / `tasks_failed`; wrapper `_run_parallel_batch_processing` sets `success = tasks_failed == 0`; `run_enhanced_etl_pipeline` reports overall `success = core_success` with advanced phases optional | Scheduler-level failure collapses into apparent success; explicitly requested phases treated as optional |
 | `benchbox/core/expected_results/registry.py` + `tpcds_results.py` | Single-flight via `_loading` dict + `threading.Event` (waiter waits up to 30 s); module-global validation-mode overrides (`_query_validation_mode_override`, `_config_validation_mode_override`, env var); cache key is benchmark + scale factor | Publication/signal ordering and policy-independent caching are not contractually pinned; a run's policy can leak into cached answers |
-| `benchbox/utils/execution_manager.py` | `PowerRunExecutor`, `ConcurrentQueryExecutor` beside canonical `StreamRunner` and benchmark power harnesses; `success` bool + `errors` list shapes; timeout via `run_with_timeout` | Public semantic overlap: unclear which utility is canonical for throughput vs power |
+| `benchbox/utils/execution_manager.py` | `PowerRunExecutor`, `ConcurrentQueryExecutor` beside canonical `StreamRunner` and benchmark power harnesses; `success` bool + `errors` list shapes; timeout via `run_with_timeout` | The two utilities are quarantined, publicly re-exported compatibility classes; `StreamRunner` is the canonical production concurrent-stream executor |
 | `benchbox/mcp/jobs.py` (`DurableJobRepository`) | Row states `queued` / `running` / `publishing` / `completed` / `failed` / `cancelled`; `lease_owner` / `lease_expires_at` / `lease_version` / `lease_generation`; `claim` / `renew` / `begin_publication` / `complete` / `fail_attempt` / `cancel` / `claim_expired` | Lease expiry can requeue while the old attempt still executes database work, duplicating effects |
 | Result serializers (`benchbox/core/results/metrics.py`, throughput `compute_metrics`) | `Throughput@Size`, `Power@Size`, `Qph` derived from completed streams | Partial/timeout results must never export a numeric sentinel as a valid measurement |
 
@@ -34,11 +34,12 @@ state machines are extended by the owning follow-up items.
 | `outstanding_work` | No | Previously timed-out/cancelled/lease-lost work may still be executing and owning resources | No |
 | `publishing` | No | A result artifact is being durably committed (`begin_publication` point in MCP; serializer write elsewhere) | No |
 | `unknown` | No | Ownership or termination cannot currently be proven (e.g., worker crash, lease loss without confirmation) | No |
+| `incomplete` | Yes | An explicitly requested phase had no executable or fully observed work, so the requested operation did not complete | No |
 | `cancelled` (durable jobs only) | Yes | Cancellation took effect before the publication commit point | No |
 
 Adapters: in-process runners map their local booleans onto this vocabulary at the publication
 boundary (`StreamRunner` timeouts surface as `timed_out` + `outstanding_work` while workers live;
-TPC-DI phases surface `failed`/`incomplete`; MCP rows keep their stored states but must expose the
+TPC-DI phases surface `failed` or `incomplete` as defined above; MCP rows keep their stored states but must expose the
 shared outcome alongside row state wherever a second worker may act).
 
 ### 2. Ownership: one owner per transition
@@ -47,8 +48,8 @@ shared outcome alongside row state wherever a second worker may act).
 |---|---|---|---|
 | `StreamRunner.execute` → spec harnesses (`tpch`/`tpcds` `throughput_test`, `official_benchmark`) | Calling run, via cooperative cancel events where enabled | Stream owner until observed termination; combined runner must not close/reuse shared connections meanwhile | `compute_metrics` + spec `run()`; only `completed` may set a nonzero score |
 | TPC-DI scheduler (`ParallelBatchProcessor`) → `_run_parallel_batch_processing` → `run_enhanced_etl_pipeline` → serialized pipeline result | Pipeline run; must propagate scheduler `success=false` and reject synthetic/non-executable work before mutation | Pipeline run; no downstream mutation after rejection | Pipeline run; overall success requires every explicitly requested phase |
-| Expected-results provider → `ExpectedResultsRegistry` single-flight → waiting runs | N/A (loading is not cancellable work) | Registry lock holder; waiter never interprets in-progress load as absence | Loader, while holding the synchronization boundary, before signaling waiters |
-| `execution_manager` utilities → callers | Each utility's documented timeout path; no utility implies termination of another's work | Utility that submitted the work | Utility that owns the result shape; compatibility adapters (follow-up item) preserve or version behavior |
+| Expected-results provider → `ExpectedResultsRegistry` single-flight → waiting runs | N/A (loading is not cancellable work) | Registry lock holder; waiter never interprets in-progress load as absence | Loader, while holding the synchronization boundary, before signaling waiters; cached entries must be policy-neutral or include validation policy in their identity |
+| `execution_manager` utilities → callers | Each utility's documented timeout path; no utility implies termination of another's work | Utility that submitted the work | `StreamRunner` is canonical for production concurrent streams. `PowerRunExecutor` and `ConcurrentQueryExecutor` remain quarantined compatibility classes; future removal or behavior change must preserve or version their public surface |
 | MCP worker attempt → `DurableJobRepository` row → replacement worker / operator | Owning worker while its lease is valid; cross-process cancel must reach the owner (native adapter interruption where supported) | Owning attempt until termination is proven or ownership transfers under the fenced retry contract | Only the current fenced owner, before/after the `begin_publication` commit point per the fencing rules |
 
 ### 3. Bounded response is not termination
