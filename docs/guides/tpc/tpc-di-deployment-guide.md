@@ -278,15 +278,9 @@ database:
   pool_size: 10
   timeout: 30
 
-parallel_processing:
-  # These are the only parallel knobs TPCDIConfig consumes. Parallel TPC-DI
-  # ETL runs on the canonical run_etl_pipeline path when enable_parallel is
-  # true; max_workers sizes its transform thread pool. There is no separate
-  # parallel scheduler, phase-gated parallel flags, workload-type selector,
-  # or adaptive mode (see adr-tpcdi-enhanced-parallel-support-decision).
-  enabled: true
-  max_workers: 4
-  chunk_size: 50000
+enable_parallel: true
+max_workers: 4
+chunk_size: 50000
 
   # Query execution parallelization
   enable_parallel_queries: true

@@ -390,6 +390,7 @@ class TestTPCDIFullBenchmarkIntegration:
         memory_measurements["after_data_gen"] = process.memory_info().rss / 1024 / 1024
 
         # ETL pipeline
+        benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite")
         memory_measurements["after_etl"] = process.memory_info().rss / 1024 / 1024
 
         # Calculate growth metrics
