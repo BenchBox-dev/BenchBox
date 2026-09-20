@@ -705,7 +705,9 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
     monkeypatch.setattr(
         metrics,
         "_is_ancestor",
-        lambda commit, head="HEAD": True if commit in synthetic_heads else real_is_ancestor(commit, head),
+        lambda commit, ref="HEAD": (
+            True if commit in synthetic_heads or commit == head else real_is_ancestor(commit, ref)
+        ),
     )
     base_freeze = process.get("base_commit_at_freeze")
     real_commit_parent = metrics._commit_parent
@@ -1075,15 +1077,60 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
     assert errors == []
 
 
+def test_acceptance_binding_rejects_branch_local_durable_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A durable acceptance record cannot establish its own publication ancestry."""
+    import json as _json5
+
+    DURABLE = "a" * 40
+    FREEZE = "b" * 40
+    BASE_REF = "c" * 40
+    frozen_bytes = b'{"frozen": true}'
+    pinned_bytes = _json5.dumps({"registration": {"commit": DURABLE, "original_commit": FREEZE}}).encode()
+
+    monkeypatch.setattr(
+        metrics,
+        "_git_show_bytes",
+        lambda revision, path: pinned_bytes if path == "acceptance.json" else frozen_bytes,
+    )
+    monkeypatch.setattr(metrics, "_sha256_bytes", lambda raw: "digest")
+    monkeypatch.setattr(metrics, "_commit_parent", lambda commit: BASE_REF if commit == FREEZE else None)
+    monkeypatch.setattr(metrics, "_has_second_parent", lambda commit: False)
+    monkeypatch.setattr(metrics, "_commit_diff_names", lambda base, commit: ["baseline.json"])
+    monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
+    monkeypatch.setattr(
+        metrics,
+        "_is_ancestor",
+        lambda commit, head="HEAD": head == "HEAD" and commit == DURABLE,
+    )
+
+    acceptance = _acceptance_doc()
+    acceptance["process_binding"] = {"criteria_version": "1.0.0", "process_digest": "digest"}
+    acceptance["registration"] = {"commit": DURABLE, "original_commit": FREEZE}
+    process = _process_doc()
+    process["base_commit_at_freeze"] = BASE_REF
+
+    errors = metrics._check_acceptance_binding(
+        acceptance, process, "digest", "baseline.json", "acceptance.json", "origin/develop"
+    )
+    assert any("published ref origin/develop" in error for error in errors)
+
+    acceptance["registration"]["original_commit"] = DURABLE
+    errors = metrics._check_acceptance_binding(
+        acceptance, process, "digest", "baseline.json", "acceptance.json", "origin/develop"
+    )
+    assert any("published ref origin/develop" in error for error in errors)
+
+
 def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """The CLI entry forwards the selected acceptance path to the history-anchor read."""
     seen: dict = {}
     real_binding = metrics._check_acceptance_binding
 
-    def binding_spy(acceptance, process, digest, process_relpath, acceptance_relpath):
+    def binding_spy(acceptance, process, digest, process_relpath, acceptance_relpath, published_ref):
         seen["acceptance_relpath"] = acceptance_relpath
         seen["process_relpath"] = process_relpath
-        return real_binding(acceptance, process, digest, process_relpath, acceptance_relpath)
+        seen["published_ref"] = published_ref
+        return real_binding(acceptance, process, digest, process_relpath, acceptance_relpath, published_ref)
 
     monkeypatch.setattr(metrics, "_check_acceptance_binding", binding_spy)
     metrics.validate_process_acceptance(
@@ -1095,6 +1142,7 @@ def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.Mo
     )
     assert seen["acceptance_relpath"] == "custom/accept.json"
     assert seen["process_relpath"] == "custom/base.json"
+    assert seen["published_ref"] == "origin/develop"
 
     captured: dict = {}
 
