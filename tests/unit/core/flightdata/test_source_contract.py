@@ -64,3 +64,32 @@ def test_download_stats_record_the_source_window(tmp_path):
     stats = downloader.get_download_stats()
     assert stats["source"] == "bts-transtats"
     assert stats["months"] == [(2024, 12)]
+
+
+def test_contract_id_stable_and_pin_sensitive(tmp_path):
+    first = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+    second = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+    assert first.source_contract_id() == second.source_contract_id()
+    other = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path)
+    assert first.source_contract_id() != other.source_contract_id()
+
+
+def test_missing_manifest_has_no_persisted_contract(tmp_path):
+    downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+    assert downloader._persisted_source_contract_id() is None
+
+
+def test_manifest_persists_contract_and_hashes(tmp_path):
+    from benchbox.utils.datagen_manifest import MANIFEST_FILENAME, load_manifest
+
+    downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
+    flights = tmp_path / "flights.csv"
+    flights.write_text("x", encoding="utf-8")
+    downloader._table_file_row_counts = {flights: 0}
+    downloader._content_hashes = {"https://example/x.zip": "abc123"}
+    downloader._write_manifest({"flights": flights})
+    manifest = load_manifest(tmp_path / MANIFEST_FILENAME)
+    assert manifest["source_contract_id"] == downloader.source_contract_id()
+    assert manifest["source_contract"]["source"] == "bts-transtats"
+    assert manifest["content_hashes"] == {"https://example/x.zip": "abc123"}
+    assert downloader._persisted_source_contract_id() == downloader.source_contract_id()

@@ -27,6 +27,7 @@ from __future__ import annotations
 import calendar
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -194,6 +195,9 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         }
         self._table_row_counts: dict[str, int] = {}
         self._table_file_row_counts: dict[Path, int] = {}
+        # Observed SHA-256 of each ingested BTS zip, persisted with the
+        # manifest so the recorded corpus pins which bytes were ingested.
+        self._content_hashes: dict[str, str] = {}
 
     def download(self) -> dict[str, Path | list[Path]]:
         """Download or generate flight data and reference tables.
@@ -202,6 +206,21 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             Dictionary mapping table names to local CSV file paths
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Reject a stale cache when the source pin changed: without this, an
+        # upgraded installation silently reuses the previous corpus because
+        # the output file names are unchanged. Legacy manifests without a
+        # recorded contract keep the old reuse behavior.
+        if not self.force_redownload:
+            persisted_id = self._persisted_source_contract_id()
+            if persisted_id is not None and persisted_id != self.source_contract_id():
+                logger.warning(
+                    "Existing flightdata corpus was generated under a different source contract "
+                    "(%s...); regenerating for the current pin (%s...).",
+                    persisted_id[:12],
+                    self.source_contract_id()[:12],
+                )
+                self.force_redownload = True
 
         flights_path = self.output_dir / self.get_compressed_filename("flights.csv")
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
@@ -661,6 +680,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             parallel=1,
             seed=self.seed,
             formats=["csv"],
+            extra_metadata={
+                "source_contract": self.source_contract(),
+                "source_contract_id": self.source_contract_id(),
+                # Observed SHA-256 of each ingested BTS zip: pins which bytes
+                # the corpus came from (a provider-side byte change surfaces
+                # as a new manifest on the next fresh generation).
+                "content_hashes": dict(self._content_hashes),
+            },
         )
         metadata = {
             "csv_delimiter": ",",
@@ -730,6 +757,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         )
         with urllib.request.urlopen(req, timeout=120) as response:
             zip_bytes = response.read()
+        self._content_hashes[url] = hashlib.sha256(zip_bytes).hexdigest()
 
         rows_written = 0
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -1044,6 +1072,25 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "months": list(self._months),
             "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
         }
+
+    def source_contract_id(self) -> str:
+        """Stable identifier for :meth:`source_contract`.
+
+        Persisted in the generation manifest so a later pin change rejects
+        the stale cache instead of silently reusing the previous corpus.
+        """
+        canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _persisted_source_contract_id(self) -> str | None:
+        """Return the contract id recorded in the existing manifest, if any."""
+        manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, ValueError):
+            return None
+        contract_id = manifest.get("source_contract_id")
+        return contract_id if isinstance(contract_id, str) else None
 
     def get_download_stats(self) -> dict[str, Any]:
         """Return statistics about the download operation."""
