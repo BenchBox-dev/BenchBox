@@ -195,14 +195,23 @@ to `start_benchmark`. Local stdio clients retain the complete synchronous
 
 Jobs are persisted in `state_db` and owned by the stable authenticated
 principal, never by an MCP session. Every worker uses transactional claims and
-renewable leases. An expired running lease is requeued within `max_attempts`;
-an expired publishing lease is completed only when the final response artifact
-already exists, otherwise it follows the retry policy. A repeated
-`idempotency_key` returns the original job only when its request is identical.
+renewable leases. A lease is retried only when the old attempt is proven
+quiescent: the owner reported its own failure after that attempt finished,
+cancellation was requested, or the publication commit point already holds
+the final response artifact (an expired publishing lease then completes
+against that artifact). An exhausted attempt budget proves nothing about
+termination, so it never justifies a retry on its own. Otherwise the old
+attempt may still be executing database work, so recovery records the terminal
+`unknown` outcome instead of requeueing: the job is never claimed again, and
+the operator must inspect the target before resubmitting with a new
+idempotency key. A repeated `idempotency_key` returns the original job only
+when its request is identical.
 
-Cancellation is immediate while queued and cooperative while running. Once a
-worker enters the publishing transition, publication is the commit point and
-cancellation is too late. The worker writes the response and result bundle to a
+Cancellation reports `accepted` while queued, `requested` while running (the
+attempt stops at the next safe boundary), and `too_late` once publication has
+committed or the job is otherwise terminal. Once a worker enters the
+publishing transition, publication is the commit point and cancellation is too
+late. The worker writes the response and result bundle to a
 tenant-owned staging directory, flushes it, atomically renames it to the final
 job directory, and only then records `completed`. This prevents a completed
 status from preceding its durable artifact. Terminal metadata and its owned
