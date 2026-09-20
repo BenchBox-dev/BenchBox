@@ -1,4 +1,10 @@
 bts_base_url: https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_{year}_{month}.zip
+# Pinned reproducible source contract: scale-factor month windows always end at
+# this month. Bumping the pin is an explicit, reviewed change - the window must
+# never slide forward as BTS publishes new months.
+pinned_source:
+  end_year: 2024
+  end_month: 12
 data_coverage:
   first_available_year: 1987
   last_available_year: 2024
