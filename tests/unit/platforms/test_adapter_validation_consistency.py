@@ -148,6 +148,38 @@ class TestAdapterValidationConsistency:
         assert result["row_count_validation"]["warning"] == mock_validation_skipped.warning_message
         assert "error" not in result["row_count_validation"]
 
+    def test_base_adapter_invalid_skip_serializes_as_failed(self):
+        """An invalid result with SKIP mode must not serialize as SKIPPED/SUCCESS.
+
+        SKIP means unevaluated; a provider failure or timeout recorded as
+        invalid must surface as FAILED with its message preserved.
+        """
+        from benchbox.platforms.base.adapter import PlatformAdapter
+
+        invalid_skip = ValidationResult(
+            is_valid=False,
+            query_id="1",
+            expected_row_count=None,
+            actual_row_count=5,
+            validation_mode=ValidationMode.SKIP,
+            error_message="Expected-results provider failed for query '1'.",
+        )
+        adapter = Mock(spec=PlatformAdapter)
+        adapter._build_query_result_with_validation = PlatformAdapter._build_query_result_with_validation.__get__(
+            adapter, PlatformAdapter
+        )
+        result = adapter._build_query_result_with_validation(
+            query_id="1",
+            execution_time=1.0,
+            actual_row_count=5,
+            validation_result=invalid_skip,
+        )
+
+        assert result["status"] == "FAILED"
+        assert result["error"] == invalid_skip.error_message
+        assert result["row_count_validation"]["status"] == "FAILED"
+        assert result["row_count_validation"]["error"] == invalid_skip.error_message
+
     def test_base_adapter_no_validation(self):
         """Test base adapter helper with no validation result."""
         from benchbox.platforms.base.adapter import PlatformAdapter
