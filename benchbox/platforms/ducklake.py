@@ -35,6 +35,7 @@ from typing import Any
 
 from benchbox.core.config_inheritance import resolve_dialect_for_query_translation
 from benchbox.platforms.base.data_loading import escape_sql_string_literal
+from benchbox.platforms.base.ddl_helpers import strip_primary_keys
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 
 from .duckdb import DuckDBAdapter, DuckDBConnectionWrapper
@@ -274,6 +275,11 @@ class DuckLakeAdapter(DuckDBAdapter):
     available on earlier DuckDB releases). This is enforced at connection
     time regardless of the driver version pinned in pyproject.toml.
     """
+
+    # Engine identity for operation execution: DuckLake shares DuckDB's SQL
+    # dialect but rejects parts of its DDL (e.g. PRIMARY KEY constraints), so
+    # capability lookups must resolve "ducklake", not "duckdb".
+    operation_platform_key = "ducklake"
 
     # Declared explicitly (not just inherited from DuckDBAdapter) because
     # test_plan_capture_phase_eligibility.py requires every concrete
@@ -836,6 +842,16 @@ class DuckLakeAdapter(DuckDBAdapter):
                 f"(expected benchmark={expected['benchmark']!r}, scale_factor={expected['scale_factor']!r}, "
                 "and tuning configuration). Use --force or a fresh catalog."
             )
+
+    def _rewrite_schema_statement(self, statement: str) -> str:
+        """Drop PRIMARY KEY constraints the DuckLake engine rejects.
+
+        DuckLake shares the DuckDB SQL dialect but does not implement
+        PRIMARY KEY/UNIQUE constraints, so the dialect-emitted clauses must
+        be stripped before execution (same adapter-level precedent as Trino
+        and Firebolt).
+        """
+        return strip_primary_keys(statement)
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
         """Create benchmark tables and persist their benchmark/run identity."""

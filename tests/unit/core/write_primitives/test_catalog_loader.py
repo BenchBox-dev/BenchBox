@@ -133,6 +133,29 @@ def test_loader_real_catalog_still_loads() -> None:
                 assert v.expected_value_max is None
 
 
+def test_datafusion_batch_values_overrides_use_unique_projection_names() -> None:
+    """DataFusion rejects duplicate projection names, so batch VALUES SELECTs carry aliases."""
+    catalog = load_write_primitives_catalog()
+
+    for operation_id in ("insert_batch_values_100", "insert_batch_values_1000"):
+        override = catalog.operations[operation_id].platform_overrides["datafusion"]
+        assert override is not None
+        assert "unnest(generate_series" in override
+        # Every SELECT item is aliased, so no two projections share an auto-generated name.
+        select_list = override.split("FROM")[0]
+        assert "SELECT" in select_list
+        assert "," in select_list
+        for item in select_list.split("SELECT", 1)[1].split(","):
+            assert " AS " in item.upper()
+
+
+def test_datafusion_skips_slash_date_format_bulk_load() -> None:
+    """DataFusion cannot cast slash-formatted dates, so the custom-date bulk load stays skipped."""
+    catalog = load_write_primitives_catalog()
+    operation = catalog.operations["bulk_load_date_format_custom"]
+    assert operation.platform_overrides["datafusion"] is None
+
+
 def test_duckdb_only_cpc_and_req_operations_skip_trino() -> None:
     catalog = load_write_primitives_catalog()
 

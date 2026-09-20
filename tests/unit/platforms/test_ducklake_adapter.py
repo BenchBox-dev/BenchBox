@@ -222,6 +222,58 @@ class TestDuckLakeAdapterBasics:
             adapter.create_connection()
 
 
+class TestDuckLakeSchemaRewrite:
+    """DuckLake shares the DuckDB dialect but rejects PRIMARY KEY constraints."""
+
+    def test_rewrite_strips_inline_and_table_level_primary_keys(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        statement = (
+            "CREATE TABLE write_ops_log (\n"
+            "  log_id INTEGER PRIMARY KEY,\n"
+            "  operation_id VARCHAR(100) NOT NULL,\n"
+            "  PRIMARY KEY (operation_id)\n"
+            ");"
+        )
+        rewritten = adapter._rewrite_schema_statement(statement)
+        assert "PRIMARY KEY" not in rewritten.upper()
+        assert "log_id INTEGER" in rewritten
+        assert "operation_id VARCHAR(100) NOT NULL" in rewritten
+
+    def test_rewrite_matches_write_primitives_staging_ddl(self, tmp_path):
+        from benchbox.core.write_primitives.schema import get_all_staging_tables_sql
+
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        for chunk in get_all_staging_tables_sql("duckdb").split("\n\n"):
+            if chunk.strip():
+                assert "PRIMARY KEY" not in adapter._rewrite_schema_statement(chunk).upper()
+
+    def test_duckdb_default_rewrite_is_identity(self):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        statement = "CREATE TABLE t (\n  id INTEGER PRIMARY KEY\n);"
+        assert DuckDBAdapter()._rewrite_schema_statement(statement) == statement
+
+    def test_operation_platform_key_resolves_ducklake(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path=str(tmp_path / "data"),
+        )
+        assert adapter.operation_platform_key == "ducklake"
+
+    def test_ducklake_pk_capability_bypasses_lock_and_ddl(self):
+        from benchbox.core.write_primitives.benchmark import _pk_lock_bypass_required
+        from benchbox.core.write_primitives.schema import _supports_primary_keys
+
+        assert _pk_lock_bypass_required("ducklake") is True
+        assert _supports_primary_keys("ducklake") is False
+
+
 class TestDuckLakeCatalogValidation:
     """Test the ``catalog`` platform option validation (w1)."""
 
