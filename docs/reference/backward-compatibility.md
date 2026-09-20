@@ -8,6 +8,21 @@ This document is the canonical process and registry for tracking backward-compat
 
 BenchBox is currently in **beta**.
 
+BenchBox uses `MAJOR.MINOR.PATCH` release numbers as a practical guide rather
+than a promise of strict semantic versioning before 1.0:
+
+- A **major** release can change compatibility or significantly change the
+  project's scope.
+- A **minor** release can add compatible features or substantially expand
+  existing capabilities.
+- A **patch** release contains fixes or documentation changes. Before 1.0, a
+  fix can still require a migration when preserving the old behavior would be
+  misleading or unsafe.
+
+The release notes and migration guidance remain the authority for a specific
+version. The policy below defines the compatibility expectations for each
+development stage.
+
 - Alpha:
   - Prioritize canonical API cleanup over compatibility.
   - Breaking changes are allowed with direct migration in the same PR.

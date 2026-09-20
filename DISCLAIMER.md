@@ -2,22 +2,23 @@
 
 BenchBox is an independent open-source project created and maintained by Joe Harris.
 
-## Alpha Software
+## Beta software
 
-> ## ⚠️️ Alpha Software ⚠️️
+> ## ⚠️️ Beta software ⚠️️
 >
-> **BenchBox is ALPHA software.**
-> - APIs may change without notice between versions
+> **BenchBox is BETA software.**
+> - Public APIs may change before 1.0
 > - Features may be incomplete or experimental
 > - Bugs and limitations are expected
-> - Production use is not recommended
+> - Production use requires testing against your workload and environment
 > - Support is best-effort through GitHub issues
 >
-> Feedback is always appreciated. [Report issues and add request features here →](https://github.com/BenchBox-dev/benchbox/issues)
+> Feedback is welcome. [Report issues or request features](https://github.com/BenchBox-dev/benchbox/issues).
 
-### What Alpha Status Means for BenchBox
+### What beta status means for BenchBox
 
-As alpha software, BenchBox is **actively developed and experimental**. Here's what you should expect:
+BenchBox is actively developed. Core workflows are usable, but the project has
+not reached its 1.0 compatibility commitment. Here is what to expect:
 
 **API Stability**: APIs, method signatures, and configuration formats may change between versions without deprecation warnings. We recommend pinning to specific versions in production environments.
 

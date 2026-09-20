@@ -1,4 +1,4 @@
-# Installation & Environment Setup
+# Installation and environment setup
 
 ```{tags} beginner, quickstart
 ```
@@ -30,6 +30,11 @@ BenchBox installs a `benchbox` executable. If you use `uv`, prefer `uv run -- be
 ## 2. Pick Optional Extras
 
 Extras keep the base install lean.
+
+Choose the smallest extra that supports the platform you plan to run. This
+keeps installation faster, reduces dependency conflicts, and avoids installing
+cloud SDKs or database drivers that you do not use. You can add another extra
+later by running the matching install command again.
 
 | Extra | Enables | Recommended (uv) | Alternative (pip-compatible) |
 | --- | --- | --- | --- |
@@ -96,6 +101,15 @@ uv pip install "benchbox[cloud,clickhouse]"
 ```
 
 Re-run the installer at any time to add extras. For `pipx`, use `pipx inject benchbox "benchbox[cloud]"`.
+
+### Choose an installer
+
+- Use `uv add` when BenchBox is a dependency of a Python project.
+- Use `python -m pip install` in an activated virtual environment when your
+  project uses pip.
+- Use `pipx install` when you want an isolated, system-wide `benchbox` command.
+- Quote `"benchbox[extra]"` with pip-compatible commands so shells such as zsh
+  do not interpret the brackets.
 
 ## 3. Verify the CLI
 

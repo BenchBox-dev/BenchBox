@@ -147,6 +147,11 @@ Skip `make ci-local` for everyday changes — `make pr-preflight` is the right g
 
 ## Testing
 
+This section is the canonical starting point for contributor test commands.
+The root README covers product use and links here instead of duplicating the
+test matrix. See [tests/README.md](tests/README.md) for test categories,
+markers, parallel-run rules, and troubleshooting.
+
 We use pytest for testing. Common testing commands:
 
 ```bash
