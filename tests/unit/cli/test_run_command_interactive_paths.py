@@ -1316,13 +1316,23 @@ class TestRunCommandValidation:
         # Should NOT show scale factor error
         assert "not TPC-compliant" not in result.output
 
-    def test_tpcds_official_mode_rejects_tpch_only_scale_factor(self):
+    @pytest.mark.parametrize("benchmark_name", ["tpcds", "tpc-ds", "tpc_ds"])
+    def test_tpcds_official_mode_rejects_tpch_only_scale_factor(self, benchmark_name):
         """TPC-DS must reject SF 30 before executing an unsubmittable run."""
         runner = CliRunner()
         with _non_interactive_base_patches():
             result = runner.invoke(
                 run,
-                ["--official", "--scale", "30", "--platform", "duckdb", "--benchmark", "tpcds", "--non-interactive"],
+                [
+                    "--official",
+                    "--scale",
+                    "30",
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    benchmark_name,
+                    "--non-interactive",
+                ],
                 obj=_run_obj(),
             )
 

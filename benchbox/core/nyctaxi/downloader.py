@@ -212,23 +212,30 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         trip_id = 0
         total_rows = 0
 
-        with self.open_output_file(output_path, "wt") as outf:
-            writer = csv.writer(outf)
-            writer.writerow(["trip_id"] + output_columns)
+        try:
+            with self.open_output_file(output_path, "wt") as outf:
+                writer = csv.writer(outf)
+                writer.writerow(["trip_id"] + output_columns)
 
-            for month in self.months:
-                url = f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet"
-                self.log_verbose(f"  Processing {self.year}-{month:02d}...")
+                for month in self.months:
+                    url = f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet"
+                    self.log_verbose(f"  Processing {self.year}-{month:02d}...")
 
-                try:
-                    month_rows = self._process_parquet_file(url, writer, trip_id)
-                    trip_id += month_rows
-                    total_rows += month_rows
-                except ChecksumMismatchError:
-                    raise
-                except Exception as e:
-                    self.logger.warning(f"Failed to process {url}: {e}")
-                    continue
+                    try:
+                        month_rows = self._process_parquet_file(url, writer, trip_id)
+                        trip_id += month_rows
+                        total_rows += month_rows
+                    except ChecksumMismatchError:
+                        raise
+                    except Exception as e:
+                        self.logger.warning(f"Failed to process {url}: {e}")
+                        continue
+        except ChecksumMismatchError:
+            with contextlib.suppress(OSError):
+                output_path.unlink()
+            with contextlib.suppress(OSError):
+                self._contract_sidecar_path(output_path).unlink()
+            raise
 
         self._table_row_counts[self._TABLE_NAME] = total_rows
         self.log_verbose(f"  {self._TABLE_NAME}: {total_rows} rows total")

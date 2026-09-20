@@ -675,9 +675,10 @@ def _validate_initial_flags(s: types.SimpleNamespace) -> None:
         s.ctx.exit(2)
 
     if s.official:
-        if s.benchmark == "tpch":
+        benchmark = normalize_benchmark_name(s.benchmark) if s.benchmark else None
+        if benchmark == "tpch":
             from benchbox.core.tpch.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
-        elif s.benchmark == "tpcds":
+        elif benchmark == "tpcds":
             from benchbox.core.tpcds.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
         else:
             tpc_allowed = frozenset({1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000})

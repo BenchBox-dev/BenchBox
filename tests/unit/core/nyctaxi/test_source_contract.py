@@ -94,6 +94,28 @@ def test_pinned_checksum_mismatch_is_not_synthetic_fallback(tmp_path, monkeypatc
     assert downloader._synthetic_fallback_months == []
 
 
+def test_checksum_abort_invalidates_output_and_sidecar(tmp_path, monkeypatch):
+    from benchbox.core.data_fetch.errors import ChecksumMismatchError
+
+    downloader = NYCTaxiDataDownloader(months=[1], output_dir=tmp_path, force_redownload=True)
+    output_path = tmp_path / downloader.get_compressed_filename("trips.csv")
+    output_path.write_text("old data", encoding="utf-8")
+    downloader._write_contract_sidecar(output_path)
+    monkeypatch.setattr(
+        downloader,
+        "_process_parquet_file",
+        lambda *_args: (_ for _ in ()).throw(
+            ChecksumMismatchError(path="source", expected_sha256="0" * 64, actual_sha256="1" * 64)
+        ),
+    )
+
+    with pytest.raises(ChecksumMismatchError):
+        downloader._download_and_process_trips()
+
+    assert not output_path.exists()
+    assert not downloader._contract_sidecar_path(output_path).exists()
+
+
 def test_unparseable_download_is_not_recorded_as_ingested(tmp_path, monkeypatch):
     import csv
     import io

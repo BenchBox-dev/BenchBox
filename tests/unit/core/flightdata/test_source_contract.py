@@ -105,6 +105,30 @@ def test_pinned_checksum_mismatch_fails_instead_of_falling_back(tmp_path, monkey
     assert downloader._stats["months_synthetic"] == 0
 
 
+def test_checksum_abort_invalidates_outputs_and_manifest(tmp_path, monkeypatch):
+    from benchbox.core.data_fetch.errors import ChecksumMismatchError
+    from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
+
+    downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path, force_redownload=True)
+    flights_path = tmp_path / downloader.get_compressed_filename("flights.csv")
+    flights_path.write_text("old data", encoding="utf-8")
+    manifest_path = tmp_path / MANIFEST_FILENAME
+    manifest_path.write_text('{"source_contract_id": "stale"}', encoding="utf-8")
+    monkeypatch.setattr(
+        downloader,
+        "_ensure_flights_data",
+        lambda _path: (_ for _ in ()).throw(
+            ChecksumMismatchError(path="source", expected_sha256="0" * 64, actual_sha256="1" * 64)
+        ),
+    )
+
+    with pytest.raises(ChecksumMismatchError):
+        downloader.download()
+
+    assert not flights_path.exists()
+    assert not manifest_path.exists()
+
+
 def test_unparseable_download_is_not_recorded_as_ingested(tmp_path, monkeypatch):
     import csv
     import io

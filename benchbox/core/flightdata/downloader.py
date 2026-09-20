@@ -268,7 +268,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         if airports_path.exists() and airports_path not in self._table_file_row_counts:
             self._record_existing_csv_file("airports", airports_path)
 
-        flight_files = self._ensure_flights_data(flights_path)
+        try:
+            flight_files = self._ensure_flights_data(flights_path)
+        except ChecksumMismatchError:
+            self.force_redownload = True
+            self._remove_flights_outputs(flights_path)
+            with contextlib.suppress(OSError):
+                (self.output_dir / MANIFEST_FILENAME).unlink()
+            raise
 
         table_files = {
             "flights": flight_files,
