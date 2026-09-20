@@ -319,6 +319,29 @@ def _public_bundle_data(
 ) -> tuple[dict[str, Any], str | None]:
     """Sanitize a bundle and its applied receipt before creating public rows."""
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
+    public_platform = public_bundle.get("platform")
+    if isinstance(public_platform, dict):
+        public_tuning = public_platform.get("tuning")
+        if isinstance(public_tuning, dict):
+            requested = public_tuning.get("requested")
+            if requested is None:
+                # Older bundles kept the requested configuration in a tuning
+                # sidecar. Inline its sanitized content so the public bundle
+                # remains self-contained after sidecars were retired.
+                legacy_bytes = _public_companion_bytes(bundle_path, ".tuning.json", anonymizer)
+                if legacy_bytes is not None:
+                    legacy = json.loads(legacy_bytes)
+                    if isinstance(legacy, dict) and isinstance(legacy.get("requested"), dict):
+                        requested = legacy["requested"]
+            if requested is not None:
+                sanitized_tuning = anonymizer.anonymize_tuning_payload({"requested": requested})
+                public_tuning["requested"] = sanitized_tuning.get("requested", {})
+        else:
+            legacy_bytes = _public_companion_bytes(bundle_path, ".tuning.json", anonymizer)
+            if legacy_bytes is not None:
+                legacy = json.loads(legacy_bytes)
+                if isinstance(legacy, dict) and isinstance(legacy.get("requested"), dict):
+                    public_platform["tuning"] = anonymizer.anonymize_tuning_payload({"requested": legacy["requested"]})
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
         # The path is part of the message, not just the log line: this exception

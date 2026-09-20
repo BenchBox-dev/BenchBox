@@ -1063,8 +1063,7 @@ class TestWritePrimitivesSCD2DuckDB:
             conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
         )
         assert stage == {"changed": 20, "unchanged": 20, "new": 20}
-        # Each change group carries its own effective date so per-op
-        # cleanups scope on the timestamp without touching other groups.
+        # Each change group carries its own effective date for validation.
         stamps = dict(
             conn.execute(
                 "SELECT change_type, MAX(effective_ts) FROM scd2_ops_stage_customer GROUP BY change_type"
@@ -1166,12 +1165,9 @@ class TestWritePrimitivesSCD2DuckDB:
         rows a *different*, valid op closed.
 
         Each staging group carries its own effective_ts (changed 2026-01-01,
-        unchanged 2026-01-02, new 2026-01-03), and new_keys_only stamps its
-        own inserts one day past the staged 'new' date, so after a valid
-        basic write closes 20 'changed' keys at the changed stamp, the
-        new_keys_only check -- scoped to its own offset stamp, with no
-        business-key filter so a wrongly closed seed key would also fail --
-        still passes. Runs only basic's
+        unchanged 2026-01-02, new 2026-01-03). After a valid basic write
+        closes 20 'changed' keys at the changed stamp, the new_keys_only
+        check remains scoped to its own staged keys. Runs only basic's
         close-old UPDATE directly (bypassing execute_operation's automatic
         cleanup, and skipping basic's own insert-new half) so the closed
         'changed' rows are still present when new_keys_only validates --
@@ -1199,20 +1195,18 @@ class TestWritePrimitivesSCD2DuckDB:
     def test_basic_cleanup_after_new_keys_only_write_deletes_nothing_foreign(self, scd2_env):
         """Basic's cleanup must not remove rows another op wrote.
 
-        new_keys_only stamps its inserts one day past the staged 'new' date
-        (2026-01-04), while basic's cleanup only deletes valid_from rows at
-        the staged changed/new dates and only reopens rows closed at the
-        changed date. Running basic's cleanup right after new_keys_only's
-        raw write must therefore leave the dimension untouched; previously,
-        with one shared effective_ts, the unscoped cleanup deleted the other
-        op's new versions.
+        Both operations preserve the staged 'new' date (2026-01-03). Cleanup
+        ownership is distinguished by the deterministic surrogate-key range:
+        basic owns the rows appended after the staged-key maximum, while
+        new_keys_only owns the lower range. Running basic's cleanup right after
+        new_keys_only's raw write must therefore leave the dimension untouched.
         """
         write_bench, conn = scd2_env
         new_keys_op = write_bench.get_operation("merge_scd_type2_new_keys_only")
         conn.execute(new_keys_op.write_sql)
         assert self._current_state(conn) == (70, 70, 0)
         own_rows = conn.execute(
-            "SELECT COUNT(*) FROM scd2_ops_dim_customer WHERE valid_from = DATE '2026-01-04'"
+            "SELECT COUNT(*) FROM scd2_ops_dim_customer WHERE valid_from = DATE '2026-01-03'"
         ).fetchone()[0]
         assert own_rows == 20
 
@@ -1228,10 +1222,9 @@ class TestWritePrimitivesSCD2DuckDB:
 
         Reciprocal of the test above: basic inserts its own 'new' versions at
         the staged 'new' date (2026-01-03), while new_keys_only's cleanup only
-        deletes valid_from rows at its own offset stamp (2026-01-04) for
-        staged new business keys. Running new_keys_only's cleanup right after
-        basic's raw write must therefore leave basic's inserted versions (and
-        its closed rows) untouched.
+        deletes the lower surrogate-key range for staged new business keys.
+        Running new_keys_only's cleanup right after basic's raw write must
+        therefore leave basic's inserted versions (and its closed rows) untouched.
         """
         write_bench, conn = scd2_env
         basic_op = write_bench.get_operation("merge_scd_type2_basic")

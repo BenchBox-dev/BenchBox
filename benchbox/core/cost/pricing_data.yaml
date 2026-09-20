@@ -1,5 +1,5 @@
 metadata:
-  version: '2025.11'
+  version: '2026.09'
   source: Cloud provider public pricing pages
   currency: USD
   note: >-
@@ -8,6 +8,10 @@ metadata:
     shows the values were authored in e0438e993 (initial release) and only
     relocated Python->YAML in 8281615b0 with no value ever changed, so it
     never described a refresh.
+  residual_risk: >-
+    These are selected derived list-price values, not vendor catalog mirrors.
+    Per-table provenance is retained below; values with unknown retrieval dates
+    are stale-by-default and cannot support normalized publication.
 provenance:
   snowflake_credit_prices:
     source: 'https://www.snowflake.com/pricing/'

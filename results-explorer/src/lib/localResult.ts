@@ -9,7 +9,7 @@ const EXECUTION_RUN_TYPES = new Set(["measurement", "warmup"]);
 const EXECUTION_MODES = new Set(["sql", "dataframe"]);
 const TUNING_MODES = new Set(["tuned", "tuned-fallback", "notuning", "auto", "custom"]);
 const FUNDING_SOURCES = new Set(["employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified"]);
-const LOCAL_COST_MODEL_VERSION = "2025.11";
+const LOCAL_COST_MODEL_VERSION = "2026.09";
 const LOCAL_COST_MODEL_SOURCE = "benchbox.core.cost.pricing";
 const CPU_FAMILY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\bapple\s+(?:m\d|a\d)/i, "apple_silicon"],
@@ -72,11 +72,24 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   }
   const bundle = objectOrError(parsed, "The JSON root must be an object.");
   // Mirror benchbox.core.results.schema_policy.result_schema_version_value():
-  // result_schema_version -> version -> schema_version.
-  const version = requiredString(
-    bundle.result_schema_version ?? bundle.version ?? bundle.schema_version,
-    "result_schema_version",
-  );
+  // Select by key presence so an explicit null is not silently replaced by a
+  // legacy alias; the server-side policy rejects conflicting or null values.
+  const hasOwn = (key: string): boolean => Object.prototype.hasOwnProperty.call(bundle, key);
+  const versionValue = hasOwn("result_schema_version")
+    ? bundle.result_schema_version
+    : hasOwn("version")
+      ? bundle.version
+      : bundle.schema_version;
+  if (
+    typeof bundle.result_schema_version === "string" &&
+    typeof bundle.version === "string" &&
+    bundle.result_schema_version.trim() !== "" &&
+    bundle.version.trim() !== "" &&
+    bundle.result_schema_version.trim() !== bundle.version.trim()
+  ) {
+    throw new LocalResultImportError("result_schema_version and version must match when both are present.");
+  }
+  const version = requiredString(versionValue, "result_schema_version");
   if (!SUPPORTED_SCHEMA_VERSIONS.has(version)) {
     throw new LocalResultImportError(
       `Schema ${version} is not supported. Local preview accepts BenchBox result schemas 2.0, 2.1, and 2.2.`,

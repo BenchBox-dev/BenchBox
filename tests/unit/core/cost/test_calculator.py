@@ -188,8 +188,9 @@ class TestCostCalculator:
         assert len(benchmark_cost.phase_costs) == 2
         assert benchmark_cost.platform_details["platform"] == "snowflake"
 
-    def test_normalized_benchmark_cost_for_cloud_compute(self):
+    def test_normalized_benchmark_cost_for_cloud_compute(self, monkeypatch):
         """Cloud compute costs become normalized cost with deployment metadata."""
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         calculator = CostCalculator()
         phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
         benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "snowflake"})
@@ -297,8 +298,10 @@ class TestBillingUnitContract:
     """
 
     @staticmethod
-    def _normalized_billing_unit(platform, platform_config):
+    def _normalized_billing_unit(platform, platform_config, monkeypatch=None):
         calculator = CostCalculator()
+        if monkeypatch is not None:
+            monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
         benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": platform})
         normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
@@ -329,11 +332,12 @@ class TestBillingUnitContract:
             == "dwu_hour"
         )
 
-    def test_snowflake_reports_credit(self):
+    def test_snowflake_reports_credit(self, monkeypatch):
         assert (
             self._normalized_billing_unit(
                 "snowflake",
                 {"edition": "standard", "cloud": "aws", "region": "us-east-1", "warehouse_size": "MEDIUM"},
+                monkeypatch,
             )
             == "credit"
         )

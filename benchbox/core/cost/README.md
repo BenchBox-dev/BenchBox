@@ -9,6 +9,10 @@ The cost estimation framework calculates compute costs for benchmark executions 
 - **Detailed cost breakdown** by phase (power test, throughput test, maintenance test)
 - **Validation and error handling** for robustness
 
+Pricing tables contain selected derived list-price values, not vendor catalog
+mirrors. Per-table provenance is authoritative; entries with unknown retrieval
+dates are stale-by-default and do not support normalized publication.
+
 ## Supported Platforms
 
 | Platform | Cost Model | Pricing Basis | Accuracy |
@@ -89,7 +93,7 @@ The cost estimation framework adds a `cost_summary` object to benchmark results 
       "edition": "standard",
       "cloud": "aws",
       "region": "us-east-1",
-      "pricing_version": "2025.11",
+      "pricing_version": "2026.09",
       "pricing_date": "unknown",
       "storage_estimate": {
         "storage_cost": 0.1534,
@@ -126,7 +130,7 @@ The cost estimation framework adds a `cost_summary` object to benchmark results 
 - `effective_cost_per_hour` - Computed as `total_cost / (wall_clock_duration_seconds / 3600)` (optional)
 
 **Platform details fields**:
-- `pricing_version` - Semantic version of pricing data (e.g., "2025.11")
+- `pricing_version` - Semantic version of pricing data (e.g., "2026.09")
 - `pricing_date` - Last validation date in ISO 8601 format
 - `storage_estimate` - Detailed storage cost breakdown (optional)
 
@@ -193,7 +197,7 @@ All cost estimates include pricing version tracking:
 
 ```python
 platform_details = {
-    "pricing_version": "2025.11",      # YYYY.MM format
+    "pricing_version": "2026.09",      # YYYY.MM format
     "pricing_date": "unknown",         # No file-level refresh date tracked
     # ... other platform details
 }
@@ -299,9 +303,12 @@ config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 [`pricing_data.yaml`](./pricing_data.yaml), the source of truth):
 - US / EU / Asia multi-region: $6.25/TiB
 - US single-regions: $6.25/TiB
-- EU / Asia single-regions: $6.875/TiB
-- Australia: $7.50/TiB; Middle East: $7.50/TiB
-- South America: $7.8125/TiB; other locations: $6.875/TiB
+- EU / Asia single-regions: $6.875/TiB, with published regional overrides in
+  `pricing_data.yaml` (for example, Europe West 1 is $7.50/TiB).
+- Australia: $7.50/TiB by bucket and $8.125/TiB for the published Australia
+  regional entries; Middle East: $7.50/TiB.
+- South America: $7.8125/TiB; other locations: $6.875/TiB only when the
+  location is explicitly priced, otherwise the result is marked as fallback.
 
 **Example**:
 ```python
@@ -838,7 +845,7 @@ To update pricing:
 
 ### Cost model version in stored results
 
-Result bundles embed `cost_model_version` (currently `"2025.11"`, matching the
+Result bundles embed `cost_model_version` (currently `"2026.09"`, matching the
 `pricing_data.yaml` metadata version). The stamp records which table produced
 the estimate; nothing cross-checks it. Decision: when the pricing version is
 bumped, historical bundles keep the version stamped at export time — no

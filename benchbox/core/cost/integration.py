@@ -63,6 +63,15 @@ def validate_platform_config(platform: str, config: dict[str, Any]) -> tuple[boo
                 f"Cost estimation may be inaccurate or fail."
             )
 
+    if platform_lower == "synapse" and str(config.get("mode") or "serverless").lower() == "dedicated":
+        if config.get("dwu_level") is None:
+            warnings.append("Missing required config field 'dwu_level' for dedicated Synapse cost calculation")
+    if platform_lower in {"databricks", "databricks-df"}:
+        # A caller may provide the already-resolved workload type directly;
+        # warehouse_type is only needed when the adapter must infer it.
+        if config.get("workload_type") is None and config.get("warehouse_type") is None:
+            warnings.append("Missing workload_type or warehouse_type for Databricks cost calculation")
+
     is_valid = len(warnings) == 0
     return is_valid, warnings
 
@@ -123,17 +132,21 @@ def add_cost_estimation_to_results(
                     resource_usage=resource_usage,
                     platform_config=platform_config,
                 )
-                if query_cost and isinstance(query_result, dict):
+                if query_cost:
+                    cost_value: float | None
                     if "price_unavailable" in query_cost.pricing_details:
                         # Gate at the stamp point: a fallback-priced figure
                         # must not read as a trustworthy per-query cost
                         # downstream. The estimate still flows into
                         # phase/benchmark totals, where the normalized
                         # contract marks the run unavailable.
-                        query_result["cost"] = None
-                        query_result["cost_status"] = "unavailable"
+                        cost_value = None
                     else:
-                        query_result["cost"] = query_cost.compute_cost
+                        cost_value = query_cost.compute_cost
+                    if isinstance(query_result, dict):
+                        query_result["cost"] = cost_value
+                    elif hasattr(query_result, "cost"):
+                        query_result.cost = cost_value
 
         # Calculate phase-level costs
         phase_costs = _calculate_phase_costs(results, platform, platform_config, calculator)
@@ -260,14 +273,16 @@ def _apply_cost_model_and_warnings(benchmark_cost: Any, platform: str, platform_
         else:
             benchmark_cost.cost_model = "actual"
     elif platform_lower == "snowflake":
-        benchmark_cost.cost_model = "actual"
         if _snowflake_phase_has_estimated_concurrent_cost(benchmark_cost):
+            benchmark_cost.cost_model = "marginal"
             benchmark_cost.warnings.append(
-                "Snowflake costs include runtime-estimated queries sharing a warehouse "
+                "Snowflake costs include runtime-estimated query costs sharing a warehouse "
                 "across concurrent streams. Each estimate prices exclusive warehouse use, "
                 "so the summed total may exceed the warehouse's wall-clock spend; metered "
                 "credits_used attributes shared cost exactly."
             )
+        else:
+            benchmark_cost.cost_model = "actual"
     elif platform_lower in ("bigquery", "duckdb", "clickhouse"):
         benchmark_cost.cost_model = "actual"
     else:
@@ -368,6 +383,8 @@ def _normalize_platform_token(raw: str) -> str:
         if token.endswith(marker):
             token = token[: -len(marker)]
     token = token.replace(" ", "-").replace("_", "-")
+    if token in {"fabric-warehouse", "microsoft-fabric-warehouse", "fabric-dw"}:
+        return "fabric_dw"
     aliases = {key.replace("_", "-"): value for key, value in get_all_platform_aliases().items()}
     canonical = aliases.get(token, token)
     # `fabric_dw` is the one registry key spelled with an underscore; every cost
@@ -748,7 +765,13 @@ def _resolve_databricks_compute(
         # warehouse_type="SERVERLESS" (raw PRO + enable_serverless_compute);
         # PRO and CLASSIC bill as provisioned SQL compute.
         config["warehouse_type"] = warehouse_type
-        config["workload_type"] = "serverless_sql" if str(warehouse_type).upper() == "SERVERLESS" else "sql_compute"
+        warehouse_type_upper = str(warehouse_type).upper()
+        if warehouse_type_upper == "SERVERLESS":
+            config["workload_type"] = "serverless_sql"
+        elif warehouse_type_upper == "CLASSIC":
+            config["workload_type"] = "sql_classic"
+        else:
+            config["workload_type"] = "sql_compute"
     else:
         # No warehouse metadata to distinguish SQL compute from all-purpose.
         # Keep the conservative mapping so a per-query estimate is still

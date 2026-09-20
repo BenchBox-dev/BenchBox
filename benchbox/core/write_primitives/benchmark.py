@@ -669,12 +669,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             #               re-run produces zero new versions);
             #   new       - brand-new business keys (custkey offset beyond the
             #               current max) that have no current version yet.
-            # Each group carries its own effective date so per-operation
-            # cleanups and validations can scope on the timestamp without
-            # touching the other groups' rows. The insert-only new-keys op
-            # additionally offsets its written valid_from by one day (see
-            # its catalog entry), keeping its rows distinct from the basic
-            # op's new-key versions stamped here.
+            # Each group carries its own effective date for validation. All
+            # insert paths preserve the staged timestamp; cleanup ownership is
+            # separated by staged business group and the deterministic
+            # surrogate-key range assigned by each operation.
             fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
             fp_same = self._scd2_row_hash_expr("c_acctbal")
             effective_changed = self._date_literal("2026-01-01")

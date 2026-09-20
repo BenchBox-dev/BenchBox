@@ -1155,6 +1155,8 @@ class PlatformOptimizationConfiguration:
         sorted_ingestion_mode = data.get("sorted_ingestion_mode", data.get("deep_sort_mode", "off"))
         sorted_ingestion_method = data.get("sorted_ingestion_method", data.get("deep_sort_method", "auto"))
         strategy = data.get("databricks_clustering_strategy")
+        if strategy is None and data.get("physical_rendering_id") == "databricks_z_order":
+            strategy = "z_order"
         if strategy is None and (data.get("liquid_clustering_enabled", False) or data.get("liquid_clustering_columns")):
             strategy = "liquid_clustering"
         if strategy is None and (data.get("z_ordering_enabled", False) or data.get("z_ordering_columns")):

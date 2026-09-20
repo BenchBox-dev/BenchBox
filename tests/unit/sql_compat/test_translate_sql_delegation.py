@@ -217,7 +217,7 @@ class TestTranslateSqlAdapterSnapshots:
     @pytest.mark.parametrize(
         "dialect,expect_quoted",
         [
-            ("snowflake", True),
+            ("snowflake", False),
             ("bigquery", True),
             ("duckdb", False),
             ("clickhouse", False),

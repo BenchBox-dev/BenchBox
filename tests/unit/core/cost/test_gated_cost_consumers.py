@@ -112,7 +112,7 @@ class TestPerQueryCostGatedAtStamp:
 
         stamped = results.query_results[0]
         assert stamped["cost"] is None
-        assert stamped["cost_status"] == "unavailable"
+        assert "cost_status" not in stamped
         assert results.cost_summary["normalized_cost"]["cost_status"] == "unavailable"
 
     def test_verified_region_stamps_per_query_cost(self) -> None:

@@ -1,11 +1,11 @@
-"""Wiring tests for DataFrame-suite plan capture (wire-plan-capture-for-dataframe...).
+"""Wiring tests for DataFrame-suite plan capture.
 
 The benchmark suite's ``capture_plans`` config and ``QueryBenchmarkResult.query_plan``
 field existed but the run path never populated them. These tests pin the wiring:
-for lazy platforms a plan is captured once, from a separate untimed execute
-before the benchmark loop, so explain() cost never leaks into a measured
-iteration; eager platforms skip capture entirely (no extra materialization);
-failures degrade to None, and ``capture_plans=False`` captures nothing.
+for supported lazy platforms a plan is captured once, from a separate untimed
+execute after the benchmark loop, so explain() cost never leaks into a measured
+iteration; eager platforms skip capture entirely; failures degrade to None, and
+``capture_plans=False`` captures nothing.
 """
 
 import pytest
@@ -77,18 +77,15 @@ def _make_suite(frame, **config_kwargs):
 
 
 class TestSuitePlanCapture:
-    def test_plan_captured_once_before_any_collect(self):
+    def test_plan_captured_once_after_measured_collects(self):
         events: list = []
         suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"))
         result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars-df")
         assert result.status == "SUCCESS"
         assert result.query_plan == "MY-PLAN"
-        # One untimed capture up front (Polars capture issues two explains:
-        # optimized + logical), then exactly one collect per measured
-        # iteration. The execute count is the discriminator: an in-loop
-        # capture would run execute only twice (once per iteration), so a
-        # revert of the hoist fails this test.
-        assert events == ["explain", "explain", "collect", "collect"]
+        # Exactly one collect per measured iteration, followed by the untimed
+        # capture (Polars capture issues two explains: optimized + logical).
+        assert events == ["collect", "collect", "explain", "explain"]
         assert query.execute_calls == 3
         assert len(result.execution_times_ms) == 2
 

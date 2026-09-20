@@ -107,23 +107,56 @@ class TestSparkAdapter:
         mock_session_class = MagicMock()
         mock_session_class.builder = mock_builder
 
-        with _mock_sys_modules(
-            {
-                "pyspark": MagicMock(),
-                "pyspark.sql": MagicMock(SparkSession=mock_session_class),
-                "pyspark.sql.types": MagicMock(
-                    StructType=MagicMock(),
-                    StructField=MagicMock(),
-                    StringType=MagicMock(),
-                    IntegerType=MagicMock(),
-                    LongType=MagicMock(),
-                    DoubleType=MagicMock(),
-                    DecimalType=MagicMock(),
-                    DateType=MagicMock(),
-                ),
-            },
-        ):
-            yield mock_session_class, mock_spark_session
+        spark_module_prefix = "benchbox.platforms.spark"
+        spark_modules_before = {
+            key: value
+            for key, value in sys.modules.items()
+            if key == spark_module_prefix or key.startswith(f"{spark_module_prefix}.")
+        }
+        platforms_package = sys.modules.get("benchbox.platforms")
+        package_spark_sentinel = object()
+        package_spark_before = (
+            getattr(platforms_package, "spark", package_spark_sentinel)
+            if platforms_package is not None
+            else package_spark_sentinel
+        )
+        if platforms_package is not None:
+            if hasattr(platforms_package, "spark"):
+                del platforms_package.spark
+        for key in spark_modules_before:
+            sys.modules.pop(key, None)
+        try:
+            with _mock_sys_modules(
+                {
+                    "pyspark": MagicMock(),
+                    "pyspark.sql": MagicMock(SparkSession=mock_session_class),
+                    "pyspark.sql.types": MagicMock(
+                        StructType=MagicMock(),
+                        StructField=MagicMock(),
+                        StringType=MagicMock(),
+                        IntegerType=MagicMock(),
+                        LongType=MagicMock(),
+                        DoubleType=MagicMock(),
+                        DecimalType=MagicMock(),
+                        DateType=MagicMock(),
+                    ),
+                },
+            ):
+                yield mock_session_class, mock_spark_session
+        finally:
+            # The adapter imports SparkSession at module import time. Evict the
+            # module loaded against the mocked Spark package before the next
+            # test so it cannot leak a MagicMock into a real Spark import.
+            for key in list(sys.modules):
+                if key == spark_module_prefix or key.startswith(f"{spark_module_prefix}."):
+                    sys.modules.pop(key, None)
+            sys.modules.update(spark_modules_before)
+            if platforms_package is not None:
+                if package_spark_before is package_spark_sentinel:
+                    if hasattr(platforms_package, "spark"):
+                        del platforms_package.spark
+                else:
+                    platforms_package.spark = package_spark_before
 
     def test_initialization_success(self, mock_pyspark):
         """Test successful adapter initialization."""

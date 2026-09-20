@@ -132,7 +132,9 @@ benchbox run --platform athena --benchmark tpch \
 
 ### Reduce Data Scanned
 
-Athena charges per TB scanned (list price $5 per TB — see `benchbox/core/cost/pricing_data.yaml`, the source of truth for cost estimates). Optimize costs with:
+Athena charges per TB scanned. The source of truth is
+`benchbox/core/cost/pricing_data.yaml`: the current list rate is $5 per TB in
+the documented regions and $9 per TB in `sa-east-1`. Optimize costs with:
 
 1. **Columnar formats** - Parquet/ORC scan only needed columns
 2. **Partitioning** - Partition by date/region for predicate pushdown

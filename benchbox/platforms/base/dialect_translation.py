@@ -84,7 +84,7 @@ class DialectTranslationMixin:
         try:
             import sqlglot
 
-            should_identify = tgt not in ("clickhouse", "postgres")
+            should_identify = tgt not in ("clickhouse", "postgres", "snowflake")
 
             translated_statements = sqlglot.transpile(sql, read=src, write=tgt, identify=should_identify)
 
