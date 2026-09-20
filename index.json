@@ -4324,15 +4324,10 @@
       "title": "Platform Deployment Registry Extensions"
     },
     "derive-benchmark-compatibility-per-platform": {
-      "claim": {
-        "expires_at": "2026-09-21T03:37:01Z",
-        "generation": "25e3cc743b574c4c8a1d0159413020cd",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Derive benchmark compatibility per platform"
     },
     "derive-credential-secondary-port-literals-password-http-port": {
