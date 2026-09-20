@@ -354,7 +354,8 @@ class SortedIngestionMixin:
         if isinstance(tracked_state, bool):
             return tracked_state
 
-        if not type(connection).__module__.startswith("duckdb"):
+        module_name = (type(connection).__module__ or "").lower()
+        if "duckdb" not in module_name:
             return False
         execute_method = getattr(connection, "execute", None)
         if not callable(execute_method):
