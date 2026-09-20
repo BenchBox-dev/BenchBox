@@ -11,6 +11,7 @@ from .adapter import (
     PlatformAdapterConnection,
     PlatformAdapterCursor,
     QueryDefinition,
+    StreamConnectionCapability,
     check_isolation_capability,
 )
 from .models import (
@@ -59,6 +60,7 @@ __all__ = [
     "TableLoadingStats",
     "ThroughputStream",
     "ThroughputTestPhase",
+    "StreamConnectionCapability",
     "ValidationPhase",
     "QueryDefinition",
     "detect_file_format",

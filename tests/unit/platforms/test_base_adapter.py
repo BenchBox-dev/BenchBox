@@ -20,6 +20,7 @@ from benchbox.platforms.base import (
     BenchmarkResults,
     ConnectionConfig,
     PlatformAdapter,
+    StreamConnectionCapability,
 )
 from benchbox.platforms.base.execution import _power_query_result, _power_test_error_result
 from benchbox.utils.dialect_utils import SQLTranslationError, SqlTranslationOutcome
@@ -33,6 +34,8 @@ pytestmark = [
 
 class MockPlatformAdapter(PlatformAdapter):
     """Mock platform adapter for testing."""
+
+    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     def add_cli_arguments(self):
         pass

@@ -21,6 +21,7 @@ from typing import Any
 
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.throughput.containment import await_quiescence
 from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     APPLIED_VERIFIED,
@@ -44,6 +45,8 @@ from benchbox.platforms.base.connection_wrappers import (
     _make_stream_cursor,
     _NoCloseProxy,  # noqa: F401 - re-exported for external imports
     check_isolation_capability,  # noqa: F401 - re-exported for external imports
+    require_throughput_stream_capability,  # noqa: F401 - re-exported for execution drivers
+    resolve_stream_connection_capability,  # noqa: F401 - re-exported for manifest sweep
 )
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
@@ -143,7 +146,9 @@ class PlatformAdapter(
     # per stream must set this to INDEPENDENT_CONNECTION *and* override
     # new_stream_connection() below - declaring the capability alone is not
     # enough, since the base new_stream_connection() raises for that value to
-    # fail fast instead of silently falling back to cursor sharing.
+    # fail fast instead of silently falling back to cursor sharing. Adapters
+    # that cannot serve concurrent streams at all declare UNSUPPORTED, which
+    # the throughput entry points refuse before stream submission.
     stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
     # Default in-container service port the adapter connects to in the reference
     # docker deployment (the container side of the compose `ports:` mapping).
@@ -282,6 +287,7 @@ class PlatformAdapter(
         self._reset_plan_capture_stats()
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
+        self._post_measurement_contained = False
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -294,6 +300,7 @@ class PlatformAdapter(
         self._reset_plan_capture_stats()
         self._client_link_metadata = None
         self._link_probe_timed_out = False
+        self._post_measurement_contained = False
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -696,7 +703,7 @@ class PlatformAdapter(
         if connection and hasattr(connection, "close"):
             connection.close()
 
-    def new_stream_connection(self, connection: Any) -> Any:
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         """Return a per-stream execution handle for one concurrent throughput
         (or connection-pool test) stream.
 
@@ -706,7 +713,13 @@ class PlatformAdapter(
         ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
         call this once per stream instead of unconditionally sharing one
         cursor, so the behavior is now a declared, overridable platform
-        capability rather than an implicit one-size-fits-all default.
+        capability rather than an implicit one-size-fits-all default. The
+        ``benchmark_type`` keyword (``"olap"`` for the TPC-H/TPC-DS throughput
+        drivers unless the caller overrides it via run config) lets
+        ``INDEPENDENT_CONNECTION`` overrides reproduce the benchmark-type
+        session tuning the shared connection carries - see equivalence
+        dimension 4 in ``StreamConnectionCapability``. The keyword is optional
+        so pre-existing overrides and test doubles keep working unchanged.
 
         Dispatches on ``stream_connection_capability``:
 
@@ -718,7 +731,8 @@ class PlatformAdapter(
           see docs/benchmarks/tpc-h.md). No new connections are opened, and
           closing the returned handle never closes the shared connection
           (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
-          only closes the cursor).
+          only closes the cursor). ``benchmark_type`` is ignored: the shared
+          connection already carries its tuning.
         - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
           engines whose driver does not support true concurrent statement
           execution across cursors of one connection) MUST override this
@@ -728,18 +742,30 @@ class PlatformAdapter(
           capability value instead of falling back to cursor sharing, so a
           subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
           fails loudly rather than silently reproducing the shared-session bug
-          this capability exists to fix.
+          this capability exists to fix. Overrides should apply
+          ``configure_for_benchmark(stream_conn, benchmark_type or "olap")``
+          (plus the ``_apply_stream_session_state`` hook for
+          connection-establishment state) so the stream session measures the
+          same tuning as the setup session.
+        - ``UNSUPPORTED``: never reaches this method - the throughput entry
+          points refuse via ``require_throughput_stream_capability`` before
+          any stream is submitted.
 
         Args:
             connection: The adapter's shared platform connection (as created by
                 ``create_connection``). Used as-is for ``SHARED_CURSOR``;
                 available for reference (e.g. to read connection parameters)
                 but not required for ``INDEPENDENT_CONNECTION`` overrides.
+            benchmark_type: Benchmark tuning vocabulary (e.g. ``"olap"``) for
+                per-stream session parity. Optional; overrides replay tuning
+                only when it is supplied, so callers that pass nothing keep
+                their previous behavior.
 
         Returns:
             A connection-like object suitable for one stream: either a cursor/
             proxy over the shared connection, or an independent connection.
         """
+        del benchmark_type  # SHARED_CURSOR reuses the already-tuned shared connection
         if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
             raise NotImplementedError(
                 f"{self.platform_name} declares stream_connection_capability="
@@ -975,16 +1001,14 @@ class PlatformAdapter(
             # succeeded. Its wall time is excluded from the published run
             # duration below so the probe never inflates the number it
             # exists to contextualise.
-            probe_start = mono_time()
-            self._collect_client_link_metadata(connection, run_config)
-            probe_elapsed_s = elapsed_seconds(probe_start)
+            probe_elapsed_s = self._collect_post_measurement_metadata(connection, run_config)
 
             # Get queries for definitions - pass canonical slug so dialect selection
             # doesn't have to infer benchmark family from object internals.
             queries = self._get_dialect_queries(
                 benchmark,
                 benchmark_slug=run_config.get("benchmark_name", ""),
-                connection=connection,
+                connection=None if self._post_measurement_contained else connection,
             )
             stream_id = "standard"
             self._extract_query_definitions(benchmark, queries, stream_id)
@@ -1005,7 +1029,9 @@ class PlatformAdapter(
                 query_results, query_executions, run_config, setup_phase
             )
 
-            platform_info, normalized_metadata = self._collect_platform_metadata(connection)
+            platform_info, normalized_metadata = self._collect_platform_metadata(
+                None if self._post_measurement_contained else connection
+            )
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
             total_rows_loaded = sum(table_stats.values()) if table_stats else 0
@@ -1125,8 +1151,61 @@ class PlatformAdapter(
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
-                self.close_connection(self.connection)
-                self.connection = None
+                self._close_run_connection()
+
+    def _defer_connection_close_until_quiescent(self, connection: Any, throughput_result: Any) -> None:
+        """Close a measurement connection only after timed-out work terminates."""
+        if throughput_result is None:
+            self.close_connection(connection)
+            return
+
+        def _close_when_quiescent() -> None:
+            while not await_quiescence(throughput_result, timeout=1.0):
+                pass
+            try:
+                self.close_connection(connection)
+            except Exception as exc:  # noqa: BLE001 - deferred cleanup must not crash a worker
+                self.logger.warning("Deferred benchmark connection cleanup failed: %r", exc)
+
+        threading.Thread(
+            target=_close_when_quiescent,
+            name="benchbox-throughput-connection-cleanup",
+            daemon=True,
+        ).start()
+
+    def _collect_post_measurement_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> float:
+        """Collect link metadata unless throughput work still owns the connection."""
+        if self._post_measurement_contained:
+            self._client_link_metadata = {
+                "collection_status": "unavailable",
+                "source": "unavailable",
+                "client_region": None,
+                "client_cloud": None,
+                "statement_overhead_ms": None,
+                "collection_error_class": "OutstandingThroughputWork",
+                "collection_error_message": (
+                    "Post-measurement metadata collection was skipped because a timed-out "
+                    "throughput worker still owns benchmark resources."
+                ),
+            }
+            self._link_probe_timed_out = True
+            return 0.0
+
+        probe_start = mono_time()
+        self._collect_client_link_metadata(connection, run_config)
+        return elapsed_seconds(probe_start)
+
+    def _close_run_connection(self) -> None:
+        """Close or defer the run connection according to containment state."""
+        connection = self.connection
+        if self._post_measurement_contained:
+            self._defer_connection_close_until_quiescent(
+                connection,
+                getattr(self, "_last_throughput_test_result", None),
+            )
+        else:
+            self.close_connection(connection)
+        self.connection = None
 
     def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
         """Probe statement overhead and discover client region post-benchmark.

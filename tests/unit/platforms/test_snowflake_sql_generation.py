@@ -69,6 +69,88 @@ class TestSnowflakeOptimizeTableDefinition:
             result = adapter._optimize_table_definition(stmt)
             assert "CLUSTER BY" not in result
 
+    def test_if_not_exists_kept_without_or_replace(self):
+        """CREATE OR REPLACE ... IF NOT EXISTS is a Snowflake syntax error."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            adapter = SnowflakeAdapter(
+                account="acct",
+                username="u",
+                password="p",
+            )
+            stmt = "CREATE TABLE IF NOT EXISTS DimDate (SK_DateID BIGINT)"
+            result = adapter._optimize_table_definition(stmt)
+            assert "OR REPLACE" not in result
+            assert "IF NOT EXISTS" in result
+
+    def test_quoted_identifiers_uppercased(self):
+        """Quoted lowercase DDL names become uppercase so folded references resolve."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            adapter = SnowflakeAdapter(
+                account="acct",
+                username="u",
+                password="p",
+            )
+            stmt = 'CREATE TABLE "store_sales" ("ss_sold_date_sk" INTEGER, "note" VARCHAR DEFAULT \'keep me\')'
+            result = adapter._optimize_table_definition(stmt)
+            assert '"STORE_SALES"' in result
+            assert '"SS_SOLD_DATE_SK"' in result
+            assert "'keep me'" in result
+
+
+class TestSnowflakeSafeguardDivision:
+    """Test _safeguard_snowflake_division NULLIF normalization."""
+
+    def test_division_routed_through_nullif(self):
+        """A zero divisor returns NULL instead of raising on Snowflake."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            adapter = SnowflakeAdapter(
+                account="acct",
+                username="u",
+                password="p",
+            )
+            result = adapter._safeguard_snowflake_division("SELECT a / b FROM t")
+            assert "NULLIF" in result
+            assert result.count("NULLIF") == 1
+
+    def test_query_without_division_unchanged(self):
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            adapter = SnowflakeAdapter(
+                account="acct",
+                username="u",
+                password="p",
+            )
+            sql = "SELECT a FROM t"
+            assert adapter._safeguard_snowflake_division(sql) == sql
+
+    def test_realistic_multi_join_query_guarded(self):
+        """A realistic multi-join ratio query keeps its structure with guarded divisors."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            adapter = SnowflakeAdapter(
+                account="acct",
+                username="u",
+                password="p",
+            )
+            sql = (
+                "SELECT CAST(amc AS DECIMAL(15, 4)) / CAST(pmc AS DECIMAL(15, 4)) AS am_pm_ratio "
+                "FROM (SELECT COUNT(*) AS amc FROM web_sales, time_dim "
+                "WHERE ws_sold_time_sk = time_dim.t_time_sk) AS at, "
+                "(SELECT COUNT(*) AS pmc FROM web_sales) AS pm"
+            )
+            result = adapter._safeguard_snowflake_division(sql)
+            assert "NULLIF" in result
+            assert "am_pm_ratio" in result
+            assert "web_sales" in result
+
 
 class TestSnowflakeGenerateTuningClause:
     def test_no_tuning_returns_empty(self):
