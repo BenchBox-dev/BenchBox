@@ -26,10 +26,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import re
 from typing import Any
-
-from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
 
 from ..utils.dependencies import (
     check_platform_dependencies,
@@ -78,6 +75,9 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
     unavailable_catalog_marker = "does not exist on the Presto server"
     default_username = "presto"
     table_format_choices = ("memory", "hive")
+    # A Presto catalog literally named "memory" behaves like the memory table
+    # format for DDL purposes even when table_format names another connector.
+    ddl_memory_catalog_names = ("memory",)
     target_dialect = PRESTO_DIALECT
     uses_client_source = True
     from_config_optional_fields = (*PrestoTrinoAdapterBase.from_config_optional_fields, "source")
@@ -210,36 +210,6 @@ class PrestoAdapter(PrestoTrinoAdapterBase):
 
         except Exception as e:
             raise RuntimeError(f"Failed to drop Presto schema {catalog}.{schema}: {e}") from e
-
-    def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Presto.
-
-        Presto table creation syntax depends on the connector/catalog being used.
-        For memory catalog, minimal syntax is needed.
-        For Hive, we can add format specifications.
-        """
-        if not statement.upper().startswith("CREATE TABLE"):
-            return statement
-
-        # Presto rejects PRIMARY KEY constraints in benchmark CREATE TABLE DDL.
-        # BenchBox workloads load immutable benchmark data, so the constraint is
-        # metadata only and can be stripped for all Presto catalogs.
-        statement = strip_primary_keys(statement)
-
-        # For memory catalog, remove any Presto-incompatible syntax.
-        # Memory catalog doesn't support WITH properties or NOT NULL constraints.
-
-        if self.table_format == "memory" or self.catalog == "memory":
-            # Memory catalog: simple CREATE TABLE without WITH clause or NOT NULL
-            statement = strip_with_properties(statement)
-            statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
-
-        elif self.table_format == "hive":
-            # Add table format specification if not present
-            if "WITH" not in statement.upper():
-                statement += " WITH (format = 'PARQUET')"
-
-        return statement
 
     def generate_tuning_clause(self, table_tuning) -> str:
         """Generate Presto-specific tuning clauses for CREATE TABLE statements.

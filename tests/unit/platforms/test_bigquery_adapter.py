@@ -2000,12 +2000,16 @@ class TestQualifyTableNames:
         assert "`p1.d1.ORDERS`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
-    def test_does_not_qualify_non_tpch_tables(self, mock_bigquery):
-        """Non-TPC-H table names are not modified."""
+    def test_qualifies_non_tpch_tables(self, mock_bigquery):
+        """Non-TPC-H table names are qualified and uppercased like TPC-H ones.
+
+        Contract change: leaving unknown tables unqualified 404s on BigQuery
+        (case-sensitive identifiers, no implicit dataset for the load
+        convention), so parser-extracted names resolve for every benchmark.
+        """
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT * FROM my_custom_table")
-        assert "my_custom_table" in result
-        assert "`p1.d1." not in result
+        assert result == "SELECT * FROM `p1.d1.MY_CUSTOM_TABLE`"
 
 
 @pytest.mark.usefixtures("dependencies_available")

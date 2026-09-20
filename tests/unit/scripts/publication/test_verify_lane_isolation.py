@@ -441,9 +441,11 @@ def test_classify_path_shared_inputs_are_exempt() -> None:
     assert classify_path("benchbox/core/results/anonymization.py") == set()
     assert classify_path("pyproject.toml") == set()
     assert classify_path("uv.lock") == set()
+    assert classify_path("scripts/generate_pricing_data.py") == set()
     assert _is_shared_input("benchbox/foo.py") is True
     assert _is_shared_input("pyproject.toml") is True
     assert _is_shared_input("uv.lock") is True
+    assert _is_shared_input("scripts/generate_pricing_data.py") is True
     # Shared inputs must not be flagged as unclassified contamination
     report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=["benchbox/foo.py"])
     assert report.success is True

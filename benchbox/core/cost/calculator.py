@@ -18,7 +18,6 @@ from benchbox.core.cost.pricing import (
     PriceResolution,
     get_pricing_age_days,
     get_table_unit,
-    is_pricing_stale,
     resolve_athena_price_per_tb,
     resolve_bigquery_price_per_tb,
     resolve_databricks_dbu_price,
@@ -101,21 +100,20 @@ def _fallback_price_tables(benchmark_cost: BenchmarkCost) -> dict[str, str | Non
 def _execution_seconds_from_resource_usage(resource_usage: dict[str, Any]) -> float | None:
     """Return measured query runtime in seconds, or None when absent.
 
-    Prefers adapter-measured ``execution_time_seconds``, then server-side
-    ``execution_time_ms``, then ``total_elapsed_time_ms`` (which includes
+    Prefer server-side ``execution_time_ms`` when available because the
+    adapter timer can include session setup and result transfer. Fall back to
+    the adapter duration, then ``total_elapsed_time_ms`` (which includes
     queueing and compilation). Non-numeric values fail closed to None.
     """
+    milliseconds = resource_usage.get("execution_time_ms")
+    if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
+        return float(milliseconds) / 1000.0
     seconds = resource_usage.get("execution_time_seconds")
-    if isinstance(seconds, bool) or seconds is None:
-        seconds = None
-    if seconds is None:
-        milliseconds = resource_usage.get("execution_time_ms")
-        if isinstance(milliseconds, bool) or milliseconds is None:
-            milliseconds = resource_usage.get("total_elapsed_time_ms")
-        if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
-            seconds = milliseconds / 1000.0
     if isinstance(seconds, (int, float)) and not isinstance(seconds, bool):
         return float(seconds)
+    milliseconds = resource_usage.get("total_elapsed_time_ms")
+    if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
+        return float(milliseconds) / 1000.0
     return None
 
 
@@ -364,6 +362,13 @@ class CostCalculator:
             warnings.append(f"normalized cost unavailable: pricing region metadata missing for {platform_lower}")
         if platform_lower == "snowflake" and not deployment.warehouse_size:
             warnings.append("normalized cost unavailable: Snowflake warehouse_size metadata missing")
+        estimated_concurrent = platform_lower == "snowflake" and any(
+            (phase.concurrent_streams or 1) > 1
+            and any(query.pricing_details.get("credits_used_estimated") for query in phase.query_costs or [])
+            for phase in benchmark_cost.phase_costs or []
+        )
+        if estimated_concurrent:
+            warnings.append("normalized cost unavailable: runtime-estimated Snowflake costs overlap concurrent streams")
         if platform_lower == "redshift":
             if not deployment.instance_type:
                 warnings.append("normalized cost unavailable: Redshift node_type metadata missing")
@@ -378,11 +383,29 @@ class CostCalculator:
                 warnings.append(f"normalized cost unavailable: fallback pricing used for {table} ({reason})")
             else:
                 warnings.append(f"normalized cost unavailable: fallback pricing used for {table}")
-        if is_pricing_stale():
+        pricing_tables = {
+            "snowflake": ("snowflake_credit_prices",),
+            "bigquery": ("bigquery_on_demand_prices",),
+            "redshift": ("redshift_node_prices",),
+            "databricks": ("databricks_dbu_prices",),
+            "databricks-df": ("databricks_dbu_prices",),
+            "athena": ("athena_price_per_tb",),
+            "synapse": (
+                "synapse_dedicated_dwu_prices"
+                if str(platform_config.get("mode") or "serverless").lower() == "dedicated"
+                else "synapse_serverless_price_per_tb",
+            ),
+            "fabric_dw": ("fabric_cu_prices", "fabric_sku_cu_map"),
+            "firebolt": ("firebolt_node_fbu_rates", "firebolt_fbu_price"),
+        }.get(platform_lower, ())
+        unknown_tables = [table for table in pricing_tables if get_pricing_age_days(table) is None]
+        stale_tables = [table for table in pricing_tables if (get_pricing_age_days(table) or 0) > 90]
+        if unknown_tables:
             warnings.append(
-                f"normalized cost unavailable: pricing data is {get_pricing_age_days()} days old; "
-                "costs may be inaccurate"
+                "normalized cost unavailable: pricing provenance is unknown for " + ", ".join(unknown_tables)
             )
+        if stale_tables:
+            warnings.append("normalized cost unavailable: pricing tables are stale: " + ", ".join(stale_tables))
         return warnings
 
     def calculate_query_cost(

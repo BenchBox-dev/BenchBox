@@ -14,7 +14,7 @@ Prices are organized by platform, cloud provider, region, and resource type.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from importlib import resources
 from typing import Any, cast
 
@@ -390,7 +390,7 @@ def resolve_bigquery_price_per_tb(location: str) -> PriceResolution:
     # Captured per-region prices: an exact table entry is the most precise
     # value for that location, so it wins over the continental buckets
     # below. This is a priced cell, not a fallback.
-    if location in BIGQUERY_ON_DEMAND_PRICES:
+    if location in BIGQUERY_ON_DEMAND_PRICES and location != "other":
         return _hit(location)
 
     # US single regions (same as multi-region)
@@ -1006,16 +1006,25 @@ def _map_region_to_tier(region: str) -> str:
     return "other"
 
 
-def get_pricing_age_days() -> int | None:
+def get_pricing_age_days(table: str | None = None) -> int | None:
     """Return number of days since pricing was last updated.
 
     Returns:
         Number of days between now and PRICING_LAST_UPDATED, or None when
         no file-level refresh date is known (per-table provenance applies).
     """
+    if table is not None:
+        retrieved = (PRICE_TABLE_PROVENANCE.get(table) or {}).get("retrieved")
+        if not isinstance(retrieved, str) or retrieved == "unknown":
+            return None
+        try:
+            validation_date = datetime.fromisoformat(retrieved)
+        except ValueError:
+            return None
+        return (date.today() - validation_date.date()).days
     if PRICING_VALIDATION_DATE is None:
         return None
-    return (datetime.now() - PRICING_VALIDATION_DATE).days
+    return (date.today() - PRICING_VALIDATION_DATE.date()).days
 
 
 def is_pricing_stale(threshold_days: int = 90) -> bool:

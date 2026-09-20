@@ -63,7 +63,7 @@ def _canonical_databricks_workload(workload_type: str) -> str:
 
 def test_extraction_emits_only_known_workload_types():
     """Guard the emission set itself: a new emitted type must update this test and the table."""
-    assert _emitted_databricks_workload_types() == {"serverless_sql", "sql_compute", "all_purpose"}
+    assert _emitted_databricks_workload_types() == {"serverless_sql", "sql_classic", "sql_compute", "all_purpose"}
 
 
 def test_every_emitted_databricks_workload_resolves_without_fallback():

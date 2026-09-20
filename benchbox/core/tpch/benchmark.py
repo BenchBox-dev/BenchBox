@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
+from benchbox.core.tpch.compliance import validate_tpch_scale
 from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.core.tpch.maintenance_test import TPCHMaintenanceTest
 from benchbox.core.tpch.queries import TPCHQueries
@@ -180,6 +181,7 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         verbose: int | bool = 0,
         parallel: int = 1,
         force_regenerate: bool = False,
+        official: bool = False,
         **kwargs: Any,
     ) -> None:
         """Initialize a TPC-H benchmark instance.
@@ -190,6 +192,9 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose: Whether to print verbose output during operations
             parallel: Number of parallel processes for data generation
             force_regenerate: Force data regeneration even if valid data exists
+            official: True for a ``--official`` run. Required for the run to
+                classify as ``official`` and therefore to be submittable; see
+                :func:`benchbox.core.tpch.compliance.classify_tpch_run`.
             **kwargs: Additional implementation-specific options
 
         Raises:
@@ -201,6 +206,16 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
         if scale_factor <= 0:
             raise ValueError(f"scale_factor must be positive, got {scale_factor}")
+
+        # Single shared validator - no silent rounding. Genuine TPC-H runs only:
+        # derived benchmarks (TPC-Havoc, TPC-H Skew) inherit this __init__ but
+        # are variant/robustness studies outside TPC-H methodology, so they stay
+        # unclassified (None) instead of being stamped unofficial (which would
+        # exclude their results from default rankings).
+        if type(self) is TPCHBenchmark:
+            self.compliance_class = validate_tpch_scale(scale_factor, official=official)
+        else:
+            self.compliance_class = None
 
         # Validate parallel parameter
         if not isinstance(parallel, int):

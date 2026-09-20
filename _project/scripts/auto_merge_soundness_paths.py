@@ -67,6 +67,7 @@ SOUNDNESS_PREFIXES = (
     "scripts/publication/",
 )
 SOUNDNESS_FILES = (
+    "scripts/heavy_tier_needed.py",
     "benchbox/platforms/base/result_capture.py",
     "benchbox/sql_compat/resolver.py",
     "benchbox/sql_compat/decision.py",

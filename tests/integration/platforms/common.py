@@ -572,7 +572,10 @@ class SnowflakeStubState:
     statements: list[str] = field(default_factory=list)
     put_commands: list[str] = field(default_factory=list)
     copy_commands: list[str] = field(default_factory=list)
-    row_counts: dict[str, int] = field(default_factory=lambda: {"LINEITEM": 2})
+    # Tables start empty so the smoke exercises the upload path; a successful
+    # COPY fills the table (mirroring the adapter's idempotent-rerun skip,
+    # which bypasses the load when the target already holds rows).
+    row_counts: dict[str, int] = field(default_factory=dict)
 
 
 class _SnowflakeCursor:
@@ -588,6 +591,7 @@ class _SnowflakeCursor:
             self._results = [("local_file", 2, 2, "SKIPPED", "", "")]
         elif lowered.startswith("copy into"):
             self._state.copy_commands.append(sql)
+            self._state.row_counts["LINEITEM"] = 2
             self._results = [("lineitem", 2, 2, "loaded", "", "")]
         elif "select count(*)" in lowered:
             from_index = lowered.find("from")

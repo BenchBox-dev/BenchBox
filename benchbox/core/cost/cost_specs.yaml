@@ -201,7 +201,6 @@ platform_config_requirements:
     required:
     - cloud
     - tier
-    - warehouse_type
     - workload_type
     - cluster_size_dbu_per_hour
     optional:
@@ -210,7 +209,6 @@ platform_config_requirements:
     required:
     - cloud
     - tier
-    - warehouse_type
     - workload_type
     - cluster_size_dbu_per_hour
     optional:

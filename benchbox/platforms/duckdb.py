@@ -876,6 +876,15 @@ class DuckDBAdapter(PlatformAdapter):
             return DuckDBConnectionWrapper(conn, self)
         return conn
 
+    def _rewrite_schema_statement(self, statement: str) -> str:
+        """Rewrite one schema statement for the execution engine.
+
+        Identity by default. Engines sharing the DuckDB dialect but rejecting
+        parts of its DDL (e.g. DuckLake and PRIMARY KEY constraints) override
+        this hook; PRIMARY KEY handling stays in each adapter.
+        """
+        return statement
+
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
@@ -916,6 +925,10 @@ class DuckDBAdapter(PlatformAdapter):
         tables_created = 0
         for statement in statements:
             if statement.strip():
+                # Engine-specific rewrite (identity by default; e.g. DuckLake
+                # strips PRIMARY KEY constraints its engine rejects).
+                statement = self._rewrite_schema_statement(statement)
+
                 # Extract table name
                 import re
 

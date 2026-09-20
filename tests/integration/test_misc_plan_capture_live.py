@@ -4,7 +4,7 @@
 
 """Live plan-capture hooks for the misc-platform parsers (Databend, QuestDB, Doris, SingleStore).
 
-Part of query-plan-capture-misc-parser-live-validation (w3): each class runs a
+Each class runs a
 real EXPLAIN over a live instance and asserts the adapter's
 get_query_plan_parser() yields a non-None QueryPlanDAG with a stable
 fingerprint. Every class is gated on its own env var and skips cleanly when
@@ -73,7 +73,7 @@ class TestLiveQuestDBQueryPlanCapture:
 
         return QuestDBAdapter(
             host=os.environ.get("QUESTDB_HOST", "localhost"),
-            port=int(os.environ.get("QUESTDB_PORT", "8812")),
+            pg_port=int(os.environ.get("QUESTDB_PG_PORT", "8812")),
             username=os.environ.get("QUESTDB_USER", "admin"),
             password=os.environ.get("QUESTDB_PASSWORD", "quest"),
             database=os.environ.get("QUESTDB_DATABASE", "qdb"),

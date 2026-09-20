@@ -132,6 +132,7 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "aborted",
         "aggregate_value",
         "avg_time",
+        "bytes_billed",
         "bytes_per_second",
         "bytes_processed",
         "bytes_returned",

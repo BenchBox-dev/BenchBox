@@ -34,7 +34,43 @@ def _fingerprint_sql(sql: str) -> str:
     Non-cryptographic dedup hash only (counting distinct statements per run),
     never a security boundary; collision risk at benchmark scale is negligible.
     """
-    return hashlib.sha1(" ".join(sql.split()).encode()).hexdigest()
+    normalized: list[str] = []
+    quote: str | None = None
+    pending_space = False
+    index = 0
+    while index < len(sql):
+        char = sql[index]
+        if quote is not None:
+            normalized.append(char)
+            if char == quote:
+                if index + 1 < len(sql) and sql[index + 1] == quote:
+                    normalized.append(sql[index + 1])
+                    index += 1
+                else:
+                    quote = None
+            index += 1
+            continue
+        if char in "'\"`":
+            if pending_space and normalized:
+                normalized.append(" ")
+            pending_space = False
+            normalized.append(char)
+            quote = char
+        elif char == "[":
+            if pending_space and normalized:
+                normalized.append(" ")
+            pending_space = False
+            normalized.append(char)
+            quote = "]"
+        elif char.isspace():
+            pending_space = True
+        else:
+            if pending_space and normalized:
+                normalized.append(" ")
+            pending_space = False
+            normalized.append(char)
+        index += 1
+    return hashlib.sha1("".join(normalized).strip().encode()).hexdigest()
 
 
 def translation_collection_active() -> bool:

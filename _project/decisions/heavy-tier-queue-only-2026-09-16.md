@@ -1,7 +1,8 @@
 # Decision: run the heavy CI tier only in the merge queue (proposal)
 
 Date: 2026-09-16
-Status: Proposed. No workflow, ruleset, or queue change lands under this
+Status: Accepted. Maintainer decision recorded 2026-09-19. No further workflow,
+ruleset, or queue change lands under this
 record. The maintainer decision in section 9 is the only authorization, and
 an agent must not record it.
 

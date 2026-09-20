@@ -433,7 +433,8 @@ class TPCHStreamRunner(VerbosityMixin):
         raise NotImplementedError(
             "TPCHStreamRunner.run_concurrent_streams does not execute SQL. It "
             "previously delegated to the non-executing run_stream() per "
-            "stream via a now-retired ConcurrentQueryExecutor wrapper, so it "
+            "stream via ConcurrentQueryExecutor, which has since been removed "
+            "(see adr-concurrency-public-api-reconciliation), so it "
             "never ran real queries either. Use "
             "benchbox.core.tpch.throughput_test.TPCHThroughputTest for real "
             "concurrent TPC-H Throughput Test execution."

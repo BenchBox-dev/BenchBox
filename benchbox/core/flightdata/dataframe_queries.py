@@ -348,18 +348,18 @@ def delay_causes_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay") > lit(15)))
 
     prepared = flights.with_columns(
-        (col("carrier_delay") > lit(0)).cast(int).alias("_carrier_flag"),
+        (col("carrier_delay") > lit(0)).cast(int).fill_null(0).alias("_carrier_flag"),
         ctx.when(col("carrier_delay") > lit(0)).then(col("carrier_delay")).otherwise(lit(None)).alias("_carrier_pos"),
-        (col("weather_delay") > lit(0)).cast(int).alias("_weather_flag"),
+        (col("weather_delay") > lit(0)).cast(int).fill_null(0).alias("_weather_flag"),
         ctx.when(col("weather_delay") > lit(0)).then(col("weather_delay")).otherwise(lit(None)).alias("_weather_pos"),
-        (col("nas_delay") > lit(0)).cast(int).alias("_nas_flag"),
+        (col("nas_delay") > lit(0)).cast(int).fill_null(0).alias("_nas_flag"),
         ctx.when(col("nas_delay") > lit(0)).then(col("nas_delay")).otherwise(lit(None)).alias("_nas_pos"),
-        (col("security_delay") > lit(0)).cast(int).alias("_security_flag"),
+        (col("security_delay") > lit(0)).cast(int).fill_null(0).alias("_security_flag"),
         ctx.when(col("security_delay") > lit(0))
         .then(col("security_delay"))
         .otherwise(lit(None))
         .alias("_security_pos"),
-        (col("late_aircraft_delay") > lit(0)).cast(int).alias("_late_flag"),
+        (col("late_aircraft_delay") > lit(0)).cast(int).fill_null(0).alias("_late_flag"),
         ctx.when(col("late_aircraft_delay") > lit(0))
         .then(col("late_aircraft_delay"))
         .otherwise(lit(None))
@@ -1305,7 +1305,10 @@ def _make_pandas_impl(row: list[str]) -> Any:
         for name in _csv(derives):
             column, derive = _PANDAS_DERIVED[name]
             filtered[column] = derive(filtered)
-        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False).agg(**_parse_aggs(aggs))
+        # SQL GROUP BY keeps NULL keys as a group; pandas drops them unless asked.
+        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False, dropna=False).agg(
+            **_parse_aggs(aggs)
+        )
         if result_filter:
             column, threshold = result_filter.split(">=")
             result = result[result[column] >= int(threshold)]

@@ -741,7 +741,7 @@ def collect_refresh_updates(evidence: dict, *, today: str) -> list[EvidenceUpdat
 def _refresh_aws_redshift(evidence: dict, updates: list[EvidenceUpdate], *, today: str) -> None:
     section = evidence["redshift_node_prices"]
     publications: set[str] = set()
-    dirty = False
+    prices_changed = False
     for region in section["regions"]:
         publication, products, terms = fetch_aws_region_offer(section["url_template"], region)
         publications.add(publication)
@@ -762,22 +762,21 @@ def _refresh_aws_redshift(evidence: dict, updates: list[EvidenceUpdate], *, toda
                         ("redshift_node_prices", "nodes", node), region, section["nodes"][node][region], replacement
                     )
                 )
-                dirty = True
+                prices_changed = True
     if len(publications) != 1:
         raise PricingGeneratorError(f"redshift regions disagree on publication date: {sorted(publications)}")
     (publication,) = publications
-    if publication != section["upstream_published"]:
+    if prices_changed and publication != section["upstream_published"]:
         updates.append(
             EvidenceUpdate(("redshift_node_prices",), "upstream_published", section["upstream_published"], publication)
         )
-        dirty = True
-    _stamp_retrieved(updates, evidence, "redshift_node_prices", today=today, dirty=dirty)
+    _stamp_retrieved(updates, evidence, "redshift_node_prices", today=today, dirty=prices_changed)
 
 
 def _refresh_aws_athena(evidence: dict, updates: list[EvidenceUpdate], *, today: str) -> None:
     section = evidence["athena_price_per_tb"]
     publications: set[str] = set()
-    dirty = False
+    prices_changed = False
     for region in section["regions"]:
         publication, products, terms = fetch_aws_region_offer(section["url_template"], region)
         publications.add(publication)
@@ -796,16 +795,15 @@ def _refresh_aws_athena(evidence: dict, updates: list[EvidenceUpdate], *, today:
             updates.append(
                 EvidenceUpdate(("athena_price_per_tb", "regions"), region, section["regions"][region], replacement)
             )
-            dirty = True
+            prices_changed = True
     if len(publications) != 1:
         raise PricingGeneratorError(f"athena regions disagree on publication date: {sorted(publications)}")
     (publication,) = publications
-    if publication != section["upstream_published"]:
+    if prices_changed and publication != section["upstream_published"]:
         updates.append(
             EvidenceUpdate(("athena_price_per_tb",), "upstream_published", section["upstream_published"], publication)
         )
-        dirty = True
-    _stamp_retrieved(updates, evidence, "athena_price_per_tb", today=today, dirty=dirty)
+    _stamp_retrieved(updates, evidence, "athena_price_per_tb", today=today, dirty=prices_changed)
 
 
 def _refresh_synapse_dedicated(evidence: dict, updates: list[EvidenceUpdate], *, today: str) -> None:

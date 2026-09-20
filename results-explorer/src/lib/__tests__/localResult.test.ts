@@ -214,7 +214,7 @@ describe("local result import", () => {
 
     expect(preview.detail).toMatchObject({
       normalized_cost_usd: null,
-      cost_model_version: "2025.11",
+      cost_model_version: "2026.09",
       cost_model_source: "benchbox.core.cost.pricing",
       cost_scope: "compute_only",
       cost_status: "unavailable",
@@ -255,11 +255,11 @@ describe("local result import", () => {
     await expect(parseLocalResultText(text)).resolves.toBeTruthy();
   });
 
-  it("prefers result_schema_version over legacy keys", async () => {
+  it("rejects conflicting result schema aliases", async () => {
     const text = JSON.stringify(
       bundle({ result_schema_version: "2.2", version: "2.0", schema_version: "2.0" }),
     );
-    await expect(parseLocalResultText(text)).resolves.toBeTruthy();
+    await expect(parseLocalResultText(text)).rejects.toThrow("must match");
   });
 
   it("rejects bundles with no version key at all", async () => {

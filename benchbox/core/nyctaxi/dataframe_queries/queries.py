@@ -64,7 +64,7 @@ def _pandas_top_zone(ctx: DataFrameContext, query_id: str, location_col: str) ->
         ctx.get_table("taxi_zones"), left_on=location_col, right_on="location_id", how="left"
     )
     return (
-        merged.groupby([location_col, "zone", "borough"], as_index=False)
+        merged.groupby([location_col, "zone", "borough"], as_index=False, dropna=False)
         .agg(trip_count=(location_col, "count"))
         .sort_values("trip_count", ascending=False)
         .head(20)
@@ -95,7 +95,7 @@ def _pandas_trip_summary(ctx: DataFrameContext, query_id: str, end: str, group_c
     aggs["total_revenue"] = ("total_amount", "sum")
     return (
         _pandas_window(ctx, query_id, "2019-01-01", end)
-        .groupby([group_col], as_index=False)
+        .groupby([group_col], as_index=False, dropna=False)
         .agg(**aggs)
         .sort_values("trip_count", ascending=False)
     )
@@ -289,7 +289,9 @@ def _make_group_query(row: list[str]) -> tuple[Any, Any]:
 
     def pandas_impl(ctx: DataFrameContext) -> Any:
         frame = _pandas_window(ctx, qid, start, end, copy=True, extra=_pandas_extra(extra) if extra else None)
-        frame = _pandas_derive(frame, derives).groupby(_items(group), as_index=False).agg(**_parse_aggs(aggs))
+        frame = (
+            _pandas_derive(frame, derives).groupby(_items(group), as_index=False, dropna=False).agg(**_parse_aggs(aggs))
+        )
         frame = _sort_pandas(frame, sort, desc)
         return frame.head(int(limit)) if limit else frame
 
@@ -381,7 +383,11 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
         suffixes=("", "_dz"),
     )
     return (
-        merged.groupby(["pickup_location_id", "pickup_zone", "dropoff_location_id", "dropoff_zone"], as_index=False)
+        merged.groupby(
+            ["pickup_location_id", "pickup_zone", "dropoff_location_id", "dropoff_zone"],
+            as_index=False,
+            dropna=False,
+        )
         .agg(
             trip_count=("pickup_location_id", "count"),
             avg_distance=("trip_distance", "mean"),
@@ -414,7 +420,7 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
     merged = merged[merged["borough"].notna()]
     return (
-        merged.groupby(["borough"], as_index=False)
+        merged.groupby(["borough"], as_index=False, dropna=False)
         .agg(
             trip_count=("borough", "count"),
             total_revenue=("total_amount", "sum"),
@@ -454,7 +460,7 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
         ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id", how="left"
     )
     return (
-        merged.groupby(["rate_code_id", "zone"], as_index=False)
+        merged.groupby(["rate_code_id", "zone"], as_index=False, dropna=False)
         .agg(
             trip_count=("rate_code_id", "count"),
             avg_distance=("trip_distance", "mean"),
@@ -528,7 +534,7 @@ def q24_pandas_impl(ctx: DataFrameContext) -> Any:
     )
     return (
         trips.merge(ctx.get_table("taxi_zones"), left_on="pickup_location_id", right_on="location_id")
-        .groupby(["zone", "borough"], as_index=False)
+        .groupby(["zone", "borough"], as_index=False, dropna=False)
         .agg(
             pickup_count=("zone", "count"),
             avg_distance=("trip_distance", "mean"),

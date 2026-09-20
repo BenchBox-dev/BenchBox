@@ -34,9 +34,9 @@ from benchbox.sql_compat.registry import REGISTRY
 
 
 # Rule_id slugs covered by pk_capability.py (write_primitives benchmark).
-# Original 4 register under .pk_lock_table_unsupported; the 8 INFORMATIONAL
-# cloud-DW groups added in w5 register under .pk_not_enforced.
-_EXPECTED_LOCK_TABLE_DIALECTS = ("datafusion", "clickhouse", "starrocks", "doris")
+# Original 4 plus ducklake register under .pk_lock_table_unsupported; the 8
+# INFORMATIONAL cloud-DW groups added in w5 register under .pk_not_enforced.
+_EXPECTED_LOCK_TABLE_DIALECTS = ("datafusion", "clickhouse", "starrocks", "doris", "ducklake")
 _EXPECTED_INFORMATIONAL_DIALECTS = (
     "snowflake",
     "redshift",
@@ -64,7 +64,7 @@ def test_pk_capability_rules_registered():
     assert not missing, f"Missing PK rules: {sorted(missing)}"
 
 
-@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris"])
+@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris", "ducklake"])
 def test_pk_rule_action_is_rewrite_ddl(platform: str):
     ctx = CompatibilityContext(
         platform=platform,
@@ -100,6 +100,25 @@ def test_datafusion_pk_rule_payload():
     assert payload.conditions is None
 
 
+def test_ducklake_pk_rule_payload():
+    ctx = CompatibilityContext(
+        platform="ducklake",
+        platform_version=None,
+        benchmark="write_primitives",
+        query_id=None,
+        phase=Phase.SCHEMA_EMIT,
+        mode="sql",
+        dialect="ducklake",
+    )
+    decision = REGISTRY.resolve(ctx)
+    assert decision is not None
+    payload = decision.payload
+    assert isinstance(payload, PKCapabilityPayload)
+    assert payload.ddl_accepted is False
+    assert payload.uniqueness_enforced is False
+    assert payload.conditions is None
+
+
 def test_starrocks_pk_rule_payload():
     ctx = CompatibilityContext(
         platform="starrocks",
@@ -124,9 +143,9 @@ def test_starrocks_pk_rule_payload():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris"])
+@pytest.mark.parametrize("platform", ["datafusion", "clickhouse", "starrocks", "doris", "ducklake"])
 def test_all_lock_platforms_have_rewrite_ddl_rule(platform: str):
-    """All 4 lock-bypass platforms have REWRITE_DDL rules in the registry."""
+    """All 5 lock-bypass platforms have REWRITE_DDL rules in the registry."""
     ctx = CompatibilityContext(
         platform=platform,
         platform_version=None,

@@ -158,6 +158,25 @@ def test_benchmark_attribute_csv_null_marker_empty_string(caplog: pytest.LogCapt
     assert caplog.records  # path (b) always warns
 
 
+def test_benchmark_attribute_csv_null_marker_sentinel_preserved(caplog: pytest.LogCaptureFixture) -> None:
+    """A truthy csv_null_marker sentinel must survive path (b) verbatim.
+
+    Benchmarks with NOT NULL schemas over gappy CSV data (ClickBench hits)
+    declare a sentinel so loaders convert only that literal to NULL while
+    empty fields stay empty strings.
+    """
+    ds = _make_data_source()  # no manifest — forces path (b)
+    benchmark = _Benchmark(csv_delimiter="|", csv_null_marker="__NULL__")
+    file_path = Path("hits.csv.gz")
+
+    with caplog.at_level(logging.WARNING):
+        dialect = resolve_csv_dialect(ds, "hits", file_path, benchmark)
+
+    assert dialect.delimiter == "|"
+    assert dialect.null_marker == "__NULL__"
+    assert caplog.records  # path (b) always warns
+
+
 def test_flightdata_declares_empty_csv_fields_as_null(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     """FlightData CSV files use empty fields for nullable delay metrics."""
     ds = _make_data_source()

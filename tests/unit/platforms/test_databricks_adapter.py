@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 import pytest
@@ -1153,6 +1154,49 @@ class TestDatabricksSqlGenerationHelpers:
                 "status": "applied",
             }
         ]
+
+    def test_load_single_table_adds_null_value_for_sentinel_marker(self):
+        """A truthy csv_null_marker must become COPY INTO nullValue.
+
+        Benchmarks with NOT NULL schemas over gappy CSV data (ClickBench)
+        need empty fields to stay empty strings; only the sentinel literal
+        may load as NULL.
+        """
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            adapter = DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+                catalog="main",
+                schema="benchbox",
+            )
+
+        benchmark = SimpleNamespace(
+            csv_delimiter="|",
+            csv_null_marker="__NULL__",
+            get_schema=lambda: {"hits": {"columns": [{"name": "WatchID"}]}},
+        )
+        cursor = Mock()
+        cursor.fetchone.return_value = (3,)
+        connection = Mock()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            row_count, _, _ = adapter._load_single_table(
+                cursor,
+                connection,
+                benchmark,
+                "hits",
+                Path("hits.csv.gz"),
+                "dbfs:/Volumes/main/benchbox/data",
+                {"hits"},
+            )
+
+        assert row_count == 3
+        assert cursor.execute.call_args_list[0].args[0] == (
+            "COPY INTO HITS (WatchID) FROM "
+            "'dbfs:/Volumes/main/benchbox/data/hits.csv.gz' "
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false', 'nullValue'='__NULL__')"
+        )
 
     def test_vacuum_table_executes_delta_maintenance(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):

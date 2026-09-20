@@ -80,14 +80,18 @@ Ship derived values under this risk acceptance subject to these guardrails,
 which keep the exposure to a small set of attributed facts rather than a
 vendor feed mirror:
 
-1. Vendor only individually selected scalar values, each with per-value
-   provenance: source API, SKU or meter identifier, region, currency, and
-   retrieved or effective date. Never vendor bulk snapshots of either catalog.
+1. Vendor only individually selected scalar values, with the retained
+   provenance needed to identify the source API, selected region, currency,
+   and retrieved or effective date. Where a provider exposes a stable SKU or
+   meter identifier, retain it with the value; the current regional tables do
+   not claim per-value identifiers that the source does not expose. Never
+   vendor bulk snapshots of either catalog.
 2. Keep vendor attribution and the residual-risk disclosure in the data file
    header and user-facing docs, alongside the other pricing provenance.
 3. Treat vendored values as stale-by-default: the generator and cost paths
    must handle refresh and staleness rather than trusting vendored values
-   indefinitely.
+   indefinitely. Unknown per-table retrieval dates remain unavailable for
+   normalized publication.
 
 Optional hardening remains useful, but it is not a generator blocker:
 

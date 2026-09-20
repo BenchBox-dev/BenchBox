@@ -1,7 +1,7 @@
 """Parity tests for W10 query_source variant rules under shadow mode.
 
 Verifies that:
-1. h2odb_variants.py registers exactly 4 rules (SQLite + ClickHouse + StarRocks + MySQL for Q9).
+1. h2odb_variants.py registers exactly 5 rules (SQLite + ClickHouse + StarRocks + MySQL + BigQuery for Q9).
 2. coffeeshop_variants.py registers exactly 2 rules (clickhouse SA4 + TM1).
 3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
 4. Shadow-mode: no divergence for covered platforms (legacy already selects variant).
@@ -32,14 +32,15 @@ from benchbox.sql_compat.registry import REGISTRY
 
 
 def test_h2odb_variant_rules_registered():
-    """Exactly 4 query_source rules registered for h2odb (SQLite + ClickHouse + StarRocks + MySQL Q9)."""
+    """Exactly 5 query_source rules registered for h2odb (SQLite + ClickHouse + StarRocks + MySQL + BigQuery Q9)."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "h2odb"]
-    assert len(rules) == 4, f"Expected 4 h2odb rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 5, f"Expected 5 h2odb rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = [entry.rule_id for _, entry in rules]
     assert "query_source.sqlite.h2odb.q9_percentile_cont_variant" in rule_ids
     assert "query_source.clickhouse.h2odb.q9_quantile_variant" in rule_ids
     assert "query_source.starrocks.h2odb.q9_percentile_approx_variant" in rule_ids
     assert "query_source.mysql.h2odb.q9_within_group_verbatim" in rule_ids
+    assert "query_source.bigquery.h2odb.q9_percentile_window_variant" in rule_ids
 
 
 @pytest.mark.parametrize(

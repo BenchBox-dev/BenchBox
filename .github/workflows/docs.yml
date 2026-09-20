@@ -31,7 +31,7 @@ concurrency:
   # arrives. Pushes to develop and release feed the deploy job and must
   # never cancel each other, so push and workflow_dispatch runs each get a
   # unique per-SHA group with cancellation disabled.
-  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || format('docs-{0}', github.sha) }}
+  group: ${{ github.event_name == 'pull_request' && format('docs-pr-{0}', github.event.pull_request.number) || format('docs-{0}-{1}', github.sha, github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

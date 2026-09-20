@@ -240,6 +240,18 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
             return self._impl.csv_delimiter
         return getattr(self, "_csv_delimiter", None)
 
+    @property
+    def csv_null_marker(self) -> "str | None":
+        """CSV null marker. Delegates to _impl if present."""
+        if hasattr(self, "_impl") and hasattr(self._impl, "csv_null_marker"):
+            return self._impl.csv_null_marker
+        return getattr(self, "_csv_null_marker", None)
+
+    @csv_null_marker.setter
+    def csv_null_marker(self, value: "str | None") -> None:
+        """Allow subclasses without _impl to override the marker per instance."""
+        self._csv_null_marker = value
+
     def get_csv_loading_config(self, table_name: str) -> "list[str] | None":
         """Get CSV loading configuration. Delegates to _impl if present."""
         if hasattr(self, "_impl") and hasattr(self._impl, "get_csv_loading_config"):

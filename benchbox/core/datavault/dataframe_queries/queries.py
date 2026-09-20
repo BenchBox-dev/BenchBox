@@ -490,8 +490,16 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
     )
     # Precompute row-level values so the global aggregate stays a plain column
     # sum on every backend (arithmetic inside an aggregate is not portable).
-    return df.with_columns((col("l_extendedprice") * col("l_discount")).alias("charge")).agg(
-        col("charge").sum().alias("revenue")
+    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
+    # selecting NULL when the row count is zero so every backend yields one
+    # NULL row like the reference query.
+    return (
+        df.with_columns((col("l_extendedprice") * col("l_discount")).alias("charge"))
+        .agg(
+            col("charge").sum().alias("revenue"),
+            col("charge").count().alias("n"),
+        )
+        .select(ctx.when(col("n") > lit(0)).then(col("revenue")).otherwise(lit(None)).alias("revenue"))
     )
 
 
@@ -518,6 +526,11 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     import pandas as pd
 
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
+    # .empty is not implemented by Dask.
+    if len(df) == 0:
+        return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(df["l_extendedprice"] * df["l_discount"]).sum()]})
 
 
@@ -1107,10 +1120,19 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     df = df.with_columns(
         ctx.when(col("p_type").str.starts_with("PROMO")).then(col("revenue")).otherwise(lit(0)).alias("promo_revenue")
     )
+    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): stay lazy and
+    # single-pass, selecting NULL when the row count is zero so every backend
+    # yields one NULL row like the reference query.
     return df.agg(
         col("promo_revenue").sum().alias("promo_sum"),
         col("revenue").sum().alias("revenue_sum"),
-    ).select((col("promo_sum") * lit(100.0) / col("revenue_sum")).alias("promo_revenue"))
+        col("revenue").count().alias("n"),
+    ).select(
+        ctx.when(col("n") > lit(0))
+        .then(col("promo_sum") * lit(100.0) / col("revenue_sum"))
+        .otherwise(lit(None))
+        .alias("promo_revenue")
+    )
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1133,7 +1155,19 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     df["promo_revenue"] = np.where(df["p_type"].str.startswith("PROMO"), df["revenue"], 0)
-    promo_pct = 100.0 * df["promo_revenue"].sum() / df["revenue"].sum()
+    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): preserve the NULL
+    # row. len() works on every pandas-family frame; .empty is not in Dask.
+    if len(df) == 0:
+        return pd.DataFrame({"promo_revenue": [None]})
+    # float() first: DECIMAL columns arrive as Decimal objects, and float *
+    # Decimal raises TypeError.
+    revenue_sum = float(df["revenue"].sum())
+    if revenue_sum == 0:
+        # Rows exist but carry no revenue: the SQL reference and the
+        # expression surface yield NaN for the 0/0 ratio, so do the same
+        # instead of raising ZeroDivisionError.
+        return pd.DataFrame({"promo_revenue": [float("nan")]})
+    promo_pct = 100.0 * float(df["promo_revenue"].sum()) / revenue_sum
     return pd.DataFrame({"promo_revenue": [promo_pct]})
 
 
@@ -1467,11 +1501,17 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Precompute the row-level revenue so the global aggregate stays a plain
     # column sum on every backend (arithmetic inside an aggregate is not
-    # portable).
+    # portable). SQL SUM() over an empty set is NULL (not 0.0): stay lazy and
+    # single-pass, selecting NULL when the row count is zero so every backend
+    # yields one NULL row like the reference query.
     return (
         df.filter(cond1 | cond2 | cond3)
         .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
-        .agg(col("revenue").sum().alias("revenue"))
+        .agg(
+            col("revenue").sum().alias("revenue"),
+            col("revenue").count().alias("n"),
+        )
+        .select(ctx.when(col("n") > lit(0)).then(col("revenue")).otherwise(lit(None)).alias("revenue"))
     )
 
 
@@ -1524,6 +1564,10 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = df[c1 | c2 | c3]
     import pandas as pd
 
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    # len() works on every pandas-family frame; .empty is not in Dask.
+    if len(filtered) == 0:
+        return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(filtered["l_extendedprice"] * (1 - filtered["l_discount"])).sum()]})
 
 

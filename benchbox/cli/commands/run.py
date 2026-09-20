@@ -1119,9 +1119,7 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
     if not s.platform_key or not s.benchmark:
         return
 
-    caps = PlatformRegistry.get_platform_capabilities(s.platform_key)
-    unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", None) if caps else None
-    block_reason: str | None = unsupported_benchmarks.get(s.benchmark) if unsupported_benchmarks else None
+    block_reason = PlatformRegistry.get_benchmark_block_reason(s.platform_key, s.benchmark)
 
     if block_reason is None:
         return
@@ -1537,6 +1535,23 @@ def _warn_tpcds_subscale(s: types.SimpleNamespace) -> None:
         )
 
 
+def _warn_tpch_subscale(s: types.SimpleNamespace) -> None:
+    if s.benchmark == "tpch" and s.scale < 1.0 and not s.quiet:
+        console.print(
+            "[yellow]⚠  TPC-H UNOFFICIAL SUBSCALE RUN[/yellow]\n"
+            f"   Scale factor: [bold]{s.scale}[/bold] (< 1.0 - not TPC-H compliant)\n"
+            "   Results are for development use only and must not be published or\n"
+            "   submitted as official TPC-H results. Official TPC metrics\n"
+            "   (QphH, power@size, throughput@size) will not be computed."
+        )
+
+
+def _warn_unofficial_subscale(s: types.SimpleNamespace) -> None:
+    """Warn on subscale runs for every compliance-gated TPC benchmark."""
+    _warn_tpcds_subscale(s)
+    _warn_tpch_subscale(s)
+
+
 def _run_dry_run(s: types.SimpleNamespace) -> None:
     """Execute the --dry-run path."""
     ctx = s.ctx
@@ -1578,7 +1593,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -1720,7 +1735,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -1916,7 +1931,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         s.ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -2180,7 +2195,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
             s.logger.error(f"Scale factor validation failed: {e}")
         s.ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     s.benchmark_config = _build_benchmark_config(s, benchmark_info)
     console.print()

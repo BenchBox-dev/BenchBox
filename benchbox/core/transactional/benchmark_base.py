@@ -262,10 +262,11 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         Args:
             operation_id: ID of the operation to execute
             connection: Database connection
-            **kwargs: Forwarded kwargs; reads ``platform_key`` and ``sql_override``
+            **kwargs: Forwarded kwargs; reads ``platform_key``,
+                ``platform_fallback_key`` and ``sql_override``
 
         Returns:
-            (operation, platform_key, sql_override) tuple
+            (operation, platform_key, fallback_key, sql_override) tuple
 
         Raises:
             ValueError: If connection is None or lacks an ``execute`` method
@@ -277,6 +278,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
             raise ValueError(f"Invalid connection type: {type(connection).__name__}")
 
         platform_key: Optional[str] = kwargs.get("platform_key")
+        fallback_key: Optional[str] = kwargs.get("platform_fallback_key")
         sql_override: Optional[str] = kwargs.get("sql_override")
 
         operation = self.operations_manager.get_operation(operation_id)
@@ -290,7 +292,30 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 self._rollback_connection_after_error(connection)
                 raise RuntimeError(f"Failed to initialize staging tables before executing '{operation_id}': {e}") from e
 
-        return operation, platform_key, sql_override
+        return operation, platform_key, fallback_key, sql_override
+
+    @staticmethod
+    def _lookup_platform_override(
+        overrides: dict[str, Any] | None,
+        platform_key: str | None,
+        fallback_key: str | None = None,
+    ) -> tuple[bool, Any]:
+        """Resolve a platform override with shared-dialect fallback.
+
+        Engines sharing a SQL dialect but carrying their own capability
+        identity (e.g. DuckLake on the DuckDB dialect) consult their own key
+        first so engine-true rules win; a missing engine entry falls back to
+        the shared dialect's entry instead of silently dropping to the catalog
+        default (which would execute SQL the engine rejects, e.g. DuckDB's
+        unsupported SAVEPOINT syntax on DuckLake). Returns ``(found, value)``;
+        a found ``None`` means explicitly unsupported (skip).
+        """
+        if overrides:
+            if platform_key and platform_key in overrides:
+                return True, overrides[platform_key]
+            if fallback_key and fallback_key in overrides:
+                return True, overrides[fallback_key]
+        return False, None
 
     def _rewrite_transactional_sql_for_platform(self, sql: str, platform_key: str | None) -> str:
         """Apply narrow transactional catalog rewrites for the active SQL dialect."""

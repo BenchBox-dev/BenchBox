@@ -48,6 +48,10 @@ class TPCH(BaseBenchmark):
         # Initialize the actual implementation using common pattern
         self._initialize_benchmark_implementation(TPCHBenchmark, scale_factor, output_dir, **kwargs)
 
+        # Surface the inner implementation's compliance classification on the
+        # facade: result builders read compliance_class off the outer benchmark.
+        self.compliance_class = getattr(self._impl, "compliance_class", None)
+
     def generate_data(self) -> list[Union[str, Path]]:
         """Generate TPC-H benchmark data.
 

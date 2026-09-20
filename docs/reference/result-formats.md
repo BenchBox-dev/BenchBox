@@ -129,7 +129,7 @@ Consumer policy is intentionally split by use case:
 | Field | Type | Description |
 |-------|------|-------------|
 | `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
-| `version` | string | Legacy key, accepted as a fallback when `result_schema_version` is absent. |
+| `version` | string | Compatibility alias emitted with `result_schema_version` during the schema-v2 transition; accepted as a fallback when the new key is absent. If both keys are present, they must match. |
 | `schema_version` | string | Oldest key, accepted as a last-resort fallback for pre-rename bundles. |
 
 #### Benchmark Block

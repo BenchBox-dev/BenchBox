@@ -50,3 +50,25 @@ def generate_official_benchmark_audit_trail(
                 file_obj.write(f"  - {error}\n")
 
     return output_path
+
+
+def classify_official_scale_run(
+    scale_factor: float,
+    *,
+    official: bool,
+    scale_points: frozenset,
+    compliance_enum: Any,
+) -> Any:
+    """Shared official-scale-point compliance shape for the TPC families.
+
+    TPC-H and TPC-DS classify methodology compliance identically: subscale
+    (< 1.0) is unofficial-subscale; an official scale point with ``--official``
+    mode is official; anything else is unofficial-nonstandard. The families
+    differ only in scale points and enum type, so each compliance module keeps
+    a thin typed wrapper around this core instead of a second structural copy.
+    """
+    if scale_factor < 1.0:
+        return compliance_enum.UNOFFICIAL_SUBSCALE
+    if official and scale_factor in scale_points:
+        return compliance_enum.OFFICIAL
+    return compliance_enum.UNOFFICIAL_NONSTANDARD

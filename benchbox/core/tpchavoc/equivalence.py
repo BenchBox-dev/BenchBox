@@ -210,6 +210,22 @@ def _identity(sql: str) -> str:
     return sql
 
 
+def _identity_rows(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """Default row normalization: compare fetched cells byte-for-byte."""
+    return rows
+
+
+def _rstrip_string_cells(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """Strip trailing whitespace from string cells, leaving other cells intact.
+
+    Mirrors SQL ``CHAR(n)`` comparison semantics (trailing spaces insignificant)
+    for samples where an engine returns an expression-over-``CHAR`` column as a
+    non-padded string. Leading whitespace is preserved: only padding can be
+    added by blank-padding, so only trailing whitespace may be removed.
+    """
+    return [tuple(cell.rstrip() if isinstance(cell, str) else cell for cell in row) for row in rows]
+
+
 def find_divergences(
     connection: Any,
     benchmark: TPCHavocBenchmark,
@@ -219,7 +235,7 @@ def find_divergences(
     translate_variant: Callable[[str], str] | None = None,
     skip_variants: Collection[str] | None = None,
     execute_transform: Callable[[str], str] | None = None,
-    strip_trailing_spaces: bool = False,
+    char_padding_tolerance: bool = False,
 ) -> list[Divergence]:
     """Compare every variant of each query to canonical TPC-H on ``connection``.
 
@@ -258,10 +274,17 @@ def find_divergences(
             sample exercises the real execution path; applied identically to
             canonical and variant, so shared transforms still cancel out. Defaults
             to identity, leaving the DuckDB/Postgres/DataFusion samples unchanged.
-        strip_trailing_spaces: Trim trailing spaces from scalar string cells before
-            comparison. PostgreSQL materializes fixed-width CHAR values with their
-            padding; the Postgres sample uses this only to compare the logical TPC-H
-            value rather than a driver-visible storage representation.
+        char_padding_tolerance: When True, strip TRAILING whitespace from string
+            cells on both sides before validation. SQL ``CHAR(n)`` comparison
+            ignores trailing spaces, but wrapping a ``CHAR`` column in an
+            expression (e.g. the v10 ``CASE``-over-``o_orderpriority``/``n_name``/
+            ``l_shipmode`` variants) changes the presentation type to a
+            non-padded string on engines like PostgreSQL while remaining
+            semantically equal - a strict byte comparison then flags a
+            divergence that is not a translation defect. Leading whitespace
+            stays significant, so a genuine leading-space transcription error is
+            still caught. Defaults to False, keeping the hard DuckDB gate
+            byte-strict; the PostgreSQL second-engine sample opts in.
 
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
@@ -288,13 +311,14 @@ def find_divergences(
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     render_variant = translate_variant if translate_variant is not None else _identity
     transform_for_engine = execute_transform if execute_transform is not None else _identity
+    normalize = _rstrip_string_cells if char_padding_tolerance else _identity_rows
     excluded = set(skip_variants or ())
     divergences: list[Divergence] = []
     for query_id in ids:
         try:
-            original = connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
-            if strip_trailing_spaces:
-                original = _strip_trailing_spaces(original)
+            original = normalize(
+                connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
+            )
         except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
             continue
@@ -320,20 +344,13 @@ def find_divergences(
                 variant_sql = transform_for_engine(
                     render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
                 )
-                variant_rows = connection.execute(variant_sql).fetchall()
-                if strip_trailing_spaces:
-                    variant_rows = _strip_trailing_spaces(variant_rows)
+                variant_rows = normalize(connection.execute(variant_sql).fetchall())
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
                 divergences.append(Divergence(query_id, variant_id, str(exc)))
             except Exception as exc:  # noqa: BLE001 - surface execution/sort errors as divergences
                 divergences.append(Divergence(query_id, variant_id, f"error: {exc}"))
     return divergences
-
-
-def _strip_trailing_spaces(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
-    """Normalize driver-visible fixed-width CHAR padding for cross-engine comparison."""
-    return [tuple(value.rstrip() if isinstance(value, str) else value for value in row) for row in rows]
 
 
 def _generate_tpch(scale_factor: float, output_dir: Path) -> tuple[Path, TPCHavocBenchmark, TPCH]:
@@ -593,33 +610,32 @@ def run_duckdb_gate() -> int:
     )
 
 
-def _run_single_dialect_divergences(
+def _dialect_sample_divergences(
     connection: Any,
     tpchavoc: TPCHavocBenchmark,
     tpch: TPCH,
+    target_dialect: str,
+    skip_variants: Collection[str],
     *,
-    dialect: str,
-    skips: Collection[str],
     query_ids: list[int] | None = None,
-    execute_transform: Callable[[str], str] | None = None,
-    strip_trailing_spaces: bool = False,
+    **sweep_kwargs: Any,
 ) -> list[Divergence]:
-    """Run an engine sweep whose canonical and variant SQL share one dialect.
+    """Run a same-dialect sweep: canonical and variants share one seam.
 
-    Shared seam for the single-dialect engine wrappers (PostgreSQL,
-    ClickHouse): both sides go through the same translation, so shared
-    translation cancels out, and engine-specific skip sets are excluded
-    (never marked equivalent).
+    Both sides are rendered into ``target_dialect`` through the same
+    translation (``netezza`` -> target for variants) so shared translation
+    cancels out; ``skip_variants`` are excluded, never marked equivalent.
+    Extra ``sweep_kwargs`` pass through to :func:`find_divergences` (e.g. an
+    engine's ``execute_transform`` or ``char_padding_tolerance``).
     """
     return find_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=dialect),
+        lambda q: tpch.get_query(q, dialect=target_dialect),
         query_ids=query_ids,
-        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", dialect),
-        skip_variants=set(skips),
-        execute_transform=execute_transform,
-        strip_trailing_spaces=strip_trailing_spaces,
+        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", target_dialect),
+        skip_variants=set(skip_variants),
+        **sweep_kwargs,
     )
 
 
@@ -640,14 +656,17 @@ def find_postgres_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
-    return _run_single_dialect_divergences(
+    return _dialect_sample_divergences(
         connection,
         tpchavoc,
         tpch,
-        dialect=POSTGRES_TARGET_DIALECT,
-        skips=POSTGRES_TPCHAVOC_SKIPS,
+        POSTGRES_TARGET_DIALECT,
+        POSTGRES_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        strip_trailing_spaces=True,
+        # Expression-over-CHAR variants (e.g. v10 CASE) come back unpadded on
+        # PostgreSQL while canonical CHAR columns stay blank-padded; both are
+        # semantically equal under CHAR comparison semantics.
+        char_padding_tolerance=True,
     )
 
 
@@ -992,12 +1011,12 @@ def find_clickhouse_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 
-    return _run_single_dialect_divergences(
+    return _dialect_sample_divergences(
         connection,
         tpchavoc,
         tpch,
-        dialect=CLICKHOUSE_TARGET_DIALECT,
-        skips=CLICKHOUSE_TPCHAVOC_SKIPS,
+        CLICKHOUSE_TARGET_DIALECT,
+        CLICKHOUSE_TPCHAVOC_SKIPS,
         query_ids=query_ids,
         execute_transform=_clickhouse_execute_transform,
     )

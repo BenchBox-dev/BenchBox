@@ -301,19 +301,15 @@ SELECT COUNT(*) FROM ITEM LIMIT 1;
             tpcds_benchmark.run_streams(connection=mock_connection, stream_files=nonexistent_files, concurrent=False)
 
     def test_run_streams_raises_not_implemented_when_concurrent_true(self, tpcds_benchmark, mock_stream_files):
-        """run_streams raises NotImplementedError for the concurrent branch too, without touching ConcurrentQueryExecutor."""
+        """run_streams raises NotImplementedError for the concurrent branch too; no executor exists to touch."""
         mock_connection = Mock()
         try:
-            with (
-                patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor") as mock_executor_class,
-                pytest.raises(NotImplementedError, match="does not execute SQL"),
-            ):
+            with pytest.raises(NotImplementedError, match="does not execute SQL"):
                 tpcds_benchmark.run_streams(
                     connection=mock_connection,
                     stream_files=mock_stream_files,
                     concurrent=True,
                 )
-            mock_executor_class.assert_not_called()
         finally:
             for stream_file in mock_stream_files:
                 stream_file.unlink()

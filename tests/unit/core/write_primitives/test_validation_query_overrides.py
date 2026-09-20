@@ -188,6 +188,18 @@ class TestRunOperationValidationOverrides:
         assert "redshift" in results[0]["skip_reason"]
         assert results[0]["passed"] is True
 
+    def test_validation_fallback_key(self, wp: WritePrimitivesBenchmark):
+        skipped = self._make_val_query("SELECT SKIPPED", overrides={"duckdb": None})
+        skipped.id = "v_skipped"
+        operation = SimpleNamespace(validation_queries=[skipped])
+        conn = MagicMock()
+        passed, results, _ = wp._run_operation_validation(
+            operation, conn, "OP_1", platform_key="ducklake", platform_fallback_key="duckdb"
+        )
+        assert passed is True
+        assert results[0]["skipped"] is True
+        conn.execute.assert_not_called()
+
     def test_mixed_validations_one_skipped_one_run(self, wp: WritePrimitivesBenchmark):
         skipped = self._make_val_query("SELECT SKIPPED", overrides={"redshift": None})
         skipped.id = "v_skipped"
@@ -205,3 +217,30 @@ class TestRunOperationValidationOverrides:
         assert results[1].get("skipped") is None
         # Only the active validation hit the connection
         conn.execute.assert_called_once_with("SELECT ACTIVE")
+
+
+# ---------------------------------------------------------------------------
+# _resolve_validation_sql fallback key
+# ---------------------------------------------------------------------------
+class TestValidationFallbackResolution:
+    def _vq(self, overrides):
+        return SimpleNamespace(id="v1", sql="SELECT DEFAULT", platform_overrides=overrides)
+
+    def test_fallback_string_override_used(self):
+        sql, skip = _resolve_validation_sql(self._vq({"duckdb": "SELECT DIALECT"}), "ducklake", "duckdb")
+        assert (sql, skip) == ("SELECT DIALECT", None)
+
+    def test_fallback_null_override_skips(self):
+        sql, skip = _resolve_validation_sql(self._vq({"duckdb": None}), "ducklake", "duckdb")
+        assert sql is None
+        assert skip is not None and "ducklake" in skip
+
+    def test_engine_entry_wins_over_fallback(self):
+        sql, skip = _resolve_validation_sql(
+            self._vq({"ducklake": "SELECT ENGINE", "duckdb": None}), "ducklake", "duckdb"
+        )
+        assert (sql, skip) == ("SELECT ENGINE", None)
+
+    def test_no_fallback_keeps_default(self):
+        sql, skip = _resolve_validation_sql(self._vq({"duckdb": "SELECT DIALECT"}), "ducklake")
+        assert (sql, skip) == ("SELECT DEFAULT", None)

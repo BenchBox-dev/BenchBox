@@ -106,10 +106,10 @@ def _routes(
     certify_jobs: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     routes: dict[str, object] = {
-        f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/develop-post-merge.yml/runs": {
+        f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fdevelop-post-merge.yml/runs": {
             "workflow_runs": push_runs
         },
-        f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/pr.yml/runs": {
+        f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fpr.yml/runs": {
             "workflow_runs": certify_runs or []
         },
     }
@@ -142,10 +142,10 @@ def test_successful_push_run_covers_tip() -> None:
     }
 
 
-def test_failed_push_run_covers_tip() -> None:
+def test_failed_push_run_does_not_cover_tip() -> None:
     result = _cover(SHA, REPO, TOKEN, _fake_urlopen(_routes([_run_record(102, conclusion="failure")])))
-    assert result["covered"] is True
-    assert result["covering_run_id"] == 102
+    assert result["covered"] is False
+    assert result["covering_run_id"] is None
 
 
 def test_cancelled_push_run_is_not_coverage() -> None:
@@ -179,7 +179,7 @@ def test_queue_certified_tip_covers_without_push_run() -> None:
 
 def test_lookup_error_fails_open() -> None:
     routes = _routes([_run_record(101)])
-    prefix = f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/develop-post-merge.yml/runs"
+    prefix = f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fdevelop-post-merge.yml/runs"
     result = _cover(SHA, REPO, TOKEN, _fake_urlopen(routes, failures={prefix}))
     assert result["covered"] is False
     assert "lookup failed open" in str(result["reason"])
@@ -237,7 +237,7 @@ def test_main_exits_zero_and_reports_covering_run(tmp_path: Path) -> None:
 def test_main_exits_zero_on_lookup_error(tmp_path: Path) -> None:
     output = tmp_path / "github_output.txt"
     routes = _routes([_run_record(101)])
-    prefix = f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/develop-post-merge.yml/runs"
+    prefix = f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fdevelop-post-merge.yml/runs"
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(sweep.urllib.request, "urlopen", _fake_urlopen(routes, failures={prefix}))
         code = sweep.main(

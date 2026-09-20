@@ -37,6 +37,7 @@ from benchbox.core.equivalence.cross_surface import (
     build_production_contexts,
     count_executed_cells,
     find_cross_surface_divergences,
+    find_cross_surface_dtype_divergences,
 )
 
 pytestmark = [
@@ -84,4 +85,54 @@ def test_read_primitives_dataframe_surface_equivalent_to_sql(tmp_path):
     unexpected = {d.key for d in divergences} - set(gate.known_divergences)
     assert not unexpected, "Read Primitives DataFrame surface diverges from SQL: " + ", ".join(
         f"{d.key} ({d.detail})" for d in divergences if d.key in unexpected
+    )
+
+
+# Same medium-lane cost class as the value gate above: the bounded cell build
+# dominates, so this carries its own 600s marker rather than sharing the
+# module default.
+@pytest.mark.timeout(600)
+def test_read_primitives_expression_frame_dtypes_match_sql(tmp_path):
+    """Every compared expression cell's frame dtypes must match the SQL reference.
+
+    Value comparison normalizes scalars, so a wrong-dtype column with
+    equal-looking values passes the gate above silently. This dtype cell
+    compares per-column dtype categories instead. Pandas frames are out of
+    scope (numpy/object dtypes carry no type signal; value comparison remains
+    their guard). Classified value-divergence cells are skipped by the caller.
+    Legitimately-empty selective filters are NOT skipped: empty Arrow tables
+    and empty Polars frames retain their declared source-column schemas, so a
+    loader regression (e.g. Decimal/String becoming Null) stays detectable
+    with zero rows. Only json_extract_nested is skipped: its frame columns are
+    computed by JSON extraction over zero rows, which Polars infers as Null -
+    an empty-input inference artifact, not a loader regression - while DuckDB
+    still declares the JSON function's string output type.
+    """
+    gate = GATES["read_primitives"]
+    data = gate.build(gate.scale_factor, tmp_path)
+    connection = data.connection
+    try:
+        contexts = build_production_contexts(
+            data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
+        )
+        divergences, compared = find_cross_surface_dtype_divergences(
+            connection,
+            query_ids=data.query_ids,
+            reference_sql=data.reference_sql,
+            dataframe_query=data.dataframe_query,
+            contexts=contexts,
+            backends=("expression",),
+            skip_keys=frozenset(gate.known_divergences),
+            # Only the computed-over-empty JSON query is skipped (see
+            # docstring); the selective filters compare schemas with zero rows.
+            skip_query_ids=frozenset({"json_extract_nested"}),
+        )
+    finally:
+        connection.close()
+
+    assert compared.get("expression", 0) > 100, (
+        f"dtypes compared on too few cells ({compared}): the cell must not go green by comparing nothing"
+    )
+    assert not divergences, "Read Primitives expression frame dtypes diverge from SQL: " + ", ".join(
+        f"{d.key} ({d.detail})" for d in divergences
     )

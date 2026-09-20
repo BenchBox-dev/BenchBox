@@ -1153,7 +1153,11 @@ class TestDriversMixin:
     def _execute_operation_query(self, benchmark, connection: Any, query_id: str) -> dict[str, Any]:
         """Execute a benchmark operation (INSERT/UPDATE/DELETE) and return result dict."""
         op_kwargs: dict[str, Any] = {}
-        op_kwargs["platform_key"] = self.get_target_dialect()
+        # Engines sharing a SQL dialect but differing in capability (e.g. DuckLake
+        # on the DuckDB dialect) set operation_platform_key so benchmarks resolve
+        # engine-true capability rules instead of the shared dialect's.
+        op_kwargs["platform_key"] = getattr(self, "operation_platform_key", None) or self.get_target_dialect()
+        op_kwargs["platform_fallback_key"] = getattr(self, "operation_platform_fallback_key", None)
         op_kwargs["platform_name"] = self.platform_name
 
         # Adapter SQL preprocessing (e.g. bulk-load rewrites) is threaded through as

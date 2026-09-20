@@ -123,7 +123,7 @@ def test_trailing_space_normalization_is_opt_in(havoc_benchmark):
         havoc_benchmark,
         lambda _q: "SELECT priority",
         query_ids=[3],
-        strip_trailing_spaces=True,
+        char_padding_tolerance=True,
     )
 
     assert divergences == []

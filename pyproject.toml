@@ -735,6 +735,10 @@ ignore_function_names = [
     "_generate_default_params",
     # Facade chains / thin delegations
     "get_all_variants",
+    # Same-dialect tpchavoc sample entry points: one-line delegations over
+    # _dialect_sample_divergences differing only in dialect/skips/extra kwarg.
+    "find_postgres_divergences",
+    "find_clickhouse_divergences",
     # G5: dataclass-to-dict conversion methods on distinct config/artifact classes
     "to_dict",
     "get_etl_config",

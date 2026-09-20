@@ -60,36 +60,39 @@ execution:
 #### Basic Power Run Setup
 
 ```python
-from benchbox.utils import PowerRunExecutor, ExecutionConfigHelper
-from benchbox import TPCH
+import statistics
 
-# Configure power run settings
-config_helper = ExecutionConfigHelper()
-config_helper.enable_power_run_iterations(
-    iterations=5,           # 5 test iterations
-    warm_up_iterations=2    # 2 warm-up iterations
-)
+import duckdb
+
+from benchbox import TPCH
+from benchbox.core.tpch.power_test import TPCHPowerTest
 
 # Create benchmark
 tpch = TPCH(scale_factor=0.1)
 
-# Execute power runs
-power_executor = PowerRunExecutor()
+# Power iterations are a plain loop over stream IDs: each TPCHPowerTest
+# run executes the 22 queries in that stream's permutation against a real
+# connection and reports Power@Size. (The former PowerRunExecutor wrapper
+# is removed; see adr-concurrency-public-api-reconciliation.)
+connection = duckdb.connect("test.db")
 
-def create_power_test():
-    from benchbox.core.tpch.power_test import TPCHPowerTest
-    return TPCHPowerTest(
+power_values = []
+for stream_id in range(5):  # 5 test iterations
+    power_test = TPCHPowerTest(
         benchmark=tpch,
-        connection_string="duckdb:test.db",
-        scale_factor=0.1
+        connection=connection,
+        scale_factor=0.1,
+        stream_id=stream_id,
+        validation=False,  # answer sets exist for stream 0 only
     )
-
-result = power_executor.execute_power_runs(create_power_test)
+    result = power_test.run()
+    assert result.success, result.errors
+    power_values.append(result.power_at_size)
 
 # Statistical analysis
-print(f"Average Power@Size: {result.avg_power_at_size:.2f}")
-print(f"Std Deviation: {result.power_at_size_stdev:.2f}")
-print(f"Confidence: {result.iterations_successful}/{result.iterations_completed}")
+print(f"Average Power@Size: {statistics.mean(power_values):.2f}")
+print(f"Std Deviation: {statistics.stdev(power_values):.2f}")
+print(f"Confidence: {len(power_values)}/5 iterations successful")
 ```
 
 #### Advanced-level Statistical Analysis
@@ -98,9 +101,7 @@ print(f"Confidence: {result.iterations_successful}/{result.iterations_completed}
 import numpy as np
 from scipy import stats
 
-# Get power@size values from all iterations
-power_values = [iter_result.power_at_size for iter_result in result.iteration_results]
-
+# power_values comes from the loop above: one Power@Size per stream-ID run
 # Calculate confidence interval (95%)
 confidence_level = 0.95
 degrees_freedom = len(power_values) - 1
@@ -115,36 +116,36 @@ confidence_interval = stats.t.interval(
 )
 
 print(f"95% Confidence Interval: {confidence_interval[0]:.2f} - {confidence_interval[1]:.2f}")
-print(f"Coefficient of Variation: {(result.power_at_size_stdev / result.avg_power_at_size) * 100:.1f}%")
+print(f"Coefficient of Variation: {(np.std(power_values) / sample_mean) * 100:.1f}%")
 ```
 
-### Performance Profiles for Power Runs
+### Sizing Power-Run Loops
 
-BenchBox provides pre-configured profiles configured for different testing scenarios:
+`ExecutionConfigHelper.apply_performance_profile()` provides named
+configuration presets (`quick`, `standard`, `thorough`, `stress`) for
+iteration counts and timeouts — but presets only store settings.
+Iterations themselves are a caller loop over stream IDs (one
+`TPCHPowerTest` run per iteration), and the per-run `timeout` bounds a
+single run. Size the loop to the decision:
 
-#### Quick Profile
+#### Quick
 - **Use Case**: Rapid development testing
 - **Iterations**: 1 (no statistical analysis)
-- **Warm-up**: 0 iterations
-- **Timeout**: 30 minutes
 - **Best For**: Development, unit testing
 
-#### Standard Profile
+#### Standard
 - **Use Case**: Balanced performance testing
-- **Iterations**: 3 + 1 warm-up
-- **Timeout**: 60 minutes per iteration
+- **Iterations**: 3
 - **Best For**: Regular performance evaluation
 
-#### Thorough Profile
+#### Thorough
 - **Use Case**: Comprehensive analysis
-- **Iterations**: 5 + 2 warm-up
-- **Timeout**: 120 minutes per iteration
+- **Iterations**: 5
 - **Best For**: Production evaluation, research
 
-#### Stress Profile
+#### Stress
 - **Use Case**: Maximum statistical confidence
-- **Iterations**: 10 + 3 warm-up
-- **Timeout**: 180 minutes per iteration
+- **Iterations**: 10
 - **Best For**: Official benchmarking, publications
 
 ## Concurrent Query Execution
@@ -190,68 +191,71 @@ execution:
 #### Basic Concurrent Execution
 
 ```python
-from benchbox.utils import ConcurrentQueryExecutor, ExecutionConfigHelper
-from benchbox import TPCH
+import duckdb
 
-# Configure concurrent execution
-config_helper = ExecutionConfigHelper()
-config_helper.enable_concurrent_queries(max_concurrent=4)
+from benchbox import TPCH
+from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
 # Create benchmark
 tpch = TPCH(scale_factor=0.1)
 
-# Execute concurrent queries
-concurrent_executor = ConcurrentQueryExecutor()
+# One throughput test owns all of its streams: the connection factory
+# hands each stream its session (see the adapter session-capability
+# contract), and StreamRunner executes them concurrently with fail-closed
+# accounting. (The former ConcurrentQueryExecutor wrapper is removed; see
+# adr-concurrency-public-api-reconciliation.)
+connection = duckdb.connect("throughput.db")
 
-def create_throughput_test(stream_id):
-    from benchbox.core.tpch.throughput_test import TPCHThroughputTest
-    return TPCHThroughputTest(
-        benchmark=tpch,
-        connection_string=f"duckdb:stream_{stream_id}.db",
-        num_streams=1,  # Each executor handles one stream
-        verbose=False
-    )
-
-result = concurrent_executor.execute_concurrent_queries(create_throughput_test)
+throughput_test = TPCHThroughputTest(
+    benchmark=tpch,
+    connection_factory=lambda: connection.cursor(),
+    scale_factor=0.1,
+    num_streams=4,
+    verbose=False,
+)
+result = throughput_test.run()
 
 # Throughput analysis
-print(f"Throughput: {result.throughput_queries_per_second:.2f} queries/sec")
-print(f"Success Rate: {result.queries_successful}/{result.queries_executed}")
-print(f"Concurrent Streams: {len(result.stream_results)}")
+print(f"Streams: {result.streams_successful}/{result.streams_executed} successful")
+for stream in result.stream_results:
+    print(f"Stream {stream.stream_id}: "
+          f"{stream.queries_successful}/{stream.queries_executed} queries, "
+          f"{stream.duration:.2f}s")
 ```
 
 #### Scalability Analysis
 
 ```python
 # Test scalability across different concurrency levels
-concurrency_levels = [1, 2, 4, 8, 16]
+concurrency_levels = [1, 2, 4, 8]
 throughput_results = {}
 
 for level in concurrency_levels:
     print(f"\nTesting with {level} concurrent streams...")
 
-    config_helper.get_concurrent_queries_settings().max_concurrent = level
-    result = concurrent_executor.execute_concurrent_queries(
-        create_throughput_test,
-        num_streams=level
+    level_test = TPCHThroughputTest(
+        benchmark=tpch,
+        connection_factory=lambda: connection.cursor(),
+        scale_factor=0.1,
+        num_streams=level,
     )
+    level_result = level_test.run()
 
+    successful = sum(s.queries_successful for s in level_result.stream_results)
+    executed = sum(s.queries_executed for s in level_result.stream_results)
     throughput_results[level] = {
-        'throughput': result.throughput_queries_per_second,
-        'success_rate': result.queries_successful / result.queries_executed,
-        'avg_duration': result.total_duration / level
+        'successful': successful,
+        'success_rate': successful / executed if executed else 0.0,
+        'avg_duration': level_result.total_time / level if level else 0.0,
     }
 
 # Analyze scalability
 print(f"\n Scalability Analysis:")
-print(f"{'Streams':<8} {'Throughput':<12} {'Success Rate':<12} {'Scalability':<12}")
-print("-" * 50)
+print(f"{'Streams':<8} {'Queries OK':<12} {'Success Rate':<12}")
+print("-" * 38)
 
-base_throughput = throughput_results[1]['throughput']
 for level, metrics in throughput_results.items():
-    scalability = metrics['throughput'] / base_throughput
-    print(f"{level:<8} {metrics['throughput']:<12.2f} "
-          f"{metrics['success_rate']:<12.1%} {scalability:<12.2f}x")
+    print(f"{level:<8} {metrics['successful']:<12} {metrics['success_rate']:<12.1%}")
 ```
 
 ## System Optimization
@@ -301,8 +305,14 @@ print(f"- Power run timeout: {summary['power_run']['settings']['timeout_per_iter
 ### Production Evaluation Workflow
 
 ```python
+import statistics
+
+import duckdb
+
 from benchbox import TPCH
-from benchbox.utils import ExecutionConfigHelper, PowerRunExecutor, ConcurrentQueryExecutor
+from benchbox.core.tpch.power_test import TPCHPowerTest
+from benchbox.core.tpch.throughput_test import TPCHThroughputTest
+from benchbox.utils import ExecutionConfigHelper
 
 # 1. System Analysis and Optimization
 config_helper = ExecutionConfigHelper()
@@ -316,54 +326,50 @@ config_helper.optimize_for_system(
 
 # 2. Benchmark Setup
 tpch = TPCH(scale_factor=1.0)  # Production scale
+connection = duckdb.connect("production_test.db")
 
 # 3. Power Run Testing (Statistical Confidence)
 print("Phase 1: Power Run Analysis")
-power_executor = PowerRunExecutor(config_helper.config_manager)
-
-def create_power_test():
-    from benchbox.core.tpch.power_test import TPCHPowerTest
-    return TPCHPowerTest(
+power_values = []
+for stream_id in range(5):
+    power_test = TPCHPowerTest(
         benchmark=tpch,
-        connection_string="duckdb:production_test.db",
+        connection=connection,
         scale_factor=1.0,
-        warm_up=True,
-        validation=True
+        stream_id=stream_id,
+        validation=(stream_id == 0),  # answer sets exist for stream 0 only
     )
-
-power_result = power_executor.execute_power_runs(create_power_test)
+    power_result = power_test.run()
+    assert power_result.success, power_result.errors
+    power_values.append(power_result.power_at_size)
 
 print(f" Single-Stream Performance:")
-print(f"  Average: {power_result.avg_power_at_size:.2f} Power@Size")
-print(f"  Std Dev: {power_result.power_at_size_stdev:.2f}")
-print(f"  Range: {power_result.min_power_at_size:.2f} - {power_result.max_power_at_size:.2f}")
+print(f"  Average: {statistics.mean(power_values):.2f} Power@Size")
+print(f"  Std Dev: {statistics.stdev(power_values):.2f}")
+print(f"  Range: {min(power_values):.2f} - {max(power_values):.2f}")
 
 # 4. Concurrent Query Testing (Throughput Analysis)
 print("\nPhase 2: Concurrent Throughput Analysis")
-concurrent_executor = ConcurrentQueryExecutor(config_helper.config_manager)
+throughput_test = TPCHThroughputTest(
+    benchmark=tpch,
+    connection_factory=lambda: connection.cursor(),
+    scale_factor=1.0,
+    num_streams=4,
+    verbose=False,
+)
+concurrent_result = throughput_test.run()
+assert concurrent_result.success, concurrent_result.errors
 
-def create_throughput_test(stream_id):
-    from benchbox.core.tpch.throughput_test import TPCHThroughputTest
-    return TPCHThroughputTest(
-        benchmark=tpch,
-        connection_string=f"duckdb:throughput_stream_{stream_id}.db",
-        num_streams=1,
-        verbose=False
-    )
-
-concurrent_result = concurrent_executor.execute_concurrent_queries(create_throughput_test)
-
+successful = sum(s.queries_successful for s in concurrent_result.stream_results)
+executed = sum(s.queries_executed for s in concurrent_result.stream_results)
 print(f" Multi-Stream Performance:")
-print(f"  Throughput: {concurrent_result.throughput_queries_per_second:.2f} queries/sec")
-print(f"  Success Rate: {concurrent_result.queries_successful}/{concurrent_result.queries_executed}")
-print(f"  Concurrent Streams: {len(concurrent_result.stream_results)}")
+print(f"  Streams: {concurrent_result.streams_successful}/{concurrent_result.streams_executed}")
+print(f"  Success Rate: {successful}/{executed}")
 
 # 5. Comprehensive Analysis
-efficiency = concurrent_result.throughput_queries_per_second / (power_result.avg_power_at_size / 3600)
 print(f"\n Performance Analysis:")
-print(f"  Single-stream efficiency: {power_result.avg_power_at_size:.2f} Power@Size")
-print(f"  Multi-stream efficiency: {efficiency:.2f}x scaling")
-print(f"  Performance consistency: ±{power_result.power_at_size_stdev:.1f} Power@Size")
+print(f"  Single-stream efficiency: {statistics.mean(power_values):.2f} Power@Size")
+print(f"  Performance consistency: ±{statistics.stdev(power_values):.1f} Power@Size")
 ```
 
 ## Best Practices
@@ -405,7 +411,8 @@ print(f"  Performance consistency: ±{power_result.power_at_size_stdev:.1f} Powe
 3. **Timeout Management**:
    - Set generous timeouts for initial testing
    - Adjust based on observed query execution times
-   - Include retry logic for transient failures
+   - Do not retry measured queries: retries invalidate TPC timing semantics,
+     so a failed stream fails the run instead of being retried
 
 4. **Result Interpretation**:
    - Linear scaling indicates good parallelization
