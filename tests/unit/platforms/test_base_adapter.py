@@ -15,6 +15,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.core.results.builder import benchmark_family as _benchmark_family, normalize_benchmark_id
+from benchbox.core.results.query_execution import query_execution_from_legacy_dict, query_execution_to_compact_v2
 from benchbox.core.schemas import QueryResult
 from benchbox.platforms.base import (
     BenchmarkResults,
@@ -2940,6 +2941,46 @@ class TestTPCHAndTPCDSExecutionHelpers:
         ]
 
     @patch("benchbox.platforms.base.execution.quiet_console")
+    @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")
+    def test_execute_tpcds_throughput_test_emits_containment_row_without_completed_queries(
+        self, _mock_set_validation_mode, _mock_console
+    ):
+        adapter = MockPlatformAdapterWithDialect()
+        throughput_result = SimpleNamespace(
+            success=False,
+            throughput_at_size=None,
+            query_throughput=0.0,
+            streams_executed=0,
+            streams_successful=0,
+            total_time=1.0,
+            errors=["deadline exceeded"],
+            stream_results=[],
+            outstanding_stream_ids=[0, 1],
+            cleanup_state="outstanding",
+        )
+
+        with patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as test_cls:
+            test_cls.return_value.run.return_value = throughput_result
+            results = adapter._execute_tpcds_throughput_test(Mock(), Mock(), {"num_streams": 2})
+
+        assert results == [
+            {
+                "query_id": "throughput_containment",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "Throughput workers remain outstanding after the phase deadline.",
+                "test_type": "throughput",
+                "outstanding_stream_ids": [0, 1],
+                "cleanup_state": "outstanding",
+            }
+        ]
+        assert query_execution_to_compact_v2(query_execution_from_legacy_dict(results[0]))["outstanding_work"] == {
+            "stream_ids": [0, 1],
+            "cleanup_state": "outstanding",
+        }
+
+    @patch("benchbox.platforms.base.execution.quiet_console")
     def test_execute_tpcds_maintenance_test_converts_output_dir_and_operation_errors(self, mock_console, tmp_path):
         adapter = MockPlatformAdapterWithDialect()
         benchmark = Mock()
@@ -3069,6 +3110,43 @@ class TestTPCHAndTPCDSExecutionHelpers:
         assert adapter._last_throughput_test_result is throughput_result
         assert throughput_result.success is False
         assert throughput_result.throughput_at_size is None
+
+    @patch("benchbox.platforms.base.execution.quiet_console")
+    def test_execute_tpch_throughput_test_emits_containment_row_without_completed_queries(self, _mock_console):
+        adapter = MockPlatformAdapterWithDialect()
+        throughput_result = SimpleNamespace(
+            success=False,
+            throughput_at_size=None,
+            query_throughput=0.0,
+            streams_executed=0,
+            streams_successful=0,
+            total_time=1.0,
+            errors=["deadline exceeded"],
+            stream_results=[],
+            outstanding_stream_ids=[0, 1],
+            cleanup_state="outstanding",
+        )
+
+        with patch("benchbox.core.tpch.throughput_test.TPCHThroughputTest") as test_cls:
+            test_cls.return_value.run.return_value = throughput_result
+            results = adapter._execute_tpch_throughput_test(Mock(), Mock(), {"num_streams": 2})
+
+        assert results == [
+            {
+                "query_id": "throughput_containment",
+                "execution_time_seconds": 0.0,
+                "status": "FAILED",
+                "rows_returned": 0,
+                "error": "Throughput workers remain outstanding after the phase deadline.",
+                "test_type": "throughput",
+                "outstanding_stream_ids": [0, 1],
+                "cleanup_state": "outstanding",
+            }
+        ]
+        assert query_execution_to_compact_v2(query_execution_from_legacy_dict(results[0]))["outstanding_work"] == {
+            "stream_ids": [0, 1],
+            "cleanup_state": "outstanding",
+        }
 
     @patch("benchbox.platforms.base.execution.quiet_console")
     def test_execute_tpch_maintenance_test_passes_rf_intervals_and_integrity_flag(self, _mock_console, tmp_path):

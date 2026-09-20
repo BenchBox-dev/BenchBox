@@ -118,6 +118,25 @@ def _resolve_requested_stream_count(run_config: dict, default: int = 2) -> int:
     return max(resolved, 2)
 
 
+def _append_throughput_containment_evidence(query_results: list[dict[str, Any]], throughput_result: Any) -> None:
+    """Append one serializable phase row when throughput workers remain live."""
+    outstanding_stream_ids = getattr(throughput_result, "outstanding_stream_ids", None)
+    if not isinstance(outstanding_stream_ids, (list, tuple)) or not outstanding_stream_ids:
+        return
+    query_results.append(
+        {
+            "query_id": "throughput_containment",
+            "execution_time_seconds": 0.0,
+            "status": "FAILED",
+            "rows_returned": 0,
+            "error": "Throughput workers remain outstanding after the phase deadline.",
+            "test_type": "throughput",
+            "outstanding_stream_ids": list(outstanding_stream_ids),
+            "cleanup_state": getattr(throughput_result, "cleanup_state", "outstanding"),
+        }
+    )
+
+
 class _CapturedPlan(NamedTuple):
     """One query's captured plan, accumulated across isolated capture passes.
 
@@ -421,6 +440,7 @@ class TestDriversMixin:
                     propagate_query_execution_metadata(query_result, platform_result)
                     query_results.append(platform_result)
 
+            _append_throughput_containment_evidence(query_results, throughput_test_result)
             return query_results
 
         except Exception as e:
@@ -529,6 +549,7 @@ class TestDriversMixin:
                     propagate_query_execution_metadata(qr, platform_result)
                     query_results.append(platform_result)
 
+            _append_throughput_containment_evidence(query_results, throughput_test_result)
             return query_results
 
         except Exception as e:
