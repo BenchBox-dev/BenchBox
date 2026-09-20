@@ -49,7 +49,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
-from benchbox.core.throughput.containment import check_phase_boundary
+from benchbox.core.throughput.containment import await_quiescence, check_phase_boundary
 from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
@@ -731,7 +731,9 @@ class TestDriversMixin:
             and not getattr(self, "dry_run_mode", False)
         )
         if not phase_eligible:
-            return self._dispatch_queries_by_type(benchmark, connection, run_config)
+            results = self._dispatch_queries_by_type(benchmark, connection, run_config)
+            self._contain_outstanding_throughput_work(run_config)
+            return results
 
         # Isolate capture: record executed queries during the timed run, capture after.
         # ``_captured_plans`` is the per-run accumulator keyed by capture key; it lets
@@ -746,8 +748,38 @@ class TestDriversMixin:
         finally:
             self._plan_capture_phase_active = False
 
+        if not self._contain_outstanding_throughput_work(run_config):
+            return results
         self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
         return results
+
+    def _contain_outstanding_throughput_work(self, run_config: dict[str, Any]) -> bool:
+        """Keep timed-out throughput workers away from post-workload resources.
+
+        A throughput timeout returns before a Python worker thread necessarily
+        terminates.  Shared-cursor streams still own the measurement connection,
+        so plan capture and metadata probes must not reuse it until termination is
+        observed.  The wait is deliberately bounded; the adapter records the
+        unresolved state so its cleanup path can defer connection close.
+        """
+        result = getattr(self, "_last_throughput_test_result", None)
+        if not getattr(result, "outstanding_stream_ids", None):
+            return True
+
+        try:
+            cleanup_timeout = float(run_config.get("stream_cleanup_timeout_seconds", 5.0))
+        except (TypeError, ValueError):
+            cleanup_timeout = 5.0
+        cleanup_timeout = max(0.0, cleanup_timeout)
+
+        if await_quiescence(result, timeout=cleanup_timeout):
+            return True
+
+        # PlatformAdapter owns the connection and uses this flag to skip every
+        # post-measurement operation that could touch it.  The remaining worker
+        # futures stay attached to the result for deferred cleanup.
+        self._post_measurement_contained = True
+        return False
 
     def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Route to the per-test-type driver (no plan-capture concerns)."""
