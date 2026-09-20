@@ -425,6 +425,10 @@ def test_bigquery_array_unnest_variant_retained_with_contract(read_primitives_co
     removal or reshaping fails loudly instead of drifting silently.
     """
     benchmark = ReadPrimitivesBenchmark()
+    # Assert the variant exists first: get_query falls back to the base query
+    # (which also contains UNNEST), so the shape check below cannot catch a
+    # removed bigquery variant on its own.
+    assert benchmark.query_manager.has_variant("array_unnest", "bigquery")
     sql = benchmark.query_manager.get_query("array_unnest", dialect="bigquery")
 
     assert "UNNEST" in sql.upper()
