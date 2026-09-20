@@ -17,4 +17,5 @@ Architecture Decision Records
 - [ADR: Client-to-Platform Locality Disclosure and Statement Overhead Probe](adr-client-link-locality-disclosure.md)
 - [ADR: Scan billing units — decimal terabytes for Athena/Synapse, tebibytes for BigQuery](adr-billing-unit-tb-tib-contract.md)
 - [ADR: Concurrency Utility APIs — Remove the Quarantined Executors](adr-concurrency-public-api-reconciliation.md)
+- [ADR: Concurrency Outcome and Resource-Ownership Contract](adr-concurrency-outcome-and-ownership-contract.md)
 - [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
