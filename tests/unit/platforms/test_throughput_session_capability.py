@@ -25,6 +25,7 @@ import pytest
 from benchbox.platforms.base.adapter import PlatformAdapter
 from benchbox.platforms.base.connection_wrappers import (
     StreamConnectionCapability,
+    open_stream_connection,
     require_throughput_stream_capability,
     resolve_stream_connection_capability,
 )
@@ -149,15 +150,15 @@ class TestResolveStreamConnectionCapability:
 
 
 class TestRequireThroughputStreamCapability:
-    def test_shared_and_undeclared_pass_through(self):
+    def test_shared_declaration_passes(self):
         assert (
             require_throughput_stream_capability(_SharedAdapter(), platform_name="Shared")
             is StreamConnectionCapability.SHARED_CURSOR
         )
-        assert (
+
+    def test_undeclared_fails_closed_before_submission(self):
+        with pytest.raises(RuntimeError, match="no explicit stream_connection_capability"):
             require_throughput_stream_capability(_BareAdapter(), platform_name="Bare")
-            is StreamConnectionCapability.SHARED_CURSOR
-        )
 
     def test_independent_with_override_passes(self):
         assert (
@@ -193,6 +194,14 @@ class TestRequireThroughputStreamCapability:
         adapter = _IndependentAdapter()
         handle = adapter.new_stream_connection(Mock())
         assert handle.benchmark_type is None
+
+    def test_legacy_override_is_called_without_new_keyword(self):
+        class _Legacy(_SharedAdapter):
+            def new_stream_connection(self, connection: Any) -> Any:
+                return connection
+
+        shared = Mock()
+        assert open_stream_connection(_Legacy(), shared, "olap") is shared
 
 
 class TestMySQLWireStreamOverride:

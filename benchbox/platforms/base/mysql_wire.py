@@ -270,17 +270,25 @@ class MySqlWireLifecycleMixin:
         """
         del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
         conn = self._connect_database()
-        cursor = conn.cursor()
         try:
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-        finally:
-            cursor.close()
-        # Replay only when the caller supplies benchmark_type (the throughput
-        # drivers always do); other callers keep their previous behavior.
-        if benchmark_type is not None:
-            self.configure_for_benchmark(conn, benchmark_type)
-        return self._wrap_database_connection(conn)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            finally:
+                cursor.close()
+            # Replay only when the caller supplies benchmark_type (the
+            # throughput drivers always do); other callers keep their previous
+            # behavior.
+            if benchmark_type is not None:
+                self.configure_for_benchmark(conn, benchmark_type)
+            return self._wrap_database_connection(conn)
+        except Exception:
+            try:
+                conn.close()
+            except Exception as close_error:  # noqa: BLE001 - preserve setup failure
+                self.logger.debug("Failed to close stream connection after setup error: %r", close_error)
+            raise
 
     def _transform_schema_statement(self, stmt: str, benchmark: Any) -> str:
         return stmt

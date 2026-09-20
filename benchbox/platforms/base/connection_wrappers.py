@@ -17,6 +17,7 @@ continue to work via re-exports in `adapter.py`.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Any
@@ -123,9 +124,8 @@ class StreamConnectionCapability(Enum):
             with a safe session model, so throughput must fail before stream
             submission with an actionable error instead of silently sharing a
             connection that cannot isolate streams. Declaring this is a
-            deliberate product statement, not a default: undeclared adapters
-            resolve to the documented default, and only an explicit
-            ``UNSUPPORTED`` declaration triggers the fail-closed rejection.
+            deliberate product statement, not a default. Undeclared adapters
+            are rejected separately by the runtime gate.
     """
 
     SHARED_CURSOR = "shared_cursor"
@@ -231,7 +231,14 @@ def require_throughput_stream_capability(adapter: Any, *, platform_name: str) ->
     """
     from benchbox.platforms.base.adapter import PlatformAdapter
 
-    capability, _declared = resolve_stream_connection_capability(adapter)
+    capability, declared = resolve_stream_connection_capability(adapter)
+    if not declared:
+        raise RuntimeError(
+            f"Platform '{platform_name}' has no explicit stream_connection_capability declaration. "
+            "Throughput is refused before stream submission; declare SHARED_CURSOR only after "
+            "reviewing the driver's concurrent-session guarantees, or declare "
+            "INDEPENDENT_CONNECTION/UNSUPPORTED as appropriate."
+        )
     if capability is StreamConnectionCapability.UNSUPPORTED:
         raise RuntimeError(
             f"Platform '{platform_name}' declares stream_connection_capability=UNSUPPORTED: "
@@ -253,6 +260,21 @@ def require_throughput_stream_capability(adapter: Any, *, platform_name: str) ->
                 "overriding new_stream_connection() per the StreamConnectionCapability contract."
             )
     return capability
+
+
+def open_stream_connection(adapter: Any, connection: Any, benchmark_type: str) -> Any:
+    """Call the stream hook with compatibility for legacy two-argument overrides."""
+    method = adapter.new_stream_connection
+    try:
+        parameters = inspect.signature(method).parameters.values()
+    except (TypeError, ValueError):
+        parameters = ()
+    accepts_keyword = any(
+        parameter.name == "benchmark_type" or parameter.kind is parameter.VAR_KEYWORD for parameter in parameters
+    )
+    if accepts_keyword:
+        return method(connection, benchmark_type=benchmark_type)
+    return method(connection)
 
 
 class _NoCloseProxy:

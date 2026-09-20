@@ -54,6 +54,7 @@ from benchbox.core.tpch.platform_power import _power_query_result, _power_test_e
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
+    open_stream_connection,
     require_throughput_stream_capability,
 )
 from benchbox.utils.dialect_utils import SQLTranslationError
@@ -314,7 +315,7 @@ class TestDriversMixin:
             # a brand-new connection/session per stream - see
             # PlatformAdapter.new_stream_connection() for the full contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection, benchmark_type=benchmark_type)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
@@ -455,7 +456,7 @@ class TestDriversMixin:
             # See new_stream_connection() docstring / connection_factory comment
             # in _execute_tpcds_throughput_test above for the capability contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection, benchmark_type=benchmark_type)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpch"
