@@ -141,10 +141,15 @@
       "title": "Add Dry Run Support to All Example Scripts"
     },
     "add-duckdb-test-asserting-scd2-ops-success-legacy-merge-into": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T02:37:48Z",
+        "generation": "74ed35ec67db48a2b7fbcc962976fc75",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add DuckDB test asserting SCD2 ops SUCCESS + legacy MERGE INTO ops SKIPPED under platform_key='duckdb', plus a no-reset sequential dim-restored-to-seed test."
     },
     "add-end-to-end-cli-testing": {
