@@ -6422,10 +6422,10 @@
     },
     "first-live-cloud-benchmark-run-and-publish": {
       "claim": {
-        "expires_at": "2026-09-19T23:38:26Z",
-        "generation": "0162a37fc2574681ba269f669a908981",
+        "expires_at": "2026-09-21T15:15:12Z",
+        "generation": "33f48ab8298f4a89b4e9d458c56c3e20",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local"
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:b3bad2bf5002f6c40a1a7768"
       },
       "needs": [],
       "priority": "critical",

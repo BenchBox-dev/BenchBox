@@ -231,5 +231,16 @@
         "wid": "w8"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:b3bad2bf5002f6c40a1a7768",
+      "at": "2026-09-20T15:15:12Z",
+      "client": "codex-mcp-client",
+      "generation": "33f48ab8298f4a89b4e9d458c56c3e20",
+      "op": "take",
+      "op_id": "01eebba992e74c0ba4d6b1f21d1595ab",
+      "session_id": "22347223b6ef4a6ba2629883859756e6"
+    }
+  ]
 }
