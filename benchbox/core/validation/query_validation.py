@@ -59,6 +59,11 @@ def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
 _reference_seed_state = threading.local()
 
 
+def _set_thread_context(state: threading.local, attribute: str, value: object) -> None:
+    """Set one named value on a thread-local context container."""
+    setattr(state, attribute, value)
+
+
 def set_reference_seed_context(is_reference_seed: bool | None) -> None:
     """Record, for the CURRENT THREAD, whether the query about to run through
     QueryValidator is using the pinned TPC reference seed's substitution
@@ -85,7 +90,7 @@ def set_reference_seed_context(is_reference_seed: bool | None) -> None:
             QueryValidator caller) are therefore completely unaffected by the
             relaxation below.
     """
-    _reference_seed_state.is_reference_seed = is_reference_seed
+    _set_thread_context(_reference_seed_state, "is_reference_seed", is_reference_seed)
 
 
 def get_reference_seed_context() -> bool | None:
@@ -109,16 +114,7 @@ _validation_mode_state = threading.local()
 
 
 def set_validation_mode_context(mode: ValidationMode | None) -> None:
-    """Record, for the CURRENT THREAD, the TPC-DS validation mode for this run.
-
-    Values:
-        A ValidationMode: validate TPC-DS queries on this thread with this
-            mode instead of the cached object's default. EXACT/LOOSE/RANGE
-            compare against the answer files; SKIP skips.
-        None (the default/unset value): fall back to the run-shared
-            configuration (benchmark-runner config, then
-            BENCHBOX_QUERY_VALIDATION_MODE), then to the cached default.
-    """
+    """Set the current thread's TPC-DS validation mode for this run."""
     _validation_mode_state.validation_mode = mode
 
 

@@ -261,9 +261,11 @@ class ExpectedResultsRegistry:
         if not should_load:
             signaled = event.wait(timeout=self.wait_timeout_seconds)
             with self._lock:
-                current = self._loading.get(benchmark_key, {}).get(scale_factor)
-                if current is not None and current["outcome"] is not None:
-                    return current["result"], current["outcome"]
+                # Read the slot this caller joined, not the mutable registry
+                # entry: clear_cache() or a retry may replace that entry while
+                # this waiter is asleep.
+                if slot["outcome"] is not None:
+                    return slot["result"], slot["outcome"]
                 if not signaled:
                     logger.debug(
                         f"Timed out waiting for {benchmark_key} SF={scale_factor} load; "
