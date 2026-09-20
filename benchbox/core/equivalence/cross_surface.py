@@ -95,6 +95,7 @@ from benchbox.core.equivalence.builders import (
     build_amplab_duckdb,
     build_clickbench_duckdb,
     build_coffeeshop_duckdb,
+    build_datavault_duckdb,
     build_flightdata_duckdb,
     build_h2odb_duckdb,
     build_joinorder_synthetic_duckdb,
@@ -1234,6 +1235,7 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
 _FLIGHTDATA_SCALE = 0.01
+_DATAVAULT_SCALE = 0.01
 
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
@@ -1343,7 +1345,7 @@ GATES: dict[str, CrossSurfaceGate] = {
 # FlightData stages here with no known-divergence baseline after its
 # output-contract fixes; promoting it to GATES also refreshes the oracle
 # coverage map, the applicability sweep artifact, and the related registry tests.
-# The next gateable benchmarks (datavault, nyctaxi,
+# The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
 # The FlightData bounded cell is one synthetic month (SF=0.01), which stays offline
 # (larger scales attempt a BTS download with a synthetic fallback) while keeping
@@ -1359,6 +1361,21 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
             "cross-implementation signal than shared-spec generators."
         ),
         scale_factor=_FLIGHTDATA_SCALE,
+    ),
+    # Data Vault stages here while its cross-surface query-execution burn-down
+    # is open: the builder forces regeneration on every build (probes can never
+    # pass on a stale manifest) and logs the probe manifest the cell came from.
+    # Promoting it to GATES also refreshes the oracle coverage map, the
+    # applicability sweep artifact, and the related registry tests.
+    "datavault": CrossSurfaceGate(
+        name="datavault",
+        build=build_datavault_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "Data Vault expression and pandas DataFrame implementations are separately handwritten for each "
+            "query, so the gate has stronger cross-implementation signal than shared-spec generators."
+        ),
+        scale_factor=_DATAVAULT_SCALE,
     ),
 }
 
