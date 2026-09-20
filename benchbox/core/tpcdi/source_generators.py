@@ -66,6 +66,7 @@ class TPCDISourceDataGenerator:
         output_dir: Optional[Path] = None,
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
+        seed: int = 42,
     ):
         """Initialize the TPC-DI source data generator.
 
@@ -74,6 +75,7 @@ class TPCDISourceDataGenerator:
             output_dir: Directory to write generated data files
             start_date: Start date for temporal data (defaults to 2020-01-01)
             end_date: End date for temporal data (defaults to 2023-12-31)
+            seed: Seed for the generator-owned random stream.
         """
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
@@ -81,6 +83,8 @@ class TPCDISourceDataGenerator:
         # Date range for temporal data
         self.start_date = start_date or date(2020, 1, 1)
         self.end_date = end_date or date(2023, 12, 31)
+        self.generation_seed = int(seed)
+        self._rng = random.Random(self.generation_seed)
 
         # Base record counts (scale_factor = 1.0)
         self.base_customers = 50000
@@ -92,8 +96,8 @@ class TPCDISourceDataGenerator:
         self.base_tax_rates = 100
         self.base_market_prices = 1000000
 
-        # Initialize random seed for reproducible data
-        random.seed(42)
+        # Source-table methods use this private RNG; they never seed or mutate
+        # the process-global random generator.
 
         # Reference data for realistic generation
         self._init_reference_data()
@@ -275,6 +279,7 @@ class TPCDISourceDataGenerator:
             Dictionary mapping source system names to lists of generated file paths
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self._rng = random.Random(self.generation_seed)
 
         file_paths = {}
 
@@ -310,53 +315,55 @@ class TPCDISourceDataGenerator:
         for i in range(1, num_customers + 1):
             # Basic customer info
             customer_id = i
-            tax_id = f"{random.randint(100000000, 999999999)}"
-            status = random.choice(self.statuses)
-            last_name = random.choice(self.last_names)
-            first_name = random.choice(self.first_names)
-            middle_initial = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            gender = random.choice(["M", "F"])
-            tier = random.choices([1, 2, 3], weights=[0.6, 0.3, 0.1])[0]
+            tax_id = f"{self._rng.randint(100000000, 999999999)}"
+            status = self._rng.choice(self.statuses)
+            last_name = self._rng.choice(self.last_names)
+            first_name = self._rng.choice(self.first_names)
+            middle_initial = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            gender = self._rng.choice(["M", "F"])
+            tier = self._rng.choices([1, 2, 3], weights=[0.6, 0.3, 0.1])[0]
 
             # Birth date (age 18-80)
-            birth_year = datetime.now().year - random.randint(18, 80)
-            date_of_birth = date(birth_year, random.randint(1, 12), random.randint(1, 28))
+            birth_year = datetime.now().year - self._rng.randint(18, 80)
+            date_of_birth = date(birth_year, self._rng.randint(1, 12), self._rng.randint(1, 28))
 
             # Address (with some data quality issues)
-            address_line1 = f"{random.randint(1, 9999)} {random.choice(['Main', 'Oak', 'First', 'Second', 'Park', 'Washington'])} St"
-            address_line2 = "" if random.random() > 0.3 else f"Apt {random.randint(1, 999)}"
-            postal_code = f"{random.randint(10000, 99999)}" if random.random() > 0.05 else ""  # 5% missing
-            city = f"City{random.randint(1, 1000)}"
-            state_province = random.choice(self.us_states)
+            address_line1 = f"{self._rng.randint(1, 9999)} {self._rng.choice(['Main', 'Oak', 'First', 'Second', 'Park', 'Washington'])} St"
+            address_line2 = "" if self._rng.random() > 0.3 else f"Apt {self._rng.randint(1, 999)}"
+            postal_code = f"{self._rng.randint(10000, 99999)}" if self._rng.random() > 0.05 else ""  # 5% missing
+            city = f"City{self._rng.randint(1, 1000)}"
+            state_province = self._rng.choice(self.us_states)
             country = "USA"
 
             # Contact info (with realistic patterns)
-            phone1 = f"{random.randint(200, 999)}-{random.randint(200, 999)}-{random.randint(1000, 9999)}"
+            phone1 = f"{self._rng.randint(200, 999)}-{self._rng.randint(200, 999)}-{self._rng.randint(1000, 9999)}"
             phone2 = (
                 ""
-                if random.random() > 0.4
-                else f"{random.randint(200, 999)}-{random.randint(200, 999)}-{random.randint(1000, 9999)}"
+                if self._rng.random() > 0.4
+                else f"{self._rng.randint(200, 999)}-{self._rng.randint(200, 999)}-{self._rng.randint(1000, 9999)}"
             )
             phone3 = (
                 ""
-                if random.random() > 0.1
-                else f"{random.randint(200, 999)}-{random.randint(200, 999)}-{random.randint(1000, 9999)}"
+                if self._rng.random() > 0.1
+                else f"{self._rng.randint(200, 999)}-{self._rng.randint(200, 999)}-{self._rng.randint(1000, 9999)}"
             )
 
-            email1 = f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 999)}@{random.choice(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'])}"
+            email1 = f"{first_name.lower()}.{last_name.lower()}{self._rng.randint(1, 999)}@{self._rng.choice(['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'])}"
             email2 = (
                 ""
-                if random.random() > 0.2
-                else f"{first_name.lower()}{i}@{random.choice(['company.com', 'business.org'])}"
+                if self._rng.random() > 0.2
+                else f"{first_name.lower()}{i}@{self._rng.choice(['company.com', 'business.org'])}"
             )
 
             # Financial info
-            credit_rating = random.choice(self.credit_ratings)
-            net_worth = random.randint(10000, 10000000) if tier == 3 else random.randint(1000, 1000000)
+            credit_rating = self._rng.choice(self.credit_ratings)
+            net_worth = self._rng.randint(10000, 10000000) if tier == 3 else self._rng.randint(1000, 1000000)
 
             # Temporal info
-            created_date = self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
-            modified_date = created_date + timedelta(days=random.randint(0, 365))
+            created_date = self.start_date + timedelta(
+                days=self._rng.randint(0, (self.end_date - self.start_date).days)
+            )
+            modified_date = created_date + timedelta(days=self._rng.randint(0, 365))
 
             data.append(
                 [
@@ -430,25 +437,25 @@ class TPCDISourceDataGenerator:
         data = []
         for i in range(1, num_accounts + 1):
             account_id = i
-            customer_id = random.randint(1, num_customers)
-            account_type = random.choice(self.account_types)
+            customer_id = self._rng.randint(1, num_customers)
+            account_type = self._rng.choice(self.account_types)
             account_description = f"{account_type} Account #{i:06d}"
-            status = random.choice(self.statuses)
-            tax_status = random.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
+            status = self._rng.choice(self.statuses)
+            tax_status = self._rng.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
 
             # Account balance (realistic distribution)
             if account_type == "Retirement":
-                balance = random.uniform(1000, 2000000)
+                balance = self._rng.uniform(1000, 2000000)
             elif account_type == "Corporate":
-                balance = random.uniform(10000, 50000000)
+                balance = self._rng.uniform(10000, 50000000)
             else:
-                balance = random.uniform(100, 1000000)
+                balance = self._rng.uniform(100, 1000000)
 
             # Dates
-            open_date = self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
-            close_date = "" if status != "Closed" else open_date + timedelta(days=random.randint(30, 1000))
+            open_date = self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
+            close_date = "" if status != "Closed" else open_date + timedelta(days=self._rng.randint(30, 1000))
             created_date = open_date
-            modified_date = created_date + timedelta(days=random.randint(0, 365))
+            modified_date = created_date + timedelta(days=self._rng.randint(0, 365))
 
             data.append(
                 [
@@ -496,17 +503,19 @@ class TPCDISourceDataGenerator:
         with open(file_path, "w", encoding="utf-8") as f:
             for i in range(1, num_trades + 1):
                 trade_id = i
-                account_id = random.randint(1, num_accounts)
-                security_id = random.randint(1, num_securities)
-                trade_type = random.choice(self.trade_types)
-                quantity = random.randint(1, 10000)
-                price = round(random.uniform(10.0, 500.0), 2)
+                account_id = self._rng.randint(1, num_accounts)
+                security_id = self._rng.randint(1, num_securities)
+                trade_type = self._rng.choice(self.trade_types)
+                quantity = self._rng.randint(1, 10000)
+                price = round(self._rng.uniform(10.0, 500.0), 2)
 
                 # Trade datetime
-                trade_date = self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
-                trade_time = time(random.randint(9, 16), random.randint(0, 59), random.randint(0, 59))
+                trade_date = self.start_date + timedelta(
+                    days=self._rng.randint(0, (self.end_date - self.start_date).days)
+                )
+                trade_time = time(self._rng.randint(9, 16), self._rng.randint(0, 59), self._rng.randint(0, 59))
 
-                status = random.choices(["COMPLETED", "PENDING", "CANCELLED"], weights=[0.85, 0.1, 0.05])[0]
+                status = self._rng.choices(["COMPLETED", "PENDING", "CANCELLED"], weights=[0.85, 0.1, 0.05])[0]
 
                 # Fixed-width format (common in legacy systems)
                 line = (
@@ -552,35 +561,35 @@ class TPCDISourceDataGenerator:
             # Personal information
             personal = ET.SubElement(employee, "personal_info")
             ET.SubElement(personal, "employee_id").text = str(i)
-            ET.SubElement(personal, "first_name").text = random.choice(self.first_names)
-            ET.SubElement(personal, "last_name").text = random.choice(self.last_names)
-            ET.SubElement(personal, "middle_initial").text = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-            ET.SubElement(personal, "gender").text = random.choice(["M", "F"])
+            ET.SubElement(personal, "first_name").text = self._rng.choice(self.first_names)
+            ET.SubElement(personal, "last_name").text = self._rng.choice(self.last_names)
+            ET.SubElement(personal, "middle_initial").text = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            ET.SubElement(personal, "gender").text = self._rng.choice(["M", "F"])
 
             # Birth date
-            birth_year = datetime.now().year - random.randint(25, 65)
-            birth_date = date(birth_year, random.randint(1, 12), random.randint(1, 28))
+            birth_year = datetime.now().year - self._rng.randint(25, 65)
+            birth_date = date(birth_year, self._rng.randint(1, 12), self._rng.randint(1, 28))
             ET.SubElement(personal, "date_of_birth").text = birth_date.strftime("%Y-%m-%d")
 
             # Employment information
             employment = ET.SubElement(employee, "employment_info")
             ET.SubElement(employment, "hire_date").text = (
-                self.start_date + timedelta(days=random.randint(0, 1000))
+                self.start_date + timedelta(days=self._rng.randint(0, 1000))
             ).strftime("%Y-%m-%d")
             ET.SubElement(employment, "department").text = "Trading"
-            ET.SubElement(employment, "title").text = random.choice(
+            ET.SubElement(employment, "title").text = self._rng.choice(
                 ["Senior Broker", "Junior Broker", "Lead Broker", "Associate Broker"]
             )
-            ET.SubElement(employment, "status").text = random.choice(["Active", "Inactive", "Leave"])
-            ET.SubElement(employment, "salary").text = str(random.randint(50000, 200000))
+            ET.SubElement(employment, "status").text = self._rng.choice(["Active", "Inactive", "Leave"])
+            ET.SubElement(employment, "salary").text = str(self._rng.randint(50000, 200000))
 
             # License information
             licenses = ET.SubElement(employee, "licenses")
             for license_type in ["Series 7", "Series 63", "Series 66"]:
-                if random.random() > 0.3:  # Not all brokers have all licenses
+                if self._rng.random() > 0.3:  # Not all brokers have all licenses
                     license_elem = ET.SubElement(licenses, "license")
                     license_elem.set("type", license_type)
-                    license_elem.text = f"{license_type}-{random.randint(100000, 999999)}"
+                    license_elem.text = f"{license_type}-{self._rng.randint(100000, 999999)}"
 
         # Write XML file
         tree = ET.ElementTree(root)
@@ -608,21 +617,21 @@ class TPCDISourceDataGenerator:
             customer = {
                 "customer_id": i,
                 "crm_id": str(uuid.uuid4()),
-                "customer_segment": random.choice(["Retail", "High Net Worth", "Corporate", "Institutional"]),
-                "acquisition_channel": random.choice(["Online", "Branch", "Referral", "Marketing", "Cold Call"]),
+                "customer_segment": self._rng.choice(["Retail", "High Net Worth", "Corporate", "Institutional"]),
+                "acquisition_channel": self._rng.choice(["Online", "Branch", "Referral", "Marketing", "Cold Call"]),
                 "acquisition_date": (
-                    self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
+                    self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
                 ).strftime("%Y-%m-%d"),
                 "last_contact_date": (
-                    self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
+                    self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
                 ).strftime("%Y-%m-%d"),
-                "preferred_contact_method": random.choice(["Email", "Phone", "Mail", "SMS"]),
-                "marketing_opt_in": random.choice([True, False]),
-                "risk_tolerance": random.choice(["Conservative", "Moderate", "Aggressive"]),
-                "investment_objectives": random.choice(["Growth", "Income", "Preservation", "Speculation"]),
-                "annual_income": random.randint(30000, 1000000),
-                "liquid_net_worth": random.randint(10000, 5000000),
-                "investment_experience": random.choice(["Novice", "Intermediate", "Advanced", "Professional"]),
+                "preferred_contact_method": self._rng.choice(["Email", "Phone", "Mail", "SMS"]),
+                "marketing_opt_in": self._rng.choice([True, False]),
+                "risk_tolerance": self._rng.choice(["Conservative", "Moderate", "Aggressive"]),
+                "investment_objectives": self._rng.choice(["Growth", "Income", "Preservation", "Speculation"]),
+                "annual_income": self._rng.randint(30000, 1000000),
+                "liquid_net_worth": self._rng.randint(10000, 5000000),
+                "investment_experience": self._rng.choice(["Novice", "Intermediate", "Advanced", "Professional"]),
                 "notes": f"Customer notes for ID {i}",
                 "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -658,15 +667,15 @@ class TPCDISourceDataGenerator:
         for i in range(1, 21):  # 20 campaigns
             campaign = {
                 "campaign_id": f"CAMP_{i:04d}",
-                "campaign_name": f"Campaign {i} - {random.choice(['Q1 Promotion', 'New Account', 'Retention', 'Cross-sell', 'Upgrade'])}",
-                "campaign_type": random.choice(campaign_types),
-                "start_date": (self.start_date + timedelta(days=random.randint(0, 300))).strftime("%Y-%m-%d"),
-                "end_date": (self.start_date + timedelta(days=random.randint(300, 700))).strftime("%Y-%m-%d"),
-                "target_segment": random.choice(["All", "High Net Worth", "New Customers", "Inactive", "Corporate"]),
-                "budget": random.randint(10000, 500000),
-                "responses": random.randint(100, 5000),
-                "conversions": random.randint(10, 500),
-                "roi": round(random.uniform(0.1, 3.0), 2),
+                "campaign_name": f"Campaign {i} - {self._rng.choice(['Q1 Promotion', 'New Account', 'Retention', 'Cross-sell', 'Upgrade'])}",
+                "campaign_type": self._rng.choice(campaign_types),
+                "start_date": (self.start_date + timedelta(days=self._rng.randint(0, 300))).strftime("%Y-%m-%d"),
+                "end_date": (self.start_date + timedelta(days=self._rng.randint(300, 700))).strftime("%Y-%m-%d"),
+                "target_segment": self._rng.choice(["All", "High Net Worth", "New Customers", "Inactive", "Corporate"]),
+                "budget": self._rng.randint(10000, 500000),
+                "responses": self._rng.randint(100, 5000),
+                "conversions": self._rng.randint(10, 500),
+                "roi": round(self._rng.uniform(0.1, 3.0), 2),
             }
             data.append(campaign)
 
@@ -708,18 +717,18 @@ class TPCDISourceDataGenerator:
 
         data = []
         for _ in range(num_prices):
-            symbol = random.choice(symbols)
-            trade_date = self.start_date + timedelta(days=random.randint(0, (self.end_date - self.start_date).days))
+            symbol = self._rng.choice(symbols)
+            trade_date = self.start_date + timedelta(days=self._rng.randint(0, (self.end_date - self.start_date).days))
 
             # Generate realistic OHLC prices
-            base_price = random.uniform(10.0, 500.0)
+            base_price = self._rng.uniform(10.0, 500.0)
             open_price = base_price
-            high_price = open_price * random.uniform(1.0, 1.05)
-            low_price = open_price * random.uniform(0.95, 1.0)
-            close_price = random.uniform(low_price, high_price)
-            volume = random.randint(1000, 10000000)
-            adjusted_close = close_price * random.uniform(0.98, 1.02)
-            source = random.choice(["NYSE", "NASDAQ", "BLOOMBERG", "REUTERS"])
+            high_price = open_price * self._rng.uniform(1.0, 1.05)
+            low_price = open_price * self._rng.uniform(0.95, 1.0)
+            close_price = self._rng.uniform(low_price, high_price)
+            volume = self._rng.randint(1000, 10000000)
+            adjusted_close = close_price * self._rng.uniform(0.98, 1.02)
+            source = self._rng.choice(["NYSE", "NASDAQ", "BLOOMBERG", "REUTERS"])
 
             data.append(
                 [
@@ -761,7 +770,7 @@ class TPCDISourceDataGenerator:
         data = []
         for jurisdiction in self.tax_jurisdictions:
             for tax_type in ["Income", "Capital Gains", "Dividend", "Interest"]:
-                rate = random.uniform(0.15, 0.37) if jurisdiction == "Federal" else random.uniform(0.0, 0.13)
+                rate = self._rng.uniform(0.15, 0.37) if jurisdiction == "Federal" else self._rng.uniform(0.0, 0.13)
 
                 effective_date = self.start_date
                 end_date = "9999-12-31"
@@ -803,10 +812,10 @@ class TPCDISourceDataGenerator:
         for i in range(1, num_companies + 1):
             company = {
                 "id": i,
-                "name": f"Company {i:04d} {random.choice(self.company_suffixes)}",
+                "name": f"Company {i:04d} {self._rng.choice(self.company_suffixes)}",
                 "ticker": f"TKR{i:04d}",
-                "industry": random.choice(self.industries),
-                "sector": random.choice(
+                "industry": self._rng.choice(self.industries),
+                "sector": self._rng.choice(
                     [
                         "Technology",
                         "Healthcare",
@@ -816,12 +825,12 @@ class TPCDISourceDataGenerator:
                         "Energy",
                     ]
                 ),
-                "market_cap": random.randint(1000000, 1000000000000),
-                "revenue": random.randint(1000000, 10000000000),
-                "net_income": random.randint(-100000000, 1000000000),
-                "total_assets": random.randint(1000000, 50000000000),
-                "total_debt": random.randint(0, 10000000000),
-                "sp_rating": random.choice(
+                "market_cap": self._rng.randint(1000000, 1000000000000),
+                "revenue": self._rng.randint(1000000, 10000000000),
+                "net_income": self._rng.randint(-100000000, 1000000000),
+                "total_assets": self._rng.randint(1000000, 50000000000),
+                "total_debt": self._rng.randint(0, 10000000000),
+                "sp_rating": self._rng.choice(
                     [
                         "AAA",
                         "AA+",
@@ -838,7 +847,7 @@ class TPCDISourceDataGenerator:
                         "BB-",
                     ]
                 ),
-                "moody_rating": random.choice(
+                "moody_rating": self._rng.choice(
                     [
                         "Aaa",
                         "Aa1",
@@ -852,10 +861,10 @@ class TPCDISourceDataGenerator:
                         "Baa3",
                     ]
                 ),
-                "street": f"{random.randint(1, 9999)} Corporate Blvd",
+                "street": f"{self._rng.randint(1, 9999)} Corporate Blvd",
                 "city": f"City{i % 100}",
-                "state": random.choice(self.us_states),
-                "zip_code": f"{random.randint(10000, 99999)}",
+                "state": self._rng.choice(self.us_states),
+                "zip_code": f"{self._rng.randint(10000, 99999)}",
                 "country": "USA",
             }
             company_data.append(company)
