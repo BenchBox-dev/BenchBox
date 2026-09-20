@@ -1,0 +1,15 @@
+{
+  "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf1_databricks_sql_20260918_204902_8eacf424.json",
+  "bundle_hash": "01a3150a0b9e89f3d1d1866a1f1100eb5ca687d9f75828b451e64acce3b99ad9",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "phase": 2,
+  "platform": "Databricks",
+  "result_source": "community",
+  "scale_factor": 1.0,
+  "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.4.0",
+  "submitted_at": "2026-09-19T12:00:34.756732+00:00",
+  "submitted_by": "Joe Harris"
+}

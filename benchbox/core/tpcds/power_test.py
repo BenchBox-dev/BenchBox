@@ -19,7 +19,9 @@ from datetime import datetime
 from typing import Any, Callable, Optional
 
 from benchbox.core.connection import DatabaseConnection
-from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.plan_capture_phase import (
+    propagate_query_execution_metadata,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -327,7 +329,7 @@ class TPCDSPowerTest:
                     # _plan_capture_key) so a combined power+throughput run can match
                     # this row by its exact key rather than the ambiguous public-id
                     # fallback in _attach_captured_plans.
-                    propagate_plan_capture_fields(result_dict, query_result)
+                    propagate_query_execution_metadata(result_dict, query_result)
 
                 # Count BEFORE commit (#1144 review): when rows_returned
                 # isn't available, _query_result_count falls back to

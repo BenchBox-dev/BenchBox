@@ -1,0 +1,15 @@
+{
+  "benchmark": "TPC-H",
+  "bundle_file": "tpch_sf1_snowflake_sql_20260919_220908_867b08e7.json",
+  "bundle_hash": "11abeacf86a864f5f75a1740173edf6db2f38442d6c045b444eefd96e909b2cc",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "phase": 2,
+  "platform": "Snowflake",
+  "result_source": "community",
+  "scale_factor": 1.0,
+  "submission_path": "PR-based",
+  "submission_tool_version": "benchbox/0.4.0",
+  "submitted_at": "2026-09-20T02:20:18.840043+00:00",
+  "submitted_by": "Joe Harris"
+}

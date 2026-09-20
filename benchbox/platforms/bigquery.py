@@ -45,13 +45,30 @@ try:
 
     google_auth = google.auth  # Store reference for _load_credentials
     from google.cloud import bigquery, storage
-    from google.cloud.exceptions import NotFound
     from google.oauth2 import service_account
 except ImportError:
     google_auth = None
     bigquery = None
     storage = None
     service_account = None
+
+# google-api-core/google-cloud-core (and thus NotFound/TooManyRequests) can be
+# present even when the heavier google-cloud-bigquery/google-cloud-storage
+# clients above are not (e.g. pulled in transitively by an unrelated
+# dependency), and vice versa. Resolve them independently so a table-casing
+# probe's `except NotFound`/`except TooManyRequests` clause always has a real
+# exception class to bind to, rather than depending on the combined import
+# above having fully succeeded.
+try:
+    from google.api_core.exceptions import TooManyRequests
+    from google.cloud.exceptions import NotFound
+except ImportError:
+
+    class NotFound(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
+
+    class TooManyRequests(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
 
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -951,11 +968,10 @@ class BigQueryAdapter(PlatformAdapter):
 
             for table_name in table_stats:
                 try:
-                    # BigQuery stores tables in uppercase for TPC benchmarks
-                    table_upper = table_name.upper()
+                    resolved_name, _ = self._resolve_target_table(connection, table_name)
 
                     # Use BigQuery's query API instead of cursor pattern
-                    query = f"SELECT 1 FROM `{self.project_id}.{self.dataset_id}.{table_upper}` LIMIT 1"
+                    query = f"SELECT 1 FROM `{self.project_id}.{self.dataset_id}.{resolved_name}` LIMIT 1"
                     query_job = connection.query(query)
                     list(query_job.result())  # Execute query to verify table is accessible
 
@@ -992,11 +1008,10 @@ class BigQueryAdapter(PlatformAdapter):
             Row count as integer, or 0 if unable to determine
         """
         try:
-            # BigQuery stores tables in uppercase for TPC benchmarks
-            table_upper = table.upper()
+            resolved_name, _ = self._resolve_target_table(connection, table)
 
             # Use BigQuery's query API instead of cursor pattern
-            query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{table_upper}`"
+            query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{resolved_name}`"
             query_job = connection.query(query)
             result = list(query_job.result())
             return result[0][0] if result else 0
@@ -1032,7 +1047,8 @@ class BigQueryAdapter(PlatformAdapter):
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
-                # Convert to BigQuery table definition
+                # Convert to BigQuery table definition (normalizing table name to uppercase
+                # per BigQuery TPC schema conventions and adapter query expectations)
                 bq_statement = self._convert_to_bigquery_table(statement)
 
                 # Execute via query job
@@ -1197,9 +1213,27 @@ class BigQueryAdapter(PlatformAdapter):
         storage_client = storage.Client(project=self.project_id, credentials=credentials)
         return storage_client.bucket(self.storage_bucket)
 
+    def _resolve_target_table(self, connection: Any, table_name: str) -> tuple[str, Any]:
+        """Resolve target table reference, checking uppercase first with fallback to exact name."""
+        table_name_upper = table_name.upper()
+        dataset_ref = connection.dataset(self.dataset_id)
+        # Try uppercase table first (default for TPC benchmarks in BigQuery)
+        try:
+            connection.get_table(dataset_ref.table(table_name_upper))
+            return table_name_upper, dataset_ref.table(table_name_upper)
+        except NotFound:
+            # Fallback to exact case if table was created with lowercase or mixed case
+            try:
+                connection.get_table(dataset_ref.table(table_name))
+                return table_name, dataset_ref.table(table_name)
+            except NotFound:
+                # If neither exists yet, default to uppercase
+                return table_name_upper, dataset_ref.table(table_name_upper)
+
     def _get_table_row_count(self, connection: Any, table_name_upper: str) -> int:
         """Return current row count for a BigQuery table."""
-        query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{table_name_upper}`"
+        resolved_name, _ = self._resolve_target_table(connection, table_name_upper)
+        query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{resolved_name}`"
         query_job = connection.query(query)
         result = list(query_job.result())
         return result[0][0] if result else 0
@@ -1214,8 +1248,7 @@ class BigQueryAdapter(PlatformAdapter):
         benchmark: Any | None = None,
     ) -> int:
         """Load one table through GCS staging."""
-        table_name_upper = table_name.upper()
-        table_ref = connection.dataset(self.dataset_id).table(table_name_upper)
+        resolved_name, table_ref = self._resolve_target_table(connection, table_name)
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1236,11 +1269,35 @@ class BigQueryAdapter(PlatformAdapter):
                 data_source=data_source,
                 benchmark=benchmark,
             )
-            uri = f"gs://{self.storage_bucket}/{blob_name}"
-            load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
-            load_job.result()
+            if file_idx > 0:
+                # BigQuery limits table update operations to 5 per 10s per table.
+                # Small throttle between chunks prevents hitting rate limits on small multi-file tables.
+                time.sleep(1.0)
 
-        return self._get_table_row_count(connection, table_name_upper)
+            uri = f"gs://{self.storage_bucket}/{blob_name}"
+            max_retries = 5
+            load_job = None
+            for attempt in range(max_retries):
+                try:
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
+                    load_job.result()
+                    break
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
+                        raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
+
+        return self._get_table_row_count(connection, resolved_name)
 
     def _load_table_direct(
         self,
@@ -1251,8 +1308,7 @@ class BigQueryAdapter(PlatformAdapter):
         benchmark: Any | None = None,
     ) -> int:
         """Load one table directly from local files."""
-        table_name_upper = table_name.upper()
-        table_ref = connection.dataset(self.dataset_id).table(table_name_upper)
+        resolved_name, table_ref = self._resolve_target_table(connection, table_name)
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1267,11 +1323,34 @@ class BigQueryAdapter(PlatformAdapter):
                 data_source=data_source,
                 benchmark=benchmark,
             )
-            with open(file_path, "rb") as source_file:
-                load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
-            load_job.result()
 
-        return self._get_table_row_count(connection, table_name_upper)
+            if file_idx > 0:
+                time.sleep(1.0)
+
+            max_retries = 5
+            load_job = None
+            for attempt in range(max_retries):
+                try:
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        with open(file_path, "rb") as source_file:
+                            load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
+                    load_job.result()
+                    break
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
+                        raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
+
+        return self._get_table_row_count(connection, resolved_name)
 
     def _build_load_job_config(
         self,
