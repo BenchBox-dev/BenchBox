@@ -266,6 +266,14 @@ tpch = TPCH(scale_factor=0.01)
 # connection and reports Power@Size. (The former PowerRunExecutor wrapper
 # is removed; see adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect(":memory:")
+data_files = tpch.generate_data()
+connection.execute(tpch.get_create_tables_sql())
+for file_path in data_files:
+    table_name = file_path.stem
+    connection.execute(
+        f"INSERT INTO {table_name} "
+        f"SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)"
+    )
 
 print("Starting power run with multiple iterations...")
 power_values = []
@@ -318,6 +326,16 @@ tpch = TPCH(scale_factor=0.01)
 # ConcurrentQueryExecutor wrapper is removed; see
 # adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect(":memory:")
+
+# Generate and load the data before opening throughput sessions.
+data_files = tpch.generate_data()
+connection.execute(tpch.get_create_tables_sql())
+for file_path in data_files:
+    table_name = file_path.stem
+    connection.execute(
+        f"INSERT INTO {table_name} "
+        f"SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)"
+    )
 
 throughput_test = TPCHThroughputTest(
     benchmark=tpch,
@@ -505,6 +523,14 @@ config_helper.optimize_for_system(cpu_cores, memory_gb)
 # Set up benchmark
 tpch = TPCH(scale_factor=0.01)
 connection = duckdb.connect(":memory:")
+data_files = tpch.generate_data()
+connection.execute(tpch.get_create_tables_sql())
+for file_path in data_files:
+    table_name = file_path.stem
+    connection.execute(
+        f"INSERT INTO {table_name} "
+        f"SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)"
+    )
 
 print("Starting systematic benchmark testing...")
 
