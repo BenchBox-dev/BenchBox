@@ -25,6 +25,8 @@ row-count evidence         row_count_validation      row_count_validation
 error                      error_message, error,      errors[] companion
                             message / error_type
 plan                       query_plan and plan fields .plans.json companion
+outstanding work           outstanding_stream_ids,   outstanding_work
+                           cleanup_state
 =========================  =========================  ========================
 
 ``None`` and a missing key never become zero, false, or an empty collection.
@@ -44,7 +46,10 @@ the presentation/execution fields in ``LEGACY_IGNORED_EXTRA_FIELDS``.  Those
 named fields are intentionally ignored because compact-v2 has no representation
 for them.  Every other unknown legacy key is rejected.  Neither boundary has a
 generic extension metadata bag: a new correctness field requires an explicit
-typed model and adapter change.
+typed model and adapter change. Throughput containment is the narrow exception:
+its existing ``outstanding_stream_ids`` and ``cleanup_state`` fields are stored
+inside canonical ``resource_usage`` and emitted as one ``outstanding_work``
+object, so serialization cannot erase evidence that workers may still be live.
 
 Migration inventory (2026-08-08)
 --------------------------------
@@ -119,6 +124,7 @@ COMPACT_V2_QUERY_FIELDS = frozenset(
         "row_count_validation",
         "dataframe_skip_summary",
         "plan_capture_error",
+        "outstanding_work",
     }
 )
 
@@ -185,8 +191,6 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "operation",
         "operation_type",
         "optimization_time",
-        # Throughput containment metadata on refused maintenance results.
-        "outstanding_stream_ids",
         "p50_time_ms",
         "p95_time_ms",
         "parse_time",
@@ -281,8 +285,14 @@ LEGACY_QUERY_FIELDS = frozenset(
         "result_digest",
         "digest",
         "test_type",
+        "outstanding_stream_ids",
+        "cleanup_state",
+        "outstanding_work",
     }
 )
+
+OUTSTANDING_WORK_CLEANUP_STATES = frozenset({"complete", "outstanding", "quiesced"})
+OUTSTANDING_WORK_RESOURCE_KEY = "outstanding_work"
 
 
 class QueryExecutionContractError(ValueError):
@@ -513,6 +523,74 @@ def normalize_stream_id(raw_value: Any) -> str | int | None:
     return str(raw_value)
 
 
+def _normalize_outstanding_work(source: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Normalize the existing throughput containment fields for serialization."""
+    nested = source.get("outstanding_work")
+    if nested is not None:
+        if not isinstance(nested, Mapping):
+            raise QueryExecutionContractError("outstanding_work must be an object")
+        unknown = set(nested) - {"stream_ids", "cleanup_state"}
+        if unknown:
+            raise QueryExecutionContractError(f"Unknown outstanding_work fields: {sorted(unknown)!r}")
+        raw_ids = nested.get("stream_ids")
+        cleanup_state = nested.get("cleanup_state")
+    else:
+        raw_ids = source.get("outstanding_stream_ids")
+        cleanup_state = source.get("cleanup_state")
+
+    if raw_ids is None and cleanup_state is None:
+        return None
+    if raw_ids is None:
+        raw_ids = []
+    if not isinstance(raw_ids, (list, tuple)):
+        raise QueryExecutionContractError("outstanding stream ids must be a list or tuple")
+    stream_ids = [normalize_non_negative_integer("outstanding stream id", value) for value in raw_ids]
+    if cleanup_state is None:
+        cleanup_state = "outstanding" if stream_ids else "complete"
+    if cleanup_state not in OUTSTANDING_WORK_CLEANUP_STATES:
+        raise QueryExecutionContractError(f"Unknown cleanup_state: {cleanup_state!r}")
+    if cleanup_state == "outstanding" and not stream_ids:
+        raise QueryExecutionContractError("cleanup_state='outstanding' requires at least one outstanding stream")
+    if stream_ids and cleanup_state != "outstanding":
+        raise QueryExecutionContractError("outstanding streams require cleanup_state='outstanding'")
+    if not stream_ids and cleanup_state == "complete":
+        return None
+    return {"stream_ids": stream_ids, "cleanup_state": cleanup_state}
+
+
+def _resource_usage_with_outstanding_work(
+    raw_resource_usage: Any,
+    outstanding_work: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if raw_resource_usage is not None and not isinstance(raw_resource_usage, Mapping):
+        raise QueryExecutionContractError("resource_usage must be an object")
+    resource_usage = dict(raw_resource_usage or {})
+    if outstanding_work is not None:
+        resource_usage[OUTSTANDING_WORK_RESOURCE_KEY] = outstanding_work
+    if resource_usage or raw_resource_usage is not None:
+        return resource_usage
+    return None
+
+
+def _outstanding_work_from_execution(execution: QueryExecution) -> dict[str, Any] | None:
+    resource_usage = execution.resource_usage
+    if not isinstance(resource_usage, Mapping):
+        return None
+    return _normalize_outstanding_work({"outstanding_work": resource_usage.get(OUTSTANDING_WORK_RESOURCE_KEY)})
+
+
+def _public_resource_usage(execution: QueryExecution) -> dict[str, Any] | None:
+    resource_usage = execution.resource_usage
+    if not isinstance(resource_usage, Mapping):
+        return None
+    public = dict(resource_usage)
+    had_outstanding_work = OUTSTANDING_WORK_RESOURCE_KEY in public
+    public.pop(OUTSTANDING_WORK_RESOURCE_KEY, None)
+    if not public and had_outstanding_work:
+        return None
+    return public
+
+
 def validate_query_execution(execution: QueryExecution) -> QueryExecution:
     """Return a validated canonical replacement for a possibly mutated model.
 
@@ -524,7 +602,7 @@ def validate_query_execution(execution: QueryExecution) -> QueryExecution:
 
     if not isinstance(execution, QueryExecution):
         raise QueryExecutionContractError(f"Expected QueryExecution, got {type(execution).__name__}")
-    return QueryExecution(
+    validated = QueryExecution(
         query_id=execution.query_id,
         stream_id=execution.stream_id,
         execution_order=execution.execution_order,
@@ -547,6 +625,7 @@ def validate_query_execution(execution: QueryExecution) -> QueryExecution:
         test_type=execution.test_type,
         error_type=execution.error_type,
     )
+    return validated
 
 
 def legacy_query_execution_mapping(value: Any) -> Mapping[str, Any]:
@@ -609,6 +688,9 @@ def legacy_query_execution_mapping(value: Any) -> Mapping[str, Any]:
         "result_digest",
         "digest",
         "test_type",
+        "outstanding_stream_ids",
+        "cleanup_state",
+        "outstanding_work",
     )
     extracted = {field: getattr(value, field) for field in contract_fields if hasattr(value, field)}
     if extracted:
@@ -697,7 +779,8 @@ def query_execution_from_legacy_dict(
         transform=str,
     )
 
-    return QueryExecution(
+    outstanding_work = _normalize_outstanding_work(source)
+    execution = QueryExecution(
         query_id=query_id,
         stream_id=stream_id,
         execution_order=(
@@ -711,7 +794,7 @@ def query_execution_from_legacy_dict(
         execution_time_ms=duration_ms,
         status=status,
         rows_returned=rows_returned,
-        resource_usage=source.get("resource_usage"),
+        resource_usage=_resource_usage_with_outstanding_work(source.get("resource_usage"), outstanding_work),
         error_message=error_message,
         iteration=iteration,
         run_type=run_type,
@@ -727,6 +810,7 @@ def query_execution_from_legacy_dict(
         test_type=source.get("test_type"),
         error_type=source.get("error_type"),
     )
+    return execution
 
 
 def query_execution_to_legacy_dict(
@@ -760,7 +844,6 @@ def query_execution_to_legacy_dict(
         "stream_id",
         "run_type",
         "execution_order",
-        "resource_usage",
         "error_type",
         "row_count_validation",
         "cost",
@@ -777,6 +860,13 @@ def query_execution_to_legacy_dict(
         value = getattr(execution, field)
         if value is not None:
             result[field] = value
+    resource_usage = _public_resource_usage(execution)
+    if resource_usage is not None:
+        result["resource_usage"] = resource_usage
+    outstanding_work = _outstanding_work_from_execution(execution)
+    if outstanding_work is not None:
+        result["outstanding_stream_ids"] = list(outstanding_work["stream_ids"])
+        result["cleanup_state"] = outstanding_work["cleanup_state"]
     if execution.error_message is not None:
         result[error_field] = execution.error_message
     return result
@@ -828,6 +918,9 @@ def query_execution_to_compact_v2(execution: QueryExecution) -> dict[str, Any]:
         result["dataframe_skip_summary"] = execution.dataframe_skip_summary
     if execution.plan_capture_error is not None:
         result["plan_capture_error"] = execution.plan_capture_error
+    outstanding_work = _outstanding_work_from_execution(execution)
+    if outstanding_work is not None:
+        result["outstanding_work"] = outstanding_work
     return result
 
 

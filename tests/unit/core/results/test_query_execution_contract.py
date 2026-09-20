@@ -189,6 +189,37 @@ def test_missing_and_null_optional_values_do_not_become_zero() -> None:
         assert "rows_returned" not in restored
 
 
+def test_live_outstanding_streams_survive_result_serialization() -> None:
+    legacy = {
+        "query_id": "throughput-containment",
+        "status": "FAILED",
+        "outstanding_stream_ids": [2, 5],
+        "cleanup_state": "outstanding",
+    }
+
+    execution = query_execution_from_legacy_dict(legacy)
+    compact = query_execution_to_compact_v2(execution)
+    restored = query_execution_from_compact_v2(compact)
+
+    assert compact["outstanding_work"] == {
+        "stream_ids": [2, 5],
+        "cleanup_state": "outstanding",
+    }
+    assert (
+        build_result_payload(_benchmark_result(legacy))["queries"][0]["outstanding_work"] == compact["outstanding_work"]
+    )
+    assert query_execution_to_legacy_dict(restored) == legacy
+
+
+def test_ordinary_result_shape_does_not_gain_outstanding_work() -> None:
+    legacy = {"query_id": "Q1", "status": "SUCCESS"}
+
+    execution = query_execution_from_legacy_dict(legacy)
+
+    assert query_execution_to_compact_v2(execution) == {"id": "Q1", "status": "SUCCESS"}
+    assert query_execution_to_legacy_dict(execution) == legacy
+
+
 def test_compact_property_round_trip_preserves_values_and_units() -> None:
     """Exhaust a bounded product of semantic edge values without an optional dependency."""
     durations = [None, 0.0, 0.001, 1.0, 1234.5]
