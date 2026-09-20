@@ -11,13 +11,6 @@ from .config_helpers import (
     PowerRunSettings,
     create_sample_execution_config,
 )
-from .execution_manager import (
-    ConcurrentQueryExecutor,
-    ConcurrentQueryResult,
-    PowerRunExecutor,
-    PowerRunIteration,
-    PowerRunResult,
-)
 from .formatting import (
     format_bytes,
     format_duration,
@@ -57,11 +50,6 @@ __all__ = [
     "format_data_directory",
     "format_schema_name",
     # Execution management
-    "PowerRunExecutor",
-    "ConcurrentQueryExecutor",
-    "PowerRunResult",
-    "ConcurrentQueryResult",
-    "PowerRunIteration",
     "PowerRunSettings",
     "ConcurrentQueriesSettings",
     "ExecutionConfigHelper",
