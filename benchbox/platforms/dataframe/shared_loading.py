@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Protocol, runtime_checkable
 
+from benchbox.core.dataframe.csv_dialect import (
+    dialect_preserves_empty_strings as dialect_preserves_empty_strings,
+)
 from benchbox.core.dataframe.schema_utils import (
     column_name,
     column_sql_type,
@@ -130,19 +133,6 @@ def declared_temporal_columns(
         if normalized_type in {"date32", "timestamp[us]"}:
             temporal_columns[name] = normalized_type
     return temporal_columns
-
-
-def dialect_preserves_empty_strings(null_marker: str | None) -> bool:
-    """True when the SQL dialect loads empty CSV fields as ``""``, not NULL.
-
-    Only ``""`` maps empty fields to NULL (TPC ``.tbl``/``.dat``, JoinOrder,
-    ...). Both ``None`` (no NULL conversion) and a non-empty sentinel (only
-    that literal maps to NULL, e.g. ClickBench's ``__NULL__``) preserve empty
-    strings, so DataFrame readers - which surface an empty text field as
-    null/NaN regardless of dialect - must restore ``""`` post-read to match
-    the SQL reference.
-    """
-    return null_marker != ""
 
 
 def resolve_empty_string_restore_columns(

@@ -443,7 +443,7 @@ class FormatConverter:
             # sentinel is NULL), do the same here so the DataFrame surface
             # does not emit NULL where the SQL surface emits "". Only "" maps
             # empty fields to NULL.
-            from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
+            from benchbox.core.dataframe.csv_dialect import dialect_preserves_empty_strings
 
             convert_options = pv.ConvertOptions(
                 auto_dict_encode=True,
