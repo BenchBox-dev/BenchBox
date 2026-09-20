@@ -64,6 +64,7 @@ from benchbox.utils.path_utils import get_benchmark_runs_dataframe_path, get_ben
 
 if TYPE_CHECKING:
     from benchbox.core.tpch.schema import Table
+    from benchbox.platforms.base.data_loading import CsvDialect
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,12 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # v6: inferred TIME columns (time32/time64) are now cast to string before the
 # Parquet write. Pre-v6 caches may embed INT32 TIME(MILLIS,false), which Spark
 # rejects on read (PARQUET_TYPE_ILLEGAL), so they must be regenerated.
-DATAFRAME_CACHE_VERSION = "v6"
+# v7: CSV dialect (delimiter, header, null marker) now resolves through the
+# shared resolve_csv_dialect() single source -- manifest metadata first, then
+# benchmark attributes -- instead of benchmark attributes alone. Pre-v7 caches
+# for manifest-annotated benchmarks may embed the attribute-only reading, so
+# they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v7"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -1105,6 +1111,7 @@ class DataFrameDataLoader:
             target_format=target_format,
             source_hash=source_hash,
             write_config=effective_write_config,
+            data_dir=data_dir,
         )
         if layout_applied:
             self.applied_write_layout = effective_write_config
@@ -1278,6 +1285,7 @@ class DataFrameDataLoader:
         target_format: DataFormat,
         source_hash: str,
         write_config: DataFrameWriteConfiguration | None = None,
+        data_dir: Path | None = None,
     ) -> dict[str, Path | list[Path]]:
         """Convert data files to target format.
 
@@ -1316,19 +1324,22 @@ class DataFrameDataLoader:
         # Get schema info for column names and types
         schema_info = self._get_schema_info(benchmark)
         pyarrow_types = self._get_pyarrow_types(benchmark)
-        null_markers = self._get_null_markers(benchmark, source_files)
+        # Single CSV dialect source: one resolved dialect per table (manifest
+        # metadata, then benchmark attributes, then format defaults) feeds the
+        # null marker, delimiter, and header alike, so the DataFrame surface
+        # cannot interpret the same metadata differently from the SQL loader.
+        table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
+        dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
 
         converted_files: dict[str, Path | list[Path]] = {}
         table_metadata: dict[str, dict[str, Any]] = {}
-
-        benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
-        benchmark_has_header = bool(getattr(benchmark, "csv_has_header", False))
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]
             column_names = schema_info.get(table_name)
             column_types = pyarrow_types.get(table_name)
             table_write_config = self._get_table_write_config(write_config, table_name, column_names)
+            table_dialect = dialects[table_name]
 
             converted_list, table_entries = self._convert_table_files(
                 table_name,
@@ -1336,10 +1347,10 @@ class DataFrameDataLoader:
                 column_names,
                 column_types,
                 table_write_config,
-                benchmark_delimiter,
+                table_dialect.delimiter,
                 cache_path,
-                null_marker=null_markers.get(table_name, ""),
-                has_header=benchmark_has_header,
+                null_marker=table_dialect.null_marker,
+                has_header=table_dialect.has_header,
             )
 
             if len(converted_list) == 1:
@@ -1496,7 +1507,64 @@ class DataFrameDataLoader:
             skip_dictionary_columns=filtered_skip_dict_cols,
         )
 
-    def _get_null_markers(self, benchmark: Any, source_files: dict[str, Path | list[Path]]) -> dict[str, str | None]:
+    @staticmethod
+    def _read_manifest_dialect_hints(data_dir: Path | None, table_names: list[str]) -> dict[str, dict[str, Any]]:
+        """Read per-table CSV dialect metadata from the datagen manifest, if present.
+
+        Returns an empty mapping when there is no data directory or no usable
+        manifest, in which case dialect resolution falls back to benchmark
+        attributes and format defaults exactly as before.
+        """
+        if data_dir is None or not table_names:
+            return {}
+        from benchbox.platforms.base.data_loading import ManifestFileSource
+
+        manifest_path = Path(data_dir) / "_datagen_manifest.json"
+        return ManifestFileSource().read_table_metadata_hints(manifest_path, table_names)
+
+    def _resolve_table_dialects(
+        self,
+        benchmark: Any,
+        source_files: dict[str, Path | list[Path]],
+        table_metadata: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, CsvDialect]:
+        """Resolve one shared CSV dialect per table through ``resolve_csv_dialect``.
+
+        Manifest metadata (when provided) wins per field, then benchmark
+        attributes, then format defaults -- the same precedence the SQL loader
+        uses. On any per-table resolution failure the dialect falls back to the
+        historical attribute-only reading (benchmark delimiter/header, empty ->
+        NULL marker).
+        """
+        from benchbox.platforms.base.data_loading import CsvDialect, DataSource, resolve_csv_dialect
+
+        dialects: dict[str, CsvDialect] = {}
+        source = DataSource(
+            source_type="benchmark_instance",
+            tables={},
+            table_metadata=dict(table_metadata) if table_metadata else {},
+        )
+        for table_name, paths in source_files.items():
+            first = paths[0] if isinstance(paths, list) else paths
+            try:
+                dialects[table_name] = resolve_csv_dialect(source, table_name, Path(first), benchmark)
+            except Exception:
+                logger.debug("Falling back to attribute-only CSV dialect for table '%s'", table_name)
+                dialects[table_name] = CsvDialect(
+                    delimiter=getattr(benchmark, "csv_delimiter", None) or ",",
+                    has_header=bool(getattr(benchmark, "csv_has_header", False)),
+                    null_marker="",
+                    normalize_booleans=False,
+                    quote=None,
+                )
+        return dialects
+
+    def _get_null_markers(
+        self,
+        benchmark: Any,
+        source_files: dict[str, Path | list[Path]],
+        table_metadata: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, str | None]:
         """Resolve each table's CSV null marker the same way the SQL loader does.
 
         Returns a per-table marker: ``None`` means empty fields are kept as empty
@@ -1506,18 +1574,10 @@ class DataFrameDataLoader:
         the same way its DuckDB SQL reference does. On any resolution failure the
         marker defaults to ``""`` (prior behavior: empty -> NULL).
         """
-        from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
-
-        markers: dict[str, str | None] = {}
-        source = DataSource(source_type="benchmark_instance", tables={})
-        for table_name, paths in source_files.items():
-            first = paths[0] if isinstance(paths, list) else paths
-            try:
-                dialect = resolve_csv_dialect(source, table_name, Path(first), benchmark)
-                markers[table_name] = dialect.null_marker
-            except Exception:
-                markers[table_name] = ""
-        return markers
+        return {
+            table_name: dialect.null_marker
+            for table_name, dialect in self._resolve_table_dialects(benchmark, source_files, table_metadata).items()
+        }
 
     def _get_schema_info(self, benchmark: Any) -> dict[str, list[str]]:
         """Extract column names from benchmark schema.
