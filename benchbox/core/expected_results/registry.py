@@ -164,6 +164,12 @@ class ExpectedResultsRegistry:
                     logger.debug(f"Query '{query_id}' is scale-independent. Using SF=1.0 expectation at SF={sf}.")
                     return expected_result_sf1, outcome_sf1
 
+            # A failed or timed-out SF=1 fallback load is reported as-is:
+            # degrading it to NO_ANSWER_SET would mask the failure as a
+            # normal skip (mirrors the primary-load guard above).
+            if outcome_sf1 in (LoadOutcome.PROVIDER_FAILED, LoadOutcome.PROVIDER_TIMEOUT):
+                return None, outcome_sf1
+
             # No scale-independent result found - validation will skip
             logger.debug(
                 f"No expected results found for benchmark '{benchmark_name}' at scale factor {sf}. "

@@ -413,3 +413,18 @@ class TestOutcomeDistinction:
         assert result.is_valid
         assert result.validation_mode == ValidationMode.SKIP
         assert "stream 2" in result.warning_message
+
+    def test_sf1_fallback_failure_propagates_provider_outcome(self, fresh_registry):
+        """A failed SF=1 fallback load must not degrade to NO_ANSWER_SET."""
+
+        def sf_gapped_provider(sf):
+            if sf == 1.0:
+                raise ConnectionError("simulated SF=1 fetch failure")
+            return None
+
+        fresh_registry.register_provider("gapped_bench", sf_gapped_provider)
+
+        result, outcome = fresh_registry.get_expected_result_detailed("gapped_bench", "1", scale_factor=10.0)
+
+        assert result is None
+        assert outcome is LoadOutcome.PROVIDER_FAILED
