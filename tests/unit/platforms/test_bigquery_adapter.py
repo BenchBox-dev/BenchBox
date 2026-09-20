@@ -3061,7 +3061,7 @@ class TestBigQueryTableResolution:
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_convert_to_bigquery_table_uppercase_flag(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
-        result = adapter._convert_to_bigquery_table("CREATE TABLE customer (id INT64)", uppercase_table_name=True)
+        result = adapter._convert_to_bigquery_table("CREATE TABLE customer (id INT64)")
         assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.CUSTOMER` (id INT64)"
 
     @patch("benchbox.platforms.bigquery.bigquery")

@@ -1049,7 +1049,7 @@ class BigQueryAdapter(PlatformAdapter):
             for statement in statements:
                 # Convert to BigQuery table definition (normalizing table name to uppercase
                 # per BigQuery TPC schema conventions and adapter query expectations)
-                bq_statement = self._convert_to_bigquery_table(statement, uppercase_table_name=True)
+                bq_statement = self._convert_to_bigquery_table(statement)
 
                 # Execute via query job
                 query_job = connection.query(bq_statement)
@@ -1715,7 +1715,7 @@ class BigQueryAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
-    def _convert_to_bigquery_table(self, statement: str, *, uppercase_table_name: bool = False) -> str:
+    def _convert_to_bigquery_table(self, statement: str) -> str:
         """Convert CREATE TABLE statement to BigQuery format.
 
         Makes tables idempotent by using CREATE OR REPLACE TABLE.
@@ -1738,12 +1738,11 @@ class BigQueryAdapter(PlatformAdapter):
             # project/dataset case (BigQuery table identifiers are
             # case-sensitive while the adapter convention is UPPERCASE tables).
             table_name = match.group(1)
-            if uppercase_table_name:
-                if "." in table_name:
-                    *qualifier, bare = table_name.split(".")
-                    table_name = ".".join([*qualifier, bare.upper()])
-                else:
-                    table_name = table_name.upper()
+            if "." in table_name:
+                *qualifier, bare = table_name.split(".")
+                table_name = ".".join([*qualifier, bare.upper()])
+            else:
+                table_name = table_name.upper()
             rest = match.group(2)
             if f"{self.dataset_id}." not in table_name:
                 qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
