@@ -30,7 +30,8 @@ BENCHMARK_LOADER_API_SURFACE = "internal"
 # Benchmarks whose result carries a compliance classification. Only these accept
 # `official`; passing it wholesale is unsafe because constructor_accepts_argument()
 # is satisfied by a bare **kwargs, so any benchmark with one would swallow it.
-COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds"})
+# TPC-DI is not gated: it has no official-scale methodology to classify against.
+COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds", "tpch"})
 
 
 def compliance_mode_kwargs(config: BenchmarkConfig) -> dict[str, Any]:

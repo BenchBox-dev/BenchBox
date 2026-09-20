@@ -149,10 +149,17 @@ def dataframe_compliance_class(benchmark_instance: object | None, benchmark_conf
     name = str(getattr(benchmark_config, "name", "") or "").lower()
     if name not in COMPLIANCE_GATED_BENCHMARKS:
         return None
-    from benchbox.core.tpcds.compliance import classify_tpcds_run
+    if name == "tpch":
+        from benchbox.core.tpch.compliance import classify_tpch_run
+
+        classify = classify_tpch_run
+    else:
+        from benchbox.core.tpcds.compliance import classify_tpcds_run
+
+        classify = classify_tpcds_run
 
     return _compliance_value(
-        classify_tpcds_run(
+        classify(
             float(getattr(benchmark_config, "scale_factor", 0) or 0),
             official=bool(getattr(benchmark_config, "official", False)),
         )
