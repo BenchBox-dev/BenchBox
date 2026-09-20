@@ -64,10 +64,14 @@ python -m pip install "benchbox[duckdb]"
 DuckDB is an optional dependency. A plain `benchbox` installation includes
 SQLite but does not include DuckDB.
 
+The commands below use the `benchbox` executable installed by either method.
+If you used `uv add` and have not activated the project environment, prefix
+each command with `uv run --`.
+
 ### 2. Run a benchmark
 
 ```bash
-uv run -- benchbox run \
+benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.01
@@ -80,16 +84,16 @@ the benchmark, validates the execution, and stores the result under
 ### 3. Inspect the result
 
 ```bash
-uv run -- benchbox results --limit 1
+benchbox results
 ```
 
-The result summary shows the run status, validation outcome, total duration,
-and query timings.
+The summary lists each recent run's benchmark, platform, timestamp, duration,
+query count, and BenchBox version.
 
 To preview a run without executing it:
 
 ```bash
-uv run -- benchbox run \
+benchbox run \
   --dry-run ./preview \
   --platform duckdb \
   --benchmark tpch \
@@ -156,7 +160,7 @@ The available fields depend on the platform and run configuration.
 Use the CLI to inspect, visualize, and export local results:
 
 ```bash
-uv run -- benchbox results --limit 5
+uv run -- benchbox results
 uv run -- benchbox visualize benchmark_runs/results/*.json
 uv run -- benchbox export --last --format html
 ```
