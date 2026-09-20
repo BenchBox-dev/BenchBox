@@ -1,6 +1,6 @@
 <!-- PROVENANCE
-generated: 2026-09-17
-content-revision: sha256:72cc0ae5661521d9
+generated: 2026-09-19
+content-revision: sha256:c42f09f4382b6432
 This header is drift-IGNORED by `--check` (see _strip_provenance). content-revision
 is a hash of the generated body (markdown + json), NOT a git SHA: a PR-branch SHA is
 orphaned by squash-merge, so to verify this artifact, regenerate it with
@@ -13,7 +13,7 @@ does this). Do not rely on this header for diffs.
 
 **What an oracle here means.** A benchmark is listed as *guarded* when an oracle is REGISTERED for it — it is **not** a claim that the oracle is currently green. The distinction matters most for cross-surface gates: only a gate in the enforced `GATES` registry is run as a CI-blocking step (so it is green or CI fails); a gate in `STAGED_GATES` is registered but not run in CI, so its registration proves nothing about correctness. The **Enforced** column reports this *cross-surface* enforcement status: `enforced (CI-blocking)`, `staged (NOT CI-enforced)`, or `—` for any benchmark that is not cross-surface-gated. A `—` therefore says nothing about whether a *non*-cross-surface oracle is enforced: the expected-results (tpch, tpcds) and TPC-Havoc variant oracles are CI-enforced via their own test suites despite showing `—` here.
 
-**Summary:** 23 shipped benchmarks — 11 guarded (oracle registered), 12 UNGUARDED (10 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle). Cross-surface gates: 7 CI-enforced, 1 staged (not CI-enforced).
+**Summary:** 23 shipped benchmarks — 12 guarded (oracle registered), 11 UNGUARDED (9 reachable by the cross-surface gate, 2 single-surface needing a fallback oracle). Cross-surface gates: 7 CI-enforced, 2 staged (not CI-enforced).
 
 **Strength + scale disclosure:** a guarded cell is not a uniform guarantee. The **Strength** column says what the oracle proves — `value-level` (full result values compared) vs `cardinality-only` (row counts only) vs `value+cardinality` (both) — and the **Scale** column says at which scale it actually holds. Both are derived from live sources (the provider's stored answers/digests and the equivalence gate's bounded scale), not hand-labelled. No expected-results oracle exists above SF=1 (the loader raises for other scales), so `tpch`/`tpcds` values are unguarded above SF=1 — the tpch **Strength** cell states this inline so the row is self-contained.
 
@@ -27,7 +27,7 @@ does this). Do not rely on this header for diffs.
 | amplab | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
 | clickbench | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | mixed-provenance | Most ClickBench DataFrame cells are generated from shared compact specs, with a small set of bespoke implementations; read as mixed provenance, not fully independent implementations. | enforced (CI-blocking) | cross-surface |
 | coffeeshop | sql+dataframe | cross-surface | value-level | SF=0.1 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | Expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | enforced (CI-blocking) | cross-surface |
-| datavault | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
+| datavault | sql+dataframe | cross-surface | value-level | SF=0.01 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | Data Vault expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators. | staged (NOT CI-enforced) | cross-surface (registered, NOT CI-enforced) |
 | flightdata | sql+dataframe | cross-surface | value-level | SF=0.01 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | FlightData expression and pandas DataFrame implementations are separately handwritten for each query (expression helpers plus a compact pandas metadata DSL), so the gate has stronger cross-implementation signal than shared-spec generators. | staged (NOT CI-enforced) | cross-surface (registered, NOT CI-enforced) |
 | h2odb | sql+dataframe | cross-surface | value-level | SF=0.01 | self-referential | Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored. | separate-handwritten | H2O-DB expression and pandas DataFrame implementations are separately handwritten for each query. | enforced (CI-blocking) | cross-surface |
 | joinorder | sql+dataframe | NONE | — | — | — | — | — | — | — | dual-surface → dispatch to cross-surface gate (w1) |
@@ -53,5 +53,5 @@ These ship with no automated correctness oracle today. Dual-surface ones are dis
 
 > Caveat (w2 oracle choice): write/DML/nondeterministic benchmarks (`write_primitives`, `transaction_primitives`, `metadata_primitives`, `tpcdi`) are listed as dual-surface, but their two surfaces may not be result-comparable; prefer structural-invariant oracles (row counts, post-state assertions) over cross-surface equality for those.
 
-- Dual-surface (cross-surface candidates): datavault, joinorder, metadata_primitives, nyctaxi, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
+- Dual-surface (cross-surface candidates): joinorder, metadata_primitives, nyctaxi, tpcdi, tpcds_obt, tpch_skew, transaction_primitives, tsbs_devops, write_primitives
 - Single-surface (fallback-oracle needed): ai_primitives, vector_search

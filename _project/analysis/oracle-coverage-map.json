@@ -83,18 +83,20 @@
     },
     {
       "benchmark": "datavault",
-      "cross_surface_applicable": true,
-      "cross_surface_enforced": null,
+      "cross_surface_applicable": false,
+      "cross_surface_enforced": false,
       "dual_surface": true,
-      "guarded": false,
-      "independence": "\u2014",
-      "independence_rationale": "\u2014",
-      "oracles": [],
-      "primary_oracle": "NONE",
-      "scale": "\u2014",
-      "strength": "\u2014",
-      "surface_provenance": "\u2014",
-      "surface_provenance_rationale": "\u2014",
+      "guarded": true,
+      "independence": "self-referential",
+      "independence_rationale": "Both compared surfaces are benchbox's own implementations; see Surface provenance for how far apart they were authored.",
+      "oracles": [
+        "cross-surface"
+      ],
+      "primary_oracle": "cross-surface",
+      "scale": "SF=0.01",
+      "strength": "value-level",
+      "surface_provenance": "separate-handwritten",
+      "surface_provenance_rationale": "Data Vault expression and pandas DataFrame implementations are separately handwritten for each query, so the gate has stronger cross-implementation signal than shared-spec generators.",
       "surfaces": [
         "sql",
         "dataframe"
