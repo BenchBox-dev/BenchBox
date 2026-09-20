@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import anyio
 from mcp.server.mcpserver import MCPServer
@@ -639,21 +639,7 @@ class DurableJobRepository:
 
     def mark_unknown_outstanding(self, execution_id: str, worker_id: str) -> bool:
         """Quarantine an owned job whose serialized result reports live work."""
-        now = utc_now().isoformat()
-        with self._connect() as connection:
-            changed = connection.execute(
-                """
-                UPDATE mcp_benchmark_jobs
-                SET state = 'unknown', lease_owner = NULL, lease_expires_at = NULL,
-                    lease_version = 1, lease_generation = 0,
-                    unproven_owner = ?, quiesced_at = NULL,
-                    error_code = 'outstanding_work', updated_at = ?, completed_at = ?
-                WHERE execution_id = ? AND lease_owner = ?
-                  AND state IN ('running', 'publishing')
-                """,
-                (worker_id, now, now, execution_id, worker_id),
-            ).rowcount
-        return changed == 1
+        return self._record_attempt_boundary(execution_id, worker_id, transition="outstanding")
 
     def cancel(self, execution_id: str, principal_id: str) -> tuple[JobRecord, str] | None:
         """Cancel an owned job and report how the request was honored.
@@ -849,10 +835,30 @@ class DurableJobRepository:
         outcome remains unknown; the attestation proves only that the old
         attempt can no longer produce external effects.
         """
+        return self._record_attempt_boundary(execution_id, worker_id, transition="quiescent")
+
+    def _record_attempt_boundary(
+        self,
+        execution_id: str,
+        worker_id: str,
+        *,
+        transition: Literal["outstanding", "quiescent"],
+    ) -> bool:
+        """Record one owner-fenced executor boundary with a single timestamp."""
         now = utc_now().isoformat()
-        with self._connect() as connection:
-            changed = connection.execute(
-                """
+        if transition == "outstanding":
+            statement = """
+                UPDATE mcp_benchmark_jobs
+                SET state = 'unknown', lease_owner = NULL, lease_expires_at = NULL,
+                    lease_version = 1, lease_generation = 0,
+                    unproven_owner = ?, quiesced_at = NULL,
+                    error_code = 'outstanding_work', updated_at = ?, completed_at = ?
+                WHERE execution_id = ? AND lease_owner = ?
+                  AND state IN ('running', 'publishing')
+            """
+            parameters = (worker_id, now, now, execution_id, worker_id)
+        else:
+            statement = """
                 UPDATE mcp_benchmark_jobs
                 SET quiesced_at = ?, unproven_owner = ?, updated_at = ?
                 WHERE execution_id = ? AND quiesced_at IS NULL
@@ -861,9 +867,10 @@ class DurableJobRepository:
                       OR (state IN ('running', 'publishing') AND lease_owner = ?)
                       OR (state IN ('running', 'publishing') AND unproven_owner = ?)
                   )
-                """,
-                (now, worker_id, now, execution_id, worker_id, worker_id, worker_id),
-            ).rowcount
+            """
+            parameters = (now, worker_id, now, execution_id, worker_id, worker_id, worker_id)
+        with self._connect() as connection:
+            changed = connection.execute(statement, parameters).rowcount
         return changed == 1
 
     def expired_terminal(self) -> list[JobRecord]:
