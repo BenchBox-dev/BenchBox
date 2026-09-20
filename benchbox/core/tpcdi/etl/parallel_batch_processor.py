@@ -644,8 +644,9 @@ class ParallelBatchProcessor:
 
         try:
             # Count submitted tasks
-            with self.task_lock:
-                stats["tasks_submitted"] = self.task_queue.qsize()
+            with self.task_queue.mutex:
+                batch_task_ids = {entry[2].task_id for entry in list(self.task_queue.queue)}
+            stats["tasks_submitted"] = len(batch_task_ids)
 
             if stats["tasks_submitted"] == 0:
                 logger.warning("No tasks submitted for parallel execution")
@@ -662,9 +663,12 @@ class ParallelBatchProcessor:
             batch_timed_out = self._process_tasks_with_dependencies(timeout_seconds)
 
             # Collect results
-            stats["tasks_completed"] = len([r for r in self.completed_tasks.values() if r.success])
-            stats["tasks_failed"] = len([r for r in self.completed_tasks.values() if not r.success])
-            stats["total_records_processed"] = sum(r.records_processed for r in self.completed_tasks.values())
+            batch_results = {
+                task_id: result for task_id, result in self.completed_tasks.items() if task_id in batch_task_ids
+            }
+            stats["tasks_completed"] = len([r for r in batch_results.values() if r.success])
+            stats["tasks_failed"] = len([r for r in batch_results.values() if not r.success])
+            stats["total_records_processed"] = sum(r.records_processed for r in batch_results.values())
 
             execution_end = datetime.now()
             stats["total_execution_time"] = (execution_end - execution_start).total_seconds()
@@ -682,7 +686,7 @@ class ParallelBatchProcessor:
             stats["tasks_pending"] = submitted - settled
             stats["timed_out"] = batch_timed_out
             stats["failed_task_ids"] = sorted(
-                task_id for task_id, result in self.completed_tasks.items() if not result.success
+                task_id for task_id, result in batch_results.items() if not result.success
             )
             if batch_timed_out:
                 stats["outcome"] = "timed_out"
@@ -772,9 +776,13 @@ class ParallelBatchProcessor:
                 logger.error(f"Error processing task: {str(e)}")
                 continue
 
-        # Wait for all submitted futures to complete
-        self._wait_for_completion()
-        return timed_out
+        # Wait only for the remainder of the same overall deadline. A timeout
+        # here means the caller must report the batch as timed out; it must not
+        # silently fall back to a separate hard-coded five-minute wait.
+        remaining_timeout = None
+        if timeout_seconds is not None:
+            remaining_timeout = max(0.0, timeout_seconds - elapsed_seconds(start_time))
+        return timed_out or self._wait_for_completion(remaining_timeout)
 
     def _check_task_dependencies(self, task: BatchProcessingTask, processed_tasks: set) -> bool:
         """Check if task dependencies are satisfied."""
@@ -866,20 +874,25 @@ class ParallelBatchProcessor:
                 if task_id in self.worker_futures:
                     del self.worker_futures[task_id]
 
-    def _wait_for_completion(self) -> None:
-        """Wait for all submitted futures to complete."""
+    def _wait_for_completion(self, timeout_seconds: Optional[float] = None) -> bool:
+        """Wait for current futures, returning whether the wait timed out."""
 
         if not self.worker_futures:
-            return
+            return False
 
         logger.debug(f"Waiting for {len(self.worker_futures)} tasks to complete")
 
-        # Wait for all futures with timeout
-        for future in as_completed(self.worker_futures.values(), timeout=300):  # 5 minute timeout
-            try:
-                future.result()  # This will raise exception if task failed
-            except Exception as e:
-                logger.debug(f"Task completed with error: {str(e)}")
+        futures = list(self.worker_futures.values())
+        try:
+            for future in as_completed(futures, timeout=timeout_seconds):
+                try:
+                    future.result()  # This will raise exception if task failed
+                except Exception as e:
+                    logger.debug(f"Task completed with error: {str(e)}")
+        except TimeoutError:
+            logger.warning("Parallel batch completion wait reached the overall timeout")
+            return True
+        return False
 
     def _start_performance_monitoring(self) -> None:
         """Start background performance monitoring thread."""
