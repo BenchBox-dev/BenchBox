@@ -319,6 +319,8 @@ def test_compact_adapter_rejects_unknown_schema_fields() -> None:
             "aborted": False,
         },
         {"translated_query": "SELECT 1", "validation_time": 0.1, "validation_passed": True},
+        {"job_id": "bdf8296d", "job_statistics": {"bytes_processed": 10}},
+        {"query_statistics": {"rows_produced": 5}},
         {"results": [(1,)], "columns": ["one"], "execution_mode": "dataframe"},
         {"cleanup_time": 0.01, "table_name": "orders", "platform": "spark", "reason": "unsupported"},
     ],

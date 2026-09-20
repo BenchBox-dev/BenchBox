@@ -1146,6 +1146,15 @@ class TestConvertToDeltaTable:
         result = adapter._convert_to_delta_table(sql)
         assert "CREATE OR REPLACE TABLE" in result
 
+    def test_if_not_exists_kept_without_or_replace(self):
+        # CREATE OR REPLACE ... IF NOT EXISTS is a Databricks syntax error.
+        adapter = _make_adapter()
+        sql = "CREATE TABLE IF NOT EXISTS DimDate (SK_DateID BIGINT)"
+        result = adapter._convert_to_delta_table(sql)
+        assert "OR REPLACE" not in result
+        assert "IF NOT EXISTS" in result
+        assert "USING DELTA" in result
+
     def test_adds_tblproperties_when_auto_optimize_enabled(self):
         adapter = _make_adapter()
         adapter.delta_auto_optimize = True
@@ -1172,6 +1181,47 @@ class TestConvertToDeltaTable:
         assert len(results) == len(statements)
         assert all("CREATE OR REPLACE TABLE" in r for r in results)
         assert all("USING DELTA" in r for r in results)
+
+
+# ---------------------------------------------------------------------------
+# _apply_tpcdi_databricks_rewrites
+# ---------------------------------------------------------------------------
+
+
+class TestApplyTpcdiDatabricksRewrites:
+    """Test _apply_tpcdi_databricks_rewrites dialect normalization."""
+
+    def test_flag_literals_become_boolean(self):
+        """BIT flag comparisons use IS TRUE/FALSE; integer columns untouched."""
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT * FROM DimCustomer WHERE IsCurrent = 1 AND BatchID = 1"
+        )
+        assert "IsCurrent IS TRUE" in result
+        assert "BatchID = 1" in result
+
+    def test_zero_flag_literal_becomes_false(self):
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT CASE WHEN TT_IS_SELL = 0 THEN 1 ELSE 0 END FROM TradeType"
+        )
+        assert "TT_IS_SELL IS FALSE" in result
+
+    def test_julianday_and_now_rewritten(self):
+        """SQLite date idioms map to Databricks equivalents."""
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites("SELECT JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))")
+        assert "JULIANDAY" not in result
+        assert "DATE('now')" not in result
+        assert "DATEDIFF" in result
+        assert "CURRENT_DATE()" in result
+
+    def test_relative_now_rewritten(self):
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT * FROM t WHERE d.DateValue >= DATE('now', '-90 days')"
+        )
+        assert "DATE_SUB(CURRENT_DATE(), 90)" in result
 
 
 # ---------------------------------------------------------------------------
@@ -1924,6 +1974,26 @@ class TestResolveFileUriAndDelimiter:
         assert filename == "orders"
         assert delimiter == ","
 
+    def test_wildcard_shard_set_expands_to_exact_per_file_uris(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/customer_demographics_1_10.dat.gz",
+            "dbfs:/Volumes/cat/sch/vol/customer_demographics_2_10.dat.gz",
+        ]
+        file_uri, filename, delimiter = adapter._resolve_file_uri_and_delimiter(files, "dbfs:/Volumes/cat/sch/vol")
+        assert "*" in file_uri
+        sources = adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri)
+        assert sources == files
+        assert all("*" not in source for source in sources)
+
+    def test_non_wildcard_source_passes_through(self):
+        adapter = _make_adapter()
+        assert adapter._expand_copy_sources(
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl",
+            "dbfs:/Volumes/cat/sch/vol",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl",
+        ) == ["dbfs:/Volumes/cat/sch/vol/orders.tbl"]
+
 
 # ---------------------------------------------------------------------------
 # close_connection
@@ -1991,7 +2061,9 @@ class TestGetRemoteFileUrisFromManifest:
         assert "lineitem" in result
         assert result["orders"] == "dbfs:/Volumes/cat/sch/vol/orders.parquet"
 
-    def test_sharded_files_get_wildcard_pattern(self):
+    def test_sharded_files_get_exact_uri_list(self):
+        # COPY INTO rejects mid-path globs, so sharded tables map to exact
+        # per-file URIs (one COPY INTO per shard at load time).
         adapter = _make_adapter()
         manifest = {
             "tables": {
@@ -2003,8 +2075,10 @@ class TestGetRemoteFileUrisFromManifest:
         }
         result = adapter._get_remote_file_uris_from_manifest("dbfs:/Volumes/cat/sch/vol", manifest)
 
-        assert "orders" in result
-        assert "*" in result["orders"]
+        assert result["orders"] == [
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.1.zst",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.2.zst",
+        ]
 
     def test_empty_table_entries_skipped(self):
         adapter = _make_adapter()
@@ -2644,6 +2718,85 @@ class TestUploadShardedFiles:
 
 
 # ---------------------------------------------------------------------------
+# _upload_single_table_path (shard auto-detect branch)
+# ---------------------------------------------------------------------------
+
+
+class TestUploadSingleTablePath:
+    """Shard auto-detect must return exact URIs, never a glob (COPY INTO rejects globs)."""
+
+    def test_sharded_branch_returns_exact_uri_list(self, tmp_path):
+        from pathlib import Path
+
+        adapter = _make_adapter()
+        first = tmp_path / "orders.tbl.1.zst"
+        first.write_bytes(b"chunk")
+        chunks = [tmp_path / "orders.tbl.1.zst", tmp_path / "orders.tbl.2.zst"]
+        mock_workspace = MagicMock()
+
+        with (
+            patch.object(
+                adapter,
+                "_detect_sharded_files",
+                return_value=(True, "orders.tbl.*.zst", chunks),
+            ),
+            patch.object(adapter, "_upload_sharded_files", return_value=None),
+        ):
+            result = adapter._upload_single_table_path(
+                "orders",
+                first,
+                "orders.tbl.1.zst",
+                "/Volumes/cat/sch/vol",
+                "dbfs:/Volumes/cat/sch/vol",
+                mock_workspace,
+                tmp_path,
+            )
+
+        assert isinstance(result, list)
+        assert all("*" not in uri for uri in result)
+        assert result == [
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.1.zst",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.2.zst",
+        ]
+        assert isinstance(chunks[0], Path)
+
+    def test_expand_copy_sources_raises_on_unexpandable_glob(self):
+        adapter = _make_adapter()
+        with pytest.raises(ValueError, match="does not accept glob"):
+            adapter._expand_copy_sources(
+                "dbfs:/Volumes/cat/sch/vol/orders.*.zst",
+                "dbfs:/Volumes/cat/sch/vol",
+                "dbfs:/Volumes/cat/sch/vol/orders.*.zst",
+            )
+
+
+# ---------------------------------------------------------------------------
+# _deduplicate_output_aliases
+# ---------------------------------------------------------------------------
+
+
+class TestDeduplicateOutputAliases:
+    """Duplicate top-level outputs gain numeric suffixes; unique queries pass through."""
+
+    def test_self_join_duplicates_get_suffixes(self):
+        adapter = _make_adapter()
+        sql = (
+            "SELECT a.syear AS syear, a.cnt AS cnt, b.syear AS syear, b.cnt AS cnt "
+            "FROM (SELECT syear, COUNT(*) AS cnt FROM t GROUP BY syear) a "
+            "JOIN (SELECT syear, COUNT(*) AS cnt FROM t GROUP BY syear) b ON a.syear = b.syear"
+        )
+        result = adapter._deduplicate_output_aliases(sql)
+        assert "syear_2" in result
+        assert "cnt_2" in result
+        assert "JOIN" in result
+
+    def test_unique_outputs_unchanged(self):
+        adapter = _make_adapter()
+        sql = "SELECT a, b, COUNT(*) AS cnt FROM t GROUP BY a, b"
+        assert adapter._deduplicate_output_aliases(sql) == sql
+
+
+# ---------------------------------------------------------------------------
 # _upload_file_content_to_uc
 # ---------------------------------------------------------------------------
 
@@ -2826,6 +2979,24 @@ class TestManifestPatternForName:
         base, ext = DatabricksAdapter._manifest_pattern_for_name("orders.parquet")
         # Non-sharded - uses stem/suffix logic
         assert "orders" in base
+
+    def test_dsdgen_underscore_chunks_detected(self):
+        from benchbox.platforms.databricks import DatabricksAdapter
+
+        names = [
+            "customer_demographics_1_10.dat.gz",
+            "customer_demographics_5_10.dat.gz",
+            "customer_demographics_10_10.dat.gz",
+        ]
+        for name in names:
+            assert DatabricksAdapter._is_manifest_shard_name(name) is True
+        assert _make_adapter()._detect_manifest_wildcard(names) == "customer_demographics.*.dat.gz"
+
+    def test_dsdgen_underscore_chunk_rejects_flat_file(self):
+        from benchbox.platforms.databricks import DatabricksAdapter
+
+        assert DatabricksAdapter._is_manifest_shard_name("customer_demographics.dat") is False
+        assert DatabricksAdapter._is_manifest_shard_name("inventory_3.dat") is False
 
 
 # ---------------------------------------------------------------------------
