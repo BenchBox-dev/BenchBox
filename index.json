@@ -8466,12 +8466,17 @@
       "title": "Close open-table-format loading gaps for Livy-based Spark adapters"
     },
     "loader-dialect-source-and-pandas-null-groups": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T04:00:49Z",
+        "generation": "e192590d92db41c2b34a05f5bce9d51b",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [
         "flightdata-cross-surface-output-contract-burn-down"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Single CSV dialect source plus pandas NULL group keys"
     },
     "local-ci-equivalents": {
