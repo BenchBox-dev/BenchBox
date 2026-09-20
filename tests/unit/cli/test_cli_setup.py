@@ -29,8 +29,14 @@ pytestmark = [
 
 @pytest.fixture()
 def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Isolate the default credential store (``~/.benchbox``) to tmp_path."""
+    """Isolate the default credential store (``~/.benchbox``) to tmp_path.
+
+    ``Path.home()`` honors USERPROFILE (not HOME) on Windows, so both must
+    point at tmp_path or the Windows lanes read/write the runner's real
+    credential store.
+    """
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     return tmp_path
 
 
@@ -231,23 +237,24 @@ class TestSetupCommand:
         assert "No credentials found for databricks" in result.output
         assert "Setup credentials: benchbox setup --platform databricks" in result.output
 
-    def test_setup_missing_dependencies(self, isolated_home: Path):
-        """Test setup with missing platform dependencies (real dependency check)."""
-        from benchbox.utils.dependencies import check_platform_dependencies
+    @patch("benchbox.utils.dependencies.check_platform_dependencies")
+    def test_setup_missing_dependencies(self, mock_check_deps, isolated_home: Path):
+        """Test setup with missing platform dependencies (forced branch).
 
-        available, missing = check_platform_dependencies("databricks")
+        The missing-dependency branch is forced via mock: deriving the branch
+        from the live check would let a broken check (wrongly reporting
+        available) select the permissive branch and still pass.
+        """
+        del isolated_home
+        mock_check_deps.return_value = (False, ["databricks-sdk", "databricks-connect"])
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks"])
 
         assert result.exit_code == 0
-        if not available:
-            assert "Missing dependencies for databricks" in result.output
-            for package in missing:
-                assert package in result.output
-            assert "Install with:" in result.output
-        else:
-            # Dependencies installed: the command proceeds past the gate.
-            assert "Missing dependencies for databricks" not in result.output
+        assert "Missing dependencies for databricks" in result.output
+        assert "databricks-sdk" in result.output
+        assert "databricks-connect" in result.output
+        assert "Install with:" in result.output
 
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
