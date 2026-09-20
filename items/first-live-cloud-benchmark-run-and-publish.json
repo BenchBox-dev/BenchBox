@@ -1,5 +1,5 @@
 {
-  "context": "Zero-cost trial sequencing verified 2026-08-17: BigQuery first (permanent free tier, 1 TiB scanned/month + 10 GB storage, plus $300/90-day new-customer credit - a full TPC-H SF100 sweep fits inside the free monthly TiB). Databricks Free Edition (free forever, serverless 2X-Small SQL warehouse, per-account daily quotas, LinkedIn verification raises limits) for SF1-SF10; use the paid trial only if quotas block SF100. Snowflake 30-day trial, $400 credits, no credit card - an X-Small warehouse is 1 credit/hour so a full SF100 load plus 22 queries costs a few credits; $400 covers SF100 and SF1000 many times over. Redshift Serverless $300 / 90 days (~800 RPU-hours). ClickHouse Cloud $300 / 30 days. Do NOT start the time-boxed trials (Snowflake, ClickHouse Cloud) until the harness is proven green on BigQuery and Databricks Free Edition, so no trial clock burns on debugging.",
+  "context": "Zero-cost trial sequencing verified 2026-08-17: BigQuery first (permanent free tier, 1 TiB scanned/month + 10 GB storage, plus $300/90-day new-customer credit - a full TPC-H SF100 sweep fits inside the free monthly TiB). Databricks Free Edition (free forever, serverless 2X-Small SQL warehouse, per-account daily quotas, LinkedIn verification raises limits) for SF1-SF10; use the paid trial only if quotas block SF100. Snowflake 30-day trial, $400 credits, no credit card - an X-Small warehouse is 1 credit/hour so a full SF100 load plus 22 queries costs a few credits; $400 covers SF100 and SF1000 many times over. Redshift Serverless $300 / 90 days (~800 RPU-hours). ClickHouse Cloud $300 / 30 days. Do NOT start the time-boxed trials (Snowflake, ClickHouse Cloud) until the harness is proven green on BigQuery and Databricks Free Edition, so no trial clock burns on debugging.\n\nCompleted 2026-09-20. Implementation PR #2214 merged to develop at 5666edb7f8746108b901576df068a8527ae6651d. Corpus mirror PR #2248 merged to published-results at 091cc78c863f57b5917ceb490c873faae830a3d7 with exact-head corpus validation green. Publication candidate run 35517904272 produced generation 9 candidate artifact 10607472615 with manifest a496d20fd0aa64b23da6b66dd054e2e9fcb0b02b2ecf0d2696883f608adeec89. Protected transaction run 35518663929 completed successfully; signed receipt live-9-0ac64a31-e93d-40a2-be02-7d478ea76df8 verified, publication journal advanced with no active transaction, all five live route hashes matched independently, and the live DuckDB contains 3 BigQuery, 3 Databricks, and 3 Snowflake results.",
   "description": "REVALIDATED 2026-08-20. Public corpus still has zero warehouse platforms. No snowflake/databricks/bigquery files under ~/Developer/benchmark_runs/results.\n\nLowest-cost signups as of 2026-08-20 (email; no paid plan required to start):\n- Databricks Free Edition (free): https://www.databricks.com/learn/free-edition\n- Snowflake 30-day trial, \\$400 credits, email only: https://signup.snowflake.com/\n- Google Cloud trial \\$300 / 90 days plus BigQuery free tier 1 TiB queries/month: https://cloud.google.com/free\n\nAfter credentials exist, run one TPC-H per warehouse and submit. Do not add PLATFORM_GROUPS or a cloud release-gate before a published result. This is independent of Explorer curated-preview launch.",
   "legacy": {
     "anti_patterns": [
@@ -240,6 +240,14 @@
       "generation": "33f48ab8298f4a89b4e9d458c56c3e20",
       "op": "take",
       "op_id": "01eebba992e74c0ba4d6b1f21d1595ab",
+      "session_id": "22347223b6ef4a6ba2629883859756e6"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:b3bad2bf5002f6c40a1a7768",
+      "at": "2026-09-20T15:15:45Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "f839570691a34953b46086be1925b8df",
       "session_id": "22347223b6ef4a6ba2629883859756e6"
     }
   ]
