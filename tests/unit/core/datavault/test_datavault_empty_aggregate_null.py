@@ -106,6 +106,16 @@ def _sat_lineitem_row(link: str, shipdate: str) -> str:
     )
 
 
+def _sat_lineitem_zero_revenue_row(link: str, shipdate: str) -> str:
+    # Same shape with l_extendedprice = 0: rows exist but carry no revenue.
+    return (
+        "INSERT INTO sat_lineitem VALUES "
+        f"('{link}', now(), NULL, 'test', 'h', 10, 0.0, 0.06, 0.0, "
+        f"'N', 'O', DATE '{shipdate}', DATE '{shipdate}', DATE '{shipdate}', "
+        "'DELIVER IN PERSON', 'AIR', 'comment')"
+    )
+
+
 def _assert_single_value(rows, expected):
     assert len(rows) == 1, f"expected one row, got {rows}"
     assert len(rows[0]) == 1, f"expected one column, got {rows}"
@@ -189,6 +199,37 @@ class TestNonEmptyRegression:
             _assert_single_value(materialize_rows(dvq.q14_expression_impl(polars_ctx)), expected[0][0])
             _assert_single_value(materialize_rows(dvq.q14_pandas_impl(pandas_ctx)), expected[0][0])
             _assert_single_value(expected, 50.0)
+        finally:
+            conn.close()
+
+    def test_q14_zero_revenue_yields_nan_not_error(self):
+        # Rows exist in the Q14 period but every row has zero revenue: the
+        # ratio is 0/0, which the SQL reference and expression backend yield
+        # as NaN. The pandas backend must match instead of raising
+        # ZeroDivisionError.
+        import math
+
+        seed = "; ".join(
+            [
+                _HUB_SEED,
+                _link_row("L1", "P1"),
+                _sat_part_row("P1", "PROMO BRUSHED COPPER"),
+                _sat_lineitem_zero_revenue_row("L1", "1995-09-10"),
+            ]
+        )
+        conn = _seeded_connection(seed)
+        try:
+            bench = DataVaultBenchmark(scale_factor=0.01)
+            expected = conn.execute(bench.get_query(14)).fetchall()
+            assert len(expected) == 1
+            assert expected[0][0] is not None and math.isnan(expected[0][0])
+            polars_ctx, pandas_ctx = _seeded_contexts(conn)
+            for rows in (
+                materialize_rows(dvq.q14_expression_impl(polars_ctx)),
+                materialize_rows(dvq.q14_pandas_impl(pandas_ctx)),
+            ):
+                assert len(rows) == 1
+                assert rows[0][0] is not None and math.isnan(rows[0][0]), f"expected NaN, got {rows}"
         finally:
             conn.close()
 

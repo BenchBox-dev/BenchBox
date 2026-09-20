@@ -1161,7 +1161,13 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
         return pd.DataFrame({"promo_revenue": [None]})
     # float() first: DECIMAL columns arrive as Decimal objects, and float *
     # Decimal raises TypeError.
-    promo_pct = 100.0 * float(df["promo_revenue"].sum()) / float(df["revenue"].sum())
+    revenue_sum = float(df["revenue"].sum())
+    if revenue_sum == 0:
+        # Rows exist but carry no revenue: the SQL reference and the
+        # expression surface yield NaN for the 0/0 ratio, so do the same
+        # instead of raising ZeroDivisionError.
+        return pd.DataFrame({"promo_revenue": [float("nan")]})
+    promo_pct = 100.0 * float(df["promo_revenue"].sum()) / revenue_sum
     return pd.DataFrame({"promo_revenue": [promo_pct]})
 
 
