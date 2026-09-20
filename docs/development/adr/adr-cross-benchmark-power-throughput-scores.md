@@ -394,8 +394,13 @@ throughput_ratio_i = candidate_completed_work_per_second_i /
 ```
 
 For throughput, one atomic measurement is a complete workload-family batch at one declared concurrency.
-Completed work per second counts only a fixed manifest's successful queries over the full active interval;
-an incomplete cycle invalidates the atom instead of changing its denominator.
+Completed work is denominated in declared weight, not raw query count: each successful completion contributes
+its query's declared weight divided by that query's planned occurrences in the fixed manifest, so one complete
+cycle fulfills exactly the manifest's total declared weight no matter how many times a query repeats.
+Completed work per second is that fulfilled weight over the full active interval; an incomplete cycle
+invalidates the atom instead of changing its denominator. Raw successful-query count must not stand in for
+work: repeating a fast query would otherwise inflate the numerator without declared-weight justification and
+let occurrence counts override the methodology's weights.
 
 For atomic measures where higher is better, the ratio direction follows the throughput form. Accuracy is an
 admission gate, not a performance multiplier, unless a future methodology explicitly defines an
