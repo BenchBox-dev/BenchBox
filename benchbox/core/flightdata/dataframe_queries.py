@@ -1305,7 +1305,10 @@ def _make_pandas_impl(row: list[str]) -> Any:
         for name in _csv(derives):
             column, derive = _PANDAS_DERIVED[name]
             filtered[column] = derive(filtered)
-        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False).agg(**_parse_aggs(aggs))
+        # SQL GROUP BY keeps NULL keys as a group; pandas drops them unless asked.
+        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False, dropna=False).agg(
+            **_parse_aggs(aggs)
+        )
         if result_filter:
             column, threshold = result_filter.split(">=")
             result = result[result[column] >= int(threshold)]
