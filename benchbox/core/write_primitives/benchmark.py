@@ -169,18 +169,23 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
     return True
 
 
-def _resolve_validation_sql(val_query: Any, platform_key: str | None) -> tuple[str | None, str | None]:
+def _resolve_validation_sql(
+    val_query: Any,
+    platform_key: str | None,
+    fallback_key: str | None = None,
+) -> tuple[str | None, str | None]:
     """Resolve the effective validation SQL for the active platform.
 
     Returns (sql, skip_reason). If skip_reason is not None, the validation must be
     skipped (still treated as passed since skip = "not applicable on this engine",
     not "failed"). Mirrors `_get_effective_write_sql` for the operation-level
-    overrides.
+    overrides, including the shared-dialect fallback (engine key first).
     """
-    overrides = val_query.platform_overrides or {}
-    if not platform_key or platform_key not in overrides:
+    found, override = TransactionalBenchmarkBase._lookup_platform_override(
+        getattr(val_query, "platform_overrides", None), platform_key, fallback_key
+    )
+    if not found:
         return val_query.sql, None
-    override = overrides[platform_key]
     if override is None:
         return None, (
             f"Validation '{val_query.id}' explicitly skipped on platform '{platform_key}' "
@@ -376,6 +381,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         platform_key: str | None = None,
         sql_override: str | None = None,
         connection: DatabaseConnection | None = None,
+        platform_fallback_key: str | None = None,
     ) -> tuple[str | None, str | None]:
         """Resolve effective write SQL (including platform overrides) or return skip reason.
 
@@ -383,6 +389,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             operation: WriteOperation with write_sql and platform_overrides
             platform_key: Platform dialect key (e.g. 'datafusion', 'duckdb') passed by adapter
             sql_override: Pre-processed SQL from adapter (e.g. bulk_load rewrite)
+            platform_fallback_key: Shared-dialect key consulted when the engine
+                key has no override entry (e.g. 'duckdb' for DuckLake)
             connection: Live connection, used ONLY to check whether a staging table
                 the operation depends on was left empty because its TPC-H source was
                 absent at setup (see :meth:`_check_staging_table_population`). When
@@ -427,8 +435,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         # string override is a per-platform SQL body used only when the adapter
         # did not supply its own ``sql_override`` below.
         platform_override_sql: str | None = None
-        if platform_key and operation.platform_overrides and platform_key in operation.platform_overrides:
-            override = operation.platform_overrides[platform_key]
+        found_override, override = self._lookup_platform_override(
+            getattr(operation, "platform_overrides", None), platform_key, platform_fallback_key
+        )
+        if found_override:
             if override is None:
                 return None, f"Operation '{operation.id}' is unsupported on platform '{platform_key}'."
             platform_override_sql = override
@@ -453,7 +463,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         # MERGE INTO, but a per-platform override that removes it (or one that
         # introduces it) must be judged on the effective body, not the catalog
         # default.
-        if (platform_key or "").lower() == "duckdb":
+        # The bundled-DuckDB execution gate follows the effective dialect: an
+        # engine sharing the DuckDB dialect (DuckLake via fallback) runs the
+        # same engine, so MERGE INTO et al must skip there too.
+        if (platform_key or "").lower() == "duckdb" or (platform_fallback_key or "").lower() == "duckdb":
             duckdb_skip_reason = duckdb_write_primitive_skip_reason(operation, effective_sql)
             if duckdb_skip_reason is not None:
                 return None, (f"Operation '{operation.id}' is skipped on DuckDB: {duckdb_skip_reason}")
@@ -669,12 +682,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             #               re-run produces zero new versions);
             #   new       - brand-new business keys (custkey offset beyond the
             #               current max) that have no current version yet.
-            # Each group carries its own effective date so per-operation
-            # cleanups and validations can scope on the timestamp without
-            # touching the other groups' rows. The insert-only new-keys op
-            # additionally offsets its written valid_from by one day (see
-            # its catalog entry), keeping its rows distinct from the basic
-            # op's new-key versions stamped here.
+            # Each group carries its own effective date for validation. All
+            # insert paths preserve the staged timestamp; cleanup ownership is
+            # separated by staged business group and the deterministic
+            # surrogate-key range assigned by each operation.
             fp_changed = self._scd2_row_hash_expr("c_acctbal + 100")
             fp_same = self._scd2_row_hash_expr("c_acctbal")
             effective_changed = self._date_literal("2026-01-01")
@@ -1251,11 +1262,17 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             ValueError: If connection is invalid
             RuntimeError: If staging tables not initialized
         """
-        operation, platform_key, sql_override = self._prepare_operation(operation_id, connection, **kwargs)
+        operation, platform_key, fallback_key, sql_override = self._prepare_operation(
+            operation_id, connection, **kwargs
+        )
 
         try:
             effective_sql, skip_reason = self._get_effective_write_sql(
-                operation, platform_key=platform_key, sql_override=sql_override, connection=connection
+                operation,
+                platform_key=platform_key,
+                sql_override=sql_override,
+                connection=connection,
+                platform_fallback_key=fallback_key,
             )
             if skip_reason is not None:
                 self.log_verbose(f"Skipping operation {operation_id}: {skip_reason}")
@@ -1287,7 +1304,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             # Execute validation queries
             validation_passed, validation_results, validation_duration_ms = self._run_operation_validation(
-                operation, connection, operation_id, platform_key=platform_key
+                operation, connection, operation_id, platform_key=platform_key, platform_fallback_key=fallback_key
             )
 
             # Execute cleanup if specified
@@ -1351,6 +1368,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         connection: DatabaseConnection,
         operation_id: str,
         platform_key: str | None = None,
+        platform_fallback_key: str | None = None,
     ) -> tuple[bool, list[dict], float]:
         """Run validation queries for a write operation.
 
@@ -1366,7 +1384,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         validation_passed = True
 
         for val_query in operation.validation_queries:
-            effective_sql, skip_reason = _resolve_validation_sql(val_query, platform_key)
+            effective_sql, skip_reason = _resolve_validation_sql(val_query, platform_key, platform_fallback_key)
 
             if skip_reason is not None:
                 self.log_verbose(f"Skipping validation '{val_query.id}' for {operation_id}: {skip_reason}")

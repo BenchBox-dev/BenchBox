@@ -1517,6 +1517,39 @@ def _read_datagen_stats_from_manifest(benchmark: Any) -> dict[str, int]:
         return {}
 
 
+def _run_ensure_auxiliary_hook(benchmark: Any) -> None:
+    """Run a benchmark's auxiliary-data hook, tolerating non-critical failures.
+
+    Shared by the manifest-reuse and populated-tables-reuse paths so stale
+    manifests are healed whenever data is reused, not only when the manifest
+    itself drives the reuse.
+    """
+    ensure_auxiliary = getattr(benchmark, "ensure_auxiliary_data_files", None)
+    if not callable(ensure_auxiliary):
+        return
+    try:
+        ensure_auxiliary()
+    except (OSError, PermissionError) as e:
+        # Critical system errors - re-raise (disk full, permissions, I/O failure)
+        raise RuntimeError(
+            f"Failed to generate auxiliary data files due to system error: {e}. "
+            "Check disk space, permissions, and file system health."
+        ) from e
+    except ImportError as e:
+        # Missing optional dependency - log warning and continue
+        logger = logging.getLogger("benchbox.core.runner")
+        logger.warning(
+            f"Failed to generate auxiliary data files due to missing dependency: {e}. "
+            "Some benchmark operations may not be available."
+        )
+    except Exception as e:
+        # Other errors - log warning but continue (auxiliary files may not be critical)
+        logger = logging.getLogger("benchbox.core.runner")
+        logger.warning(
+            f"Failed to generate auxiliary data files: {type(e).__name__}: {e}. Some benchmark operations may fail."
+        )
+
+
 def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     """Ensure data is generated, respecting manifest and generator validator.
 
@@ -1536,6 +1569,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
         if _populated_tables_are_valid(benchmark, config):
+            # Caller-supplied tables bypass manifest reuse, but stale manifests
+            # still need healing (e.g. FlightData dialect backfill).
+            _run_ensure_auxiliary_hook(benchmark)
             return False
         populated_tables_invalid = True
         if no_regenerate_flag:
@@ -1556,30 +1592,7 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
 
             # Allow benchmarks to ensure auxiliary files exist even when reusing data
             # This is needed for benchmarks that generate additional test files beyond the main data
-            ensure_auxiliary = getattr(benchmark, "ensure_auxiliary_data_files", None)
-            if callable(ensure_auxiliary):
-                try:
-                    ensure_auxiliary()
-                except (OSError, PermissionError) as e:
-                    # Critical system errors - re-raise (disk full, permissions, I/O failure)
-                    raise RuntimeError(
-                        f"Failed to generate auxiliary data files due to system error: {e}. "
-                        "Check disk space, permissions, and file system health."
-                    ) from e
-                except ImportError as e:
-                    # Missing optional dependency - log warning and continue
-                    logger = logging.getLogger("benchbox.core.runner")
-                    logger.warning(
-                        f"Failed to generate auxiliary data files due to missing dependency: {e}. "
-                        "Some benchmark operations may not be available."
-                    )
-                except Exception as e:
-                    # Other errors - log warning but continue (auxiliary files may not be critical)
-                    logger = logging.getLogger("benchbox.core.runner")
-                    logger.warning(
-                        f"Failed to generate auxiliary data files: {type(e).__name__}: {e}. "
-                        "Some benchmark operations may fail."
-                    )
+            _run_ensure_auxiliary_hook(benchmark)
 
             return False
 

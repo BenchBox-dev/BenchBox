@@ -109,9 +109,9 @@ VERSION_MATRIX = [
     pytest.param({"version": "2.1"}, "2.1", id="legacy-key"),
     pytest.param({"schema_version": "2.0"}, "2.0", id="oldest-key"),
     pytest.param(
-        {"result_schema_version": "2.2", "version": "2.1", "schema_version": "2.0"},
+        {"result_schema_version": "2.2", "version": "2.2", "schema_version": "2.0"},
         "2.2",
-        id="new-wins",
+        id="aliases-match",
     ),
     pytest.param({"version": "2.1", "schema_version": "2.0"}, "2.1", id="legacy-wins"),
     pytest.param({}, None, id="missing"),

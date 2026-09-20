@@ -12,12 +12,12 @@ all 5 example-validation/build failures). 3 runs returned no jobs
 
 | Failed job | Runs | Share of 164 |
 |---|---:|---:|
-| Public-site visual regression | 122 | 74% |
+| Public-site visual regression | 119 | 73% |
 | linkcheck | 41 | 25% |
 | example-validation | 4 | 2% |
 | build | 1 | 1% |
 
-Per-run combos: visual-only 115 (112 single, 3 matrix-duplicate),
+Per-run combos: visual-only 112 (109 single, 3 matrix-duplicate),
 linkcheck-only 38, visual+linkcheck 3, visual+example-validation 1,
 example-validation-only 3, build-only 1, no job data 3.
 
@@ -35,12 +35,12 @@ example-validation-only 3, build-only 1, no job data 3.
 
 Run IDs by class (all `docs.yml`):
 
-- Visual compare: pinned from the jobs census; samples inspected in full:
+- Visual compare: pinned from the tracked [job-level census](docs-failure-visual-census-2026-09-17.md); samples inspected in full:
   32607230782, 33173426172, 33449832585, 33979596978, 34296989469,
   32639629718, 32878090115, 32908874383, 33282624353, 33407102328,
   33510872791, 33579874229, 33981606756, 33996038204, 34311390476,
-  34698706588, 34776620196 (plus the remainder of the 100 in the census
-  file set; every sampled mismatch named pages its PR plausibly changed,
+  34698706588, 34776620196 (plus the remainder in the tracked census; every
+  sampled mismatch named pages its PR plausibly changed,
   and every sampled PR merged with no approval recorded).
 - Baseline mode: 32610797552, 32611876780, 32637797757, 32787551811,
   32860694781, 32860715856, 32870012225, 32870026917, 32870040262,

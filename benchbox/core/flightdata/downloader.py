@@ -27,6 +27,7 @@ from __future__ import annotations
 import calendar
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -78,6 +79,12 @@ FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
 # BTS CSV field names (subset used in BenchBox schema)
 BTS_FIELD_NAMES = _DOWNLOADER_SPECS["bts_field_names"]
 
+# Pinned reproducible source contract: month windows always end here, never at
+# "latest available", so newly published BTS months cannot silently shift data.
+_PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
+PINNED_END_YEAR = int(_PINNED_SOURCE.get("end_year", LAST_AVAILABLE_YEAR))
+PINNED_END_MONTH = int(_PINNED_SOURCE.get("end_month", 12))
+
 
 def _scale_to_months(scale_factor: float) -> int:
     """Convert scale factor to number of months of data to download.
@@ -105,18 +112,28 @@ def _scale_to_months(scale_factor: float) -> int:
     return min(months, max_months)
 
 
-def _months_sequence(num_months: int, end_year: int = LAST_AVAILABLE_YEAR) -> list[tuple[int, int]]:
-    """Generate (year, month) pairs working backwards from end_year.
+def _months_sequence(
+    num_months: int,
+    end_year: int = PINNED_END_YEAR,
+    end_month: int = PINNED_END_MONTH,
+) -> list[tuple[int, int]]:
+    """Generate (year, month) pairs working backwards from the pinned end month.
+
+    The default window ends at the pinned source contract (``PINNED_END_YEAR`` /
+    ``PINNED_END_MONTH``), not at latest-available: BTS publishes new months
+    continuously, and ending at "latest" would silently shift every scale
+    factor's dataset. Bumping the pin is an explicit, reviewed change.
 
     Args:
         num_months: Number of months to generate
-        end_year: Last year to include (uses December of this year)
+        end_year: Last year to include
+        end_month: Last month to include within the end year
 
     Returns:
         List of (year, month) tuples, most recent first
     """
     result = []
-    year, month = end_year, 12
+    year, month = end_year, end_month
     for _ in range(num_months):
         result.append((year, month))
         month -= 1
@@ -168,14 +185,19 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self._num_months = _scale_to_months(scale_factor)
         self._months = _months_sequence(self._num_months)
         self._stats: dict[str, Any] = {
+            "source": "bts-transtats",
             "scale_factor": scale_factor,
             "num_months": self._num_months,
+            "months": list(self._months),
             "months_downloaded": 0,
             "months_synthetic": 0,
             "total_flights": 0,
         }
         self._table_row_counts: dict[str, int] = {}
         self._table_file_row_counts: dict[Path, int] = {}
+        # Observed SHA-256 of each ingested BTS zip, persisted with the
+        # manifest so the recorded corpus pins which bytes were ingested.
+        self._content_hashes: dict[str, str] = {}
 
     def download(self) -> dict[str, Path | list[Path]]:
         """Download or generate flight data and reference tables.
@@ -184,6 +206,21 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             Dictionary mapping table names to local CSV file paths
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Reject a stale cache when the source pin changed: without this, an
+        # upgraded installation silently reuses the previous corpus because
+        # the output file names are unchanged. Legacy manifests without a
+        # recorded contract keep the old reuse behavior.
+        if not self.force_redownload:
+            persisted_id = self._persisted_source_contract_id()
+            if persisted_id is not None and persisted_id != self.source_contract_id():
+                logger.warning(
+                    "Existing flightdata corpus was generated under a different source contract "
+                    "(%s...); regenerating for the current pin (%s...).",
+                    persisted_id[:12],
+                    self.source_contract_id()[:12],
+                )
+                self.force_redownload = True
 
         flights_path = self.output_dir / self.get_compressed_filename("flights.csv")
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
@@ -643,6 +680,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             parallel=1,
             seed=self.seed,
             formats=["csv"],
+            extra_metadata={
+                "source_contract": self.source_contract(),
+                "source_contract_id": self.source_contract_id(),
+                # Observed SHA-256 of each ingested BTS zip: pins which bytes
+                # the corpus came from (a provider-side byte change surfaces
+                # as a new manifest on the next fresh generation).
+                "content_hashes": dict(self._content_hashes),
+            },
         )
         metadata = {
             "csv_delimiter": ",",
@@ -712,6 +757,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         )
         with urllib.request.urlopen(req, timeout=120) as response:
             zip_bytes = response.read()
+        self._content_hashes[url] = hashlib.sha256(zip_bytes).hexdigest()
 
         rows_written = 0
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -1012,6 +1058,39 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
     def num_months(self) -> int:
         """Get the number of months of data to process."""
         return self._num_months
+
+    def source_contract(self) -> dict[str, Any]:
+        """Pinned reproducible source contract for the configured window.
+
+        Returns the exact remote file set this downloader will read, so runs
+        record which source snapshot they came from and reviewers can see a
+        source change as a contract change.
+        """
+        return {
+            "source": "bts-transtats",
+            "base_url": BTS_BASE_URL,
+            "months": list(self._months),
+            "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
+        }
+
+    def source_contract_id(self) -> str:
+        """Stable identifier for :meth:`source_contract`.
+
+        Persisted in the generation manifest so a later pin change rejects
+        the stale cache instead of silently reusing the previous corpus.
+        """
+        canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _persisted_source_contract_id(self) -> str | None:
+        """Return the contract id recorded in the existing manifest, if any."""
+        manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, ValueError):
+            return None
+        contract_id = manifest.get("source_contract_id")
+        return contract_id if isinstance(contract_id, str) else None
 
     def get_download_stats(self) -> dict[str, Any]:
         """Return statistics about the download operation."""

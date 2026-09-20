@@ -254,8 +254,10 @@ class StarRocksWorkloadMixin:
             # is a baseline requirement, not a tuning choice.
             tuned_clauses: list[str] = []
 
+            # partition_by already holds the rendered PARTITION BY clause
+            # (single-renderer contract), so it is used verbatim.
             if tuning_clauses is not None and tuning_clauses.partition_by and "PARTITION BY" not in current_upper:
-                partition_clause = generator.render_partition_clause(tuning_clauses.partition_by)
+                partition_clause = tuning_clauses.partition_by
                 suffix_clauses.append(partition_clause)
                 tuned_clauses.append(partition_clause)
 
@@ -272,8 +274,10 @@ class StarRocksWorkloadMixin:
             if dist_tuned:
                 tuned_clauses.append(distribution_clause)
 
+            # order_by already holds the rendered ORDER BY clause
+            # (single-renderer contract), so it is used verbatim.
             if tuning_clauses is not None and tuning_clauses.order_by and "ORDER BY" not in current_upper:
-                order_clause = generator.render_order_by_clause(tuning_clauses.order_by)
+                order_clause = tuning_clauses.order_by
                 suffix_clauses.append(order_clause)
                 tuned_clauses.append(order_clause)
 

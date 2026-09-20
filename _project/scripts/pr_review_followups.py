@@ -86,6 +86,15 @@ class IssueComment:
 
 
 @dataclass(frozen=True)
+class PullRequestReview:
+    id: int
+    body: str
+    user_login: str
+    submitted_at: str
+    commit_id: str | None = None
+
+
+@dataclass(frozen=True)
 class PendingComment:
     pr: PullRequest
     comment: ReviewComment
@@ -290,6 +299,18 @@ def issue_comment_from_api(item: dict[str, Any]) -> IssueComment:
     )
 
 
+def pull_request_review_from_api(item: dict[str, Any]) -> PullRequestReview:
+    user = item.get("user")
+    user_login = user.get("login") if isinstance(user, dict) else ""
+    return PullRequestReview(
+        id=int(item["id"]),
+        body=str(item.get("body") or ""),
+        user_login=str(user_login or ""),
+        submitted_at=str(item.get("submitted_at") or ""),
+        commit_id=item.get("commit_id"),
+    )
+
+
 def fetch_pr_review_comments(runner: CommandRunner, *, repo: str, pr_number: int) -> list[ReviewComment]:
     """REST fallback: fetch review comments for a single PR.
 
@@ -325,6 +346,22 @@ def fetch_pr_issue_comments(runner: CommandRunner, *, repo: str, pr_number: int)
         ],
     )
     return [issue_comment_from_api(row) for row in rows]
+
+
+def fetch_pr_reviews(runner: CommandRunner, *, repo: str, pr_number: int) -> list[PullRequestReview]:
+    """Fetch submitted PR reviews, including reviews whose body is not in the timeline."""
+    rows = gh_json_lines(
+        runner,
+        [
+            "gh",
+            "api",
+            "--paginate",
+            f"repos/{repo}/pulls/{pr_number}/reviews?per_page=100",
+            "--jq",
+            ".[] | @json",
+        ],
+    )
+    return [pull_request_review_from_api(row) for row in rows]
 
 
 REVIEW_COMMENTS_GRAPHQL_QUERY = """
@@ -561,6 +598,7 @@ def review_inventory_for_pr(
     comments: Sequence[ReviewComment],
     *,
     author_logins: set[str],
+    include_post_merge: bool = False,
 ) -> ReviewInventory:
     replies_by_parent: dict[int, list[ReviewComment]] = {}
     for comment in comments:
@@ -574,7 +612,7 @@ def review_inventory_for_pr(
             continue
         if comment.user_login not in author_logins:
             continue
-        if not comment_precedes_merge(comment, pr):
+        if not include_post_merge and not comment_precedes_merge(comment, pr):
             continue
         item = PendingComment(
             pr=pr,
@@ -600,9 +638,17 @@ def pending_comments_for_pr(
     return list(review_inventory_for_pr(pr, comments, author_logins=author_logins).actionable)
 
 
+def _timestamp_sort_key(timestamp: str, identifier: int) -> tuple[dt.datetime, int]:
+    parsed = parse_github_time(timestamp) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+    return (parsed, identifier)
+
+
 def _comment_sort_key(comment: IssueComment) -> tuple[dt.datetime, int]:
-    parsed = parse_github_time(comment.created_at) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)
-    return (parsed, comment.id)
+    return _timestamp_sort_key(comment.created_at, comment.id)
+
+
+def _review_sort_key(review: PullRequestReview) -> tuple[dt.datetime, int]:
+    return _timestamp_sort_key(review.submitted_at, review.id)
 
 
 def is_usage_limit_review_comment(comment: IssueComment, *, author_logins: set[str]) -> bool:
@@ -617,11 +663,16 @@ def is_review_result_comment(comment: IssueComment, *, author_logins: set[str]) 
     return comment.user_login in author_logins and any(marker in comment.body for marker in CODEX_REVIEW_RESULT_MARKERS)
 
 
+def is_review_result_review(review: PullRequestReview, *, author_logins: set[str]) -> bool:
+    return review.user_login in author_logins and any(marker in review.body for marker in CODEX_REVIEW_RESULT_MARKERS)
+
+
 def usage_limit_review_retry_for_pr(
     pr: PullRequest,
     comments: Sequence[IssueComment],
     *,
     author_logins: set[str],
+    reviews: Sequence[PullRequestReview] = (),
 ) -> UsageLimitReviewRetry | None:
     """Return follow-up state when Codex hit review quota without a later result.
 
@@ -642,6 +693,7 @@ def usage_limit_review_retry_for_pr(
     latest_usage = max(usage_comments, key=_comment_sort_key)
     usage_time, usage_id = _comment_sort_key(latest_usage)
     latest_trigger: IssueComment | None = None
+    result_reviews = [review for review in reviews if is_review_result_review(review, author_logins=author_logins)]
     for comment in comments:
         comment_time, comment_id = _comment_sort_key(comment)
         if (comment_time, comment_id) <= (usage_time, usage_id):
@@ -651,6 +703,8 @@ def usage_limit_review_retry_for_pr(
         if is_review_trigger_comment(comment):
             if latest_trigger is None or _comment_sort_key(comment) > _comment_sort_key(latest_trigger):
                 latest_trigger = comment
+    if any(_review_sort_key(review) > (usage_time, usage_id) for review in result_reviews):
+        return None
     return UsageLimitReviewRetry(pr=pr, usage_comment=latest_usage, trigger_comment=latest_trigger)
 
 
@@ -675,7 +729,11 @@ def discover_usage_limit_review_retries(
     )
     for pr in pull_requests:
         comments = fetch_pr_issue_comments(runner, repo=repo, pr_number=pr.number)
-        retry = usage_limit_review_retry_for_pr(pr, comments, author_logins=author_logins)
+        usage_comments = [
+            comment for comment in comments if is_usage_limit_review_comment(comment, author_logins=author_logins)
+        ]
+        reviews = fetch_pr_reviews(runner, repo=repo, pr_number=pr.number) if usage_comments else []
+        retry = usage_limit_review_retry_for_pr(pr, comments, author_logins=author_logins, reviews=reviews)
         if retry is not None:
             retries.append(retry)
     return retries
@@ -691,6 +749,7 @@ def discover_review_inventory(
     until: dt.datetime | None,
     author_logins: set[str],
     require_thread_state: bool = False,
+    include_post_merge: bool = False,
 ) -> ReviewInventory:
     actionable: list[PendingComment] = []
     resolved_for_audit: list[PendingComment] = []
@@ -709,7 +768,12 @@ def discover_review_inventory(
             pr_number=pr.number,
             require_thread_state=require_thread_state,
         )
-        inventory = review_inventory_for_pr(pr, comments, author_logins=author_logins)
+        inventory = review_inventory_for_pr(
+            pr,
+            comments,
+            author_logins=author_logins,
+            include_post_merge=include_post_merge,
+        )
         actionable.extend(inventory.actionable)
         resolved_for_audit.extend(inventory.resolved_for_audit)
     return ReviewInventory(tuple(actionable), tuple(resolved_for_audit))
@@ -724,6 +788,7 @@ def discover_pending_comments(
     since: dt.datetime | None,
     until: dt.datetime | None,
     author_logins: set[str],
+    include_post_merge: bool = False,
 ) -> list[PendingComment]:
     """Compatibility wrapper for callers that only need actionable comments."""
     return list(
@@ -735,6 +800,7 @@ def discover_pending_comments(
             since=since,
             until=until,
             author_logins=author_logins,
+            include_post_merge=include_post_merge,
         ).actionable
     )
 
@@ -1286,6 +1352,7 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
         until=until,
         author_logins=authors,
         require_thread_state=require_thread_state,
+        include_post_merge=bool(getattr(args, "include_post_merge", False)),
     )
     all_pending = list(inventory.actionable)
     pending = list(all_pending)
@@ -1378,6 +1445,12 @@ def build_parser() -> argparse.ArgumentParser:
         sub.add_argument("--since", default=os.environ.get("PR_REVIEW_SINCE"))
         sub.add_argument("--until", default=os.environ.get("PR_REVIEW_UNTIL"))
         sub.add_argument("--author", action="append", default=list(DEFAULT_REVIEW_AUTHORS))
+        sub.add_argument(
+            "--include-post-merge",
+            default=os.environ.get("PR_REVIEW_INCLUDE_POST_MERGE", "0").lower() in {"1", "true", "yes"},
+            action=argparse.BooleanOptionalAction,
+            help="Include matching review comments posted after the PR merged (needed for retriggered reviews).",
+        )
         sub.add_argument(
             "--no-usage-limit-review-retry",
             dest="retry_usage_limit_reviews",

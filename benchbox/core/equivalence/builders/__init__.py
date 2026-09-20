@@ -4,6 +4,7 @@ from benchbox.core.equivalence.builders.amplab import build_amplab_duckdb
 from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duckdb_cell
 from benchbox.core.equivalence.builders.clickbench import build_clickbench_duckdb
 from benchbox.core.equivalence.builders.coffeeshop import build_coffeeshop_duckdb
+from benchbox.core.equivalence.builders.datavault import build_datavault_duckdb
 from benchbox.core.equivalence.builders.flightdata import build_flightdata_duckdb
 from benchbox.core.equivalence.builders.h2odb import build_h2odb_duckdb
 from benchbox.core.equivalence.builders.joinorder_synthetic import build_joinorder_synthetic_duckdb
@@ -16,6 +17,7 @@ __all__ = [
     "build_amplab_duckdb",
     "build_clickbench_duckdb",
     "build_coffeeshop_duckdb",
+    "build_datavault_duckdb",
     "build_flightdata_duckdb",
     "build_h2odb_duckdb",
     "build_joinorder_synthetic_duckdb",

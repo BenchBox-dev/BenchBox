@@ -280,10 +280,6 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if self.hvfhv_downloader is not None:
             row_counts.update(self.hvfhv_downloader.get_download_stats().get("row_counts", {}))
 
-        # Skip manifest when all downloaders reused cached data (no row counts collected)
-        if not row_counts:
-            return
-
         manifest = DataGenerationManifest(
             output_dir=self.output_dir,
             benchmark="nyctaxi",

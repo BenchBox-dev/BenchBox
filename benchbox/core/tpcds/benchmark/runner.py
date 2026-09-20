@@ -977,8 +977,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         Raises:
             NotImplementedError: Always. This method never executed real SQL
-                against ``connection`` -- both its "concurrent" branch (via a
-                now-retired ``ConcurrentQueryExecutor`` wrapper) and its
+                against ``connection`` -- both its "concurrent" branch (via
+                ``ConcurrentQueryExecutor``, since removed; see
+                adr-concurrency-public-api-reconciliation) and its
                 sequential branch bottomed out in ``_execute_single_stream``,
                 which only counted ``-- Query`` comment lines in each stream
                 file and reported every stream as successful. Use

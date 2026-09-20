@@ -356,6 +356,7 @@ class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
         by: str | list[str],
         agg_spec: dict[str, Any],
         as_index: bool = False,
+        **kwargs: Any,
     ) -> Any:
         """Perform grouped aggregation with platform-specific handling.
 
@@ -371,6 +372,7 @@ class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
             by: Column(s) to group by
             agg_spec: Aggregation specification (named or direct)
             as_index: Whether to use group columns as index (default False)
+            **kwargs: Extra native groupby options (e.g. dropna=False)
 
         Returns:
             Aggregated DataFrame
@@ -380,7 +382,7 @@ class PandasFamilyContext(DataFrameContextImpl[DF], Generic[DF]):
         # Unwrap if needed
         native_df = df._df if isinstance(df, UnifiedPandasFrame) else df
 
-        result = self._adapter.groupby_agg(native_df, by, agg_spec, as_index=as_index)
+        result = self._adapter.groupby_agg(native_df, by, agg_spec, as_index=as_index, **kwargs)
         return UnifiedPandasFrame(result, self._adapter)
 
     def scalar(self, df: Any, column: str | None = None) -> Any:
@@ -973,6 +975,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         by: str | list[str],
         agg_spec: dict[str, Any],
         as_index: bool = False,
+        **kwargs: Any,
     ) -> DF:
         """Perform grouped aggregation with platform-specific handling.
 
@@ -986,6 +989,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
                 - Named aggs: {"sum_qty": ("qty", "sum"), "avg_price": ("price", "mean")}
                 - Direct aggs: {"qty": "sum", "price": "mean"}
             as_index: Whether to use group columns as index (default False)
+            **kwargs: Extra native groupby options (e.g. dropna=False)
 
         Returns:
             Aggregated DataFrame
@@ -996,9 +1000,9 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         is_named_agg = any(isinstance(v, tuple) for v in agg_spec.values())
 
         if is_named_agg:
-            return df.groupby(by, as_index=as_index).agg(**agg_spec)  # type: ignore[return-value]
+            return df.groupby(by, as_index=as_index, **kwargs).agg(**agg_spec)  # type: ignore[return-value]
         else:
-            return df.groupby(by, as_index=as_index).agg(agg_spec)  # type: ignore[return-value]
+            return df.groupby(by, as_index=as_index, **kwargs).agg(agg_spec)  # type: ignore[return-value]
 
     # =========================================================================
     # Concrete Methods - Common functionality

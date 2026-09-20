@@ -153,10 +153,10 @@ def _benchmark_gate_records() -> list[BaselineRecord]:
 
     records: list[BaselineRecord] = []
     for platform_key in sorted(PlatformRegistry.get_platform_names()):
-        caps = PlatformRegistry.get_platform_capabilities(platform_key)
-        if caps is None or not caps.unsupported_benchmarks:
+        unsupported = PlatformRegistry.get_unsupported_benchmarks(platform_key)
+        if not unsupported:
             continue
-        for benchmark in sorted(caps.unsupported_benchmarks):
+        for benchmark in sorted(unsupported):
             records.append(
                 _rec(
                     platform_key,
@@ -223,6 +223,7 @@ def _ddl_optimize_records() -> list[BaselineRecord]:
     #   platforms/databend/adapter.py    → databend
     #   platforms/databricks/adapter.py  → databricks  (platform_transform_fn → pre-pass loop, w17)
     #   platforms/doris.py               → doris  (_inject_doris_ddl_clauses, not _optimize_table_definition)
+    #   platforms/ducklake.py            → ducklake  (ducklake_strip_primary_keys via _rewrite_schema_statement)
     #   platforms/fabric_warehouse.py    → fabric_dw  (_optimize_table_definition; CLI key is fabric_dw)
     #   platforms/firebolt.py            → firebolt
     #   platforms/lakesail.py            → lakesail
@@ -244,6 +245,7 @@ def _ddl_optimize_records() -> list[BaselineRecord]:
         "databend",
         "databricks",
         "doris",
+        "ducklake",
         "fabric_dw",
         "firebolt",
         "lakesail",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from decimal import Decimal
 from typing import Any
 
@@ -32,13 +33,16 @@ _TPCH_TABLES = (
 _DUCKDB_CONTRACT_SHAPE_QUERIES = (
     "json_aggregates",
     "array_agg_distinct",
+    "array_agg_simple",
     "array_slice",
     "array_distinct",
+    "array_unnest",
     "struct_construction",
     "array_of_struct",
     "map_construction",
     "list_filter",
     "list_reduce",
+    "list_transform",
     "window_rank",
 )
 
@@ -64,11 +68,14 @@ _CLICKHOUSE_VARIANT_QUERIES = (
     "array_length",
     "array_min_max",
     "array_agg_distinct",
+    "array_agg_simple",
     "array_slice",
     "array_sort",
     "array_distinct",
+    "array_unnest",
     "struct_access",
     "array_of_struct",
+    "map_construction",
     "map_keys_values",
     "list_filter",
     "list_reduce",
@@ -347,3 +354,83 @@ def test_clickhouse_variants_match_duckdb_reference(
     contract = read_primitives_contracts[query_id]
 
     assert _canonical_rows(comparison_rows, contract) == _canonical_rows(reference_rows, contract)
+
+
+def _flatten_named_struct(cell: Any) -> Any:
+    """Flatten ClickHouse's positionally-named Tuple encoding to a plain tuple.
+
+    ClickHouse ``tuple(a, b, c)`` decodes over Arrow as ``{'1': a, '2': b,
+    '3': c}`` while DuckDB ``ROW(a, b, c)`` decodes as ``(a, b, c)``. Both
+    follow SELECT order, so ordering dict values by integer key reproduces the
+    DuckDB shape for comparison.
+    """
+    if isinstance(cell, dict) and cell and all(key.isdigit() for key in cell):
+        return tuple(cell[str(index)] for index in range(1, len(cell) + 1))
+    return cell
+
+
+def test_clickhouse_struct_construction_matches_duckdb_reference(
+    read_primitives_duckdb_conn,
+    clickhouse_session,
+    read_primitives_queries_by_dialect,
+    read_primitives_contracts,
+):
+    """ClickHouse tuple() construction should carry the same fields as DuckDB ROW()."""
+    reference_rows = _duckdb_rows(
+        read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"]["struct_construction"]
+    )
+    comparison_rows = _clickhouse_rows(
+        clickhouse_session, read_primitives_queries_by_dialect["clickhouse"]["struct_construction"]
+    )
+    contract = read_primitives_contracts["struct_construction"]
+
+    flattened = [(brand, _flatten_named_struct(contact), acctbal) for brand, contact, acctbal in comparison_rows]
+    assert _canonical_rows(flattened, contract) == _canonical_rows(reference_rows, contract)
+
+
+def test_clickhouse_list_transform_matches_duckdb_reference(
+    read_primitives_duckdb_conn,
+    clickhouse_session,
+    read_primitives_queries_by_dialect,
+):
+    """ClickHouse arrayMap() scaling should match DuckDB list_transform() numerically.
+
+    DuckDB aggregates DECIMAL prices (decoded as Decimal) while ClickHouse
+    decodes them as float64, so comparison is numeric with tolerance rather
+    than exact canonical equality. Arrays are order-insensitive per contract.
+    """
+    reference_rows = _duckdb_rows(
+        read_primitives_duckdb_conn, read_primitives_queries_by_dialect["duckdb"]["list_transform"]
+    )
+    comparison_rows = _clickhouse_rows(
+        clickhouse_session, read_primitives_queries_by_dialect["clickhouse"]["list_transform"]
+    )
+
+    reference_by_brand = {brand: sorted(float(cell) for cell in prices) for brand, prices in reference_rows}
+    comparison_by_brand = {brand: sorted(float(cell) for cell in prices) for brand, prices in comparison_rows}
+    assert set(comparison_by_brand) == set(reference_by_brand)
+    for brand, expected in reference_by_brand.items():
+        actual = comparison_by_brand[brand]
+        assert len(actual) == len(expected)
+        for actual_cell, expected_cell in zip(actual, expected):
+            assert math.isclose(actual_cell, expected_cell, rel_tol=1e-9)
+
+
+def test_bigquery_array_unnest_variant_retained_with_contract(read_primitives_contracts):
+    """The BigQuery array_unnest variant should stay retained with its UNNEST shape.
+
+    BigQuery has no local execution engine in this suite, so runtime parity
+    requires live credentials and stays out of scope here. This locks the
+    retained variant, its UNNEST statement shape, and its result contract so
+    removal or reshaping fails loudly instead of drifting silently.
+    """
+    benchmark = ReadPrimitivesBenchmark()
+    # Assert the variant exists first: get_query falls back to the base query
+    # (which also contains UNNEST), so the shape check below cannot catch a
+    # removed bigquery variant on its own.
+    assert benchmark.query_manager.has_variant("array_unnest", "bigquery")
+    sql = benchmark.query_manager.get_query("array_unnest", dialect="bigquery")
+
+    assert "UNNEST" in sql.upper()
+    contract = read_primitives_contracts["array_unnest"]
+    assert set(contract.row_identity) == {"ps_suppkey", "part_key"}

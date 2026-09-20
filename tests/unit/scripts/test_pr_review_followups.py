@@ -199,6 +199,75 @@ def _issue_comment(
     )
 
 
+def _review(
+    review_id: int,
+    *,
+    user_login: str = "chatgpt-codex-connector[bot]",
+    submitted_at: str = "2026-05-04T10:05:00Z",
+    body: str = "\n### 💡 Codex Review\n\nFinding text",
+):
+    return pr_review_followups.PullRequestReview(
+        id=review_id,
+        body=body,
+        user_login=user_login,
+        submitted_at=submitted_at,
+    )
+
+
+def test_review_inventory_can_include_comments_from_retriggered_post_merge_reviews() -> None:
+    comment = _comment(1, created_at="2026-05-04T12:05:00Z")
+
+    inventory = pr_review_followups.review_inventory_for_pr(
+        _pr(),
+        [comment],
+        author_logins={"chatgpt-codex-connector[bot]"},
+        include_post_merge=True,
+    )
+
+    assert [item.comment.id for item in inventory.actionable] == [1]
+
+
+def test_fetch_pr_reviews_reads_review_objects_not_issue_timeline_comments() -> None:
+    runner = RecordingRunner(
+        responses={
+            (
+                "gh",
+                "api",
+                "--paginate",
+                "repos/joeharris76/BenchBox/pulls/123/reviews?per_page=100",
+                "--jq",
+                ".[] | @json",
+            ): subprocess.CompletedProcess(
+                [],
+                0,
+                json.dumps(
+                    {
+                        "id": 77,
+                        "body": "### 💡 Codex Review",
+                        "user": {"login": "chatgpt-codex-connector[bot]"},
+                        "submitted_at": "2026-05-04T10:05:00Z",
+                        "commit_id": "abc123",
+                    }
+                )
+                + "\n",
+                "",
+            )
+        }
+    )
+
+    reviews = pr_review_followups.fetch_pr_reviews(runner, repo="joeharris76/BenchBox", pr_number=123)
+
+    assert reviews == [
+        pr_review_followups.PullRequestReview(
+            id=77,
+            body="### 💡 Codex Review",
+            user_login="chatgpt-codex-connector[bot]",
+            submitted_at="2026-05-04T10:05:00Z",
+            commit_id="abc123",
+        )
+    ]
+
+
 def test_pending_comments_skip_action_marker_replies_and_post_merge_comments() -> None:
     action_reply = _comment(
         2,
@@ -573,10 +642,13 @@ def test_makefile_wires_resolved_audit_and_fail_on_pending_to_list_only() -> Non
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
 
     assert "PR_REVIEW_INCLUDE_RESOLVED ?= 0" in makefile
+    assert "PR_REVIEW_INCLUDE_POST_MERGE ?= 0" in makefile
     assert "PR_REVIEW_FAIL_ON_PENDING ?= 0" in makefile
     list_recipe = makefile.split("pr-review-followups-list:", 1)[1].split("\n\n", 1)[0]
     run_recipe = makefile.split("pr-review-followups:", 1)[1].split("\n\n", 1)[0]
     assert "--include-resolved" in list_recipe
+    assert "--include-post-merge" in list_recipe
+    assert "--include-post-merge" in run_recipe
     assert "--fail-on-pending" in list_recipe
     assert "--include-resolved" not in run_recipe
     assert "--fail-on-pending" not in run_recipe
@@ -674,6 +746,44 @@ def test_usage_limit_retry_skips_later_no_findings_review_result() -> None:
     )
 
     assert retry is None
+
+
+def test_usage_limit_retry_skips_later_review_object_result() -> None:
+    comments = [
+        _issue_comment(
+            10,
+            body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT,
+            created_at="2026-05-04T10:00:00Z",
+        )
+    ]
+
+    retry = pr_review_followups.usage_limit_review_retry_for_pr(
+        _pr(),
+        comments,
+        author_logins={"chatgpt-codex-connector[bot]"},
+        reviews=[_review(12)],
+    )
+
+    assert retry is None
+
+
+def test_usage_limit_retry_ignores_review_object_submitted_before_latest_limit() -> None:
+    comments = [
+        _issue_comment(
+            10,
+            body=pr_review_followups.CODEX_USAGE_LIMIT_REVIEW_TEXT,
+            created_at="2026-05-04T10:10:00Z",
+        )
+    ]
+
+    retry = pr_review_followups.usage_limit_review_retry_for_pr(
+        _pr(),
+        comments,
+        author_logins={"chatgpt-codex-connector[bot]"},
+        reviews=[_review(12, submitted_at="2026-05-04T10:05:00Z")],
+    )
+
+    assert retry is not None
 
 
 def test_prompt_carries_completed_sweep_patterns() -> None:

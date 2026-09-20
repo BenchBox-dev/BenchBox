@@ -586,7 +586,7 @@ jobs:
     # A queue-certified skip never fires auto-revert: its gates report
     # 'skipped', and this explicit guard keeps the trigger off even if a
     # future edit changes how skipped results read here.
-    if: ${{ github.event_name != 'schedule' && needs.queue-certification.outputs.certified != 'true' && always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
+    if: ${{ github.event_name != 'schedule' && always() && (needs.lint.result == 'failure' || needs.explorer-tokens.result == 'failure' || (needs.queue-certification.outputs.certified != 'true' && (needs.fast-test.result == 'failure' || needs.medium-test.result == 'failure'))) }}
     outputs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}

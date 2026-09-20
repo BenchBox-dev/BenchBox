@@ -392,6 +392,10 @@ class DorisDDLGenerator(BaseDDLGenerator):
     def platform_name(self) -> str:
         return "doris"
 
+    def render_partition_clause(self, partition_by: str) -> str:
+        """Render ``PARTITION BY RANGE (...) ()`` from a comma-joined column expression."""
+        return f"PARTITION BY RANGE ({partition_by}) ()"
+
     def _get_benchmark_tuning(self) -> dict[str, Any] | None:
         """Get benchmark-specific tuning dictionaries.
 
@@ -439,7 +443,10 @@ class DorisDDLGenerator(BaseDDLGenerator):
           clause (rendered-SQL contract: never a bare column name, so dry-run
           preview via ``TuningClauses.get_inline_clauses()`` and execution DDL
           render the identical string exactly once)
-        - ``partition_by``: Optional PARTITION BY RANGE expression
+        - ``partition_by``: rendered ``PARTITION BY RANGE (...) ()`` clause
+          (rendered-SQL contract: never a bare column name, so dry-run
+          preview via ``TuningClauses.get_inline_clauses()`` and execution
+          DDL render the identical string exactly once)
         - ``table_properties``: Doris PROPERTIES (replication, colocate, bloom filter)
         - ``platform``: ``"doris"`` so inline clauses order DISTRIBUTED BY
           after PARTITION BY, as the Doris dialect requires
@@ -485,10 +492,14 @@ class DorisDDLGenerator(BaseDDLGenerator):
             logger.info(f"Doris table {table_name}: using benchmark default distribution key ({clauses.distribute_by})")
 
         # ── PARTITION BY RANGE (from PARTITIONING tuning) ──
+        # Stored rendered (not bare), mirroring the distribute_by contract:
+        # get_inline_clauses() emits it verbatim and
+        # generate_create_table_ddl() uses it directly, so preview and
+        # execution can never disagree or duplicate it.
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             sorted_cols = sorted(partition_columns, key=lambda c: c.order)
-            clauses.partition_by = ", ".join(c.name for c in sorted_cols)
+            clauses.partition_by = self.render_partition_clause(", ".join(c.name for c in sorted_cols))
 
         # ── Clustering warning ──
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -584,9 +595,9 @@ class DorisDDLGenerator(BaseDDLGenerator):
             if tuning.sort_by:
                 statement = f"{statement}\nDUPLICATE KEY ({tuning.sort_by})"
 
-            # PARTITION BY RANGE clause (if specified)
+            # PARTITION BY RANGE clause (already rendered in partition_by).
             if tuning.partition_by:
-                statement = f"{statement}\nPARTITION BY RANGE ({tuning.partition_by}) ()"
+                statement = f"{statement}\n{tuning.partition_by}"
 
             # DISTRIBUTED BY HASH ... BUCKETS N (already rendered in distribute_by)
             if tuning.distribute_by:

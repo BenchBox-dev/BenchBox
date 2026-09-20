@@ -64,6 +64,7 @@ scripts/publication/verify_lane_isolation.py @joeharris76
 # SOUNDNESS_PREFIXES (auto-merge withholding) and route review requests.
 # .github/workflows/pr.yml deliberately excluded
 # (high churn; its required check is pinned by the ruleset-drift canary).
+scripts/heavy_tier_needed.py @joeharris76
 _project/scripts/auto_merge_soundness_paths.py @joeharris76
 .github/workflows/auto-merge-on-open.yml @joeharris76
 .github/workflows/release.yml @joeharris76

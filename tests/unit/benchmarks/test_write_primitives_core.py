@@ -644,10 +644,9 @@ class TestSCD2Operations:
         The compact one-line-JSON catalog has no template layer, so this clause is
         copy-pasted across ops. This guard fails loudly if one copy drifts (e.g. a
         surrogate-key fix applied to only one op), which would silently desync
-        history semantics across the SCD2 ops. merge_scd_type2_new_keys_only is
-        the deliberate exception: it stamps valid_from one day past the staged
-        'new' effective_ts so its rows are distinguishable from basic's rows
-        inserted from the same stage rows (cleanup isolation).
+        history semantics across the SCD2 ops. Every insert-only path preserves
+        the staged effective timestamp; cleanup isolation comes from the
+        operation's key scope rather than changing the validity interval.
         """
         catalog = load_write_primitives_catalog()
         # The shared INSERT projection: surrogate key from MAX(sk) + ROW_NUMBER(),
@@ -662,10 +661,8 @@ class TestSCD2Operations:
                 f"{op_id} INSERT projection drifted from the shared SCD2 form"
             )
         new_keys_only = catalog.operations["merge_scd_type2_new_keys_only"].write_sql
-        assert canonical_projection not in new_keys_only
-        assert "CAST(s.effective_ts + INTERVAL '1' DAY AS DATE)" in new_keys_only, (
-            "new_keys_only lost its insert-time discriminator; its rows would share "
-            "basic's valid_from and cross-op cleanup isolation would break"
+        assert canonical_projection in new_keys_only, (
+            "new_keys_only must preserve the staged effective timestamp and shared insert projection"
         )
 
 

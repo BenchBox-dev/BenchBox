@@ -723,6 +723,17 @@ class TestPrestoAdapter:
         assert "NOT NULL" in optimized
         assert "WITH (format = 'PARQUET')" in optimized
 
+    def test_optimize_table_definition_memory_catalog_name(self, presto_stubs):
+        """A catalog literally named memory strips like the memory table format."""
+        adapter = PrestoAdapter(catalog="memory", table_format="hive")
+
+        sql = "CREATE TABLE test (id INTEGER PRIMARY KEY, kind VARCHAR(15) NOT NULL)"
+        optimized = adapter._optimize_table_definition(sql)
+
+        assert "PRIMARY KEY" not in optimized
+        assert "NOT NULL" not in optimized
+        assert "WITH" not in optimized
+
     def test_analyze_table_memory_catalog(self, presto_stubs):
         """Test ANALYZE is skipped for memory catalog."""
         prestodb_mock, _ = presto_stubs

@@ -63,6 +63,36 @@ class TestGenerateTuningClausesLineitem:
         assert "USING BITMAP" in clauses.post_create_statements[0]
 
 
+class TestPartitionByRenderedContract:
+    """partition_by holds the full PARTITION BY RANGE clause, never bare columns."""
+
+    def test_partition_by_stored_rendered(self, gen_tpch):
+        from benchbox.core.tuning.interface import TuningColumn
+
+        tt = TableTuning(
+            table_name="lineitem",
+            partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
+        )
+        clauses = gen_tpch.generate_tuning_clauses(tt)
+        assert clauses.partition_by == "PARTITION BY RANGE (l_shipdate) ()"
+
+    def test_partition_rendered_once_in_ddl_and_preview(self, gen_tpch):
+        from benchbox.core.tuning.interface import TuningColumn
+
+        tt = TableTuning(
+            table_name="lineitem",
+            partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
+        )
+        clauses = gen_tpch.generate_tuning_clauses(tt)
+        cols = [ColumnDefinition("l_orderkey", "BIGINT"), ColumnDefinition("l_shipdate", "DATE")]
+        ddl = gen_tpch.generate_create_table_ddl("lineitem", cols, clauses)
+        assert ddl.count("PARTITION BY RANGE (l_shipdate) ()") == 1
+        assert "PARTITION BY RANGE (PARTITION" not in ddl
+        inline = clauses.get_inline_clauses()
+        assert "l_shipdate" not in inline
+        assert "PARTITION BY RANGE (l_shipdate) ()" in inline
+
+
 class TestGenerateTuningClausesNation:
     def test_nation_no_bloom_filter(self, gen_tpch):
         clauses = gen_tpch.generate_tuning_clauses(TableTuning(table_name="nation"))

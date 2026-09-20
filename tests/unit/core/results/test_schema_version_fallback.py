@@ -1,9 +1,9 @@
 """Fallback-matrix contract tests for the bundle schema version key.
 
-Covers the post-#2199 shape: producers emit ``result_schema_version``
-exclusively, while readers accept ``result_schema_version`` ->
-``version`` -> ``schema_version`` through the single
-``result_schema_version_value()`` read path, and reject a missing key.
+Covers the post-#2199 shape: producers emit matching
+``result_schema_version`` and legacy ``version`` aliases, while readers accept
+``result_schema_version`` -> ``version`` -> ``schema_version`` through the
+single ``result_schema_version_value()`` read path and reject conflicts.
 """
 
 from __future__ import annotations
@@ -29,10 +29,7 @@ pytestmark = [
         ({"result_schema_version": "2.2"}, "2.2"),
         ({"version": "2.1"}, "2.1"),
         ({"schema_version": "2.0"}, "2.0"),
-        (
-            {"result_schema_version": "2.2", "version": "2.1", "schema_version": "2.0"},
-            "2.2",
-        ),
+        ({"result_schema_version": "2.2", "version": "2.2", "schema_version": "2.0"}, "2.2"),
         ({"version": "2.1", "schema_version": "2.0"}, "2.1"),
         ({"result_schema_version": "2.2", "schema_version": "2.0"}, "2.2"),
         ({}, None),
@@ -41,6 +38,11 @@ pytestmark = [
 )
 def test_result_schema_version_value_fallback_matrix(bundle: dict, expected: str | None) -> None:
     assert result_schema_version_value(bundle) == expected
+
+
+def test_result_schema_version_value_rejects_conflicting_aliases() -> None:
+    with pytest.raises(ValueError, match="must match"):
+        result_schema_version_value({"result_schema_version": "2.2", "version": "2.1"})
 
 
 @pytest.mark.parametrize("not_a_dict", [None, "2.2", 22, ["2.2"]])
@@ -64,8 +66,8 @@ def test_load_oldest_schema_version_key(tmp_path: Path) -> None:
     assert result.benchmark_id == data["benchmark"]["id"]
 
 
-def test_load_prefers_new_key_when_all_present(tmp_path: Path) -> None:
-    data = make_v2_result_dict(version="2.1")
+def test_load_accepts_matching_new_and_legacy_keys(tmp_path: Path) -> None:
+    data = make_v2_result_dict(version="2.2")
     data["result_schema_version"] = "2.2"
     data["schema_version"] = "2.0"
 

@@ -255,6 +255,9 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
     # Build the payload
     payload: dict[str, Any] = {
         "result_schema_version": SCHEMA_VERSION,
+        # Keep the historical alias during the schema-v2 compatibility window;
+        # loaders require both aliases to agree when both are present.
+        "version": SCHEMA_VERSION,
         "run": order_dict(
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
         ),
@@ -365,6 +368,10 @@ def _aggregate_scan_bytes(result: BenchmarkResults) -> dict[str, Any] | None:
     Totals cover every execution carrying byte metrics regardless of status,
     matching the cost calculator's unfiltered phase collection.
     """
+    preserved = result.cost_summary.get("scan_bytes") if isinstance(result.cost_summary, Mapping) else None
+    if isinstance(preserved, Mapping) and preserved:
+        return dict(preserved)
+
     total_billed = 0
     total_scanned = 0
     billed_seen = False
@@ -612,16 +619,19 @@ def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) 
 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
     """Add cost summary to payload if available."""
-    if result.cost_summary:
-        normalized_cost = result.cost_summary.get("normalized_cost")
-        if isinstance(normalized_cost, dict):
-            payload["normalized_cost"] = normalized_cost
-        cost_block: dict[str, Any] = {}
-        if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
-            cost_block["total_usd"] = result.cost_summary["total_cost"]
-        cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
-        if cost_block:
-            payload["cost"] = cost_block
+    if not result.cost_summary:
+        return
+    normalized_cost = result.cost_summary.get("normalized_cost")
+    if isinstance(normalized_cost, dict):
+        payload["normalized_cost"] = normalized_cost
+    if not ({"total_cost", "cost_model"} & result.cost_summary.keys()):
+        return
+    cost_block: dict[str, Any] = {}
+    if "total_cost" in result.cost_summary and _normalized_cost_allows_direct_total(normalized_cost):
+        cost_block["total_usd"] = result.cost_summary["total_cost"]
+    cost_block["model"] = result.cost_summary.get("cost_model", "estimated")
+    if cost_block:
+        payload["cost"] = cost_block
 
 
 def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:

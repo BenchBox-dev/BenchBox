@@ -160,7 +160,8 @@ class TestDatabricksSizingFromNormalizedCompute:
         assert deployment["cluster_size"] == "1.0"
         assert deployment["cloud_region"] == "us-east-1"
 
-    def test_observed_serverless_run_with_runtime_publishes(self) -> None:
+    def test_observed_serverless_run_with_runtime_publishes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         """Measured runtime plus observed sizing is sufficient for normalized.
 
         The Databricks adapter reports ``execution_time_seconds`` per query,

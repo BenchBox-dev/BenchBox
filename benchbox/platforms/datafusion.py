@@ -124,9 +124,19 @@ class DataFusionConnectionCompat:
     def execute(self, query: str, parameters: Any = None) -> DataFusionCursorCompat:
         if parameters is not None:
             raise ValueError("DataFusion SQL execute() does not support bound parameters in this adapter path")
-        cursor = DataFusionCursorCompat(self._context.sql(query))
-        if self._requires_eager_execution(query):
+        # DataFusion's context accepts only a single statement per sql() call,
+        # so split multi-statement batches (e.g. write_primitives staging
+        # population) and run each statement in order, keeping the last cursor.
+        from benchbox.platforms.base.mysql_wire import split_sql_statements
+
+        statements = split_sql_statements(query) or [query]
+        cursor = DataFusionCursorCompat(self._context.sql(statements[0]))
+        if self._requires_eager_execution(statements[0]):
             cursor.fetchall()
+        for statement in statements[1:]:
+            cursor = DataFusionCursorCompat(self._context.sql(statement))
+            if self._requires_eager_execution(statement):
+                cursor.fetchall()
         return cursor
 
     def sql(self, query: str) -> Any:
@@ -698,12 +708,18 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
         return schemas
 
-    def _create_empty_schema_tables(self, connection: Any) -> dict[str, int]:
+    def _create_empty_schema_tables(self, connection: Any, skip: set[str] | None = None) -> dict[str, int]:
         """Create empty in-memory tables from self._table_schemas.
 
         Used when a benchmark has no data files (e.g. metadata_primitives) so
-        that catalog-discovery queries can find the tables via INFORMATION_SCHEMA.
+        that catalog-discovery queries can find the tables via INFORMATION_SCHEMA,
+        and after file-backed loads to materialize schema-known tables that have
+        no data files (e.g. write_primitives staging tables populated at runtime).
         DataFusion maps SQL types to Arrow types; unsupported DDL is skipped.
+
+        Args:
+            connection: Active DataFusion connection.
+            skip: Lowercased table names that are already registered.
         """
         type_map = {
             "BIGINT": "BIGINT",
@@ -716,7 +732,10 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             "DATE": "DATE",
             "TIMESTAMP": "TIMESTAMP",
         }
+        skip_lower = {name.lower() for name in skip} if skip else set()
         for table_name, schema_info in self._table_schemas.items():
+            if table_name.lower() in skip_lower:
+                continue
             columns = schema_info.get("columns", [])
             if not columns:
                 continue
@@ -732,7 +751,7 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
                 if "(" in col_type and base_type in ("DECIMAL", "NUMERIC"):
                     arrow_type = f"DECIMAL{col_type[len(base_type) :]}"
                 col_defs.append(f'"{col_name}" {arrow_type}')
-            ddl = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(col_defs)})"
+            ddl = f"CREATE TABLE IF NOT EXISTS {table_name.lower()} ({', '.join(col_defs)})"
             try:
                 connection.execute(ddl)
                 self.log_very_verbose(f"Created empty table: {table_name}")
@@ -830,6 +849,11 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
             per_table_timings[table_name_lower] = {"total_ms": table_duration * 1000}
 
             self.log_verbose(f"Loaded table {table_name_lower}: {row_count:,} rows in {table_duration:.2f}s")
+
+        # Materialize schema-known tables that have no data files (e.g.
+        # write_primitives staging tables, populated at benchmark setup).
+        # Already-loaded tables are skipped; CREATE is IF NOT EXISTS.
+        self._create_empty_schema_tables(connection, skip=set(table_stats))
 
         total_duration = elapsed_seconds(start_time)
         total_rows = sum(table_stats.values())

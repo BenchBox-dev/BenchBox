@@ -145,8 +145,7 @@ class TestWritePrimitivesSCD2PostgreSQL:
             conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
         )
         assert stage == {"changed": 20, "unchanged": 20, "new": 20}
-        # Each change group carries its own effective date so per-op
-        # cleanups scope on the timestamp without touching other groups.
+        # Each change group carries its own effective date for validation.
         stamps = dict(
             conn.execute(
                 "SELECT change_type, MAX(effective_ts) FROM scd2_ops_stage_customer GROUP BY change_type"

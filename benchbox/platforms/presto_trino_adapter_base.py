@@ -454,6 +454,37 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             self.logger.error(f"Failed to connect to {self.platform_log_name}: {e}")
             raise
 
+    # DDL optimizer hooks for the shared _optimize_table_definition below.
+    # Memory-like catalogs get WITH properties and NOT NULL stripped; formats
+    # in ddl_format_property_formats gain WITH (format = 'PARQUET').
+    ddl_memory_table_formats: tuple[str, ...] = ("memory",)
+    ddl_memory_catalog_names: tuple[str, ...] = ()
+    ddl_format_property_formats: tuple[str, ...] = ("hive",)
+
+    def _optimize_table_definition(self, statement: str) -> str:
+        """Optimize a CREATE TABLE definition for the connector/catalog in use.
+
+        Shared Presto/Trino flow: benchmark DDL carries PRIMARY KEY metadata
+        the engines reject, so it is stripped for every catalog; memory-like
+        catalogs additionally lose WITH properties and NOT NULL constraints;
+        Hive-like catalogs gain an explicit format declaration.
+        """
+        from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
+
+        if not statement.upper().startswith("CREATE TABLE"):
+            return statement
+
+        statement = strip_primary_keys(statement)
+
+        if self.table_format in self.ddl_memory_table_formats or (self.catalog or "") in self.ddl_memory_catalog_names:
+            statement = strip_with_properties(statement)
+            statement = re.sub(r"\s+NOT\s+NULL", "", statement, flags=re.IGNORECASE)
+        elif self.table_format in self.ddl_format_property_formats:
+            if "WITH" not in statement.upper():
+                statement += " WITH (format = 'PARQUET')"
+
+        return statement
+
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using optimized table definitions."""
         from benchbox.platforms.presto_trino_utils import execute_schema_statements

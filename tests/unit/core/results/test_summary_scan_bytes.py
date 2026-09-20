@@ -93,3 +93,12 @@ class TestAggregateScanBytes:
         results = _results([{"query_id": "1", "execution_time_ms": 100.0, "rows_returned": 1, "status": "SUCCESS"}])
         payload = build_result_payload(results)
         assert "cost" not in payload["summary"]
+
+    def test_payload_omits_top_level_cost_for_scan_only_summary(self) -> None:
+        results = _results([{"query_id": "1", "execution_time_ms": 100.0, "rows_returned": 1, "status": "SUCCESS"}])
+        results.cost_summary = {"scan_bytes": {"total_bytes_scanned": 512}}
+
+        payload = build_result_payload(results)
+
+        assert payload["summary"]["cost"] == {"total_bytes_scanned": 512}
+        assert "cost" not in payload

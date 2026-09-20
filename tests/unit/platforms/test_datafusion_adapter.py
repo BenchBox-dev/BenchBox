@@ -874,6 +874,24 @@ WHERE DATE '1994-01-01' <= DATE '1995-01-01'"""
         mock_df.collect.assert_called_once()
 
     @patch("benchbox.platforms.datafusion.SessionContext")
+    def test_connection_compat_execute_splits_multi_statement_batch(self, mock_session_context):
+        """Multi-statement batches run one statement per sql() call."""
+        mock_df = Mock()
+        mock_df.collect.return_value = []
+
+        mock_ctx = Mock()
+        mock_ctx.sql.return_value = mock_df
+
+        compat = DataFusionConnectionCompat(mock_ctx)
+        compat.execute("INSERT INTO t VALUES (1); INSERT INTO t VALUES (2)")
+
+        assert [call.args[0] for call in mock_ctx.sql.call_args_list] == [
+            "INSERT INTO t VALUES (1)",
+            "INSERT INTO t VALUES (2)",
+        ]
+        assert mock_df.collect.call_count == 2
+
+    @patch("benchbox.platforms.datafusion.SessionContext")
     def test_working_dir_lock_lifecycle(self, mock_session_context):
         """Test working-dir lock supports reentrant acquire/release in one process."""
         with tempfile.TemporaryDirectory() as tmpdir:

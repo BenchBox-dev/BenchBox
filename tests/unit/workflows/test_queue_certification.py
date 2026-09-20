@@ -127,12 +127,14 @@ def _pr_routes(
     browser_jobs: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     routes: dict[str, object] = {
-        f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/pr.yml/runs": {"workflow_runs": runs},
+        f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fpr.yml/runs": {
+            "workflow_runs": runs
+        },
     }
     for run_id, jobs in jobs_by_run.items():
         routes[f"https://api.github.com/repos/{REPO}/actions/runs/{run_id}/jobs"] = {"jobs": jobs}
     routes[
-        f"https://api.github.com/repos/{REPO}/actions/workflows/.github/workflows/results-explorer-browser.yml/runs"
+        f"https://api.github.com/repos/{REPO}/actions/workflows/.github%2Fworkflows%2Fresults-explorer-browser.yml/runs"
     ] = {"workflow_runs": browser_runs or []}
     if browser_jobs is not None:
         routes[f"https://api.github.com/repos/{REPO}/actions/runs/777/jobs"] = {"jobs": browser_jobs}

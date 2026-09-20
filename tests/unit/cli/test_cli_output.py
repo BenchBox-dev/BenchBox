@@ -538,7 +538,7 @@ class TestResultExporter:
             data = json.load(f)
 
         assert data["result_schema_version"] == "2.2"
-        assert "version" not in data
+        assert data["version"] == "2.2"
         assert data["benchmark"]["id"] == "tpch"
         assert data["benchmark"]["name"] == "TPC-H"
 
@@ -570,7 +570,7 @@ class TestResultExporter:
             data = json.load(f)
 
         assert data["result_schema_version"] == "2.2"
-        assert "version" not in data
+        assert data["version"] == "2.2"
         assert data["benchmark"]["name"] == "TPC-H"
         assert data["platform"]["name"] == "duckdb"
 
@@ -889,8 +889,8 @@ class TestResultExporter:
 
         comparison = self.exporter.compare_results(baseline_path, current_path)
 
-        # Comparison proceeds but reports missing canonical version as unknown
-        assert comparison["baseline_version"] == "unknown"
+        # Comparison falls back to the legacy compatibility alias.
+        assert comparison["baseline_version"] == "2.2"
         assert comparison["current_version"] == "2.2"
 
     def test_export_comparison_report(self):

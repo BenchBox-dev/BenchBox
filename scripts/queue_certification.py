@@ -87,7 +87,8 @@ def _workflow_runs(
     urlopen: Callable[..., Any],
 ) -> list[dict[str, Any]]:
     query = urllib.parse.urlencode({"head_sha": sha, "event": "merge_group", "per_page": "30"})
-    payload = _api_get(f"actions/workflows/{workflow_file}/runs?{query}", repo, token, urlopen)
+    workflow_quoted = urllib.parse.quote(workflow_file, safe="")
+    payload = _api_get(f"actions/workflows/{workflow_quoted}/runs?{query}", repo, token, urlopen)
     runs = payload.get("workflow_runs")
     if not isinstance(runs, list):
         raise CertificationError(f"run listing for {workflow_file} has no workflow_runs list")
