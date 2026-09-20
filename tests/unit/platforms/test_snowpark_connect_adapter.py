@@ -575,6 +575,70 @@ class TestSnowparkConnectAdapterCLI:
         assert adapter.schema == "MY_SCHEMA"
         assert adapter.role == "MY_ROLE"
 
+    def test_from_config_forwards_force_recreate(self, mock_snowpark):
+        """Production construction via from_config must preserve the flag."""
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        base = {
+            "account": "xy12345.us-east-1",
+            "user": "test_user",
+            "password": "test_password",
+        }
+        assert SnowparkConnectAdapter.from_config({**base, "force_recreate": True}).force_recreate is True
+        assert SnowparkConnectAdapter.from_config({**base, "force": True}).force_recreate is True
+        assert SnowparkConnectAdapter.from_config(dict(base)).force_recreate is False
+
+    def test_load_data_csv_truncates_before_copy_when_forced(self, mock_snowpark, tmp_path):
+        """Forced CSV loads must TRUNCATE before COPY so reruns stay idempotent."""
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+            force_recreate=True,
+        )
+        table_file = tmp_path / "lineitem.tbl"
+        table_file.write_bytes(b"1|one|\n")
+        benchmark = MagicMock()
+        benchmark.get_table_loading_order.return_value = ["lineitem"]
+        mock_session = MagicMock()
+        mock_session.sql.return_value.collect.return_value = [(3,)]
+
+        table_stats, _, _ = adapter.load_data(benchmark, mock_session, Path(tmp_path))
+
+        assert table_stats == {"lineitem": 3}
+        statements = [str(call.args[0]) for call in mock_session.sql.call_args_list]
+        assert any("TRUNCATE TABLE lineitem" in sql for sql in statements)
+        assert any("COPY INTO" in sql and "FORCE = TRUE" in sql for sql in statements)
+        truncate_idx = next(i for sql in statements for i in [statements.index(sql)] if "TRUNCATE TABLE" in sql)
+        copy_idx = next(i for i, sql in enumerate(statements) if "COPY INTO" in sql)
+        assert truncate_idx < copy_idx
+
+    def test_load_data_csv_full_refresh_by_default(self, mock_snowpark, tmp_path):
+        """Default CSV loads are full refreshes: hygiene plus truncate and FORCE."""
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+        table_file = tmp_path / "lineitem.tbl"
+        table_file.write_bytes(b"1|one|\n")
+        benchmark = MagicMock()
+        benchmark.get_table_loading_order.return_value = ["lineitem"]
+        mock_session = MagicMock()
+        mock_session.sql.return_value.collect.return_value = [(3,)]
+
+        adapter.load_data(benchmark, mock_session, Path(tmp_path))
+
+        statements = [str(call.args[0]) for call in mock_session.sql.call_args_list]
+        assert any(sql.startswith("REMOVE ") for sql in statements)
+        assert any("PUT " in sql and "OVERWRITE = TRUE" in sql for sql in statements)
+        assert any("TRUNCATE TABLE lineitem" in sql for sql in statements)
+        assert any("COPY INTO" in sql and "FORCE = TRUE" in sql for sql in statements)
+
 
 class TestSnowparkConnectAdapterTuning:
     """Tests for tuning configuration."""

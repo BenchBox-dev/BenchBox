@@ -113,3 +113,17 @@ def test_skip_variants_are_excluded_not_executed_not_counted(havoc_benchmark):
     assert len(connection.executed) == 1 + (10 - len(skipped))
     keys = {d.key for d in divergences}
     assert keys.isdisjoint(skipped)
+
+
+def test_trailing_space_normalization_is_opt_in(havoc_benchmark):
+    connection = _RecordingConnection(rows=[("1-URGENT       ",)])
+
+    divergences = find_divergences(
+        connection,
+        havoc_benchmark,
+        lambda _q: "SELECT priority",
+        query_ids=[3],
+        char_padding_tolerance=True,
+    )
+
+    assert divergences == []
