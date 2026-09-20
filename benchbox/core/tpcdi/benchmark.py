@@ -421,7 +421,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     query_params.update(params)
                 return variant_sql.format(**query_params)
 
-            if platform in ("bigquery", "clickhouse") and query_id == "EQ7" and params is not None:
+            if (
+                platform in ("bigquery", "clickhouse", "databricks", "snowflake")
+                and query_id == "EQ7"
+                and params is not None
+            ):
                 query_params = self.query_manager.etl_queries._generate_default_params(query_id)
                 query_params.update(params)
                 default_params = self.query_manager.etl_queries._generate_default_params(query_id)
