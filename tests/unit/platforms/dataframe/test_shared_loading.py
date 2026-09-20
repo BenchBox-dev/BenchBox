@@ -12,7 +12,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from benchbox.platforms.dataframe.shared_loading import load_tables_from_data_source_impl
+from benchbox.platforms.dataframe.shared_loading import (
+    dialect_preserves_empty_strings,
+    load_tables_from_data_source_impl,
+    resolve_empty_string_restore_columns,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -162,3 +166,27 @@ class TestLoadTablesFromDataSourceImpl:
         adapter = MagicMock(spec=[])  # spec=[] prevents auto-creating platform_name
         with pytest.raises(AttributeError):
             load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("null_marker", "expected"),
+    [
+        (None, True),  # no NULL conversion: empty fields stay ''
+        ("", False),  # empty fields ARE null (TPC .tbl/.dat, JoinOrder)
+        ("__NULL__", True),  # only the sentinel is NULL; empty fields stay ''
+        ("NULL", True),  # any non-empty sentinel preserves empty strings
+    ],
+)
+def test_dialect_preserves_empty_strings(null_marker: str | None, expected: bool) -> None:
+    """Only '' maps empty CSV fields to NULL; None and sentinels preserve ''."""
+    assert dialect_preserves_empty_strings(null_marker) is expected
+
+
+def test_restore_columns_includes_sentinel_marker_columns() -> None:
+    """A non-empty null sentinel must not disable the '' restore (ClickBench __NULL__)."""
+    assert resolve_empty_string_restore_columns(["a", "b"], "__NULL__", ["a", "b", "c"]) == ["a", "b"]
+
+
+def test_restore_columns_skips_empty_marker_columns() -> None:
+    """The '' marker means empty fields are NULL, so no restore may run."""
+    assert resolve_empty_string_restore_columns(["a"], "", ["a"]) == []

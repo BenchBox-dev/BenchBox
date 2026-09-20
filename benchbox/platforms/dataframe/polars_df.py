@@ -44,6 +44,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
 
 logger = logging.getLogger(__name__)
 
@@ -272,9 +273,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: The SQL dialect's null marker. ``None`` means empty fields
-                stay '' in string columns (match DuckDB/pandas); ``""`` means empty
-                fields are NULL. (Trailing delimiters are handled natively by
+            null_marker: The SQL dialect's null marker. ``None`` (no NULL
+                conversion) or a non-empty sentinel (only the sentinel is NULL,
+                e.g. ClickBench's ``__NULL__``) means empty fields stay '' in
+                string columns (match DuckDB/pandas); ``""`` means empty fields
+                are NULL. (Trailing delimiters are handled natively by
                 truncate_ragged_lines.)
             string_columns: Accepted for expression-family parity; Polars applies
                 this via ``missing_utf8_is_empty_string`` for UTF-8 columns.
@@ -300,12 +303,12 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             # empty->null. Without this, a prefer_parquet=False load reintroduces the
             # empty-string->null divergence (the cross-surface Q6/Q17/Q18 bug) on the
             # Polars surface. Numeric columns always treat an empty field as null.
-            # This is the same null_marker-is-None decision that
+            # This is the same decision that
             # shared_loading.resolve_empty_string_restore_columns makes for every
             # other adapter; Polars applies it natively as a single scan_csv flag
             # (over all UTF-8 columns) instead of a per-column post-read restore, so
             # there is no post-hoc coercion step here to consolidate.
-            "missing_utf8_is_empty_string": null_marker is None,
+            "missing_utf8_is_empty_string": dialect_preserves_empty_strings(null_marker),
         }
 
         # Add row limit if specified

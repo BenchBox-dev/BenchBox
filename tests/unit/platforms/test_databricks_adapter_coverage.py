@@ -491,6 +491,11 @@ class TestLoadSingleTable:
 
         cursor = MagicMock()
         cursor.fetchone.return_value = (42,)
+        # DESCRIBE TABLE response, then COPY INTO result rows
+        cursor.fetchall.side_effect = [
+            [("id", "int", ""), ("amount", "decimal(8,2)", "")],
+            [("orders.parquet", "LOADED", "", 42, "", "")],
+        ]
         connection = MagicMock()
         benchmark = MagicMock()
         # Return no schema so column_list is empty
@@ -516,6 +521,9 @@ class TestLoadSingleTable:
         assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
         assert "ORDERS" in copy_sql
         assert "dbfs:/Volumes/main/bench/orders.parquet" in copy_sql
+        # Parquet loads cast through a SELECT to the Delta column types
+        assert "FILEFORMAT = PARQUET" in copy_sql
+        assert "CAST(`id` AS int)" in copy_sql
 
 
 # ---------------------------------------------------------------------------

@@ -344,10 +344,13 @@ def _assert_manifest_null_markers(tmp_path: Path, tables: dict[str, Path], bench
 
 
 def test_clickbench_generator_manifest_null_marker(tmp_path: Path) -> None:
-    """ClickBench dry-run manifest must resolve null_marker=None for hits.
+    """ClickBench dry-run manifest must resolve null_marker='__NULL__' for hits.
 
     Every hits column is NOT NULL, so empty string fields must load as ""
-    rather than NULL on every platform.
+    rather than NULL on every platform. A None marker leaves the decision
+    to each loader default, and the cloud defaults (BigQuery, Snowflake,
+    Databricks/Spark) map bare empties to NULL; only the sentinel converts
+    to NULL while empty fields stay empty strings.
     """
     from benchbox.core.clickbench.generator import ClickBenchDataGenerator
     from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
@@ -360,8 +363,8 @@ def test_clickbench_generator_manifest_null_marker(tmp_path: Path) -> None:
     assert source is not None, "DataSourceResolver returned None"
     for table, path in tables.items():
         dialect = resolve_csv_dialect(source, table, Path(path), benchmark)
-        assert dialect.null_marker is None, (
-            f"table {table!r}: expected null_marker is None to preserve empty strings, got {dialect.null_marker!r}"
+        assert dialect.null_marker == "__NULL__", (
+            f"table {table!r}: expected null_marker '__NULL__' to preserve empty strings, got {dialect.null_marker!r}"
         )
 
 

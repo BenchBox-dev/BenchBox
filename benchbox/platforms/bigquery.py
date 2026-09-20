@@ -1187,7 +1187,7 @@ class BigQueryAdapter(PlatformAdapter):
                     f"--scale {scale_factor} --compression gzip\n\n"
                     f"Or use uncompressed data (larger files, slower uploads):\n\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
-                    f"--scale {scale_factor} --no-compression\n"
+                    f"--scale {scale_factor} --compression none\n"
                 )
 
     def _create_storage_bucket(self) -> Any:
@@ -1665,16 +1665,68 @@ class BigQueryAdapter(PlatformAdapter):
             else:
                 table_name = table_name.upper()
             rest = match.group(2)
+            # BigQuery table identifiers are case-sensitive: normalize the
+            # table segment to UPPERCASE to match the adapter-wide convention
+            # used by loads, validation, row counts, and query qualification.
+            # Project and dataset segments keep their configured case.
             if f"{self.dataset_id}." not in table_name:
-                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
+                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name.upper()}`"
             elif not table_name.startswith("`"):
-                qualified_table = f"`{table_name}`"
+                *qualifier, bare = table_name.split(".")
+                qualified_table = "`" + ".".join([*qualifier, bare.upper()]) + "`"
             else:
                 qualified_table = table_name
             statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
         else:
             if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
                 statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+
+        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
+        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
+        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
+        # NUMERIC and inherits its limits.
+        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
+            precision, scale = int(match.group(2)), int(match.group(3))
+            if scale > 9 or precision > 38:
+                return f"BIGNUMERIC({precision},{scale})"
+            return match.group(0)
+
+        statement = re.sub(
+            r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            _decimal_to_bignumeric,
+            statement,
+            flags=re.IGNORECASE,
+        )
+
+        # BigQuery rejects enforced PRIMARY KEY; it only supports informational
+        # NOT ENFORCED table constraints. Convert inline column PRIMARY KEYs
+        # (e.g. JoinOrder's `id INTEGER PRIMARY KEY`) to a table constraint.
+        _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
+        pk_cols = [
+            name
+            for name in re.findall(
+                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
+                r"PRIMARY\s+KEY(?!\s*\()",
+                rest if match else statement,
+                flags=re.IGNORECASE | re.MULTILINE,
+            )
+            if name.upper() not in _pk_keywords
+        ]
+        if match:
+            rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
+            if pk_cols:
+                depth = 0
+                for i, ch in enumerate(rest):
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            rest = rest[:i] + f", PRIMARY KEY ({', '.join(pk_cols)}) NOT ENFORCED" + rest[i:]
+                            break
+            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+        else:
+            statement = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", statement, flags=re.IGNORECASE)
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in statement.upper() and self.partitioning_field:
@@ -1686,6 +1738,48 @@ class BigQueryAdapter(PlatformAdapter):
 
         return statement
 
+    # Fallback table list when query parsing is unavailable. Covers TPC-H;
+    # parser-extracted names handle every other benchmark.
+    _FALLBACK_QUALIFY_TABLES = (
+        "REGION",
+        "NATION",
+        "CUSTOMER",
+        "SUPPLIER",
+        "PART",
+        "PARTSUPP",
+        "ORDERS",
+        "LINEITEM",
+    )
+
+    def _extract_unqualified_tables(self, query: str) -> list[str] | None:
+        """Return UPPERCASE names of unqualified tables referenced by the query.
+
+        Returns None when the query cannot be parsed, so the caller can fall
+        back to the static table list. CTE names and already-qualified
+        references are excluded.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return None
+        try:
+            tree = sqlglot.parse_one(query)
+        except Exception:
+            return None
+        if tree is None:
+            return None
+        cte_names = {cte.alias_or_name.upper() for cte in tree.find_all(exp.CTE)}
+        tables: list[str] = []
+        for table in tree.find_all(exp.Table):
+            if table.db or table.catalog:
+                continue
+            name = (table.name or "").upper()
+            if not name or name in cte_names or name in tables:
+                continue
+            tables.append(name)
+        return tables
+
     def _qualify_table_names(self, query: str) -> str:
         """Add full qualification to table names in query.
 
@@ -1693,28 +1787,47 @@ class BigQueryAdapter(PlatformAdapter):
         Queries processed by sqlglot with identify=True should skip this method to avoid
         conflicts with backtick-quoted identifiers. When default_dataset is configured,
         BigQuery automatically resolves unqualified table names.
+
+        Table names are extracted with a SQL parser so benchmarks beyond TPC-H
+        resolve; BigQuery table identifiers are case-sensitive, so every name
+        is normalized to UPPERCASE to match created tables. Falls back to the
+        static TPC-H list when parsing is unavailable.
+
+        Only occurrences in table position (after FROM / JOIN or a
+        comma-separated FROM item) are rewritten: string literals and comments
+        are masked first, so same-named columns, aliases, and literal text are
+        left alone.
         """
-        # Simple table name qualification - could be with proper SQL parsing
-        table_names = [
-            "REGION",
-            "NATION",
-            "CUSTOMER",
-            "SUPPLIER",
-            "PART",
-            "PARTSUPP",
-            "ORDERS",
-            "LINEITEM",
-        ]
+        import re
+
+        table_names = self._extract_unqualified_tables(query)
+        if table_names is None:
+            table_names = list(self._FALLBACK_QUALIFY_TABLES)
+
+        # Blank string literals and comments length-preservingly so matches
+        # found in the masked copy align with the original query.
+        literal_pattern = r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/"
+
+        def _mask(text: str) -> str:
+            return re.sub(literal_pattern, lambda match: " " * len(match.group(0)), text, flags=re.DOTALL)
+
+        masked = _mask(query)
 
         for table_name in table_names:
             # Replace unqualified table names
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
 
-            # Simple replacement - in production would use proper SQL parser
-            import re
-
-            pattern = rf"\b{table_name}\b"
-            query = re.sub(pattern, qualified_name, query, flags=re.IGNORECASE)
+            pattern = rf"(\bFROM\s+|\bJOIN\s+|,\s*)({re.escape(table_name)})\b"
+            segments: list[str] = []
+            last = 0
+            for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
+                name_start, name_end = match.span(2)
+                segments.append(query[last:name_start])
+                segments.append(qualified_name)
+                last = name_end
+            segments.append(query[last:])
+            query = "".join(segments)
+            masked = _mask(query)
 
         return query
 

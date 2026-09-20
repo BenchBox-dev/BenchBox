@@ -2063,6 +2063,25 @@ class DatabricksAdapter(PlatformAdapter):
             dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
         ).delimiter
 
+    def _resolve_copy_dialect(self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None):
+        """Resolve Databricks COPY INTO CSV dialect through the shared pipeline."""
+        from benchbox.platforms.base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
+
+        dialect_source = data_source or DataSource(source_type="databricks_copy_into", tables={})
+        return resolve_csv_dialect(
+            dialect_source, table_name, file_path, benchmark if benchmark is not None else NO_BENCHMARK
+        )
+
+    def _resolve_csv_null_marker(
+        self, data_source: Any, table_name: str, file_path: Path, benchmark: Any | None
+    ) -> str | None:
+        """Resolve Databricks COPY INTO null marker through the shared CSV dialect pipeline.
+
+        Returns None when the dialect carries no marker, in which case COPY INTO
+        keeps its default empty-field handling.
+        """
+        return self._resolve_copy_dialect(data_source, table_name, file_path, benchmark).null_marker
+
     def _get_column_list_for_table(self, benchmark, table_name: str) -> str:
         """Get explicit column mapping from benchmark schema for COPY INTO."""
         if not hasattr(benchmark, "get_schema"):
@@ -2086,6 +2105,26 @@ class DatabricksAdapter(PlatformAdapter):
         except Exception as e:
             self.log_very_verbose(f"Could not get column list for {table_name}: {e}")
         return ""
+
+    def _parquet_cast_select(self, cursor: Any, table_name_upper: str) -> str:
+        """Build a SELECT list casting Parquet fields to the Delta column types.
+
+        Reads the target types from DESCRIBE TABLE so Parquet/Delta type
+        mismatches (e.g. int64 fields into INT columns) load without a
+        DELTA_FAILED_TO_MERGE_FIELDS error. Partition-metadata rows emitted
+        by DESCRIBE are skipped.
+        """
+        cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
+        items = []
+        for row in cursor.fetchall():
+            col = str(row[0]) if len(row) > 0 else ""
+            dtype = str(row[1]) if len(row) > 1 else ""
+            if not col or col.startswith("#") or not dtype or dtype.startswith("#"):
+                continue
+            items.append(f"CAST(`{col}` AS {dtype}) AS `{col}`")
+        if not items:
+            raise RuntimeError(f"DESCRIBE TABLE {table_name_upper} returned no columns for Parquet cast SELECT")
+        return ", ".join(items)
 
     def _load_single_table(
         self,
@@ -2117,16 +2156,50 @@ class DatabricksAdapter(PlatformAdapter):
             benchmark=benchmark,
         )
         column_list = self._get_column_list_for_table(benchmark, table_name)
+        # Mirror the dialect-path derivation in _resolve_file_uri_and_delimiter so
+        # the null marker resolves for the same file the delimiter came from.
+        if isinstance(file_path, list) and file_path:
+            null_dialect_path = Path(self._path_name(file_path[0]))
+        else:
+            null_dialect_path = Path(filename.replace(".*", ""))
+        null_marker = self._resolve_csv_null_marker(
+            data_source, table_name or null_dialect_path.stem, null_dialect_path, benchmark
+        )
+        format_options = f"'delimiter'='{delimiter}', 'header'='false'"
+        if null_marker:
+            # A truthy marker means only that literal is NULL, so empty fields
+            # stay empty strings. Falsy markers keep COPY INTO defaults.
+            sentinel = null_marker.replace("'", "''")
+            format_options += f", 'nullValue'='{sentinel}'"
+
         copy_sources = self._expand_copy_sources(file_path, stage_root, file_uri)
         if len(copy_sources) > 1:
             self.log_verbose(f"Loading {table_name_upper} from {len(copy_sources)} shard files")
 
+        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the CSV
+        # COPY path. Parquet field types need not match the Delta DDL (IMDb
+        # integers are int64 while the schema says INTEGER/INT), so load
+        # through a SELECT that casts every field to the target column type
+        # read from DESCRIBE TABLE. Column lists and CSV format options apply
+        # to delimited text only.
+        is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
+        parquet_select = ""
+        if is_parquet:
+            self.log_very_verbose(f"Using PARQUET file format for {table_name_upper}")
+            parquet_select = self._parquet_cast_select(cursor, table_name_upper)
+
         copy_time = 0.0
         for source_uri in copy_sources:
-            copy_sql = (
-                f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
-                f"FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='{delimiter}', 'header'='false')"
-            )
+            if is_parquet:
+                copy_sql = (
+                    f"COPY INTO {table_name_upper} FROM (SELECT {parquet_select} FROM '{source_uri}') "
+                    f"FILEFORMAT = PARQUET"
+                )
+            else:
+                copy_sql = (
+                    f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                )
             copy_start = mono_time()
             cursor.execute(copy_sql)
             copy_time += elapsed_seconds(copy_start)

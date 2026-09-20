@@ -391,3 +391,43 @@ class TestGeneratorExtended:
 
         # Basic test
         assert generator is not None
+
+    def test_quote_clickbench_field_matches_minimal_except_empties(self, temp_dir):
+        """Custom quoting mirrors csv.QUOTE_MINIMAL, quoting only empties extra."""
+        import csv as csv_module
+        import io
+
+        from benchbox.core.clickbench.generator import format_clickbench_row, quote_clickbench_field
+
+        assert quote_clickbench_field("") == '""'
+        assert quote_clickbench_field(None) == '""'
+        assert quote_clickbench_field(0) == "0"
+        assert quote_clickbench_field(42) == "42"
+        assert quote_clickbench_field("plain") == "plain"
+        assert quote_clickbench_field("a|b") == '"a|b"'
+        assert quote_clickbench_field('say "hi"') == '"say ""hi"""'
+        assert quote_clickbench_field("l1\nl2") == '"l1\nl2"'
+
+        # A joined row must round-trip through the stdlib parser to identical values.
+        tricky = ["", "x", 7, "a|b", 'q"q', "l1\nl2", "trail ", "  lead", "__NULL__"]
+        mine = [quote_clickbench_field(v) for v in tricky]
+        parsed = next(csv_module.reader(io.StringIO("|".join(mine)), delimiter="|"))
+        assert parsed == ["", "x", "7", "a|b", 'q"q', "l1\nl2", "trail ", "  lead", "__NULL__"]
+
+        assert format_clickbench_row(["a", "", 3]) == 'a|""|3\r\n'
+
+    def test_manifest_records_null_sentinel(self, temp_dir):
+        """Generated manifest must carry the __NULL__ load contract."""
+        import json
+
+        generator = ClickBenchDataGenerator(output_dir=temp_dir)
+        data_file = temp_dir / "hits.csv.gz"
+        data_file.write_bytes(b"placeholder")
+        generator._table_row_counts = {"hits": 1}
+
+        generator._write_manifest({"hits": data_file})
+
+        manifest = json.loads((temp_dir / "_datagen_manifest.json").read_text())
+        metadata = manifest["tables"]["hits"]["formats"]["tbl"][0]["metadata"]
+        assert metadata["csv_delimiter"] == "|"
+        assert metadata["csv_null_marker"] == "__NULL__"

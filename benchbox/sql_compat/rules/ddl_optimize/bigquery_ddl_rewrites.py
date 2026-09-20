@@ -19,8 +19,13 @@ register_ddl_rewrite(
     rule_name="convert_to_bigquery_table",
     transformer_id="bigquery_convert_to_bigquery_table",
     description="Convert DuckDB-style CREATE TABLE to BigQuery DDL: CREATE OR REPLACE TABLE, "
-    "project.dataset table qualification, and optional PARTITION BY / CLUSTER BY clauses.",
+    "project.dataset table qualification, DECIMAL/NUMERIC(p,s) exceeding NUMERIC limits rewritten "
+    "to BIGNUMERIC, inline PRIMARY KEY converted to a NOT ENFORCED table constraint, "
+    "and optional PARTITION BY / CLUSTER BY clauses.",
     reason="BigQuery DDL runs in a project/dataset namespace and benchmark schema creation must be "
-    "idempotent across repeated runs. Optional partitioning and clustering clauses are appended "
-    "from adapter configuration because DuckDB DDL does not emit BigQuery storage layout hints.",
+    "idempotent across repeated runs. DECIMAL is only an alias for NUMERIC (scale capped at 9), so "
+    "columns such as DECIMAL(18,14) latitude/longitude must become BIGNUMERIC. BigQuery rejects "
+    "enforced PRIMARY KEY, so inline column keys (e.g. JoinOrder) become PRIMARY KEY NOT ENFORCED "
+    "table constraints. Optional partitioning and clustering clauses are appended from adapter "
+    "configuration because DuckDB DDL does not emit BigQuery storage layout hints.",
 )

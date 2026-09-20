@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -947,6 +948,7 @@ class SnowflakeAdapter(PlatformAdapter):
             ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
             REPLACE_INVALID_CHARACTERS = TRUE
             EMPTY_FIELD_AS_NULL = TRUE
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             COMPRESSION = '{self.compression}'
         """)
         cursor.execute(f"""
@@ -958,6 +960,7 @@ class SnowflakeAdapter(PlatformAdapter):
             ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
             REPLACE_INVALID_CHARACTERS = TRUE
             EMPTY_FIELD_AS_NULL = TRUE
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             COMPRESSION = '{self.compression}'
         """)
 
@@ -982,6 +985,47 @@ class SnowflakeAdapter(PlatformAdapter):
         self.log_very_verbose(f"Using CSV file format for {table_name}")
         return f"{self.schema}.BENCHBOX_CSV_FORMAT"
 
+    def _ensure_preserve_file_format(
+        self,
+        cursor: Any,
+        table_name: str,
+        first_file: Path,
+        data_source: DataSource,
+        benchmark: Any,
+    ) -> str | None:
+        """Create and return a per-dialect file format preserving empty strings.
+
+        Returns the qualified format name when the resolved dialect carries a
+        truthy null-marker sentinel: only that literal loads as NULL while
+        empty fields stay empty strings (required by NOT NULL schemas such as
+        ClickBench). Returns None otherwise so the caller keeps the static
+        CSV/TBL format choice.
+        """
+        dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
+        if not dialect.null_marker:
+            return None
+        key = f"{dialect.delimiter}\x1f{dialect.null_marker}\x1f{int(dialect.has_header)}\x1f{self.compression}"
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12].upper()
+        format_name = f"{self.schema}.BENCHBOX_DYN_{digest}"
+        delimiter = dialect.delimiter.replace("'", "''")
+        marker = dialect.null_marker.replace("'", "''")
+        skip_header = 1 if dialect.has_header else 0
+        self.log_very_verbose(f"Ensuring preserve-empty-strings file format {format_name} for {table_name}")
+        cursor.execute(f"""
+            CREATE FILE FORMAT IF NOT EXISTS {format_name}
+            TYPE = 'CSV'
+            FIELD_DELIMITER = '{delimiter}'
+            RECORD_DELIMITER = '\\n'
+            SKIP_HEADER = {skip_header}
+            ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
+            REPLACE_INVALID_CHARACTERS = TRUE
+            EMPTY_FIELD_AS_NULL = FALSE
+            NULL_IF = ('{marker}')
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+            COMPRESSION = '{self.compression}'
+        """)
+        return format_name
+
     def _parse_copy_results(self, copy_results: list[Any]) -> None:
         """Log per-file COPY INTO warnings while tolerating parse failures."""
         for row in copy_results:
@@ -1002,6 +1046,24 @@ class SnowflakeAdapter(PlatformAdapter):
             error_msg = str(row[5]) if len(row) > 5 and row[5] else "No error message provided"
             self.logger.warning(f"File {file_name} status: {status}, loaded {loaded} rows. Error: {error_msg}")
 
+    def _count_existing_rows(self, cursor: Any, target_table: str, table_name: str) -> int:
+        """Return the row count of an already-created target table, else 0."""
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+        except Exception:
+            try:
+                cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
+            except Exception:
+                return 0
+        try:
+            row = cursor.fetchone()
+        except Exception:
+            return 0
+        try:
+            return int(row[0]) if row else 0
+        except (ValueError, TypeError):
+            return 0
+
     def _load_table_from_stage(
         self,
         cursor: Any,
@@ -1015,6 +1077,15 @@ class SnowflakeAdapter(PlatformAdapter):
         stage_name = f"@%{table_name_upper}"
         target_table = table_name_upper
         self.log_very_verbose(f"Using stage: {stage_name}")
+
+        # Idempotent reruns: schema creation is skipped when tables already
+        # hold data, so the load must also be skipped or every rerun appends
+        # a full duplicate copy (observed as exactly 2x/3x row counts when
+        # two agents share a deterministic database name).
+        existing_rows = self._count_existing_rows(cursor, target_table, table_name)
+        if existing_rows > 0:
+            self.logger.info(f"Skipping load for {target_table}: already holds {existing_rows:,} rows")
+            return existing_rows
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_msg = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1031,11 +1102,23 @@ class SnowflakeAdapter(PlatformAdapter):
 
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
-        file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the
+        # CSV named formats: load with an inline Parquet format. Column
+        # matching is a COPY-level parameter (MATCH_BY_COLUMN_NAME), not a
+        # FILE_FORMAT option; case-insensitive matching bridges UPPERCASE
+        # tables and lowercase Parquet fields.
+        is_parquet = str(valid_files[0]).lower().endswith(".parquet")
+        if is_parquet:
+            file_format_clause = "FILE_FORMAT = (TYPE = 'PARQUET') MATCH_BY_COLUMN_NAME = 'CASE_INSENSITIVE'"
+        else:
+            file_format = self._ensure_preserve_file_format(cursor, table_name, valid_files[0], ds, bm)
+            if file_format is None:
+                file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+            file_format_clause = f"FILE_FORMAT = (FORMAT_NAME = '{file_format}')"
         copy_command = f"""
             COPY INTO {target_table}
             FROM {stage_name}
-            FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+            {file_format_clause}
             ON_ERROR = 'CONTINUE'
             PURGE = TRUE
         """
@@ -1048,7 +1131,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 copy_command = f"""
                     COPY INTO {target_table}
                     FROM {stage_name}
-                    FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+                    {file_format_clause}
                     ON_ERROR = 'CONTINUE'
                     PURGE = TRUE
                 """
@@ -1349,12 +1432,11 @@ class SnowflakeAdapter(PlatformAdapter):
 
         Makes tables idempotent by using CREATE OR REPLACE TABLE, and
         uppercases quoted identifiers. DDL translation quotes source-case
-        names, so TPC-DS tables would otherwise be created as quoted
-        lowercase ("store_sales") while queries, COPY targets, and
-        validation probes reference the folded uppercase name
-        (STORE_SALES). Uppercasing quoted identifiers keeps both spellings
-        resolving to the same table. Single-quoted string literals are
-        left untouched.
+        names, so tables would otherwise be created as quoted lowercase
+        ("hits", "store_sales") while queries, COPY targets, and validation
+        probes reference the folded uppercase name (HITS, STORE_SALES).
+        Uppercasing quoted identifiers keeps both spellings resolving to the
+        same table. Single-quoted string literals are left untouched.
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
@@ -1368,7 +1450,13 @@ class SnowflakeAdapter(PlatformAdapter):
 
         import re
 
-        statement = re.sub(r'"([^"]+)"', lambda m: m.group(0).upper(), statement)
+        # Uppercase double-quoted identifiers outside single-quoted string
+        # literals (DEFAULT '...', COMMENT '...'), which may themselves
+        # contain double quotes that must be preserved verbatim.
+        parts = re.split(r"('(?:[^']|'')*')", statement)
+        for index in range(0, len(parts), 2):
+            parts[index] = re.sub(r'"([^"]+)"', lambda m: m.group(0).upper(), parts[index])
+        statement = "".join(parts)
 
         return statement
 

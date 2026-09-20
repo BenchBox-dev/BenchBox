@@ -60,14 +60,17 @@ def write_delimited_manifest(
     has_header: bool = False,
     null_marker: str | None = None,
     normalize_booleans: bool = False,
+    quote: str | None = None,
 ) -> None:
     """Write a generator manifest with CSV-dialect metadata for delimited files.
 
     Shorthand for :func:`write_generator_manifest` covering the common
     pipe/comma-delimited case (AMPLab, ClickBench, vector_search): every table
-    entry records the same delimiter, header, null-marker, and boolean
+    entry records the same delimiter, header, null-marker, boolean, and quote
     contract. ``null_marker=""`` means empty fields load as NULL;
-    ``None`` preserves empty strings.
+    ``None`` preserves empty strings. ``quote`` records the field quote
+    character when files contain quoted fields (e.g. quoted empty strings);
+    ``None`` records no quote metadata.
     """
     write_generator_manifest(
         generator,
@@ -79,5 +82,6 @@ def write_delimited_manifest(
             "csv_has_header": has_header,
             "csv_null_marker": null_marker,
             "csv_normalize_booleans": normalize_booleans,
+            "csv_quote": quote,
         },
     )
