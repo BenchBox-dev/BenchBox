@@ -6421,15 +6421,10 @@
       "title": "Split ClickHouse into first-class clickhouse-local, clickhouse-server, and clickhouse-cloud platforms"
     },
     "first-live-cloud-benchmark-run-and-publish": {
-      "claim": {
-        "expires_at": "2026-09-21T15:15:12Z",
-        "generation": "33f48ab8298f4a89b4e9d458c56c3e20",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:b3bad2bf5002f6c40a1a7768"
-      },
+      "claim": null,
       "needs": [],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Run and publish the first live cloud-warehouse benchmark results (Snowflake, Databricks, BigQuery)"
     },
     "fix-ascii-visualization-regressions": {
