@@ -1,7 +1,7 @@
 ---
 develop_sha: 2eb03f3e67ec8f7f1347738f29696fa39ed5f526
-measured_at_sha: d3be003b8203154dbadc13d169ff8af4c5e3b96d
-checked_sha: d3be003b8203154dbadc13d169ff8af4c5e3b96d
+measured_at_sha: dd20aed2d53a87a4c34ae74c73a187cfa9bf3c5e
+checked_sha: dd20aed2d53a87a4c34ae74c73a187cfa9bf3c5e
 ---
 
 # Remediation contract evidence
@@ -97,7 +97,22 @@ paths:
   confirmed remote journal head; `test_corrupt_journal_fails_closed` rejects
   missing or invalid persistence state.
 
-The prescribed pipeline and publication seam replay passed 109 tests after
+## Prescribed replay command
+
+At `checked_sha` (`dd20aed2d53a87a4c34ae74c73a187cfa9bf3c5e`), the prescribed
+replay was:
+
+```bash
+uv run -- python -m pytest \
+  tests/unit/scripts/explorer_pipeline/test_pipeline.py \
+  tests/unit/scripts/publication/test_transaction.py \
+  tests/unit/scripts/publication/test_journal.py -q
+```
+
+The clean detached-worktree result was `111 passed`. The command and pinned
+SHA define the replay; the aggregate count is summary evidence only.
+
+The prescribed pipeline and publication seam replay passed 111 tests after
 the end-to-end cohort consumer control was added. Re-run the cited nodes after
 any source or consumer change; a passing aggregate count is not acceptance of
 the collective claim.
