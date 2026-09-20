@@ -1368,8 +1368,11 @@ class ResultCaptureMixin:
                 "actual": actual_row_count,
             }
 
-            # Correct SKIP vs PASSED vs FAILED mapping
-            if validation_result.validation_mode == ValidationMode.SKIP:
+            # Correct SKIP vs PASSED vs FAILED mapping. SKIP means unevaluated
+            # and only applies to valid results: an invalid result (evaluated
+            # and failed, or failed-to-evaluate after a provider error) must
+            # surface as FAILED with its message, never as SKIPPED/SUCCESS.
+            if validation_result.validation_mode == ValidationMode.SKIP and validation_result.is_valid:
                 row_count_validation["status"] = "SKIPPED"
                 if validation_result.warning_message:
                     row_count_validation["warning"] = validation_result.warning_message
