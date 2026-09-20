@@ -36,20 +36,12 @@ TPCDS_MIN_SUBSCALE: float = 0.001
 
 
 def classify_tpcds_run(scale_factor: float, *, official: bool = False) -> TpcdsComplianceClass:
-    """Return the compliance class for a TPC-DS run at *scale_factor*.
+    """Compliance class for a TPC-DS run; shared official-scale shape, TPC-DS points/enum."""
+    from benchbox.core.tpc_patterns import classify_official_scale_run
 
-    Args:
-        scale_factor: The requested TPC-DS scale factor (> 0).
-        official: True when the caller is running in ``--official`` mode.
-
-    Returns:
-        The appropriate :class:`TpcdsComplianceClass` value.
-    """
-    if scale_factor < 1.0:
-        return TpcdsComplianceClass.UNOFFICIAL_SUBSCALE
-    if official and scale_factor in OFFICIAL_SCALE_POINTS:
-        return TpcdsComplianceClass.OFFICIAL
-    return TpcdsComplianceClass.UNOFFICIAL_NONSTANDARD
+    return classify_official_scale_run(
+        scale_factor, official=official, scale_points=OFFICIAL_SCALE_POINTS, compliance_enum=TpcdsComplianceClass
+    )
 
 
 def validate_tpcds_scale(

@@ -91,6 +91,9 @@ class ExportParitySqlBenchmark(BaseBenchmark):
         self._name = "TPC-H"
         super().__init__(scale_factor=0.01, output_dir=output_dir)
         self.tables = {}
+        # Mirror the classification a real SF=0.01 TPC-H benchmark carries so
+        # the cross-mode contract covers the compliance field both surfaces emit.
+        self.compliance_class = "unofficial_subscale"
 
     def generate_data(self) -> list[Path]:
         return []
