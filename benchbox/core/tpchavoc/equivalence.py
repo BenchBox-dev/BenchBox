@@ -593,6 +593,36 @@ def run_duckdb_gate() -> int:
     )
 
 
+def _run_single_dialect_divergences(
+    connection: Any,
+    tpchavoc: TPCHavocBenchmark,
+    tpch: TPCH,
+    *,
+    dialect: str,
+    skips: Collection[str],
+    query_ids: list[int] | None = None,
+    execute_transform: Callable[[str], str] | None = None,
+    strip_trailing_spaces: bool = False,
+) -> list[Divergence]:
+    """Run an engine sweep whose canonical and variant SQL share one dialect.
+
+    Shared seam for the single-dialect engine wrappers (PostgreSQL,
+    ClickHouse): both sides go through the same translation, so shared
+    translation cancels out, and engine-specific skip sets are excluded
+    (never marked equivalent).
+    """
+    return find_divergences(
+        connection,
+        tpchavoc,
+        lambda q: tpch.get_query(q, dialect=dialect),
+        query_ids=query_ids,
+        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", dialect),
+        skip_variants=set(skips),
+        execute_transform=execute_transform,
+        strip_trailing_spaces=strip_trailing_spaces,
+    )
+
+
 def find_postgres_divergences(
     connection: Any,
     tpchavoc: TPCHavocBenchmark,
@@ -610,13 +640,13 @@ def find_postgres_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
-    return find_divergences(
+    return _run_single_dialect_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=POSTGRES_TARGET_DIALECT),
+        tpch,
+        dialect=POSTGRES_TARGET_DIALECT,
+        skips=POSTGRES_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", POSTGRES_TARGET_DIALECT),
-        skip_variants=set(POSTGRES_TPCHAVOC_SKIPS),
         strip_trailing_spaces=True,
     )
 
@@ -962,13 +992,13 @@ def find_clickhouse_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 
-    return find_divergences(
+    return _run_single_dialect_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=CLICKHOUSE_TARGET_DIALECT),
+        tpch,
+        dialect=CLICKHOUSE_TARGET_DIALECT,
+        skips=CLICKHOUSE_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", CLICKHOUSE_TARGET_DIALECT),
-        skip_variants=set(CLICKHOUSE_TPCHAVOC_SKIPS),
         execute_transform=_clickhouse_execute_transform,
     )
 

@@ -818,6 +818,12 @@ ignore_rules = [
     # CLI tuning defaults display commands are intentionally duplicated UX pathways
     { function_names = ["show_defaults"], path_contains = ["benchbox/cli/commands/df_tuning.py", "benchbox/cli/commands/tuning_group.py"] },
 
+    # TPC-Havoc single-dialect engine sweep entry points - thin delegations over
+    # _run_single_dialect_divergences that must remain distinct public names for
+    # the CLI samples and engine integration tests. Shared invocation logic is
+    # consolidated in the helper; residual similarity is adapter arity, not logic.
+    { function_names = ["find_postgres_divergences", "find_clickhouse_divergences"], path_contains = ["benchbox/core/tpchavoc/equivalence.py"] },
+
     # --- Boilerplate ignore rules added 2026-02-21 (groups G1-G28 from duplicate-check triage) ---
 
     # G8,G9,G11,G22: Protocol/ABC abstract method stubs across dataframe type hierarchy
