@@ -618,6 +618,161 @@ def count_executed_cells(
     return coverage
 
 
+def _dtype_category(dtype: Any) -> str:
+    """Map an Arrow or Polars dtype to a coarse comparison category.
+
+    One spelling table covers both engines: their spellings are disjoint and
+    no spelling maps to different categories per engine, so a single pass
+    classifies both (widths and engine spellings ignored).
+    """
+    text = str(dtype).lower()
+    if text.startswith(("int", "uint")):
+        return "integer"
+    if text.startswith(("float", "double", "halffloat")):
+        return "float"
+    if text.startswith("decimal"):
+        return "decimal"
+    if text in ("string", "large_string", "utf8", "large_utf8", "string_view", "utf8_view"):
+        return "string"
+    if text in ("bool", "boolean"):
+        return "boolean"
+    if text.startswith(("date", "timestamp", "datetime", "time", "duration", "interval", "month_day_nano")):
+        return "temporal"
+    if text.startswith(("list", "large_list", "fixed_size_list", "array", "struct", "map")):
+        return "nested"
+    if text == "null":
+        return "null"
+    if text.startswith(("binary", "large_binary")):
+        return "binary"
+    return f"other:{text}"
+
+
+def _dtype_categories_equivalent(reference: str, candidate: str) -> bool:
+    """Whether two dtype categories acceptably describe the same column.
+
+    Exact category match, plus the one documented loader mapping: the
+    production DataFrame loader casts DECIMAL source columns to DOUBLE, so a
+    decimal SQL result legitimately arrives as a float frame column.
+    """
+    if reference == candidate:
+        return True
+    # Ordered, not symmetric: only a SQL decimal legitimately arrives as a
+    # frame float. The reverse (SQL float, frame decimal) is the wrong-dtype
+    # regression this cell exists to catch, so a set comparison would mask it.
+    return reference == "decimal" and candidate == "float"
+
+
+def _frame_polars_categories(result: Any) -> list[str] | None:
+    """Return ordered dtype categories for a Polars-schema frame, else None.
+
+    Unwraps the same result shapes :func:`materialize_rows` accepts
+    (``UnifiedLazyFrame`` wrappers, lazy or eager Polars frames) without
+    materializing rows. Returns None for frames without a Polars-style
+    ``schema`` mapping (notably Pandas results, whose numpy/object dtypes carry
+    no reliable type signal and stay covered by value comparison instead).
+    """
+    native = getattr(result, "native", result)
+    if hasattr(native, "collect"):
+        native = native.collect()
+    schema = getattr(native, "schema", None)
+    if schema is None:
+        return None
+    values = schema.values() if hasattr(schema, "values") else schema
+    return [_dtype_category(dtype) for dtype in values]
+
+
+def find_cross_surface_dtype_divergences(
+    connection: Any,
+    *,
+    query_ids: Iterable[Any],
+    reference_sql: Callable[[Any], str],
+    dataframe_query: Callable[[Any], Any],
+    contexts: dict[str, Any],
+    backends: tuple[str, ...] = ("expression",),
+    skip_keys: frozenset[str] = frozenset(),
+    skip_query_ids: frozenset[Any] = frozenset(),
+) -> tuple[list[SurfaceDivergence], dict[str, int]]:
+    """Compare each cell's frame column dtypes against the SQL reference types.
+
+    Value comparison normalizes scalars (Decimal to float, timestamps to
+    strings), so a column that arrives with the wrong dtype but equal-looking
+    values - the TEXT->null / TIMESTAMP->string loader bugs the value gate
+    caught - passes silently. This cell compares dtype *categories* (widths and
+    engine spellings ignored) per result column instead.
+
+    Only backends with typed frames participate (the Polars expression family);
+    Pandas results use numpy/object dtypes with no reliable type signal and
+    stay covered by value comparison. Cells without an impl are skipped, cells
+    in ``skip_keys`` (classified value divergences) and queries in
+    ``skip_query_ids`` (vacuous references whose empty frames cannot carry
+    dtypes) are skipped by the caller. Anything else that cannot be compared -
+    a failing reference, a failing frame build, an untyped frame, a width or
+    category mismatch - is returned as a divergence, never silently passed.
+
+    Returns:
+        Tuple of (divergences, compared counts per backend).
+    """
+    divergences: list[SurfaceDivergence] = []
+    compared = dict.fromkeys(backends, 0)
+    for query_id in query_ids:
+        if query_id in skip_query_ids:
+            continue
+        try:
+            # fetch_arrow_table() (not .arrow()) so the result is a
+            # materialized pyarrow.Table on every DuckDB version, matching the
+            # loader path in dataframe_surface.
+            reference_schema = connection.execute(reference_sql(query_id)).fetch_arrow_table().schema
+        except Exception as exc:
+            divergences.append(SurfaceDivergence(query_id=query_id, cell="reference", detail=f"error: {exc}"))
+            continue
+        reference_categories = [_dtype_category(field.type) for field in reference_schema]
+        query = dataframe_query(query_id)
+        for backend in backends:
+            key = f"{query_id}_{backend}"
+            if key in skip_keys:
+                continue
+            impl = query.get_impl_for_family(backend)
+            if impl is None:
+                continue
+            try:
+                candidate_categories = _frame_polars_categories(impl(contexts[backend]))
+            except Exception as exc:
+                divergences.append(SurfaceDivergence(query_id=query_id, cell=backend, detail=f"error: {exc}"))
+                continue
+            if candidate_categories is None:
+                divergences.append(
+                    SurfaceDivergence(
+                        query_id=query_id,
+                        cell=backend,
+                        detail="error: frame has no Polars-style schema to compare",
+                    )
+                )
+                continue
+            compared[backend] += 1
+            if len(candidate_categories) != len(reference_categories):
+                divergences.append(
+                    SurfaceDivergence(
+                        query_id=query_id,
+                        cell=backend,
+                        detail=(
+                            "dtype width mismatch: reference has "
+                            f"{len(reference_categories)} columns, frame has {len(candidate_categories)}"
+                        ),
+                    )
+                )
+                continue
+            for index, (reference, candidate) in enumerate(zip(reference_categories, candidate_categories)):
+                if not _dtype_categories_equivalent(reference, candidate):
+                    divergences.append(
+                        SurfaceDivergence(
+                            query_id=query_id,
+                            cell=backend,
+                            detail=(f"dtype mismatch at column {index}: reference {reference}, frame {candidate}"),
+                        )
+                    )
+    return divergences, compared
+
+
 _PRODUCTION_ADAPTERS: dict[str, str] = {
     "expression": "benchbox.platforms.dataframe.polars_df:PolarsDataFrameAdapter",
     "pandas": "benchbox.platforms.dataframe.pandas_df:PandasDataFrameAdapter",
