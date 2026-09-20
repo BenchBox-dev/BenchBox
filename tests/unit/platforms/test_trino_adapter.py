@@ -1425,6 +1425,16 @@ class TestTrinoTableDefinitionOptimization:
         result = adapter._optimize_table_definition(sql)
         assert "WITH (format = 'PARQUET')" in result
 
+    def test_catalog_name_alone_does_not_trigger_memory_stripping(self):
+        """Unlike Presto, Trino keys memory stripping on table_format only."""
+        try:
+            adapter = TrinoAdapter(catalog="memory", table_format="hive")
+        except ImportError:
+            pytest.skip("Trino drivers not installed")
+        sql = "CREATE TABLE orders (id BIGINT)"
+        result = adapter._optimize_table_definition(sql)
+        assert "WITH (format = 'PARQUET')" in result
+
     @pytest.mark.parametrize(
         ("table_format", "adds_format"),
         [("memory", False), ("hive", True), ("iceberg", True), ("delta", False)],
