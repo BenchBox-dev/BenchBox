@@ -242,6 +242,7 @@ class TPCDIDataGenerator(
             # Reset per request so repeated generation with the same seed does
             # not depend on prior table generation in this process.
             self._rng = random.Random(self.generation_seed)
+            self.financial_patterns = FinancialDataPatterns(seed=self.generation_seed)
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
             if self.enable_progress:

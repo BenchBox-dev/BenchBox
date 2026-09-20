@@ -8,6 +8,7 @@ This test module validates the implementation of TPC-DI Phase 1 requirements:
 - Complete schema coverage
 """
 
+import random
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
@@ -419,6 +420,19 @@ class TestDataGenerator:
 
 class TestIntegration:
     """Integration tests for complete TPC-DI Phase 1 implementation."""
+
+    def test_repeated_generation_resets_all_private_rngs(self, tmp_path):
+        """A same-seed retry reproduces all financial fact data in one instance."""
+        generator = TPCDIDataGenerator(scale_factor=0.001, output_dir=tmp_path, generation_seed=73)
+        global_state = random.getstate()
+
+        first_paths = generator.generate_data(tables=["FactCashBalances", "FactHoldings"])
+        first_contents = {table: Path(path).read_bytes() for table, path in first_paths.items()}
+        second_paths = generator.generate_data(tables=["FactCashBalances", "FactHoldings"])
+        second_contents = {table: Path(path).read_bytes() for table, path in second_paths.items()}
+
+        assert second_contents == first_contents
+        assert random.getstate() == global_state
 
     def test_schema_and_generator_compatibility(self):
         """Test that schema manager and generator are compatible."""

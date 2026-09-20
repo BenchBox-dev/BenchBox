@@ -2079,6 +2079,19 @@ class TestApplyTpcdiBigqueryRewrites:
         assert "DATE('now')" not in result
         assert "UNIX_DATE" in result
 
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_relative_date_uses_bigquery_interval_syntax(self, mock_bigquery):
+        """AQ7's SQLite relative date becomes parseable BigQuery SQL."""
+        import sqlglot
+
+        from benchbox.core.tpcdi.query_analytics import TPCDIAnalyticalQueries
+
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._apply_tpcdi_bigquery_rewrites(TPCDIAnalyticalQueries().get_query("AQ7"))
+
+        assert "DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)" in result
+        sqlglot.parse_one(result, read="bigquery")
+
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestSafeguardDivisionByZero:

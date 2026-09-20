@@ -2379,34 +2379,45 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 + phase3_results.get("records_loaded", 0)
             )
 
-            # Determine overall success - be more resilient to failures in advanced features
-            # For test environments, focus on core functionality rather than advanced ETL features
-            # Core phases that must succeed: phase2 (SCD processing) - essential functionality
-            core_phase_successes = [
-                phase2_results.get("success", False),
+            required_phase_results = {
+                "enhanced_data_processing": phase1_results,
+                "enhanced_scd_processing": phase2_results,
+                "incremental_loading": phase3_results,
+            }
+            failed_phases = [
+                {
+                    "phase": phase_name,
+                    "error": phase_result.get("error") or phase_result.get("errors") or "phase reported failure",
+                }
+                for phase_name, phase_result in required_phase_results.items()
+                if not phase_result.get("success", False)
             ]
 
-            # Optional phases - failure doesn't fail the entire pipeline
-            optional_phase_successes = [
-                phase1_results.get("success", False),  # Advanced FinWire/CustomerMgmt processing
-                phase3_results.get("success", False),  # Incremental loading
-            ]
+            # Quality monitoring is observational and remains optional. Every
+            # requested ETL phase must succeed for the pipeline to succeed.
+            optional_phase_successes = []
             if enable_data_quality_monitoring:
-                optional_phase_successes.append(phase4_results.get("success", False))
+                optional_phase_successes.append(pipeline_results["phases"]["data_quality_monitoring"]["success"])
 
-            # Pipeline succeeds if core phases succeed
-            core_success = all(core_phase_successes)
+            core_success = not failed_phases
             optional_success_count = sum(optional_phase_successes)
 
             pipeline_results["success"] = core_success
             pipeline_results["core_phases_success"] = core_success
+            pipeline_results["failed_phases"] = failed_phases
             pipeline_results["optional_phases_success"] = f"{optional_success_count}/{len(optional_phase_successes)}"
 
             end_time = datetime.now()
             pipeline_results["end_time"] = end_time.isoformat()
             pipeline_results["total_duration"] = elapsed_seconds(start_mono)
 
-            emit(f"✅ Enhanced ETL pipeline completed successfully in {pipeline_results['total_duration']:.2f} seconds")
+            if core_success:
+                emit(
+                    f"✅ Enhanced ETL pipeline completed successfully in {pipeline_results['total_duration']:.2f} seconds"
+                )
+            else:
+                failed_names = ", ".join(failure["phase"] for failure in failed_phases)
+                emit(f"❌ Enhanced ETL pipeline failed required phases: {failed_names}")
 
         except Exception as e:
             if enable_error_recovery and self.error_recovery_manager:
