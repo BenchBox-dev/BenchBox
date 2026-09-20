@@ -64,3 +64,8 @@ https://benchbox\.dev/results/compare\?ids=[0-9a-f]{8},[0-9a-f]{8}$
 # (HTTP 403 with cf-mitigated: challenge); the link remains visible in the
 # rendered documentation.
 https://browser\.geekbench\.com/.*
+
+# Geekbench's public blog pages reject automated CI requests with HTTP 403;
+# the methodology links remain useful and visible in the rendered docs.
+https://www\.geekbench\.com/blog/2023/06/geekbench-61/.*
+https://www\.geekbench\.com/blog/2026/07/geekbench-7/.*
