@@ -42,6 +42,7 @@ from typing import Any
 
 import yaml
 
+from benchbox.core.data_fetch.errors import ChecksumMismatchError
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.datagen_manifest import (
     MANIFEST_FILENAME,
@@ -84,6 +85,7 @@ BTS_FIELD_NAMES = _DOWNLOADER_SPECS["bts_field_names"]
 _PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
 PINNED_END_YEAR = int(_PINNED_SOURCE.get("end_year", LAST_AVAILABLE_YEAR))
 PINNED_END_MONTH = int(_PINNED_SOURCE.get("end_month", 12))
+PINNED_SOURCE_SHA256 = {str(url): str(digest) for url, digest in (_PINNED_SOURCE.get("sha256") or {}).items()}
 
 
 def _scale_to_months(scale_factor: float) -> int:
@@ -199,6 +201,31 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         # manifest so the recorded corpus pins which bytes were ingested.
         self._content_hashes: dict[str, str] = {}
 
+    def source_provenance(self) -> dict[str, Any]:
+        """Return fail-closed provenance and promotion eligibility for this corpus."""
+        urls = set(self.source_contract()["urls"])
+        expected = {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256}
+        observed = {url: self._content_hashes[url] for url in urls if url in self._content_hashes}
+        synthetic_count = int(self._stats["months_synthetic"])
+        downloaded_count = int(self._stats["months_downloaded"])
+        if synthetic_count and downloaded_count:
+            source = "mixed"
+        elif synthetic_count:
+            source = "synthetic"
+        elif downloaded_count:
+            source = "remote"
+        else:
+            source = "unknown"
+        eligible = (
+            bool(urls) and not synthetic_count and set(expected) == urls == set(observed) and expected == observed
+        )
+        return {
+            "source": source,
+            "expected_sha256": expected,
+            "observed_sha256": observed,
+            "promotion_eligible": eligible,
+        }
+
     def download(self) -> dict[str, Path | list[Path]]:
         """Download or generate flight data and reference tables.
 
@@ -207,13 +234,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Reject a stale cache when the source pin changed: without this, an
-        # upgraded installation silently reuses the previous corpus because
-        # the output file names are unchanged. Legacy manifests without a
-        # recorded contract keep the old reuse behavior.
+        # Reject a stale or unverifiable cache: without this, an upgraded
+        # installation silently reuses the previous corpus because the output
+        # file names are unchanged.
         if not self.force_redownload:
             persisted_id = self._persisted_source_contract_id()
-            if persisted_id is not None and persisted_id != self.source_contract_id():
+            if persisted_id is None:
+                self.force_redownload = True
+            elif persisted_id != self.source_contract_id():
                 logger.warning(
                     "Existing flightdata corpus was generated under a different source contract "
                     "(%s...); regenerating for the current pin (%s...).",
@@ -221,6 +249,8 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                     self.source_contract_id()[:12],
                 )
                 self.force_redownload = True
+            else:
+                self._restore_persisted_provenance()
 
         flights_path = self.output_dir / self.get_compressed_filename("flights.csv")
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
@@ -687,6 +717,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 # the corpus came from (a provider-side byte change surfaces
                 # as a new manifest on the next fresh generation).
                 "content_hashes": dict(self._content_hashes),
+                "source_provenance": self.source_provenance(),
             },
         )
         metadata = {
@@ -724,6 +755,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         # For small scale factors (SF < 0.1), always use synthetic to avoid
         # network calls in CI/testing. Users wanting real data should use SF >= 0.1.
         if self.scale_factor < 0.1:
+            self._stats["months_synthetic"] += 1
             return self._generate_synthetic_month(writer, year, month, start_id)
 
         url = BTS_BASE_URL.format(year=year, month=month)
@@ -757,8 +789,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         )
         with urllib.request.urlopen(req, timeout=120) as response:
             zip_bytes = response.read()
-        self._content_hashes[url] = hashlib.sha256(zip_bytes).hexdigest()
-
+        actual_sha256 = hashlib.sha256(zip_bytes).hexdigest()
+        expected_sha256 = PINNED_SOURCE_SHA256.get(url)
+        if expected_sha256 is not None and actual_sha256 != expected_sha256:
+            raise ChecksumMismatchError(path=url, expected_sha256=expected_sha256, actual_sha256=actual_sha256)
         rows_written = 0
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             # Find the CSV file inside the ZIP
@@ -775,6 +809,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                         writer.writerow(row)
                         rows_written += 1
 
+        self._content_hashes[url] = actual_sha256
         return rows_written
 
     def _transform_bts_row(self, bts: dict[str, str], flight_id: int) -> list[Any] | None:
@@ -1071,6 +1106,11 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             "base_url": BTS_BASE_URL,
             "months": list(self._months),
             "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
+            "expected_sha256": {
+                url: PINNED_SOURCE_SHA256[url]
+                for url in [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months]
+                if url in PINNED_SOURCE_SHA256
+            },
         }
 
     def source_contract_id(self) -> str:
@@ -1092,6 +1132,23 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         contract_id = manifest.get("source_contract_id")
         return contract_id if isinstance(contract_id, str) else None
 
+    def _restore_persisted_provenance(self) -> None:
+        """Restore evidence needed to classify a reused verified corpus."""
+        try:
+            manifest = load_manifest(Path(self.output_dir) / MANIFEST_FILENAME)
+        except (OSError, ValueError):
+            return
+        hashes = manifest.get("content_hashes")
+        if isinstance(hashes, dict):
+            self._content_hashes = {str(url): str(digest) for url, digest in hashes.items()}
+        provenance = manifest.get("source_provenance")
+        if isinstance(provenance, dict):
+            source = provenance.get("source")
+            if source in {"synthetic", "mixed"}:
+                self._stats["months_synthetic"] = self._num_months
+            if source in {"remote", "mixed"}:
+                self._stats["months_downloaded"] = len(self._content_hashes)
+
     def get_download_stats(self) -> dict[str, Any]:
         """Return statistics about the download operation."""
-        return dict(self._stats)
+        return {**self._stats, "source_provenance": self.source_provenance()}

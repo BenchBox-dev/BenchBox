@@ -28,6 +28,7 @@ from typing import Any, Union
 import numpy as np
 import yaml
 
+from benchbox.core.data_fetch.errors import ChecksumMismatchError
 from benchbox.core.nyctaxi.schema import get_green_trips_columns, get_hvfhv_trips_columns, get_trips_columns
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
@@ -46,6 +47,7 @@ SCALE_FACTOR_SAMPLE_DIVISOR = float(_DOWNLOADER_SPECS["scale_factor_sample_divis
 _PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
 PINNED_SOURCE_YEAR = int(_PINNED_SOURCE.get("year", 2019))
 PINNED_SOURCE_MONTHS = [int(month) for month in _PINNED_SOURCE.get("months", list(range(1, 13)))]
+PINNED_SOURCE_SHA256 = {str(url): str(digest) for url, digest in (_PINNED_SOURCE.get("sha256") or {}).items()}
 
 # Complete NYC TLC Taxi Zone data (all 265 zones)
 # Source: https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv
@@ -111,12 +113,14 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         record which source snapshot they came from and reviewers can see a
         source change as a contract change.
         """
+        urls = [f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet" for month in self.months]
         return {
             "source": "nyc-tlc",
             "base_url": TLC_BASE_URL,
             "year": self.year,
             "months": list(self.months),
-            "urls": [f"{TLC_BASE_URL}/{self._URL_PREFIX}_{self.year}-{month:02d}.parquet" for month in self.months],
+            "urls": urls,
+            "expected_sha256": {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256},
             "taxi_zones_url": _DOWNLOADER_SPECS["taxi_zones_url"],
         }
 
@@ -141,6 +145,19 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         contract_id = persisted.get("source_contract_id")
         return contract_id if isinstance(contract_id, str) else None
 
+    def _restore_persisted_provenance(self, output_path: Path) -> None:
+        """Restore evidence needed to classify a reused verified corpus."""
+        try:
+            persisted = json.loads(self._contract_sidecar_path(output_path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        hashes = persisted.get("content_hashes")
+        if isinstance(hashes, dict):
+            self._content_hashes = {str(url): str(digest) for url, digest in hashes.items()}
+        synthetic = persisted.get("synthetic_months")
+        if isinstance(synthetic, list):
+            self._synthetic_fallback_months = [str(month) for month in synthetic]
+
     def _write_contract_sidecar(self, output_path: Path) -> None:
         sidecar = {
             "source_contract": self.source_contract(),
@@ -150,6 +167,7 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
             # new manifest on the next fresh generation).
             "content_hashes": dict(self._content_hashes),
             "synthetic_months": list(self._synthetic_fallback_months),
+            "source_provenance": self.source_provenance(),
         }
         self._contract_sidecar_path(output_path).write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
 
@@ -172,9 +190,8 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         if output_path.exists() and not self.force_redownload:
             persisted_id = self._read_persisted_contract_id(output_path)
             if persisted_id is None:
-                self.log_verbose(self._SKIP_EXISTING_MESSAGE)
-                return output_path
-            if persisted_id != self.source_contract_id():
+                self.logger.warning("Existing %s has no source-contract evidence; regenerating.", output_path.name)
+            elif persisted_id != self.source_contract_id():
                 self.logger.warning(
                     "Existing %s was generated under a different source contract "
                     "(%s...); regenerating for the current pin (%s...).",
@@ -183,6 +200,7 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
                     self.source_contract_id()[:12],
                 )
             else:
+                self._restore_persisted_provenance(output_path)
                 self.log_verbose(self._SKIP_EXISTING_MESSAGE)
                 return output_path
 
@@ -206,6 +224,8 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
                     month_rows = self._process_parquet_file(url, writer, trip_id)
                     trip_id += month_rows
                     total_rows += month_rows
+                except ChecksumMismatchError:
+                    raise
                 except Exception as e:
                     self.logger.warning(f"Failed to process {url}: {e}")
                     continue
@@ -229,9 +249,16 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
         try:
             urllib.request.urlretrieve(url, tmp_name)
             with open(tmp_name, "rb") as handle:
-                self._content_hashes[url] = hashlib.sha256(handle.read()).hexdigest()
+                actual_sha256 = hashlib.sha256(handle.read()).hexdigest()
+            expected_sha256 = PINNED_SOURCE_SHA256.get(url)
+            if expected_sha256 is not None and actual_sha256 != expected_sha256:
+                raise ChecksumMismatchError(path=url, expected_sha256=expected_sha256, actual_sha256=actual_sha256)
             table = pq.read_table(tmp_name)
             df = table.to_pandas()
+        except ChecksumMismatchError:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp_name)
+            raise
         except Exception as e:
             self.logger.warning(f"Download failed: {e}, using synthetic data")
             with contextlib.suppress(OSError):
@@ -240,6 +267,7 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
             return self._generate_synthetic_month(writer, start_trip_id)
         with contextlib.suppress(OSError):
             os.unlink(tmp_name)
+        self._content_hashes[url] = actual_sha256
 
         if self.sample_rate < 1.0:
             sample_size = max(1, int(len(df) * self.sample_rate))
@@ -355,8 +383,31 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
             "seed": self.seed,
             "row_counts": dict(self._table_row_counts),
             "synthetic_months": synthetic,
+            "source_provenance": self.source_provenance(),
         }
         return {"taxi_type": self._STATS_TAXI_TYPE, **stats} if self._STATS_TAXI_TYPE is not None else stats
+
+    def source_provenance(self) -> dict[str, Any]:
+        """Return fail-closed provenance and promotion eligibility for this corpus."""
+        urls = set(self.source_contract()["urls"])
+        expected = {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256}
+        observed = {url: self._content_hashes[url] for url in urls if url in self._content_hashes}
+        synthetic = set(self._synthetic_fallback_months)
+        if synthetic and observed:
+            source = "mixed"
+        elif synthetic:
+            source = "synthetic"
+        elif observed:
+            source = "remote"
+        else:
+            source = "unknown"
+        eligible = bool(urls) and not synthetic and set(expected) == urls == set(observed) and expected == observed
+        return {
+            "source": source,
+            "expected_sha256": expected,
+            "observed_sha256": observed,
+            "promotion_eligible": eligible,
+        }
 
 
 class NYCTaxiDataDownloader(_TripDataDownloader):

@@ -675,7 +675,12 @@ def _validate_initial_flags(s: types.SimpleNamespace) -> None:
         s.ctx.exit(2)
 
     if s.official:
-        tpc_allowed = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
+        if s.benchmark == "tpch":
+            from benchbox.core.tpch.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
+        elif s.benchmark == "tpcds":
+            from benchbox.core.tpcds.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
+        else:
+            tpc_allowed = frozenset({1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000})
         if s.scale not in tpc_allowed:
             console.print(f"[red]❌ Scale factor {s.scale} is not TPC-compliant[/red]")
             console.print(f"Allowed scale factors: {sorted(tpc_allowed)}")

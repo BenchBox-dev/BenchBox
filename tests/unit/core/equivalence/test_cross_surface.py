@@ -1075,6 +1075,16 @@ def test_read_primitives_known_divergences_are_all_classified():
         "map_construction_expression",
         "map_keys_values_expression",
     }
+    assert GATES["read_primitives"].dtype_skip_keys == frozenset(
+        {
+            "approx_quantile_groupby_expression",
+            "json_aggregates_expression",
+            "map_access_expression",
+            "map_construction_expression",
+            "map_keys_values_expression",
+        }
+    )
+    assert GATES["read_primitives"].dtype_skip_keys != frozenset(known)
 
 
 def test_read_primitives_sketch_residue_predicate_accepts_bounded_rejects_wide():

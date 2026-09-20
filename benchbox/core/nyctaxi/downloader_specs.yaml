@@ -28,6 +28,9 @@ scale_factor_sample_divisor: 10.0
 pinned_source:
   year: 2019
   months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  # Keys are full provider URLs. Stable promotion stays blocked until the
+  # complete default window has independently reviewed SHA-256 digests.
+  sha256: {}
 taxi_zones:
 - - 1
   - EWR

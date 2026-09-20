@@ -287,6 +287,21 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             compression=resolve_compression_metadata(self.downloader),
             parallel=1,
             seed=self.seed,
+            extra_metadata={
+                "source_provenance": {
+                    "trips": self.downloader.source_provenance(),
+                    **(
+                        {"green_trips": self.green_downloader.source_provenance()}
+                        if self.green_downloader is not None
+                        else {}
+                    ),
+                    **(
+                        {"hvfhv_trips": self.hvfhv_downloader.source_provenance()}
+                        if self.hvfhv_downloader is not None
+                        else {}
+                    ),
+                }
+            },
         )
 
         for table, path in self.tables.items():

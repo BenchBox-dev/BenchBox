@@ -271,11 +271,12 @@ class TestGreenTaxiDataDownloader:
         assert stats["taxi_type"] == "green"
         assert stats["scale_factor"] == 0.01
 
-    def test_skips_existing_file(self, tmp_path):
-        """Should skip re-generating if file already exists."""
+    def test_skips_existing_file_with_matching_source_contract(self, tmp_path):
+        """A verified cache may be reused without regeneration."""
         existing = tmp_path / "green_trips.csv"
         existing.write_text("already_here")
         downloader = GreenTaxiDataDownloader(scale_factor=0.01, output_dir=tmp_path, year=2019, months=[1])
+        downloader._write_contract_sidecar(existing)
         result_path = downloader.download()
         assert result_path.read_text() == "already_here"  # unchanged
 

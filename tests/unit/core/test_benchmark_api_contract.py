@@ -245,6 +245,24 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
     assert "support status counts are stable=5, beta=12, experimental=5" in contract_doc
 
 
+def test_external_dataset_stable_promotion_requires_complete_content_pins(tmp_path: Path) -> None:
+    """A status-only edit cannot promote an external corpus without byte pins."""
+    from benchbox.core.flightdata.downloader import PINNED_SOURCE_SHA256, FlightDataDownloader
+    from benchbox.core.nyctaxi.downloader import PINNED_SOURCE_SHA256 as NYC_SHA256, NYCTaxiDataDownloader
+
+    required_urls = {
+        "flightdata": set(FlightDataDownloader(scale_factor=1, output_dir=tmp_path).source_contract()["urls"]),
+        "nyctaxi": set(NYCTaxiDataDownloader(output_dir=tmp_path).source_contract()["urls"]),
+    }
+    configured = {"flightdata": PINNED_SOURCE_SHA256, "nyctaxi": NYC_SHA256}
+    for benchmark_id in required_urls:
+        if BENCHMARK_METADATA[benchmark_id]["support_status"] == "stable":
+            assert set(configured[benchmark_id]) == required_urls[benchmark_id], (
+                f"{benchmark_id} cannot be stable until its default external corpus has complete SHA-256 pins"
+            )
+            assert all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in configured[benchmark_id].values())
+
+
 def test_benchmark_support_status_criteria_matrix_covers_every_benchmark() -> None:
     """The criteria matrix must carry one row per benchmark whose status matches the registry.
 

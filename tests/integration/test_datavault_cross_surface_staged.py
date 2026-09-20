@@ -91,9 +91,16 @@ def test_staged_gate_forces_regeneration_records_manifest_and_runs_all_cells(tmp
             backends=gate.backends,
         )
         coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
+        execution_failures = [
+            divergence
+            for divergence in divergences
+            if divergence.cell == "reference" or divergence.detail.startswith("error: ")
+        ]
         assert coverage == {"expression": 22, "pandas": 22}, (
             f"every query must run on both backends, coverage={coverage}, divergences={[d.key for d in divergences]}"
         )
-        assert isinstance(divergences, list)
+        assert not execution_failures, "every staged SQL and DataFrame cell must execute: " + ", ".join(
+            f"{divergence.key} ({divergence.detail})" for divergence in execution_failures
+        )
     finally:
         data.connection.close()
