@@ -105,7 +105,6 @@ class TestTPCDIScalabilityPerformance:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=True,
                 enable_error_recovery=True,
             )
@@ -474,17 +473,18 @@ class TestTPCDIScalabilityPerformance:
             "records": scd_result.get("records_processed", 0),
         }
 
-        # 3. Parallel Batch Processing
+        # 3. Canonical Parallel Transforms (the retained parallel path)
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
-        parallel_result = benchmark._run_parallel_batch_processing()
+        source_files = benchmark.generate_source_data(formats=["csv"], batch_types=["historical"])
+        parallel_result = benchmark._transform_source_data_parallel(dict(source_files), "historical")
 
         phase_profiles["parallel_processing"] = {
             "time": time.time() - start_time,
             "memory_delta": process.memory_info().rss / 1024 / 1024 - start_memory,
-            "success": parallel_result.get("success", False),
-            "batches": parallel_result.get("batches_processed", 0),
+            "success": parallel_result.get("records_processed", 0) > 0,
+            "batches": parallel_result.get("records_processed", 0),
         }
 
         # 4. Incremental Loading
@@ -626,10 +626,28 @@ class TestTPCDIScalabilityPerformance:
         assert len(fast_queries) + len(medium_queries) >= len(successful_queries) * 0.8, "Too many slow queries"
 
     def test_parallel_processing_scalability_analysis(self, temp_dir, test_database):
-        """Analyze parallel processing scalability with different worker counts."""
-        worker_configurations = [1, 2, 4, 8]
-        scalability_results = {}
+        """Canonical parallel transforms must stage identical work at every width.
 
+        Parallel TPC-DI ETL lives in ``_transform_source_data_parallel``
+        (driven by ``enable_parallel``/``max_workers``), not in the removed
+        synthetic batch scheduler. Scaling the worker count must preserve
+        staged semantics exactly: same record totals, same tables, same
+        rows. Timing is reported for analysis only - tiny fixtures cannot
+        meaningfully assert speedup.
+        """
+        worker_configurations = [1, 2, 4]
+        setup_config = TPCDIConfig(
+            scale_factor=0.1,
+            output_dir=temp_dir / "workers_setup",
+            enable_parallel=True,
+            max_workers=4,
+        )
+        setup_config.output_dir.mkdir(parents=True, exist_ok=True)
+        setup_benchmark = TPCDIBenchmark(config=setup_config)
+        source_files = setup_benchmark.generate_source_data(formats=["csv"], batch_types=["historical"])
+        assert source_files.get("csv"), "no CSV source files generated for scaling analysis"
+
+        scalability_results = {}
         for worker_count in worker_configurations:
             config = TPCDIConfig(
                 scale_factor=0.1,
@@ -641,58 +659,36 @@ class TestTPCDIScalabilityPerformance:
 
             benchmark = TPCDIBenchmark(config=config)
 
-            # Measure parallel processing performance
             start_time = time.time()
-
-            benchmark.create_schema(test_database, "sqlite")
-            benchmark.generate_data()
-
-            etl_results = benchmark.run_enhanced_etl_pipeline(
-                test_database,
-                dialect="sqlite",
-                enable_parallel_processing=True,
-                enable_data_quality_monitoring=False,  # Focus on parallel performance
-            )
-
+            transform_results = benchmark._transform_source_data_parallel(dict(source_files), "historical")
             total_time = time.time() - start_time
 
+            staged_tables = {
+                table: frame.sort_values(list(frame.columns)).reset_index(drop=True)
+                for table, frame in transform_results["staged_data"].items()
+            }
             scalability_results[worker_count] = {
                 "total_time": total_time,
-                "etl_success": etl_results["success"],
-                "parallel_batches": etl_results["phases"]
-                .get("parallel_batch_processing", {})
-                .get("batches_processed", 0),
-                "workers_used": etl_results["phases"].get("parallel_batch_processing", {}).get("parallel_workers", 0),
-                "records_processed": etl_results.get("total_records_processed", 0),
+                "records_processed": transform_results["records_processed"],
+                "staged_tables": staged_tables,
             }
 
-            # Clear database for next test
-            self._clear_test_database(test_database)
-
         # Analyze scalability characteristics
-        print("\n=== PARALLEL PROCESSING SCALABILITY ===")
+        print("\n=== PARALLEL TRANSFORM SCALABILITY ===")
 
-        baseline_time = scalability_results[1]["total_time"]
+        baseline = scalability_results[1]
+        assert baseline["records_processed"] > 0, "canonical parallel path staged no records"
 
         for worker_count, result in scalability_results.items():
-            speedup = baseline_time / max(result["total_time"], 0.001)
-            efficiency = speedup / worker_count
-
-            print(
-                f"Workers: {worker_count}, Time: {result['total_time']:.2f}s, "
-                f"Speedup: {speedup:.2f}x, Efficiency: {efficiency:.2f}"
+            print(f"Workers: {worker_count}, Time: {result['total_time']:.2f}s, Records: {result['records_processed']}")
+            assert result["records_processed"] == baseline["records_processed"], (
+                f"worker count {worker_count} staged a different record total than width 1"
             )
-
-            assert result["etl_success"], f"ETL failed with {worker_count} workers"
-
-        # Validate that parallel processing provides some benefit
-        max_workers = max(worker_configurations)
-        parallel_speedup = baseline_time / max(scalability_results[max_workers]["total_time"], 0.001)
-
-        # Expect parallel processing not to be slower than single-threaded (>= 0.9x)
-        # Parallelism benefits vary with environment, and overhead can reduce benefits
-        # for small workloads. The key validation is that ETL succeeds with parallelism.
-        assert parallel_speedup >= 0.9, f"Parallel processing shows insufficient benefit: {parallel_speedup:.2f}x"
+            assert set(result["staged_tables"]) == set(baseline["staged_tables"])
+            for table, frame in result["staged_tables"].items():
+                assert frame.equals(baseline["staged_tables"][table]), (
+                    f"worker count {worker_count} staged different rows for {table}"
+                )
 
 
 if __name__ == "__main__":

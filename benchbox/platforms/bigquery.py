@@ -1522,6 +1522,26 @@ class BigQueryAdapter(PlatformAdapter):
                 # Non-translated queries (e.g., raw TPC-H) need explicit qualification
                 translated_query = self._qualify_table_names(query)
 
+            # TPC-DI uses SQL Server/SQLite idioms (BIT flag literals,
+            # JULIANDAY, DATE('now')) that BigQuery rejects. Config names
+            # vary ("TPC-DI", "tpcdi"), so compare alphanumerics only.
+            import re
+
+            if re.sub(r"[^a-z0-9]", "", (benchmark_type or "").lower()).startswith("tpcdi"):
+                translated_query = self._apply_tpcdi_bigquery_rewrites(translated_query)
+
+            # Normalize division-by-zero semantics: BigQuery raises on a zero
+            # divisor instead of yielding NULL, so route divisions
+            # through SAFE_DIVIDE (no-op unless the divisor is zero).
+            translated_query = self._safeguard_division_by_zero(translated_query)
+
+            # Re-normalize identifier case: the safeguard re-renders through
+            # sqlglot, which can (re)introduce quoted source-case identifiers
+            # (e.g. variant SQL that skipped base translation). Normalization
+            # is idempotent, so already-uppercase queries are unaffected.
+            if "`" in translated_query:
+                translated_query = self._normalize_table_names_case(translated_query)
+
             # Use default job config if available
             job_config = getattr(connection, "_default_job_config", bigquery.QueryJobConfig())
 
@@ -1620,6 +1640,9 @@ class BigQueryAdapter(PlatformAdapter):
         """Convert CREATE TABLE statement to BigQuery format.
 
         Makes tables idempotent by using CREATE OR REPLACE TABLE.
+        Table names are normalized to UPPERCASE to match the adapter-wide
+        convention used by loads, validation, row counts, and query
+        normalization (TPC-DS DDL sources use lowercase names).
         """
         import re
 
@@ -1632,7 +1655,15 @@ class BigQueryAdapter(PlatformAdapter):
         )
         match = pattern.match(statement)
         if match:
+            # Uppercase only the table segment; a qualified name keeps its
+            # project/dataset case (BigQuery table identifiers are
+            # case-sensitive while the adapter convention is UPPERCASE tables).
             table_name = match.group(1)
+            if "." in table_name:
+                *qualifier, bare = table_name.split(".")
+                table_name = ".".join([*qualifier, bare.upper()])
+            else:
+                table_name = table_name.upper()
             rest = match.group(2)
             # BigQuery table identifiers are case-sensitive: normalize the
             # table segment to UPPERCASE to match the adapter-wide convention
@@ -1756,9 +1787,12 @@ class BigQueryAdapter(PlatformAdapter):
     def _normalize_table_names_case(self, query: str) -> str:
         """Normalize backtick-quoted table names to UPPERCASE for case-sensitive matching.
 
-        BigQuery stores TPC-DS tables in UPPERCASE (per schema), but sqlglot generates
-        lowercase table names with backticks. Since backtick-quoted identifiers are
-        case-sensitive in BigQuery, we need to normalize to UPPERCASE to match the schema.
+        BigQuery stores benchmark tables in UPPERCASE (per schema), but sqlglot
+        generates quoted identifiers in source case (lowercase TPC-DS names,
+        mixed-case TPC-DI names such as DimCustomer). Since backtick-quoted
+        table identifiers are case-sensitive in BigQuery, normalize them to
+        UPPERCASE to match the schema. Column identifiers are case-insensitive
+        in BigQuery, so uppercasing them as well is harmless.
 
         Only processes backtick-quoted identifiers to avoid affecting string literals.
 
@@ -1766,18 +1800,59 @@ class BigQueryAdapter(PlatformAdapter):
             query: SQL query with backtick-quoted identifiers
 
         Returns:
-            Query with lowercase table names normalized to UPPERCASE
+            Query with quoted identifiers normalized to UPPERCASE
         """
         import re
 
-        # Pattern: backtick, lowercase word characters (table names), backtick
-        # This safely matches table identifiers without affecting string literals
-        pattern = r"`([a-z_][a-z0-9_]*)`"
+        # Pattern: backtick, simple identifier, backtick. Already-uppercase
+        # identifiers are unaffected by upper(). Dotted (qualified)
+        # references are handled segment-wise by the caller pipeline and
+        # left alone here.
+        pattern = r"`([A-Za-z_][A-Za-z0-9_]*)`"
 
         def uppercase_table(match: re.Match[str]) -> str:
             return f"`{match.group(1).upper()}`"
 
         return re.sub(pattern, uppercase_table, query)
+
+    def _apply_tpcdi_bigquery_rewrites(self, query: str) -> str:
+        """BigQuery TPC-DI idioms via the shared cloud rewrite core."""
+        from benchbox.platforms.cloud_shared import rewrite_tpcdi_for_bigquery
+
+        return rewrite_tpcdi_for_bigquery(query)
+
+    def _safeguard_division_by_zero(self, query: str) -> str:
+        """Route `/` divisions through BigQuery's SAFE_DIVIDE.
+
+        BigQuery raises on a zero divisor instead of yielding NULL,
+        which turns degenerate subscale ratios (e.g. TPC-DS Q90 at SF 0.1,
+        0/0) into hard query failures. SAFE_DIVIDE returns NULL instead and
+        is a no-op for non-zero divisors. Queries without a division are
+        returned unchanged.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="bigquery")
+        except Exception as e:
+            self.log_very_verbose(f"Division safeguard skipped (unparseable BigQuery SQL): {e}")
+            return query
+        if not any(isinstance(node, exp.Div) for node in tree.walk()):
+            return query
+
+        def to_safe_divide(node: exp.Expression) -> exp.Expression:
+            if isinstance(node, exp.Div):
+                return exp.Anonymous(
+                    this="SAFE_DIVIDE",
+                    expressions=[node.this.copy(), node.expression.copy()],
+                )
+            return node
+
+        return tree.transform(to_safe_divide).sql(dialect="bigquery", identify=True)
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
         """Get BigQuery-specific metadata and system information."""

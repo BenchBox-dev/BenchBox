@@ -63,7 +63,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert tpcdi_benchmark.finwire_processor is None
         assert tpcdi_benchmark.customer_mgmt_processor is None
         assert tpcdi_benchmark.scd_processor is None
-        assert tpcdi_benchmark.parallel_batch_processor is None
         assert tpcdi_benchmark.incremental_loader is None
         assert tpcdi_benchmark.data_quality_monitor is None
         assert tpcdi_benchmark.error_recovery_manager is None
@@ -77,7 +76,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert tpcdi_benchmark.finwire_processor is not None
         assert tpcdi_benchmark.customer_mgmt_processor is not None
         assert tpcdi_benchmark.scd_processor is not None
-        assert tpcdi_benchmark.parallel_batch_processor is not None
         assert tpcdi_benchmark.incremental_loader is not None
         assert tpcdi_benchmark.data_quality_monitor is not None
         assert tpcdi_benchmark.error_recovery_manager is not None
@@ -98,9 +96,9 @@ class TestTPCDIPhase3BenchmarkIntegration:
         # Verify Phase 3 component status
         phase3_components = status["phase_3_components"]
         assert phase3_components["finwire_processor"] is True
+        assert "parallel_batch_processor" not in phase3_components
         assert phase3_components["customer_mgmt_processor"] is True
         assert phase3_components["scd_processor"] is True
-        assert phase3_components["parallel_batch_processor"] is True
         assert phase3_components["incremental_loader"] is True
         assert phase3_components["data_quality_monitor"] is True
         assert phase3_components["error_recovery_manager"] is True
@@ -120,7 +118,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         results = tpcdi_benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
             enable_error_recovery=True,
         )
@@ -137,15 +134,15 @@ class TestTPCDIPhase3BenchmarkIntegration:
 
         # Verify enhanced features were enabled
         enhanced_features = results["enhanced_features"]
-        assert enhanced_features["parallel_processing"] is True
         assert enhanced_features["data_quality_monitoring"] is True
         assert enhanced_features["error_recovery"] is True
 
-        # Verify phases were executed
+        # Verify phases were executed (parallel ETL is not a phase here: it
+        # lives on the canonical run_etl_pipeline path via enable_parallel)
         phases = results["phases"]
         assert "enhanced_data_processing" in phases
         assert "enhanced_scd_processing" in phases
-        assert "parallel_batch_processing" in phases
+        assert "parallel_batch_processing" not in phases
         assert "incremental_loading" in phases
         assert "data_quality_monitoring" in phases
 
@@ -202,19 +199,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert results["records_processed"] > 0
         assert results["changes_detected"] >= 0
 
-    def test_parallel_batch_processing_phase(self, tpcdi_benchmark, test_database):
-        """Test parallel batch processing phase."""
-        tpcdi_benchmark.create_schema(test_database, "sqlite")
-        tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
-
-        # Test parallel batch processing phase
-        results = tpcdi_benchmark._run_parallel_batch_processing()
-
-        assert results["success"] is True
-        assert results["batches_processed"] > 0
-        assert results["workers_used"] > 0
-        assert results["workers_used"] <= tpcdi_benchmark.max_workers
-
     def test_incremental_data_loading_phase(self, tpcdi_benchmark, test_database):
         """Test incremental data loading phase."""
         tpcdi_benchmark.create_schema(test_database, "sqlite")
@@ -263,29 +247,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert results["quality_score"] > 0
         assert results["issues_detected"] >= 0
 
-    def test_enhanced_pipeline_with_parallel_processing_disabled(self, tpcdi_benchmark, test_database):
-        """Test enhanced pipeline with parallel processing disabled."""
-        tpcdi_benchmark.create_schema(test_database, "sqlite")
-
-        # Run enhanced ETL pipeline with parallel processing disabled
-        results = tpcdi_benchmark.run_enhanced_etl_pipeline(
-            test_database,
-            dialect="sqlite",
-            enable_parallel_processing=False,
-            enable_data_quality_monitoring=True,
-            enable_error_recovery=True,
-        )
-
-        # Verify parallel processing phase was skipped
-        assert "parallel_batch_processing" not in results["phases"]
-        assert results["enhanced_features"]["parallel_processing"] is False
-
-        # But other phases should still be present
-        assert "enhanced_data_processing" in results["phases"]
-        assert "enhanced_scd_processing" in results["phases"]
-        assert "incremental_loading" in results["phases"]
-        assert "data_quality_monitoring" in results["phases"]
-
     def test_enhanced_pipeline_with_monitoring_disabled(self, tpcdi_benchmark, test_database):
         """Test enhanced pipeline with data quality monitoring disabled."""
         tpcdi_benchmark.create_schema(test_database, "sqlite")
@@ -294,7 +255,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         results = tpcdi_benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=False,
             enable_error_recovery=True,
         )
@@ -307,7 +267,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         # But other phases should still be present
         assert "enhanced_data_processing" in results["phases"]
         assert "enhanced_scd_processing" in results["phases"]
-        assert "parallel_batch_processing" in results["phases"]
         assert "incremental_loading" in results["phases"]
 
     def test_error_recovery_integration(self, tpcdi_benchmark, test_database):
@@ -547,22 +506,52 @@ class TestTPCDIPhase3PerformanceIntegration:
         )
         return TPCDIBenchmark(config=config)
 
-    def test_parallel_processing_performance_benefit(self, performance_benchmark):
-        """Test that parallel processing provides performance benefits."""
-        with sqlite3.connect(":memory:") as conn:
-            performance_benchmark._initialize_connection_dependent_systems(conn, "sqlite")
+    def test_canonical_parallel_transform_matches_sequential(self, performance_benchmark, tmp_path):
+        """The canonical parallel path must preserve sequential semantics.
 
-            # Measure performance with parallel processing
-            start_time = datetime.now()
-            parallel_results = performance_benchmark._run_parallel_batch_processing()
-            parallel_duration = (datetime.now() - start_time).total_seconds()
+        Parallel TPC-DI ETL lives in ``_transform_source_data_parallel``
+        (driven by ``TPCDIConfig(enable_parallel=True, max_workers=N)``),
+        not in the removed synthetic batch scheduler. Running the same real
+        per-file transforms sequentially and concurrently must stage
+        identical record counts, tables, and rows.
+        """
+        customer_columns = [
+            "CustomerID",
+            "TaxID",
+            "Status",
+            "LastName",
+            "FirstName",
+            "MiddleInitial",
+            "Gender",
+            "Tier",
+            "DOB",
+            "AddressLine1",
+            "City",
+            "StateProv",
+            "PostalCode",
+            "Country",
+            "Phone1",
+            "Email1",
+        ]
+        source_files = {"csv": []}
+        for index in range(3):
+            path = tmp_path / f"customer_batch_{index}.csv"
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(",".join(customer_columns) + "\n")
+                for row in range(5):
+                    handle.write(",".join([f"{col}_{index}_{row}" for col in customer_columns]) + "\n")
+            source_files["csv"].append(str(path))
 
-            assert parallel_results["success"] is True
-            assert parallel_results["workers_used"] > 1
-            assert parallel_duration >= 0
+        sequential = performance_benchmark._transform_source_data(dict(source_files), "historical")
+        parallel = performance_benchmark._transform_source_data_parallel(dict(source_files), "historical")
 
-            # In a real scenario, we would compare with sequential processing
-            # For this test, we just verify parallel processing completes successfully
+        assert sequential["records_processed"] == 15
+        assert parallel["records_processed"] == sequential["records_processed"]
+        assert sorted(parallel["transformations_applied"]) == sorted(sequential["transformations_applied"])
+        assert set(parallel["staged_data"]) == set(sequential["staged_data"]) == {"DimCustomer"}
+        sequential_rows = sequential["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
+        parallel_rows = parallel["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
+        assert parallel_rows.equals(sequential_rows)
 
     def test_incremental_loading_performance(self, performance_benchmark):
         """Test incremental loading performance characteristics."""

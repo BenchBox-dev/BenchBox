@@ -45,7 +45,6 @@ from benchbox.core.tpcdi.etl.data_quality_monitor import DataQualityMonitor
 from benchbox.core.tpcdi.etl.error_recovery import ErrorRecoveryManager
 from benchbox.core.tpcdi.etl.finwire_processor import FinWireProcessor
 from benchbox.core.tpcdi.etl.incremental_loader import IncrementalDataLoader
-from benchbox.core.tpcdi.etl.parallel_batch_processor import ParallelBatchProcessor
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult
 from benchbox.core.tpcdi.etl.scd_processor import EnhancedSCDType2Processor
 from benchbox.core.tpcdi.generator import TPCDIDataGenerator
@@ -190,7 +189,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self.finwire_processor = None  # Initialized when connection is available
         self.customer_mgmt_processor = None  # Initialized when connection is available
         self.scd_processor = None  # Initialized when connection is available
-        self.parallel_batch_processor = None  # Initialized when connection is available
         self.incremental_loader = None  # Initialized when connection is available
         self.data_quality_monitor = None  # Initialized when connection is available
         self.error_recovery_manager = None  # Initialized when connection is available
@@ -348,19 +346,31 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
         from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+            BIGQUERY_EQ7_SQL,
             CLICKHOUSE_AQ6_SQL,
             CLICKHOUSE_AQ7_SQL,
             CLICKHOUSE_AQ8_SQL,
             CLICKHOUSE_AQ10_SQL,
             CLICKHOUSE_EQ7_SQL,
+            DATABRICKS_EQ7_SQL,
             DATAFUSION_AQ9_SQL,
             DATAFUSION_EQ7_SQL,
             DATAFUSION_VQ6_SQL,
             DORIS_EQ7_SQL,
+            SNOWFLAKE_EQ7_SQL,
             STARROCKS_EQ7_SQL,
         )
 
         variants: dict[str, dict[str, str]] = {
+            "bigquery": {
+                "EQ7": BIGQUERY_EQ7_SQL,
+            },
+            "databricks": {
+                "EQ7": DATABRICKS_EQ7_SQL,
+            },
+            "snowflake": {
+                "EQ7": SNOWFLAKE_EQ7_SQL,
+            },
             "clickhouse": {
                 "AQ6": CLICKHOUSE_AQ6_SQL,
                 "AQ7": CLICKHOUSE_AQ7_SQL,
@@ -409,7 +419,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     query_params.update(params)
                 return variant_sql.format(**query_params)
 
-            if platform == "clickhouse" and query_id == "EQ7" and params is not None:
+            if (
+                platform in ("bigquery", "clickhouse", "databricks", "snowflake")
+                and query_id == "EQ7"
+                and params is not None
+            ):
                 query_params = self.query_manager.etl_queries._generate_default_params(query_id)
                 query_params.update(params)
                 default_params = self.query_manager.etl_queries._generate_default_params(query_id)
@@ -494,6 +508,17 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 query_text,
             )
 
+        elif target_dialect.lower() == "snowflake":
+            # Snowflake has no JULIANDAY function and rejects DATE('now').
+            # Rewrite DATE idioms here; JULIANDAY is rewritten after
+            # translation below (SQLGlot passes it through untouched, while
+            # the shared diff regex cannot handle nested function args).
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"DATEADD(day, -{m.group(1)}, CURRENT_DATE())",
+                query_text,
+            )
+            query_text = _DATE_NOW_RE.sub("CURRENT_DATE()", query_text)
+
         elif (
             "clickhouse" in target_dialect.lower()
             or "starrocks" in target_dialect.lower()
@@ -556,6 +581,23 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(
                 lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
                 query_text,
+            )
+
+        elif target_dialect.lower() == "snowflake":
+            # SQLGlot passes unknown JULIANDAY calls through for Snowflake.
+            # Rewrite diffs first (nesting-safe), then any surviving bare
+            # call as day-number arithmetic.
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)\s*-\s*JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"DATEDIFF(day, \2, \1)",
+                query_text,
+                flags=re.IGNORECASE,
+            )
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"(DATEDIFF(day, DATE '1970-01-01', \1) + 2440588)",
+                query_text,
+                flags=re.IGNORECASE,
             )
 
         return query_text
@@ -1909,14 +1951,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             scd_config = SCDProcessingConfig()
             self.scd_processor = EnhancedSCDType2Processor(connection, config=scd_config)
 
-        if self.parallel_batch_processor is None:
-            from benchbox.core.tpcdi.etl.parallel_batch_processor import (
-                ParallelProcessingConfig,
-            )
-
-            parallel_config = ParallelProcessingConfig(max_workers=self.max_workers)
-            self.parallel_batch_processor = ParallelBatchProcessor(parallel_config)
-
         if self.incremental_loader is None:
             from benchbox.core.tpcdi.etl.incremental_loader import IncrementalLoadConfig
 
@@ -2217,25 +2251,26 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self,
         connection: Any,
         dialect: str = "duckdb",
-        enable_parallel_processing: bool | None = None,
         enable_data_quality_monitoring: bool = True,
         enable_error_recovery: bool = True,
     ) -> dict[str, Any]:
         """Run the enhanced TPC-DI ETL pipeline with Phase 3 capabilities.
 
+        Parallel ETL is not a phase of this pipeline: concurrent execution
+        lives on the canonical path via ``TPCDIConfig(enable_parallel=True,
+        max_workers=N)`` (see ``run_etl_pipeline``). The removed
+        ``enable_parallel_processing`` flag gated only synthetic batch tasks
+        that processed no data (adr-tpcdi-enhanced-parallel-support-decision).
+
         Args:
             connection: Database connection
             dialect: SQL dialect
-            enable_parallel_processing: Enable parallel batch processing (uses config if None)
             enable_data_quality_monitoring: Enable real-time data quality monitoring
             enable_error_recovery: Enable error recovery and retry mechanisms
 
         Returns:
             Enhanced ETL execution results
         """
-        if enable_parallel_processing is None:
-            enable_parallel_processing = self.enable_parallel
-
         emit("Starting enhanced TPC-DI ETL pipeline (Phase 3)")
         start_time = datetime.now()
         start_mono = mono_time()
@@ -2246,7 +2281,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         pipeline_results: dict[str, Any] = {
             "start_time": start_time.isoformat(),
             "enhanced_features": {
-                "parallel_processing": enable_parallel_processing,
                 "data_quality_monitoring": enable_data_quality_monitoring,
                 "error_recovery": enable_error_recovery,
             },
@@ -2285,57 +2319,42 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "success": phase2_results.get("success", False),
             }
 
-            # Phase 3: Parallel Batch Processing (if enabled)
-            if enable_parallel_processing:
-                emit("Phase 3: Parallel batch processing...")
-                phase3_start = mono_time()
+            # Phase 3: Incremental Data Loading
+            emit("Phase 3: Incremental data loading...")
+            phase3_start = mono_time()
 
-                phase3_results = self._run_parallel_batch_processing()
-                phase3_time = elapsed_seconds(phase3_start)
-
-                pipeline_results["phases"]["parallel_batch_processing"] = {
-                    "duration": phase3_time,
-                    "batches_processed": phase3_results.get("batches_processed", 0),
-                    "parallel_workers": phase3_results.get("workers_used", 0),
-                    "success": phase3_results.get("success", False),
-                }
-
-            # Phase 4: Incremental Data Loading
-            emit("Phase 4: Incremental data loading...")
-            phase4_start = mono_time()
-
-            phase4_results = self._run_incremental_data_loading(connection)
-            phase4_time = elapsed_seconds(phase4_start)
+            phase3_results = self._run_incremental_data_loading(connection)
+            phase3_time = elapsed_seconds(phase3_start)
 
             pipeline_results["phases"]["incremental_loading"] = {
-                "duration": phase4_time,
-                "incremental_batches": phase4_results.get("batches_loaded", 0),
-                "records_loaded": phase4_results.get("records_loaded", 0),
-                "success": phase4_results.get("success", False),
+                "duration": phase3_time,
+                "incremental_batches": phase3_results.get("batches_loaded", 0),
+                "records_loaded": phase3_results.get("records_loaded", 0),
+                "success": phase3_results.get("success", False),
             }
 
-            # Phase 5: Data Quality Monitoring (if enabled)
+            # Phase 4: Data Quality Monitoring (if enabled)
             if enable_data_quality_monitoring:
-                emit("Phase 5: Data quality monitoring...")
-                phase5_start = mono_time()
+                emit("Phase 4: Data quality monitoring...")
+                phase4_start = mono_time()
 
-                phase5_results = self._run_data_quality_monitoring(connection)
-                phase5_time = elapsed_seconds(phase5_start)
+                phase4_results = self._run_data_quality_monitoring(connection)
+                phase4_time = elapsed_seconds(phase4_start)
 
                 pipeline_results["phases"]["data_quality_monitoring"] = {
-                    "duration": phase5_time,
-                    "quality_rules_executed": phase5_results.get("rules_executed", 0),
-                    "quality_score": phase5_results.get("quality_score", 0.0),
-                    "issues_detected": phase5_results.get("issues_detected", 0),
-                    "success": phase5_results.get("success", False),
+                    "duration": phase4_time,
+                    "quality_rules_executed": phase4_results.get("rules_executed", 0),
+                    "quality_score": phase4_results.get("quality_score", 0.0),
+                    "issues_detected": phase4_results.get("issues_detected", 0),
+                    "success": phase4_results.get("success", False),
                 }
-                pipeline_results["quality_score"] = phase5_results.get("quality_score", 0.0)
+                pipeline_results["quality_score"] = phase4_results.get("quality_score", 0.0)
 
             # Calculate total records processed
             pipeline_results["total_records_processed"] = (
                 phase1_results.get("total_records", 0)
                 + phase2_results.get("records_processed", 0)
-                + phase4_results.get("records_loaded", 0)
+                + phase3_results.get("records_loaded", 0)
             )
 
             # Determine overall success - be more resilient to failures in advanced features
@@ -2348,12 +2367,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             # Optional phases - failure doesn't fail the entire pipeline
             optional_phase_successes = [
                 phase1_results.get("success", False),  # Advanced FinWire/CustomerMgmt processing
-                phase4_results.get("success", False),  # Incremental loading
+                phase3_results.get("success", False),  # Incremental loading
             ]
-            if enable_parallel_processing:
-                optional_phase_successes.append(phase3_results.get("success", False))
             if enable_data_quality_monitoring:
-                optional_phase_successes.append(phase5_results.get("success", False))
+                optional_phase_successes.append(phase4_results.get("success", False))
 
             # Pipeline succeeds if core phases succeed
             core_success = all(core_phase_successes)
@@ -2467,80 +2484,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         except Exception as e:
             emit(f"❌ Enhanced SCD processing failed: {e}")
-            results["error"] = str(e)
-
-        return results
-
-    def _run_parallel_batch_processing(self) -> dict[str, Any]:
-        """Run parallel batch processing."""
-        results = {"success": False, "batches_processed": 0, "workers_used": 0}
-
-        try:
-            if self.parallel_batch_processor:
-                # Submit actual batch processing tasks
-                from benchbox.core.tpcdi.etl.parallel_batch_processor import (
-                    BatchProcessingTask,
-                )
-
-                def process_historical_batch(data):
-                    return {
-                        "batch_type": "historical",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                def process_incremental_batch(data):
-                    return {
-                        "batch_type": "incremental",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                def process_staging_batch(data):
-                    return {
-                        "batch_type": "staging",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                # Create and submit actual batch processing tasks
-                tasks = [
-                    BatchProcessingTask(
-                        task_id="historical_batch",
-                        task_function=process_historical_batch,
-                        task_data={"records": int(1000 * self.scale_factor)},
-                        priority=1,
-                    ),
-                    BatchProcessingTask(
-                        task_id="incremental_batch",
-                        task_function=process_incremental_batch,
-                        task_data={"records": int(500 * self.scale_factor)},
-                        priority=2,
-                    ),
-                    BatchProcessingTask(
-                        task_id="staging_batch",
-                        task_function=process_staging_batch,
-                        task_data={"records": int(200 * self.scale_factor)},
-                        priority=3,
-                    ),
-                ]
-
-                # Submit tasks to parallel processor
-                for task in tasks:
-                    self.parallel_batch_processor.submit_task(task)
-
-                # Execute parallel batch processing
-                execution_result = self.parallel_batch_processor.execute_parallel_batch(timeout_seconds=300)
-
-                results["batches_processed"] = execution_result.get("tasks_completed", 0)
-                results["workers_used"] = min(self.max_workers, len(tasks))
-                results["success"] = execution_result.get("tasks_failed", 0) == 0
-
-                if not results["success"]:
-                    results["error"] = f"Failed tasks: {execution_result.get('tasks_failed', 0)}"
-
-        except Exception as e:
-            emit(f"❌ Parallel batch processing failed: {e}")
             results["error"] = str(e)
 
         return results
@@ -2691,7 +2634,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "finwire_processor": self.finwire_processor is not None,
                 "customer_mgmt_processor": self.customer_mgmt_processor is not None,
                 "scd_processor": self.scd_processor is not None,
-                "parallel_batch_processor": self.parallel_batch_processor is not None,
                 "incremental_loader": self.incremental_loader is not None,
                 "data_quality_monitor": self.data_quality_monitor is not None,
                 "error_recovery_manager": self.error_recovery_manager is not None,

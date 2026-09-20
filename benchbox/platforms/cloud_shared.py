@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from benchbox.core.exceptions import ConfigurationError
@@ -112,3 +113,96 @@ def validate_session_cache_control(
         cursor.close()
 
     return result
+
+
+_TPCDI_FLAG_COLUMNS = r"IsCurrent|TT_IS_SELL|HolidayFlag"
+
+
+def rewrite_tpcdi_sqlite_idioms(
+    query: str,
+    *,
+    flag_true: str,
+    flag_false: str,
+    julianday_replacement: str,
+) -> str:
+    """Rewrite TPC-DI SQL Server/SQLite idioms for engines without them.
+
+    Shared core behind the BigQuery and Databricks TPC-DI rewrites:
+
+    - BIT flag columns (IsCurrent, TT_IS_SELL, HolidayFlag) compare ``= 1``
+      / ``= 0`` against BOOLEAN columns; ``flag_true``/``flag_false`` are
+      ``re.sub`` replacement templates where ``\\1``/``\\2`` are the column
+      name and optional backtick (e.g. ``r"\\1\\2 = TRUE"``).
+    - ``DATE('now')`` becomes ``CURRENT_DATE()`` and
+      ``DATE('now', '-N days')`` becomes ``DATE_SUB(CURRENT_DATE(), N)``.
+    - ``JULIANDAY(d)`` is rendered with ``julianday_replacement``, an
+      ``re.sub`` replacement template where ``\\1`` is the inner expression
+      (e.g. ``r"(UNIX_DATE(\\1) + 2440588)"``).
+
+    Args:
+        query: TPC-DI SQL text with SQLite idioms.
+        flag_true: Replacement for ``<flag> = 1`` comparisons.
+        flag_false: Replacement for ``<flag> = 0`` comparisons.
+        julianday_replacement: Engine-specific JULIANDAY rendering.
+
+    Returns:
+        Query with portable equivalents. Day-number arithmetic is
+        preserved; in differences the added constants cancel exactly.
+    """
+    query = re.sub(
+        rf"\b({_TPCDI_FLAG_COLUMNS})(`?)\s*=\s*1\b",
+        flag_true,
+        query,
+        flags=re.IGNORECASE,
+    )
+    query = re.sub(
+        rf"\b({_TPCDI_FLAG_COLUMNS})(`?)\s*=\s*0\b",
+        flag_false,
+        query,
+        flags=re.IGNORECASE,
+    )
+    # Iterate to fixpoint so nested forms such as
+    # JULIANDAY(DATE('now')) resolve inside-out.
+    for _ in range(3):
+        rewritten = re.sub(
+            r"DATE\s*\(\s*'now'\s*,\s*'-(\d+)\s+days?'\s*\)",
+            r"DATE_SUB(CURRENT_DATE(), \1)",
+            query,
+            flags=re.IGNORECASE,
+        )
+        rewritten = re.sub(
+            r"DATE\s*\(\s*'now'\s*\)",
+            "CURRENT_DATE()",
+            rewritten,
+            flags=re.IGNORECASE,
+        )
+        rewritten = re.sub(
+            r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+            julianday_replacement,
+            rewritten,
+            flags=re.IGNORECASE,
+        )
+        if rewritten == query:
+            break
+        query = rewritten
+    return query
+
+
+def rewrite_tpcdi_for_bigquery(query: str) -> str:
+    """TPC-DI SQLite idioms with BigQuery's JULIANDAY rendering."""
+    return rewrite_tpcdi_sqlite_idioms(
+        query,
+        flag_true=r"\1\2 = TRUE",
+        flag_false=r"\1\2 = FALSE",
+        julianday_replacement=r"(UNIX_DATE(\1) + 2440588)",
+    )
+
+
+def rewrite_tpcdi_for_databricks(query: str) -> str:
+    """TPC-DI SQLite idioms with Databricks' JULIANDAY rendering."""
+    return rewrite_tpcdi_sqlite_idioms(
+        query,
+        flag_true=r"\1\2 IS TRUE",
+        flag_false=r"\1\2 IS FALSE",
+        julianday_replacement=r"(DATEDIFF(\1, '1970-01-01') + 2440588)",
+    )

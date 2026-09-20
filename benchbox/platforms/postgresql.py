@@ -527,7 +527,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         self.log_operation_complete("PostgreSQL connection", details=f"Applied: {', '.join(settings_applied)}")
         return conn
 
-    def new_stream_connection(self, connection: Any) -> Any:
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         """Open an independent PostgreSQL connection for one throughput stream.
 
         Overrides the base ``SHARED_CURSOR`` implementation: psycopg
@@ -540,13 +540,22 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         existing connection parameters, with the same session GUCs applied as
         ``create_connection`` (schema/database creation is a one-time setup
         step already done on the shared ``connection`` and is not repeated
-        here). The returned connection is closed by the caller (the
-        throughput/maintenance stream driver's ``finally`` block) -- see
-        ``PlatformAdapter.new_stream_connection()`` for the full contract.
+        here), plus the benchmark-type tuning ``configure_for_benchmark``
+        applies to the shared connection (equivalence dimension 4 - without
+        this a stream would measure vanilla planner settings while the setup
+        session measures OLAP tuning). The returned connection is closed by
+        the caller (the throughput/maintenance stream driver's ``finally``
+        block) -- see ``PlatformAdapter.new_stream_connection()`` for the
+        full contract.
 
         Args:
             connection: The adapter's shared platform connection. Not reused
                 here -- a fresh connection/session is always opened.
+            benchmark_type: Benchmark tuning vocabulary forwarded to
+                ``configure_for_benchmark`` (replay skipped when omitted);
+                resolved virtually so wire-compatible subclasses
+                (TimescaleDB, CedarDB, pg_duckdb) reapply their own tuning
+                deltas per stream.
 
         Returns:
             A new, independent psycopg connection for this stream.
@@ -580,6 +589,19 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # same way as the setup connection instead of running as vanilla
             # PostgreSQL. No-op for the base adapter.
             self._apply_stream_session_state(conn)
+
+            # Reapply the benchmark-type session tuning the shared connection
+            # carries (equivalence dimension 4): configure_for_benchmark runs
+            # against the setup connection during the tuning phase, and a
+            # stream that skipped it would measure different planner settings.
+            # Virtual dispatch reapplies wire-compatible subclass deltas
+            # (TimescaleDB chunk skipping, CedarDB OLAP plan shapes,
+            # pg_duckdb forced DuckDB routing, QuestDB parallel-filter SETs).
+            # Replay happens only when the caller supplies benchmark_type
+            # (the throughput drivers always do): maintenance and legacy
+            # callers that pass nothing keep their exact previous behavior.
+            if benchmark_type is not None:
+                self.configure_for_benchmark(conn, benchmark_type)
 
             conn.commit()
             return conn

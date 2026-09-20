@@ -27,7 +27,7 @@ if TYPE_CHECKING:
         UnifiedTuningConfiguration,
     )
 
-from .base import DriverIsolationCapability, PlatformAdapter
+from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
 
 try:
     import sqlite3
@@ -197,6 +197,11 @@ class SQLiteAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
     plan_capture_phase_eligible = True
+    # SQLite serves throughput streams from cursors of the single connection:
+    # the adapter defaults ``check_same_thread`` to False (cross-thread use
+    # is an explicit opt-in, not an accident) against one process-local file,
+    # so per-stream cursors share one session exactly like the DuckDB tier.
+    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
     def platform_name(self) -> str:

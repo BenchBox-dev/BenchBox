@@ -645,6 +645,25 @@ class TestDatabricksAdapter:
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):
+        """TPC power harness passes a per-stream cursor without cursor()."""
+        mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+        )
+
+        result = adapter.execute_query(mock_cursor, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        mock_cursor.execute.assert_called_with("SELECT 1")
+        mock_cursor.close.assert_not_called()
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_get_query_statistics(self, mock_databricks_sql):
         """Test query statistics retrieval (method not implemented)."""
         adapter = DatabricksAdapter(
@@ -1209,6 +1228,39 @@ class TestDatabricksSqlGenerationHelpers:
             )
 
         adapter.validate_external_table_requirements()
+
+
+class TestNormalizeDatabricksQuery:
+    """Test _normalize_databricks_query execution normalizations."""
+
+    def _make_adapter(self, **kwargs):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            defaults = {
+                "server_hostname": "test.cloud.databricks.com",
+                "http_path": "/sql/1.0/warehouses/test",
+                "access_token": "tok",
+            }
+            defaults.update(kwargs)
+            return DatabricksAdapter(**defaults)
+
+    def test_duplicate_output_names_gain_suffix(self):
+        """Second occurrence of a duplicate output name is suffixed."""
+        adapter = self._make_adapter()
+        result = adapter._normalize_databricks_query("SELECT a.syear, b.syear, a.cnt FROM t AS a, t AS b")
+        assert "syear_2" in result
+        assert "cnt" in result
+
+    def test_unique_outputs_unchanged(self):
+        """Queries without duplicates pass through byte-identical."""
+        adapter = self._make_adapter()
+        query = "SELECT a, b FROM t WHERE c = 1"
+        assert adapter._normalize_databricks_query(query) == query
+
+    def test_division_routes_through_try_divide(self):
+        """Zero divisors return NULL instead of raising DIVIDE_BY_ZERO."""
+        adapter = self._make_adapter()
+        result = adapter._normalize_databricks_query("SELECT x / y FROM t")
+        assert "TRY_DIVIDE" in result
 
 
 class TestConvertToDeltaTable:
@@ -2107,7 +2159,7 @@ class TestCopyIntoSqlGeneration:
         assert "'dbfs:/Volumes/main/bench/data/region.tbl'" in copy_sql
 
     def test_copy_into_with_wildcard_for_sharded(self):
-        """Wildcard patterns should be passed through to COPY INTO."""
+        """A bare glob with no expandable files must fail loudly, never reach COPY INTO."""
         adapter = self._make_adapter()
         benchmark = Mock(spec=[])
         cursor = Mock()
@@ -2115,18 +2167,18 @@ class TestCopyIntoSqlGeneration:
         conn = Mock()
 
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
-            adapter._load_single_table(
-                cursor,
-                conn,
-                benchmark,
-                "lineitem",
-                "dbfs:/Volumes/main/bench/data/lineitem.tbl.*",
-                "dbfs:/Volumes/main/bench/data",
-                {"lineitem"},
-            )
+            with pytest.raises(ValueError, match="does not accept glob"):
+                adapter._load_single_table(
+                    cursor,
+                    conn,
+                    benchmark,
+                    "lineitem",
+                    "dbfs:/Volumes/main/bench/data/lineitem.tbl.*",
+                    "dbfs:/Volumes/main/bench/data",
+                    {"lineitem"},
+                )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
-        assert "lineitem.tbl.*" in copy_sql
+        assert not any("COPY INTO" in str(call.args[0]) for call in cursor.execute.call_args_list)
 
     def test_load_single_table_raises_when_table_missing(self):
         adapter = self._make_adapter()

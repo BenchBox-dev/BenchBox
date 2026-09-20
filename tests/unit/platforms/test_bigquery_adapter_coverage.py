@@ -1885,15 +1885,16 @@ class TestNormalizeTableNamesCase:
         # Pattern requires lowercase start, so LINEITEM won't change; result equals input
         assert "`LINEITEM`" in result
 
-    def test_mixed_case_single_word_not_matched(self):
-        """Mixed-case identifiers starting with uppercase are not matched by the pattern."""
+    def test_mixed_case_single_word_uppercased(self):
+        """Mixed-case identifiers normalize to UPPERCASE to match the schema."""
         adapter = _make_adapter()
 
         query = "SELECT * FROM `LineItem`"
         result = adapter._normalize_table_names_case(query)
 
-        # Pattern requires [a-z_] start; LineItem won't match, stays as is
-        assert "`LineItem`" in result
+        # Backtick-quoted identifiers are case-sensitive in BigQuery while
+        # tables are stored UPPERCASE, so LineItem must become LINEITEM
+        assert "`LINEITEM`" in result
 
     def test_full_path_backtick_not_matched_by_single_word_pattern(self):
         """Full paths like `proj.ds.table` are not matched - dots outside char class."""
