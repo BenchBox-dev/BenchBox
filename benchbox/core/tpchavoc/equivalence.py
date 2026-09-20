@@ -113,7 +113,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -210,20 +210,15 @@ def _identity(sql: str) -> str:
     return sql
 
 
-def _identity_rows(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
-    """Default row normalization: compare fetched cells byte-for-byte."""
-    return rows
-
-
-def _rstrip_string_cells(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
-    """Strip trailing whitespace from string cells, leaving other cells intact.
-
-    Mirrors SQL ``CHAR(n)`` comparison semantics (trailing spaces insignificant)
-    for samples where an engine returns an expression-over-``CHAR`` column as a
-    non-padded string. Leading whitespace is preserved: only padding can be
-    added by blank-padding, so only trailing whitespace may be removed.
-    """
-    return [tuple(cell.rstrip() if isinstance(cell, str) else cell for cell in row) for row in rows]
+def _rstrip_char_cells(rows: list[tuple[Any, ...]], column_indexes: Collection[int]) -> list[tuple[Any, ...]]:
+    """Strip ASCII blank-padding only from columns known to have ``CHAR`` semantics."""
+    indexes = set(column_indexes)
+    return [
+        tuple(
+            cell.rstrip(" ") if index in indexes and isinstance(cell, str) else cell for index, cell in enumerate(row)
+        )
+        for row in rows
+    ]
 
 
 def find_divergences(
@@ -235,7 +230,7 @@ def find_divergences(
     translate_variant: Callable[[str], str] | None = None,
     skip_variants: Collection[str] | None = None,
     execute_transform: Callable[[str], str] | None = None,
-    char_padding_tolerance: bool = False,
+    char_padding_columns: Mapping[int, Collection[int]] | None = None,
 ) -> list[Divergence]:
     """Compare every variant of each query to canonical TPC-H on ``connection``.
 
@@ -274,17 +269,10 @@ def find_divergences(
             sample exercises the real execution path; applied identically to
             canonical and variant, so shared transforms still cancel out. Defaults
             to identity, leaving the DuckDB/Postgres/DataFusion samples unchanged.
-        char_padding_tolerance: When True, strip TRAILING whitespace from string
-            cells on both sides before validation. SQL ``CHAR(n)`` comparison
-            ignores trailing spaces, but wrapping a ``CHAR`` column in an
-            expression (e.g. the v10 ``CASE``-over-``o_orderpriority``/``n_name``/
-            ``l_shipmode`` variants) changes the presentation type to a
-            non-padded string on engines like PostgreSQL while remaining
-            semantically equal - a strict byte comparison then flags a
-            divergence that is not a translation defect. Leading whitespace
-            stays significant, so a genuine leading-space transcription error is
-            still caught. Defaults to False, keeping the hard DuckDB gate
-            byte-strict; the PostgreSQL second-engine sample opts in.
+        char_padding_columns: Optional mapping of query ID to result-column
+            indexes whose source SQL type is ``CHAR``. Only ASCII space padding
+            in those columns is ignored. Other string columns and all other
+            whitespace remain byte-strict.
 
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
@@ -311,10 +299,10 @@ def find_divergences(
     ids = query_ids if query_ids is not None else benchmark.get_implemented_queries()
     render_variant = translate_variant if translate_variant is not None else _identity
     transform_for_engine = execute_transform if execute_transform is not None else _identity
-    normalize = _rstrip_string_cells if char_padding_tolerance else _identity_rows
     excluded = set(skip_variants or ())
     divergences: list[Divergence] = []
     for query_id in ids:
+        normalize = lambda rows: _rstrip_char_cells(rows, (char_padding_columns or {}).get(query_id, ()))
         try:
             original = normalize(
                 connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
@@ -625,8 +613,7 @@ def _dialect_sample_divergences(
     Both sides are rendered into ``target_dialect`` through the same
     translation (``netezza`` -> target for variants) so shared translation
     cancels out; ``skip_variants`` are excluded, never marked equivalent.
-    Extra ``sweep_kwargs`` pass through to :func:`find_divergences` (e.g. an
-    engine's ``execute_transform`` or ``char_padding_tolerance``).
+    Extra ``sweep_kwargs`` pass through to :func:`find_divergences`.
     """
     return find_divergences(
         connection,
@@ -663,10 +650,9 @@ def find_postgres_divergences(
         POSTGRES_TARGET_DIALECT,
         POSTGRES_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        # Expression-over-CHAR variants (e.g. v10 CASE) come back unpadded on
-        # PostgreSQL while canonical CHAR columns stay blank-padded; both are
-        # semantically equal under CHAR comparison semantics.
-        char_padding_tolerance=True,
+        # Keep PostgreSQL's expression-over-CHAR exception limited to result
+        # columns whose TPC-H source type is actually CHAR.
+        char_padding_columns={4: (0,), 5: (0,), 7: (0, 1), 12: (0,)},
     )
 
 

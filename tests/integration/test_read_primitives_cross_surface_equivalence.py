@@ -99,7 +99,7 @@ def test_read_primitives_expression_frame_dtypes_match_sql(tmp_path):
     equal-looking values passes the gate above silently. This dtype cell
     compares per-column dtype categories instead. Pandas frames are out of
     scope (numpy/object dtypes carry no type signal; value comparison remains
-    their guard). Classified value-divergence cells are skipped by the caller.
+    their guard). Dtype waivers are separate from value-divergence waivers.
     Legitimately-empty selective filters are NOT skipped: empty Arrow tables
     and empty Polars frames retain their declared source-column schemas, so a
     loader regression (e.g. Decimal/String becoming Null) stays detectable
@@ -122,7 +122,7 @@ def test_read_primitives_expression_frame_dtypes_match_sql(tmp_path):
             dataframe_query=data.dataframe_query,
             contexts=contexts,
             backends=("expression",),
-            skip_keys=frozenset(gate.known_divergences),
+            skip_keys=gate.dtype_skip_keys,
             # Only the computed-over-empty JSON query is skipped (see
             # docstring); the selective filters compare schemas with zero rows.
             skip_query_ids=frozenset({"json_extract_nested"}),

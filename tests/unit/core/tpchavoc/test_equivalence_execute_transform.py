@@ -115,22 +115,26 @@ def test_clickhouse_execute_transform_keeps_windowed_divisor_intact():
 
 
 @pytest.mark.parametrize(
-    ("canonical", "variant", "tolerance", "expected_keys"),
+    ("canonical", "variant", "padding_columns", "expected_keys"),
     [
         # Padded canonical vs stripped variant diverges under the strict default.
-        ([("1-URGENT       ", 1)], [("1-URGENT", 1)], False, ["1_v1"]),
+        ([("1-URGENT       ", 1)], [("1-URGENT", 1)], None, ["1_v1"]),
         # Opt-in tolerance accepts blank-padding but nothing else.
-        ([("1-URGENT       ", 1)], [("1-URGENT", 1)], True, []),
+        ([("1-URGENT       ", 1)], [("1-URGENT", 1)], {1: (0,)}, []),
         # Leading whitespace is never padding: still diverges when opted in.
-        ([("  1-URGENT", 1)], [("1-URGENT", 1)], True, ["1_v1"]),
+        ([("  1-URGENT", 1)], [("1-URGENT", 1)], {1: (0,)}, ["1_v1"]),
         # A genuinely different value still diverges when opted in.
-        ([("1-URGENT       ", 1)], [("2-HIGH", 1)], True, ["1_v1"]),
+        ([("1-URGENT       ", 1)], [("2-HIGH", 1)], {1: (0,)}, ["1_v1"]),
+        # VARCHAR/TEXT remains strict beside a declared CHAR column.
+        ([("1-URGENT       ", "comment ")], [("1-URGENT", "comment")], {1: (0,)}, ["1_v1"]),
+        # Tabs and newlines are data, not SQL CHAR blank-padding.
+        ([("1-URGENT\t", 1)], [("1-URGENT", 1)], {1: (0,)}, ["1_v1"]),
     ],
 )
-def test_char_padding_tolerance(canonical, variant, tolerance, expected_keys):
-    """Trailing-only normalization: padding accepted, leading/value diffs kept."""
+def test_char_padding_tolerance(canonical, variant, padding_columns, expected_keys):
+    """Only declared CHAR columns accept ASCII blank-padding."""
     conn = _padding_connection(canonical, variant)
     divergences = find_divergences(
-        conn, _benchmark_validating_strictly(), lambda q: "SELECT 1", char_padding_tolerance=tolerance
+        conn, _benchmark_validating_strictly(), lambda q: "SELECT 1", char_padding_columns=padding_columns
     )
     assert [d.key for d in divergences] == expected_keys

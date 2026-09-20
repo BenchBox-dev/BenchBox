@@ -420,6 +420,11 @@ class CrossSurfaceGate:
     # for a deliberate, defensible presentational difference - never to mute a
     # regression.
     known_divergences: dict[str, str | ClassifiedDivergence] = field(default_factory=dict)
+    # Dtype waivers are deliberately separate from value divergences. A cell
+    # may have an accepted approximate or tie-broken value while its schema is
+    # still required to match. Add only representation pairs that cannot share
+    # a useful dtype category (for example SQL JSON text vs a native list).
+    dtype_skip_keys: frozenset[str] = frozenset()
     # Queries whose SQL reference legitimately returns 0 rows at the bounded
     # cell, keyed by query id, with a rationale string. A both-empty cell
     # compares empty-vs-empty and is NON-discriminating (every backend trivially
@@ -1477,6 +1482,15 @@ GATES: dict[str, CrossSurfaceGate] = {
         name="read_primitives",
         build=build_read_primitives_duckdb,
         known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
+        dtype_skip_keys=frozenset(
+            {
+                "approx_quantile_groupby_expression",
+                "json_aggregates_expression",
+                "map_access_expression",
+                "map_construction_expression",
+                "map_keys_values_expression",
+            }
+        ),
         legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
         # Pandas decodes selected SQL NULL cells as NaN in object/numeric result
         # columns (for example MAP lookup misses and LEAD/LAG frame edges). Keep

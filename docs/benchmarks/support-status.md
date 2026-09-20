@@ -91,7 +91,9 @@ are applied here: this matrix documents status, it does not change it.
   routing decision) is the concrete blocker. Tracked as a deferred follow-up on
   `benchmark-support-status-criteria-matrix`.
 - **External-dataset betas (`nyctaxi`, `flightdata`):** promotion is gated on a
-  pinned, reproducible external-source contract, not on query coverage.
+  complete set of reviewed SHA-256 pins for the default external corpus, not
+  on query coverage. Until those maps are populated, generated corpora record
+  observed hashes but remain ineligible for stable promotion.
 - **Experimental families (`tpcds_obt`, `datavault`):** they now inherit
   `benchbox.base.BaseBenchmark`. Reassess promotion on their own evidence, not
   on the deprecated internal-base migration.

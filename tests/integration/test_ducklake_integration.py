@@ -387,6 +387,50 @@ class TestDuckLakeSqliteCatalogLive:
         assert parquet_files, f"Expected DuckLake Parquet data files under {databases_dir}"
 
 
+class TestDuckLakeWritePrimitivesLive:
+    """Representative exact-head proof for DuckLake write-operation routing."""
+
+    def setup_method(self) -> None:
+        _skip_unless_extensions("ducklake")
+
+    def test_write_primitives_success_and_engine_specific_skip(self, tmp_path: Path) -> None:
+        result = run_cli_command(
+            [
+                "run",
+                "--platform",
+                "ducklake",
+                "--benchmark",
+                "write_primitives",
+                "--scale",
+                "0.01",
+                "--queries",
+                "insert_single_row,merge_scd_type2_basic,ddl_create_index_on_existing",
+                "--non-interactive",
+            ],
+            cwd=tmp_path,
+        )
+        assert result.returncode == 0, (
+            f"benchbox run failed (exit {result.returncode}).\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+
+        result_files = sorted((tmp_path / "benchmark_runs" / "results").glob("*.json"))
+        assert len(result_files) == 1, result_files
+        payload = json.loads(result_files[0].read_text(encoding="utf-8"))
+        assert payload["summary"]["validation"] == "passed"
+        assert payload["summary"]["queries"]["failed"] == 0
+        statuses: dict[str, set[str]] = {}
+        for query in payload["queries"]:
+            statuses.setdefault(query["id"], set()).add(query["status"])
+        assert statuses["insert_single_row"] == {"SUCCESS"}
+        assert statuses["merge_scd_type2_basic"] == {"SUCCESS"}
+        assert statuses["ddl_create_index_on_existing"] == {"SKIPPED"}
+        assert payload["platform"]["config"]["catalog_backend"] == "duckdb"
+
+        databases_dir = tmp_path / "benchmark_runs" / "databases"
+        assert list(databases_dir.rglob("*.ducklake"))
+        assert list(databases_dir.rglob("*.parquet"))
+
+
 # =============================================================================
 # 3. PostgreSQL catalog - live, gated behind Docker-service reachability
 # =============================================================================

@@ -105,3 +105,12 @@ def test_skips_are_honored(typed_conn):
     divergences, compared = _run(typed_conn, _query(frame), skip_query_ids=frozenset({"q1"}))
     assert divergences == []
     assert compared == {"expression": 0}
+
+
+def test_value_divergence_key_is_checked_without_explicit_dtype_waiver(typed_conn):
+    """Value-level exceptions must not implicitly suppress dtype checking."""
+    frame = pl.DataFrame({"a": [None, None], "b": [1, 2]})
+    divergences, compared = _run(typed_conn, _query(frame), skip_keys=frozenset())
+
+    assert compared == {"expression": 1}
+    assert any("reference string, frame null" in divergence.detail for divergence in divergences)
