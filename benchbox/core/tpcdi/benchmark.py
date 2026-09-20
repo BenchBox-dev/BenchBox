@@ -176,7 +176,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         # Initialize components
         self.query_manager = TPCDIQueryManager()
-        self.data_generator = TPCDIDataGenerator(self.config.scale_factor, self.output_dir, **kwargs)
+        generator_kwargs = dict(kwargs)
+        generator_kwargs.setdefault("generation_seed", getattr(self.config, "generation_seed", 42))
+        self.data_generator = TPCDIDataGenerator(self.config.scale_factor, self.output_dir, **generator_kwargs)
 
         # Initialize new integrated systems
         self.schema_manager = TPCDISchemaManager()
@@ -226,13 +228,21 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self.staging_dir = config.staging_dir
         self.warehouse_dir = config.warehouse_dir
 
-    def generate_data(self, tables: Optional[list[str]] = None, output_format: str = "csv") -> list[Union[str, Path]]:
+    def generate_data(
+        self,
+        tables: Optional[list[str]] = None,
+        output_format: str = "csv",
+        seed: Optional[int] = None,
+    ) -> list[Union[str, Path]]:
         """Generate TPC-DI data.
 
         Args:
             tables: Optional list of tables to generate. If None, generates all.
             output_format: Format for output data (only "csv" supported
                 currently)
+            seed: Optional explicit generation seed for this request,
+                overriding the configured generation_seed. Recorded in output
+                metadata with the generation algorithm version.
 
         Returns:
             List of paths to generated data files
@@ -243,6 +253,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
+        # Duck-typed generators (including test doubles) may not carry a
+        # generation_seed attribute; only real generators participate in the
+        # request-scoped override contract below.
+        original_generation_seed = getattr(self.data_generator, "generation_seed", None)
+        if seed is not None:
+            self.data_generator.generation_seed = int(seed)
+
         if tables is None:
             tables = list(TABLES.keys())
 
@@ -251,8 +268,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if invalid_tables:
             raise ValueError(f"Invalid table names: {invalid_tables}")
 
-        self.tables = self.data_generator.generate_data(tables)
-        return list(self.tables.values())
+        try:
+            self.tables = self.data_generator.generate_data(tables)
+            return list(self.tables.values())
+        finally:
+            # A request override must not change the benchmark instance's
+            # configured seed for a later generation request.
+            self.data_generator.generation_seed = original_generation_seed
 
     def get_query(
         self,
