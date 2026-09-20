@@ -496,7 +496,9 @@ benchbox-fixture-key-material
             [(True, 100, 0, 0, "LOADED", None)],  # Copy results
             [(100,)],  # Row count
         ]
-        mock_cursor.fetchone.return_value = (100,)  # Row count query
+        # Existence check sees an empty table so the upload proceeds; the
+        # final row-count query reports the loaded rows.
+        mock_cursor.fetchone.side_effect = [(0,), (100,)]
 
         mock_benchmark = Mock()
 
@@ -544,7 +546,8 @@ benchbox-fixture-key-material
             [(True, 100, 0, 0, "LOADED", None)],  # Copy results
             [(100,)],  # Row count
         ]
-        mock_cursor.fetchone.return_value = (100,)
+        # Existence check sees an empty table so the timed load proceeds.
+        mock_cursor.fetchone.side_effect = [(0,), (100,)]
 
         mock_benchmark = Mock()
 
@@ -939,7 +942,8 @@ benchbox-fixture-key-material
         """Stage loading should PUT each file, execute COPY INTO, and return the counted rows."""
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
-        mock_cursor.fetchone.return_value = (5,)
+        # Existence check sees an empty table so the upload proceeds.
+        mock_cursor.fetchone.side_effect = [(0,), (5,)]
 
         adapter = SnowflakeAdapter(
             account="test_account",
@@ -978,7 +982,8 @@ benchbox-fixture-key-material
         """Fallback to lowercase quoted stage and table name when uppercase stage reports does not exist."""
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
-        mock_cursor.fetchone.return_value = (10,)
+        # Existence check sees an empty table so the upload proceeds.
+        mock_cursor.fetchone.side_effect = [(0,), (10,)]
 
         # First PUT on @%LINEITEM raises, subsequent calls succeed
         def mock_execute(sql):
@@ -1011,6 +1016,34 @@ benchbox-fixture-key-material
         assert any(f"PUT file://{path.absolute()} @%LINEITEM" in sql for sql in execute_calls)
         assert any(f'PUT file://{path.absolute()} @%"lineitem"' in sql for sql in execute_calls)
         assert any('COPY INTO "lineitem"' in sql for sql in execute_calls)
+
+    def test_load_table_from_stage_skips_when_table_holds_rows(self):
+        """Idempotent reruns skip PUT/COPY when the target already holds rows."""
+        mock_cursor = Mock()
+        mock_cursor.fetchone.return_value = (100,)
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".tbl", delete=False) as f:
+            f.write(b"1|one|\n")
+            path = Path(f.name)
+
+        try:
+            row_count = adapter._load_table_from_stage(mock_cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert row_count == 100
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert not any("PUT file://" in sql for sql in execute_calls)
+        assert not any("COPY INTO" in sql for sql in execute_calls)
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_olap(self, mock_snowflake):
