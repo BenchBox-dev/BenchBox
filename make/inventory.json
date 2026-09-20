@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "0876ef6178923af757483a7310ae07077c9b2c21457cbdb6882197e4af55402e",
+  "contract_sha256": "cb52ed814bcdf8cb3f841a3f3a9bd14d895294772ca1adce4763181f1a951e42",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -103,6 +103,7 @@
     "pr-preflight",
     "pr-preflight-fast-tests",
     "pr-preflight-focused-tests",
+    "pr-preflight-medium-tests",
     "pr-preflight-uncached",
     "pr-ready",
     "pr-refresh",
@@ -1237,8 +1238,8 @@
       },
       {
         "header": "pr-review-followups:",
-        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
-        "recipe_sha256": "c8851c8e77365d6cc387449a3ecf939c549f3cb87c13993caa633ab4a2986615"
+        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
+        "recipe_sha256": "4c57721350a23e79652ec2ea1b843fbf43ae6363c5063bbb692cf1b69757b956"
       }
     ],
     "pr-review-followups-list": [
@@ -1249,8 +1250,8 @@
       },
       {
         "header": "pr-review-followups-list:",
-        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
-        "recipe_sha256": "15af64c2d95acde8c5e6b4eaf3141f5524f00629ea207c84a542f3edc6f3c633"
+        "recipe": "\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
+        "recipe_sha256": "def3c27a52e57395bf88402913b5c68100787c2fd35369c400d2219b584bdb38"
       }
     ],
     "pr-status": [
@@ -2113,7 +2114,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "60695bb12fea3a25d84f9409bb9d800664aae9553d0e706902bd662a17ce28b6",
+  "semantic_sha256": "a30141a7b0d7967b7bae1deee195a6cbf0f54194bf699b07c798a6f7c4a0daad",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2150,6 +2151,12 @@
       "kind": "variable",
       "name": "PR_REVIEW_INCLUDE_RESOLVED",
       "sha256": "b3580c2d9a6eac4f66ca8556373515fcc1fdb5f9ca96bd42617cb8e3efcf9f4b"
+    },
+    {
+      "body": "PR_REVIEW_INCLUDE_POST_MERGE ?= 0",
+      "kind": "variable",
+      "name": "PR_REVIEW_INCLUDE_POST_MERGE",
+      "sha256": "213905a3714eb2da9677e0f1863e761c61790b1472a02fd60d48e1f553342e7d"
     },
     {
       "body": "PR_REVIEW_FAIL_ON_PENDING ?= 0",
@@ -2242,9 +2249,9 @@
       "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
+      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
       "kind": "rule",
-      "sha256": "ac613c1d66bc7cc7e819c53fe3f703cd531895ebe823b96c21cbe94ad8b16b99",
+      "sha256": "41d0a306960535105483f02dabc0468926c2e7fa66c8d4708390cd94b7725ec3",
       "targets": [
         ".PHONY"
       ]
@@ -3940,17 +3947,17 @@
       ]
     },
     {
-      "body": "pr-review-followups-list:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
+      "body": "pr-review-followups-list:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
       "kind": "rule",
-      "sha256": "16658e3c4e23217a4e00d93c2b5fe6649fbb45e1a7e90f72190d1ab03045b7c3",
+      "sha256": "62919477cf9fabbe481a36f78cd3630f1f674fbbe3ccbcce91defd5254d5c733",
       "targets": [
         "pr-review-followups-list"
       ]
     },
     {
-      "body": "pr-review-followups:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
+      "body": "pr-review-followups:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
       "kind": "rule",
-      "sha256": "a0df6871a1f58e2dc8526f94f5348f7f585882674f0b698abbee200d21031ea1",
+      "sha256": "b7a3f2964bb583d63b485d26add4afbf3e8774f4e328e398d9e9362ee974d9d9",
       "targets": [
         "pr-review-followups"
       ]
@@ -4746,6 +4753,13 @@
     "PR_REVIEW_FAIL_ON_PENDING": [
       {
         "body": "PR_REVIEW_FAIL_ON_PENDING ?= 0",
+        "directive": "",
+        "operator": "?="
+      }
+    ],
+    "PR_REVIEW_INCLUDE_POST_MERGE": [
+      {
+        "body": "PR_REVIEW_INCLUDE_POST_MERGE ?= 0",
         "directive": "",
         "operator": "?="
       }

@@ -571,7 +571,7 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 suggested_phase="benchmark_gate",
                 description="caps.unsupported_benchmarks access - benchmark_gate preflight",
             )
-        # Current CLI shape: getattr(caps, "unsupported_benchmarks", None)
+        # Legacy CLI shape: getattr(caps, "unsupported_benchmarks", None)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -587,6 +587,26 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 platforms=[],
                 suggested_phase="benchmark_gate",
                 description="getattr(caps, 'unsupported_benchmarks') - benchmark_gate preflight",
+            )
+        # Explicit compatibility API: PlatformRegistry.get_benchmark_block_reason(),
+        # get_unsupported_benchmarks(), or is_benchmark_supported() call sites.
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr
+            in (
+                "get_benchmark_block_reason",
+                "get_unsupported_benchmarks",
+                "is_benchmark_supported",
+            )
+        ):
+            yield InventoryEntry(
+                file=rel,
+                line=node.lineno,
+                kind="benchmark_gate",
+                platforms=[],
+                suggested_phase="benchmark_gate",
+                description=f"{node.func.attr}() - benchmark_gate preflight via compatibility API",
             )
 
 

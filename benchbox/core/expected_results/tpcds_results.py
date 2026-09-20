@@ -63,27 +63,38 @@ from benchbox.core.expected_results.models import (
 
 logger = logging.getLogger(__name__)
 
-# Module-level configuration for validation mode override
-_query_validation_mode_override: ValidationMode | None = None
+# Module-level configuration for validation mode from benchmark runners.
+# This is the cross-thread production channel: drivers set it once per run
+# phase and stream workers read it at validation time. Concurrent runs that
+# need isolation must use per-thread run context instead (see
+# set_query_validation_mode), which takes precedence over this value.
+# Cached answer objects never incorporate this value.
 _config_validation_mode_override: str | None = None
 
 
 def set_query_validation_mode(mode: ValidationMode | None) -> None:
-    """Set query validation mode override for TPC-DS.
+    """Set query validation mode override for TPC-DS, for the CURRENT THREAD.
 
-    This affects validation for TPC-DS queries, which default to SKIP mode due to
-    parameterization. Use with caution - EXACT mode requires seed alignment.
+    The override is stored in thread-local run context (see
+    benchbox.core.validation.query_validation.set_validation_mode_context),
+    so concurrent runs on other threads never observe it. Cached answer
+    objects are policy-independent; the override is applied at validation
+    time, never baked into the cache.
+
+    TPC-DS queries default to SKIP mode due to parameterization. Use with
+    caution - EXACT mode requires seed alignment.
 
     Args:
-        mode: Validation mode to use (EXACT, SKIP, RANGE, LOOSE), or None to use default (SKIP)
+        mode: Validation mode to use (EXACT, SKIP, RANGE, LOOSE), or None to clear
 
     Example:
         >>> from benchbox.core.expected_results.models import ValidationMode
         >>> from benchbox.core.expected_results.tpcds_results import set_query_validation_mode
         >>> set_query_validation_mode(ValidationMode.EXACT)
     """
-    global _query_validation_mode_override
-    _query_validation_mode_override = mode
+    from benchbox.core.validation.query_validation import set_validation_mode_context
+
+    set_validation_mode_context(mode)
     if mode is not None:
         logger.info(f"Query validation mode override set to: {mode.value}")
 
@@ -105,36 +116,44 @@ def set_config_validation_mode(mode_str: str | None) -> None:
 
 
 def get_query_validation_mode() -> ValidationMode:
-    """Get the current query validation mode for TPC-DS.
+    """Get the run-shared query validation mode for TPC-DS.
+
+    This reads only run-shared channels (benchmark-runner config, then the
+    BENCHBOX_QUERY_VALIDATION_MODE environment variable). Per-thread run
+    context, when set, takes precedence over this value; see
+    benchbox.core.validation.query_validation.get_validation_mode_context.
+    Cached answer objects never incorporate this value.
 
     Checks in order:
-    1. Module-level override set via set_query_validation_mode() (programmatic)
-    2. Config override set via set_config_validation_mode() (from CLI --validation-mode)
-    3. Environment variable BENCHBOX_QUERY_VALIDATION_MODE (backward compatibility)
-    4. Default: SKIP (safe for parameterized queries)
+    1. Config override set via set_config_validation_mode() (from CLI --validation-mode)
+    2. Environment variable BENCHBOX_QUERY_VALIDATION_MODE (backward compatibility)
+    3. Default: SKIP (safe for parameterized queries)
+
+    The string "disabled" explicitly maps to SKIP (validation off).
 
     Returns:
         ValidationMode to use for TPC-DS queries
     """
-    # Check module-level override first (programmatic takes precedence)
-    if _query_validation_mode_override is not None:
-        return _query_validation_mode_override
-
     # Check config override (from CLI --validation-mode flag)
     if _config_validation_mode_override is not None:
+        normalized = _config_validation_mode_override.lower()
+        if normalized == "disabled":
+            return ValidationMode.SKIP
         try:
-            mode = ValidationMode(_config_validation_mode_override)
+            mode = ValidationMode(normalized)
             logger.debug(f"Using query validation mode from config: {mode.value}")
             return mode
         except ValueError:
             logger.warning(
                 f"Invalid config validation mode: {_config_validation_mode_override}. "
-                f"Valid values: exact, loose, range, skip. Using default: skip"
+                f"Valid values: exact, loose, range, skip, disabled. Using default: skip"
             )
 
     # Check environment variable (backward compatibility)
     env_mode = os.environ.get("BENCHBOX_QUERY_VALIDATION_MODE", "").lower()
     if env_mode:
+        if env_mode == "disabled":
+            return ValidationMode.SKIP
         try:
             mode = ValidationMode(env_mode)
             logger.info(f"Using query validation mode from environment: {mode.value}")
@@ -142,7 +161,7 @@ def get_query_validation_mode() -> ValidationMode:
         except ValueError:
             logger.warning(
                 f"Invalid BENCHBOX_QUERY_VALIDATION_MODE: {env_mode}. "
-                f"Valid values: exact, loose, range, skip. Using default: skip"
+                f"Valid values: exact, loose, range, skip, disabled. Using default: skip"
             )
 
     # Default to SKIP (safe default for parameterized TPC-DS queries)
@@ -184,38 +203,29 @@ def get_tpcds_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRe
         # Add specific queries here if identified as scale-independent
     }
 
-    # Get validation mode (can be overridden via environment variable or programmatically)
-    validation_mode = get_query_validation_mode()
+    # Cached answer data is policy-independent: every object carries the safe
+    # SKIP default and the effective validation mode is resolved per run at
+    # validation time (per-thread run context, then run-shared config/env).
+    # Baking another run's mode into these objects would leak policy across
+    # concurrent runs sharing the cache.
+    mode_notes = (
+        "Cached TPC-DS answer-file expectation. The effective validation mode "
+        "is resolved per run at validation time (default SKIP, safe because "
+        "TPC-DS queries are parameterized with random substitution values "
+        "controlled by RNGSEED while the answer files represent ONE specific "
+        "parameterization). To enable EXACT validation, set "
+        "BENCHBOX_QUERY_VALIDATION_MODE=exact or call "
+        "set_query_validation_mode(ValidationMode.EXACT)."
+    )
 
     for query_id, row_count in row_counts.items():
         is_scale_independent = scale_independent_queries.get(query_id, False)
-
-        # Build notes based on validation mode
-        if validation_mode == ValidationMode.SKIP:
-            mode_notes = (
-                "Validation set to SKIP because TPC-DS queries are parameterized with random "
-                "substitution values controlled by RNGSEED. The answer files represent ONE specific "
-                "parameterization, while benchmark runs may use different seeds. "
-                "To enable EXACT validation, set BENCHBOX_QUERY_VALIDATION_MODE=exact or call "
-                "set_query_validation_mode(ValidationMode.EXACT)."
-            )
-        elif validation_mode == ValidationMode.EXACT:
-            mode_notes = (
-                "Validation set to EXACT mode (override enabled). "
-                "Query results MUST match answer files exactly. Failures indicate either: "
-                "(1) seed mismatch between power test and answer generation, "
-                "(2) platform-specific differences (NULL sorting, precision), or "
-                "(3) incorrect query execution. "
-                "Power test uses parameter seed = base_seed + stream_id + 1000 (e.g., seed=1001 for stream 0 with base_seed=1)."
-            )
-        else:
-            mode_notes = f"Validation mode: {validation_mode.value}"
 
         query_results[query_id] = ExpectedQueryResult(
             query_id=query_id,
             scale_factor=scale_factor,
             expected_row_count=row_count,
-            validation_mode=validation_mode,
+            validation_mode=ValidationMode.SKIP,
             scale_independent=is_scale_independent,
             notes=f"Expected result from TPC-DS answer file for SF={scale_factor}. {mode_notes}",
         )

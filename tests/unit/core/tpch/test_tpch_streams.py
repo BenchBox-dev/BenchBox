@@ -511,18 +511,13 @@ class TestTPCHStreamRunnerAdditional:
             runner.run_stream(stream_file, stream_id=0)
 
     def test_run_concurrent_streams_raises_not_implemented_no_longer_uses_executor(self, tmp_path):
-        """run_concurrent_streams raises directly; it no longer routes through ConcurrentQueryExecutor."""
+        """run_concurrent_streams raises directly; the executor indirection is removed."""
         runner = TPCHStreamRunner(connection_string="duckdb:///:memory:", verbose=1)
         stream_file = tmp_path / "stream_0.sql"
         stream_file.write_text("-- Query 1 (Stream 0, Position 1)\nSELECT 1;\n")
 
-        with (
-            patch("benchbox.utils.execution_manager.ConcurrentQueryExecutor") as mock_executor_class,
-            pytest.raises(NotImplementedError, match="does not execute SQL"),
-        ):
+        with pytest.raises(NotImplementedError, match="does not execute SQL"):
             runner.run_concurrent_streams([stream_file])
-
-        mock_executor_class.assert_not_called()
 
     @patch("benchbox.utils.tpc_compilation.get_tpc_templates_dir")
     @patch("subprocess.run")

@@ -151,7 +151,7 @@ class TestSnowflakeEstimation:
         assert isinstance(from_elapsed, QueryCost)
         assert from_ms.compute_cost == pytest.approx(from_elapsed.compute_cost)
 
-    def test_seconds_beat_server_side_milliseconds(self) -> None:
+    def test_server_side_milliseconds_beat_adapter_seconds(self) -> None:
         calculator = CostCalculator()
         cost = calculator.calculate_query_cost(
             "snowflake",
@@ -159,7 +159,7 @@ class TestSnowflakeEstimation:
             _config(),
         )
         assert isinstance(cost, QueryCost)
-        assert cost.pricing_details["execution_time_seconds"] == 60.0
+        assert cost.pricing_details["execution_time_seconds"] == 3600.0
 
     def test_per_query_size_overrides_config(self) -> None:
         calculator = CostCalculator()
@@ -234,7 +234,8 @@ class TestSnowflakeEstimation:
 
 
 class TestSnowflakeNormalizedGate:
-    def test_observed_run_with_edition_publishes(self) -> None:
+    def test_observed_run_with_edition_publishes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         results = _results(
             platform_info={
                 "platform_type": "snowflake",
@@ -365,7 +366,7 @@ class TestSnowflakeEstimatedConcurrencyWarning:
 
         cost = _benchmark_cost(4, True)
         _apply_cost_model_and_warnings(cost, "snowflake", {})
-        assert cost.cost_model == "actual"
+        assert cost.cost_model == "marginal"
         assert any("concurrent streams" in warning for warning in cost.warnings)
 
     def test_sequential_estimated_run_does_not_warn(self) -> None:
@@ -381,7 +382,8 @@ class TestSnowflakeEstimatedConcurrencyWarning:
 
 
 class TestSnowflakeNestedEditionShape:
-    def test_configuration_nested_edition_reaches_the_cost_model(self) -> None:
+    def test_configuration_nested_edition_reaches_the_cost_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         """Pin the adapter-realistic shape: edition under configuration.
 
         The adapter reports operator config under

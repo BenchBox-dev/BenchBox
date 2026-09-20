@@ -48,6 +48,11 @@ class TestExtractCostSummaryPreservesNormalizedCost:
         assert _extract_cost_summary({}, None) is None
         assert _extract_cost_summary({}, {"cost_status": "normalized"}) is None
 
+    def test_preserves_scan_bytes_without_creating_direct_cost_fields(self) -> None:
+        scan_bytes = {"total_bytes_scanned": 512}
+
+        assert _extract_cost_summary({}, None, scan_bytes) == {"scan_bytes": scan_bytes}
+
 
 class TestNormalizedCostAllowsDirectTotal:
     def test_missing_block_allows_direct_total_for_legacy_bundles(self) -> None:

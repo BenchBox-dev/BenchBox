@@ -5,9 +5,9 @@ SPA and the canonical version set lives in
 ``benchbox.core.results.schema_policy``. A code-gen step would add build
 coupling that doesn't pay for itself yet. A test is enough — it fires on
 develop the moment a schema version is added without updating the local
-preview gate, which is when the catch is needed. It also pins the
-``result_schema_version`` -> ``version`` -> ``schema_version`` read order
-to match ``result_schema_version_value()``.
+preview gate, which is when the catch is needed. It also pins key-presence
+selection for the version aliases so an explicit null is not silently
+replaced by a legacy value.
 
 If a new canonical version appears here, update
 ``SUPPORTED_SCHEMA_VERSIONS`` in ``results-explorer/src/lib/localResult.ts``.
@@ -31,9 +31,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_RESULT_TS = REPO_ROOT / "results-explorer" / "src" / "lib" / "localResult.ts"
 
 _VERSION_SET_RE = re.compile(r"const SUPPORTED_SCHEMA_VERSIONS = new Set\(\[(?P<versions>[^\]]*)\]\)")
-_VERSION_CHAIN_RE = re.compile(
-    r"bundle\.result_schema_version\s*\?\?\s*bundle\.version\s*\?\?\s*bundle\.schema_version"
-)
 
 
 def _source() -> str:
@@ -48,10 +45,10 @@ def test_supported_versions_match_canonical_set() -> None:
 
 
 def test_version_fallback_chain_matches_helper() -> None:
-    assert _VERSION_CHAIN_RE.search(_source()) is not None, (
-        "localResult.ts must read result_schema_version ?? version ?? schema_version, "
-        "mirroring result_schema_version_value()"
-    )
+    source = _source()
+    assert 'hasOwn("result_schema_version")' in source
+    assert 'hasOwn("version")' in source
+    assert "result_schema_version and version must match" in source
 
 
 TRANSFORMER_PY = REPO_ROOT / "_project" / "scripts" / "explorer_pipeline" / "transformer.py"

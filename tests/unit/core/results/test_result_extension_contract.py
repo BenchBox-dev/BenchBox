@@ -86,7 +86,7 @@ def test_platform_specific_extensions_keep_current_schema_v2_locations() -> None
 
     SchemaV2Validator().validate(payload)
     assert PUBLIC_SUBMISSION_SCHEMA_POLICY.evaluate(payload["result_schema_version"]).accepted
-    assert "version" not in payload
+    assert payload["version"] == "2.2"
 
     assert "migration" not in payload
     assert payload["phases"]["migration"] == {

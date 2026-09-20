@@ -21,7 +21,7 @@ DOCS = REPO_ROOT / ".github" / "workflows" / "docs.yml"
 EXPECTED_GROUP = (
     "${{ github.event_name == 'pull_request' "
     "&& format('docs-pr-{0}', github.event.pull_request.number) "
-    "|| format('docs-{0}', github.sha) }}"
+    "|| format('docs-{0}-{1}', github.sha, github.run_id) }}"
 )
 EXPECTED_CANCEL = "${{ github.event_name == 'pull_request' }}"
 
@@ -41,7 +41,7 @@ def _evaluate(event: str, number: int | None, sha: str) -> tuple[str, bool]:
     if event == "pull_request":
         assert number is not None
         return f"docs-pr-{number}", True
-    return f"docs-{sha}", False
+    return f"docs-{sha}-123", False
 
 
 def test_docs_cancels_superseded_pr_runs_only() -> None:
@@ -60,7 +60,7 @@ def test_develop_and_release_pushes_never_cancel() -> None:
     for event, sha in (("push", "c" * 40), ("push", "d" * 40), ("workflow_dispatch", "e" * 40)):
         group, cancel = _evaluate(event, None, sha)
         assert cancel is False, event
-        assert group == f"docs-{sha}"
+        assert group == f"docs-{sha}-123"
     assert _evaluate("push", None, "c" * 40)[0] != _evaluate("push", None, "d" * 40)[0]
 
 

@@ -41,7 +41,7 @@ def create_test_results(**kwargs):
 class TestAddCostEstimationToResults:
     """Tests for add_cost_estimation_to_results function."""
 
-    def test_adds_cost_summary_to_results(self):
+    def test_adds_cost_summary_to_results(self, monkeypatch):
         """Test that cost_summary is added to BenchmarkResults.
 
         The warehouse size arrives through the normalized compute block marked
@@ -51,6 +51,7 @@ class TestAddCostEstimationToResults:
         be a fabricated value and must not back a published total. See
         ``test_configured_only_warehouse_size_does_not_publish_a_total``.
         """
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         results = create_test_results(
             benchmark_name="TPC-H",
             platform_compute={

@@ -797,7 +797,9 @@ class QueryPlanDAG:
         consistent with the actual tree.
         """
         self.plan_fingerprint = self.compute_plan_fingerprint()
-        self.fingerprint_integrity = FingerprintIntegrity.VERIFIED
+        self.fingerprint_integrity = (
+            FingerprintIntegrity.TRUNCATED if self.truncated_at_depth is not None else FingerprintIntegrity.VERIFIED
+        )
         # The recomputed fingerprint uses the current encoding version.
         self.fingerprint_version = FINGERPRINT_VERSION
         self._normalized_fingerprint = None
@@ -946,7 +948,7 @@ class QueryPlanDAG:
         # as plain childless leaves, so record the shallowest cut on the plan.
         plan.truncated_at_depth = find_truncation_depth(logical_root_data)
 
-        if plan.truncated_at_depth is not None and verify_fingerprint:
+        if plan.truncated_at_depth is not None:
             # Intentional depth truncation drops subtrees, so no fingerprint
             # can authenticate the full tree: a stored one cannot match the
             # rehydrated tree, and a freshly computed one only covers the

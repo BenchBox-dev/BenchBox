@@ -891,6 +891,60 @@ class PlatformRegistry:
         return caps.default_mode
 
     @classmethod
+    def get_unsupported_benchmarks(cls, platform_name: str) -> dict[str, str]:
+        """Get benchmarks gated for a platform, mapped to block reasons.
+
+        The mapping is derived from ``BENCHMARK_GATE`` rules in the sql_compat
+        registry (see ``get_platform_capabilities``), so support claims stay
+        explicit and testable instead of living in prose or stale metadata.
+
+        Args:
+            platform_name: Name of the platform (aliases are resolved automatically)
+
+        Returns:
+            Mapping of benchmark name to human-readable block reason.
+            Empty when the platform has no benchmark gates or is unknown.
+        """
+        caps = cls.get_platform_capabilities(platform_name)
+        if caps is None:
+            return {}
+        # getattr-with-default: callers may substitute partial capability
+        # doubles that predate this field.
+        return dict(getattr(caps, "unsupported_benchmarks", None) or {})
+
+    @classmethod
+    def get_benchmark_block_reason(cls, platform_name: str, benchmark: str) -> str | None:
+        """Get the reason a benchmark is blocked on a platform, if any.
+
+        Args:
+            platform_name: Name of the platform (aliases are resolved automatically)
+            benchmark: Benchmark name (e.g., 'tpch', 'vector_search')
+
+        Returns:
+            Block reason when the benchmark is gated for the platform,
+            otherwise None. Unknown platforms also return None; platform
+            availability remains a separate concern.
+        """
+        return cls.get_unsupported_benchmarks(platform_name).get(benchmark)
+
+    @classmethod
+    def is_benchmark_supported(cls, platform_name: str, benchmark: str) -> bool:
+        """Check whether a benchmark may run on a platform.
+
+        "Supported" here means "not blocked by a benchmark gate". It does
+        not imply the platform is installed or available; use
+        ``is_platform_available`` for that orthogonal check.
+
+        Args:
+            platform_name: Name of the platform (aliases are resolved automatically)
+            benchmark: Benchmark name (e.g., 'tpch', 'vector_search')
+
+        Returns:
+            True when no benchmark gate blocks the combination.
+        """
+        return cls.get_benchmark_block_reason(platform_name, benchmark) is None
+
+    @classmethod
     def get_dual_mode_platforms(cls) -> list[str]:
         """Get platforms that support both SQL and DataFrame modes.
 

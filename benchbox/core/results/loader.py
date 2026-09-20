@@ -270,7 +270,7 @@ def reconstruct_benchmark_results(
     environment_section = data.get("environment", {})
     system_profile = _extract_system_profile(environment_section)
     execution_environment = _extract_execution_environment(environment_section)
-    cost_summary = _extract_cost_summary(data.get("cost", {}), data.get("normalized_cost"))
+    cost_summary = _extract_cost_summary(data.get("cost", {}), data.get("normalized_cost"), summary_section.get("cost"))
     plans_captured, plan_failures = _extract_plans_info(plans_data)
 
     queries_counts = summary_section.get("queries", {})
@@ -561,6 +561,7 @@ def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[
 def _extract_cost_summary(
     cost_section: dict[str, Any],
     normalized_cost_section: dict[str, Any] | None = None,
+    scan_bytes_section: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Extract cost summary from cost section.
 
@@ -569,14 +570,20 @@ def _extract_cost_summary(
     bundles without a normalized_cost block still round-trip their direct
     total via the schema-side missing-vs-rejected distinction.
     """
-    if not cost_section:
+    if not cost_section and not isinstance(scan_bytes_section, dict):
         return None
-    summary: dict[str, Any] = {
-        "total_cost": cost_section.get("total_usd"),
-        "cost_model": cost_section.get("model", "estimated"),
-    }
+    summary: dict[str, Any] = {}
+    if cost_section:
+        summary.update(
+            {
+                "total_cost": cost_section.get("total_usd"),
+                "cost_model": cost_section.get("model", "estimated"),
+            }
+        )
     if isinstance(normalized_cost_section, dict):
         summary["normalized_cost"] = normalized_cost_section
+    if isinstance(scan_bytes_section, dict):
+        summary["scan_bytes"] = dict(scan_bytes_section)
     return summary
 
 

@@ -7,9 +7,9 @@ that a per-push run already gated. A tip is *covered* when EITHER of the
 following holds:
 
 1. A ``develop-post-merge.yml`` run with event ``push`` and ``head_sha``
-   exactly equal to the tip reached a terminal conclusion of ``success``
-   or ``failure``. A ``cancelled``/``startup_failure`` run, a missing run,
-   or a still-running run is NOT coverage; the sweep runs.
+   exactly equal to the tip reached a terminal conclusion of ``success``.
+   Failed, cancelled, startup-failed, missing, or still-running runs are NOT
+   coverage; the sweep runs the gates again.
 2. The tip is queue-certified under the exact rule in ci-dedupe-01
    (:func:`queue_certification.find_certifying_run` with a push-to-develop
    event/ref): the merge queue already passed this exact SHA.
@@ -56,7 +56,7 @@ REQUEST_TIMEOUT_SECONDS = 20
 # Terminal conclusions that prove the tip's gates actually executed. A
 # cancelled or startup_failure run never ran the gates to a verdict, so it
 # is not coverage; the sweep runs.
-COVERING_CONCLUSIONS = ("success", "failure")
+COVERING_CONCLUSIONS = ("success",)
 
 
 class CoverageError(RuntimeError):
@@ -96,7 +96,8 @@ def _push_runs_for_sha(
     urlopen: Callable[..., Any],
 ) -> list[dict[str, Any]]:
     query = urllib.parse.urlencode({"head_sha": sha, "event": "push", "per_page": "30"})
-    payload = _api_get(f"actions/workflows/{POST_MERGE_WORKFLOW_FILE}/runs?{query}", repo, token, urlopen)
+    workflow_quoted = urllib.parse.quote(POST_MERGE_WORKFLOW_FILE, safe="")
+    payload = _api_get(f"actions/workflows/{workflow_quoted}/runs?{query}", repo, token, urlopen)
     runs = payload.get("workflow_runs")
     if not isinstance(runs, list):
         raise CoverageError(f"run listing for {POST_MERGE_WORKFLOW_FILE} has no workflow_runs list")
@@ -136,7 +137,7 @@ def _find_covering_push_run(
     return {
         "covered": False,
         "covering_run_id": None,
-        "reason": "no success/failure push run of develop-post-merge.yml on this exact SHA",
+        "reason": "no successful push run of develop-post-merge.yml on this exact SHA",
     }
 
 

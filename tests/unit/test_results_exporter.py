@@ -223,7 +223,7 @@ def test_exporter_serializes_execution_phases(tmp_path):
     import benchbox
 
     assert payload["result_schema_version"] == "2.2"
-    assert "version" not in payload
+    assert payload["version"] == "2.2"
     assert payload["export"]["benchbox_version"] == benchbox.__version__
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"

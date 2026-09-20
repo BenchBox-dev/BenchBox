@@ -81,8 +81,7 @@ def test_stale_pricing_table_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Staleness reaches the status evaluator, not just a warnings string."""
-    monkeypatch.setattr(calculator_module, "is_pricing_stale", lambda *args, **kwargs: True)
-    monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda: 313)
+    monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 313)
 
     calculator = CostCalculator()
     phase_cost = calculator.calculate_phase_cost(
@@ -98,11 +97,12 @@ def test_stale_pricing_table_is_unavailable(
 
     assert normalized_cost.cost_status == "unavailable"
     assert normalized_cost.normalized_cost_usd is None
-    assert any("313 days old" in warning for warning in warnings)
+    assert any("pricing tables are stale" in warning for warning in warnings)
 
 
-def test_fresh_pricing_table_emits_no_staleness_warning() -> None:
+def test_fresh_pricing_table_emits_no_staleness_warning(monkeypatch: pytest.MonkeyPatch) -> None:
     """The staleness rule is inert while the pricing clock is fresh."""
+    monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 1)
     calculator = CostCalculator()
     phase_cost = calculator.calculate_phase_cost(
         "power_test",
@@ -178,7 +178,8 @@ def test_synapse_serverless_unlisted_region_is_unavailable() -> None:
     assert any("synapse_serverless_price_per_tb" in warning for warning in warnings)
 
 
-def test_verified_regions_stay_normalized() -> None:
+def test_verified_regions_stay_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 1)
     """Over-trigger probe: the region guard must not close verified regions."""
     calculator = CostCalculator()
 
