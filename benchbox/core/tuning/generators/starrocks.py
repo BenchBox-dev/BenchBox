@@ -35,7 +35,8 @@ Example:
     >>> generator = StarRocksDDLGenerator()
     >>> clauses = generator.generate_tuning_clauses(table_tuning)
     >>> emit(clauses.distribute_by)  # "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
-    >>> emit(clauses.order_by)       # "l_orderkey, l_linenumber"
+    >>> emit(clauses.partition_by)   # "PARTITION BY (l_shipdate)"
+    >>> emit(clauses.order_by)       # "ORDER BY (l_orderkey, l_linenumber)"
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -150,8 +151,10 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
           clause (rendered-SQL contract: never a bare column name, so dry-run
           preview via ``TuningClauses.get_inline_clauses()`` and execution DDL
           render the identical string exactly once)
-        - ``partition_by``: ``PARTITION BY`` column expression
-        - ``order_by``: sort-key column list (``ORDER BY``)
+        - ``partition_by``: the rendered ``PARTITION BY (...)`` clause, under
+          the same rendered-SQL contract as ``distribute_by``
+        - ``order_by``: the rendered ``ORDER BY (...)`` sort-key clause, under
+          the same rendered-SQL contract as ``distribute_by``
         - ``platform``: ``"starrocks"`` so inline clauses order DISTRIBUTED BY
           after PARTITION BY, as the StarRocks dialect requires
 
@@ -186,16 +189,21 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
             clauses.distribute_by = self.render_distribution_clause(sorted_cols[0].name)
 
         # ── PARTITION BY (from PARTITIONING tuning) ──
+        # Stored rendered (not bare), mirroring the distribute_by contract:
+        # get_inline_clauses() emits it verbatim and
+        # generate_create_table_ddl()/the workload use it directly, so
+        # preview and execution can never disagree or duplicate it.
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             sorted_cols = sorted(partition_columns, key=lambda c: c.order)
-            clauses.partition_by = ", ".join(c.name for c in sorted_cols)
+            clauses.partition_by = self.render_partition_clause(", ".join(c.name for c in sorted_cols))
 
         # ── ORDER BY sort key (from SORTING tuning) ──
+        # Stored rendered (not bare) under the same contract as PARTITION BY.
         sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
         if sort_columns:
             sorted_cols = sorted(sort_columns, key=lambda c: c.order)
-            clauses.order_by = ", ".join(c.name for c in sorted_cols)
+            clauses.order_by = self.render_order_by_clause(", ".join(c.name for c in sorted_cols))
 
         # ── Clustering warning (no StarRocks clause) ──
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -250,9 +258,10 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         col_list = self.generate_column_list(columns)
         statement = f"{statement}\n(\n    {col_list}\n)"
 
-        # PARTITION BY (tuned) precedes DISTRIBUTED BY.
+        # PARTITION BY (tuned) precedes DISTRIBUTED BY. partition_by is already
+        # rendered, so it is used verbatim like distribute_by.
         if tuning and tuning.partition_by:
-            statement = f"{statement}\n{self.render_partition_clause(tuning.partition_by)}"
+            statement = f"{statement}\n{tuning.partition_by}"
 
         # DISTRIBUTED BY HASH ... BUCKETS N (engine-mandatory). A tuned
         # distribute_by is already rendered, so it is used verbatim; only the
@@ -262,9 +271,10 @@ class StarRocksDDLGenerator(BaseDDLGenerator):
         elif columns:
             statement = f"{statement}\n{self.render_distribution_clause(columns[0].name)}"
 
-        # ORDER BY sort key (tuned) follows DISTRIBUTED BY.
+        # ORDER BY sort key (tuned) follows DISTRIBUTED BY. order_by is already
+        # rendered, so it is used verbatim like distribute_by.
         if tuning and tuning.order_by:
-            statement = f"{statement}\n{self.render_order_by_clause(tuning.order_by)}"
+            statement = f"{statement}\n{tuning.order_by}"
 
         statement = f"{statement}{self.STATEMENT_TERMINATOR}"
 

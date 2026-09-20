@@ -101,7 +101,7 @@ class TestGenerateTuningClauses:
             ],
         )
         clauses = gen.generate_tuning_clauses(tt)
-        assert clauses.partition_by == "ss_sold_date_sk, ss_item_sk"
+        assert clauses.partition_by == "PARTITION BY (ss_sold_date_sk, ss_item_sk)"
 
     def test_order_by_from_sorting(self, gen):
         tt = TableTuning(
@@ -112,7 +112,7 @@ class TestGenerateTuningClauses:
             ],
         )
         clauses = gen.generate_tuning_clauses(tt)
-        assert clauses.order_by == "l_orderkey, l_linenumber"
+        assert clauses.order_by == "ORDER BY (l_orderkey, l_linenumber)"
 
     def test_all_three_tuning_types_together(self, gen):
         tt = TableTuning(
@@ -123,8 +123,8 @@ class TestGenerateTuningClauses:
         )
         clauses = gen.generate_tuning_clauses(tt)
         assert clauses.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
-        assert clauses.partition_by == "l_shipdate"
-        assert clauses.order_by == "l_linenumber"
+        assert clauses.partition_by == "PARTITION BY (l_shipdate)"
+        assert clauses.order_by == "ORDER BY (l_linenumber)"
 
     def test_clustering_logs_but_emits_no_clause(self, gen, caplog):
         tt = TableTuning(table_name="lineitem", clustering=[TuningColumn("l_shipmode", "VARCHAR(10)", 1)])
@@ -152,8 +152,8 @@ class TestDryRunShape:
         d = gen.generate_tuning_clauses(tt).to_dict()
         assert d == {
             "distribute_by": "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8",
-            "partition_by": "l_shipdate",
-            "order_by": "l_linenumber",
+            "partition_by": "PARTITION BY (l_shipdate)",
+            "order_by": "ORDER BY (l_linenumber)",
             "platform": "starrocks",
         }
 
@@ -206,8 +206,9 @@ class TestGenerateCreateTableDdl:
 
 
 class TestInlineClausesContract:
-    """Dry-run preview (get_inline_clauses) must emit the rendered DISTRIBUTED BY
-    exactly once -- no stray bare column line -- and order it after PARTITION BY."""
+    """Dry-run preview (get_inline_clauses) must emit every clause fully rendered
+    exactly once -- no stray bare column line -- in PARTITION BY ->
+    DISTRIBUTED BY -> ORDER BY order."""
 
     def test_no_bare_column_and_single_distributed_by(self, gen):
         tt = TableTuning(
@@ -218,7 +219,11 @@ class TestInlineClausesContract:
         )
         inline = gen.generate_tuning_clauses(tt).get_inline_clauses()
         assert "l_orderkey" not in inline
+        assert "l_shipdate" not in inline
+        assert "l_linenumber" not in inline
+        assert inline.count("PARTITION BY (l_shipdate)") == 1
         assert inline.count("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8") == 1
+        assert inline.count("ORDER BY (l_linenumber)") == 1
 
     def test_distributed_by_after_partition_by(self, gen):
         tt = TableTuning(
@@ -227,4 +232,4 @@ class TestInlineClausesContract:
             partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
         )
         inline = gen.generate_tuning_clauses(tt).get_inline_clauses()
-        assert inline.index("l_shipdate") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8")
+        assert inline.index("PARTITION BY (l_shipdate)") < inline.index("DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8")
