@@ -23,6 +23,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from benchbox.core.expected_results.models import ValidationMode
     from benchbox.platforms.base.adapter import PlatformAdapter
 
 logger = logging.getLogger(__name__)
@@ -175,22 +176,29 @@ def check_isolation_capability(
 def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnectionCapability, bool]:
     """Resolve an adapter's per-stream session capability and declaration site.
 
-    Walks the adapter's MRO for an explicit ``stream_connection_capability``
-    assignment. A value assigned anywhere below ``PlatformAdapter`` itself
-    (including deliberate inheritance from a proven intermediate ancestor,
-    e.g. a wire-compatible subclass reusing its parent's override) counts as
-    declared; falling through to the base default counts as undeclared.
+    Manifest-registered adapters resolve from their canonical manifest entry.
+    Non-manifest test or extension adapters may declare the capability on a
+    class below ``PlatformAdapter``; otherwise they remain undeclared.
 
     Args:
         adapter: Adapter instance or class to resolve.
 
     Returns:
-        ``(capability, declared)`` where ``declared`` is True only when a
-        subclass in the MRO explicitly assigned the value.
+        ``(capability, declared)`` where ``declared`` is true for a manifest
+        adapter or an explicit non-manifest class declaration.
     """
+    from benchbox.core.platform_manifest import PLATFORM_MANIFEST
     from benchbox.platforms.base.adapter import PlatformAdapter
 
     cls = adapter if isinstance(adapter, type) else type(adapter)
+    for entry in PLATFORM_MANIFEST:
+        spec = entry.adapter
+        if (
+            spec is not None
+            and spec.class_name == cls.__name__
+            and (cls.__module__ == spec.module or cls.__module__.startswith(f"{spec.module}."))
+        ):
+            return StreamConnectionCapability(spec.stream_connection_capability), True
     for klass in cls.__mro__:
         if klass is PlatformAdapter:
             break
@@ -330,7 +338,13 @@ class PlatformAdapterConnection:
     so they use maintenance mode. Power/throughput tests use validation mode for result checking.
     """
 
-    def __init__(self, connection: Any, platform_adapter: PlatformAdapter, maintenance_mode: bool = False):
+    def __init__(
+        self,
+        connection: Any,
+        platform_adapter: PlatformAdapter,
+        maintenance_mode: bool = False,
+        validation_mode: ValidationMode | None = None,
+    ):
         """Initialize the connection adapter.
 
         Args:
@@ -345,6 +359,7 @@ class PlatformAdapterConnection:
         self.dialect = getattr(platform_adapter, "get_target_dialect", lambda: "standard")()
         self._maintenance_mode = maintenance_mode
         self._validate_row_count = True
+        self.validation_mode = validation_mode
 
         # Benchmark context for query validation (set by TPC test runners)
         self.benchmark_type: str | None = None
@@ -395,15 +410,18 @@ class PlatformAdapterConnection:
 
         # Non-parameterized queries use the platform adapter for validation support
         # Execute query with validation context
-        result = self.platform_adapter.execute_query(
-            self.connection,
-            query,
-            self._current_query_id,
-            benchmark_type=self.benchmark_type,
-            scale_factor=self.scale_factor,
-            validate_row_count=self._validate_row_count,
-            stream_id=self._current_stream_id,
-        )
+        from benchbox.core.validation.query_validation import validation_mode_context
+
+        with validation_mode_context(self.validation_mode):
+            result = self.platform_adapter.execute_query(
+                self.connection,
+                query,
+                self._current_query_id,
+                benchmark_type=self.benchmark_type,
+                scale_factor=self.scale_factor,
+                validate_row_count=self._validate_row_count,
+                stream_id=self._current_stream_id,
+            )
         return PlatformAdapterCursor(result)
 
     def commit(self):

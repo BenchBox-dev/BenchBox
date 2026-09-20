@@ -8,12 +8,13 @@ import os
 import shutil
 import sqlite3
 import sys
+import time
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import anyio
 from mcp.server.mcpserver import MCPServer
@@ -66,6 +67,11 @@ CANCEL_ANNOTATIONS = ToolAnnotations(
 )
 
 
+# Leased attempts always hold database capacity. Unknown outcomes hold it until
+# the fenced executor durably attests that its call has returned.
+LEASED_STATES = ("running", "publishing")
+
+
 @dataclass(frozen=True, slots=True)
 class JobRecord:
     """One persisted benchmark job."""
@@ -86,6 +92,8 @@ class JobRecord:
     created_at: str
     updated_at: str
     completed_at: str | None
+    unproven_owner: str | None = None
+    quiesced_at: str | None = None
 
 
 class DurableJobRepository:
@@ -105,7 +113,14 @@ class DurableJobRepository:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode = WAL")
+            for attempt in range(100):
+                try:
+                    connection.execute("PRAGMA journal_mode = WAL")
+                    break
+                except sqlite3.OperationalError as exc:
+                    if "locked" not in str(exc).lower() or attempt == 99:
+                        raise
+                    time.sleep(0.01)
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS mcp_benchmark_jobs (
@@ -127,9 +142,12 @@ class DurableJobRepository:
                     cancel_requested INTEGER NOT NULL DEFAULT 0,
                     artifact_path TEXT,
                     error_code TEXT,
+                    enqueue_sequence INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    completed_at TEXT
+                    completed_at TEXT,
+                    unproven_owner TEXT,
+                    quiesced_at TEXT
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS mcp_job_idempotency_idx
                     ON mcp_benchmark_jobs (principal_id, idempotency_key)
@@ -138,16 +156,44 @@ class DurableJobRepository:
                     ON mcp_benchmark_jobs (state, created_at);
                 CREATE INDEX IF NOT EXISTS mcp_job_owner_idx
                     ON mcp_benchmark_jobs (principal_id, execution_id);
+                CREATE TABLE IF NOT EXISTS mcp_job_claim_fairness (
+                    principal_id TEXT PRIMARY KEY,
+                    last_served_sequence INTEGER NOT NULL DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS mcp_job_order (
+                    name TEXT PRIMARY KEY,
+                    value INTEGER NOT NULL
+                );
                 """
             )
-            columns = {row["name"] for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs)")}
-            if "lease_version" not in columns:
-                connection.execute("ALTER TABLE mcp_benchmark_jobs ADD COLUMN lease_version INTEGER NOT NULL DEFAULT 1")
-            if "lease_generation" not in columns:
-                connection.execute(
-                    "ALTER TABLE mcp_benchmark_jobs ADD COLUMN lease_generation INTEGER NOT NULL DEFAULT 0"
-                )
+            self._ensure_column(connection, "lease_version", "INTEGER NOT NULL DEFAULT 1")
+            self._ensure_column(connection, "lease_generation", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column(connection, "unproven_owner", "TEXT")
+            self._ensure_column(connection, "quiesced_at", "TEXT")
+            self._ensure_column(connection, "enqueue_sequence", "INTEGER")
+            connection.execute("UPDATE mcp_benchmark_jobs SET enqueue_sequence = rowid WHERE enqueue_sequence IS NULL")
+            connection.execute(
+                """
+                INSERT INTO mcp_job_order (name, value)
+                SELECT 'enqueue', COALESCE(MAX(enqueue_sequence), 0) FROM mcp_benchmark_jobs
+                WHERE 1
+                ON CONFLICT (name) DO UPDATE SET value = MAX(value, excluded.value)
+                """
+            )
             self._migrate_state_check(connection)
+
+    @staticmethod
+    def _ensure_column(connection: sqlite3.Connection, name: str, declaration: str) -> None:
+        """Add one migration column, tolerating a concurrent initializer winner."""
+        columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs)")}
+        if name in columns:
+            return
+        try:
+            connection.execute(f"ALTER TABLE mcp_benchmark_jobs ADD COLUMN {name} {declaration}")
+        except sqlite3.OperationalError:
+            columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(mcp_benchmark_jobs)")}
+            if name not in columns:
+                raise
 
     @staticmethod
     def _migrate_state_check(connection: sqlite3.Connection) -> None:
@@ -228,9 +274,12 @@ class DurableJobRepository:
                 cancel_requested INTEGER NOT NULL DEFAULT 0,
                 artifact_path TEXT,
                 error_code TEXT,
+                enqueue_sequence INTEGER,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                completed_at TEXT
+                completed_at TEXT,
+                unproven_owner TEXT,
+                quiesced_at TEXT
             )
             """
         )
@@ -270,7 +319,21 @@ class DurableJobRepository:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             completed_at=row["completed_at"],
+            unproven_owner=row["unproven_owner"],
+            quiesced_at=row["quiesced_at"],
         )
+
+    @staticmethod
+    def _next_order(connection: sqlite3.Connection, name: str) -> int:
+        """Return a database-owned monotonic order value inside the caller's transaction."""
+        connection.execute(
+            "INSERT INTO mcp_job_order (name, value) VALUES (?, 0) ON CONFLICT (name) DO NOTHING",
+            (name,),
+        )
+        connection.execute("UPDATE mcp_job_order SET value = value + 1 WHERE name = ?", (name,))
+        row = connection.execute("SELECT value FROM mcp_job_order WHERE name = ?", (name,)).fetchone()
+        assert row is not None
+        return int(row[0])
 
     def submit(
         self,
@@ -279,7 +342,13 @@ class DurableJobRepository:
         *,
         idempotency_key: str | None = None,
     ) -> tuple[JobRecord, bool]:
-        """Create a queued job, or return the principal's idempotent match."""
+        """Create a queued job, or return the principal's idempotent match.
+
+        Submission bounds queued depth only: the global queue and the
+        principal's own queued share. Running admission is enforced
+        separately by :meth:`claim`, so new work can wait while outstanding
+        attempts hold database capacity.
+        """
         normalized_key = idempotency_key.strip() if idempotency_key is not None else None
         if normalized_key is not None and (not normalized_key or len(normalized_key) > 200):
             raise MCPError(-32602, "idempotency_key must contain 1 to 200 characters")
@@ -298,19 +367,35 @@ class DurableJobRepository:
                         raise MCPError(JOB_IDEMPOTENCY_CONFLICT, "Idempotency key was used for a different request")
                     connection.commit()
                     return self._record(existing), False
-            active_count = connection.execute(
-                "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state IN ('queued', 'running', 'publishing')"
+            queued_total = connection.execute(
+                "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued'"
             ).fetchone()[0]
-            if active_count >= self.limits.queue_limit:
+            if queued_total >= self.limits.queue_limit:
                 connection.rollback()
                 raise MCPError(JOB_QUEUE_FULL, "Benchmark job queue is full")
+            queued_owned = connection.execute(
+                "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued' AND principal_id = ?",
+                (principal_id,),
+            ).fetchone()[0]
+            if queued_owned >= self.limits.max_queued_per_principal:
+                connection.rollback()
+                raise MCPError(JOB_QUEUE_FULL, "Benchmark job queue is full for this principal")
             connection.execute(
                 """
                 INSERT INTO mcp_benchmark_jobs (
-                    execution_id, principal_id, state, request_json, idempotency_key, created_at, updated_at
-                ) VALUES (?, ?, 'queued', ?, ?, ?, ?)
+                    execution_id, principal_id, state, request_json, idempotency_key,
+                    enqueue_sequence, created_at, updated_at
+                ) VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)
                 """,
-                (execution_id, principal_id, json.dumps(dict(request), sort_keys=True), normalized_key, now, now),
+                (
+                    execution_id,
+                    principal_id,
+                    json.dumps(dict(request), sort_keys=True),
+                    normalized_key,
+                    self._next_order(connection, "enqueue"),
+                    now,
+                    now,
+                ),
             )
             row = connection.execute(
                 "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (execution_id,)
@@ -337,30 +422,90 @@ class DurableJobRepository:
         return self._record(row) if row is not None else None
 
     def claim(self, worker_id: str) -> JobRecord | None:
-        """Transactionally lease the oldest queued job."""
-        now_epoch = utc_now().timestamp()
-        now = utc_now().isoformat()
+        """Transactionally lease one queued job under running capacity and fairness.
+
+        Running admission is bounded globally and per principal over leased
+        attempts plus unquiesced unknown work, so a lost
+        lease keeps holding database capacity until a fenced transition
+        proves quiescence. Among eligible principals the least-recently-served
+        wins, and each principal's own oldest queued job wins, which keeps
+        per-principal FIFO order while preventing a noisy principal from
+        starving the rest.
+        """
+        now = utc_now()
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            outstanding_total = connection.execute(
+                """SELECT COUNT(*) FROM mcp_benchmark_jobs
+                   WHERE state IN (?, ?) OR (state = 'unknown' AND quiesced_at IS NULL)""",
+                LEASED_STATES,
+            ).fetchone()[0]
+            if outstanding_total >= self.limits.max_running:
+                connection.commit()
+                return None
+            winner = connection.execute(
+                """
+                SELECT queued.principal_id AS principal_id,
+                       MIN(queued.enqueue_sequence) AS oldest
+                FROM mcp_benchmark_jobs AS queued
+                WHERE queued.state = 'queued'
+                  AND (
+                      SELECT COUNT(*)
+                      FROM mcp_benchmark_jobs AS active
+                      WHERE (active.state IN (?, ?)
+                             OR (active.state = 'unknown' AND active.quiesced_at IS NULL))
+                        AND active.principal_id = queued.principal_id
+                  ) < ?
+                GROUP BY queued.principal_id
+                ORDER BY
+                    COALESCE(
+                        (SELECT last_served_sequence FROM mcp_job_claim_fairness AS fair
+                         WHERE fair.principal_id = queued.principal_id),
+                        0
+                    ),
+                    MIN(queued.enqueue_sequence),
+                    queued.principal_id
+                LIMIT 1
+                """,
+                (*LEASED_STATES, self.limits.max_running_per_principal),
+            ).fetchone()
+            if winner is None:
+                connection.commit()
+                return None
             row = connection.execute(
-                "SELECT * FROM mcp_benchmark_jobs WHERE state = 'queued' ORDER BY created_at LIMIT 1"
+                """
+                SELECT * FROM mcp_benchmark_jobs
+                WHERE state = 'queued' AND principal_id = ?
+                ORDER BY enqueue_sequence, rowid LIMIT 1
+                """,
+                (winner["principal_id"],),
             ).fetchone()
             if row is None:
-                connection.commit()
+                connection.rollback()
                 return None
             execution_id = row["execution_id"]
             changed = connection.execute(
                 """
                 UPDATE mcp_benchmark_jobs
                 SET state = 'running', attempts = attempts + 1, lease_owner = ?, lease_expires_at = ?,
-                    lease_version = 2, lease_generation = lease_generation + 1, updated_at = ?
+                    lease_version = 2, lease_generation = lease_generation + 1,
+                    unproven_owner = NULL, quiesced_at = NULL, updated_at = ?
                 WHERE execution_id = ? AND state = 'queued'
                 """,
-                (worker_id, now_epoch + self.limits.lease_seconds, now, execution_id),
+                (worker_id, now.timestamp() + self.limits.lease_seconds, now.isoformat(), execution_id),
             ).rowcount
             if changed != 1:
                 connection.rollback()
                 return None
+            connection.execute(
+                """
+                INSERT INTO mcp_job_claim_fairness (principal_id, last_served_sequence)
+                VALUES (?, ?)
+                ON CONFLICT (principal_id) DO UPDATE
+                    SET last_served_sequence = excluded.last_served_sequence
+                """,
+                (winner["principal_id"], self._next_order(connection, "claim")),
+            )
             claimed = connection.execute(
                 "SELECT * FROM mcp_benchmark_jobs WHERE execution_id = ?", (execution_id,)
             ).fetchone()
@@ -465,6 +610,17 @@ class DurableJobRepository:
                 return None
             cancelled = bool(row["cancel_requested"])
             retry = retryable and not cancelled and row["attempts"] < self.limits.max_attempts
+            if retry:
+                queued_total = connection.execute(
+                    "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued'"
+                ).fetchone()[0]
+                queued_owned = connection.execute(
+                    "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued' AND principal_id = ?",
+                    (row["principal_id"],),
+                ).fetchone()[0]
+                retry = queued_total < self.limits.queue_limit and queued_owned < self.limits.max_queued_per_principal
+                if not retry:
+                    error_code = "retry_queue_full"
             next_state = "queued" if retry else ("cancelled" if cancelled else "failed")
             completed_at = None if retry else now
             connection.execute(
@@ -478,6 +634,10 @@ class DurableJobRepository:
             )
             connection.commit()
         return next_state
+
+    def mark_unknown_outstanding(self, execution_id: str, worker_id: str) -> bool:
+        """Quarantine an owned job whose serialized result reports live work."""
+        return self._record_attempt_boundary(execution_id, worker_id, transition="outstanding")
 
     def cancel(self, execution_id: str, principal_id: str) -> tuple[JobRecord, str] | None:
         """Cancel an owned job and report how the request was honored.
@@ -563,12 +723,14 @@ class DurableJobRepository:
                 changed = connection.execute(
                     """UPDATE mcp_benchmark_jobs
                        SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
-                           lease_generation = lease_generation + 1, updated_at = ?
+                           lease_generation = lease_generation + 1,
+                           unproven_owner = COALESCE(unproven_owner, ?), updated_at = ?
                        WHERE execution_id = ? AND lease_owner = ? AND lease_version = 1
                          AND lease_expires_at <= ? AND state IN ('running', 'publishing')""",
                     (
                         recovery_owner,
                         wall_now + self.limits.lease_seconds,
+                        candidate["lease_owner"],
                         utc_now().isoformat(),
                         candidate["execution_id"],
                         candidate["lease_owner"],
@@ -579,12 +741,14 @@ class DurableJobRepository:
                 changed = connection.execute(
                     """UPDATE mcp_benchmark_jobs
                        SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
-                           lease_generation = lease_generation + 1, updated_at = ?
+                           lease_generation = lease_generation + 1,
+                           unproven_owner = COALESCE(unproven_owner, ?), updated_at = ?
                        WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
                          AND lease_generation = ? AND state IN ('running', 'publishing')""",
                     (
                         recovery_owner,
                         wall_now + self.limits.lease_seconds,
+                        candidate["lease_owner"],
                         utc_now().isoformat(),
                         candidate["execution_id"],
                         candidate["lease_owner"],
@@ -605,11 +769,11 @@ class DurableJobRepository:
     def recover(self, job: JobRecord, *, published_artifact: Path | None = None) -> str | None:
         """Recover one expired lease without allowing duplicate completion.
 
-        Retry is allowed only when the old attempt is proven quiescent: the
-        owner reported its own failure via :meth:`fail_attempt` (which runs only
-        after that attempt finished), cancellation was requested, or the
-        publication commit point already holds a durable artifact. An
-        exhausted attempt budget proves nothing about termination, so an
+        The publication commit point can be completed from a durable artifact.
+        Every other unreported expiry becomes ``unknown`` until the displaced
+        worker separately attests quiescence. The proof may arrive just before
+        or after recovery wins the fence. Cancellation and an exhausted
+        attempt budget prove nothing about termination, so an
         unreported expired attempt records the terminal ``unknown`` outcome
         even on its final attempt: the job is never claimed again and an
         operator must inspect before resubmitting with a new idempotency key.
@@ -632,15 +796,10 @@ class DurableJobRepository:
                 artifact = str(published_artifact)
                 error_code = None
                 completed_at = now
-            elif bool(current["cancel_requested"]):
-                next_state = "cancelled"
-                artifact = None
-                error_code = None
-                completed_at = now
             else:
                 next_state = "unknown"
                 artifact = None
-                error_code = "unknown_outcome"
+                error_code = "cancellation_unconfirmed" if bool(current["cancel_requested"]) else "unknown_outcome"
                 completed_at = now
             changed = connection.execute(
                 """
@@ -666,6 +825,52 @@ class DurableJobRepository:
             connection.commit()
         return next_state
 
+    def attest_quiescence(self, execution_id: str, worker_id: str) -> bool:
+        """Record that an executor returned, releasing capacity if it becomes unknown.
+
+        The recovery transition records the displaced lease owner. Only that
+        owner can attest that the synchronous database call has returned. The
+        outcome remains unknown; the attestation proves only that the old
+        attempt can no longer produce external effects.
+        """
+        return self._record_attempt_boundary(execution_id, worker_id, transition="quiescent")
+
+    def _record_attempt_boundary(
+        self,
+        execution_id: str,
+        worker_id: str,
+        *,
+        transition: Literal["outstanding", "quiescent"],
+    ) -> bool:
+        """Record one owner-fenced executor boundary with a single timestamp."""
+        now = utc_now().isoformat()
+        if transition == "outstanding":
+            statement = """
+                UPDATE mcp_benchmark_jobs
+                SET state = 'unknown', lease_owner = NULL, lease_expires_at = NULL,
+                    lease_version = 1, lease_generation = 0,
+                    unproven_owner = ?, quiesced_at = NULL,
+                    error_code = 'outstanding_work', updated_at = ?, completed_at = ?
+                WHERE execution_id = ? AND lease_owner = ?
+                  AND state IN ('running', 'publishing')
+            """
+            parameters = (worker_id, now, now, execution_id, worker_id)
+        else:
+            statement = """
+                UPDATE mcp_benchmark_jobs
+                SET quiesced_at = ?, unproven_owner = ?, updated_at = ?
+                WHERE execution_id = ? AND quiesced_at IS NULL
+                  AND (
+                      (state = 'unknown' AND unproven_owner = ?)
+                      OR (state IN ('running', 'publishing') AND lease_owner = ?)
+                      OR (state IN ('running', 'publishing') AND unproven_owner = ?)
+                  )
+            """
+            parameters = (now, worker_id, now, execution_id, worker_id, worker_id, worker_id)
+        with self._connect() as connection:
+            changed = connection.execute(statement, parameters).rowcount
+        return changed == 1
+
     def expired_terminal(self) -> list[JobRecord]:
         """Return terminal jobs whose retention period has elapsed."""
         cutoff = utc_now().timestamp() - self.limits.retention_seconds
@@ -673,10 +878,11 @@ class DurableJobRepository:
             rows = connection.execute(
                 """
                 SELECT * FROM mcp_benchmark_jobs
-                WHERE state IN ('completed', 'failed', 'cancelled', 'unknown')
+                WHERE (state IN (?, ?, ?)
+                       OR (state = 'unknown' AND quiesced_at IS NOT NULL))
                   AND completed_at IS NOT NULL AND unixepoch(completed_at) <= ?
                 """,
-                (cutoff,),
+                ("completed", "failed", "cancelled", cutoff),
             ).fetchall()
         return [self._record(row) for row in rows]
 
@@ -686,14 +892,94 @@ class DurableJobRepository:
             changed = connection.execute(
                 """
                 DELETE FROM mcp_benchmark_jobs
-                WHERE execution_id = ? AND state IN ('completed', 'failed', 'cancelled', 'unknown')
+                WHERE execution_id = ? AND (
+                    state IN (?, ?, ?)
+                    OR (state = 'unknown' AND quiesced_at IS NOT NULL)
+                )
                 """,
-                (execution_id,),
+                (execution_id, "completed", "failed", "cancelled"),
             ).rowcount
         return changed == 1
 
+    def capacity_summary(self) -> dict[str, Any]:
+        """Report durable row counts against running capacity for operators.
+
+        Row counts and capacity usage are separated: ``outstanding`` jobs
+        (leased attempts plus work whose lease was lost without proof of
+        termination) hold database capacity until a fenced transition
+        releases them. ``quarantined`` names every unproven job with the
+        reason it still holds capacity.
+        """
+        with self._connect() as connection:
+            state_rows = connection.execute(
+                "SELECT state, COUNT(*) AS total FROM mcp_benchmark_jobs GROUP BY state"
+            ).fetchall()
+            principal_rows = connection.execute(
+                """
+                SELECT principal_id,
+                       SUM(CASE WHEN state = 'queued' THEN 1 ELSE 0 END) AS queued,
+                       SUM(CASE WHEN state IN (?, ?)
+                                     OR (state = 'unknown' AND quiesced_at IS NULL)
+                                THEN 1 ELSE 0 END) AS outstanding
+                FROM mcp_benchmark_jobs
+                GROUP BY principal_id
+                """,
+                LEASED_STATES,
+            ).fetchall()
+            quarantined_rows = connection.execute(
+                """
+                SELECT execution_id, principal_id, error_code, updated_at
+                FROM mcp_benchmark_jobs
+                WHERE state = 'unknown' AND quiesced_at IS NULL
+                ORDER BY updated_at, execution_id
+                """
+            ).fetchall()
+        states = {str(row["state"]): int(row["total"]) for row in state_rows}
+        outstanding = sum(int(row["outstanding"] or 0) for row in principal_rows)
+        return {
+            "limits": {
+                "queue_limit": self.limits.queue_limit,
+                "max_queued_per_principal": self.limits.max_queued_per_principal,
+                "max_running": self.limits.max_running,
+                "max_running_per_principal": self.limits.max_running_per_principal,
+            },
+            "queued": states.get("queued", 0),
+            "outstanding": outstanding,
+            "states": states,
+            "quarantined": [
+                {
+                    "execution_id": str(row["execution_id"]),
+                    "principal_id": str(row["principal_id"]),
+                    "reason": str(row["error_code"] or "unknown_outcome"),
+                    "since": str(row["updated_at"]),
+                }
+                for row in quarantined_rows
+            ],
+            "per_principal": {
+                str(row["principal_id"]): {
+                    "queued": int(row["queued"] or 0),
+                    "outstanding": int(row["outstanding"] or 0),
+                }
+                for row in principal_rows
+            },
+        }
+
 
 BenchmarkExecutor = Callable[[JobRecord, Path], dict[str, Any]]
+
+
+def _response_has_outstanding_work(value: object) -> bool:
+    """Return whether a serialized core result says work may still be running."""
+    if isinstance(value, Mapping):
+        outstanding = value.get("outstanding_stream_ids")
+        if isinstance(outstanding, (list, tuple)) and bool(outstanding):
+            return True
+        if value.get("cleanup_state") == "outstanding":
+            return True
+        return any(_response_has_outstanding_work(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_response_has_outstanding_work(item) for item in value)
+    return False
 
 
 class DurableJobWorker:
@@ -863,6 +1149,7 @@ class DurableJobWorker:
     async def _run_job(self, job: JobRecord) -> None:
         gate = await anyio.to_thread.run_sync(self.repository.get, job.execution_id)
         if gate is None or gate.lease_owner != self.worker_id or gate.state != "running":
+            await anyio.to_thread.run_sync(self.repository.attest_quiescence, job.execution_id, self.worker_id)
             return  # Fenced or finalized before starting; recovery owns the outcome.
         if gate.cancel_requested:
             await anyio.to_thread.run_sync(self.repository.fail_attempt, job.execution_id, self.worker_id, "cancelled")
@@ -874,6 +1161,7 @@ class DurableJobWorker:
         try:
             execution_error: Exception | None = None
             response: dict[str, Any] | None = None
+            executor_quiescent = True
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self._heartbeat, job.execution_id, lease_lost)
                 try:
@@ -883,6 +1171,15 @@ class DurableJobWorker:
                         execution_error = exc
                     if execution_error is None:
                         assert response is not None
+                        executor_quiescent = not _response_has_outstanding_work(response)
+                        if not executor_quiescent:
+                            await anyio.to_thread.run_sync(
+                                self.repository.mark_unknown_outstanding,
+                                job.execution_id,
+                                self.worker_id,
+                            )
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
                         if response.get("status") == "failed":
                             await anyio.to_thread.run_sync(
                                 lambda: self.repository.fail_attempt(
@@ -916,6 +1213,14 @@ class DurableJobWorker:
                             shutil.rmtree(staging, ignore_errors=True)
                 finally:
                     task_group.cancel_scope.cancel()
+                    # The synchronous executor has returned. If recovery fenced
+                    # this attempt meanwhile, record the distinct durable proof
+                    # that it can no longer produce external effects.
+                    if executor_quiescent:
+                        with anyio.CancelScope(shield=True):
+                            await anyio.to_thread.run_sync(
+                                self.repository.attest_quiescence, job.execution_id, self.worker_id
+                            )
             if execution_error is not None:
                 raise execution_error
         except BaseException as exc:
@@ -1133,6 +1438,29 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         return _public_status(job)
 
     @mcp.tool(annotations=READ_ANNOTATIONS)
+    async def get_benchmark_capacity() -> dict[str, Any]:
+        """Report queue depth and running capacity without exposing other tenants.
+
+        Global row counts are aggregates only; the per-principal slice and
+        the quarantined job list are restricted to the current principal.
+        """
+        principal = authenticated_principal()
+        summary = await anyio.to_thread.run_sync(runtime.repository.capacity_summary)
+        owned = summary["per_principal"].get(principal.principal_id, {"queued": 0, "outstanding": 0})
+        return {
+            "limits": summary["limits"],
+            "queued": summary["queued"],
+            "outstanding": summary["outstanding"],
+            "states": summary["states"],
+            "owned": owned,
+            "quarantined": [
+                {key: entry[key] for key in ("execution_id", "reason", "since")}
+                for entry in summary["quarantined"]
+                if entry["principal_id"] == principal.principal_id
+            ],
+        }
+
+    @mcp.tool(annotations=READ_ANNOTATIONS)
     async def get_benchmark_result(execution_id: str) -> dict[str, Any]:
         """Return a completed owned result without exposing another tenant's paths."""
         principal = authenticated_principal()
@@ -1165,6 +1493,7 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
 
 
 __all__ = [
+    "LEASED_STATES",
     "DurableJobRepository",
     "DurableJobRuntime",
     "DurableJobWorker",

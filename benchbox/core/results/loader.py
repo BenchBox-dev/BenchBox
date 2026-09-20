@@ -23,6 +23,8 @@ from benchbox.core.results.models import (
     NativeComparison,
     NativeComparisonEntry,
     SetupPhase,
+    ThroughputStream,
+    ThroughputTestPhase,
 )
 from benchbox.core.results.query_execution import (
     query_execution_from_compact_v2,
@@ -806,18 +808,57 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
             per_table_stats={},  # Not serialized; summary-level only
         )
 
+    throughput = None
+    throughput_data = phases_section.get("throughput_test")
+    if throughput_data and throughput_data.get("status") != "NOT_RUN":
+        streams = [
+            ThroughputStream(
+                stream_id=stream.get("stream_id", 0),
+                start_time="",
+                end_time="",
+                duration_ms=0,
+                query_executions=[],
+                success=stream.get("success", False),
+                error_message=stream.get("error"),
+            )
+            for stream in throughput_data.get("stream_results", [])
+        ]
+        outstanding_work = throughput_data.get("outstanding_work")
+        throughput = ThroughputTestPhase(
+            start_time="",
+            end_time="",
+            duration_ms=throughput_data.get("duration_ms", 0),
+            num_streams=len(streams),
+            streams=streams,
+            total_queries_executed=0,
+            throughput_at_size=None,
+            success=throughput_data.get("status") == "COMPLETED",
+            errors=list(throughput_data.get("errors", [])),
+            outstanding_work=(
+                {
+                    "stream_ids": list(outstanding_work.get("stream_ids", [])),
+                    "cleanup_state": outstanding_work.get("cleanup_state", "complete"),
+                }
+                if isinstance(outstanding_work, dict)
+                else None
+            ),
+        )
+
     # Only return ExecutionPhases if we have at least one reconstructable phase.
     # Setup sub-phases (data_generation, schema_creation, etc.) are serialized as
     # flat status/duration_ms pairs - insufficient to reconstruct the full dataclass
     # tree, so we provide a minimal SetupPhase shell for round-trip fidelity.
-    if migration is None and not any(
-        phases_section.get(p, {}).get("status") not in (None, "NOT_RUN") for p in ("power_test", "throughput_test")
+    if (
+        migration is None
+        and throughput is None
+        and not any(phases_section.get(p, {}).get("status") not in (None, "NOT_RUN") for p in ("power_test",))
     ):
         return None
 
     return ExecutionPhases(
         setup=SetupPhase(),  # Placeholder; sub-phase detail not recoverable
         migration=migration,
+        throughput_test=throughput,
     )
 
 

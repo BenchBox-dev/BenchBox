@@ -18,6 +18,7 @@ from typing import Any, Literal, cast
 SupportStatus = Literal["stable", "beta", "experimental", "repo_only", "deprecated", "document_only"]
 DefaultMode = Literal["sql", "dataframe"]
 AliasScope = Literal["cli", "registry"]
+StreamConnectionCapabilityName = Literal["shared_cursor", "independent_connection", "unsupported"]
 
 SUPPORT_STATUS_VALUES: tuple[SupportStatus, ...] = (
     "stable",
@@ -52,6 +53,7 @@ class AdapterImportSpec:
     module: str
     class_name: str
     registration_order: int
+    stream_connection_capability: StreamConnectionCapabilityName
 
 
 @dataclass(frozen=True)
@@ -147,18 +149,34 @@ def _validate_capabilities(key: str, capabilities: object) -> None:
 def _parse_adapter(key: str, adapter_data: object) -> AdapterImportSpec | None:
     if adapter_data is None:
         return None
-    if not isinstance(adapter_data, dict) or set(adapter_data) != {"module", "class_name", "registration_order"}:
+    if not isinstance(adapter_data, dict) or not set(adapter_data) <= {
+        "module",
+        "class_name",
+        "registration_order",
+        "stream_connection_capability",
+    }:
+        raise ValueError(f"Platform {key!r} adapter contains unsupported fields")
+    required = {"module", "class_name", "registration_order"}
+    if not required <= set(adapter_data):
         raise ValueError(f"Platform {key!r} adapter must contain module, class_name, and registration_order")
     module = adapter_data["module"]
     class_name = adapter_data["class_name"]
     registration_order = adapter_data["registration_order"]
+    stream_capability = adapter_data.get("stream_connection_capability", "unsupported")
     if not isinstance(module, str) or not module.startswith("benchbox.platforms."):
         raise ValueError(f"Platform {key!r} has invalid adapter module {module!r}")
     if not isinstance(class_name, str) or not class_name.endswith("Adapter"):
         raise ValueError(f"Platform {key!r} has invalid adapter class {class_name!r}")
     if not isinstance(registration_order, int) or isinstance(registration_order, bool) or registration_order < 0:
         raise ValueError(f"Platform {key!r} has invalid adapter registration_order {registration_order!r}")
-    return AdapterImportSpec(module=module, class_name=class_name, registration_order=registration_order)
+    if stream_capability not in {"shared_cursor", "independent_connection", "unsupported"}:
+        raise ValueError(f"Platform {key!r} has invalid stream_connection_capability {stream_capability!r}")
+    return AdapterImportSpec(
+        module=module,
+        class_name=class_name,
+        registration_order=registration_order,
+        stream_connection_capability=cast(StreamConnectionCapabilityName, stream_capability),
+    )
 
 
 def _parse_aliases(key: str, aliases_data: object) -> tuple[PlatformAliasSpec, ...]:
@@ -281,7 +299,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.duckdb",
       "class_name": "DuckDBAdapter",
-      "registration_order": 0
+      "registration_order": 0,
+      "stream_connection_capability": "shared_cursor"
     },
     "display_name": "DuckDB",
     "description": "Columnar OLAP engine • Single-node • In-memory",
@@ -385,7 +404,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.sqlite",
       "class_name": "SQLiteAdapter",
-      "registration_order": 11
+      "registration_order": 11,
+      "stream_connection_capability": "shared_cursor"
     },
     "display_name": "SQLite",
     "description": "Row-based OLTP database • Single-node • File-based",
@@ -522,7 +542,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.ducklake",
       "class_name": "DuckLakeAdapter",
-      "registration_order": 2
+      "registration_order": 2,
+      "stream_connection_capability": "shared_cursor"
     },
     "display_name": "DuckLake",
     "description": "Open lakehouse format • DuckDB engine • Parquet + SQL catalog",
@@ -1301,7 +1322,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.postgresql",
       "class_name": "PostgreSQLAdapter",
-      "registration_order": 18
+      "registration_order": 18,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "PostgreSQL",
     "description": "Relational database • COPY loading",
@@ -1355,7 +1377,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.timescaledb",
       "class_name": "TimescaleDBAdapter",
-      "registration_order": 19
+      "registration_order": 19,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "TimescaleDB",
     "description": "Time-series database • Hypertables • Compression",
@@ -1425,7 +1448,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.pg_mooncake",
       "class_name": "PgMooncakeAdapter",
-      "registration_order": 21
+      "registration_order": 21,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "pg_mooncake",
     "description": "Columnstore PostgreSQL • Parquet/Iceberg • DuckDB Execution",
@@ -1483,7 +1507,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.cedardb",
       "class_name": "CedarDBAdapter",
-      "registration_order": 23
+      "registration_order": 23,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "CedarDB",
     "description": "High-performance OLAP/OLTP • PostgreSQL-compatible • Formerly Umbra",
@@ -1538,7 +1563,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.pg_duckdb",
       "class_name": "PgDuckDBAdapter",
-      "registration_order": 20
+      "registration_order": 20,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "pg_duckdb",
     "description": "DuckDB-accelerated PostgreSQL • Vectorized OLAP • MotherDuck",
@@ -1930,7 +1956,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.doris",
       "class_name": "DorisAdapter",
-      "registration_order": 28
+      "registration_order": 28,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "Apache Doris",
     "description": "MPP OLAP • Real-time analytics • MySQL protocol",
@@ -1987,7 +2014,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.singlestore",
       "class_name": "SingleStoreAdapter",
-      "registration_order": 29
+      "registration_order": 29,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "SingleStore",
     "description": "Distributed SQL • Real-time analytics • MySQL protocol",
@@ -2131,7 +2159,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.questdb",
       "class_name": "QuestDBAdapter",
-      "registration_order": 22
+      "registration_order": 22,
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "QuestDB",
     "description": "Time-series database • PG wire protocol • High-performance ingestion",
@@ -2590,7 +2619,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.spark",
       "class_name": "SparkAdapter",
-      "registration_order": 41
+      "registration_order": 41,
+      "stream_connection_capability": "shared_cursor"
     },
     "display_name": "Apache Spark",
     "description": "Distributed SQL • Local/cluster • Spark engine",
@@ -2991,7 +3021,8 @@ _PLATFORM_MANIFEST_JSON = """[
     "adapter": {
       "module": "benchbox.platforms.pyspark",
       "class_name": "PySparkSQLAdapter",
-      "registration_order": 25
+      "registration_order": 25,
+      "stream_connection_capability": "shared_cursor"
     },
     "display_name": "PySpark",
     "description": "Spark DataFrame API • Distributed • Java 17+",

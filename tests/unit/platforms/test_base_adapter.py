@@ -3336,6 +3336,38 @@ class TestBuildExecutionPhasesVariants:
         assert throughput_test_phase is not None
         assert adapter._last_throughput_test_result is None
 
+    @pytest.mark.parametrize("benchmark_name", ["tpch", "tpcds"])
+    def test_captures_outstanding_throughput_work_without_completed_queries(self, benchmark_name):
+        adapter = MockPlatformAdapter()
+        adapter._last_throughput_test_result = SimpleNamespace(
+            stream_results=[],
+            total_time=60.0,
+            start_time="2025-01-01T00:00:00",
+            end_time="2025-01-01T00:01:00",
+            config=SimpleNamespace(num_streams=2),
+            throughput_at_size=None,
+            success=False,
+            errors=["deadline expired"],
+            outstanding_stream_ids=[0, 1],
+            cleanup_state="outstanding",
+        )
+
+        _, _, _, throughput_test_phase = adapter._build_execution_phases(
+            [],
+            [],
+            {"test_execution_type": "throughput", "benchmark_name": benchmark_name},
+            setup_phase=None,
+        )
+
+        assert throughput_test_phase is not None
+        assert throughput_test_phase.streams == []
+        assert throughput_test_phase.total_queries_executed == 0
+        assert throughput_test_phase.outstanding_work == {
+            "stream_ids": [0, 1],
+            "cleanup_state": "outstanding",
+        }
+        assert adapter._last_throughput_test_result is None
+
     def test_capture_plans_path_does_not_raise(self):
         adapter = MockPlatformAdapter()
         adapter.capture_plans = True

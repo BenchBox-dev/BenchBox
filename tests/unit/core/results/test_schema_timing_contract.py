@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from benchbox.core.results.loader import reconstruct_benchmark_results
 from benchbox.core.results.metrics import percentile_ms
 from benchbox.core.results.models import ExecutionPhases, SetupPhase, ThroughputStream, ThroughputTestPhase
 from benchbox.core.results.query_execution import QueryExecutionContractError
@@ -138,6 +139,35 @@ def test_build_result_payload_accepts_consistent_duration_aliases() -> None:
         "errors": ["Stream 5 failed: worker died"],
     }
     assert "throughput_at_size" not in payload["summary"].get("tpc_metrics", {})
+
+
+def test_throughput_outstanding_work_survives_schema_round_trip_without_query_rows() -> None:
+    result = _result_with_queries([])
+    result.execution_phases = ExecutionPhases(
+        setup=SetupPhase(),
+        throughput_test=ThroughputTestPhase(
+            start_time="2026-02-12T00:00:00",
+            end_time="2026-02-12T00:00:01",
+            duration_ms=1000,
+            num_streams=2,
+            streams=[],
+            total_queries_executed=0,
+            throughput_at_size=None,
+            success=False,
+            errors=["deadline expired"],
+            outstanding_work={"stream_ids": [0, 1], "cleanup_state": "outstanding"},
+        ),
+    )
+
+    payload = build_result_payload(result)
+
+    assert payload["queries"] == []
+    assert payload["phases"]["throughput_test"]["outstanding_work"] == {
+        "stream_ids": [0, 1],
+        "cleanup_state": "outstanding",
+    }
+    reloaded = build_result_payload(reconstruct_benchmark_results(payload))
+    assert reloaded["phases"]["throughput_test"] == payload["phases"]["throughput_test"]
 
 
 def test_build_result_payload_rejects_conflicting_duration_aliases() -> None:

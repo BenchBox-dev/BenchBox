@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 # Import expected_results to trigger provider registration
 # This ensures TPC-H and TPC-DS providers are available when QueryValidator is instantiated
@@ -126,6 +128,20 @@ def get_validation_mode_context() -> ValidationMode | None:
 def clear_validation_mode_context() -> None:
     """Reset the current thread's validation-mode run context to unset (None)."""
     _validation_mode_state.validation_mode = None
+
+
+@contextmanager
+def validation_mode_context(mode: ValidationMode | None) -> Iterator[None]:
+    """Apply a TPC-DS validation policy for one operation and restore its caller."""
+    if mode is None:
+        yield
+        return
+    previous = get_validation_mode_context()
+    set_validation_mode_context(mode)
+    try:
+        yield
+    finally:
+        set_validation_mode_context(previous)
 
 
 class QueryValidator:

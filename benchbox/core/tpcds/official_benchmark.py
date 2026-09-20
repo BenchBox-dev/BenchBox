@@ -76,6 +76,13 @@ def _extract_metric(result: Any, attr: str, default: float = 0.0) -> float:
     return default
 
 
+def _phase_succeeded(result: Any) -> bool:
+    """Return a phase's explicit outcome for either mapping or object results."""
+    if isinstance(result, dict):
+        return result.get("success") is not False
+    return getattr(result, "success", None) is not False
+
+
 class TPCDSOfficialBenchmark:
     """TPC-DS Official Benchmark implementation following TPC-DS specification."""
 
@@ -192,11 +199,12 @@ class TPCDSOfficialBenchmark:
                     # Publish the metric only when the phase explicitly
                     # succeeded; a timed-out or otherwise failed phase must
                     # not export its numeric sentinel as a measurement.
-                    if getattr(throughput_result, "success", None) is False:
+                    throughput_metric = _extract_metric(throughput_result, "throughput_at_size")
+                    if not _phase_succeeded(throughput_result) or throughput_metric <= 0:
                         result.errors.append("Throughput Test failed: Throughput@Size withheld from results.")
                         result.success = False
                     else:
-                        result.throughput_at_size = _extract_metric(throughput_result, "throughput_at_size")
+                        result.throughput_at_size = throughput_metric
 
                 except Exception as e:
                     result.errors.append(f"Throughput Test failed: {e}")

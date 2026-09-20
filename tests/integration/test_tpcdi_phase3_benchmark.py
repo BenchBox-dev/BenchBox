@@ -147,7 +147,10 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert "data_quality_monitoring" in phases
 
         # Verify basic success metrics
-        assert results["success"] is True
+        # This fixture has no FinWire/customer-management inputs, so the
+        # explicitly requested data-processing phase must fail the pipeline.
+        assert results["success"] is False
+        assert [failure["phase"] for failure in results["failed_phases"]] == ["enhanced_data_processing"]
         assert results["total_records_processed"] > 0
         assert results["quality_score"] > 0
 
@@ -288,6 +291,53 @@ class TestTPCDIPhase3BenchmarkIntegration:
                 assert "error" in results
                 mock_recovery.handle_pipeline_error.assert_called()
             mock_processing.assert_called_once()
+
+    @pytest.mark.parametrize(
+        ("failed_method", "failed_phase"),
+        [
+            ("_run_enhanced_data_processing", "enhanced_data_processing"),
+            ("_run_enhanced_scd_processing", "enhanced_scd_processing"),
+            ("_run_incremental_data_loading", "incremental_loading"),
+        ],
+    )
+    def test_requested_phase_failure_fails_pipeline_with_identity_and_cause(
+        self, tpcdi_benchmark, test_database, failed_method, failed_phase
+    ):
+        """Every requested ETL phase is required and retains its failure cause."""
+        successful_results = {
+            "_run_enhanced_data_processing": {"success": True, "total_records": 1},
+            "_run_enhanced_scd_processing": {"success": True, "records_processed": 1},
+            "_run_incremental_data_loading": {"success": True, "records_loaded": 1},
+        }
+        with (
+            patch.object(tpcdi_benchmark, "_initialize_connection_dependent_systems"),
+            patch.object(
+                tpcdi_benchmark,
+                "_run_enhanced_data_processing",
+                return_value=successful_results["_run_enhanced_data_processing"],
+            ),
+            patch.object(
+                tpcdi_benchmark,
+                "_run_enhanced_scd_processing",
+                return_value=successful_results["_run_enhanced_scd_processing"],
+            ),
+            patch.object(
+                tpcdi_benchmark,
+                "_run_incremental_data_loading",
+                return_value=successful_results["_run_incremental_data_loading"],
+            ),
+        ):
+            with patch.object(tpcdi_benchmark, failed_method, return_value={"success": False, "error": "boom"}):
+                results = tpcdi_benchmark.run_enhanced_etl_pipeline(
+                    test_database,
+                    dialect="sqlite",
+                    enable_data_quality_monitoring=False,
+                    enable_error_recovery=False,
+                )
+
+        assert results["success"] is False
+        assert results["failed_phases"] == [{"phase": failed_phase, "error": "boom"}]
+        assert results["phases"][failed_phase]["success"] is False
 
     def test_enhanced_pipeline_performance_metrics(self, tpcdi_benchmark, test_database):
         """Test performance metrics collection in enhanced pipeline."""

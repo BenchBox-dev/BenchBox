@@ -124,6 +124,7 @@ def rewrite_tpcdi_sqlite_idioms(
     flag_true: str,
     flag_false: str,
     julianday_replacement: str,
+    relative_date_replacement: str,
 ) -> str:
     """Rewrite TPC-DI SQL Server/SQLite idioms for engines without them.
 
@@ -134,7 +135,8 @@ def rewrite_tpcdi_sqlite_idioms(
       ``re.sub`` replacement templates where ``\\1``/``\\2`` are the column
       name and optional backtick (e.g. ``r"\\1\\2 = TRUE"``).
     - ``DATE('now')`` becomes ``CURRENT_DATE()`` and
-      ``DATE('now', '-N days')`` becomes ``DATE_SUB(CURRENT_DATE(), N)``.
+      ``DATE('now', '-N days')`` uses the engine-specific
+      ``relative_date_replacement`` template, where ``\\1`` is the day count.
     - ``JULIANDAY(d)`` is rendered with ``julianday_replacement``, an
       ``re.sub`` replacement template where ``\\1`` is the inner expression
       (e.g. ``r"(UNIX_DATE(\\1) + 2440588)"``).
@@ -166,7 +168,7 @@ def rewrite_tpcdi_sqlite_idioms(
     for _ in range(3):
         rewritten = re.sub(
             r"DATE\s*\(\s*'now'\s*,\s*'-(\d+)\s+days?'\s*\)",
-            r"DATE_SUB(CURRENT_DATE(), \1)",
+            relative_date_replacement,
             query,
             flags=re.IGNORECASE,
         )
@@ -195,6 +197,7 @@ def rewrite_tpcdi_for_bigquery(query: str) -> str:
         flag_true=r"\1\2 = TRUE",
         flag_false=r"\1\2 = FALSE",
         julianday_replacement=r"(UNIX_DATE(\1) + 2440588)",
+        relative_date_replacement=r"DATE_SUB(CURRENT_DATE(), INTERVAL \1 DAY)",
     )
 
 
@@ -205,4 +208,5 @@ def rewrite_tpcdi_for_databricks(query: str) -> str:
         flag_true=r"\1\2 IS TRUE",
         flag_false=r"\1\2 IS FALSE",
         julianday_replacement=r"(DATEDIFF(\1, '1970-01-01') + 2440588)",
+        relative_date_replacement=r"DATE_SUB(CURRENT_DATE(), \1)",
     )

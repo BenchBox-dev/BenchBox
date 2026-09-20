@@ -279,7 +279,7 @@ class TestDriversMixin:
 
     def _execute_tpcds_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC-DS Throughput Test using production TPCDSThroughputTest implementation."""
-        from benchbox.core.expected_results.tpcds_results import set_config_validation_mode
+        from benchbox.core.expected_results.tpcds_results import parse_validation_mode, set_config_validation_mode
         from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest
 
         console = quiet_console
@@ -291,7 +291,7 @@ class TestDriversMixin:
             num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
-            # Set TPC-DS validation mode from config (takes precedence over environment variable)
+            run_validation_mode = parse_validation_mode(validation_mode)
             set_config_validation_mode(validation_mode)
 
             console.print(
@@ -319,7 +319,11 @@ class TestDriversMixin:
             # PlatformAdapter.new_stream_connection() for the full contract.
             def connection_factory():
                 stream_connection = open_stream_connection(self, connection, benchmark_type)
-                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
+                conn_wrapper = PlatformAdapterConnection(
+                    stream_connection,
+                    self,
+                    validation_mode=run_validation_mode,
+                )
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor

@@ -337,6 +337,32 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     audit = ob.generate_audit_trail(official)
     assert audit.exists()
 
+    class _FailedDictThroughputPhase:
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self):
+            return {"success": False, "throughput_at_size": 64.0}
+
+    fake_tp_mod.TPCDSThroughputTest = _FailedDictThroughputPhase
+    failed_dict = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
+    assert failed_dict.success is False
+    assert failed_dict.throughput_at_size == 0.0
+    assert failed_dict.qphds_at_size == 0.0
+
+    class _FailedObjectThroughputPhase:
+        def __init__(self, **kwargs):
+            pass
+
+        def run(self):
+            return SimpleNamespace(success=False, throughput_at_size=64.0)
+
+    fake_tp_mod.TPCDSThroughputTest = _FailedObjectThroughputPhase
+    failed_object = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
+    assert failed_object.success is False
+    assert failed_object.throughput_at_size == 0.0
+    assert failed_object.qphds_at_size == 0.0
+
     bad = TPCDSOfficialBenchmarkResult(
         config=cfg,
         start_time="s",
