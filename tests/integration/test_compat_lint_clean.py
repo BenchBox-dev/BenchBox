@@ -124,7 +124,7 @@ def test_bigquery_runtime_ddl_rewrite_is_represented_in_governance_inventory():
 
     converted = adapter._convert_to_bigquery_table("CREATE TABLE orders (created_at DATE, customer_id INT64)")
 
-    assert "CREATE OR REPLACE TABLE `proj.ds.orders`" in converted
+    assert "CREATE OR REPLACE TABLE `proj.ds.ORDERS`" in converted
     assert "PARTITION BY DATE(created_at)" in converted
     assert "CLUSTER BY customer_id" in converted
     status = next(

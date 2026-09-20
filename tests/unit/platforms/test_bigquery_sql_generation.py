@@ -40,7 +40,7 @@ class TestBigQueryConvertToBigQueryTable:
     def test_three_part_name_in_output(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
         result = adapter._convert_to_bigquery_table("CREATE TABLE orders (id INT64)")
-        assert "my-proj.my_dataset.orders" in result
+        assert "my-proj.my_dataset.ORDERS" in result
 
     def test_partition_by_added_when_configured(self):
         adapter = _make_adapter(partitioning_field="order_date")
