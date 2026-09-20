@@ -140,6 +140,8 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "columns",
         "comparison",
         "connection_id",
+        # Throughput containment metadata on refused maintenance results.
+        "contained",
         "cost_estimated",
         "cost_usd",
         "cpu_time",
@@ -182,6 +184,8 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "operation",
         "operation_type",
         "optimization_time",
+        # Throughput containment metadata on refused maintenance results.
+        "outstanding_stream_ids",
         "p50_time_ms",
         "p95_time_ms",
         "parse_time",

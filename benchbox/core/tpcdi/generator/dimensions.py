@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-import random
 from datetime import datetime, time, timedelta
 
 from ..financial_data import generate_realistic_tax_rates
@@ -154,31 +153,31 @@ class DimensionGenerationMixin:
                 for i in range(chunk_start, chunk_end):
                     sk_company_id = i
                     company_id = i
-                    status = random.choice(self._statuses)
+                    status = self._rng.choice(self._statuses)
                     name = f"Company {i:04d} Inc."
-                    industry = random.choice(self._industries)
-                    sp_rating = random.choice(self._sp_ratings)
+                    industry = self._rng.choice(self._industries)
+                    sp_rating = self._rng.choice(self._sp_ratings)
                     is_low_grade = sp_rating in ["BB+", "BB", "BB-"]
                     # Generate market cap based on company size and rating
                     # Higher rated companies tend to have larger market caps
-                    base_market_cap = random.uniform(100_000_000, 50_000_000_000)  # $100M to $50B
+                    base_market_cap = self._rng.uniform(100_000_000, 50_000_000_000)  # $100M to $50B
                     if not is_low_grade:
-                        market_cap = round(base_market_cap * random.uniform(1.2, 2.0), 2)
+                        market_cap = round(base_market_cap * self._rng.uniform(1.2, 2.0), 2)
                     else:
-                        market_cap = round(base_market_cap * random.uniform(0.5, 1.0), 2)
+                        market_cap = round(base_market_cap * self._rng.uniform(0.5, 1.0), 2)
                     ceo = f"CEO {i:04d}"
 
-                    address_line1 = f"{random.randint(1, 9999)} Main Street"
+                    address_line1 = f"{self._rng.randint(1, 9999)} Main Street"
                     address_line2 = ""
-                    postal_code = f"{random.randint(10000, 99999)}"
+                    postal_code = f"{self._rng.randint(10000, 99999)}"
                     city = f"City{i % 100}"
-                    state_prov = random.choice(self._us_states)
+                    state_prov = self._rng.choice(self._us_states)
                     country = "USA"
                     description = f"Description for {name}"
                     founding_date = datetime(
-                        random.randint(1950, 2020),
-                        random.randint(1, 12),
-                        random.randint(1, 28),
+                        self._rng.randint(1950, 2020),
+                        self._rng.randint(1, 12),
+                        self._rng.randint(1, 28),
                     ).date()
 
                     is_current = True
@@ -239,18 +238,18 @@ class DimensionGenerationMixin:
                 sk_security_id = i
                 symbol = f"SYM{i:04d}"
                 issue = "S"  # Stock
-                status = random.choice(self._statuses)
+                status = self._rng.choice(self._statuses)
                 name = f"Security {i:04d}"
-                exchange_id = random.choice(["NYSE", "NASDAQ", "AMEX"])
-                sk_company_id = random.randint(1, num_companies)
-                shares_outstanding = random.randint(1000000, 1000000000)
+                exchange_id = self._rng.choice(["NYSE", "NASDAQ", "AMEX"])
+                sk_company_id = self._rng.randint(1, num_companies)
+                shares_outstanding = self._rng.randint(1000000, 1000000000)
                 first_trade = datetime(
-                    random.randint(2000, 2020),
-                    random.randint(1, 12),
-                    random.randint(1, 28),
+                    self._rng.randint(2000, 2020),
+                    self._rng.randint(1, 12),
+                    self._rng.randint(1, 28),
                 ).date()
                 first_trade_on_exchange = first_trade
-                dividend = round(random.uniform(0, 5.0), 2)
+                dividend = round(self._rng.uniform(0, 5.0), 2)
 
                 is_current = True
                 batch_id = 1
@@ -291,29 +290,29 @@ class DimensionGenerationMixin:
             for i in range(1, num_customers + 1):
                 sk_customer_id = i
                 customer_id = i
-                tax_id = f"{random.randint(100000000, 999999999)}"
-                status = random.choice(self._statuses)
+                tax_id = f"{self._rng.randint(100000000, 999999999)}"
+                status = self._rng.choice(self._statuses)
                 last_name = f"LastName{i:05d}"
                 first_name = f"FirstName{i:05d}"
-                middle_initial = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-                gender = random.choice(["M", "F"])
-                tier = random.choices([1, 2, 3], weights=[0.6, 0.3, 0.1])[0]
+                middle_initial = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                gender = self._rng.choice(["M", "F"])
+                tier = self._rng.choices([1, 2, 3], weights=[0.6, 0.3, 0.1])[0]
                 dob = datetime(
-                    random.randint(1930, 2000),
-                    random.randint(1, 12),
-                    random.randint(1, 28),
+                    self._rng.randint(1930, 2000),
+                    self._rng.randint(1, 12),
+                    self._rng.randint(1, 28),
                 ).date()
 
                 # Address information
-                address_line1 = f"{random.randint(1, 9999)} Customer Street"
+                address_line1 = f"{self._rng.randint(1, 9999)} Customer Street"
                 address_line2 = ""
-                postal_code = f"{random.randint(10000, 99999)}"
+                postal_code = f"{self._rng.randint(10000, 99999)}"
                 city = f"City{i % 500}"
-                state_prov = random.choice(self._us_states)
+                state_prov = self._rng.choice(self._us_states)
                 country = "USA"
 
                 # Contact information
-                phone1 = f"{random.randint(100, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
+                phone1 = f"{self._rng.randint(100, 999)}-{self._rng.randint(100, 999)}-{self._rng.randint(1000, 9999)}"
                 phone2 = ""
                 phone3 = ""
                 email1 = f"customer{i}@email.com"
@@ -321,13 +320,13 @@ class DimensionGenerationMixin:
 
                 # Tax information
                 national_tax_rate_desc = "Federal Tax"
-                national_tax_rate = round(random.uniform(0.15, 0.35), 5)
+                national_tax_rate = round(self._rng.uniform(0.15, 0.35), 5)
                 local_tax_rate_desc = "State Tax"
-                local_tax_rate = round(random.uniform(0.0, 0.10), 5)
+                local_tax_rate = round(self._rng.uniform(0.0, 0.10), 5)
 
                 agency_id = "AGY001"
-                credit_rating = random.randint(300, 850)
-                net_worth = random.randint(10000, 10000000)
+                credit_rating = self._rng.randint(300, 850)
+                net_worth = self._rng.randint(10000, 10000000)
                 marketing_nameplate = f"Customer {i}"
 
                 is_current = True
@@ -388,11 +387,11 @@ class DimensionGenerationMixin:
             for i in range(1, num_accounts + 1):
                 sk_account_id = i
                 account_id = i
-                sk_broker_id = random.randint(1, 100)  # Assume 100 brokers
-                sk_customer_id = random.randint(1, num_customers)
-                status = random.choice(self._statuses)
+                sk_broker_id = self._rng.randint(1, 100)  # Assume 100 brokers
+                sk_customer_id = self._rng.randint(1, num_customers)
+                status = self._rng.choice(self._statuses)
                 account_desc = f"Account {i:06d}"
-                tax_status = random.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
+                tax_status = self._rng.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
 
                 is_current = True
                 batch_id = 1
@@ -503,16 +502,16 @@ class DimensionGenerationMixin:
                 if i in managers:
                     manager_id = None  # Top-level managers
                 else:
-                    manager_id = random.choice(managers)
+                    manager_id = self._rng.choice(managers)
 
-                first_name = random.choice(self.financial_patterns.first_names)
-                last_name = random.choice(self.financial_patterns.last_names)
-                middle_initial = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+                first_name = self._rng.choice(self.financial_patterns.first_names)
+                last_name = self._rng.choice(self.financial_patterns.last_names)
+                middle_initial = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
                 # Generate branch and office
                 branch = f"Branch {((i - 1) // 20) + 1:02d}"  # 20 brokers per branch
-                office = f"Office {random.choice(['A', 'B', 'C', 'D'])}"
-                phone = f"{random.randint(100, 999)}-{random.randint(100, 999)}-{random.randint(1000, 9999)}"
+                office = f"Office {self._rng.choice(['A', 'B', 'C', 'D'])}"
+                phone = f"{self._rng.randint(100, 999)}-{self._rng.randint(100, 999)}-{self._rng.randint(1000, 9999)}"
 
                 is_current = True
                 batch_id = 1

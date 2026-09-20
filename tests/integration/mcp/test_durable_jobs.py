@@ -51,7 +51,7 @@ def test_two_worker_submission_observation_and_completion(tmp_path: Path) -> Non
     assert observed.artifact_path is not None and Path(observed.artifact_path).is_file()
 
 
-def test_restart_recovers_expired_worker_lease(tmp_path: Path) -> None:
+def test_restart_records_unknown_instead_of_rerunning_lost_lease(tmp_path: Path) -> None:
     limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_attempts=2)
     first_repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
     submitted, _ = first_repository.submit("tenant-a", _request())
@@ -68,13 +68,21 @@ def test_restart_recovers_expired_worker_lease(tmp_path: Path) -> None:
     restarted_worker.recover_expired()
     anyio.run(anyio.sleep, 0.06)
     restarted_worker.recover_expired()
+    unknown = first_repository.get(submitted.execution_id)
+    assert unknown is not None and unknown.state == "unknown"
+    # The lost attempt may still have executed, so no worker reruns it automatically.
+    assert restarted_repository.claim(restarted_worker.worker_id) is None
+
+    # The operator inspects, then resubmits with a new idempotency key.
+    resubmitted, created = first_repository.submit("tenant-a", _request(), idempotency_key="restart-after-unknown")
+    assert created is True
     claimed = restarted_repository.claim(restarted_worker.worker_id)
-    assert claimed is not None
+    assert claimed is not None and claimed.execution_id == resubmitted.execution_id
     anyio.run(restarted_worker._run_job, claimed)
 
-    completed = first_repository.get(submitted.execution_id)
+    completed = first_repository.get(resubmitted.execution_id)
     assert completed is not None and completed.state == "completed"
-    assert completed.attempts == 2
+    assert completed.attempts == 1
 
 
 def test_tenant_cannot_observe_or_cancel_another_job(tmp_path: Path) -> None:
