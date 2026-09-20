@@ -2,7 +2,7 @@
 
 Verifies that:
 1. nyctaxi_variants.py registers exactly 8 rules (4 StarRocks + 4 ClickHouse).
-2. tpcdi_variants.py registers exactly 10 rules (five ClickHouse + three DataFusion + StarRocks/Doris EQ7).
+2. tpcdi_variants.py registers exactly 13 rules (five ClickHouse + three DataFusion + StarRocks/Doris/BigQuery/Databricks/Snowflake EQ7).
 3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
 4. Shadow-mode: no divergence (legacy already selects the variant SQL).
 5. Registry is silent for platforms with no rule (duckdb).
@@ -122,9 +122,9 @@ def test_nyctaxi_clickhouse_has_trip_duration_variant():
 
 
 def test_tpcdi_variant_rules_registered():
-    """TPC-DI query-source rules cover ClickHouse, DataFusion, StarRocks, and Doris."""
+    """TPC-DI query-source rules cover ClickHouse, DataFusion, StarRocks, Doris, BigQuery, Databricks, and Snowflake."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "tpcdi"]
-    assert len(rules) == 10, f"Expected 10 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
+    assert len(rules) == 13, f"Expected 13 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = {entry.rule_id for _, entry in rules}
     for rule_id in (
         "query_source.clickhouse.tpcdi.aq6_cross_join_variant",
@@ -139,6 +139,9 @@ def test_tpcdi_variant_rules_registered():
     assert "query_source.datafusion.tpcdi.vq6_projection_variant" in rule_ids
     assert "query_source.starrocks.tpcdi.eq7_derived_table_variant" in rule_ids
     assert "query_source.doris.tpcdi.eq7_derived_table_variant" in rule_ids
+    assert "query_source.bigquery.tpcdi.eq7_derived_table_variant" in rule_ids
+    assert "query_source.databricks.tpcdi.eq7_derived_table_variant" in rule_ids
+    assert "query_source.snowflake.tpcdi.eq7_derived_table_variant" in rule_ids
 
 
 @pytest.mark.parametrize(
@@ -154,6 +157,8 @@ def test_tpcdi_variant_rules_registered():
         ("datafusion", "VQ6", "grouped_positions"),
         ("starrocks", "EQ7", "quality_metrics"),
         ("doris", "EQ7", "quality_metrics"),
+        ("databricks", "EQ7", "quality_metrics"),
+        ("snowflake", "EQ7", "quality_metrics"),
     ],
 )
 def test_tpcdi_rule_action_and_payload(platform: str, query_id: str, expected_snippet: str):

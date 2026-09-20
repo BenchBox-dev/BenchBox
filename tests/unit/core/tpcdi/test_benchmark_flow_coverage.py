@@ -112,11 +112,6 @@ def test_initialize_connection_dependent_systems_and_stats(tmp_path: Path, monke
     )
     monkeypatch.setattr(
         benchmark_module,
-        "ParallelBatchProcessor",
-        lambda *_a, **_k: created.append("parallel") or object(),
-    )
-    monkeypatch.setattr(
-        benchmark_module,
         "IncrementalDataLoader",
         lambda *_a, **_k: created.append("incremental") or object(),
     )
@@ -136,7 +131,6 @@ def test_initialize_connection_dependent_systems_and_stats(tmp_path: Path, monke
         "incremental",
         "loader",
         "monitor",
-        "parallel",
         "pipeline",
         "recovery",
         "scd",

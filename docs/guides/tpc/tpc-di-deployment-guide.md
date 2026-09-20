@@ -278,22 +278,9 @@ database:
   pool_size: 10
   timeout: 30
 
-parallel_processing:
-  mode: "adaptive"  # sequential, thread_pool, process_pool, adaptive
-  max_workers: 4
-  workload_type: "mixed"  # io_bound, cpu_bound, mixed
-
-  # ETL pipeline parallelization
-  enable_parallel_etl: true
-  enable_parallel_extract: true
-  enable_parallel_transform: true
-  enable_parallel_load: true
-  enable_parallel_validation: true
-
-  # Data generation parallelization
-  enable_parallel_data_generation: true
-  parallel_table_generation: true
-  parallel_format_generation: true
+enable_parallel: true
+max_workers: 4
+chunk_size: 50000
 
   # Query execution parallelization
   enable_parallel_queries: true
