@@ -5237,10 +5237,15 @@
       "title": "Expand query plan fingerprint coverage and verification"
     },
     "expand-runtime-parity-coverage-for-retained-read-primitives": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-21T02:40:43Z",
+        "generation": "a81fe58399f04454b827ca9062f56305",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:2e89a92587215dde21e87c8d"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Expand runtime parity coverage for retained read_primitives variants not covered by the first local parity suite"
     },
     "expand-seed-corpus-to-sf-0-1": {
