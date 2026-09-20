@@ -796,8 +796,8 @@ class PlatformRegistry:
                 auth_methods=deepcopy(mode_spec.get("auth_methods", [])),
             )
 
-        # unsupported_benchmarks is computed from registry benchmark_gate rules;
-        # the hardcoded dict in metadata is the legacy source and is ignored post-w16.
+        # unsupported_benchmarks is computed from registry benchmark_gate rules,
+        # the single source. The manifest carries no per-platform gate dict.
         import benchbox.sql_compat.rules.benchmark_gate.clickhouse_local_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.lakesail_gate  # noqa: F401
         import benchbox.sql_compat.rules.benchmark_gate.pg_family_gate  # noqa: F401

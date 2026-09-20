@@ -130,6 +130,51 @@ class TestPlatformCapabilitiesAlignment:
             assert caps.supports_sql, f"Dual-mode platform '{platform}' missing supports_sql"
             assert caps.supports_dataframe, f"Dual-mode platform '{platform}' missing supports_dataframe"
 
+    def test_manifest_adapter_refs_resolve_to_platform_adapters(self):
+        """Every manifest adapter ref must import to a PlatformAdapter subclass.
+
+        Adapter presence is a support claim; proving it from the importable
+        class rather than trusting the manifest keeps the claim test-derived.
+        """
+        import importlib
+
+        from benchbox.platforms.base import PlatformAdapter
+
+        unresolvable = []
+        for entry in PLATFORM_MANIFEST:
+            if entry.adapter is None:
+                continue
+            try:
+                module = importlib.import_module(entry.adapter.module)
+                cls = getattr(module, entry.adapter.class_name, None)
+            except ImportError as exc:
+                unresolvable.append(f"{entry.key}: cannot import {entry.adapter.module}: {exc}")
+                continue
+            if not (isinstance(cls, type) and issubclass(cls, PlatformAdapter)):
+                unresolvable.append(f"{entry.key}: {entry.adapter.class_name} is not a PlatformAdapter subclass")
+        assert not unresolvable, f"Manifest adapter refs with no executable adapter: {unresolvable}"
+
+    def test_manifest_carries_no_legacy_unsupported_benchmarks(self):
+        """Benchmark gates live only in sql_compat benchmark_gate rules.
+
+        A per-platform gate dict in the manifest is stale metadata: the
+        registry ignores it and derives unsupported_benchmarks from the rules.
+        """
+        stale = [entry.key for entry in PLATFORM_MANIFEST if (entry.capabilities or {}).get("unsupported_benchmarks")]
+        assert not stale, (
+            f"Platforms with legacy manifest gate dicts (ignored by the registry): {stale}. "
+            "Express the gate as a benchmark_gate rule instead."
+        )
+
+    def test_default_mode_is_a_supported_mode(self):
+        """A platform's default execution mode must be one it supports."""
+        for entry in PLATFORM_MANIFEST:
+            caps = entry.capabilities or {}
+            default = caps.get("default_mode", "sql")
+            assert caps.get(f"supports_{default}"), (
+                f"Platform '{entry.key}' defaults to mode '{default}' without supports_{default}"
+            )
+
     def test_dataframe_adapter_mapping_matches_registry_capabilities(self):
         """The local DataFrame factory's semantic keys must be DataFrame-capable."""
         from benchbox.platforms import _DATAFRAME_PLATFORM_INFO
