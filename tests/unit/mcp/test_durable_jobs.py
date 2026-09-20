@@ -535,6 +535,37 @@ def test_run_job_honors_cancel_before_execution(tmp_path: Path) -> None:
     assert finished is not None and finished.state == "cancelled"
 
 
+def test_serialized_outstanding_work_remains_unknown_and_holds_capacity(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=1))
+    workspaces = TenantWorkspaceProvider(tmp_path / "workspaces")
+    worker = DurableJobWorker(
+        repository,
+        workspaces,
+        executor=lambda _job, _staging: {
+            "results": [
+                {
+                    "status": "FAILED",
+                    "cleanup_state": "outstanding",
+                    "outstanding_stream_ids": [3],
+                }
+            ]
+        },
+        worker_id="worker-a",
+    )
+    submitted, _ = repository.submit("tenant-a", _request())
+    repository.submit("tenant-b", _request())
+    claimed = repository.claim("worker-a")
+    assert claimed is not None
+
+    anyio.run(worker._run_job, claimed)
+
+    contained = repository.get(submitted.execution_id)
+    assert contained is not None and contained.state == "unknown"
+    assert contained.error_code == "outstanding_work"
+    assert contained.quiesced_at is None
+    assert repository.claim("worker-b") is None
+
+
 def test_run_job_skips_claim_fenced_before_start(tmp_path: Path) -> None:
     limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01)
     repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
@@ -641,6 +672,27 @@ def test_quiescence_attestation_survives_a_later_recovery_fence(tmp_path: Path) 
     assert replacement is not None and replacement.execution_id == second.execution_id
 
 
+def test_quiescence_attestation_between_fence_and_recovery_is_owner_fenced(tmp_path: Path) -> None:
+    limits = JobLimits(lease_seconds=0.05, poll_seconds=0.01, max_running=1)
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", limits)
+    submitted, _ = repository.submit("tenant-a", _request())
+    assert repository.claim("worker-a") is not None
+
+    assert repository.claim_expired("observer") is None
+    anyio.run(anyio.sleep, 0.06)
+    fenced = repository.claim_expired("recovery-owner")
+    assert fenced is not None
+    assert fenced.state == "running"
+    assert fenced.unproven_owner == "worker-a"
+    assert repository.attest_quiescence(submitted.execution_id, "stranger") is False
+    assert repository.attest_quiescence(submitted.execution_id, "worker-a") is True
+    assert repository.recover(fenced) == "unknown"
+
+    recovered = repository.get(submitted.execution_id)
+    assert recovered is not None and recovered.state == "unknown"
+    assert recovered.quiesced_at is not None
+
+
 def test_legacy_database_migrates_state_check_for_unknown(tmp_path: Path) -> None:
     path = tmp_path / "state.sqlite3"
     _write_legacy_database(path)
@@ -733,6 +785,38 @@ def test_submit_enforces_global_and_per_principal_queued_bounds(tmp_path: Path) 
     repository.submit("tenant-b", _request())
     with pytest.raises(MCPError, match="queue is full$"):
         repository.submit("tenant-c", _request())
+
+
+def test_retry_respects_global_queued_bound(tmp_path: Path) -> None:
+    repository = DurableJobRepository(
+        tmp_path / "state.sqlite3",
+        JobLimits(queue_limit=1, max_queued_per_principal=5, max_attempts=2),
+    )
+    retrying, _ = repository.submit("tenant-a", _request())
+    assert repository.claim("worker-a") is not None
+    queued, _ = repository.submit("tenant-b", _request())
+
+    assert repository.fail_attempt(retrying.execution_id, "worker-a", "transient") == "failed"
+    failed = repository.get(retrying.execution_id)
+    assert failed is not None and failed.error_code == "retry_queue_full"
+    claimed = repository.claim("worker-b")
+    assert claimed is not None and claimed.execution_id == queued.execution_id
+
+
+def test_retry_respects_per_principal_queued_bound(tmp_path: Path) -> None:
+    repository = DurableJobRepository(
+        tmp_path / "state.sqlite3",
+        JobLimits(queue_limit=5, max_queued_per_principal=1, max_attempts=2),
+    )
+    retrying, _ = repository.submit("tenant-a", _request())
+    assert repository.claim("worker-a") is not None
+    queued, _ = repository.submit("tenant-a", _request())
+
+    assert repository.fail_attempt(retrying.execution_id, "worker-a", "transient") == "failed"
+    failed = repository.get(retrying.execution_id)
+    assert failed is not None and failed.error_code == "retry_queue_full"
+    claimed = repository.claim("worker-b")
+    assert claimed is not None and claimed.execution_id == queued.execution_id
 
 
 def test_claim_enforces_global_running_bound_including_unknown(tmp_path: Path) -> None:

@@ -218,7 +218,9 @@ late.
 Durable admission bounds queued depth and running capacity separately, across
 every worker process and restart. Submission is refused past `queue_limit`
 queued jobs globally or `max_queued_per_principal` for the caller, so one
-tenant cannot fill the queue. Claiming is refused past `max_running`
+tenant cannot fill the queue. An owned attempt that requests a retry must pass
+the same queued limits transactionally; otherwise it terminates with
+`retry_queue_full`. Claiming is refused past `max_running`
 outstanding attempts globally or `max_running_per_principal` for the job's
 owner, where outstanding means leased attempts plus `unknown` work whose
 lease was lost without proof of termination. A lost lease therefore keeps
@@ -226,10 +228,12 @@ holding database capacity: no replacement attempt is admitted until a fenced
 transition proves quiescence. When the displaced executor returns, its worker
 records a separate durable attestation; only then does the unknown job release
 capacity. Retention never deletes an unquiesced row, even after its result
-artifacts expire. Claims use database-owned monotonic sequences to serve the
-least-recently-served principal with queued work first and the oldest queued
-job within each principal. Host clock rollback therefore cannot change
-fairness or FIFO order. `get_benchmark_capacity` reports global row counts,
+artifacts expire. A serialized execution result that reports outstanding
+streams is quarantined as `unknown` with `outstanding_work`; executor return is
+not treated as quiescence for that job. Claims use database-owned monotonic
+sequences to serve the least-recently-served principal with queued work first
+and the oldest queued job within each principal. Host clock rollback cannot
+change fairness or FIFO order. `get_benchmark_capacity` reports global row counts,
 the caller's own usage, and the caller's quarantined jobs with the reason each
 still holds capacity; it never exposes another tenant's jobs.
 

@@ -612,6 +612,17 @@ class DurableJobRepository:
                 return None
             cancelled = bool(row["cancel_requested"])
             retry = retryable and not cancelled and row["attempts"] < self.limits.max_attempts
+            if retry:
+                queued_total = connection.execute(
+                    "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued'"
+                ).fetchone()[0]
+                queued_owned = connection.execute(
+                    "SELECT COUNT(*) FROM mcp_benchmark_jobs WHERE state = 'queued' AND principal_id = ?",
+                    (row["principal_id"],),
+                ).fetchone()[0]
+                retry = queued_total < self.limits.queue_limit and queued_owned < self.limits.max_queued_per_principal
+                if not retry:
+                    error_code = "retry_queue_full"
             next_state = "queued" if retry else ("cancelled" if cancelled else "failed")
             completed_at = None if retry else now
             connection.execute(
@@ -625,6 +636,24 @@ class DurableJobRepository:
             )
             connection.commit()
         return next_state
+
+    def mark_unknown_outstanding(self, execution_id: str, worker_id: str) -> bool:
+        """Quarantine an owned job whose serialized result reports live work."""
+        now = utc_now().isoformat()
+        with self._connect() as connection:
+            changed = connection.execute(
+                """
+                UPDATE mcp_benchmark_jobs
+                SET state = 'unknown', lease_owner = NULL, lease_expires_at = NULL,
+                    lease_version = 1, lease_generation = 0,
+                    unproven_owner = ?, quiesced_at = NULL,
+                    error_code = 'outstanding_work', updated_at = ?, completed_at = ?
+                WHERE execution_id = ? AND lease_owner = ?
+                  AND state IN ('running', 'publishing')
+                """,
+                (worker_id, now, now, execution_id, worker_id),
+            ).rowcount
+        return changed == 1
 
     def cancel(self, execution_id: str, principal_id: str) -> tuple[JobRecord, str] | None:
         """Cancel an owned job and report how the request was honored.
@@ -711,7 +740,7 @@ class DurableJobRepository:
                     """UPDATE mcp_benchmark_jobs
                        SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
                            lease_generation = lease_generation + 1,
-                           unproven_owner = ?, updated_at = ?
+                           unproven_owner = COALESCE(unproven_owner, ?), updated_at = ?
                        WHERE execution_id = ? AND lease_owner = ? AND lease_version = 1
                          AND lease_expires_at <= ? AND state IN ('running', 'publishing')""",
                     (
@@ -729,7 +758,7 @@ class DurableJobRepository:
                     """UPDATE mcp_benchmark_jobs
                        SET lease_owner = ?, lease_expires_at = ?, lease_version = 2,
                            lease_generation = lease_generation + 1,
-                           unproven_owner = ?, updated_at = ?
+                           unproven_owner = COALESCE(unproven_owner, ?), updated_at = ?
                        WHERE execution_id = ? AND lease_owner = ? AND lease_version = 2
                          AND lease_generation = ? AND state IN ('running', 'publishing')""",
                     (
@@ -830,9 +859,10 @@ class DurableJobRepository:
                   AND (
                       (state = 'unknown' AND unproven_owner = ?)
                       OR (state IN ('running', 'publishing') AND lease_owner = ?)
+                      OR (state IN ('running', 'publishing') AND unproven_owner = ?)
                   )
                 """,
-                (now, worker_id, now, execution_id, worker_id, worker_id),
+                (now, worker_id, now, execution_id, worker_id, worker_id, worker_id),
             ).rowcount
         return changed == 1
 
@@ -931,6 +961,20 @@ class DurableJobRepository:
 
 
 BenchmarkExecutor = Callable[[JobRecord, Path], dict[str, Any]]
+
+
+def _response_has_outstanding_work(value: object) -> bool:
+    """Return whether a serialized core result says work may still be running."""
+    if isinstance(value, Mapping):
+        outstanding = value.get("outstanding_stream_ids")
+        if isinstance(outstanding, (list, tuple)) and bool(outstanding):
+            return True
+        if value.get("cleanup_state") == "outstanding":
+            return True
+        return any(_response_has_outstanding_work(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_response_has_outstanding_work(item) for item in value)
+    return False
 
 
 class DurableJobWorker:
@@ -1112,6 +1156,7 @@ class DurableJobWorker:
         try:
             execution_error: Exception | None = None
             response: dict[str, Any] | None = None
+            executor_quiescent = True
             async with anyio.create_task_group() as task_group:
                 task_group.start_soon(self._heartbeat, job.execution_id, lease_lost)
                 try:
@@ -1121,6 +1166,15 @@ class DurableJobWorker:
                         execution_error = exc
                     if execution_error is None:
                         assert response is not None
+                        executor_quiescent = not _response_has_outstanding_work(response)
+                        if not executor_quiescent:
+                            await anyio.to_thread.run_sync(
+                                self.repository.mark_unknown_outstanding,
+                                job.execution_id,
+                                self.worker_id,
+                            )
+                            shutil.rmtree(staging, ignore_errors=True)
+                            return
                         if response.get("status") == "failed":
                             await anyio.to_thread.run_sync(
                                 lambda: self.repository.fail_attempt(
@@ -1157,10 +1211,11 @@ class DurableJobWorker:
                     # The synchronous executor has returned. If recovery fenced
                     # this attempt meanwhile, record the distinct durable proof
                     # that it can no longer produce external effects.
-                    with anyio.CancelScope(shield=True):
-                        await anyio.to_thread.run_sync(
-                            self.repository.attest_quiescence, job.execution_id, self.worker_id
-                        )
+                    if executor_quiescent:
+                        with anyio.CancelScope(shield=True):
+                            await anyio.to_thread.run_sync(
+                                self.repository.attest_quiescence, job.execution_id, self.worker_id
+                            )
             if execution_error is not None:
                 raise execution_error
         except BaseException as exc:
