@@ -70,6 +70,9 @@ from benchbox.core.tpch.power_test import TPCHPowerTest
 # Create benchmark
 tpch = TPCH(scale_factor=0.1)
 
+# This example requires test.db to contain a loaded TPC-H SF 0.1 dataset.
+# Generate and load it first, or replace this path with an initialized database.
+
 # Power iterations are a plain loop over stream IDs: each TPCHPowerTest
 # run executes the 22 queries in that stream's permutation against a real
 # connection and reports Power@Size. (The former PowerRunExecutor wrapper
@@ -198,6 +201,9 @@ from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
 # Create benchmark
 tpch = TPCH(scale_factor=0.1)
+
+# This example requires throughput.db to contain a loaded TPC-H SF 0.1 dataset.
+# Generate and load it first, or replace this path with an initialized database.
 
 # One throughput test owns all of its streams: the connection factory
 # hands each stream its session (see the adapter session-capability

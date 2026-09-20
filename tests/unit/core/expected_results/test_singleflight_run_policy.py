@@ -45,19 +45,14 @@ def fresh_registry():
 def _isolate_run_policy(monkeypatch):
     """Guard every test against run-policy leakage.
 
-    Validation-mode context is thread-local and the runner-config override
-    is a module global: both persist across test functions on the same
-    worker. Reset before AND after each test, and force the environment
-    channel empty so test order and ambient CI variables never matter.
+    Validation-mode context persists on the current worker thread. Reset it
+    before and after each test, and force the environment channel empty so
+    test order and ambient CI variables never matter.
     """
-    import benchbox.core.expected_results.tpcds_results as tpcds_results
-
     clear_validation_mode_context()
     monkeypatch.delenv("BENCHBOX_QUERY_VALIDATION_MODE", raising=False)
-    monkeypatch.setattr(tpcds_results, "_config_validation_mode_override", None)
     yield
     clear_validation_mode_context()
-    tpcds_results._config_validation_mode_override = None
 
 
 def _answer_set(count=100):
@@ -221,6 +216,84 @@ def policy_validator(fresh_registry):
 
 
 class TestRunLocalPolicy:
+    def test_production_connection_wrappers_carry_policy_into_worker_threads(self, policy_validator):
+        from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+
+        barrier = threading.Barrier(2)
+        outcomes = {}
+
+        class _Adapter:
+            @staticmethod
+            def get_target_dialect():
+                return "duckdb"
+
+            @staticmethod
+            def execute_query(connection, query, query_id, **kwargs):
+                barrier.wait(timeout=10)
+                outcome = policy_validator.validate_query_result(
+                    benchmark_type="tpcds",
+                    query_id=query_id,
+                    actual_row_count=140,
+                    scale_factor=kwargs["scale_factor"],
+                )
+                outcomes[connection] = outcome
+                return {"rows_returned": 140}
+
+        wrappers = {
+            "exact": PlatformAdapterConnection("exact", _Adapter(), validation_mode=ValidationMode.EXACT),
+            "skip": PlatformAdapterConnection("skip", _Adapter(), validation_mode=ValidationMode.SKIP),
+        }
+        for wrapper in wrappers.values():
+            wrapper.benchmark_type = "tpcds"
+            wrapper.scale_factor = 1.0
+            wrapper.set_query_context("1")
+
+        threads = [threading.Thread(target=wrapper.execute, args=("select 1",)) for wrapper in wrappers.values()]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+        assert outcomes["exact"].validation_mode == ValidationMode.EXACT
+        assert outcomes["exact"].is_valid is False
+        assert outcomes["skip"].validation_mode == ValidationMode.SKIP
+        assert outcomes["skip"].is_valid is True
+
+    def test_wrapper_without_policy_preserves_power_run_thread_context(self, policy_validator):
+        from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+
+        outcomes = []
+
+        class _Adapter:
+            @staticmethod
+            def get_target_dialect():
+                return "duckdb"
+
+            @staticmethod
+            def execute_query(connection, query, query_id, **kwargs):
+                outcomes.append(
+                    policy_validator.validate_query_result(
+                        benchmark_type="tpcds",
+                        query_id=query_id,
+                        actual_row_count=140,
+                        scale_factor=kwargs["scale_factor"],
+                    )
+                )
+                return {"rows_returned": 140}
+
+        wrapper = PlatformAdapterConnection("power", _Adapter())
+        wrapper.benchmark_type = "tpcds"
+        wrapper.scale_factor = 1.0
+        wrapper.set_query_context("1")
+        set_validation_mode_context(ValidationMode.EXACT)
+        try:
+            wrapper.execute("select 1")
+        finally:
+            clear_validation_mode_context()
+
+        assert outcomes[0].validation_mode == ValidationMode.EXACT
+        assert outcomes[0].is_valid is False
+
     def test_concurrent_modes_cannot_contaminate_one_another(self, policy_validator):
         outcomes = {}
 

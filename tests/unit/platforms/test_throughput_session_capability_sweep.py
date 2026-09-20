@@ -3,7 +3,8 @@
 Every concrete adapter exposed to throughput (each platform manifest entry
 with SQL support and a runtime adapter registration) resolves through
 :func:`resolve_stream_connection_capability` to exactly one declared
-``StreamConnectionCapability``. This test pins that resolution per manifest
+``StreamConnectionCapability`` through an adapter declaration or the reviewed
+exact-class compatibility registry. This test pins that resolution per manifest
 key in ``throughput_session_capability_snapshot.json`` so a new adapter, a
 changed declaration, or a newly importable adapter fails in CI until its
 classification is an explicit, reviewed decision - the fail-closed gate for
@@ -71,7 +72,8 @@ def _declaration_site(adapter_cls: type) -> str | None:
             break
         if "stream_connection_capability" in klass.__dict__:
             return f"{klass.__module__}.{klass.__name__}"
-    return None
+    _capability, declared = resolve_stream_connection_capability(adapter_cls)
+    return "reviewed-shared-cursor-registry" if declared else None
 
 
 def _resolve_entry(key: str) -> dict[str, object]:
@@ -140,11 +142,15 @@ class TestThroughputSessionCapabilitySweep:
             f"{REFRESH_ENV_VAR}=1 and commit the updated snapshot."
         )
 
-    def test_no_unresolvable_or_missing_override_entries(self):
+    def test_every_entry_is_declared_and_usable(self):
         records = [_resolve_entry(key) for key in _sql_adapter_keys()]
-        bad = [r for r in records if r.get("status") != "resolved" or r.get("gate") == "missing-override"]
+        bad = [
+            r
+            for r in records
+            if r.get("status") != "resolved" or not r.get("declared") or r.get("gate") == "missing-override"
+        ]
         assert not bad, (
-            "Adapters that cannot resolve to a usable capability: "
+            "Adapters without a deliberate, usable capability: "
             + "; ".join(f"{r['key']} ({r.get('status')}/{r.get('gate')}: {r.get('detail', '')})" for r in bad)
             + ". UNSUPPORTED declarations are allowed (they fail closed at runtime); "
             "'invalid' and 'missing-override' entries must be fixed in the adapter."

@@ -63,14 +63,6 @@ from benchbox.core.expected_results.models import (
 
 logger = logging.getLogger(__name__)
 
-# Module-level configuration for validation mode from benchmark runners.
-# This is the cross-thread production channel: drivers set it once per run
-# phase and stream workers read it at validation time. Concurrent runs that
-# need isolation must use per-thread run context instead (see
-# set_query_validation_mode), which takes precedence over this value.
-# Cached answer objects never incorporate this value.
-_config_validation_mode_override: str | None = None
-
 
 def set_query_validation_mode(mode: ValidationMode | None) -> None:
     """Set query validation mode override for TPC-DS, for the CURRENT THREAD.
@@ -102,17 +94,31 @@ def set_query_validation_mode(mode: ValidationMode | None) -> None:
 def set_config_validation_mode(mode_str: str | None) -> None:
     """Set validation mode from benchmark configuration.
 
-    This is called by the benchmark runner to pass validation_mode from CLI/config
-    to the TPC-DS provider. Takes precedence over environment variable but not
-    over programmatic override.
+    This compatibility entry point now writes only the current thread's run
+    context. Production throughput workers receive the parsed policy on their
+    connection wrapper instead of consulting process-global state.
 
     Args:
         mode_str: Validation mode string ("exact", "loose", "range", "disabled"), or None
     """
-    global _config_validation_mode_override
-    _config_validation_mode_override = mode_str
-    if mode_str is not None:
-        logger.debug(f"Config validation mode set to: {mode_str}")
+    set_query_validation_mode(parse_validation_mode(mode_str))
+
+
+def parse_validation_mode(mode_str: str | None) -> ValidationMode | None:
+    """Parse a configured validation mode without mutating run state."""
+    if mode_str is None:
+        return None
+    normalized = mode_str.lower()
+    if normalized == "disabled":
+        return ValidationMode.SKIP
+    try:
+        return ValidationMode(normalized)
+    except ValueError:
+        logger.warning(
+            f"Invalid config validation mode: {mode_str}. "
+            "Valid values: exact, loose, range, skip, disabled. Using default: skip"
+        )
+        return ValidationMode.SKIP
 
 
 def get_query_validation_mode() -> ValidationMode:
@@ -124,31 +130,15 @@ def get_query_validation_mode() -> ValidationMode:
     benchbox.core.validation.query_validation.get_validation_mode_context.
     Cached answer objects never incorporate this value.
 
-    Checks in order:
-    1. Config override set via set_config_validation_mode() (from CLI --validation-mode)
-    2. Environment variable BENCHBOX_QUERY_VALIDATION_MODE (backward compatibility)
-    3. Default: SKIP (safe for parameterized queries)
+    Checks the environment variable BENCHBOX_QUERY_VALIDATION_MODE, then uses
+    SKIP as the safe default. Runner configuration is carried in run-local
+    context and is resolved by QueryValidator before this fallback is called.
 
     The string "disabled" explicitly maps to SKIP (validation off).
 
     Returns:
         ValidationMode to use for TPC-DS queries
     """
-    # Check config override (from CLI --validation-mode flag)
-    if _config_validation_mode_override is not None:
-        normalized = _config_validation_mode_override.lower()
-        if normalized == "disabled":
-            return ValidationMode.SKIP
-        try:
-            mode = ValidationMode(normalized)
-            logger.debug(f"Using query validation mode from config: {mode.value}")
-            return mode
-        except ValueError:
-            logger.warning(
-                f"Invalid config validation mode: {_config_validation_mode_override}. "
-                f"Valid values: exact, loose, range, skip, disabled. Using default: skip"
-            )
-
     # Check environment variable (backward compatibility)
     env_mode = os.environ.get("BENCHBOX_QUERY_VALIDATION_MODE", "").lower()
     if env_mode:
