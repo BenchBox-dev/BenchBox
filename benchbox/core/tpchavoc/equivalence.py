@@ -219,6 +219,7 @@ def find_divergences(
     translate_variant: Callable[[str], str] | None = None,
     skip_variants: Collection[str] | None = None,
     execute_transform: Callable[[str], str] | None = None,
+    strip_trailing_spaces: bool = False,
 ) -> list[Divergence]:
     """Compare every variant of each query to canonical TPC-H on ``connection``.
 
@@ -257,6 +258,10 @@ def find_divergences(
             sample exercises the real execution path; applied identically to
             canonical and variant, so shared transforms still cancel out. Defaults
             to identity, leaving the DuckDB/Postgres/DataFusion samples unchanged.
+        strip_trailing_spaces: Trim trailing spaces from scalar string cells before
+            comparison. PostgreSQL materializes fixed-width CHAR values with their
+            padding; the Postgres sample uses this only to compare the logical TPC-H
+            value rather than a driver-visible storage representation.
 
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
@@ -288,6 +293,8 @@ def find_divergences(
     for query_id in ids:
         try:
             original = connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
+            if strip_trailing_spaces:
+                original = _strip_trailing_spaces(original)
         except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
             continue
@@ -314,12 +321,19 @@ def find_divergences(
                     render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
                 )
                 variant_rows = connection.execute(variant_sql).fetchall()
+                if strip_trailing_spaces:
+                    variant_rows = _strip_trailing_spaces(variant_rows)
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
                 divergences.append(Divergence(query_id, variant_id, str(exc)))
             except Exception as exc:  # noqa: BLE001 - surface execution/sort errors as divergences
                 divergences.append(Divergence(query_id, variant_id, f"error: {exc}"))
     return divergences
+
+
+def _strip_trailing_spaces(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+    """Normalize driver-visible fixed-width CHAR padding for cross-engine comparison."""
+    return [tuple(value.rstrip() if isinstance(value, str) else value for value in row) for row in rows]
 
 
 def _generate_tpch(scale_factor: float, output_dir: Path) -> tuple[Path, TPCHavocBenchmark, TPCH]:
@@ -603,6 +617,7 @@ def find_postgres_divergences(
         query_ids=query_ids,
         translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", POSTGRES_TARGET_DIALECT),
         skip_variants=set(POSTGRES_TPCHAVOC_SKIPS),
+        strip_trailing_spaces=True,
     )
 
 
