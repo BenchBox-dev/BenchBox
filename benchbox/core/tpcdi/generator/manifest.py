@@ -64,6 +64,8 @@ class ManifestMixin:
             return 0
 
     def _write_manifest(self, output_dir: Path, table_paths: dict[str, str]) -> None:
+        from benchbox.core.tpcdi.generator.facts import FACT_TRADE_GENERATION_ALGORITHM_VERSION
+
         manifest = DataGenerationManifest(
             output_dir=output_dir,
             benchmark="tpcdi",
@@ -74,6 +76,8 @@ class ManifestMixin:
                 "level": getattr(self, "compression_level", None),
             },
             parallel=self.max_workers or 1,
+            seed=getattr(self, "generation_seed", None),
+            extra_metadata={"generation_algorithm_version": FACT_TRADE_GENERATION_ALGORITHM_VERSION},
         )
         for table, path_str in table_paths.items():
             p = Path(path_str)

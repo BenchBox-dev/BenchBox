@@ -35,6 +35,13 @@ class TPCDIConfig:
     max_workers: Optional[int] = None
     chunk_size: int = 10000
 
+    # Deterministic generation: explicit seed for per-record FactTrade
+    # randomness, reproducible across worker counts. The default (42)
+    # preserves the historical seed value for legacy callers; a different
+    # seed produces a demonstrably different dataset. Recorded in output
+    # metadata with the generation algorithm version.
+    generation_seed: int = 42
+
     # ETL settings
     enable_validation: bool = True
     strict_validation: bool = False
