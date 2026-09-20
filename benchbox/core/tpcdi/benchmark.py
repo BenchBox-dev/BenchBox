@@ -255,7 +255,10 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
-        original_generation_seed = self.data_generator.generation_seed
+        # Duck-typed generators (including test doubles) may not carry a
+        # generation_seed attribute; only real generators participate in the
+        # request-scoped override contract below.
+        original_generation_seed = getattr(self.data_generator, "generation_seed", None)
         if seed is not None:
             self.data_generator.generation_seed = int(seed)
 
