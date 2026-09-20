@@ -2182,9 +2182,6 @@ _PLATFORM_MANIFEST_JSON = """[
             "password"
           ]
         }
-      },
-      "unsupported_benchmarks": {
-        "vector_search": "QuestDB 9.3.4 has no VECTOR column type. Schema creation fails immediately. No fix planned: requires QuestDB to add native vector support."
       }
     },
     "support_status": "beta"
