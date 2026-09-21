@@ -7417,10 +7417,15 @@
       "title": "Iceberg support for Redshift (via Spectrum) and BigQuery (via BigLake)"
     },
     "iceberg-table-format-support-testing": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T20:35:04Z",
+        "generation": "9f88dd3027da453b820ef6710d431d54",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Iceberg table format support testing"
     },
     "implement-cli-progress-tracking-and-execution-reporting": {
