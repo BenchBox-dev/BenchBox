@@ -2457,9 +2457,9 @@
     },
     "cloud-spark-adapters-emr-serverless-dataproc-serverless-syna": {
       "claim": {
-        "expires_at": "2026-09-22T16:55:39Z",
-        "generation": "9fad943945fc41678677ded8afd06a1b",
-        "renewals": 0,
+        "expires_at": "2026-09-22T17:25:26Z",
+        "generation": "5f2ae28d0f384b04b132c136873dbe9d",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
       },
       "needs": [],
