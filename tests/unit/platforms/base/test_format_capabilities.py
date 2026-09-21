@@ -117,6 +117,7 @@ class TestFormatCapabilities:
         assert PARQUET_CAPABILITY.supported_platforms.get("datafusion") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("athena") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("postgresql") == SupportLevel.EXTENSION
+        assert PARQUET_CAPABILITY.supported_platforms.get("pg_duckdb") == SupportLevel.EXTENSION
 
     def test_parquet_spark_platform_support(self):
         """Test Parquet support for Spark-based platforms."""
@@ -152,6 +153,7 @@ class TestFormatCapabilities:
         expected = {
             "databricks": SupportLevel.NATIVE,
             "duckdb": SupportLevel.EXTENSION,
+            "pg_duckdb": SupportLevel.EXTENSION,
             "datafusion": SupportLevel.EXTENSION,
             "trino": SupportLevel.EXTENSION,
             "presto": SupportLevel.EXTENSION,
@@ -187,6 +189,7 @@ class TestFormatCapabilities:
         """Test Iceberg platform support across all registered platforms."""
         expected = {
             "duckdb": SupportLevel.EXPERIMENTAL,
+            "pg_duckdb": SupportLevel.EXPERIMENTAL,
             "datafusion": SupportLevel.EXTENSION,
             "trino": SupportLevel.EXTENSION,
             "presto": SupportLevel.EXTENSION,
