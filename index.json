@@ -112,9 +112,9 @@
     },
     "add-databricks-hudi-support-to-benchbox-databricks-sql-adapt": {
       "claim": {
-        "expires_at": "2026-09-22T20:35:00Z",
-        "generation": "027952cba9f143689c50326e9c4cee32",
-        "renewals": 0,
+        "expires_at": "2026-09-22T21:14:30Z",
+        "generation": "a870b7ca04ce46818a9f23c50006f9e6",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
       },
       "needs": [],
