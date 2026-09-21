@@ -10879,15 +10879,10 @@
       "title": "Platform Troubleshooting Guide"
     },
     "platforms-databricks-dataframe-adapter-18-120-miss-and-platf": {
-      "claim": {
-        "expires_at": "2026-09-22T15:35:56Z",
-        "generation": "bd435ece8fc54d04b12d80d8a8edd835",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "platforms/databricks/dataframe_adapter (18%, 120 miss) and platforms/dataframe/pyspark_df (23%, 200 miss)"
     },
     "platforms-list-unreadable-at-standard-width": {
