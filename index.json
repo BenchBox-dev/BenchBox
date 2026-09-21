@@ -16841,10 +16841,15 @@
       "title": "✅ TPC-DI Data Generator Compression Support"
     },
     "tpc-di-dataframe-implementation-38-operations": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T13:23:57Z",
+        "generation": "155d4775f2114e41bcc277d91d737dc2",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "TPC-DI DataFrame implementation (38 operations)"
     },
     "tpc-ds-dry-run-execute-real-test-sql-capture-power-throughput-maintenance": {
