@@ -2456,15 +2456,10 @@
       "title": "Cloud Spark Adapter Consolidation - Extract Common Patterns"
     },
     "cloud-spark-adapters-emr-serverless-dataproc-serverless-syna": {
-      "claim": {
-        "expires_at": "2026-09-22T17:25:26Z",
-        "generation": "5f2ae28d0f384b04b132c136873dbe9d",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Cloud Spark adapters (EMR Serverless, Dataproc Serverless, Synapse Spark)"
     },
     "cloud-spark-aqe-toggle": {
