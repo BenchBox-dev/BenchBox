@@ -674,6 +674,9 @@ DDLGeneratorType = DDLGenerator | BaseDDLGenerator
 # Platforms known to have no physical tuning surface (no partitioning, clustering,
 # distribution, or sort-key clauses to emit) - the NoOp fallback for these is
 # expected and permanent, so get_ddl_generator() does not warn for them.
+# This includes every DataFrame/expression-family engine (pandas, cudf, dask,
+# polars, datafusion, pyspark, lakesail, velox): DataFrame-mode DDL generation
+# resolves through this same registry-owned path and lands on the silent NoOp.
 _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
     {
         "sqlite",
@@ -682,8 +685,31 @@ _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
         "cudf",
         "dask",
         "polars",
+        "datafusion",
+        "pyspark",
+        "lakesail",
+        "velox",
     }
 )
+
+# DataFrame-mode key variants that resolve to the same registry-owned path as
+# their base engine. The DataFrame platform family addresses engines as
+# "<engine>-df" (polars-df, pandas-df, cudf-df, dask-df, datafusion-df,
+# pyspark-df, lakesail-df) and the packaging extras expose "dataframe-<engine>"
+# aliases (dataframe-pandas, dataframe-polars, ...). Both spellings normalize
+# to the base engine key before the generators/tuning-free lookup so DataFrame
+# mode never diverges from the single registry path based on key spelling.
+_DATAFRAME_KEY_PREFIX = "dataframe-"
+_DATAFRAME_KEY_SUFFIX = "-df"
+
+
+def _normalize_dataframe_platform_key(platform_lower: str) -> str:
+    """Normalize a DataFrame-mode platform key to its base engine key."""
+    if platform_lower.startswith(_DATAFRAME_KEY_PREFIX):
+        return platform_lower[len(_DATAFRAME_KEY_PREFIX) :]
+    if platform_lower.endswith(_DATAFRAME_KEY_SUFFIX):
+        return platform_lower[: -len(_DATAFRAME_KEY_SUFFIX)]
+    return platform_lower
 
 
 def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
@@ -770,13 +796,23 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     if platform_lower in generators:
         return generators[platform_lower]()
 
+    # DataFrame-mode keys ("<engine>-df", "dataframe-<engine>") resolve behind
+    # the same registry-owned path: normalize to the base engine key and retry
+    # the generators mapping so a real generator always wins when one exists.
+    normalized = _normalize_dataframe_platform_key(platform_lower)
+    if normalized != platform_lower and normalized in generators:
+        return generators[normalized]()
+
     # Platforms with no physical tuning surface at all (in-memory/embedded engines
     # with no indexes, partitioning, or clustering clauses to emit). NoOp is the
     # correct, permanent answer for these, so the fallback stays silent. Anything
     # else falling through here is either a platform that should get a real
     # generator eventually or a typo'd platform string - both are worth a
     # warning since dry-run/tuning preview would otherwise go silently empty.
-    if platform_lower not in _TUNING_FREE_PLATFORMS:
+    # The tuning-free check runs on the normalized key so DataFrame-mode
+    # spellings ("polars-df", "dataframe-polars", ...) stay silent exactly when
+    # their base engine is tuning-free.
+    if normalized not in _TUNING_FREE_PLATFORMS:
         logger.warning(
             "No DDL generator registered for platform %r; tuning clauses will be "
             "empty (NoOp fallback). If %r supports physical tuning, register it "

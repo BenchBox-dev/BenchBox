@@ -236,13 +236,48 @@ class TestNoOpFallbackWarning:
             for record in caplog.records
         )
 
-    @pytest.mark.parametrize("platform_key", ["sqlite", "sqlite3", "pandas", "cudf", "dask", "polars"])
+    @pytest.mark.parametrize(
+        "platform_key",
+        [
+            "sqlite",
+            "sqlite3",
+            "pandas",
+            "cudf",
+            "dask",
+            "polars",
+            "datafusion",
+            "pyspark",
+            "lakesail",
+            "velox",
+            # DataFrame-mode spellings resolve behind the same registry-owned
+            # path and stay silent exactly when their base engine is tuning-free.
+            "polars-df",
+            "pandas-df",
+            "cudf-df",
+            "dask-df",
+            "datafusion-df",
+            "pyspark-df",
+            "lakesail-df",
+            "dataframe-pandas",
+            "dataframe-polars",
+            "dataframe-dask",
+            "dataframe-cudf",
+            "dataframe-pyspark",
+            "dataframe-datafusion",
+        ],
+    )
     def test_known_tuning_free_platforms_stay_silent(self, platform_key: str, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
             generator = get_ddl_generator(platform_key)
 
         assert isinstance(generator, NoOpDDLGenerator)
         assert caplog.records == []
+
+    def test_dataframe_variant_matches_base_engine(self) -> None:
+        """DataFrame-mode spellings resolve to the same generator as the base engine."""
+        assert type(get_ddl_generator("polars-df")).__name__ == type(get_ddl_generator("polars")).__name__
+        assert type(get_ddl_generator("dataframe-polars")).__name__ == type(get_ddl_generator("polars")).__name__
+        assert type(get_ddl_generator("datafusion-df")).__name__ == type(get_ddl_generator("datafusion")).__name__
 
     def test_registered_platform_never_warns(self, caplog: pytest.LogCaptureFixture) -> None:
         with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
