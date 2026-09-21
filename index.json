@@ -8598,10 +8598,15 @@
       "title": "Modularize build orchestration by domain after quality contracts stabilize"
     },
     "managed-spark-adapter-follow-up-items": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T16:48:44Z",
+        "generation": "71ef2d9951fb40a480b21fa614acfa6f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Managed Spark adapter follow-up items"
     },
     "manifest-hash-gate-dormant-while-corpus-has-no-sidecars": {
