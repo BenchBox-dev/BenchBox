@@ -18230,12 +18230,17 @@
       "title": "Replace DataFusion error-message-text parsing in unified_frame.py with a version/capability check"
     },
     "unified-list-expr-native-and-expr-index": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T15:30:59Z",
+        "generation": "0d2543f3c1ea4241b93cb642a8765557",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [
         "full-string-to-array-support-returning-actual-list-expressio"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "UnifiedListExpr native projection and expression indices"
     },
     "unified-output-path-normalization-for-remote-paths-cli-unified-runner": {
