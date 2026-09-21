@@ -4647,15 +4647,10 @@
       "title": "Rewrite architecture.md and structure.md to match current codebase"
     },
     "docs-tests-readme-pytest-config": {
-      "claim": {
-        "expires_at": "2026-09-22T15:27:29Z",
-        "generation": "7823bf1916ec49a5b2ddc45882201757",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d79997238c1073f74d5d5813"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Fix tests README pytest config paths"
     },
     "document-cli-comprehensively": {
