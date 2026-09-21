@@ -31,6 +31,7 @@ benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --sca
 
 # Preview multiple output formats
 benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark primitives --scale 0.001
+```
 
 ### Seed Control in Dry Run
 
@@ -48,7 +49,6 @@ benchbox run --dry-run ./preview_tpch_seed5 --platform duckdb --benchmark tpch -
 ```
 
 If a specific seed cannot generate all queries at a tiny scale, the CLI preflight validation will fail fast and report example failures. Try a different seed or a slightly larger scale.
-```
 
 ### Programmatic Usage
 
@@ -97,16 +97,22 @@ When you run a dry run, BenchBox creates an output directory:
 
 ```
 dry_run_output/
-├── summary.json              # Complete configuration summary
-├── summary.yaml              # Human-readable configuration
-├── system_profile.json       # System information
-├── queries/                  # Individual SQL query files
+├── <prefix>_<timestamp>.json                    # Complete configuration summary
+├── <prefix>_<timestamp>.yaml                    # Human-readable configuration
+├── <prefix>_queries_<timestamp>/                # Individual SQL query files
 │   ├── query_1.sql
 │   ├── query_2.sql
 │   └── ...
-├── schema.sql                # Database schema definition
-└── resource_estimates.json   # Memory and performance estimates
+├── <prefix>_ddl_<timestamp>.sql                 # DDL preview, when present
+├── <prefix>_post_load_<timestamp>.sql           # Post-load statements, when present
+└── <prefix>_schema_<timestamp>.sql              # Database schema definition
 ```
+
+Timestamps use `%Y%m%d_%H%M%S`. The CLI derives `<prefix>` from the benchmark
+and platform (for example `tpch_duckdb`); programmatic use defaults to
+`dryrun`. DataFrame mode writes `<prefix>_dataframe_queries_<timestamp>/` and
+a `.py` schema file instead. System profile and resource estimates are fields
+inside the JSON/YAML output, not separate files.
 
 ### Summary Files
 
