@@ -45,6 +45,7 @@ from benchbox.core.metadata_primitives.ddl import (
     generate_drop_role_sql,
     generate_grant_sql,
     generate_revoke_sql,
+    generate_wide_table_columns,
     supports_acl,
 )
 from benchbox.core.metadata_primitives.generator import MetadataGenerator
@@ -1301,12 +1302,6 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         """
         platform_name = adapter.platform_name
         spark_session = getattr(ctx, "spark_session", None) or getattr(adapter, "spark", None)
-        dataframes = self._get_registered_dataframes(ctx)
-        if not dataframes:
-            logger.info("Bootstrapping in-memory schema fixtures for Metadata Primitives DataFrame mode")
-            dataframes = self._bootstrap_dataframe_fixture_tables(ctx, adapter)
-        else:
-            self._register_dataframes_with_adapter(adapter, dataframes)
 
         # Get iterations from config
         config_options = getattr(benchmark_config, "options", {}) or {}
@@ -1316,6 +1311,17 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         categories = config_options.get("metadata_categories")
         if isinstance(categories, str):
             categories = [c.strip() for c in categories.split(",")]
+
+        complexity_preset: MetadataComplexityConfig | str | None = None
+        if categories is not None and "complexity" in categories:
+            complexity_preset = config_options.get("metadata_complexity_preset", "wide_tables")
+
+        dataframes = self._get_registered_dataframes(ctx)
+        if not dataframes:
+            logger.info("Bootstrapping in-memory schema fixtures for Metadata Primitives DataFrame mode")
+            dataframes = self._bootstrap_dataframe_fixture_tables(ctx, adapter, complexity_preset=complexity_preset)
+        else:
+            self._register_dataframes_with_adapter(adapter, dataframes)
 
         # Run the benchmark
         result = self.run_dataframe_benchmark(
@@ -1352,9 +1358,22 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
             )
         return output
 
-    def _bootstrap_dataframe_fixture_tables(self, ctx: Any, adapter: Any) -> dict[str, Any]:
-        """Build and register in-memory schema fixtures for DataFrame metadata ops."""
+    def _bootstrap_dataframe_fixture_tables(
+        self,
+        ctx: Any,
+        adapter: Any,
+        complexity_preset: MetadataComplexityConfig | str | None = None,
+    ) -> dict[str, Any]:
+        """Build and register in-memory schema fixtures for DataFrame metadata ops.
+
+        When a complexity preset is given (DataFrame runs requesting the
+        "complexity" category), stress-scale fixtures from the shared DDL path
+        are merged in so wide-table and complex-type probes run against
+        stress catalog tables instead of only the small base schema.
+        """
         dataframes = self._build_dataframe_fixture_tables(adapter)
+        if complexity_preset is not None:
+            dataframes.update(self.build_complexity_dataframes(adapter, complexity_preset))
 
         register_table = getattr(ctx, "register_table", None)
         if callable(register_table):
@@ -1411,16 +1430,205 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         column_type: str,
         ordinal: int,
     ) -> Any:
-        """Return a single representative scalar value for a schema column."""
-        if column_type.startswith("INTEGER"):
+        """Return a single representative value for a schema column.
+
+        Values are typed so DataFrame schema inference preserves the DDL type
+        distribution: lists for arrays, dicts for structs/maps/objects, and
+        Decimal for decimals. The complex branches run before the scalar
+        branches because DDL type strings embed scalar keywords (e.g. the
+        "INTEGER" inside "STRUCT(x INTEGER, y INTEGER)").
+        """
+        normalized = column_type.upper().strip()
+        if (
+            normalized.startswith("STRUCT")
+            or normalized.startswith("TUPLE")
+            or normalized.startswith("OBJECT")
+            or normalized.startswith("JSONB")
+        ):
+            return MetadataPrimitivesBenchmark._sample_struct_value(
+                table_name=table_name,
+                column_name=column_name,
+                column_type=column_type,
+                ordinal=ordinal,
+            )
+        if normalized.startswith("MAP"):
+            return MetadataPrimitivesBenchmark._sample_map_value(
+                table_name=table_name,
+                column_name=column_name,
+                column_type=column_type,
+                ordinal=ordinal,
+            )
+        if normalized.startswith("ARRAY") or normalized.endswith("[]"):
+            if "STRUCT" in normalized:
+                return [
+                    MetadataPrimitivesBenchmark._sample_struct_value(
+                        table_name=table_name,
+                        column_name=column_name,
+                        column_type=normalized[normalized.index("STRUCT") :],
+                        ordinal=ordinal,
+                    )
+                ]
+            if "CHAR" in normalized or "VARCHAR" in normalized or "STRING" in normalized or "TEXT" in normalized:
+                return [f"{table_name}_{column_name}_{ordinal}_item"]
+            return [ordinal]
+        if normalized.startswith("INTEGER") or normalized.startswith("BIGINT") or normalized.startswith("SMALLINT"):
             return ordinal
-        if column_type.startswith("DECIMAL"):
-            return float(ordinal) + 0.25
-        if column_type.startswith("DATE"):
+        if normalized.startswith("DECIMAL") or normalized.startswith("NUMERIC"):
+            from decimal import Decimal
+
+            return Decimal(ordinal) + Decimal("0.25")
+        if normalized.startswith("DOUBLE") or normalized.startswith("FLOAT") or normalized.startswith("REAL"):
+            return float(ordinal) + 0.5
+        if normalized.startswith("BOOLEAN") or normalized.startswith("BOOL"):
+            return ordinal % 2 == 0
+        if normalized.startswith("TIMESTAMP") or normalized.startswith("DATETIME"):
+            from datetime import datetime
+
+            return datetime(1998, 1, min(ordinal, 28), min(ordinal, 23), 0, 0)
+        if normalized.startswith("DATE"):
             return date(1998, 1, min(ordinal, 28))
-        if "CHAR" in column_type or "VARCHAR" in column_type or "STRING" in column_type:
+        if "CHAR" in normalized or "VARCHAR" in normalized or "STRING" in normalized or "TEXT" in normalized:
             return f"{table_name}_{column_name}_{ordinal}"
         return f"{table_name}_{column_name}_{ordinal}"
+
+    @staticmethod
+    def _sample_struct_value(
+        *,
+        table_name: str,
+        column_name: str,
+        column_type: str,
+        ordinal: int,
+    ) -> dict[str, Any]:
+        """Return a dict value for a STRUCT/Tuple/OBJECT/JSONB column.
+
+        Field definitions ("STRUCT(key VARCHAR, value VARCHAR)") are sampled
+        per field so nested distributions survive; bare spellings ("OBJECT",
+        "JSONB") fall back to a representative key/value pair.
+        """
+        inner = MetadataPrimitivesBenchmark._bracket_inner(column_type)
+        if inner is not None:
+            value: dict[str, Any] = {}
+            for index, part in enumerate(MetadataPrimitivesBenchmark._split_top_level(inner)):
+                tokens = part.strip().split(None, 1)
+                if len(tokens) != 2:
+                    continue
+                field_name, field_type = tokens
+                value[field_name.strip("<>():")] = MetadataPrimitivesBenchmark._sample_dataframe_value(
+                    table_name=table_name,
+                    column_name=f"{column_name}_{field_name.strip('<>():') or index}",
+                    column_type=field_type,
+                    ordinal=ordinal,
+                )
+            if value:
+                return value
+        return {
+            f"{table_name}_{column_name}_{ordinal}_key": ordinal,
+        }
+
+    @staticmethod
+    def _sample_map_value(
+        *,
+        table_name: str,
+        column_name: str,
+        column_type: str,
+        ordinal: int,
+    ) -> dict[str, Any]:
+        """Return a single-entry dict value for a MAP column."""
+        inner = MetadataPrimitivesBenchmark._bracket_inner(column_type)
+        if inner is not None:
+            parts = MetadataPrimitivesBenchmark._split_top_level(inner)
+            if len(parts) == 2:
+                key = MetadataPrimitivesBenchmark._sample_dataframe_value(
+                    table_name=table_name,
+                    column_name=f"{column_name}_key",
+                    column_type=parts[0],
+                    ordinal=ordinal,
+                )
+                map_value = MetadataPrimitivesBenchmark._sample_dataframe_value(
+                    table_name=table_name,
+                    column_name=f"{column_name}_value",
+                    column_type=parts[1],
+                    ordinal=ordinal,
+                )
+                try:
+                    hash(key)
+                except TypeError:
+                    key = f"{table_name}_{column_name}_{ordinal}_key"
+                return {key: map_value}
+        return {
+            f"{table_name}_{column_name}_{ordinal}_key": ordinal,
+        }
+
+    @staticmethod
+    def _bracket_inner(column_type: str) -> str | None:
+        """Return the text inside the outermost brackets, or None when absent."""
+        for opening, closing in (("(", ")"), ("<", ">")):
+            start = column_type.find(opening)
+            end = column_type.rfind(closing)
+            if start != -1 and end != -1 and end > start:
+                return column_type[start + 1 : end]
+        return None
+
+    @staticmethod
+    def _split_top_level(text: str) -> list[str]:
+        """Split on top-level commas, ignoring nested brackets."""
+        parts: list[str] = []
+        depth = 0
+        current: list[str] = []
+        pairs = {"(": ")", "<": ">", "[": "]"}
+        closers = set(pairs.values())
+        for char in text:
+            if char in pairs:
+                depth += 1
+                current.append(char)
+            elif char in closers:
+                depth = max(depth - 1, 0)
+                current.append(char)
+            elif char == "," and depth == 0:
+                parts.append("".join(current))
+                current = []
+            else:
+                current.append(char)
+        parts.append("".join(current))
+        return parts
+
+    def build_complexity_dataframes(
+        self,
+        adapter: Any,
+        config: MetadataComplexityConfig | str = "wide_tables",
+    ) -> dict[str, Any]:
+        """Build stress-scale DataFrame fixtures from the shared DDL path.
+
+        Uses generate_wide_table_columns so the DataFrame surface validates
+        the same column distribution as SQL DDL generation. Returns a wide
+        table plus catalog_size narrow tables for large-catalog stress.
+        """
+        if isinstance(config, str):
+            config = get_complexity_preset(config)
+        wide_columns = generate_wide_table_columns(
+            width=config.width_factor,
+            dialect="duckdb",
+            type_complexity=config.type_complexity,
+        )
+        wide_row: dict[str, Any] = {}
+        for ordinal, column in enumerate(wide_columns, start=1):
+            wide_row[column.name] = self._sample_dataframe_value(
+                table_name="stress_wide",
+                column_name=column.name,
+                column_type=column.data_type,
+                ordinal=ordinal,
+            )
+        tables: dict[str, Any] = {
+            "stress_wide": self._create_fixture_dataframe(adapter, wide_row),
+        }
+        for index in range(1, max(config.catalog_size, 1) + 1):
+            table_name = f"stress_catalog_{index:04d}"
+            row = self._build_dataframe_fixture_row(
+                table_name,
+                [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "VARCHAR(255)"}],
+            )
+            tables[table_name] = self._create_fixture_dataframe(adapter, row)
+        return tables
 
     @staticmethod
     def _create_fixture_dataframe(adapter: Any, row: dict[str, Any]) -> Any:
