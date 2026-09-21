@@ -14,7 +14,7 @@
 | metadata_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | nyctaxi | candidate-unverified | 25 | 25 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
 | tpcdi | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
-| tpcds_obt | candidate-unverified | 89 | 3 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
+| tpcds_obt | candidate-unverified | 89 | 17 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
 | tpch_skew | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
 | transaction_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | tsbs_devops | candidate-unverified | 18 | 18 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |

@@ -65,7 +65,8 @@ def test_resolution_detects_a_nonstandard_registry_name() -> None:
     """Registry discovery is type-based because valid constant names are not uniform."""
     queries = registry_dataframe_queries("tpcds_obt")
 
-    assert [query.query_id for query in queries] == ["Q1", "Q2", "Q3"]
+    ids = sorted((query.query_id for query in queries), key=lambda qid: int(qid[1:]))
+    assert ids == [f"Q{i}" for i in range(1, 18)]
 
 
 def test_the_registry_helper_is_quiet_about_a_benchmark_that_ships_none() -> None:
