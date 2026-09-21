@@ -130,7 +130,13 @@ profile plus different `physical_rendering_id` is a cross-mechanism comparison,
 not an identical-tuning cohort.
 
 Current Databricks defaults preserve the legacy `*_tuned.yaml` Z-ORDER rendering.
-Use `*_liquid_tuned.yaml` to request Liquid AUTO. Liquid templates must not
+Use `*_liquid_tuned.yaml` to request Liquid AUTO by passing the template as an explicit path (there is no `liquid` keyword; `--tuning tuned` only resolves `<benchmark>_tuned.yaml`):
+
+```bash
+benchbox run --platform databricks --benchmark tpch --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml
+```
+
+Liquid templates must not
 carry `z_ordering_enabled`, `z_ordering_columns`, per-table `partitioning`, or
 per-table `distribution` fields; partition and ZORDER-era candidates are folded
 into Liquid workload intent, and automatic clustering does not prove that

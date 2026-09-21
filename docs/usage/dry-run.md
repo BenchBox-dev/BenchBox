@@ -27,7 +27,7 @@ Dry run mode is essential for:
 benchbox run --dry-run ./benchmark_runs/dryrun_previews --platform duckdb --benchmark tpch --scale 0.1
 
 # Preview with tuning configurations
-benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --scale 0.01 --tuning
+benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --scale 0.01 --tuning tuned
 
 # Preview multiple output formats
 benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark primitives --scale 0.001
