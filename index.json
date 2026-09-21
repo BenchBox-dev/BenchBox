@@ -14533,10 +14533,15 @@
       "title": "Verify remediation across affected instances and downstream consumers"
     },
     "revisit-extras-naming-topology-e-g-dataframe-pandas-vs-panda": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T11:53:04Z",
+        "generation": "5764a117554649ae9e458cb725307ef8",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Revisit extras naming / topology (e.g. `dataframe-pandas` vs `pandas` aliases)"
     },
     "rework-results-secondary-navigation-information-architecture": {
