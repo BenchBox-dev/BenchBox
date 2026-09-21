@@ -16,6 +16,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import sys
 import time
 from collections import OrderedDict
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -1151,6 +1152,7 @@ class TestBenchmarkDataFrameIntegration:
         pytest.importorskip("polars")
 
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.complexity import get_complexity_preset
         from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -1163,12 +1165,20 @@ class TestBenchmarkDataFrameIntegration:
             benchmark_config=SimpleNamespace(options={"power_iterations": 1, "metadata_categories": ["complexity"]}),
         )
 
-        assert len(rows) == len(benchmark.get_table_names()) * 2
+        # The default "wide_tables" preset contributes its wide table plus its
+        # catalog tables on top of the base schema tables; every probed table
+        # runs both complexity ops.
+        preset = get_complexity_preset("wide_tables")
+        expected_tables = len(benchmark.get_table_names()) + 1 + preset.catalog_size
+        assert len(rows) == expected_tables * 2
         assert all(
             row["query_id"].startswith("df_wide_table_schema_")
             or row["query_id"].startswith("df_complex_type_introspection_")
             for row in rows
         )
+        query_ids = [row["query_id"] for row in rows]
+        assert any("stress_wide" in query_id for query_id in query_ids)
+        assert any("stress_catalog_" in query_id for query_id in query_ids)
 
     def test_execute_dataframe_workload_uses_registered_context_tables(self, monkeypatch):
         """execute_dataframe_workload should extract native tables from the context contract."""
@@ -1382,3 +1392,108 @@ class TestComplexityStressFixtures:
         assert result.success is True
         assert result.metrics["is_wide_table"] is True
         assert result.metrics["column_count"] >= 100
+
+    @pytest.mark.parametrize(
+        ("column_type", "expected"),
+        [
+            ("INTEGER[]", [3]),
+            ("VARCHAR[]", ["t_c_3_item"]),
+            ("ARRAY<INT64>", [3]),
+            ("STRUCT(key VARCHAR, value VARCHAR)", {"key": "t_c_key_3", "value": "t_c_value_3"}),
+            (
+                "STRUCT(name VARCHAR, data STRUCT(x INTEGER, y INTEGER))",
+                {"name": "t_c_name_3", "data": {"x": 3, "y": 3}},
+            ),
+            ("MAP(VARCHAR, INTEGER)", {"t_c_key_3": 3}),
+            ("OBJECT", {"t_c_3_key": 3}),
+            ("DECIMAL(18,4)", Decimal("3.25")),
+        ],
+    )
+    def test_sample_dataframe_value_preserves_complex_types(self, column_type: str, expected: object) -> None:
+        """Complex DDL types must sample to values inference preserves."""
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+
+        assert (
+            MetadataPrimitivesBenchmark._sample_dataframe_value(
+                table_name="t", column_name="c", column_type=column_type, ordinal=3
+            )
+            == expected
+        )
+
+    def test_complex_type_introspection_sees_nested_fixture(self):
+        """Complex-type introspection must report columns on a NESTED fixture."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.complexity import MetadataComplexityConfig, TypeComplexity
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        config = MetadataComplexityConfig(
+            width_factor=30,
+            view_depth=1,
+            type_complexity=TypeComplexity.NESTED,
+            catalog_size=2,
+        )
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        tables = benchmark.build_complexity_dataframes(adapter, config)
+        manager = benchmark.get_dataframe_operations(adapter.platform_name)
+
+        result = manager.execute_complex_type_introspection(tables["stress_wide"])
+        assert result.success is True
+        assert result.metrics["complex_column_count"] > 0
+
+    def test_execute_workload_bootstraps_stress_tables_for_complexity(self, monkeypatch):
+        """The complexity category must bootstrap stress fixtures into the run."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.benchmark import MetadataBenchmarkResult
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        captured: dict[str, object] = {}
+
+        def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
+            captured["keys"] = set(dataframes)
+            return MetadataBenchmarkResult(results=[], total_queries=0)
+
+        monkeypatch.setattr(benchmark, "run_dataframe_benchmark", fake_run)
+
+        ctx = adapter.create_context()
+        benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(
+                options={"metadata_categories": ["complexity"], "metadata_complexity_preset": "minimal"}
+            ),
+        )
+        assert "stress_wide" in captured["keys"]
+        assert any(key.startswith("stress_catalog_") for key in captured["keys"])
+
+    def test_execute_workload_skips_stress_tables_by_default(self, monkeypatch):
+        """Runs without the complexity category must not bootstrap stress tables."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.benchmark import MetadataBenchmarkResult
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        captured: dict[str, object] = {}
+
+        def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
+            captured["keys"] = set(dataframes)
+            return MetadataBenchmarkResult(results=[], total_queries=0)
+
+        monkeypatch.setattr(benchmark, "run_dataframe_benchmark", fake_run)
+
+        ctx = adapter.create_context()
+        benchmark.execute_dataframe_workload(
+            ctx=ctx,
+            adapter=adapter,
+            benchmark_config=SimpleNamespace(options={}),
+        )
+        assert "stress_wide" not in captured["keys"]
