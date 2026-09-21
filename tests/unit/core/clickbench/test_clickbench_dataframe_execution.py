@@ -112,18 +112,21 @@ class TestClickBenchQueryExecution:
     """Every ClickBench query executes on both backends with identical results."""
 
     @pytest.fixture(scope="class")
-    def hits(self):
+    @classmethod
+    def hits(cls):
         return _make_hits()
 
     @pytest.fixture(scope="class")
-    def expr_ctx(self, hits):
+    @classmethod
+    def expr_ctx(cls, hits):
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
         ctx.register_table("hits", pl.from_pandas(hits).lazy())
         return ctx
 
     @pytest.fixture(scope="class")
-    def pandas_ctx(self, hits):
+    @classmethod
+    def pandas_ctx(cls, hits):
         return _PandasContext({"hits": hits})
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
