@@ -755,6 +755,24 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             return max_expr.over(partition_by)
         return max_expr
 
+    @staticmethod
+    def _window_order_columns(order_by: list[tuple[str, bool]] | None, column: str) -> tuple[list[str], bool]:
+        """Normalize a window ORDER BY to a (columns, ascending) pair.
+
+        Multi-column keys (e.g. a deterministic ``(date, key)`` tie-break) are
+        passed through to Polars' ``over(..., order_by=[...])``. Polars takes a
+        single ``descending`` flag, so every key must share one direction;
+        mixed ASC/DESC keys raise until a per-column encoding lands.
+        """
+        order_by = order_by or [(column, True)]
+        directions = {ascending for _, ascending in order_by}
+        if len(directions) > 1:
+            raise ValueError(
+                "Polars window helpers require a uniform ORDER BY direction, "
+                f"got {order_by!r}; encode mixed directions per column first."
+            )
+        return [name for name, _ in order_by], order_by[0][1]
+
     def window_lag(
         self,
         column: str,
@@ -769,9 +787,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         original row order) rather than shifting in the frame's current order and
         then re-sorting the shifted values.
         """
-        order_col, ascending = order_by[0] if order_by else (column, True)
+        order_cols, ascending = self._window_order_columns(order_by, column)
         parts = partition_by if partition_by else [pl.lit(1)]
-        return pl.col(column).shift(offset).over(parts, order_by=order_col, descending=not ascending)
+        return pl.col(column).shift(offset).over(parts, order_by=order_cols, descending=not ascending)
 
     def window_lead(
         self,
@@ -781,9 +799,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         order_by: list[tuple[str, bool]] | None = None,
     ) -> PolarsExpr:
         """Create a LEAD() window function expression (see window_lag)."""
-        order_col, ascending = order_by[0] if order_by else (column, True)
+        order_cols, ascending = self._window_order_columns(order_by, column)
         parts = partition_by if partition_by else [pl.lit(1)]
-        return pl.col(column).shift(-offset).over(parts, order_by=order_col, descending=not ascending)
+        return pl.col(column).shift(-offset).over(parts, order_by=order_cols, descending=not ascending)
 
     def window_ntile(
         self,
@@ -797,11 +815,13 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         the first ``count % n`` buckets get ``ceil(count/n)`` rows, the rest get
         ``floor(count/n)``. The naive ``ceil(rank*n/count)`` formula does not match
         that distribution (e.g. n=3 over 5 rows), so compute the buckets piecewise
-        from the 0-indexed position.
+        from the 0-indexed position. Multi-column ORDER BY tie-breaks rank over
+        the struct of the key columns (lexicographic order).
         """
-        order_col, ascending = order_by[0]
-        r0 = pl.col(order_col).rank(method="ordinal", descending=not ascending) - pl.lit(1)
-        count_expr = pl.col(order_col).count()
+        order_cols, ascending = self._window_order_columns(order_by, order_by[0][0])
+        rank_col: PolarsExpr = pl.struct(order_cols) if len(order_cols) > 1 else pl.col(order_cols[0])
+        r0 = rank_col.rank(method="ordinal", descending=not ascending) - pl.lit(1)
+        count_expr = pl.col(order_cols[0]).count()
         base = count_expr // n  # floor bucket size
         rem = count_expr % n  # number of larger (base+1) buckets
         big = rem * (base + pl.lit(1))  # rows covered by the larger buckets
