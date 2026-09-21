@@ -1869,9 +1869,9 @@
     },
     "ci-dedupe-06-heavy-tier-queue-only": {
       "claim": {
-        "expires_at": "2026-09-19T11:38:51Z",
-        "generation": "121a242eb34c4945903ebd1c1aa3afe8",
-        "renewals": 1,
+        "expires_at": "2026-09-22T12:46:47Z",
+        "generation": "985556db7775488c817394d2610020a2",
+        "renewals": 0,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
       },
       "needs": [
