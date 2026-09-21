@@ -518,17 +518,23 @@ class UnifiedListExpr:
         """Get element at index from list.
 
         Args:
-            index: Element index (0-based)
+            index: Element index (0-based); a plain int or an expression
+                (UnifiedExpr or backend-native) evaluating to one per row.
         """
+        native_index = index.native if isinstance(index, UnifiedExpr) else index
         if self._is_pyspark:
-            return UnifiedExpr(self._expr.getItem(index))
+            return UnifiedExpr(self._expr.getItem(native_index))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            # DataFusion array_element is 1-indexed
-            idx = index + 1 if isinstance(index, int) else index
-            return UnifiedExpr(df_f.array_element(self._expr, df_lit(idx)))
-        return UnifiedExpr(self._expr.list.get(index))
+            # DataFusion array_element is 1-indexed: offset plain ints and
+            # per-row index expressions alike from 0-based to 1-based.
+            if isinstance(native_index, int):
+                native_index = df_lit(native_index + 1)
+            else:
+                native_index = native_index + 1
+            return UnifiedExpr(df_f.array_element(self._expr, native_index))
+        return UnifiedExpr(self._expr.list.get(native_index))
 
     def eval(self, expr: Any) -> UnifiedListExpr:
         """Evaluate an expression on each list element (Polars-only).
@@ -555,6 +561,15 @@ class UnifiedListExpr:
         enables the Polars-style .list accessor on list-typed expressions.
         """
         return self
+
+    @property
+    def native(self) -> Any:
+        """Get the underlying backend-native list expression.
+
+        Mirrors UnifiedExpr.native so unaliased list expressions can flow
+        through with_columns/select unwrapping like any other expression.
+        """
+        return self._expr
 
     def alias(self, name: str) -> UnifiedExpr:
         """Alias the list expression.
@@ -3821,8 +3836,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if len(columns) == 1 and isinstance(columns[0], list):
             columns = tuple(columns[0])
 
-        # Unwrap UnifiedExpr objects
-        unwrapped = [c.native if isinstance(c, UnifiedExpr) else c for c in columns]
+        # Unwrap UnifiedExpr/UnifiedListExpr objects (the latter covers
+        # unaliased list expressions, which expose .native like UnifiedExpr)
+        unwrapped = [c.native if isinstance(c, (UnifiedExpr, UnifiedListExpr)) else c for c in columns]
 
         if _is_datafusion_df(self._df):
             # DataFusion: Check if any expression contains aggregates
@@ -3902,8 +3918,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if len(exprs) == 1 and isinstance(exprs[0], list):
             exprs = tuple(exprs[0])
 
-        # Unwrap UnifiedExpr objects
-        unwrapped = [e.native if isinstance(e, UnifiedExpr) else e for e in exprs]
+        # Unwrap UnifiedExpr/UnifiedListExpr objects (the latter covers
+        # unaliased list expressions, which expose .native like UnifiedExpr)
+        unwrapped = [e.native if isinstance(e, (UnifiedExpr, UnifiedListExpr)) else e for e in exprs]
 
         if _is_pyspark_df(self._df):
             # PySpark: Use withColumn which properly replaces existing columns
