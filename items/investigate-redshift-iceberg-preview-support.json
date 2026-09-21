@@ -1,4 +1,5 @@
 {
+  "context": "Finding: the deferral question is answered YES, production-ready. Redshift reads Iceberg via Spectrum (CREATE EXTERNAL SCHEMA ... FROM DATA CATALOG over the Glue catalog) and reached GA for Iceberg writes (CREATE TABLE ... USING ICEBERG, INSERT; COPY still unsupported, use INSERT/CTAS to ingest). Since Aug 2026 Redshift also reads/writes Iceberg v3 tables (default values, row lineage, deletion vectors). Both provisioned (Spectrum) and Serverless are covered. BenchBox gap: benchbox/platforms/redshift.py has no Iceberg code path (no external-schema-from-catalog DDL, no USING ICEBERG DDL). Recommendation: implement Spectrum-mapped Iceberg support in the Redshift adapter (item iceberg-support-for-redshift-via-spectrum-and-bigquery-via-b). No live verification possible without AWS credentials.",
   "description": "Promoted from deferral #221 of open-table-format-gap-analysis.\nDeferred: Investigate Redshift Iceberg preview support\nReason deferred: Redshift has limited Iceberg preview support but unclear if production-ready",
   "legacy": {
     "item_meta": {
