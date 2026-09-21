@@ -68,6 +68,36 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def resolve_table_paths(parquet_dir: Path, table: str) -> list[Path]:
+    """Resolve the parquet files backing one TPC-H table.
+
+    Datagen writes small tables as a single ``{table}.parquet`` file and
+    shards large tables as ``{table}.<shard>.parquet`` (e.g.
+    ``lineitem.2.parquet``). Prefer the single file when present; otherwise
+    return the numeric shards in shard order so multi-file adapters load the
+    same rows the ``run`` path stages from ``benchmark.tables``.
+
+    Args:
+        parquet_dir: Directory containing parquet data (or versioned
+            ``parquet/v8``-style layout resolved by the caller).
+        table: Table name (e.g., ``"lineitem"``).
+
+    Returns:
+        Ordered list of parquet paths, empty when the table is absent.
+    """
+    single = parquet_dir / f"{table}.parquet"
+    if single.exists():
+        return [single]
+    shards: list[tuple[int, Path]] = []
+    for candidate in parquet_dir.glob(f"{table}.*.parquet"):
+        try:
+            shard_index = int(candidate.stem.rsplit(".", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        shards.append((shard_index, candidate))
+    return [path for _, path in sorted(shards)]
+
+
 class PlatformCategory(Enum):
     """Categories for DataFrame platform comparisons."""
 
@@ -568,9 +598,9 @@ class DataFrameBenchmarkSuite:
 
         # Load tables using the adapter's load_table method
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                adapter.load_table(ctx, table, [table_path])
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                adapter.load_table(ctx, table, table_paths)
 
         return ctx
 
@@ -1152,9 +1182,10 @@ class SQLVsDataFrameBenchmark:
         conn = duckdb.connect()
         tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM read_parquet('{table_path}')")
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                path_list = ", ".join(f"'{path}'" for path in table_paths)
+                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM read_parquet([{path_list}])")
         return conn
 
     @staticmethod
@@ -1167,9 +1198,9 @@ class SQLVsDataFrameBenchmark:
         conn = sqlite3.connect(":memory:")
         tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                df = pd.read_parquet(str(table_path))
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                df = pd.concat([pd.read_parquet(str(path)) for path in table_paths], ignore_index=True)
                 df.to_sql(table, conn, index=False)
         return conn
 
@@ -1220,9 +1251,9 @@ class SQLVsDataFrameBenchmark:
 
         # Load tables
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                adapter.load_table(ctx, table, [table_path])
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                adapter.load_table(ctx, table, table_paths)
 
         # Get query and capability info
         query = self._query_registry.get(query_id)
