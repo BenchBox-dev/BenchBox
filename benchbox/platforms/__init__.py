@@ -846,6 +846,7 @@ velox|offheap_size|Off-heap memory for Velox native engine (e.g., '8g', '16g')|{
 velox|driver_memory|Spark driver JVM heap memory (e.g., '4g')|{'default': '4g'}
 velox|shuffle_partitions|Number of shuffle partitions|{'parser': 'int', 'default': '200'}
 velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_bool', 'default': 'true'}
+velox|table_format|Lakehouse table format for accelerated reads (parquet, orc, delta, iceberg, hudi)|{'choices': ('parquet', 'orc', 'delta', 'iceberg', 'hudi'), 'default': 'parquet'}
 """
 
     _SPEC_PARSERS = {"int": int, "float": float, "parse_bool": parse_bool}

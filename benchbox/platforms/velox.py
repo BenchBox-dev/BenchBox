@@ -77,6 +77,28 @@ _COLUMNAR_SHUFFLE_MANAGER = "org.apache.spark.shuffle.sort.ColumnarShuffleManage
 # contract.  Treating it as one would silently mean "remote".
 SUPPORTED_VELOX_DEPLOYMENTS = frozenset({"local", "remote"})
 
+# Lakehouse table formats with validated read-acceleration configuration.
+# parquet/orc need no extra Spark conf; delta/iceberg/hudi each require their
+# SQL extension plus session-catalog wiring before Gluten can read them.
+# Delta/Iceberg keys mirror SparkAdapter (benchbox/platforms/spark.py).
+_SUPPORTED_TABLE_FORMATS = frozenset({"parquet", "orc", "delta", "iceberg", "hudi"})
+
+_TABLE_FORMAT_SPARK_CONF: dict[str, dict[str, str]] = {
+    "delta": {
+        "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+        "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+    },
+    "iceberg": {
+        "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        "spark.sql.catalog.spark_catalog": "org.apache.iceberg.spark.SparkSessionCatalog",
+        "spark.sql.catalog.spark_catalog.type": "hive",
+    },
+    "hudi": {
+        "spark.sql.extensions": "org.apache.spark.sql.hudi.HoodieSparkSessionExtension",
+        "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.hudi.catalog.HoodieCatalog",
+    },
+}
+
 
 class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
     """Apache Gluten + Velox Spark acceleration platform adapter.
@@ -172,7 +194,13 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             config.get("shuffle_partitions") if config.get("shuffle_partitions") is not None else 200
         )
         self.adaptive_enabled = config.get("adaptive_enabled") if config.get("adaptive_enabled") is not None else True
-        self.table_format = config.get("table_format") or "parquet"
+        table_format = (config.get("table_format") or "parquet").lower()
+        if table_format not in _SUPPORTED_TABLE_FORMATS:
+            raise ValueError(
+                f"Unsupported Velox table_format '{table_format}'. "
+                f"Supported formats: {sorted(_SUPPORTED_TABLE_FORMATS)}."
+            )
+        self.table_format = table_format
         self.spark_config = config.get("spark_config") or {}
         self.disable_cache = config.get("disable_cache") if config.get("disable_cache") is not None else True
 
@@ -303,6 +331,11 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
 
         if self.disable_cache:
             conf["spark.sql.inMemoryColumnarStorage.enabled"] = "false"
+
+        # Lakehouse read acceleration: delta/iceberg/hudi need their SQL
+        # extension plus session-catalog wiring or Spark cannot read them and
+        # Gluten has nothing to accelerate. parquet/orc need no extra keys.
+        conf.update(_TABLE_FORMAT_SPARK_CONF.get(self.table_format, {}))
 
         if self.deployment == "local":
             # Mandatory Gluten configuration - omitting any of these silently

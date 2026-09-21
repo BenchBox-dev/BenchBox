@@ -234,6 +234,89 @@ class TestVeloxSparkConf:
             adapter._get_spark_conf()
 
 
+class TestVeloxTableFormatConf:
+    """Per-format read-acceleration Spark conf (delta/iceberg/hudi)."""
+
+    @pytest.fixture
+    def mock_pyspark(self):
+        with patch.dict(
+            "sys.modules",
+            {
+                "pyspark": MagicMock(),
+                "pyspark.sql": MagicMock(SparkSession=MagicMock()),
+                "pyspark.sql.types": MagicMock(),
+            },
+        ):
+            yield
+
+    def test_parquet_default_emits_no_format_keys(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter()._get_spark_conf()
+        assert "spark.sql.extensions" not in conf
+        assert "spark.sql.catalog.spark_catalog" not in conf
+
+    def test_orc_emits_no_format_keys(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(table_format="orc")._get_spark_conf()
+        assert "spark.sql.extensions" not in conf
+        assert "spark.sql.catalog.spark_catalog" not in conf
+
+    def test_delta_conf(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(table_format="delta")._get_spark_conf()
+        assert conf["spark.sql.extensions"] == "io.delta.sql.DeltaSparkSessionExtension"
+        assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+
+    def test_iceberg_conf(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(table_format="iceberg")._get_spark_conf()
+        assert conf["spark.sql.extensions"] == "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.iceberg.spark.SparkSessionCatalog"
+        assert conf["spark.sql.catalog.spark_catalog.type"] == "hive"
+
+    def test_hudi_conf(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(table_format="hudi")._get_spark_conf()
+        assert conf["spark.sql.extensions"] == "org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
+        assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.spark.sql.hudi.catalog.HoodieCatalog"
+
+    def test_format_conf_applies_in_remote_mode(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(deployment="remote", table_format="delta")._get_spark_conf()
+        assert conf["spark.sql.extensions"] == "io.delta.sql.DeltaSparkSessionExtension"
+
+    def test_spark_config_override_still_wins(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        adapter = VeloxAdapter(
+            table_format="delta",
+            spark_config={"spark.sql.extensions": "com.example.CustomExtensions"},
+        )
+        assert adapter._get_spark_conf()["spark.sql.extensions"] == "com.example.CustomExtensions"
+
+    def test_unsupported_format_rejected(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="Unsupported Velox table_format"):
+            VeloxAdapter(table_format="clickhouse")
+
+    def test_format_name_is_case_insensitive(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        adapter = VeloxAdapter(table_format="Delta")
+        assert adapter.table_format == "delta"
+        assert (
+            adapter._get_spark_conf()["spark.sql.catalog.spark_catalog"]
+            == "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        )
+
+
 class TestVeloxConfigureForBenchmark:
     """configure_for_benchmark() must not clobber explicit spark_config entries."""
 
