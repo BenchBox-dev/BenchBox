@@ -28,7 +28,7 @@ from importlib import import_module
 
 import pytest
 
-from benchbox.core.tuning import generators as generators_pkg
+from benchbox.core.tuning import ddl_generator as ddl_generator_module, generators as generators_pkg
 from benchbox.core.tuning.ddl_generator import (
     BaseDDLGenerator,
     NoOpDDLGenerator,
@@ -247,17 +247,16 @@ class TestNoOpFallbackWarning:
             "polars",
             "datafusion",
             "pyspark",
-            "lakesail",
-            "velox",
             # DataFrame-mode spellings resolve behind the same registry-owned
             # path and stay silent exactly when their base engine is tuning-free.
+            # "lakesail-df" is deliberately absent: bare "lakesail" is a SQL
+            # engine with real tuning output, so it (and its df spelling) warn.
             "polars-df",
             "pandas-df",
             "cudf-df",
             "dask-df",
             "datafusion-df",
             "pyspark-df",
-            "lakesail-df",
             "dataframe-pandas",
             "dataframe-polars",
             "dataframe-dask",
@@ -273,6 +272,44 @@ class TestNoOpFallbackWarning:
         assert isinstance(generator, NoOpDDLGenerator)
         assert caplog.records == []
 
+    @pytest.mark.parametrize(
+        "platform_key",
+        [
+            # Undeclared affix combinations must never resolve to an unrelated
+            # real generator - they take the warning/NoOp path instead.
+            "snowflake-df",
+            "dataframe-snowflake",
+            "duckdb-df",
+            "dataframe-bigquery",
+            # Bare lakesail/velox are SQL engines with real tuning output
+            # (PARTITIONED BY); the warning exposes the preview-versus-
+            # execution gap until they get real registry generators.
+            "lakesail",
+            "velox",
+            "lakesail-df",
+            "velox-df",
+            "dataframe-lakesail",
+            "dataframe-databricks",
+        ],
+    )
+    def test_undeclared_or_tuning_capable_keys_warn_and_fall_back_to_noop(
+        self, platform_key: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.tuning.ddl_generator"):
+            generator = get_ddl_generator(platform_key)
+
+        assert isinstance(generator, NoOpDDLGenerator)
+        assert any(
+            platform_key in record.getMessage() and record.levelno == logging.WARNING for record in caplog.records
+        )
+
+    def test_databricks_df_resolves_to_delta_generator(self) -> None:
+        """ "databricks-df" is a declared manifest key whose base engine has a
+        real generator, so DataFrame-mode Databricks renders Delta DDL."""
+        from benchbox.core.tuning.generators.spark_family import DeltaDDLGenerator
+
+        assert isinstance(get_ddl_generator("databricks-df"), DeltaDDLGenerator)
+
     def test_dataframe_variant_matches_base_engine(self) -> None:
         """DataFrame-mode spellings resolve to the same generator as the base engine."""
         assert type(get_ddl_generator("polars-df")).__name__ == type(get_ddl_generator("polars")).__name__
@@ -284,3 +321,52 @@ class TestNoOpFallbackWarning:
             get_ddl_generator("questdb")
 
         assert caplog.records == []
+
+
+class TestDataframeBaseSetsMatchDeclarations:
+    """_DATAFRAME_SUFFIX_BASES/_DATAFRAME_PREFIX_BASES gate affix-stripping, so
+    they must match the spellings the manifest and packaging extras actually
+    declare. A stale entry would either resurrect the undeclared-combination
+    hijack (extra base) or warn for a declared spelling (missing base).
+    """
+
+    def test_suffix_bases_match_manifest_df_spellings(self) -> None:
+        from benchbox.core.platform_manifest import PLATFORM_MANIFEST
+
+        expected: set[str] = set()
+        for entry in PLATFORM_MANIFEST:
+            if entry.key.endswith("-df"):
+                expected.add(entry.key[: -len("-df")])
+            for alias in entry.aliases:
+                if alias.name.endswith("-df"):
+                    expected.add(entry.key)
+
+        assert frozenset(expected) == ddl_generator_module._DATAFRAME_SUFFIX_BASES, (
+            "Drift between _DATAFRAME_SUFFIX_BASES and the platform manifest's "
+            f'"<engine>-df" spellings: {sorted(set(expected) ^ set(ddl_generator_module._DATAFRAME_SUFFIX_BASES))}. '
+            "Update the set with a reason when the manifest gains or loses a df spelling."
+        )
+
+    def test_prefix_bases_match_dataframe_extras(self) -> None:
+        import tomllib
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[4]
+        with open(repo_root / "pyproject.toml", "rb") as handle:
+            pyproject = tomllib.load(handle)
+        extras = pyproject["project"]["optional-dependencies"]
+        # "dataframe-all" and the "dataframe-*-family" bundles install engine
+        # groups; they are not platform spellings, so "all" must never strip
+        # to a (nonexistent) base engine key.
+        non_spelling_extras = {"dataframe-all"}
+        expected = {
+            name[len("dataframe-") :]
+            for name in extras
+            if name.startswith("dataframe-") and not name.endswith("-family") and name not in non_spelling_extras
+        }
+
+        assert frozenset(expected) == ddl_generator_module._DATAFRAME_PREFIX_BASES, (
+            "Drift between _DATAFRAME_PREFIX_BASES and pyproject's dataframe-* "
+            f"extras: {sorted(set(expected) ^ set(ddl_generator_module._DATAFRAME_PREFIX_BASES))}. "
+            "Update the set with a reason when extras change."
+        )

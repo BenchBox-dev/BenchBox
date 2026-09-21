@@ -674,9 +674,10 @@ DDLGeneratorType = DDLGenerator | BaseDDLGenerator
 # Platforms known to have no physical tuning surface (no partitioning, clustering,
 # distribution, or sort-key clauses to emit) - the NoOp fallback for these is
 # expected and permanent, so get_ddl_generator() does not warn for them.
-# This includes every DataFrame/expression-family engine (pandas, cudf, dask,
-# polars, datafusion, pyspark, lakesail, velox): DataFrame-mode DDL generation
-# resolves through this same registry-owned path and lands on the silent NoOp.
+# Bare `lakesail` and `velox` are deliberately NOT listed: their SQL adapters
+# call _create_schema_with_tuning() and their generate_tuning_clause() methods
+# emit PARTITIONED BY, so a tuned dry run must keep the warning that exposes
+# the preview-versus-execution gap until they get real registry generators.
 _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
     {
         "sqlite",
@@ -687,28 +688,61 @@ _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
         "polars",
         "datafusion",
         "pyspark",
-        "lakesail",
-        "velox",
     }
 )
 
-# DataFrame-mode key variants that resolve to the same registry-owned path as
-# their base engine. The DataFrame platform family addresses engines as
-# "<engine>-df" (polars-df, pandas-df, cudf-df, dask-df, datafusion-df,
-# pyspark-df, lakesail-df) and the packaging extras expose "dataframe-<engine>"
-# aliases (dataframe-pandas, dataframe-polars, ...). Both spellings normalize
-# to the base engine key before the generators/tuning-free lookup so DataFrame
-# mode never diverges from the single registry path based on key spelling.
+# Base engine keys that own a declared "<engine>-df" spelling in the platform
+# manifest (the CLI aliases plus the "databricks-df" entry key - see
+# benchbox/core/platform_manifest.py). Only these bases strip the "-df"
+# suffix below; undeclared combinations such as "snowflake-df" never resolve
+# to an unrelated real generator and instead take the warning/NoOp path.
+# Update trigger: a new manifest "<engine>-df" alias or entry key.
+_DATAFRAME_SUFFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+        "lakesail",
+        "databricks",
+    }
+)
+
+# Base engine keys that own a declared "dataframe-<engine>" packaging extra
+# (see pyproject.toml [project.optional-dependencies]). Only these bases
+# strip the "dataframe-" prefix below, so "dataframe-snowflake" takes the
+# warning/NoOp path instead of resolving to SnowflakeDDLGenerator.
+# Update trigger: a new dataframe-* extra in pyproject.toml.
+_DATAFRAME_PREFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+    }
+)
+
 _DATAFRAME_KEY_PREFIX = "dataframe-"
 _DATAFRAME_KEY_SUFFIX = "-df"
 
 
 def _normalize_dataframe_platform_key(platform_lower: str) -> str:
-    """Normalize a DataFrame-mode platform key to its base engine key."""
+    """Normalize a declared DataFrame-mode platform key to its base engine key.
+
+    Only declared spellings normalize: "<engine>-df" when the base owns a
+    manifest-declared DataFrame spelling, and "dataframe-<engine>" when the
+    base owns a dataframe-* packaging extra. Anything else returns unchanged.
+    """
     if platform_lower.startswith(_DATAFRAME_KEY_PREFIX):
-        return platform_lower[len(_DATAFRAME_KEY_PREFIX) :]
+        base = platform_lower[len(_DATAFRAME_KEY_PREFIX) :]
+        return base if base in _DATAFRAME_PREFIX_BASES else platform_lower
     if platform_lower.endswith(_DATAFRAME_KEY_SUFFIX):
-        return platform_lower[: -len(_DATAFRAME_KEY_SUFFIX)]
+        base = platform_lower[: -len(_DATAFRAME_KEY_SUFFIX)]
+        return base if base in _DATAFRAME_SUFFIX_BASES else platform_lower
     return platform_lower
 
 
@@ -796,9 +830,12 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     if platform_lower in generators:
         return generators[platform_lower]()
 
-    # DataFrame-mode keys ("<engine>-df", "dataframe-<engine>") resolve behind
-    # the same registry-owned path: normalize to the base engine key and retry
-    # the generators mapping so a real generator always wins when one exists.
+    # Declared DataFrame-mode keys ("<engine>-df" for manifest-declared engines,
+    # "dataframe-<engine>" for packaging-extra engines) resolve behind the same
+    # registry-owned path: normalize to the base engine key and retry the
+    # generators mapping so a real generator always wins when one exists
+    # (e.g. "databricks-df" renders Delta DDL). Undeclared combinations skip
+    # normalization entirely and fall through to the warning/NoOp path below.
     normalized = _normalize_dataframe_platform_key(platform_lower)
     if normalized != platform_lower and normalized in generators:
         return generators[normalized]()
