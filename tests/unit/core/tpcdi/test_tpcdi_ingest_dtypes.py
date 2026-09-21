@@ -74,4 +74,4 @@ def test_json_transform_keeps_opening_date_as_string(tmp_path: Path) -> None:
 
 
 def test_pandas_major_version_is_declared() -> None:
-    assert int(pd.__version__.split(".")[0]) >= 2
+    assert int(pd.__version__.split(".")[0]) >= 3

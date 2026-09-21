@@ -58,7 +58,7 @@ DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
         version_attr="__version__",
         extra_name="pandas",
         description="Reference Pandas implementation",
-        min_version="2.0.0",
+        min_version="3.0.0",
     ),
     "polars": PlatformInfo(
         name="Polars",
