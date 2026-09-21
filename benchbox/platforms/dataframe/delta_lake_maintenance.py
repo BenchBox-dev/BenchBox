@@ -23,6 +23,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -47,6 +48,8 @@ from benchbox.core.dataframe.maintenance_interface import (
     DELTA_LAKE_CAPABILITIES,
     BaseDataFrameMaintenanceOperations,
     DataFrameMaintenanceCapabilities,
+    MaintenanceOperationType,
+    MaintenanceResult,
 )
 
 if TYPE_CHECKING:
@@ -315,6 +318,103 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
 
         self.logger.info(f"Merged {rows_affected} rows into Delta table at {table_path}")
         return rows_affected
+
+    def optimize_table(
+        self,
+        table_path: Path | str,
+        *,
+        strategy: str = "compact",
+        columns: list[str] | None = None,
+        partition_filter: Any | None = None,
+    ) -> MaintenanceResult:
+        """Compact or z-order a Delta table via delta-rs.
+
+        rows_affected counts files rewritten (removed + added), which is the
+        meaningful work unit for file layout operations.
+        """
+        operation = MaintenanceOperationType.OPTIMIZE
+        start_time = time.time()
+        try:
+            self._check_capability(operation)
+            normalized = strategy.lower()
+            if normalized not in ("compact", "cluster", "z_order"):
+                raise NotImplementedError(
+                    f"Unknown Delta optimize strategy '{strategy}'. Use 'compact' or 'cluster'/'z_order'."
+                )
+            if normalized in ("cluster", "z_order") and not columns:
+                raise ValueError("Delta z-order optimization requires ordering columns.")
+            try:
+                dt = DeltaTable(str(table_path))
+            except Exception as e:
+                raise RuntimeError(f"Could not open Delta table at {table_path}: {e}") from e
+            if normalized == "compact":
+                metrics = dt.optimize.compact(partition_filters=partition_filter)
+            else:
+                metrics = dt.optimize.z_order(list(columns or []), partition_filters=partition_filter)
+            metrics = dict(metrics or {})
+            files_affected = int(metrics.get("numFilesAdded", 0)) + int(metrics.get("numFilesRemoved", 0))
+            end_time = time.time()
+            self.logger.info(f"Optimized Delta table at {table_path} ({normalized}): {metrics}")
+            return MaintenanceResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=files_affected,
+                metrics={"strategy": normalized, **metrics},
+            )
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"OPTIMIZE failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
+
+    def vacuum_table(
+        self,
+        table_path: Path | str,
+        *,
+        retention_hours: int | None = None,
+        dry_run: bool = True,
+        enforce_retention: bool = True,
+    ) -> MaintenanceResult:
+        """Vacuum a Delta table via delta-rs.
+
+        rows_affected counts reclaimed (or, for a dry run, reclaimable)
+        files; their paths are carried in metrics.
+        """
+        operation = MaintenanceOperationType.VACUUM
+        start_time = time.time()
+        try:
+            self._check_capability(operation)
+            try:
+                dt = DeltaTable(str(table_path))
+            except Exception as e:
+                raise RuntimeError(f"Could not open Delta table at {table_path}: {e}") from e
+            deleted = list(
+                dt.vacuum(
+                    retention_hours=retention_hours,
+                    dry_run=dry_run,
+                    enforce_retention_duration=enforce_retention,
+                )
+                or []
+            )
+            end_time = time.time()
+            self.logger.info(f"Vacuumed Delta table at {table_path} (dry_run={dry_run}): {len(deleted)} files")
+            return MaintenanceResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=len(deleted),
+                metrics={"dry_run": dry_run, "deleted_paths": deleted},
+            )
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"VACUUM failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
 
 
 def get_delta_lake_maintenance_operations(

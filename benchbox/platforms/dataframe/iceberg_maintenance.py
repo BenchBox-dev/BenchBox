@@ -28,6 +28,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -65,6 +67,8 @@ from benchbox.core.dataframe.maintenance_interface import (
     ICEBERG_CAPABILITIES,
     BaseDataFrameMaintenanceOperations,
     DataFrameMaintenanceCapabilities,
+    MaintenanceOperationType,
+    MaintenanceResult,
 )
 
 if TYPE_CHECKING:
@@ -600,6 +604,82 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
 
         # Fallback - assume it's just the column name
         return condition
+
+    def optimize_table(
+        self,
+        table_path: Path | str,
+        *,
+        strategy: str = "compact",
+        columns: list[str] | None = None,
+        partition_filter: Any | None = None,
+    ) -> MaintenanceResult:
+        """Binpack optimization is not available in pyiceberg.
+
+        Raises:
+            NotImplementedError: Always — pyiceberg 0.12 exposes no
+                rewrite_data_files action. Run Spark rewrite_data_files
+                for Iceberg file layout work.
+        """
+        _ = (table_path, strategy, columns, partition_filter)
+        raise NotImplementedError(
+            "Iceberg OPTIMIZE is not implemented: pyiceberg exposes no binpack rewrite. "
+            "Use Spark rewrite_data_files for Iceberg file layout work."
+        )
+
+    def vacuum_table(
+        self,
+        table_path: Path | str,
+        *,
+        retention_hours: int | None = None,
+        dry_run: bool = True,
+        enforce_retention: bool = True,
+    ) -> MaintenanceResult:
+        """Expire Iceberg snapshots via table.maintenance.expire_snapshots.
+
+        Without retention_hours every non-current snapshot is expired; with
+        it, only snapshots older than the cutoff are. A dry run computes the
+        expirable set without committing. rows_affected counts expired
+        snapshots; their ids are carried in metrics.
+        """
+        _ = enforce_retention
+        operation = MaintenanceOperationType.VACUUM
+        start_time = time.time()
+        try:
+            self._check_capability(operation)
+            identifier = self._normalize_table_identifier(str(table_path))
+            try:
+                table = self.catalog.load_table(identifier)
+            except Exception as e:
+                raise RuntimeError(f"Could not open Iceberg table {identifier}: {e}") from e
+            snapshots = list(table.snapshots() or [])
+            current_id = table.current_snapshot().snapshot_id if table.current_snapshot() else None
+            if retention_hours is not None:
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+                expirable = [
+                    snapshot.snapshot_id
+                    for snapshot in snapshots
+                    if snapshot.snapshot_id != current_id and snapshot.timestamp_ms < int(cutoff.timestamp() * 1000)
+                ]
+            else:
+                expirable = [snapshot.snapshot_id for snapshot in snapshots if snapshot.snapshot_id != current_id]
+            if not dry_run and expirable:
+                table.maintenance.expire_snapshots().by_ids(expirable).commit()
+            end_time = time.time()
+            self.logger.info(f"Vacuumed Iceberg table {identifier} (dry_run={dry_run}): {len(expirable)} snapshots")
+            return MaintenanceResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=len(expirable),
+                metrics={"dry_run": dry_run, "expired_snapshot_ids": expirable},
+            )
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"VACUUM failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
 
 
 def get_iceberg_maintenance_operations(

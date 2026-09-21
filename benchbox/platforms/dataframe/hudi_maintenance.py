@@ -28,6 +28,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,8 @@ from benchbox.core.dataframe.maintenance_interface import (
     HUDI_CAPABILITIES,
     BaseDataFrameMaintenanceOperations,
     DataFrameMaintenanceCapabilities,
+    MaintenanceOperationType,
+    MaintenanceResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -391,6 +394,115 @@ class HudiMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         finally:
             # Clean up temp view
             self.spark.catalog.dropTempView(source_view)
+
+    def _call_target(self, table_path: Path | str) -> str:
+        """Render the CALL target clause for a catalog name or table path.
+
+        Hudi procedures accept either ``table => '<db.tbl>'`` or
+        ``path => '<location>'``; paths are detected by the presence of a
+        slash. Single quotes inside the value are doubled.
+        """
+        value = str(table_path).replace("'", "''")
+        if "/" in value or "\\" in value:
+            return f"path => '{value}'"
+        return f"table => '{value}'"
+
+    def _run_procedure(self, operation: MaintenanceOperationType, sql: str, start_time: float) -> MaintenanceResult:
+        """Execute a CALL procedure and wrap its result rows."""
+        try:
+            result_frame = self.spark.sql(sql)
+            rows = result_frame.collect() if hasattr(result_frame, "collect") else []
+            row_dicts = [dict(row.asDict()) if hasattr(row, "asDict") else dict(row) for row in rows]
+            deleted = 0
+            for row_dict in row_dicts:
+                for key, value in row_dict.items():
+                    if "deleted" in str(key).lower() and isinstance(value, int):
+                        deleted += value
+            end_time = time.time()
+            self.logger.info(f"Hudi procedure succeeded: {sql}")
+            return MaintenanceResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=deleted,
+                metrics={"statement": sql, "result_rows": row_dicts},
+            )
+        except Exception as e:
+            self.logger.error(f"Hudi procedure failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
+
+    def optimize_table(
+        self,
+        table_path: Path | str,
+        *,
+        strategy: str = "compact",
+        columns: list[str] | None = None,
+        partition_filter: Any | None = None,
+    ) -> MaintenanceResult:
+        """Run Hudi compaction or clustering via Spark SQL CALL procedures.
+
+        "compact" maps to run_compaction (MOR tables); "cluster" maps to
+        run_clustering (COW and MOR). columns/partition_filter are accepted
+        for protocol conformance and ignored: the procedures take no
+        column or partition arguments.
+        """
+        _ = (columns, partition_filter)
+        operation = MaintenanceOperationType.OPTIMIZE
+        start_time = time.time()
+        try:
+            self._check_capability(operation)
+            normalized = strategy.lower()
+            target = self._call_target(table_path)
+            if normalized == "compact":
+                sql = f"CALL run_compaction(op => 'run', {target})"
+            elif normalized == "cluster":
+                sql = f"CALL run_clustering({target})"
+            else:
+                raise NotImplementedError(f"Unknown Hudi optimize strategy '{strategy}'. Use 'compact' or 'cluster'.")
+            return self._run_procedure(operation, sql, start_time)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"OPTIMIZE failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
+
+    def vacuum_table(
+        self,
+        table_path: Path | str,
+        *,
+        retention_hours: int | None = None,
+        dry_run: bool = True,
+        enforce_retention: bool = True,
+    ) -> MaintenanceResult:
+        """Run Hudi cleaner via the run_clean CALL procedure.
+
+        retention_hours maps to hours_retained with a KEEP_LATEST_BY_HOURS
+        policy. run_clean has no dry-run mode, so dry_run=True raises
+        NotImplementedError instead of pretending to preview.
+        """
+        _ = enforce_retention
+        operation = MaintenanceOperationType.VACUUM
+        start_time = time.time()
+        try:
+            self._check_capability(operation)
+            if dry_run:
+                raise NotImplementedError("Hudi run_clean has no dry-run mode. Re-run with dry_run=False to clean.")
+            target = self._call_target(table_path)
+            if retention_hours is not None:
+                sql = (
+                    f"CALL run_clean({target}, clean_policy => 'KEEP_LATEST_BY_HOURS', "
+                    f"hours_retained => {int(retention_hours)})"
+                )
+            else:
+                sql = f"CALL run_clean({target})"
+            return self._run_procedure(operation, sql, start_time)
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"VACUUM failed: {e}")
+            return MaintenanceResult.failure(operation, str(e), start_time)
 
 
 def get_hudi_maintenance_operations(
