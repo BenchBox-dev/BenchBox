@@ -258,3 +258,60 @@ class TestUnsupportedAggregateStateMessage:
         assert "polars-df" in msg
         assert "aggregate_merge" in msg
         assert "sketch" in msg.lower()
+
+
+class TestAggregatePersistStorageValidation:
+    """DataFrame mirror of the SQL sketch_bytes storage-size validations."""
+
+    def test_persist_round_trip_reports_matching_on_disk_size(self, tmp_path: Path):
+        pytest.importorskip("polars")
+        import polars as pl
+
+        caps = DataFrameWriteCapabilities(platform_name="polars", supports_aggregate_persist=True)
+        manager = _make_manager_with_caps(caps)
+        builder = lambda: pl.DataFrame({"group": ["a", "b"], "sketch": [b"\x01\x02", b"\x03\x04"]})  # noqa: E731
+
+        target = tmp_path / "state"
+        result = manager.execute_aggregate_persist(target, builder, compression="zstd")
+
+        on_disk_bytes = sum(f.stat().st_size for f in target.rglob("*.parquet"))
+        on_disk_files = len(list(target.rglob("*.parquet")))
+        assert result.success is True
+        assert result.bytes_written == on_disk_bytes > 0
+        assert result.file_count == on_disk_files == 1
+        assert result.validation_passed is True
+        (entry,) = result.validation_results
+        assert entry["check"] == "storage_size"
+        assert entry["passed"] is True
+        assert entry["reason"] is None
+
+    def test_mismatched_reported_size_fails_validation_not_persist(self, tmp_path: Path, monkeypatch):
+        caps = DataFrameWriteCapabilities(platform_name="test", supports_aggregate_persist=True)
+        manager = _make_manager_with_caps(caps)
+        monkeypatch.setattr(
+            manager,
+            "_persist_dataframe_to_parquet",
+            lambda df, path, compression: (10, 4096, 1),
+        )
+
+        target = tmp_path / "state"
+        result = manager.execute_aggregate_persist(target, MagicMock(), compression="zstd")
+
+        assert result.success is True
+        assert result.validation_passed is False
+        (entry,) = result.validation_results
+        assert entry["check"] == "storage_size"
+        assert entry["passed"] is False
+        assert entry["expected_bytes"] == 0
+        assert entry["actual_bytes"] == 4096
+        assert entry["reason"] is not None
+
+    def test_empty_target_dir_passes_for_zero_rows(self, tmp_path: Path):
+        manager = _make_manager_with_caps(
+            DataFrameWriteCapabilities(platform_name="test", supports_aggregate_persist=True)
+        )
+        target = tmp_path / "state"
+        target.mkdir()
+        entry = manager.validate_persisted_storage_size(target, rows_affected=0, bytes_written=0, file_count=0)
+        assert entry["check"] == "storage_size"
+        assert entry["passed"] is True
