@@ -18244,10 +18244,15 @@
       "title": "Unified Tuning Configuration System ✅ COMPLETED"
     },
     "unify-dataframe-mode-ddl-generation-behind-the-same-registry": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T11:58:01Z",
+        "generation": "d3fb8da7a8834ed3b50edc11208c1b05",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Unify DataFrame-mode DDL generation behind the same registry-owned path"
     },
     "unify-dataframe-sql-default-storage-location": {
