@@ -1,4 +1,5 @@
 {
+  "context": "Finding: BigQuery reads Apache Iceberg natively through BigLake tables: CREATE EXTERNAL TABLE ... OPTIONS(format='ICEBERG', connection=..., uris=['gs://bucket/table/metadata/*.metadata.json']) or via the BigLake metastore (Iceberg REST catalog); BigQuery-managed Iceberg tables also exist. Plain BigLake Iceberg tables are read-only (no DML, no Storage API, no cached metadata); managed Iceberg tables support UPDATE/DELETE/MERGE. BenchBox gap: benchbox/platforms/bigquery.py has no Iceberg code path (no format='ICEBERG' DDL, no metadata-URI handling, no connection option). Recommendation: implement BigLake Iceberg external-table DDL in the BigQuery adapter (item iceberg-support-for-redshift-via-spectrum-and-bigquery-via-b). No live verification possible without GCP credentials.",
   "description": "Promoted from deferral #220 of open-table-format-gap-analysis.\nDeferred: Investigate BigQuery BigLake Iceberg support\nReason deferred: BigQuery supports BigLake Iceberg tables but adapter has no Iceberg code",
   "legacy": {
     "item_meta": {
