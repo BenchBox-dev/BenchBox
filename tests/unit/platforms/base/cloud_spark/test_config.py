@@ -324,6 +324,36 @@ class TestCloudPlatformEnum:
         assert "local" in platforms
 
 
+class TestOptimizerAdaptiveToggle:
+    """SparkConfigOptimizer honors adaptive_enabled instead of force-enabling AQE."""
+
+    AQE_KEYS = (
+        "spark.sql.adaptive.enabled",
+        "spark.sql.adaptive.coalescePartitions.enabled",
+        "spark.sql.adaptive.skewJoin.enabled",
+    )
+
+    def test_tpch_disables_all_three_aqe_keys(self):
+        config = SparkConfigOptimizer.for_tpch(scale_factor=1.0, adaptive_enabled=False)
+        rendered = config.to_dict()
+        assert [rendered[key] for key in self.AQE_KEYS] == ["false"] * 3
+        assert config.parallelism.adaptive_enabled is False
+
+    def test_tpch_defaults_to_aqe_on(self):
+        rendered = SparkConfigOptimizer.for_tpch(scale_factor=1.0).to_dict()
+        assert [rendered[key] for key in self.AQE_KEYS] == ["true"] * 3
+
+    def test_tpcds_disables_all_three_aqe_keys(self):
+        config = SparkConfigOptimizer.for_tpcds(scale_factor=1.0, adaptive_enabled=False)
+        rendered = config.to_dict()
+        assert [rendered[key] for key in self.AQE_KEYS] == ["false"] * 3
+
+    def test_ssb_forwards_toggle_to_tpch(self):
+        config = SparkConfigOptimizer.for_ssb(scale_factor=1.0, adaptive_enabled=False)
+        rendered = config.to_dict()
+        assert [rendered[key] for key in self.AQE_KEYS] == ["false"] * 3
+
+
 class TestBenchmarkTypeEnum:
     """Test BenchmarkType enum."""
 

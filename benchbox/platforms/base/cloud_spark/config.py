@@ -207,6 +207,7 @@ class SparkConfigOptimizer:
         platform: str | CloudPlatform = CloudPlatform.LOCAL,
         instance_type: str | None = None,
         num_executors: int | None = None,
+        adaptive_enabled: bool = True,
     ) -> SparkConfig:
         """Create optimized configuration for TPC-H benchmark.
 
@@ -221,6 +222,10 @@ class SparkConfigOptimizer:
             platform: Cloud platform for optimizations
             instance_type: Instance type for resource sizing
             num_executors: Number of executors (None = auto)
+            adaptive_enabled: Adaptive Query Execution on/off. The three AQE
+                keys (enabled, coalescePartitions, skewJoin) render explicitly
+                in both directions; an explicit user spark_config entry still
+                wins downstream.
 
         Returns:
             Optimized SparkConfig for TPC-H
@@ -238,7 +243,7 @@ class SparkConfigOptimizer:
             parallelism=SparkParallelismConfig(
                 shuffle_partitions=shuffle_partitions,
                 default_parallelism=shuffle_partitions,
-                adaptive_enabled=True,
+                adaptive_enabled=adaptive_enabled,
                 target_post_shuffle_input_size="64MB",
             ),
             io=SparkIOConfig(
@@ -247,8 +252,9 @@ class SparkConfigOptimizer:
                 parquet_filter_pushdown=True,
             ),
             aqe=SparkAQEConfig(
-                enabled=True,
-                skew_join_enabled=True,
+                enabled=adaptive_enabled,
+                coalesce_partitions_enabled=adaptive_enabled,
+                skew_join_enabled=adaptive_enabled,
                 skew_join_skewed_partition_factor=5.0,
             ),
         )
@@ -265,6 +271,7 @@ class SparkConfigOptimizer:
         platform: str | CloudPlatform = CloudPlatform.LOCAL,
         instance_type: str | None = None,
         num_executors: int | None = None,
+        adaptive_enabled: bool = True,
     ) -> SparkConfig:
         """Create optimized configuration for TPC-DS benchmark.
 
@@ -279,6 +286,7 @@ class SparkConfigOptimizer:
             platform: Cloud platform for optimizations
             instance_type: Instance type for resource sizing
             num_executors: Number of executors (None = auto)
+            adaptive_enabled: Adaptive Query Execution on/off (default: True).
 
         Returns:
             Optimized SparkConfig for TPC-DS
@@ -300,7 +308,7 @@ class SparkConfigOptimizer:
             parallelism=SparkParallelismConfig(
                 shuffle_partitions=shuffle_partitions,
                 default_parallelism=shuffle_partitions,
-                adaptive_enabled=True,
+                adaptive_enabled=adaptive_enabled,
                 target_post_shuffle_input_size="128MB",  # Larger for TPC-DS
             ),
             io=SparkIOConfig(
@@ -310,8 +318,9 @@ class SparkConfigOptimizer:
                 broadcast_timeout=600,  # Longer timeout for complex queries
             ),
             aqe=SparkAQEConfig(
-                enabled=True,
-                skew_join_enabled=True,
+                enabled=adaptive_enabled,
+                coalesce_partitions_enabled=adaptive_enabled,
+                skew_join_enabled=adaptive_enabled,
                 skew_join_skewed_partition_factor=3.0,  # More aggressive skew handling
                 skew_join_skewed_partition_threshold="128MB",
             ),

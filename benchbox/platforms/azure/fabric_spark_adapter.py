@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     )
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms._spark_helpers import spark_aqe_conf_entries
 from benchbox.platforms.azure._credentials import AzureTokenProvider
 from benchbox.platforms.azure._livy_mixin import LivyStatementMixin
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
@@ -145,6 +146,7 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         timeout_minutes: int = 60,
         spark_config: dict[str, str] | None = None,
         table_format: str | None = None,
+        adaptive_enabled: bool = True,
         **kwargs: Any,
     ) -> None:
         """Initialize the Fabric Spark adapter.
@@ -159,6 +161,9 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             timeout_minutes: Statement timeout in minutes (default: 60).
             spark_config: Additional Spark configuration.
             table_format: Table format for benchmark tables (delta, parquet, iceberg).
+            adaptive_enabled: Adaptive Query Execution on/off (default: True).
+                Rendered explicitly in both directions at Livy session build;
+                an explicit user spark_config entry still wins.
             **kwargs: Additional platform options.
         """
         if not AZURE_IDENTITY_AVAILABLE:
@@ -179,6 +184,7 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         self.timeout_minutes = timeout_minutes
         self.table_format = table_format or "delta"
         self.user_spark_config = spark_config or {}
+        self.adaptive_enabled = adaptive_enabled
 
         # Derive Livy endpoint if not provided
         self.livy_endpoint = livy_endpoint or self._derive_livy_endpoint()
@@ -271,11 +277,10 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
         # Build session configuration
         session_config: dict[str, Any] = {
             "kind": "spark",
-            "conf": {
-                # Default Spark configuration for benchmarks
-                "spark.sql.adaptive.enabled": "true",
-                "spark.sql.adaptive.coalescePartitions.enabled": "true",
-            },
+            # AQE keys explicit in both directions: Spark enables AQE by
+            # default since 3.2.0, so omitting them would silently leave it
+            # on when adaptive_enabled is False.
+            "conf": spark_aqe_conf_entries(self.adaptive_enabled),
         }
 
         # Table format session extensions (Delta is native on Fabric, no extra config needed)
@@ -671,22 +676,26 @@ class FabricSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter):
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.FABRIC,
+                adaptive_enabled=self.adaptive_enabled,
             )
         elif self._benchmark_type == "tpcds":
             config = SparkConfigOptimizer.for_tpcds(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.FABRIC,
+                adaptive_enabled=self.adaptive_enabled,
             )
         elif self._benchmark_type == "ssb":
             config = SparkConfigOptimizer.for_ssb(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.FABRIC,
+                adaptive_enabled=self.adaptive_enabled,
             )
         else:
             # Default to TPC-H config for unknown benchmarks
             config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=CloudPlatform.FABRIC,
+                adaptive_enabled=self.adaptive_enabled,
             )
 
         self._spark_config = config.to_dict()
