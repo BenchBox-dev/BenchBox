@@ -4981,10 +4981,15 @@
       "title": "Record DuckLake catalog backend and storage location in result metadata"
     },
     "ducklake-remeasure-cv-on-quiet-host": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T20:45:47Z",
+        "generation": "d61c29cd62f24f5bba619bb8f0c33d14",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b44bd671ebbe4ed4cb7f095b"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Re-measure DuckLake deployment-mode CVs on a quiet host"
     },
     "ducklake-specific-benchmarks-time-travel-schema-evolution-sn": {
