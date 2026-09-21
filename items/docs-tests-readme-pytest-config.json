@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "tests/README.md tree shows root pytest.ini and pytest-ci.ini with correct paths",
+    "README states which Make targets select the CI profile"
+  ],
+  "context": "Adversarial review accepted (codex gpt-5.6-sol): PARTIALLY-CONFIRM. Root pytest.ini and pytest-ci.ini both exist; README misplaces pytest.ini inside tests/.",
+  "description": "Fix Test Structure diagram in tests/README.md: remove tests/pytest.ini, document root pytest.ini (default) and pytest-ci.ini (CI profile) and how CI-oriented Make targets select it. Verify against Makefile pytest invocations.",
+  "links": [
+    "tests/README.md",
+    "pytest.ini",
+    "pytest-ci.ini"
+  ]
+}

@@ -4625,6 +4625,13 @@
       "status": "done",
       "title": "Rewrite architecture.md and structure.md to match current codebase"
     },
+    "docs-tests-readme-pytest-config": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix tests README pytest config paths"
+    },
     "document-cli-comprehensively": {
       "claim": null,
       "needs": [],
