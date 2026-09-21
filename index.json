@@ -18325,15 +18325,10 @@
       "title": "✅ Update Documentation"
     },
     "upgrade-pandas-to-3x": {
-      "claim": {
-        "expires_at": "2026-09-22T14:24:45Z",
-        "generation": "f4c938b807694550bdd211c63f3b694f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear"
     },
     "use-benchmark-support-status-to-redesign-the-explorer-benchm": {
