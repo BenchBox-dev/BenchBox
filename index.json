@@ -7391,15 +7391,10 @@
       "title": "Human/maintainer action queue: steps agents cannot perform"
     },
     "iceberg-delta-lake-hudi-maintenance-operations": {
-      "claim": {
-        "expires_at": "2026-09-22T18:32:20Z",
-        "generation": "6e96a2f55c20496c8b439c80f7cd72f9",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Iceberg/Delta Lake/Hudi maintenance operations"
     },
     "iceberg-hudi-delta-read-acceleration-coverage": {
