@@ -4988,10 +4988,15 @@
       "title": "Re-measure DuckLake deployment-mode CVs on a quiet host"
     },
     "ducklake-specific-benchmarks-time-travel-schema-evolution-sn": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T20:44:47Z",
+        "generation": "db780d90082c4f748fc3f6fc51749caf",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b44bd671ebbe4ed4cb7f095b"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "DuckLake-specific benchmarks (time travel, schema evolution, snapshot/maintenance workloads)"
     },
     "duplicate-code-followup-triage-centralization": {
