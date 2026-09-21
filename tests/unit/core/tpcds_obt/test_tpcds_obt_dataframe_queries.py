@@ -55,6 +55,13 @@ def _sample_polars() -> pl.LazyFrame:
             "channel": ["store", "web", "store", "catalog"],
             "has_return": ["N", "Y", "Y", "N"],
             "return_amount": [0.0, 12.5, 7.5, 0.0],
+            "item_sk": [1, 2, 1, 3],
+            "quantity": [2, 1, 3, 1],
+            "ext_discount_amt": [1.0, 0.0, 0.5, 0.0],
+            "coupon_amt": [0.0, 2.0, 0.0, 0.0],
+            "net_paid": [19.0, 18.0, 29.5, 15.0],
+            "net_paid_inc_tax": [20.9, 19.8, 32.45, 16.5],
+            "net_profit": [5.0, 6.0, 8.0, 4.0],
         }
     ).lazy()
 
@@ -66,17 +73,23 @@ def _sample_pandas() -> pd.DataFrame:
             "channel": ["store", "web", "store", "catalog"],
             "has_return": ["N", "Y", "Y", "N"],
             "return_amount": [0.0, 12.5, 7.5, 0.0],
+            "item_sk": [1, 2, 1, 3],
+            "quantity": [2, 1, 3, 1],
+            "ext_discount_amt": [1.0, 0.0, 0.5, 0.0],
+            "coupon_amt": [0.0, 2.0, 0.0, 0.0],
+            "net_paid": [19.0, 18.0, 29.5, 15.0],
+            "net_paid_inc_tax": [20.9, 19.8, 32.45, 16.5],
+            "net_profit": [5.0, 6.0, 8.0, 4.0],
         }
     )
 
 
-def test_registry_exposes_three_queries() -> None:
+def test_registry_exposes_seventeen_queries() -> None:
     from benchbox.core.tpcds_obt.dataframe_queries import REGISTRY
 
-    assert REGISTRY.get("Q1") is not None
-    assert REGISTRY.get("Q2") is not None
-    assert REGISTRY.get("Q3") is not None
-    assert len(REGISTRY.get_query_ids()) == 3
+    for query_id in [f"Q{i}" for i in range(1, 18)]:
+        assert REGISTRY.get(query_id) is not None, f"{query_id} missing from registry"
+    assert len(REGISTRY.get_query_ids()) == 17
 
 
 def test_query_outputs_match_between_families() -> None:
