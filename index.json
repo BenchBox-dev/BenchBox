@@ -12511,10 +12511,15 @@
       "title": "Read Primitives DataFrame implementation (136 queries)"
     },
     "read-primitives-simplify-inline-window-helpers": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T12:07:14Z",
+        "generation": "550a228efcd042e89b1419cf66374352",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Simplify read_primitives inline raw-Polars window impls back onto the (now-fixed) unified helpers"
     },
     "read-primitives-waivers-classified-divergence": {
