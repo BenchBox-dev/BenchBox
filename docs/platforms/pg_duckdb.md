@@ -55,6 +55,23 @@ export MOTHERDUCK_TOKEN=your-token-here
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
 
+## Data Lake Queries (S3 Parquet/Iceberg)
+
+pg_duckdb routes analytical queries through its embedded DuckDB engine, so
+lakehouse reads use the same DuckDB extension path as standalone DuckDB:
+Parquet via the extension path, Delta Lake via the DuckDB delta extension,
+and Iceberg as experimental. BenchBox registers these levels in
+`benchbox/platforms/base/format_capabilities.py` under the `pg_duckdb` key,
+with native loads staying tbl-first like `postgresql`.
+
+Cloud reads need credentials at query time, never in code or committed
+config. MotherDuck mode remains the supported cloud variant (token via the
+`MOTHERDUCK_TOKEN` environment variable). Direct S3 Parquet/Iceberg reads
+through the embedded engine additionally need object-storage credentials
+and Parquet file management, and live verification is still pending -
+that is tracked separately and requires explicit approval for live cloud
+tests before any S3 read path is claimed as supported.
+
 ## Installation
 
 ### Python Dependencies
