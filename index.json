@@ -7403,15 +7403,10 @@
       "title": "Iceberg/Delta Lake/Hudi maintenance operations"
     },
     "iceberg-hudi-delta-read-acceleration-coverage": {
-      "claim": {
-        "expires_at": "2026-09-22T18:13:53Z",
-        "generation": "5ed17076a2d54443b5aa07ab0f8164bd",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Iceberg / Hudi / Delta read acceleration coverage"
     },
     "iceberg-support-for-redshift-via-spectrum-and-bigquery-via-b": {
