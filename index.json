@@ -11887,17 +11887,12 @@
       "title": "Make plan-history flap/version detection fingerprint_version-aware"
     },
     "qpc-15-dataframe-capture-error-persistence": {
-      "claim": {
-        "expires_at": "2026-09-22T12:17:45Z",
-        "generation": "b763f59495ba44f9beac4410a252756e",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [
         "qpc-05-silent-failure-surfacing"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Persist DataFrame plan-capture error cause to the bundle; reset capture state per run"
     },
     "qpc-16-plan-max-depth-cli-wiring": {
