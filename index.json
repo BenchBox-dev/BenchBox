@@ -8020,10 +8020,15 @@
       "title": "Investigate BigQuery BigLake Iceberg support"
     },
     "investigate-pg-duckdb-table-format-registration": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T20:41:26Z",
+        "generation": "30b8e68d01aa4bdcba23126ee73bb0a1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b44bd671ebbe4ed4cb7f095b"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Investigate pg_duckdb table format registration"
     },
     "investigate-redshift-iceberg-preview-support": {
