@@ -3603,15 +3603,10 @@
       "title": "Make real-data archive downloads safe under concurrent fetch_data callers"
     },
     "data-lake-query-support-s3-parquet-iceberg-reads-via-pg-duck": {
-      "claim": {
-        "expires_at": "2026-09-22T20:43:58Z",
-        "generation": "ca75103ee8804f908ec5a3e0582274ef",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:b44bd671ebbe4ed4cb7f095b"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)"
     },
     "database-management-boundaries": {
