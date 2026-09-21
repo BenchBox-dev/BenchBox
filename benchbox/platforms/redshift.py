@@ -1690,6 +1690,14 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             s3_client.upload_file(str(file_path), self.s3_bucket, s3_key)
         return f"s3://{self.s3_bucket}/{s3_prefix}/"
 
+    @staticmethod
+    def _is_iceberg_directory(path: Path) -> bool:
+        """Return whether a local directory is an Iceberg table directory."""
+        metadata = path / "metadata"
+        if not path.is_dir() or not metadata.is_dir():
+            return False
+        return (metadata / "version-hint.text").exists() or bool(list(metadata.glob("*.metadata.json")))
+
     def _upload_external_directory_to_s3(self, s3_client: Any, table_name: str, directory: Path) -> str:
         """Upload a directory tree for external Delta-style registration."""
         table_name_lower = table_name.lower()
@@ -1743,17 +1751,21 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 table_name_lower = table_name.lower()
                 valid_files = self._filter_valid_files(file_paths)
                 delta_dirs = [path for path in valid_files if path.is_dir() and (path / "_delta_log").is_dir()]
+                iceberg_dirs = [path for path in valid_files if self._is_iceberg_directory(path)]
                 parquet_files = [path for path in valid_files if path.suffix.lower() == ".parquet"]
                 if delta_dirs:
                     location = self._upload_external_directory_to_s3(s3_client, table_name_lower, delta_dirs[0])
                     source_format = "delta"
+                elif iceberg_dirs:
+                    location = self._upload_external_directory_to_s3(s3_client, table_name_lower, iceberg_dirs[0])
+                    source_format = "iceberg"
                 elif parquet_files:
                     location = self._upload_external_parquet_files_to_s3(s3_client, table_name_lower, parquet_files)
                     source_format = "parquet"
                 else:
                     raise ValueError(
-                        f"Redshift external mode requires Parquet files or Delta directories for table "
-                        f"'{table_name_lower}'. No supported sources were found."
+                        f"Redshift external mode requires Parquet files, Delta directories, or Iceberg "
+                        f"directories for table '{table_name_lower}'. No supported sources were found."
                     )
 
                 column_defs = self._build_external_column_definitions(benchmark, table_name_lower)
@@ -1763,24 +1775,19 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 )
                 cursor.execute(f"DROP TABLE IF EXISTS {external_schema}.{table_name_lower}")
                 if source_format == "delta":
-                    cursor.execute(
-                        f"""
-                        CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
-                        ({column_defs})
-                        STORED AS PARQUET
-                        LOCATION '{location}'
-                        TABLE PROPERTIES ('table_type'='DELTA')
-                        """
-                    )
+                    table_properties = "\n                        TABLE PROPERTIES ('table_type'='DELTA')"
+                elif source_format == "iceberg":
+                    table_properties = "\n                        TABLE PROPERTIES ('table_type'='ICEBERG')"
                 else:
-                    cursor.execute(
-                        f"""
-                        CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
-                        ({column_defs})
-                        STORED AS PARQUET
-                        LOCATION '{location}'
-                        """
-                    )
+                    table_properties = ""
+                cursor.execute(
+                    f"""
+                    CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
+                    ({column_defs})
+                    STORED AS PARQUET
+                    LOCATION '{location}'{table_properties}
+                    """
+                )
                 cursor.execute(f"SELECT COUNT(*) FROM {external_schema}.{table_name_lower}")
                 result = cursor.fetchone()
                 table_stats[table_name_lower] = int(result[0]) if result else 0

@@ -532,6 +532,59 @@ class TestBigQueryAdapter:
         assert "format = 'DELTA_LAKE'" in query_sql
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_create_external_tables_generates_iceberg_biglake_sql(self, mock_bigquery, dependencies_available):
+        """Iceberg external mode should create BigLake SQL with ICEBERG format."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        mock_connection = Mock()
+        mock_query_job = Mock()
+        mock_query_job.result.return_value = []
+        mock_connection.query.return_value = mock_query_job
+
+        with (
+            patch.object(
+                adapter,
+                "_prepare_external_table_uris",
+                return_value=("ICEBERG", ["gs://benchbox-bucket/benchbox-data/lineitem/"]),
+            ),
+            patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem")]}),
+            patch.object(adapter, "_create_storage_bucket", return_value=Mock()),
+            patch.object(adapter, "_get_table_row_count", return_value=77),
+        ):
+            table_stats, _, _ = adapter.create_external_tables(
+                benchmark=Mock(), connection=mock_connection, data_dir=Path("/tmp")
+            )
+
+        assert table_stats == {"LINEITEM": 77}
+        query_sql = str(mock_connection.query.call_args[0][0])
+        assert "WITH CONNECTION `test-project.us.benchbox`" in query_sql
+        assert "format = 'ICEBERG'" in query_sql
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_create_external_tables_iceberg_requires_biglake_connection(self, mock_bigquery, dependencies_available):
+        """Iceberg external mode should reject runs without BigLake connection config."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iceberg_dir = Path(tmpdir) / "lineitem"
+            (iceberg_dir / "metadata").mkdir(parents=True)
+            (iceberg_dir / "metadata" / "v1.metadata.json").write_text("{}")
+
+            with pytest.raises(ValueError, match="biglake_connection"):
+                adapter._prepare_external_table_uris(Mock(), "lineitem", [iceberg_dir])
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_delta_requires_biglake_connection(self, mock_bigquery, dependencies_available):
         """Delta external mode should reject runs without BigLake connection config."""
         adapter = BigQueryAdapter(

@@ -1135,14 +1135,14 @@ class BigQueryAdapter(PlatformAdapter):
             source_format, uris = self._prepare_external_table_uris(bucket, table_name, file_paths)
             if not uris:
                 raise ValueError(
-                    f"BigQuery external mode requires Parquet files or Delta directories for table "
-                    f"'{table_name_upper}'. No supported sources were found."
+                    f"BigQuery external mode requires Parquet files, Delta directories, or Iceberg "
+                    f"directories for table '{table_name_upper}'. No supported sources were found."
                 )
 
             uris_sql = ", ".join(f"'{uri}'" for uri in uris)
             connection_clause = (
                 f"\n                WITH CONNECTION `{self.biglake_connection}`"
-                if source_format == "DELTA_LAKE"
+                if source_format in ("DELTA_LAKE", "ICEBERG")
                 else ""
             )
             ddl = f"""
@@ -1485,7 +1485,7 @@ class BigQueryAdapter(PlatformAdapter):
         return table_stats, per_table_timings
 
     def _prepare_external_table_uris(self, bucket: Any, table_name: str, file_paths: Any) -> tuple[str, list[str]]:
-        """Prepare BigQuery external-table sources for parquet files or delta directories."""
+        """Prepare BigQuery external-table sources for parquet, delta, or iceberg directories."""
         valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
         delta_uris = self._prepare_external_delta_uris(bucket, table_name, valid_files)
         if delta_uris:
@@ -1494,6 +1494,13 @@ class BigQueryAdapter(PlatformAdapter):
                     "BigQuery Delta external mode requires --platform-option biglake_connection=<project.region.name>."
                 )
             return "DELTA_LAKE", delta_uris
+        iceberg_uris = self._prepare_external_iceberg_uris(bucket, table_name, valid_files)
+        if iceberg_uris:
+            if not self.biglake_connection:
+                raise ValueError(
+                    "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+                )
+            return "ICEBERG", iceberg_uris
         return "PARQUET", self._prepare_external_parquet_uris(bucket, table_name, valid_files)
 
     def _prepare_external_parquet_uris(self, bucket: Any, table_name: str, file_paths: Any) -> list[str]:
@@ -1532,6 +1539,40 @@ class BigQueryAdapter(PlatformAdapter):
 
             path = Path(file_path)
             if not path.is_dir() or not (path / "_delta_log").is_dir():
+                continue
+
+            table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
+            for source_file in path.rglob("*"):
+                if not source_file.is_file():
+                    continue
+                relative = source_file.relative_to(path)
+                blob = bucket.blob(f"{table_prefix}{relative.as_posix()}")
+                blob.upload_from_filename(str(source_file))
+            uris.append(f"gs://{self.storage_bucket}/{table_prefix}")
+
+        return uris
+
+    @staticmethod
+    def _is_iceberg_directory(path: Path) -> bool:
+        """Return whether a local path is an Iceberg table directory."""
+        metadata = path / "metadata"
+        if not path.is_dir() or not metadata.is_dir():
+            return False
+        return (metadata / "version-hint.text").exists() or bool(list(metadata.glob("*.metadata.json")))
+
+    def _prepare_external_iceberg_uris(self, bucket: Any, table_name: str, file_paths: list[Path]) -> list[str]:
+        """Prepare BigQuery Iceberg table root URIs from local or cloud directory inputs."""
+        uris: list[str] = []
+
+        for file_path in file_paths:
+            file_path_str = str(file_path)
+            if is_cloud_path(file_path_str):
+                if "/metadata/" in file_path_str:
+                    uris.append(file_path_str.split("/metadata/", 1)[0] + "/")
+                continue
+
+            path = Path(file_path)
+            if not self._is_iceberg_directory(path):
                 continue
 
             table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
