@@ -4633,10 +4633,15 @@
       "title": "docs linkcheck turns transient external-site timeouts into a red CI job"
     },
     "docs-phase-ddl-optimize-wording": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T16:13:08Z",
+        "generation": "de639e7975c24848b5d9d6db86d26566",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d79997238c1073f74d5d5813"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Clarify Phase path and compat check wording"
     },
     "docs-rewrite-architecture-and-structure": {
