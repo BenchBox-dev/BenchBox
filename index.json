@@ -111,15 +111,10 @@
       "title": "Add data_generation_version field to BenchmarkResults for change tracking"
     },
     "add-databricks-hudi-support-to-benchbox-databricks-sql-adapt": {
-      "claim": {
-        "expires_at": "2026-09-22T21:14:30Z",
-        "generation": "a870b7ca04ce46818a9f23c50006f9e6",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add Databricks Hudi support to BenchBox Databricks SQL adapter"
     },
     "add-dedicated-tags-for-platforms-and-benchmarks": {
