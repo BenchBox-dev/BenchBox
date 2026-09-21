@@ -1,0 +1,13 @@
+{
+  "acceptance": [
+    "AGENTS.md names benchbox.sql_compat.context.Phase",
+    "States single make compat-docs-check target performs both generated-doc and DDL-drift checks"
+  ],
+  "context": "Adversarial review accepted (codex gpt-5.6-sol): CONFIRM Nit. Enum lives at benchbox/sql_compat/context.py:10; compat-docs-check runs generate_compat_docs --check plus inventory --check-ddl-drift.",
+  "description": "In AGENTS.md qualify Phase.DDL_OPTIMIZE as benchbox.sql_compat.context.Phase and reword compat-docs-check so it reads as one target covering both checks, not two commands.",
+  "links": [
+    "AGENTS.md",
+    "benchbox/sql_compat/context.py",
+    "make/documentation.mk"
+  ]
+}
