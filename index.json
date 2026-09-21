@@ -6138,10 +6138,15 @@
       "title": "Record that the identity remediation instruction is external, and inoculate agents against following it"
     },
     "external-table-mode-for-spark-based-cloud-platforms-athena-s": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T17:25:50Z",
+        "generation": "6192ce3309a44713bc86506cd339602d",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "External table mode for Spark-based cloud platforms (Athena Spark, EMR Serverless, Dataproc, Glue)"
     },
     "extract-ascii-charting-into-standalone-library": {
