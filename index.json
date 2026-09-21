@@ -13033,12 +13033,17 @@
       "title": "Remove Excessive Adjective/Adverb Usage"
     },
     "remove-or-integrate-legacy-cudf-platform-module": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T11:53:33Z",
+        "generation": "09d9f67c9b92456dbe185dfd2152458e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [
         "platform-support-status-and-extension-health"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Platform cleanup: decide fate of legacy top-level cuDF adapter module"
     },
     "remove-polars-sql-mode": {
