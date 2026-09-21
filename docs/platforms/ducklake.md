@@ -240,6 +240,19 @@ best DuckLake can do. See
 [ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
 for why this is documented rather than instrumented.
 
+## Lakehouse-Feature Benchmarks (Time Travel, Schema Evolution, Snapshots)
+
+DuckLake parity today means TPC-H/TPC-DS parity with DuckDB plus the
+run-phase `maintenance` operations shared with the other lakehouse paths
+(insert/delete/update/merge via `benchbox/platforms/dataframe/ducklake_maintenance.py`,
+with time-travel support flagged in the maintenance capabilities). There is
+no dedicated time-travel, schema-evolution, or snapshot/maintenance
+benchmark workload yet: those need versioned-query fixtures and
+compaction/snapshot lifecycle harnesses that do not exist in the runner,
+so they remain a separate research item. When adding one, build it on the
+existing maintenance-operations interface and the documented no-compaction
+bias above rather than inventing a parallel harness.
+
 ## Troubleshooting
 
 ### DuckDB Version Too Old
