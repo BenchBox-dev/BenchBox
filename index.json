@@ -7840,10 +7840,15 @@
       "title": "Integration Test Suite Cleanup - Remove Placeholder and Failing Tests"
     },
     "integration-tests-with-real-pyspark-delta-lake": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T18:20:17Z",
+        "generation": "92989800241d4df1b47313012cc176e1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Integration tests with real PySpark + Delta Lake"
     },
     "integration-tests-with-real-pyspark-delta-lake-catalog": {
