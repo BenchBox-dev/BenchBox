@@ -49,6 +49,8 @@ def _unstage(entries: dict[str, object], saved: dict[str, object]) -> None:
 
 def test_reload_with_working_databricks_connect():
     """A working databricks.connect marks the extra available."""
+    initial_available = mod.DATABRICKS_CONNECT_AVAILABLE
+    initial_error = mod._databricks_connect_error
     pkg = types.ModuleType("databricks")
     pkg.__path__ = []
     connect = types.ModuleType("databricks.connect")
@@ -62,7 +64,8 @@ def test_reload_with_working_databricks_connect():
     finally:
         _unstage(staged, saved)
         _reload_adapter()
-    assert mod.DATABRICKS_CONNECT_AVAILABLE is False
+    assert initial_available == mod.DATABRICKS_CONNECT_AVAILABLE
+    assert mod._databricks_connect_error == initial_error
 
 
 def test_reload_with_crashing_databricks_connect():

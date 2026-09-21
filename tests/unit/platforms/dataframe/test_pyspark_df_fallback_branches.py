@@ -19,11 +19,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import benchbox.platforms.dataframe.pyspark_df as mod
+from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+_java_version, _ = ensure_compatible_java()
+_REQUIRES_JAVA = not is_java_compatible(_java_version)
 
 
 def _adapter_without_session():
@@ -82,6 +86,7 @@ def test_module_fallback_aliases_without_pyspark(monkeypatch: pytest.MonkeyPatch
     assert mod.F is not None
 
 
+@pytest.mark.skipif(_REQUIRES_JAVA, reason="window spec starts a real Spark session")
 def test_window_count_star_uses_lit_one():
     """COUNT(*) renders F.count(F.lit(1)) over the window spec."""
     pytest.importorskip("pyspark")
