@@ -96,9 +96,22 @@ def _make_pandas_impl(spec: _ObtQuerySpec) -> Callable[[DataFrameContext], Any]:
             result = result.sort_values(list(spec.sort_keys), ascending=not spec.descending)
         if spec.limit:
             result = result.head(spec.limit)
-        return result
+        return _materialize(result)
 
     return impl
+
+
+def _materialize(value: Any) -> Any:
+    """Compute a lazy frame/scalar (e.g. Dask) to a concrete value.
+
+    Pandas objects have no ``compute`` attribute and pass through unchanged,
+    so the pandas-family path stays backend-agnostic without importing
+    engine SDKs here.
+    """
+    compute = getattr(value, "compute", None)
+    if callable(compute):
+        return compute()
+    return value
 
 
 def _pandas_scalar(table: Any, column: str, func: str) -> Any:
@@ -107,8 +120,8 @@ def _pandas_scalar(table: Any, column: str, func: str) -> Any:
         return len(table)
     values = table[column]
     if func == "n_unique":
-        return int(values.nunique())
-    return float(getattr(values, func)())
+        return int(_materialize(values.nunique()))
+    return float(_materialize(getattr(values, func)()))
 
 
 def _register_spec(spec: _ObtQuerySpec) -> None:
@@ -260,8 +273,10 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("high_value_sales", "sale_id", "count"),
             ("high_value_revenue", "net_paid", "sum"),
         ),
+        # Implementations report 0.0 (not NULL) for SUM over an empty filtered
+        # set on every backend, so the reference coalesces to match.
         sql_equivalent=(
-            "SELECT COUNT(sale_id) AS high_value_sales, SUM(net_paid) AS high_value_revenue "
+            "SELECT COUNT(sale_id) AS high_value_sales, COALESCE(SUM(net_paid), 0) AS high_value_revenue "
             "FROM tpcds_sales_returns_obt WHERE net_paid >= 200"
         ),
     ),
@@ -331,9 +346,10 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("total_coupons", "coupon_amt", "sum"),
             ("coupon_revenue", "net_paid", "sum"),
         ),
+        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
-            "SELECT COUNT(sale_id) AS coupon_sales, SUM(coupon_amt) AS total_coupons, "
-            "SUM(net_paid) AS coupon_revenue "
+            "SELECT COUNT(sale_id) AS coupon_sales, COALESCE(SUM(coupon_amt), 0) AS total_coupons, "
+            "COALESCE(SUM(net_paid), 0) AS coupon_revenue "
             "FROM tpcds_sales_returns_obt WHERE coupon_amt > 0"
         ),
     ),
@@ -348,9 +364,10 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("store_revenue", "net_paid", "sum"),
             ("store_profit", "net_profit", "sum"),
         ),
+        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
-            "SELECT COUNT(sale_id) AS store_sales, SUM(net_paid) AS store_revenue, "
-            "SUM(net_profit) AS store_profit "
+            "SELECT COUNT(sale_id) AS store_sales, COALESCE(SUM(net_paid), 0) AS store_revenue, "
+            "COALESCE(SUM(net_profit), 0) AS store_profit "
             "FROM tpcds_sales_returns_obt WHERE channel = 'store'"
         ),
     ),
@@ -365,9 +382,11 @@ _QUERY_SPECS: tuple[_ObtQuerySpec, ...] = (
             ("total_revenue_inc_tax", "net_paid_inc_tax", "sum"),
             ("total_profit", "net_profit", "sum"),
         ),
+        # See Q10: ungrouped SUMs coalesce to match the 0.0 implementations report.
         sql_equivalent=(
-            "SELECT COUNT(sale_id) AS total_sales, SUM(net_paid) AS total_revenue, "
-            "SUM(net_paid_inc_tax) AS total_revenue_inc_tax, SUM(net_profit) AS total_profit "
+            "SELECT COUNT(sale_id) AS total_sales, COALESCE(SUM(net_paid), 0) AS total_revenue, "
+            "COALESCE(SUM(net_paid_inc_tax), 0) AS total_revenue_inc_tax, "
+            "COALESCE(SUM(net_profit), 0) AS total_profit "
             "FROM tpcds_sales_returns_obt"
         ),
     ),
