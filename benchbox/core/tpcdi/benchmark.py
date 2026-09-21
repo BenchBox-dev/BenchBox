@@ -1031,7 +1031,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
             return results
 
-        backend = DataFrameETLBackend(maintenance_ops=maintenance_ops, platform_name=platform_name)
+        backend = DataFrameETLBackend(
+            maintenance_ops=maintenance_ops,
+            platform_name=platform_name,
+            table_root=Path(self.output_dir) / "dataframe-etl-tables",
+        )
         return results + self._execute_etl_stage_queries(
             backend=backend,
             stage_map=stage_map,

@@ -160,8 +160,11 @@ class PolarsMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             df = dataframe.collect()
         elif isinstance(dataframe, pl.DataFrame):
             df = dataframe
+        elif hasattr(dataframe, "to_parquet") and hasattr(dataframe, "columns"):
+            # Pandas DataFrame (e.g. TPC-DI ETL stages pandas frames)
+            df = pl.from_pandas(dataframe)
         else:
-            raise TypeError(f"Expected Polars DataFrame or LazyFrame, got {type(dataframe)}")
+            raise TypeError(f"Expected Polars DataFrame, LazyFrame, or Pandas DataFrame, got {type(dataframe)}")
 
         row_count = df.height
 
@@ -477,8 +480,11 @@ class PolarsMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             source_df = source_dataframe.collect()
         elif isinstance(source_dataframe, pl.DataFrame):
             source_df = source_dataframe
+        elif hasattr(source_dataframe, "to_parquet") and hasattr(source_dataframe, "columns"):
+            # Pandas DataFrame (e.g. TPC-DI ETL stages pandas frames)
+            source_df = pl.from_pandas(source_dataframe)
         else:
-            raise TypeError(f"Expected Polars DataFrame or LazyFrame, got {type(source_dataframe)}")
+            raise TypeError(f"Expected Polars DataFrame, LazyFrame, or Pandas DataFrame, got {type(source_dataframe)}")
 
         source_count = source_df.height
         if source_count == 0:
