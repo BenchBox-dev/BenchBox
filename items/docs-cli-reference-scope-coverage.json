@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "CLI_REFERENCE.md no longer claims exhaustive canonical coverage",
+    "Links docs/reference/cli/index.md and live --help",
+    "Covers or explicitly scopes out compare, convert, platforms, shell, tuning with correct counts"
+  ],
+  "context": "Adversarial review accepted (codex gpt-5.6-sol): PARTIALLY-CONFIRM. CLI_REFERENCE.md has ~19 headings, omits 5 registered commands; competing canonical/comprehensive labels unclear.",
+  "description": "Scope-label docs/CLI_REFERENCE.md as condensed overview, link the detailed per-command index and live --help, correct coverage count, and document or explicitly scope out compare, convert, platforms, shell, tuning.",
+  "links": [
+    "docs/CLI_REFERENCE.md",
+    "docs/reference/cli/index.md",
+    "benchbox/cli/commands/__init__.py"
+  ]
+}

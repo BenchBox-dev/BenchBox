@@ -4583,6 +4583,13 @@
       "status": "done",
       "title": "Sync browser-duckdb-schema.sql with the ADR-2 physical_mechanisms / physical_rendering_id columns"
     },
+    "docs-cli-reference-scope-coverage": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Scope CLI reference and cover missing commands"
+    },
     "docs-document-undocumented-cli-commands": {
       "claim": null,
       "needs": [],
