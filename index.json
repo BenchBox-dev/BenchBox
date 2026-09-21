@@ -2463,17 +2463,12 @@
       "title": "Cloud Spark adapters (EMR Serverless, Dataproc Serverless, Synapse Spark)"
     },
     "cloud-spark-aqe-toggle": {
-      "claim": {
-        "expires_at": "2026-09-22T16:50:31Z",
-        "generation": "1c074b7b19834209ae94db2d23440f2a",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [
         "port-the-same-fixes-to-the-sibling-spark-family-adapters-lak"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add AQE toggle to Azure Synapse/Fabric Spark adapters and cloud optimizer"
     },
     "cloud-spark-dependency-groups": {
