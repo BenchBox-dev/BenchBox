@@ -42,6 +42,7 @@ from benchbox.core.dataframe.benchmark_suite import (
     QueryBenchmarkResult,
     SQLComparisonResult,
     SQLVsDataFrameSummary,
+    resolve_table_paths,
 )
 
 pytestmark = [
@@ -1405,3 +1406,59 @@ class TestBenchmarkSuiteConvenienceFunctions:
         assert exported == output_paths
         normalized.assert_called_once_with(summary)
         generate.assert_called_once()
+
+
+# ===========================================================================
+# Sharded parquet table resolution
+# ===========================================================================
+
+
+class TestResolveTablePaths:
+    """Tests for resolve_table_paths used by suite table loading."""
+
+    def test_single_file_preferred(self, tmp_path):
+        single = tmp_path / "lineitem.parquet"
+        single.write_text("stub")
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == [single]
+
+    def test_shards_returned_in_numeric_order(self, tmp_path):
+        for shard in ("lineitem.2.parquet", "lineitem.10.parquet", "lineitem.1.parquet"):
+            (tmp_path / shard).write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == [
+            tmp_path / "lineitem.1.parquet",
+            tmp_path / "lineitem.2.parquet",
+            tmp_path / "lineitem.10.parquet",
+        ]
+
+    def test_non_numeric_suffix_ignored(self, tmp_path):
+        (tmp_path / "lineitem.bak.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == []
+
+    def test_missing_table_returns_empty(self, tmp_path):
+        assert resolve_table_paths(tmp_path, "orders") == []
+
+    def test_other_tables_not_matched(self, tmp_path):
+        (tmp_path / "partsupp.1.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "part") == []
+        assert resolve_table_paths(tmp_path, "partsupp") == [tmp_path / "partsupp.1.parquet"]
+
+    def test_create_context_loads_sharded_tables(self, tmp_path):
+        suite = DataFrameBenchmarkSuite(config=BenchmarkConfig())
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+        (tmp_path / "lineitem.2.parquet").write_text("stub")
+        (tmp_path / "nation.parquet").write_text("stub")
+        fake_adapter = MagicMock()
+        fake_adapter.create_context.return_value = object()
+
+        with patch("benchbox.platforms.get_dataframe_adapter", return_value=fake_adapter):
+            suite._create_context("dask-df", tmp_path)
+
+        loaded = {call.args[1]: call.args[2] for call in fake_adapter.load_table.call_args_list}
+        assert loaded["lineitem"] == [tmp_path / "lineitem.1.parquet", tmp_path / "lineitem.2.parquet"]
+        assert loaded["nation"] == [tmp_path / "nation.parquet"]
+        assert "orders" not in loaded
