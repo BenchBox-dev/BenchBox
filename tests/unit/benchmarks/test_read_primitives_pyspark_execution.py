@@ -368,10 +368,10 @@ class TestPySparkSkipList:
     """The PySpark skip list must stay in sync with unified-API capabilities."""
 
     def test_skip_list_contains_raw_polars_impls(self):
+        # window_lead_lag_same_frame, qualify_lag_lead, and qualify_ntile were
+        # ported to the unified window helpers (composite ORDER BY) and run on
+        # PySpark now, so they are deliberately absent from this list.
         for query_id in (
-            "window_lead_lag_same_frame",
-            "qualify_lag_lead",
-            "qualify_ntile",
             "window_moving_frame",
             "window_multiple_orderings",
             "optimizer_common_subexpression",

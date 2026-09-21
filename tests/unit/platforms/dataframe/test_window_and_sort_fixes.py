@@ -72,3 +72,37 @@ def test_unified_sort_desc_marker_is_descending():
     out = lf.sort(UnifiedExpr(pl.col("a")), UnifiedExpr(pl.col("b")).desc()).native.collect()
     # a ascending, b DESCENDING within a.
     assert out.select("a", "b").rows() == [(1, 3), (1, 1), (2, 2)]
+
+
+def test_window_lag_honors_composite_order_by():
+    adapter = PolarsDataFrameAdapter()
+    # Ties on o1 are broken by o2: order is (1,1)->v10, (1,2)->v20, (2,1)->v30.
+    df = pl.DataFrame({"g": [1, 1, 1], "o1": [1, 2, 1], "o2": [2, 1, 1], "v": [20, 30, 10]})
+    expr = adapter.window_lag("v", 1, partition_by=["g"], order_by=[("o1", True), ("o2", True)])
+    out = df.with_columns(expr.alias("lag")).sort(["o1", "o2"])
+    assert out["lag"].to_list() == [None, 10, 20]
+
+
+def test_window_lead_honors_composite_order_by():
+    adapter = PolarsDataFrameAdapter()
+    df = pl.DataFrame({"g": [1, 1, 1], "o1": [1, 2, 1], "o2": [2, 1, 1], "v": [20, 30, 10]})
+    expr = adapter.window_lead("v", 1, partition_by=["g"], order_by=[("o1", True), ("o2", True)])
+    out = df.with_columns(expr.alias("lead")).sort(["o1", "o2"])
+    assert out["lead"].to_list() == [20, 30, None]
+
+
+def test_window_ntile_honors_composite_order_by():
+    adapter = PolarsDataFrameAdapter()
+    # NTILE(2) over 4 rows ordered by (o1, o2) -> buckets [1, 1, 2, 2].
+    df = pl.DataFrame({"o1": [1, 1, 2, 2], "o2": [2, 1, 2, 1]})
+    expr = adapter.window_ntile(2, order_by=[("o1", True), ("o2", True)])
+    out = df.with_columns(expr.alias("nt")).sort(["o1", "o2"])
+    assert out["nt"].to_list() == [1, 1, 2, 2]
+
+
+def test_window_helpers_reject_mixed_order_directions():
+    adapter = PolarsDataFrameAdapter()
+    with pytest.raises(ValueError, match="uniform ORDER BY direction"):
+        adapter.window_lag("v", 1, partition_by=["g"], order_by=[("o1", True), ("o2", False)])
+    with pytest.raises(ValueError, match="uniform ORDER BY direction"):
+        adapter.window_ntile(2, order_by=[("o1", True), ("o2", False)])

@@ -174,19 +174,6 @@ SKIP_FOR_PYSPARK = [
     # PySpark does not override element() so it raises NotImplementedError.
     "list_filter",
     "list_transform",
-    # window_lead_lag_same_frame's expression impl uses raw Polars (`.native` +
-    # pl.col(...).shift().over()) for a deterministic composite-key LAG/LEAD that
-    # the unified window helpers cannot yet express (single-column order_by only;
-    # see TODO read-primitives-simplify-inline-window-helpers). pl.col(...) on a
-    # non-Polars native frame fails, so PySpark skips it until the impl is ported.
-    "window_lead_lag_same_frame",
-    # qualify_lag_lead's expression impl uses raw Polars (`.native` +
-    # pl.col(...).shift().over()) after a total-order sort matching the catalog
-    # SQL's window tie-break. Same porting precondition as above.
-    "qualify_lag_lead",
-    # qualify_ntile's expression impl computes NTILE inline with raw Polars
-    # (int_range().over() bucket formula). Same porting precondition as above.
-    "qualify_ntile",
     # window_moving_frame's expression impl uses raw Polars rolling_mean and
     # rolling_sum_by for bounded ROWS/RANGE frames the unified window helpers
     # cannot express. pl.col(...) on a non-Polars native frame fails, so
@@ -228,9 +215,6 @@ SKIP_FOR_DATAFUSION = [
     "list_transform",  # .list.eval() is Polars-only - no DataFusion equivalent
     "list_reduce",  # array_sum() not in DataFusion v50 Python bindings
     "array_distinct",  # DataFusion array_distinct returns Dictionary(Int32,Utf8) causing Arrow type mismatch
-    # Raw-Polars (`.native` + pl.col) deterministic LAG/LEAD impl; pl.col on a
-    # non-Polars native frame fails (see SKIP_FOR_PYSPARK note above).
-    "window_lead_lag_same_frame",
 ]
 
 
@@ -1585,21 +1569,21 @@ def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     """Offset window functions over the same frame (deterministic tie-break).
 
-    Uses raw Polars via ``.native``: ``UnifiedExpr`` has no ``.shift`` and the
-    ``window_lag``/``window_lead`` helpers shift before sorting. LAG/LEAD are
-    computed with ``shift().over()`` after a total-order sort that matches the
-    catalog SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break.
+    LAG/LEAD come from the ``window_lag``/``window_lead`` helpers over the
+    catalog SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break; the
+    explicit sort reproduces the previous output row order.
     """
-    import polars as pl
-
+    order_by = [("o_orderdate", True), ("o_orderkey", True)]
     return (
         ctx.get_table("orders")
-        .native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1996, 1, 1)))
-        .sort(["o_custkey", "o_orderdate", "o_orderkey"])
-        .with_columns(
-            pl.col("o_totalprice").shift(1).over("o_custkey").alias("prev_order_price"),
-            pl.col("o_totalprice").shift(-1).over("o_custkey").alias("next_order_price"),
+        .filter(
+            (ctx.col("o_orderdate") >= ctx.lit(date(1995, 1, 1))) & (ctx.col("o_orderdate") < ctx.lit(date(1996, 1, 1)))
         )
+        .with_columns(
+            ctx.window_lag("o_totalprice", 1, partition_by=["o_custkey"], order_by=order_by).alias("prev_order_price"),
+            ctx.window_lead("o_totalprice", 1, partition_by=["o_custkey"], order_by=order_by).alias("next_order_price"),
+        )
+        .sort(["o_custkey", "o_orderdate", "o_orderkey"])
         .select("o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price")
     )
 
@@ -3412,33 +3396,20 @@ def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top quartile by value for each market segment using NTILE.
 
-    The ``window_ntile`` helper uses a wrong bucket formula, so NTILE is computed
-    inline (raw Polars): the SQL definition assigns the first ``cnt % n`` buckets
-    ``ceil(cnt/n)`` rows. Ordering matches the catalog tie-break
+    Buckets come from the ``window_ntile`` helper over the catalog tie-break
     ``ORDER BY o_totalprice, o_orderkey``.
     """
-    import polars as pl
-
     n = 4
-    lf = (
-        _orders_customer_since_1995_expr(ctx)
-        .native.sort(["c_mktsegment", "o_totalprice", "o_orderkey"])
-        .with_columns(
-            pl.int_range(0, pl.len()).over("c_mktsegment").alias("_r0"),
-            pl.len().over("c_mktsegment").alias("_cnt"),
-        )
-    )
-    base = pl.col("_cnt") // n
-    rem = pl.col("_cnt") % n
-    big = rem * (base + 1)
-    quartile = (
-        pl.when(pl.col("_r0") < big)
-        .then(pl.col("_r0") // (base + 1) + 1)
-        .otherwise(rem + (pl.col("_r0") - big) // base + 1)
-    )
-    lf = lf.with_columns(quartile.cast(pl.Int64).alias("quartile"))
     return (
-        lf.filter(pl.col("quartile") == n)
+        _orders_customer_since_1995_expr(ctx)
+        .with_columns(
+            ctx.window_ntile(
+                n,
+                order_by=[("o_totalprice", True), ("o_orderkey", True)],
+                partition_by=["c_mktsegment"],
+            ).alias("quartile")
+        )
+        .filter(ctx.col("quartile") == n)
         .select("c_mktsegment", "o_orderkey", "o_totalprice", "quartile")
         .sort(["c_mktsegment", "o_totalprice", "o_orderkey"], descending=[False, True, True])
     )
@@ -3556,16 +3527,20 @@ def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders where price increased from previous order using LAG.
 
-    Raw Polars (via ``.native``) for a correct LAG: ``shift(1).over()`` after a
-    total-order sort matching the catalog SQL's ``ORDER BY o_orderdate, o_orderkey``
-    window tie-break (the ``window_lag`` helper shifts before sorting).
+    The previous price comes from the ``window_lag`` helper over the catalog
+    SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break.
     """
-    import polars as pl
-
-    lf = _orders_customer_since_1995_expr(ctx).native.sort(["c_custkey", "o_orderdate", "o_orderkey"])
-    lf = lf.with_columns(pl.col("o_totalprice").shift(1).over("c_custkey").alias("prev_order_price"))
     return (
-        lf.filter(pl.col("o_totalprice") > pl.col("prev_order_price"))
+        _orders_customer_since_1995_expr(ctx)
+        .with_columns(
+            ctx.window_lag(
+                "o_totalprice",
+                1,
+                partition_by=["c_custkey"],
+                order_by=[("o_orderdate", True), ("o_orderkey", True)],
+            ).alias("prev_order_price")
+        )
+        .filter(ctx.col("o_totalprice") > ctx.col("prev_order_price"))
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price")
         .sort(["c_custkey", "o_orderdate", "o_orderkey"])
     )
