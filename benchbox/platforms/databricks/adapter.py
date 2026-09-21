@@ -452,7 +452,7 @@ class DatabricksAdapter(PlatformAdapter):
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
         """Build opt-in sorted-ingestion SQL for Databricks."""
-        if self.table_format == "hudi":
+        if getattr(self, "table_format", "delta") == "hudi":
             # CTAS ORDER BY rewrites and ZORDER/Liquid clustering are Delta-only.
             self.logger.info(f"Skipped sorted ingestion for Hudi table {table_name}")
             return None

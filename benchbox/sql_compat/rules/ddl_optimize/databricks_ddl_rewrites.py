@@ -24,3 +24,14 @@ register_ddl_rewrite(
     "for idempotency, tables must declare USING DELTA, and auto-optimize TBLPROPERTIES "
     "improve write performance when delta_auto_optimize is enabled.",
 )
+
+register_ddl_rewrite(
+    platform="databricks",
+    rule_name="convert_to_hudi_table",
+    transformer_id="databricks_hudi_ddl_optimizer",
+    description="Convert DuckDB-style DDL to Databricks Apache Hudi format: "
+    "CREATE OR REPLACE TABLE, USING HUDI, TBLPROPERTIES table type and record keys",
+    reason="Databricks Hudi tables must declare USING HUDI with TBLPROPERTIES carrying "
+    "the table type and, when configured, the record key and precombine field. "
+    "Delta-only auto-optimize properties are never emitted for Hudi tables.",
+)

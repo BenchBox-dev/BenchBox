@@ -157,6 +157,7 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
+    ("databricks", "_convert_to_hudi_table"): ("databricks_hudi_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
     ("fabric_dw", "_optimize_table_definition"): ("fabric_dw_ddl_optimizer",),
     ("firebolt", "_optimize_table_definition"): ("firebolt_ddl_optimizer",),
