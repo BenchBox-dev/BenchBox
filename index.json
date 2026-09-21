@@ -3895,10 +3895,15 @@
       "title": "Architecture hardening: retire or revive old DataFrame runner and add exported-bundle parity"
     },
     "dataframe-side-storage-size-validation-for-sketch-persistenc": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T12:16:52Z",
+        "generation": "d55a415972904ce1bcff6710230e36fa",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "DataFrame-side storage-size validation for sketch persistence"
     },
     "dataframe-support-release-preparation": {
