@@ -7854,10 +7854,15 @@
       "title": "Integration tests with real PySpark + Delta Lake catalog"
     },
     "integration-tests-with-real-pyspark-delta-lake-execution": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T18:27:22Z",
+        "generation": "b8aa966dc6124aeb8eaa33ace107d378",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Integration tests with real PySpark + Delta Lake execution"
     },
     "interactive-cdfchart-tooltip-showing-exact-percentile-at-cur": {
