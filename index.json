@@ -8027,15 +8027,10 @@
       "title": "Investigate pg_duckdb table format registration"
     },
     "investigate-redshift-iceberg-preview-support": {
-      "claim": {
-        "expires_at": "2026-09-22T20:43:34Z",
-        "generation": "1087dd9346984957a014b8a47b760f88",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Investigate Redshift Iceberg preview support"
     },
     "isolate-experimental-core-subsystems": {
