@@ -7847,10 +7847,15 @@
       "title": "Integration tests with real PySpark + Delta Lake"
     },
     "integration-tests-with-real-pyspark-delta-lake-catalog": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T18:26:46Z",
+        "generation": "cd23b545b48c42e3925e3aa9bd587741",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Integration tests with real PySpark + Delta Lake catalog"
     },
     "integration-tests-with-real-pyspark-delta-lake-execution": {
