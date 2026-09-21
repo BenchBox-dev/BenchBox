@@ -7415,10 +7415,15 @@
       "title": "Iceberg / Hudi / Delta read acceleration coverage"
     },
     "iceberg-support-for-redshift-via-spectrum-and-bigquery-via-b": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T20:44:25Z",
+        "generation": "1f94b530e4904628894ad31105a41a41",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Iceberg support for Redshift (via Spectrum) and BigQuery (via BigLake)"
     },
     "iceberg-table-format-support-testing": {
