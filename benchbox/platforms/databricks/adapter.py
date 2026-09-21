@@ -302,6 +302,21 @@ class DatabricksAdapter(PlatformAdapter):
             config.get("delta_auto_compact") if config.get("delta_auto_compact") is not None else True
         )
 
+        # Table format selection: "delta" (default) or "hudi". Hudi tables are
+        # created with USING HUDI plus record-key TBLPROPERTIES; Delta-only
+        # layout operations (OPTIMIZE, ZORDER, Liquid) are recorded as skipped
+        # for Hudi tables instead of emitting invalid SQL.
+        table_format = str(config.get("table_format") or "delta").lower()
+        if table_format not in ("delta", "hudi"):
+            raise ValueError(f"Unsupported Databricks table_format '{table_format}'. Use 'delta' or 'hudi'.")
+        self.table_format = table_format
+        self.hudi_primary_key = config.get("hudi_primary_key")
+        self.hudi_precombine_field = config.get("hudi_precombine_field")
+        hudi_table_type = str(config.get("hudi_table_type") or "cow").lower()
+        if hudi_table_type not in ("cow", "mor"):
+            raise ValueError(f"Unsupported hudi_table_type '{hudi_table_type}'. Use 'cow' or 'mor'.")
+        self.hudi_table_type = hudi_table_type
+
         # Cluster settings. No default: BenchBox connects to an existing SQL
         # warehouse over `http_path` and never sizes one, so a value here is
         # requested intent and nothing else. The former "Medium" fallback was
@@ -437,6 +452,10 @@ class DatabricksAdapter(PlatformAdapter):
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
         """Build opt-in sorted-ingestion SQL for Databricks."""
+        if self.table_format == "hudi":
+            # CTAS ORDER BY rewrites and ZORDER/Liquid clustering are Delta-only.
+            self.logger.info(f"Skipped sorted ingestion for Hudi table {table_name}")
+            return None
         mode, method = self.resolve_sorted_ingestion_strategy()
         if mode == "off":
             return None
@@ -552,6 +571,10 @@ class DatabricksAdapter(PlatformAdapter):
             "enable_delta_optimization",
             "delta_auto_optimize",
             "delta_auto_compact",
+            "table_format",
+            "hudi_primary_key",
+            "hudi_precombine_field",
+            "hudi_table_type",
             "create_catalog",
             "disable_result_cache",
         ]:
@@ -715,6 +738,10 @@ class DatabricksAdapter(PlatformAdapter):
                 "enable_delta_optimization": self.enable_delta_optimization,
                 "delta_auto_optimize": self.delta_auto_optimize,
                 "delta_auto_compact": self.delta_auto_compact,
+                "table_format": self.table_format,
+                "hudi_primary_key": self.hudi_primary_key,
+                "hudi_precombine_field": self.hudi_precombine_field,
+                "hudi_table_type": self.hudi_table_type,
                 "cluster_size": self.cluster_size,
                 "auto_terminate_minutes": self.auto_terminate_minutes,
                 "cluster_mode": getattr(self, "cluster_mode", None),
@@ -984,7 +1011,7 @@ class DatabricksAdapter(PlatformAdapter):
         has_storage = bool(staging_location or config.get("catalog") or config.get("schema"))
         return _compact_metadata(
             {
-                "table_format": "delta",
+                "table_format": str(config.get("table_format") or "delta").lower(),
                 "staging_location": staging_location,
                 "catalog": config.get("catalog"),
                 "schema": config.get("schema"),
@@ -2212,7 +2239,16 @@ class DatabricksAdapter(PlatformAdapter):
             self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
 
         optimize_time = 0.0
-        if self.enable_delta_optimization:
+        if self.table_format == "hudi":
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name_upper,
+                statement=f"OPTIMIZE {table_name_upper} (Delta-only; skipped for Hudi table)",
+                status="skipped",
+                phase="post_load",
+            )
+            self.logger.info(f"Skipped Delta OPTIMIZE for Hudi table {table_name_upper}")
+        elif self.enable_delta_optimization:
             optimize_start = mono_time()
             optimize_statement = f"OPTIMIZE {table_name_upper}"
             try:
@@ -2661,7 +2697,12 @@ class DatabricksAdapter(PlatformAdapter):
         return fixed_sql
 
     def _convert_to_delta_table(self, statement: str) -> str:
-        """Convert CREATE TABLE statement to Delta Lake format."""
+        """Convert CREATE TABLE statement to the configured table format.
+
+        Kept under its historical name: "delta" renders USING DELTA as
+        before, while table_format="hudi" renders USING HUDI with record-key
+        TBLPROPERTIES instead.
+        """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
@@ -2670,6 +2711,9 @@ class DatabricksAdapter(PlatformAdapter):
         if "CREATE TABLE" in statement.upper() and "OR REPLACE" not in statement.upper():
             if "IF NOT EXISTS" not in statement.upper():
                 statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+
+        if self.table_format == "hudi":
+            return self._convert_to_hudi_table(statement)
 
         # Default to DELTA format when unspecified
         if "USING" not in statement.upper():
@@ -2699,6 +2743,38 @@ class DatabricksAdapter(PlatformAdapter):
                 properties.append("'delta.autoOptimize.autoCompact' = 'true'")
 
             statement += ", ".join(properties) + ")"
+
+        return statement
+
+    def _convert_to_hudi_table(self, statement: str) -> str:
+        """Convert CREATE TABLE statement to Apache Hudi format.
+
+        Emits USING HUDI with TBLPROPERTIES carrying the table type and,
+        when configured, the record key and precombine field. Delta-only
+        auto-optimize properties are never emitted for Hudi tables.
+        """
+        if "USING" not in statement.upper():
+            paren_count = 0
+            using_pos = len(statement)
+
+            for i, char in enumerate(statement):
+                if char == "(":
+                    paren_count += 1
+                elif char == ")":
+                    paren_count -= 1
+                    if paren_count == 0:
+                        using_pos = i + 1
+                        break
+
+            statement = statement[:using_pos] + " USING HUDI" + statement[using_pos:]
+
+        if "TBLPROPERTIES" not in statement.upper():
+            properties = [f"'type' = '{self.hudi_table_type}'"]
+            if self.hudi_primary_key:
+                properties.append(f"'primaryKey' = '{self.hudi_primary_key}'")
+            if self.hudi_precombine_field:
+                properties.append(f"'preCombineField' = '{self.hudi_precombine_field}'")
+            statement += " TBLPROPERTIES (" + ", ".join(properties) + ")"
 
         return statement
 
@@ -2797,12 +2873,28 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def optimize_table(self, connection: Any, table_name: str) -> None:
-        """Optimize Delta Lake table."""
+        """Optimize Delta Lake table.
+
+        Hudi tables skip Delta OPTIMIZE (recorded as a skipped layout
+        operation): Hudi file management runs through its own
+        cleaner/clustering table configurations.
+        """
         if not self.enable_delta_optimization:
             return
 
-        cursor = connection.cursor()
         table_name_upper = table_name.upper()
+        if self.table_format == "hudi":
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name_upper,
+                statement=f"OPTIMIZE {table_name_upper} (Delta-only; skipped for Hudi table)",
+                status="skipped",
+                phase="manual",
+            )
+            self.logger.info(f"Skipped Delta OPTIMIZE for Hudi table {table_name_upper}")
+            return
+
+        cursor = connection.cursor()
         statement = f"OPTIMIZE {table_name_upper}"
         try:
             cursor.execute(statement)
@@ -2828,8 +2920,16 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.close()
 
     def vacuum_table(self, connection: Any, table_name: str, hours: int = 168) -> None:
-        """Vacuum Delta Lake table to remove old files."""
+        """Vacuum Delta Lake table to remove old files.
+
+        Hudi tables skip Delta VACUUM: retention runs through Hudi cleaner
+        table configurations, and Delta RETAIN syntax is not valid for them.
+        """
         if not self.enable_delta_optimization:
+            return
+
+        if self.table_format == "hudi":
+            self.logger.info(f"Skipped Delta VACUUM for Hudi table {table_name.upper()}")
             return
 
         cursor = connection.cursor()
@@ -2870,10 +2970,14 @@ class DatabricksAdapter(PlatformAdapter):
         """Generate Databricks-specific tuning clauses for CREATE TABLE statements.
 
         Databricks supports:
-        - USING DELTA (Delta Lake format)
+        - USING DELTA (Delta Lake format) or USING HUDI (Apache Hudi)
         - PARTITIONED BY (column1, column2, ...)
         - CLUSTER BY (column1, column2, ...) for Delta Lake 2.0+
         - Z-ORDER optimization
+
+        CLUSTER BY / Z-ORDER are Delta-only: Hudi tables get USING HUDI,
+        record-key TBLPROPERTIES, and PARTITIONED BY, with clustering omitted
+        (Hudi manages file layout via its own cleaner/clustering configs).
 
         Args:
             table_tuning: The tuning configuration for the table
@@ -2889,6 +2993,9 @@ class DatabricksAdapter(PlatformAdapter):
         try:
             # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
+
+            if self.table_format == "hudi":
+                return self._generate_hudi_tuning_clause(table_tuning, TuningType)
 
             # Always use Delta Lake format for better performance
             clauses.append("USING DELTA")
@@ -2927,6 +3034,24 @@ class DatabricksAdapter(PlatformAdapter):
         except ImportError:
             # If tuning interface not available, at least use Delta format
             clauses.append("USING DELTA")
+
+        return " ".join(clauses)
+
+    def _generate_hudi_tuning_clause(self, table_tuning, TuningType) -> str:
+        """Generate USING HUDI tuning clauses for CREATE TABLE statements."""
+        clauses = ["USING HUDI"]
+        properties = [f"'type' = '{self.hudi_table_type}'"]
+        if self.hudi_primary_key:
+            properties.append(f"'primaryKey' = '{self.hudi_primary_key}'")
+        if self.hudi_precombine_field:
+            properties.append(f"'preCombineField' = '{self.hudi_precombine_field}'")
+        clauses.append("TBLPROPERTIES (" + ", ".join(properties) + ")")
+
+        partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
+        if partition_columns:
+            sorted_cols = sorted(partition_columns, key=lambda col: col.order)
+            column_names = [col.name for col in sorted_cols]
+            clauses.append(f"PARTITIONED BY ({', '.join(column_names)})")
 
         return " ".join(clauses)
 
@@ -3137,6 +3262,20 @@ class DatabricksAdapter(PlatformAdapter):
             self.logger.info(f"Liquid Clustering selected for {table_name} but no clustering columns were available")
 
     def _apply_zorder_optimization(self, cursor: Any, table_name: str, zorder_columns: list[str]) -> None:
+        if self.table_format == "hudi":
+            self._record_layout_operation(
+                mechanism="z_order",
+                table=table_name,
+                statement=(
+                    f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)}) "
+                    "(Delta-only; skipped for Hudi table)"
+                ),
+                status="skipped",
+                phase="pre_load",
+                columns=zorder_columns,
+            )
+            self.logger.info(f"Skipped Z-ORDER for Hudi table {table_name}")
+            return
         clause = f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)})"
         try:
             cursor.execute(clause)
@@ -3176,6 +3315,16 @@ class DatabricksAdapter(PlatformAdapter):
             )
 
     def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> None:
+        if self.table_format == "hudi":
+            self._record_layout_operation(
+                mechanism="optimize",
+                table=table_name,
+                statement=f"OPTIMIZE {table_name} (Delta-only; skipped for Hudi table)",
+                status="skipped",
+                phase=phase,
+            )
+            self.logger.info(f"Skipped Delta OPTIMIZE for Hudi table {table_name}")
+            return
         optimize_statement = f"OPTIMIZE {table_name}"
         try:
             cursor.execute(optimize_statement)

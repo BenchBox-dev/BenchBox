@@ -160,3 +160,105 @@ class TestDatabricksCopyIntoSql:
 
         executed_sql = [call.args[0] for call in mock_cursor.execute.call_args_list if call.args]
         assert any("COPY INTO" in sql and "LINEITEM" in sql for sql in executed_sql)
+
+
+def _make_hudi_adapter(**kwargs):
+    kwargs.setdefault("hudi_primary_key", "l_orderkey")
+    kwargs.setdefault("hudi_precombine_field", "l_commitdate")
+    kwargs.setdefault("table_format", "hudi")
+    return _make_adapter(**kwargs)
+
+
+class TestDatabricksHudiSupport:
+    def test_default_format_is_delta(self):
+        adapter = _make_adapter()
+        assert adapter.table_format == "delta"
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a BIGINT)")
+        assert "USING DELTA" in result
+
+    def test_hudi_ddl_with_keys(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE main.benchbox.lineitem (l_orderkey BIGINT)")
+        assert "USING HUDI" in result
+        assert "USING DELTA" not in result
+        assert "'type' = 'cow'" in result
+        assert "'primaryKey' = 'l_orderkey'" in result
+        assert "'preCombineField' = 'l_commitdate'" in result
+        assert "delta.autoOptimize" not in result
+
+    def test_hudi_ddl_without_keys(self):
+        adapter = _make_adapter(table_format="hudi")
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a BIGINT)")
+        assert "USING HUDI" in result
+        assert "'type' = 'cow'" in result
+        assert "primaryKey" not in result
+
+    def test_hudi_mor_table_type(self):
+        adapter = _make_hudi_adapter(hudi_table_type="mor")
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a BIGINT)")
+        assert "'type' = 'mor'" in result
+
+    def test_invalid_table_format_rejected(self):
+        with pytest.raises(ValueError, match="Unsupported Databricks table_format"):
+            _make_adapter(table_format="clickhouse")
+
+    def test_invalid_hudi_table_type_rejected(self):
+        with pytest.raises(ValueError, match="Unsupported hudi_table_type"):
+            _make_adapter(table_format="hudi", hudi_table_type="cow_mor")
+
+    def test_hudi_tuning_clause(self):
+        adapter = _make_hudi_adapter()
+        tuning = Mock()
+        part_col = Mock()
+        part_col.name = "l_shipdate"
+        part_col.order = 0
+        tuning.has_any_tuning.return_value = True
+        tuning.get_columns_by_type.side_effect = lambda t: [part_col] if "partitioning" in str(t).lower() else []
+        result = adapter.generate_tuning_clause(tuning)
+        assert "USING HUDI" in result
+        assert "PARTITIONED BY (l_shipdate)" in result
+        assert "CLUSTER BY" not in result
+
+    def test_optimize_table_skipped_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        connection = MagicMock()
+        adapter.optimize_table(connection, "lineitem")
+        connection.cursor.assert_not_called()
+        assert adapter._skipped_layout_operations
+        skipped = adapter._skipped_layout_operations[-1]
+        assert skipped["mechanism"] == "optimize"
+        assert skipped["status"] == "skipped"
+
+    def test_apply_delta_optimize_skipped_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        cursor = MagicMock()
+        adapter._apply_delta_optimize(cursor, "LINEITEM", phase="post_load")
+        cursor.execute.assert_not_called()
+        assert adapter._skipped_layout_operations[-1]["mechanism"] == "optimize"
+
+    def test_apply_zorder_skipped_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        cursor = MagicMock()
+        adapter._apply_zorder_optimization(cursor, "LINEITEM", ["l_orderkey"])
+        cursor.execute.assert_not_called()
+        assert adapter._skipped_layout_operations[-1]["mechanism"] == "z_order"
+
+    def test_vacuum_table_skipped_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        connection = MagicMock()
+        adapter.vacuum_table(connection, "lineitem")
+        connection.cursor.assert_not_called()
+
+    def test_ctas_sort_returns_none_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        assert adapter._build_ctas_sort_sql("LINEITEM", [Mock()]) is None
+
+    def test_metadata_reports_hudi_format(self):
+        adapter = _make_hudi_adapter()
+        connection = MagicMock()
+        info = adapter.get_platform_info(connection)
+        configuration = info["configuration"]
+        assert configuration["table_format"] == "hudi"
+        assert configuration["hudi_primary_key"] == "l_orderkey"
+        assert configuration["hudi_precombine_field"] == "l_commitdate"
+        assert configuration["hudi_table_type"] == "cow"
