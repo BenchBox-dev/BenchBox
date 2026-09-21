@@ -2738,10 +2738,15 @@
       "title": "Reduce complexity in query plan and TPC-DS functions (complexity batch 10)"
     },
     "complexity-stress-testing-wide-tables-large-catalogs-in-data": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T11:51:14Z",
+        "generation": "068976776eb141ae8a5f077b73b95832",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Complexity stress testing (wide tables, large catalogs) in DataFrame mode"
     },
     "complexity-validation-misc-w14": {
