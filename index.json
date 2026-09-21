@@ -2215,10 +2215,15 @@
       "title": "CLI Verbose Logging Mode ✅ COMPLETED"
     },
     "clickbench-dataframe-queries-446-stmts-30-5": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T13:00:28Z",
+        "generation": "863f43c80ff54099bd8df5b5fa71c6d2",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "ClickBench dataframe queries (446 stmts, 30.5%)"
     },
     "clickbench-empty-string-vs-null-constraint-issue-completed": {
