@@ -1,0 +1,12 @@
+{
+  "acceptance": [
+    "docs/usage/dry-run.md output tree matches timestamp-prefixed filenames written by DryRunSaver",
+    "All fenced code blocks open and close correctly"
+  ],
+  "context": "Adversarial review new findings accepted and verified: docs promise fixed summary.json/summary.yaml/queries/schema.sql vs benchbox/core/dryrun.py timestamped prefix_timestamp files; unmatched fences around dry-run.md:25-51.",
+  "description": "Amend docs/usage/dry-run.md Output Structure tree to actual timestamp-prefixed JSON/YAML/query outputs from benchbox/core/dryrun.py save methods, and repair the unclosed/stray markdown code fences in the Quick Start section.",
+  "links": [
+    "docs/usage/dry-run.md",
+    "benchbox/core/dryrun.py"
+  ]
+}

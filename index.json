@@ -4597,6 +4597,13 @@
       "status": "done",
       "title": "Document 10 undocumented CLI commands and 13 undocumented run flags"
     },
+    "docs-dry-run-output-and-fence": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix dry-run output tree and code fences"
+    },
     "docs-fix-critical-accuracy-errors": {
       "claim": null,
       "needs": [],
