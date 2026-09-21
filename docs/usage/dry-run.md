@@ -31,6 +31,7 @@ benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --sca
 
 # Preview multiple output formats
 benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark primitives --scale 0.001
+```
 
 ### Seed Control in Dry Run
 
@@ -48,7 +49,6 @@ benchbox run --dry-run ./preview_tpch_seed5 --platform duckdb --benchmark tpch -
 ```
 
 If a specific seed cannot generate all queries at a tiny scale, the CLI preflight validation will fail fast and report example failures. Try a different seed or a slightly larger scale.
-```
 
 ### Programmatic Usage
 
@@ -306,7 +306,7 @@ benchbox run --dry-run ./tuned_preview \
   --platform duckdb \
   --benchmark tpcds \
   --scale 0.1 \
-  --tuning
+  --tuning tuned
 ```
 
 Additional output includes:
