@@ -8001,15 +8001,10 @@
       "title": "Connection usernames are exported in clear in internal result metadata"
     },
     "investigate-aws-athena-non-spark-iceberg-support": {
-      "claim": {
-        "expires_at": "2026-09-22T20:41:14Z",
-        "generation": "c83b9c818cb848e18a75513a44c6138c",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Investigate AWS Athena (non-Spark) Iceberg support"
     },
     "investigate-bigquery-biglake-iceberg-support": {
