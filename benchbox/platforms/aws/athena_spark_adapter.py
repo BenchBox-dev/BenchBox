@@ -47,6 +47,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkConfigMixin,
     CloudSparkStaging,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -113,7 +114,7 @@ class AthenaSparkCalculationState:
     SUCCESS_STATES = {COMPLETED}
 
 
-class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """Amazon Athena for Apache Spark platform adapter.
 
     Athena Spark provides interactive Spark execution with sub-second startup.
@@ -606,6 +607,16 @@ result.show(100, truncate=False)
             logger.info(f"Created table {self.database}.{table}")
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table over staged files via Spark SQL."""
+        create_table_sql = f"""
+            CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name}
+            USING {file_format.upper()}
+            LOCATION '{location}'
+        """
+        self._submit_calculation(create_table_sql, code_type="SQL", wait_for_completion=True)
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(
         self,

@@ -50,6 +50,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkStaging,
     SparkConfigOptimizer,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -86,7 +87,7 @@ class GlueJobStatus:
     WAITING = "WAITING"
 
 
-class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
+class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """AWS Glue managed Spark platform adapter.
 
     Glue is AWS's serverless ETL service that runs Apache Spark jobs.
@@ -401,6 +402,11 @@ class AWSGlueAdapter(SparkTuningMixin, PlatformAdapter):
                 logger.debug(f"Table '{table_name}' already exists, skipping")
             else:
                 raise
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table in the Glue Data Catalog."""
+        self._create_catalog_table(table_name, file_format, location)
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(
         self,

@@ -49,6 +49,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkConfigMixin,
     CloudSparkStaging,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -84,7 +85,7 @@ class EMRServerlessJobState:
     CANCELLED = "CANCELLED"
 
 
-class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """Amazon EMR Serverless managed Spark platform adapter.
 
     EMR Serverless provides serverless Spark execution with automatic scaling
@@ -474,6 +475,21 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                     raise
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table over staged files via a Spark SQL job run.
+
+        Uses DDL for every format (rather than the Glue catalog API used by
+        native parquet loads) so registration shares the single job-run path
+        that external-mode row counts require anyway.
+        """
+        create_sql = (
+            f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name} "
+            f"USING {file_format.upper()} LOCATION '{location}'"
+        )
+        job_run_id = self._submit_job_run(create_sql)
+        self._wait_for_job_run(job_run_id)
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def _submit_job_run(self, query: str) -> str:
         """Submit a Spark SQL job run.
