@@ -45,6 +45,7 @@ from benchbox.core.metadata_primitives.ddl import (
     generate_drop_role_sql,
     generate_grant_sql,
     generate_revoke_sql,
+    generate_wide_table_columns,
     supports_acl,
 )
 from benchbox.core.metadata_primitives.generator import MetadataGenerator
@@ -1412,15 +1413,62 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         ordinal: int,
     ) -> Any:
         """Return a single representative scalar value for a schema column."""
-        if column_type.startswith("INTEGER"):
+        normalized = column_type.upper()
+        if normalized.startswith("INTEGER") or normalized.startswith("BIGINT") or normalized.startswith("SMALLINT"):
             return ordinal
-        if column_type.startswith("DECIMAL"):
+        if normalized.startswith("DECIMAL") or normalized.startswith("NUMERIC"):
             return float(ordinal) + 0.25
-        if column_type.startswith("DATE"):
+        if normalized.startswith("DOUBLE") or normalized.startswith("FLOAT") or normalized.startswith("REAL"):
+            return float(ordinal) + 0.5
+        if normalized.startswith("BOOLEAN") or normalized.startswith("BOOL"):
+            return ordinal % 2 == 0
+        if normalized.startswith("TIMESTAMP") or normalized.startswith("DATETIME"):
+            from datetime import datetime
+
+            return datetime(1998, 1, min(ordinal, 28), min(ordinal, 23), 0, 0)
+        if normalized.startswith("DATE"):
             return date(1998, 1, min(ordinal, 28))
-        if "CHAR" in column_type or "VARCHAR" in column_type or "STRING" in column_type:
+        if "CHAR" in normalized or "VARCHAR" in normalized or "STRING" in normalized or "TEXT" in normalized:
             return f"{table_name}_{column_name}_{ordinal}"
         return f"{table_name}_{column_name}_{ordinal}"
+
+    def build_complexity_dataframes(
+        self,
+        adapter: Any,
+        config: MetadataComplexityConfig | str = "wide_tables",
+    ) -> dict[str, Any]:
+        """Build stress-scale DataFrame fixtures from the shared DDL path.
+
+        Uses generate_wide_table_columns so the DataFrame surface validates
+        the same column distribution as SQL DDL generation. Returns a wide
+        table plus catalog_size narrow tables for large-catalog stress.
+        """
+        if isinstance(config, str):
+            config = get_complexity_preset(config)
+        wide_columns = generate_wide_table_columns(
+            width=config.width_factor,
+            dialect="duckdb",
+            type_complexity=config.type_complexity,
+        )
+        wide_row: dict[str, Any] = {}
+        for ordinal, column in enumerate(wide_columns, start=1):
+            wide_row[column.name] = self._sample_dataframe_value(
+                table_name="stress_wide",
+                column_name=column.name,
+                column_type=column.data_type,
+                ordinal=ordinal,
+            )
+        tables: dict[str, Any] = {
+            "stress_wide": self._create_fixture_dataframe(adapter, wide_row),
+        }
+        for index in range(1, max(config.catalog_size, 1) + 1):
+            table_name = f"stress_catalog_{index:04d}"
+            row = self._build_dataframe_fixture_row(
+                table_name,
+                [{"name": "id", "type": "INTEGER"}, {"name": "name", "type": "VARCHAR(255)"}],
+            )
+            tables[table_name] = self._create_fixture_dataframe(adapter, row)
+        return tables
 
     @staticmethod
     def _create_fixture_dataframe(adapter: Any, row: dict[str, Any]) -> Any:

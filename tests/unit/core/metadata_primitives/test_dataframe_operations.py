@@ -1331,3 +1331,54 @@ class TestBenchmarkDataFrameIntegration:
 
         assert len(rows) == 1
         assert rows[0]["query_id"] == "schema_list_tables"
+
+
+@pytest.mark.unit
+class TestComplexityStressFixtures:
+    """Shared-DDL stress fixtures for DataFrame mode."""
+
+    def test_build_complexity_dataframes_uses_shared_ddl(self):
+        """Wide fixture columns must match generate_wide_table_columns."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.core.metadata_primitives.complexity import MetadataComplexityConfig, TypeComplexity
+        from benchbox.core.metadata_primitives.ddl import generate_wide_table_columns
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        config = MetadataComplexityConfig(
+            width_factor=120,
+            view_depth=1,
+            type_complexity=TypeComplexity.SCALAR,
+            catalog_size=5,
+        )
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        tables = benchmark.build_complexity_dataframes(adapter, config)
+
+        expected = generate_wide_table_columns(
+            width=120,
+            dialect="duckdb",
+            type_complexity=TypeComplexity.SCALAR,
+        )
+        wide = tables["stress_wide"]
+        assert wide.width == len(expected)
+        assert set(wide.columns) == {column.name for column in expected}
+        assert len(tables) == 1 + config.catalog_size
+
+    def test_wide_table_schema_op_on_shared_ddl_fixture(self):
+        """Wide-table introspection must flag the shared-DDL fixture as wide."""
+        pytest.importorskip("polars")
+
+        from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
+        from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+        benchmark = MetadataPrimitivesBenchmark()
+        adapter = PolarsDataFrameAdapter()
+        tables = benchmark.build_complexity_dataframes(adapter, "wide_tables")
+        manager = benchmark.get_dataframe_operations(adapter.platform_name)
+
+        result = manager.execute_wide_table_schema(tables["stress_wide"])
+        assert result.success is True
+        assert result.metrics["is_wide_table"] is True
+        assert result.metrics["column_count"] >= 100
