@@ -2264,10 +2264,15 @@
       "title": "Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)"
     },
     "clickhouse-delta-support-via-conversion-or-external-tooling": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-22T18:30:19Z",
+        "generation": "1ec3f042b8664365908f1e4e405913a1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "ClickHouse Delta support via conversion or external tooling"
     },
     "clickhouse-error-message-capture": {
