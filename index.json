@@ -16855,15 +16855,10 @@
       "title": "\"TPC-DS Dry Run: Execute Real Test SQL Capture (Power/Throughput/Maintenance) ✅\""
     },
     "tpc-ds-obt-dataframe-implementation-17-queries": {
-      "claim": {
-        "expires_at": "2026-09-22T13:45:46Z",
-        "generation": "c5d276711d8a418896acb531845f6879",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ba05dca5193664f72a5b9978"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "TPC-DS-OBT DataFrame implementation (17 queries)"
     },
     "tpc-ds-query-result-validation-fixes": {
