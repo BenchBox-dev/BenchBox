@@ -532,7 +532,12 @@ class UnifiedListExpr:
             if isinstance(native_index, int):
                 native_index = df_lit(native_index + 1)
             else:
-                native_index = native_index + 1
+                import pyarrow as pa
+
+                # Cast per-row indices to Int64 first: a UInt64 index (e.g.
+                # from array_length) plus a Python int coerces to Decimal128,
+                # which array_element rejects during planning.
+                native_index = native_index.cast(pa.int64()) + 1
             return UnifiedExpr(df_f.array_element(self._expr, native_index))
         return UnifiedExpr(self._expr.list.get(native_index))
 
