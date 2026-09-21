@@ -2877,15 +2877,10 @@
       "title": "Connection Parameter Conflicts in TPC Test Methods"
     },
     "consider-whether-other-core-drivers-polars-clickhouse-connec": {
-      "claim": {
-        "expires_at": "2026-09-22T11:52:14Z",
-        "generation": "4634ae229cb54475b3dd1abe243d7f4b",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Consider whether other core drivers (polars, clickhouse-connect, psycopg2-binary) should similarly be made optional"
     },
     "consolidate-benchmark-name-detection": {
