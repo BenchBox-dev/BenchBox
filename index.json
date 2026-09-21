@@ -4598,15 +4598,10 @@
       "title": "Document 10 undocumented CLI commands and 13 undocumented run flags"
     },
     "docs-dry-run-output-and-fence": {
-      "claim": {
-        "expires_at": "2026-09-22T16:13:30Z",
-        "generation": "fb7012aa305a47c4a9d951f1304ac2b1",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d79997238c1073f74d5d5813"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Fix dry-run output tree and code fences"
     },
     "docs-fix-critical-accuracy-errors": {
