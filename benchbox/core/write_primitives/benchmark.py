@@ -1752,6 +1752,28 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                     "rows_returned": 0,
                     "error": f"AGGREGATE_PERSIST failed: {persist.error_message or 'unknown error'}",
                 }
+            # The persist executed, but a failed storage-size post-condition
+            # means it did not do what it claims. Report it as
+            # VALIDATION_FAILED (mirroring the SQL validation path) rather
+            # than merging, deleting the evidence, and returning SUCCESS, so
+            # storage drift cannot render green. The evidence directory is
+            # left in place for diagnosis; the next iteration clears it.
+            if not persist.validation_passed:
+                details = (
+                    "; ".join(
+                        str(entry.get("reason") or entry.get("check", "storage_size"))
+                        for entry in persist.validation_results
+                        if isinstance(entry, dict) and not entry.get("passed", True)
+                    )
+                    or "storage validation failed"
+                )
+                return {
+                    "query_id": op_id,
+                    "status": "VALIDATION_FAILED",
+                    "execution_time_seconds": elapsed_seconds(t0),
+                    "rows_returned": int(persist.rows_affected),
+                    "error": f"AGGREGATE_PERSIST storage validation failed: {details}",
+                }
             merge = manager.execute_aggregate_merge(target_path, merge_extract)
             elapsed = elapsed_seconds(t0)
             if not merge.success:

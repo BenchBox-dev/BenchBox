@@ -953,6 +953,12 @@ class DataFrameWriteOperationsManager:
             target_path.mkdir(parents=True, exist_ok=True)
             rows, bytes_written, file_count = self._persist_dataframe_to_parquet(state_df, target_path, compression)
             end_time = time.time()
+            storage_check = self.validate_persisted_storage_size(
+                target_path,
+                rows_affected=rows,
+                bytes_written=bytes_written,
+                file_count=file_count,
+            )
             return DataFrameWriteResult(
                 operation_type=WriteOperationType.AGGREGATE_PERSIST,
                 success=True,
@@ -963,6 +969,8 @@ class DataFrameWriteOperationsManager:
                 bytes_written=bytes_written,
                 compression=compression,
                 file_count=file_count,
+                validation_passed=bool(storage_check["passed"]),
+                validation_results=[storage_check],
             )
         except Exception as e:
             self.logger.error(f"AGGREGATE_PERSIST failed: {e}")
@@ -1063,6 +1071,50 @@ class DataFrameWriteOperationsManager:
         file_count = len(parquet_files)
         bytes_written = sum(f.stat().st_size for f in parquet_files)
         return row_count, bytes_written, file_count
+
+    @staticmethod
+    def validate_persisted_storage_size(
+        target_path: Path | str,
+        *,
+        rows_affected: int,
+        bytes_written: int | None,
+        file_count: int | None,
+    ) -> dict[str, Any]:
+        """Cross-check reported sketch-persist storage sizes against disk.
+
+        Mirrors the SQL surface's ``sketch_bytes`` bound validations: the
+        persisted Parquet payload is re-measured from ``target_path`` and
+        compared with the sizes reported by the persist writer. Returns a
+        validation entry with ``check="storage_size"`` for
+        ``DataFrameWriteResult.validation_results``.
+        """
+        target = Path(target_path)
+        parquet_files = list(target.rglob("*.parquet")) if target.exists() else []
+        on_disk_bytes = sum(f.stat().st_size for f in parquet_files)
+        on_disk_files = len(parquet_files)
+        reasons: list[str] = []
+        if bytes_written is None or bytes_written < 0:
+            reasons.append(f"reported bytes_written is {bytes_written}")
+        elif bytes_written != on_disk_bytes:
+            reasons.append(f"reported bytes_written={bytes_written} != on-disk bytes={on_disk_bytes}")
+        if file_count is None or file_count < 0:
+            reasons.append(f"reported file_count is {file_count}")
+        elif file_count != on_disk_files:
+            reasons.append(f"reported file_count={file_count} != on-disk files={on_disk_files}")
+        if rows_affected > 0:
+            if (bytes_written or 0) <= 0:
+                reasons.append(f"non-empty persist ({rows_affected} rows) reported no bytes")
+            if (file_count or 0) < 1:
+                reasons.append(f"non-empty persist ({rows_affected} rows) reported no files")
+        return {
+            "check": "storage_size",
+            "passed": not reasons,
+            "expected_bytes": on_disk_bytes,
+            "actual_bytes": bytes_written,
+            "expected_files": on_disk_files,
+            "actual_files": file_count,
+            "reason": "; ".join(reasons) if reasons else None,
+        }
 
 
 def get_dataframe_write_manager(
