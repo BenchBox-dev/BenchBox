@@ -35,9 +35,11 @@ try:
     from pyiceberg.catalog import Catalog, load_catalog
     from pyiceberg.expressions import (
         AlwaysTrue,
+        And,
         EqualTo,
         GreaterThan,
         GreaterThanOrEqual,
+        IsNull,
         LessThan,
         LessThanOrEqual,
         NotEqualTo,
@@ -357,6 +359,29 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         self.logger.warning(f"Could not parse condition '{condition}', using AlwaysTrue")
         return AlwaysTrue()
 
+    def _dict_to_expression(self, condition: dict[str, Any]) -> Any:
+        """Translate a column-to-value mapping into a native Iceberg predicate.
+
+        Callers that cannot consume SQL predicate text (see
+        ``accepts_sql_predicates``) pass native operands instead: None becomes
+        IsNull, booleans/numbers/strings become EqualTo, combined with And.
+        """
+        if not condition:
+            raise ValueError("Iceberg condition dictionary cannot be empty")
+        terms: list[Any] = []
+        for raw_column, value in condition.items():
+            column = str(raw_column)
+            if value is None:
+                terms.append(IsNull(column))
+            elif isinstance(value, bool | int | float | str):
+                terms.append(EqualTo(column, value))
+            else:
+                raise TypeError(f"Unsupported Iceberg condition value for {column!r}: {value!r}")
+        predicate: Any = terms[0]
+        for term in terms[1:]:
+            predicate = And(predicate, term)
+        return predicate
+
     def _do_delete(
         self,
         table_path: Path | str,
@@ -384,8 +409,10 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         rows_before = sum(1 for _ in scan.to_arrow().to_batches())
         rows_before = iceberg_table.scan().to_arrow().num_rows
 
-        # Parse condition if string
-        if isinstance(condition, str):
+        # Parse condition if string; translate native dict operands directly.
+        if isinstance(condition, dict):
+            delete_filter = self._dict_to_expression(condition)
+        elif isinstance(condition, str):
             delete_filter = self._parse_condition(condition)
         else:
             delete_filter = condition
@@ -429,8 +456,10 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         except Exception as e:
             raise RuntimeError(f"Could not load Iceberg table {table_identifier}: {e}") from e
 
-        # Parse condition
-        if isinstance(condition, str):
+        # Parse condition if string; translate native dict operands directly.
+        if isinstance(condition, dict):
+            update_filter = self._dict_to_expression(condition)
+        elif isinstance(condition, str):
             update_filter = self._parse_condition(condition)
         else:
             update_filter = condition

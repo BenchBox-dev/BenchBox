@@ -193,3 +193,19 @@ class TestBackendContracts:
             backend.execute_scd2_expire("DimCustomer", {"IsCurrent; DROP TABLE x": True}, {"IsCurrent": False})
         with pytest.raises(TypeError, match="must be a SQL expression string or dict"):
             backend.execute_scd2_expire("DimCustomer", [("IsCurrent", True)], {"IsCurrent": False})
+
+    def test_dict_condition_passes_through_natively_for_non_sql_adapters(self, tmp_path: Path) -> None:
+        ops, seen = _recording_ops()
+        ops.get_capabilities = lambda: SimpleNamespace(accepts_sql_predicates=False)
+        backend = DataFrameETLBackend(maintenance_ops=ops, platform_name="iceberg", table_root=tmp_path)
+
+        result = backend.execute_scd2_expire(
+            "DimCustomer",
+            {"IsCurrent": True, "CustomerID": 101},
+            {"IsCurrent": False},
+        )
+
+        assert result == {"success": True, "rows_affected": 1}
+        _, condition, updates = seen["update"]
+        assert condition == {"IsCurrent": True, "CustomerID": 101}
+        assert updates == {"IsCurrent": False}

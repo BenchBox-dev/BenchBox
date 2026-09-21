@@ -101,6 +101,10 @@ class DataFrameMaintenanceCapabilities:
         supports_time_travel: Can query historical versions
         max_batch_size: Recommended maximum rows per operation
         notes: Additional platform-specific notes
+        accepts_sql_predicates: Can consume backend-rendered SQL predicate
+            strings and SQL-rendered update values. False when the adapter
+            only parses a narrow predicate subset and needs native
+            predicate/value operands instead.
     """
 
     platform_name: str
@@ -115,6 +119,7 @@ class DataFrameMaintenanceCapabilities:
     supports_time_travel: bool = False
     max_batch_size: int = 100000
     notes: str = ""
+    accepts_sql_predicates: bool = True
 
     def supports_operation(self, operation: MaintenanceOperationType) -> bool:
         """Check if a specific operation type is supported.
@@ -188,6 +193,9 @@ ICEBERG_CAPABILITIES = DataFrameMaintenanceCapabilities(
     supports_time_travel=True,
     max_batch_size=1000000,
     notes="Full ACID compliance via Apache Iceberg",
+    # The Iceberg condition parser handles single unquoted comparisons only;
+    # callers must pass native predicate/value operands instead of SQL text.
+    accepts_sql_predicates=False,
 )
 
 HUDI_CAPABILITIES = DataFrameMaintenanceCapabilities(

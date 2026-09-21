@@ -237,3 +237,76 @@ class TestIcebergDataFrameConversion:
 
         assert result.success is True
         assert result.rows_affected == 3
+
+
+@pytest.mark.skipif(IS_WINDOWS, reason="PyIceberg path handling incompatible with Windows")
+class TestIcebergDictCondition:
+    """Native dict conditions must translate to Iceberg predicates exactly."""
+
+    def test_dict_to_expression_builds_conjunction(self):
+        from pyiceberg.expressions import And, EqualTo
+
+        from benchbox.platforms.dataframe.iceberg_maintenance import (
+            IcebergMaintenanceOperations,
+        )
+
+        ops = IcebergMaintenanceOperations()
+        predicate = ops._dict_to_expression({"IsCurrent": True, "CustomerID": 101})
+
+        assert isinstance(predicate, And)
+        assert isinstance(predicate.left, EqualTo)
+        assert isinstance(predicate.right, EqualTo)
+        assert predicate.left.term.name == "IsCurrent"
+        assert predicate.right.term.name == "CustomerID"
+
+    def test_dict_to_expression_maps_none_to_is_null(self):
+        from pyiceberg.expressions import IsNull
+
+        from benchbox.platforms.dataframe.iceberg_maintenance import (
+            IcebergMaintenanceOperations,
+        )
+
+        ops = IcebergMaintenanceOperations()
+        assert isinstance(ops._dict_to_expression({"EndDate": None}), IsNull)
+
+    def test_dict_to_expression_rejects_empty_and_unsupported(self):
+        from benchbox.platforms.dataframe.iceberg_maintenance import (
+            IcebergMaintenanceOperations,
+        )
+
+        ops = IcebergMaintenanceOperations()
+        with pytest.raises(ValueError, match="cannot be empty"):
+            ops._dict_to_expression({})
+        with pytest.raises(TypeError, match="Unsupported Iceberg condition value"):
+            ops._dict_to_expression({"tags": ["a"]})
+
+    def test_update_with_dict_condition_expires_one_row(self, tmp_path):
+        import pandas as pd
+
+        from benchbox.platforms.dataframe.iceberg_maintenance import (
+            IcebergMaintenanceOperations,
+        )
+
+        ops = IcebergMaintenanceOperations(working_dir=tmp_path)
+        frame = pd.DataFrame(
+            {
+                "SK_CustomerID": [1, 2],
+                "CustomerID": [101, 102],
+                "IsCurrent": [True, True],
+            }
+        )
+        insert = ops.insert_rows(table_path="DimCustomer", dataframe=frame, mode="append")
+        assert insert.success is True
+
+        update = ops.update_rows(
+            table_path="DimCustomer",
+            condition={"IsCurrent": True, "CustomerID": 101},
+            updates={"IsCurrent": False},
+        )
+        assert update.success is True
+        assert update.rows_affected == 1
+
+        table = ops.catalog.load_table("default.DimCustomer")
+        out = table.scan().to_arrow().to_pandas().sort_values("SK_CustomerID").reset_index(drop=True)
+        assert out["IsCurrent"].tolist() == [False, True]
+        assert str(out["IsCurrent"].dtype) == "bool"

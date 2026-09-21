@@ -114,14 +114,33 @@ class DataFrameETLBackend:
             "notes": f"Validation executed in DataFrame mode for platform '{self.platform_name}'",
         }
 
+    def _adapter_accepts_sql_predicates(self) -> bool:
+        """Whether the maintenance adapter consumes SQL predicate text.
+
+        Adapters declaring ``accepts_sql_predicates=False`` (e.g. Iceberg,
+        whose parser handles single unquoted comparisons only) receive native
+        dict conditions and native update values instead. Unknown adapters
+        default to the SQL path, preserving current behavior.
+        """
+        get_capabilities = getattr(self.maintenance_ops, "get_capabilities", None)
+        if get_capabilities is None:
+            return True
+        try:
+            return bool(get_capabilities().accepts_sql_predicates)
+        except Exception:
+            return True
+
     def execute_scd2_expire(self, table_name: str, condition: str | Any, updates: dict[str, Any]) -> dict[str, Any]:
         """Expire current rows using UPDATE maintenance operation."""
         if not updates:
             return {"success": True, "rows_affected": 0}
-        sql_updates = {str(column): _render_literal(value) for column, value in updates.items()}
-        result = self.maintenance_ops.update_rows(
-            self._resolve_table_path(table_name), _condition_to_sql(condition), sql_updates
-        )
+        if isinstance(condition, dict) and not self._adapter_accepts_sql_predicates():
+            predicate: str | Any = condition
+            rendered_updates = {str(column): value for column, value in updates.items()}
+        else:
+            predicate = _condition_to_sql(condition)
+            rendered_updates = {str(column): _render_literal(value) for column, value in updates.items()}
+        result = self.maintenance_ops.update_rows(self._resolve_table_path(table_name), predicate, rendered_updates)
         if not result.success:
             raise RuntimeError(result.error_message or f"Failed to expire rows for table {table_name}")
         return {"success": True, "rows_affected": int(result.rows_affected)}
