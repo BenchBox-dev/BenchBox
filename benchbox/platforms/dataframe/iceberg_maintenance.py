@@ -567,13 +567,15 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             rows_inserted = len(new_rows)
 
             if rows_inserted > 0:
-                target_df = pa.concat_tables([target_df, new_rows])
+                target_df = pa.concat_tables(
+                    [pa.Table.from_pandas(target_df), pa.Table.from_pandas(new_rows)]
+                ).to_pandas()
 
         # Overwrite table with merged data
         result_arrow = pa.Table.from_pandas(target_df)
         iceberg_table.overwrite(result_arrow)
 
-        total_affected = rows_updated + rows_inserted
+        total_affected = int(rows_updated) + int(rows_inserted)
         self.logger.info(
             f"Merged into Iceberg table {table_identifier}: {rows_updated} updated, {rows_inserted} inserted"
         )

@@ -192,12 +192,7 @@ class TestIcebergMaintenanceCoverage:
         assert result == "id"
 
     def test_do_merge_when_not_matched(self, tmp_path):
-        """Cover the when_not_matched insert path in _do_merge.
-
-        Note: pyiceberg's _do_merge uses pa.concat_tables with a pandas DataFrame
-        (a known issue in the implementation), so we expect a TypeError here.
-        The test verifies the code path is exercised.
-        """
+        """Cover the when_not_matched insert path in _do_merge."""
         import pyarrow as pa
 
         ops = im.IcebergMaintenanceOperations(working_dir=tmp_path)
@@ -209,16 +204,17 @@ class TestIcebergMaintenanceCoverage:
         # Source with a new row (id=3 not in target)
         source = pa.table({"id": pa.array([3], type=pa.int64()), "val": pa.array([30], type=pa.int64())})
 
-        # The production code has a known issue where it passes a pandas DataFrame
-        # to pa.concat_tables when there are unmatched rows; exercise the path.
-        with pytest.raises((TypeError, Exception)):
-            ops._do_merge(
-                "default.merge_tbl",
-                source,
-                "target.id = source.id",
-                when_matched=None,
-                when_not_matched={"insert": "*"},
-            )
+        affected = ops._do_merge(
+            "default.merge_tbl",
+            source,
+            "target.id = source.id",
+            when_matched=None,
+            when_not_matched={"insert": "*"},
+        )
+
+        assert affected == 1
+        merged = ops.catalog.load_table("default.merge_tbl").scan().to_arrow()
+        assert sorted(merged.column("id").to_pylist()) == [1, 2, 3]
 
     def test_do_merge_when_matched_with_source_ref(self, tmp_path):
         """Cover the when_matched source column reference path in _do_merge."""
