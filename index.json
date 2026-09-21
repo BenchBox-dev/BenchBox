@@ -8008,15 +8008,10 @@
       "title": "Investigate AWS Athena (non-Spark) Iceberg support"
     },
     "investigate-bigquery-biglake-iceberg-support": {
-      "claim": {
-        "expires_at": "2026-09-22T20:42:34Z",
-        "generation": "8a655e5a14944cefa7f859ec22aea093",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4b359b32ceb0da6b31d29cbc"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Investigate BigQuery BigLake Iceberg support"
     },
     "investigate-pg-duckdb-table-format-registration": {
