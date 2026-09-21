@@ -674,6 +674,10 @@ DDLGeneratorType = DDLGenerator | BaseDDLGenerator
 # Platforms known to have no physical tuning surface (no partitioning, clustering,
 # distribution, or sort-key clauses to emit) - the NoOp fallback for these is
 # expected and permanent, so get_ddl_generator() does not warn for them.
+# Bare `lakesail` and `velox` are deliberately NOT listed: their SQL adapters
+# call _create_schema_with_tuning() and their generate_tuning_clause() methods
+# emit PARTITIONED BY, so a tuned dry run must keep the warning that exposes
+# the preview-versus-execution gap until they get real registry generators.
 _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
     {
         "sqlite",
@@ -682,8 +686,64 @@ _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
         "cudf",
         "dask",
         "polars",
+        "datafusion",
+        "pyspark",
     }
 )
+
+# Base engine keys that own a declared "<engine>-df" spelling in the platform
+# manifest (the CLI aliases plus the "databricks-df" entry key - see
+# benchbox/core/platform_manifest.py). Only these bases strip the "-df"
+# suffix below; undeclared combinations such as "snowflake-df" never resolve
+# to an unrelated real generator and instead take the warning/NoOp path.
+# Update trigger: a new manifest "<engine>-df" alias or entry key.
+_DATAFRAME_SUFFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+        "lakesail",
+        "databricks",
+    }
+)
+
+# Base engine keys that own a declared "dataframe-<engine>" packaging extra
+# (see pyproject.toml [project.optional-dependencies]). Only these bases
+# strip the "dataframe-" prefix below, so "dataframe-snowflake" takes the
+# warning/NoOp path instead of resolving to SnowflakeDDLGenerator.
+# Update trigger: a new dataframe-* extra in pyproject.toml.
+_DATAFRAME_PREFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+    }
+)
+
+_DATAFRAME_KEY_PREFIX = "dataframe-"
+_DATAFRAME_KEY_SUFFIX = "-df"
+
+
+def _normalize_dataframe_platform_key(platform_lower: str) -> str:
+    """Normalize a declared DataFrame-mode platform key to its base engine key.
+
+    Only declared spellings normalize: "<engine>-df" when the base owns a
+    manifest-declared DataFrame spelling, and "dataframe-<engine>" when the
+    base owns a dataframe-* packaging extra. Anything else returns unchanged.
+    """
+    if platform_lower.startswith(_DATAFRAME_KEY_PREFIX):
+        base = platform_lower[len(_DATAFRAME_KEY_PREFIX) :]
+        return base if base in _DATAFRAME_PREFIX_BASES else platform_lower
+    if platform_lower.endswith(_DATAFRAME_KEY_SUFFIX):
+        base = platform_lower[: -len(_DATAFRAME_KEY_SUFFIX)]
+        return base if base in _DATAFRAME_SUFFIX_BASES else platform_lower
+    return platform_lower
 
 
 def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
@@ -770,13 +830,26 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     if platform_lower in generators:
         return generators[platform_lower]()
 
+    # Declared DataFrame-mode keys ("<engine>-df" for manifest-declared engines,
+    # "dataframe-<engine>" for packaging-extra engines) resolve behind the same
+    # registry-owned path: normalize to the base engine key and retry the
+    # generators mapping so a real generator always wins when one exists
+    # (e.g. "databricks-df" renders Delta DDL). Undeclared combinations skip
+    # normalization entirely and fall through to the warning/NoOp path below.
+    normalized = _normalize_dataframe_platform_key(platform_lower)
+    if normalized != platform_lower and normalized in generators:
+        return generators[normalized]()
+
     # Platforms with no physical tuning surface at all (in-memory/embedded engines
     # with no indexes, partitioning, or clustering clauses to emit). NoOp is the
     # correct, permanent answer for these, so the fallback stays silent. Anything
     # else falling through here is either a platform that should get a real
     # generator eventually or a typo'd platform string - both are worth a
     # warning since dry-run/tuning preview would otherwise go silently empty.
-    if platform_lower not in _TUNING_FREE_PLATFORMS:
+    # The tuning-free check runs on the normalized key so DataFrame-mode
+    # spellings ("polars-df", "dataframe-polars", ...) stay silent exactly when
+    # their base engine is tuning-free.
+    if normalized not in _TUNING_FREE_PLATFORMS:
         logger.warning(
             "No DDL generator registered for platform %r; tuning clauses will be "
             "empty (NoOp fallback). If %r supports physical tuning, register it "
