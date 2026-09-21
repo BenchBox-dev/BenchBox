@@ -372,9 +372,9 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         for raw_column, value in condition.items():
             column = str(raw_column)
             if value is None:
-                terms.append(IsNull(column))
+                terms.append(IsNull(term=column))
             elif isinstance(value, bool | int | float | str):
-                terms.append(EqualTo(column, value))
+                terms.append(EqualTo(term=column, literal=value))
             else:
                 raise TypeError(f"Unsupported Iceberg condition value for {column!r}: {value!r}")
         predicate: Any = terms[0]
