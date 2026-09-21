@@ -1868,18 +1868,13 @@
       "title": "Add the medium test tier to make pr-preflight for code-routed diffs"
     },
     "ci-dedupe-06-heavy-tier-queue-only": {
-      "claim": {
-        "expires_at": "2026-09-22T12:46:47Z",
-        "generation": "985556db7775488c817394d2610020a2",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:8c9d238ab57c9b08dd47248d"
-      },
+      "claim": null,
       "needs": [
         "ci-dedupe-04-heavy-tier-queue-only-decision-gate",
         "ci-dedupe-05-pr-preflight-medium-tier"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Run the heavy CI tier on merge_group only, with soundness and packaging carve-outs"
     },
     "ci-dedupe-07-heavy-tier-rollback-watch": {
