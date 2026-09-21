@@ -1453,7 +1453,7 @@ class TestComplexityStressFixtures:
 
         benchmark = MetadataPrimitivesBenchmark()
         adapter = PolarsDataFrameAdapter()
-        captured: dict[str, object] = {}
+        captured: dict[str, set[str]] = {}
 
         def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
             captured["keys"] = set(dataframes)
@@ -1482,7 +1482,7 @@ class TestComplexityStressFixtures:
 
         benchmark = MetadataPrimitivesBenchmark()
         adapter = PolarsDataFrameAdapter()
-        captured: dict[str, object] = {}
+        captured: dict[str, set[str]] = {}
 
         def fake_run(platform_name, dataframes, spark_session=None, categories=None, iterations=1):
             captured["keys"] = set(dataframes)
