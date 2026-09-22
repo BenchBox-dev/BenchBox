@@ -913,6 +913,234 @@ class TestValidateBundle:
 
 
 # ---------------------------------------------------------------------------
+# timing plausibility warnings (C1-C4; warnings only, never refuse)
+# ---------------------------------------------------------------------------
+
+
+def _timing_bundle(
+    per_query_ms,
+    *,
+    benchmark="tpch",
+    platform="Snowflake",
+    scale_factor=0.1,
+    geomean_ms=None,
+    rows_loaded=866602,
+    validation="passed",
+):
+    """Build a bundle with explicit per-query timings.
+
+    ``per_query_ms`` maps query id to ms (single value or list of samples).
+    Archived shapes mirror the September cloud TPC-H runs that motivated
+    these gates.
+    """
+    queries = []
+    for qid, ms in per_query_ms.items():
+        for sample in ms if isinstance(ms, list) else [ms]:
+            queries.append({"id": qid, "ms": sample, "status": "SUCCESS"})
+    total = len(queries)
+    timing = {"total_ms": sum(q["ms"] for q in queries)}
+    if geomean_ms is not None:
+        timing["geometric_mean_ms"] = geomean_ms
+    summary = {"validation": validation, "queries": {"total": total, "passed": total, "failed": 0}}
+    if timing:
+        summary["timing"] = timing
+    if rows_loaded is not None:
+        summary["data"] = {"rows_loaded": rows_loaded}
+    return {
+        "version": "2.1",
+        "run": {"id": "timing-test", "timestamp": "2026-09-19T00:00:00", "total_duration_ms": 60000},
+        "benchmark": {"id": benchmark, "name": benchmark, "scale_factor": scale_factor},
+        "platform": {"name": platform, "version": "1.0"},
+        "summary": summary,
+        "phases": {"validation": {"status": "PASSED" if validation == "passed" else "PARTIAL"}},
+        "queries": queries,
+    }
+
+
+def _flat_queries(base=4500.0, spread=60.0, count=22):
+    return {f"Q{i}": base + (i % 5) * spread / 4 for i in range(1, count + 1)}
+
+
+def _varied_queries(count=22):
+    return {f"Q{i}": 200.0 * i for i in range(1, count + 1)}
+
+
+class TestTimingPlateau:
+    def test_flat_heterogeneous_run_warns_but_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries()), vr)
+        assert vr.ok, vr.errors
+        assert any("timing-plateau" in w for w in vr.warnings)
+
+    def test_varied_run_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_varied_queries()), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_uniform_benchmark_is_out_of_scope(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(), benchmark="read_primitives"), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_few_distinct_queries_unevaluable(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle({"Q1": 4400.0, "Q2": 4450.0}), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_all_zero_timings_have_no_plateau_warning(self):
+        data = _timing_bundle({f"Q{i}": 0.0 for i in range(1, 23)})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok  # owned by the queries-section gate
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+
+class TestSmallScaleFloor:
+    def test_slow_floor_on_tiny_data_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0)), vr)
+        assert vr.ok, vr.errors
+        assert any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_fast_floor_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_varied_queries(), rows_loaded=866602), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_large_scale_is_out_of_scope(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), scale_factor=1.0), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_large_row_counts_excuse_a_slow_floor(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=60_000_000), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_missing_rows_never_silently_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=None), vr)
+        assert vr.ok, vr.errors
+        assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
+
+
+def _write_timing_bundle(tmp_path, name, per_query_ms, **kwargs):
+    path = tmp_path / name
+    path.write_text(json.dumps(_timing_bundle(per_query_ms, **kwargs)), encoding="utf-8")
+    return path
+
+
+class TestScaleInvariance:
+    def test_flat_scales_warn_on_both_bundles(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert all(any("scale-invariant" in w for w in vr.warnings) for vr in results)
+
+    def test_single_scale_is_silent(self, tmp_path):
+        (ofar,) = validate_bundles([_write_timing_bundle(tmp_path, "only.json", _flat_queries(), platform="Snowflake")])
+        assert ofar.ok, ofar.errors
+        assert not any("scale-invariant" in w for w in ofar.warnings)
+
+    def test_growing_timings_are_silent(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=400.0),
+            scale_factor=0.1,
+            geomean_ms=400.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4000.0),
+            scale_factor=10.0,
+            geomean_ms=4000.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_partial_bundles_do_not_distort(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+            validation="partial",
+        )
+        results = validate_bundles([lo, hi], allow_partial_validation=True)
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+
+class TestFloorOutlier:
+    def _peer_set(self, tmp_path, floors):
+        paths = []
+        for i, floor in enumerate(floors):
+            paths.append(
+                _write_timing_bundle(
+                    tmp_path,
+                    f"p{i}.json",
+                    {"Q1": floor, "Q2": floor + 500, "Q3": floor + 1000},
+                    scale_factor=1.0,
+                    geomean_ms=floor + 500,
+                    platform=f"Engine{i}",
+                    rows_loaded=8_661_245,
+                )
+            )
+        return validate_bundles(paths)
+
+    def test_slow_peer_warns_informationally(self, tmp_path):
+        slow, mid, fast = self._peer_set(tmp_path, [4500.0, 350.0, 300.0])
+        assert slow.ok and mid.ok and fast.ok
+        assert any("floor-outlier" in w for w in slow.warnings)
+        assert not any("floor-outlier" in w for w in mid.warnings)
+        assert not any("floor-outlier" in w for w in fast.warnings)
+
+    def test_pair_without_peers_is_silent(self, tmp_path):
+        first, second = self._peer_set(tmp_path, [4500.0, 300.0])
+        assert first.ok and second.ok
+        assert not any("floor-outlier" in w for vr in (first, second) for w in vr.warnings)
+
+
+# ---------------------------------------------------------------------------
 # _validate_manifest_hash
 # ---------------------------------------------------------------------------
 
