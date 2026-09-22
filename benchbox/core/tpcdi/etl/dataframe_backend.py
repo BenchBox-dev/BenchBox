@@ -76,7 +76,7 @@ def _render_literal(value: Any) -> str:
     if isinstance(value, Decimal):
         return str(value)
     if isinstance(value, datetime):
-        return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
+        return f"'{value.isoformat(sep=' ')}'"
     if isinstance(value, date):
         return f"'{value.strftime('%Y-%m-%d')}'"
     if isinstance(value, str):

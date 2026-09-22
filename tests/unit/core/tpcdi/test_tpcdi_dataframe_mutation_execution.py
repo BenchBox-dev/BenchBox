@@ -219,13 +219,15 @@ class TestBackendContracts:
         assert _render_literal(np.float64(1.5)) == "1.5"
 
     def test_render_literal_supports_temporal_and_decimal(self) -> None:
-        from datetime import date, datetime
+        from datetime import date, datetime, timezone
         from decimal import Decimal
 
         from benchbox.core.tpcdi.etl.dataframe_backend import _render_literal
 
         assert _render_literal(date(2020, 1, 1)) == "'2020-01-01'"
         assert _render_literal(datetime(2020, 1, 1, 12, 30, 0)) == "'2020-01-01 12:30:00'"
+        assert _render_literal(datetime(2020, 1, 1, 12, 30, 0, 123456)) == "'2020-01-01 12:30:00.123456'"
+        assert _render_literal(datetime(2020, 1, 1, 12, 30, 0, tzinfo=timezone.utc)) == "'2020-01-01 12:30:00+00:00'"
         assert _render_literal(Decimal("10.5")) == "10.5"
 
     def test_render_literal_rejects_non_finite_floats(self) -> None:
