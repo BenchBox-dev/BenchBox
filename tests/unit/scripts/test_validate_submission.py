@@ -1059,6 +1059,8 @@ class TestEmptyResultRows:
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not any("result-rows-empty" in w for w in vr.warnings)
+
+
 # timing plausibility warnings (C1-C4; warnings only, never refuse)
 # ---------------------------------------------------------------------------
 
