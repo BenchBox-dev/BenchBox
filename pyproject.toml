@@ -750,7 +750,7 @@ ignore_rules = [
     { function_names = ["from_config", "apply_constraint_configuration", "apply_unified_tuning", "supports_tuning_type", "apply_tuning_configuration"], path_contains = [
         "benchbox/platforms/athena.py", "benchbox/platforms/azure_synapse.py",
         "benchbox/platforms/bigquery.py", "benchbox/platforms/clickhouse_cloud.py",
-        "benchbox/platforms/cudf.py", "benchbox/platforms/datafusion.py",
+        "benchbox/platforms/datafusion.py",
         "benchbox/platforms/doris.py", "benchbox/platforms/duckdb.py",
         "benchbox/platforms/fabric_lakehouse.py", "benchbox/platforms/fabric_warehouse.py",
         "benchbox/platforms/firebolt.py", "benchbox/platforms/lakesail.py",
