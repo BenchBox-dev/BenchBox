@@ -16153,10 +16153,15 @@
       "title": "Override artifact + PR workflow with approval separation"
     },
     "submission-severity-override-contract": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-23T12:51:06Z",
+        "generation": "8e1685deb272466a84c4fb05937c2485",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fb22ec513f5189c4ea828e84"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Severity migration: warn-require-override contract + mirror"
     },
     "submission-validator-drift-develop-vs-published-results": {
