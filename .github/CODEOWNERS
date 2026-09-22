@@ -38,6 +38,7 @@ benchbox/core/results/schema_policy.py @joeharris76
 _project/scripts/explorer_publish.py @joeharris76
 scripts/generate_corpus_inventory.py @joeharris76
 scripts/validate_submission.py @joeharris76
+results-data/bundles/**/*.override.json @joeharris76
 .github/workflows/validate-submission.yml @joeharris76
 .github/workflows/sync-results-data-to-published.yml @joeharris76
 .github/workflows/docs.yml @joeharris76

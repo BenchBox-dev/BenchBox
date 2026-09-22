@@ -179,7 +179,7 @@ jobs:
           from benchbox.core.results.canonical_json import canonical_json_bytes
 
           RESULTS_DATA = Path("results-data")
-          COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json")
+          COMPANION_SUFFIXES = (".manifest.json", ".plans.json", ".tuning.json", ".applied.json", ".override.json")
           MIGRATION_MANIFEST = "path-privacy-migration.manifest.json"
 
           manager = AnonymizationManager()
@@ -390,6 +390,7 @@ jobs:
             | grep -vi '\.tuning\.json$' \
             | grep -vi '\.applied\.json$' \
             | grep -vi '\.manifest\.json$' \
+            | grep -vi '\.override\.json$' \
             || true)
 
           STATE="success"

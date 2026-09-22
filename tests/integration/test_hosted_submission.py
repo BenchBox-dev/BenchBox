@@ -136,12 +136,15 @@ def hosted_service():
 
 @pytest.fixture
 def result_file(tmp_path: Path) -> Path:
+    # Full canonical TPC-H coverage: submit runs the bundle validator on
+    # every path (including real hosted uploads), and short query sets or
+    # missing benchmark ids are refused before anything is sent.
     path = tmp_path / "tpch_duckdb.json"
     path.write_text(
         json.dumps(
             {
                 "version": "2.1",
-                "benchmark": {"name": "tpch", "scale_factor": 0.01},
+                "benchmark": {"id": "tpch", "name": "tpch", "scale_factor": 0.01},
                 "platform": {"name": "duckdb"},
                 "run": {
                     "id": "run1",
@@ -152,6 +155,7 @@ def result_file(tmp_path: Path) -> Path:
                     "queries": {"total": 22, "passed": 22, "failed": 0},
                     "validation": "passed",
                 },
+                "queries": [{"id": f"Q{i}", "ms": 100.0, "status": "SUCCESS"} for i in range(1, 23)],
             }
         ),
         encoding="utf-8",
