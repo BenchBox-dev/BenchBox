@@ -91,7 +91,10 @@ validation yet). Requirements and limits:
   and the Hudi Spark bundle / `HoodieSparkSessionExtension` where needed);
   BenchBox only emits the `USING HUDI` DDL and does not install libraries.
 - `hudi_primary_key` should be set: Hudi needs a record key, and BenchBox
-  passes it through as the `primaryKey` table property.
+  passes it through as the `primaryKey` table property. Each key is emitted
+  only for tables whose DDL defines that column, so one global key never
+  leaks into the other tables of a multi-table benchmark; tables without
+  the column still get `USING HUDI` plus the table type.
 - Managed data loads (`COPY INTO`) are Delta-only, so `load_data` raises for
   Hudi tables: load Hudi tables through a Hudi-aware Spark job. Delta-only
   maintenance (`OPTIMIZE`, `VACUUM`, `ZORDER`, Liquid Clustering) is recorded

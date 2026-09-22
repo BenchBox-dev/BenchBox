@@ -2765,8 +2765,11 @@ class DatabricksAdapter(PlatformAdapter):
         """Convert CREATE TABLE statement to Apache Hudi format.
 
         Emits USING HUDI with TBLPROPERTIES carrying the table type and,
-        when configured, the record key and precombine field. Delta-only
-        auto-optimize properties are never emitted for Hudi tables. A
+        when configured, the record key and precombine field. Each key is
+        emitted only for statements that define the column, so one global
+        key never leaks into other tables of a multi-table benchmark.
+        Delta-only auto-optimize properties are never emitted for Hudi
+        tables. A
         pre-existing USING clause is replaced (never left as USING DELTA),
         and Hudi keys missing from pre-existing TBLPROPERTIES are merged in.
         Record-key values are validated as SQL identifiers at init, so the
@@ -2789,11 +2792,7 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             statement = re.sub(r"(?i)\bUSING\s+\w+", "USING HUDI", statement, count=1)
 
-        properties = [f"'type' = '{self.hudi_table_type}'"]
-        if self.hudi_primary_key:
-            properties.append(f"'primaryKey' = '{self.hudi_primary_key}'")
-        if self.hudi_precombine_field:
-            properties.append(f"'preCombineField' = '{self.hudi_precombine_field}'")
+        properties = self._hudi_table_properties(statement)
         if "TBLPROPERTIES" not in statement.upper():
             statement += " TBLPROPERTIES (" + ", ".join(properties) + ")"
         else:
@@ -2803,6 +2802,24 @@ class DatabricksAdapter(PlatformAdapter):
                 statement = statement[:pos] + ", " + ", ".join(missing) + statement[pos:]
 
         return statement
+
+    def _hudi_table_properties(self, statement: str) -> list[str]:
+        """Build the Hudi TBLPROPERTIES entries for one CREATE TABLE statement.
+
+        The table type always applies. The configured record key and
+        precombine field apply only when the statement defines that column:
+        multi-table benchmarks use different keys per table, so a global key
+        must not leak into tables that lack the column.
+        """
+        properties = [f"'type' = '{self.hudi_table_type}'"]
+        key_options = (
+            ("'primaryKey'", self.hudi_primary_key),
+            ("'preCombineField'", self.hudi_precombine_field),
+        )
+        for option, field in key_options:
+            if field and re.search(rf"\b{re.escape(field)}\b", statement, re.IGNORECASE):
+                properties.append(f"{option} = '{field}'")
+        return properties
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:  # noqa: C901
         """Get Databricks-specific metadata and system information."""

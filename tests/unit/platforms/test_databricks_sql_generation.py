@@ -178,13 +178,32 @@ class TestDatabricksHudiSupport:
 
     def test_hudi_ddl_with_keys(self):
         adapter = _make_hudi_adapter()
-        result = adapter._convert_to_delta_table("CREATE TABLE main.benchbox.lineitem (l_orderkey BIGINT)")
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE main.benchbox.lineitem (l_orderkey BIGINT, l_commitdate DATE)"
+        )
         assert "USING HUDI" in result
         assert "USING DELTA" not in result
         assert "'type' = 'cow'" in result
         assert "'primaryKey' = 'l_orderkey'" in result
         assert "'preCombineField' = 'l_commitdate'" in result
         assert "delta.autoOptimize" not in result
+
+    def test_hudi_ddl_omits_keys_missing_from_table(self):
+        """A global Hudi key must not leak into tables lacking the column."""
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE main.benchbox.region (r_regionkey BIGINT)")
+        assert "USING HUDI" in result
+        assert "'type' = 'cow'" in result
+        assert "primaryKey" not in result
+        assert "preCombineField" not in result
+
+    def test_hudi_ddl_omits_only_absent_key(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE main.benchbox.orders (o_orderkey BIGINT, l_commitdate DATE)"
+        )
+        assert "'primaryKey'" not in result
+        assert "'preCombineField' = 'l_commitdate'" in result
 
     def test_hudi_ddl_without_keys(self):
         adapter = _make_adapter(table_format="hudi")
@@ -292,7 +311,7 @@ class TestDatabricksHudiSupport:
     def test_hudi_ddl_merges_existing_tblproperties(self):
         adapter = _make_hudi_adapter()
         result = adapter._convert_to_delta_table(
-            "CREATE TABLE t (id INT) USING DELTA TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')"
+            "CREATE TABLE t (l_orderkey BIGINT) USING DELTA TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')"
         )
         assert "USING HUDI" in result
         assert "USING DELTA" not in result
@@ -303,7 +322,7 @@ class TestDatabricksHudiSupport:
     def test_hudi_ddl_does_not_duplicate_present_keys(self):
         adapter = _make_hudi_adapter()
         result = adapter._convert_to_delta_table(
-            "CREATE TABLE t (id INT) TBLPROPERTIES ('type' = 'mor', 'primaryKey' = 'id')"
+            "CREATE TABLE t (l_orderkey BIGINT, l_commitdate DATE) TBLPROPERTIES ('type' = 'mor', 'primaryKey' = 'id')"
         )
         assert result.count("'type'") == 1
         assert result.count("'primaryKey'") == 1
