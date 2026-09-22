@@ -1707,3 +1707,148 @@ class TestOverrideContract:
         bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
         assert main([str(bundle), "--bogus-flag"]) == 2
         assert "unrecognized flag" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# committed override artifacts (<stem>.override.json)
+# ---------------------------------------------------------------------------
+
+
+def _override_doc(*rules, **kw):
+    doc = {
+        "rules": [{"rule": rule, "rule_version": "1"} for rule in rules or ("timing-plateau",)],
+        "reason": "verified against profiler trace",
+        "evidence": "https://example.com/trace",
+        "expires": "single-batch",
+        "approver": "reviewer2",
+    }
+    doc.update(kw)
+    return doc
+
+
+def _write_plateau_bundle(tmp_path, name="flat.json"):
+    bundle = tmp_path / name
+    bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+    return bundle
+
+
+class TestOverrideDocument:
+    def test_valid_document_accepts(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(), bundle_stem="flat") == []
+
+    def test_expiry_matrix(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(expires="2999-01-01"), bundle_stem="flat") == []
+        expired = validate_override_document(_override_doc(expires="2000-01-01"), bundle_stem="flat")
+        assert any("expired" in e for e in expired)
+        bad = validate_override_document(_override_doc(expires="next Friday"), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in bad)
+        nonstr = validate_override_document(_override_doc(expires=20260101), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in nonstr)
+
+    def test_unknown_rule_and_wrong_severity_refused(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        unknown = validate_override_document(_override_doc("nope"), bundle_stem="flat")
+        assert any("not a known rubric rule" in e for e in unknown)
+        info = validate_override_document(_override_doc("floor-outlier"), bundle_stem="flat")
+        assert any("only warn-require-override rules are overridable" in e for e in info)
+
+    def test_version_pin_required_and_exact(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        doc = _override_doc()
+        del doc["rules"][0]["rule_version"]
+        assert any("exactly rule and rule_version" in e for e in validate_override_document(doc, bundle_stem="flat"))
+        stale_doc = _override_doc()
+        stale_doc["rules"][0]["rule_version"] = "0"
+        stale = validate_override_document(stale_doc, bundle_stem="flat")
+        assert any("does not match registry version" in e for e in stale)
+
+    def test_shape_and_content_guards(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(["x"], bundle_stem="flat") != []
+        assert any(
+            "unknown fields" in e for e in validate_override_document(_override_doc(aprover="x"), bundle_stem="flat")
+        )
+        assert any(
+            "missing fields" in e for e in validate_override_document({"rule": "timing-plateau"}, bundle_stem="flat")
+        )
+        assert any(
+            "non-empty string" in e for e in validate_override_document(_override_doc(reason="  "), bundle_stem="flat")
+        )
+        assert any(
+            "non-empty list" in e for e in validate_override_document(_override_doc(bundles=[]), bundle_stem="flat")
+        )
+        assert any(
+            "own stem" in e for e in validate_override_document(_override_doc(bundles=["other"]), bundle_stem="flat")
+        )
+        assert validate_override_document(_override_doc(bundles=["flat", "flat2"]), bundle_stem="flat") == []
+
+
+class TestOverrideSatisfaction:
+    def test_valid_artifact_satisfies_finding(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert vr.override_required == ["timing-plateau", "small-scale-floor"]
+        assert unsatisfied_override_rules([vr]) == {}
+
+    def test_satisfaction_narrows_unsatisfied_map(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(json.dumps(_override_doc("timing-plateau")), encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert unsatisfied_override_rules([vr]) == {str(bundle): ["small-scale-floor"]}
+
+    def test_malformed_artifact_errors_in_both_lanes(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text("{not json", encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok
+        assert any("override artifact" in e for e in vr.errors)
+        (mirror,) = validate_bundles([bundle], allow_partial_validation=True)
+        assert not mirror.ok
+
+    def test_expired_artifact_satisfies_nothing(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc(expires="2000-01-01")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok  # malformed-audit artifact is an error, not silent
+        assert main([str(bundle)]) == 1
+
+    def test_main_passes_with_valid_artifact(self, tmp_path, capsys):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        assert main([str(bundle)]) == 0
+        out = capsys.readouterr().out
+        assert "override(s) required" in out
+
+    def test_override_companion_excluded_from_discovery(self, tmp_path):
+        from benchbox.validation.bundle import is_primary_bundle_file
+
+        bundle = _write_plateau_bundle(tmp_path)
+        artifact = bundle.with_name("flat.override.json")
+        artifact.write_text(json.dumps(_override_doc()), encoding="utf-8")
+        assert not is_primary_bundle_file(artifact)
+
+    def test_override_companion_privacy_scanned(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        doc = _override_doc(reason="see /Users/alice/private notes")
+        bundle.with_name("flat.override.json").write_text(json.dumps(doc), encoding="utf-8")
+        assert main([str(bundle)]) == 1

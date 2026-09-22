@@ -105,7 +105,7 @@ __all__ = [
 ]
 
 
-_PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json")
+_PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json", ".override.json")
 
 
 def _public_json_surfaces(bundle_path: Path) -> list[Path]:
@@ -157,7 +157,7 @@ def _append_public_privacy_errors(paths: list[Path], results: list[ValidationRes
 
 CORPUS_RELATIVE_ROOT = "results-data/bundles"
 _CORPUS_ROOT_PARTS = ("results-data", "bundles")
-_CORPUS_METADATA_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json")
+_CORPUS_METADATA_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json", ".override.json")
 _CORPUS_METADATA_FILENAMES = ("corpus-inventory.json", "submission-manifest.json")
 # JSON-named files that are NOT corpus data: package/TS manifests and other
 # executable or tool surfaces that must not ride into the corpus tree even

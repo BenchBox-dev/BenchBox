@@ -121,6 +121,19 @@ report `summary.validation=passed` with no failed measurement evidence.
 Truthful partial results are accepted only from the trusted maintainer mirror
 path and remain excluded from rankings.
 
+### 5a. Plausibility overrides
+
+Timing-plausibility findings (`timing-plateau`, `scale-invariant`,
+`small-scale-floor`) block community publication until covered by a
+committed `<bundle_stem>.override.json` companion beside the bundle.
+The artifact lists the covered rules with exact registry pins, the
+reason, an evidence link, an expiry date (`YYYY-MM-DD`) or
+`single-batch`, and the approver. The approver must differ from the PR author, and an APPROVED
+review from the approver must exist — file content alone never
+authorizes. Overrides never substitute for the `unofficial-research`
+compliance label and vice versa. Expired or malformed artifacts fail
+validation; the mirror lane renders overrides advisory.
+
 Submissions are **data-only**: every file a PR adds under
 `results-data/bundles/` must be a supported `.json` result bundle, companion,
 sidecar manifest, or the inventory. Scripts, workflows, symlinks, executables,
