@@ -36,7 +36,13 @@ from benchbox.core.results.canonical_json import canonical_json_bytes
 from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY, result_schema_version_value
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 from benchbox.core.tuning.modes import is_canonical_mode
-from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
+from benchbox.validation.bundle import (
+    APPLIED_COMPANION_MAX_BYTES,
+    APPLIED_RECEIPT_MAX_ENTRIES,
+    COMPANION_SUFFIXES,
+    OVERRIDE_SUFFIX,
+    accepted_override_rules,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -685,6 +691,39 @@ def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
     if not isinstance(payload, dict):
         return None, False
     return payload.get("receipt"), False
+
+
+def _override_display(bundle_path: Path) -> dict[str, Any]:
+    """Accepted plausibility overrides for badge display.
+
+    Reads the ``{stem}.override.json`` companion and returns the accepted
+    rule ids plus the audit fields (evidence link, approver, expiry).
+    Anything invalid, expired, or unreadable yields empty values — the
+    submission validator (not the explorer) owns refusal, so display
+    never invents an override and never shows a rejected one. Empty
+    values also cover the common case: no companion, no override.
+    """
+    empty: dict[str, Any] = {
+        "override_rules": [],
+        "override_evidence": None,
+        "override_approver": None,
+        "override_expires": None,
+    }
+    accepted, _errors = accepted_override_rules(bundle_path)
+    if not accepted:
+        return empty
+    try:
+        payload = json.loads(bundle_path.with_name(f"{bundle_path.stem}{OVERRIDE_SUFFIX}").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return empty
+    if not isinstance(payload, dict):
+        return empty
+    return {
+        "override_rules": sorted(accepted),
+        "override_evidence": payload.get("evidence") if isinstance(payload.get("evidence"), str) else None,
+        "override_approver": payload.get("approver") if isinstance(payload.get("approver"), str) else None,
+        "override_expires": payload.get("expires") if isinstance(payload.get("expires"), str) else None,
+    }
 
 
 def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = None) -> str | None:
@@ -1479,6 +1518,7 @@ class BundleTransformer:
             bundle_data,
             normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle_data) is not None else None,
         )
+        override = _override_display(bundle_path)
         entry = ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -1510,6 +1550,10 @@ class BundleTransformer:
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
             applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            override_rules=override["override_rules"],
+            override_evidence=override["override_evidence"],
+            override_approver=override["override_approver"],
+            override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1601,6 +1645,7 @@ class BundleTransformer:
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
         has_tuning = _has_requested_tuning(bundle_data) or bundle_path.with_name(f"{stem}.tuning.json").exists()
+        override = _override_display(bundle_path)
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
@@ -1643,6 +1688,10 @@ class BundleTransformer:
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
             applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            override_rules=override["override_rules"],
+            override_evidence=override["override_evidence"],
+            override_approver=override["override_approver"],
+            override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),

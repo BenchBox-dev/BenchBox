@@ -41,7 +41,14 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 # v10: result_environment and result_detail_metrics gained client_region,
 #      client_cloud, statement_overhead_min_ms, statement_overhead_median_ms,
 #      and link_status.
-EXPLORER_READ_MODEL_VERSION = 10
+# v11: results and result_detail_metrics gained override_rules,
+#      override_evidence, override_approver, and override_expires (accepted
+#      plausibility-override badge data, stored verbatim from the
+#      {stem}.override.json companion and selected unconditionally by the
+#      detail projection). A v10 snapshot lacks the columns, so a v10
+#      snapshot would hit a DuckDB binder error instead of the intended
+#      rebuild message.
+EXPLORER_READ_MODEL_VERSION = 11
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,
     "newer_policy": "warn-and-continue",

@@ -176,6 +176,55 @@ export function formatValidationStatus(raw: string | null | undefined): string {
 }
 
 /**
+ * Parse the `override_rules` column (a canonical JSON array string of covered
+ * rule ids, written by the explorer pipeline) into a rule-id list. Strict:
+ * anything that is not a JSON array of strings yields [] — display never
+ * invents an override, so an unreadable value badges as no override rather
+ * than guessing.
+ */
+export function parseOverrideRules(raw: string | null | undefined): string[] {
+  if (raw === null || raw === undefined || raw === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((entry): entry is string => typeof entry === "string" && entry !== "");
+  } catch {
+    return [];
+  }
+}
+
+export interface OverrideBadgeInfo {
+  /** Covered rule ids, in pipeline order. */
+  rules: string[];
+  /** Reader-facing label, e.g. "Overridden: timing-c1". */
+  label: string;
+  /** Tooltip-length explanation naming the covered rules. */
+  title: string;
+}
+
+/**
+ * Reader-facing language for an accepted plausibility override. Returns null
+ * when no override was accepted (no companion, invalid, or expired) so
+ * callers can render nothing. An override is never clean: the tone is always
+ * "warning", regardless of the recorded validation status.
+ */
+export function describeOverride(
+  rules: string[] | null | undefined,
+  opts?: { approver?: string | null; expires?: string | null },
+): OverrideBadgeInfo | null {
+  if (!rules || rules.length === 0) return null;
+  const approver = opts?.approver?.trim() ? ` Approved by ${opts.approver!.trim()}.` : "";
+  const expires = opts?.expires?.trim() ? ` Override expires ${opts.expires!.trim()}.` : "";
+  return {
+    rules,
+    label: `Overridden: ${rules.join(", ")}`,
+    title:
+      `This result was accepted under a committed plausibility override covering ${rules.join(", ")}.` +
+      `${approver}${expires} It is not a clean pass.`,
+  };
+}
+
+/**
  * Non-clean validation status: anything that is not the literal "passed"
  * value, including missing/empty status. Mirrors the condition
  * MetaLeaderboard.tsx already uses to decide whether the validation badge

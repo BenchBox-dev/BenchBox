@@ -30,7 +30,7 @@ const hoisted = vi.hoisted(() => {
   // exact table lists, so it doesn't need updating when SNAPSHOT_READY_SCANS
   // changes.
   function healthyQueryImpl(sql: string): FakeRows {
-    if (/read_model_version/i.test(sql)) return rows([{ read_model_version: 10 }]);
+    if (/read_model_version/i.test(sql)) return rows([{ read_model_version: 11 }]);
     if (/^ATTACH/i.test(sql)) return rows([]);
     if (/^SET /i.test(sql)) return rows([]);
     if (/COUNT\(\*\)/i.test(sql)) return rows([{ n: 1 }]);

@@ -41,6 +41,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     CompanionPrivacyError,
     _applied_receipt,
+    _override_display,
     _platform_percentile_stats,
     _public_companion_bytes,
     _sanitize_applied_receipt,
@@ -312,12 +313,40 @@ def _public_applied_receipt(
     return canonical_json_bytes(public_receipt).decode("utf-8")
 
 
+def _public_override_display(
+    bundle_path: Path,
+) -> dict[str, Any]:
+    """Return the accepted-override badge data after the public-path privacy check.
+
+    The transformer reads the ``{stem}.override.json`` companion from disk
+    next to the *source* bundle even when the row is built from the
+    anonymized public bundle, so the raw evidence/approver strings would
+    otherwise bypass anonymization. These are human-authored audit strings
+    (evidence link, approver handle, expiry), public by design -- unlike the
+    applied receipt there is nothing to redact, only a leak to refuse. A
+    private local path in any free-text field fails the build rather than
+    publishing it.
+    """
+    display = _override_display(bundle_path)
+    leaks = find_public_path_leaks(display)
+    if leaks:
+        raise PrivacyRejectionError(
+            f"{bundle_path}: public override display privacy check failed for fields: " + ", ".join(sorted(set(leaks)))
+        )
+    return display
+
+
 def _public_bundle_data(
     bundle_path: Path,
     bundle_data: dict[str, Any],
     anonymizer: AnonymizationManager,
 ) -> tuple[dict[str, Any], str | None]:
-    """Sanitize a bundle and its applied receipt before creating public rows."""
+    """Sanitize a bundle and its applied receipt before creating public rows.
+
+    The accepted-override badge data travels separately via
+    ``_public_override_display`` (leak-checked, never redacted): it is read
+    from the source-side companion even on this lane.
+    """
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
     public_platform = public_bundle.get("platform")
     if isinstance(public_platform, dict):
@@ -809,6 +838,15 @@ class ExplorerPipeline:
                         data=public_bundle,
                     )
                     entry = entry.model_copy(update={"applied_receipt": public_receipt})
+                    public_override = _public_override_display(bundle_path)
+                    entry = entry.model_copy(
+                        update={
+                            "override_rules": public_override["override_rules"],
+                            "override_evidence": public_override["override_evidence"],
+                            "override_approver": public_override["override_approver"],
+                            "override_expires": public_override["override_expires"],
+                        }
+                    )
 
                     detail = self._transformer.to_detail_result(
                         bundle_path,
@@ -819,6 +857,14 @@ class ExplorerPipeline:
                         data=public_bundle,
                     )
                     detail = detail.model_copy(update={"applied_receipt": public_receipt})
+                    detail = detail.model_copy(
+                        update={
+                            "override_rules": public_override["override_rules"],
+                            "override_evidence": public_override["override_evidence"],
+                            "override_approver": public_override["override_approver"],
+                            "override_expires": public_override["override_expires"],
+                        }
+                    )
 
                     dest_bundle = (out_bundles_dir / f"{result_id}.json").resolve()
                     if not dest_bundle.is_relative_to(out_bundles_dir.resolve()):
