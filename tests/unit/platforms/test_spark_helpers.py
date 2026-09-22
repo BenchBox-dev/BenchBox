@@ -916,3 +916,36 @@ class TestApplySparkOlapRuntimeConf:
 
         # Should not raise.
         apply_spark_olap_runtime_conf(spark, "tpch", adaptive_enabled=True)
+
+
+class TestAdaptiveEnabledFromConfig:
+    def test_top_level_bool_wins(self) -> None:
+        from benchbox.platforms._spark_helpers import adaptive_enabled_from_config
+
+        assert adaptive_enabled_from_config({"adaptive_enabled": False}) is False
+        assert adaptive_enabled_from_config({"adaptive_enabled": True}) is True
+
+    def test_nested_options_fallback(self) -> None:
+        from benchbox.platforms._spark_helpers import adaptive_enabled_from_config
+
+        assert adaptive_enabled_from_config({"options": {"adaptive_enabled": False}}) is False
+        assert adaptive_enabled_from_config({"options": {"adaptive_enabled": True}}) is True
+
+    def test_top_level_beats_nested(self) -> None:
+        from benchbox.platforms._spark_helpers import adaptive_enabled_from_config
+
+        config = {"adaptive_enabled": True, "options": {"adaptive_enabled": False}}
+        assert adaptive_enabled_from_config(config) is True
+
+    def test_defaults_on(self) -> None:
+        from benchbox.platforms._spark_helpers import adaptive_enabled_from_config
+
+        assert adaptive_enabled_from_config({}) is True
+        assert adaptive_enabled_from_config({"options": {}}) is True
+
+    def test_option_parser_strings(self) -> None:
+        from benchbox.platforms._spark_helpers import adaptive_enabled_from_config
+
+        assert adaptive_enabled_from_config({"options": {"adaptive_enabled": "false"}}) is False
+        assert adaptive_enabled_from_config({"options": {"adaptive_enabled": "0"}}) is False
+        assert adaptive_enabled_from_config({"adaptive_enabled": "yes"}) is True

@@ -301,6 +301,7 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         results_path = f"{self.gcs_staging_dir}/results/{batch_id}"
 
         # Create PySpark script that runs the query and saves results
+        query_literal = json.dumps(query)
         job_script = f'''
 from pyspark.sql import SparkSession
 
@@ -311,7 +312,7 @@ spark = SparkSession.builder \\
 
 spark.sql("USE {self.database}")
 
-result = spark.sql("""{query}""")
+result = spark.sql({query_literal})
 result.write.mode("overwrite").json("{results_path}")
 
 spark.stop()
@@ -456,7 +457,7 @@ spark.stop()
 
             create_table_query = f"""
                 CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table}
-                USING {self.table_format.upper()}
+                USING {file_format.upper()}
                 LOCATION '{table_uri}'
             """
             self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)

@@ -30,6 +30,25 @@ def dependencies_available():
         yield
 
 
+def _make_real_iceberg_table(table_dir: Path) -> None:
+    """Build a minimal real Iceberg table with one data file."""
+    pytest.importorskip("pyiceberg", reason="iceberg staging tests need pyiceberg")
+    pa = pytest.importorskip("pyarrow", reason="iceberg staging tests need pyarrow")
+    from pyiceberg.catalog.sql import SqlCatalog
+    from pyiceberg.schema import Schema
+    from pyiceberg.types import LongType, NestedField, StringType
+
+    catalog = SqlCatalog("bq-test", uri=f"sqlite:///{table_dir.parent}/cat.db", warehouse=str(table_dir.parent))
+    catalog.create_namespace_if_not_exists("ns")
+    table = catalog.create_table(
+        "ns.t",
+        schema=Schema(NestedField(1, "id", LongType()), NestedField(2, "name", StringType())),
+        location=table_dir.as_uri(),
+        properties={"format-version": "2"},
+    )
+    table.overwrite(pa.table({"id": [1], "name": ["a"]}))
+
+
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQueryAdapter:
     """Test BigQuery platform adapter functionality."""
@@ -530,6 +549,118 @@ class TestBigQueryAdapter:
         query_sql = str(mock_connection.query.call_args[0][0])
         assert "WITH CONNECTION `test-project.us.benchbox`" in query_sql
         assert "format = 'DELTA_LAKE'" in query_sql
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_create_external_tables_generates_iceberg_biglake_sql(self, mock_bigquery, dependencies_available):
+        """Iceberg external mode should create BigLake SQL with ICEBERG format."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        mock_connection = Mock()
+        mock_query_job = Mock()
+        mock_query_job.result.return_value = []
+        mock_connection.query.return_value = mock_query_job
+
+        with (
+            patch.object(
+                adapter,
+                "_prepare_external_table_uris",
+                return_value=("ICEBERG", ["gs://benchbox-bucket/benchbox-data/lineitem/"]),
+            ),
+            patch.object(adapter, "_resolve_data_files", return_value={"lineitem": [Path("/tmp/lineitem")]}),
+            patch.object(adapter, "_create_storage_bucket", return_value=Mock()),
+            patch.object(adapter, "_get_table_row_count", return_value=77),
+        ):
+            table_stats, _, _ = adapter.create_external_tables(
+                benchmark=Mock(), connection=mock_connection, data_dir=Path("/tmp")
+            )
+
+        assert table_stats == {"LINEITEM": 77}
+        query_sql = str(mock_connection.query.call_args[0][0])
+        assert "WITH CONNECTION `test-project.us.benchbox`" in query_sql
+        assert "format = 'ICEBERG'" in query_sql
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_create_external_tables_iceberg_requires_biglake_connection(self, mock_bigquery, dependencies_available):
+        """Iceberg external mode should reject runs without BigLake connection config."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iceberg_dir = Path(tmpdir) / "lineitem"
+            (iceberg_dir / "metadata").mkdir(parents=True)
+            (iceberg_dir / "metadata" / "v1.metadata.json").write_text("{}")
+
+            with pytest.raises(ValueError, match="biglake_connection"):
+                adapter._prepare_external_table_uris(Mock(), "lineitem", [iceberg_dir])
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_points_at_metadata_file(self, mock_bigquery, dependencies_available):
+        """Iceberg uris must reference the current metadata file, not the table root."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        mock_bucket = Mock()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iceberg_dir = Path(tmpdir) / "lineitem"
+            _make_real_iceberg_table(iceberg_dir)
+
+            uris = adapter._prepare_external_iceberg_uris(mock_bucket, "lineitem", [iceberg_dir])
+
+        assert len(uris) == 1
+        assert uris[0].startswith("gs://benchbox-bucket/benchbox-data/lineitem/metadata/")
+        assert uris[0].endswith(".metadata.json")
+        # Data files and the rewritten graph were all uploaded.
+        uploaded = {call.args[0] for call in mock_bucket.blob.call_args_list}
+        assert any(name.endswith(".parquet") for name in uploaded)
+        assert any(name.endswith(".metadata.json") for name in uploaded)
+        assert any(name.endswith(".avro") for name in uploaded)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_accepts_cloud_metadata_file(self, mock_bigquery, dependencies_available):
+        """Cloud inputs must already reference a metadata file; roots are skipped."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        metadata_uri = "gs://other-bucket/table/metadata/00003-ccc.metadata.json"
+        uris = adapter._prepare_external_iceberg_uris(Mock(), "lineitem", [metadata_uri])
+        assert uris == [metadata_uri]
+
+        uris = adapter._prepare_external_iceberg_uris(Mock(), "lineitem", ["gs://other-bucket/table/"])
+        assert uris == []
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_rejects_metadata_dir_without_file(self, mock_bigquery, dependencies_available):
+        """A metadata directory without a file URI must fail specifically, not fall through."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        with pytest.raises(ValueError, match=r"\*\.metadata\.json file URI"):
+            adapter._prepare_external_iceberg_uris(Mock(), "lineitem", ["gs://other-bucket/table/metadata/"])
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_delta_requires_biglake_connection(self, mock_bigquery, dependencies_available):

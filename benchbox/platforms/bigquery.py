@@ -14,6 +14,7 @@ import argparse
 import importlib
 import json
 import logging
+import tempfile
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.file_format import detect_compression, detect_data_format
+from benchbox.utils.iceberg_layout import relocate_iceberg_table, resolve_iceberg_metadata_file
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
@@ -1135,14 +1137,14 @@ class BigQueryAdapter(PlatformAdapter):
             source_format, uris = self._prepare_external_table_uris(bucket, table_name, file_paths)
             if not uris:
                 raise ValueError(
-                    f"BigQuery external mode requires Parquet files or Delta directories for table "
-                    f"'{table_name_upper}'. No supported sources were found."
+                    f"BigQuery external mode requires Parquet files, Delta directories, or Iceberg "
+                    f"directories for table '{table_name_upper}'. No supported sources were found."
                 )
 
             uris_sql = ", ".join(f"'{uri}'" for uri in uris)
             connection_clause = (
                 f"\n                WITH CONNECTION `{self.biglake_connection}`"
-                if source_format == "DELTA_LAKE"
+                if source_format in ("DELTA_LAKE", "ICEBERG")
                 else ""
             )
             ddl = f"""
@@ -1485,7 +1487,7 @@ class BigQueryAdapter(PlatformAdapter):
         return table_stats, per_table_timings
 
     def _prepare_external_table_uris(self, bucket: Any, table_name: str, file_paths: Any) -> tuple[str, list[str]]:
-        """Prepare BigQuery external-table sources for parquet files or delta directories."""
+        """Prepare BigQuery external-table sources for parquet, delta, or iceberg directories."""
         valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
         delta_uris = self._prepare_external_delta_uris(bucket, table_name, valid_files)
         if delta_uris:
@@ -1494,6 +1496,13 @@ class BigQueryAdapter(PlatformAdapter):
                     "BigQuery Delta external mode requires --platform-option biglake_connection=<project.region.name>."
                 )
             return "DELTA_LAKE", delta_uris
+        iceberg_uris = self._prepare_external_iceberg_uris(bucket, table_name, valid_files)
+        if iceberg_uris:
+            if not self.biglake_connection:
+                raise ValueError(
+                    "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+                )
+            return "ICEBERG", iceberg_uris
         return "PARQUET", self._prepare_external_parquet_uris(bucket, table_name, valid_files)
 
     def _prepare_external_parquet_uris(self, bucket: Any, table_name: str, file_paths: Any) -> list[str]:
@@ -1542,6 +1551,60 @@ class BigQueryAdapter(PlatformAdapter):
                 blob = bucket.blob(f"{table_prefix}{relative.as_posix()}")
                 blob.upload_from_filename(str(source_file))
             uris.append(f"gs://{self.storage_bucket}/{table_prefix}")
+
+        return uris
+
+    def _prepare_external_iceberg_uris(self, bucket: Any, table_name: str, file_paths: list[Path]) -> list[str]:
+        """Prepare BigQuery Iceberg metadata-file URIs from local or cloud inputs.
+
+        BigLake ``format = 'ICEBERG'`` external tables require ``uris`` to point
+        at the table's current JSON metadata file, not the table root. Local
+        table directories are relocated to GCS — a byte copy would leave
+        ``file://`` references throughout the metadata graph — and the
+        relocated metadata file is returned; cloud inputs must already
+        reference a ``*.metadata.json`` file.
+        """
+        uris: list[str] = []
+        local_dirs: list[Path] = []
+        seen_iceberg_shape = False
+
+        for file_path in file_paths:
+            file_path_str = str(file_path)
+            if is_cloud_path(file_path_str):
+                if file_path_str.lower().endswith(".metadata.json"):
+                    uris.append(file_path_str)
+                elif "/metadata/" in file_path_str:
+                    seen_iceberg_shape = True
+                continue
+
+            path = Path(file_path)
+            if resolve_iceberg_metadata_file(path) is None:
+                continue
+            local_dirs.append(path)
+
+        if seen_iceberg_shape and not uris and not local_dirs:
+            raise ValueError(
+                f"BigQuery Iceberg external mode found Iceberg-shaped cloud input for table '{table_name.lower()}' "
+                "but no *.metadata.json file URI: pass the table's current gs://.../metadata/*.metadata.json URI."
+            )
+
+        if (uris or local_dirs) and not self.biglake_connection:
+            raise ValueError(
+                "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+            )
+
+        for path in local_dirs:
+            table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
+            dest_uri = f"gs://{self.storage_bucket}/{table_prefix.rstrip('/')}"
+            with tempfile.TemporaryDirectory(prefix="benchbox-iceberg-reloc-") as staging:
+                relocated = relocate_iceberg_table(path, dest_uri, staging)
+                for rel in relocated.data_files:
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(path / rel))
+                for rel, staged in relocated.graph_files.items():
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(staged))
+            uris.append(relocated.metadata_location)
 
         return uris
 
