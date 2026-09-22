@@ -147,6 +147,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".gitattributes",
     ".mcp.json",
     ".todo-db/",
+    # Import-layering config: consumed by CI lint, never read by lane builds.
+    ".importlinter",
 )
 
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {

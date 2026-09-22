@@ -147,7 +147,7 @@ all = [
     "singlestoredb>=1.0.0",  # For SingleStore (Helios / self-managed)
     # DataFrame platforms
     "polars>=1.35.2",
-    "dask[distributed]>=2024.1.0",
+    "dask[distributed]>=2025.1.0",
     "pyspark[connect]>=3.5.0",
 ]
 cloud = [
@@ -245,9 +245,9 @@ ai-primitives = [
 # Pandas family - string-based column access, eager evaluation
 pandas = ["pandas>=3.0.0"]
 dataframe-pandas = ["pandas>=3.0.0"]
-dask = ["dask[distributed]>=2024.1.0", "pandas>=3.0.0"]
+dask = ["dask[distributed]>=2025.1.0", "pandas>=3.0.0"]
 dataframe-dask = [
-    "dask[distributed]>=2024.1.0",
+    "dask[distributed]>=2025.1.0",
     "pandas>=3.0.0",
 ]
 # Note: cudf requires NVIDIA GPU with CUDA 12.x
@@ -279,7 +279,7 @@ dataframe-datafusion = [
 # DataFrame family convenience groups
 dataframe-pandas-family = [
     "pandas>=3.0.0",
-    "dask[distributed]>=2024.1.0",
+    "dask[distributed]>=2025.1.0",
     # cudf not included - requires NVIDIA GPU/CUDA, install separately
 ]
 dataframe-expression-family = [
@@ -289,7 +289,7 @@ dataframe-expression-family = [
 ]
 dataframe-all = [
     "pandas>=3.0.0",
-    "dask[distributed]>=2024.1.0",
+    "dask[distributed]>=2025.1.0",
     "polars>=1.35.2",
     "pyspark>=3.5.0",
     "datafusion>=54.0.0",
@@ -750,7 +750,7 @@ ignore_rules = [
     { function_names = ["from_config", "apply_constraint_configuration", "apply_unified_tuning", "supports_tuning_type", "apply_tuning_configuration"], path_contains = [
         "benchbox/platforms/athena.py", "benchbox/platforms/azure_synapse.py",
         "benchbox/platforms/bigquery.py", "benchbox/platforms/clickhouse_cloud.py",
-        "benchbox/platforms/cudf.py", "benchbox/platforms/datafusion.py",
+        "benchbox/platforms/datafusion.py",
         "benchbox/platforms/doris.py", "benchbox/platforms/duckdb.py",
         "benchbox/platforms/fabric_lakehouse.py", "benchbox/platforms/fabric_warehouse.py",
         "benchbox/platforms/firebolt.py", "benchbox/platforms/lakesail.py",

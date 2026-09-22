@@ -82,6 +82,9 @@ Generate sample unified tuning configurations for specific platforms.
 ### Options
 
 - `--platform TEXT`: Target platform (required) - duckdb, databricks, snowflake, etc.
+- `--mode [sql|dataframe|auto]`: Tuning mode (default: auto-detect from platform)
+- `--profile [default|optimized|streaming|memory-constrained|gpu]`: Configuration profile (DataFrame mode only)
+- `--smart-defaults`: Use auto-detected system-optimal settings (DataFrame mode only)
 - `--output TEXT`: Output file path. Default depends on mode:
   - SQL mode: `<platform>_tuning.yaml` (e.g. `duckdb_tuning.yaml`)
   - DataFrame mode: `<platform>_<profile>_tuning.yaml` (e.g. `polars_optimized_tuning.yaml`)
@@ -129,11 +132,20 @@ benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 
 ### Validate Configuration
 
+DataFrame platforms only; `--platform` is required and must name a
+DataFrame platform (SQL platform names are rejected). SQL-format YAML
+files are not rejected: SQL-only sections such as `primary_keys` and
+`table_tunings` are silently ignored and only the DataFrame sections
+are validated, so a "valid" result does not mean the SQL content was
+checked. Validate the file your platform will actually load.
+
 ```bash
 benchbox tuning validate polars_tuning.yaml --platform polars
 ```
 
 ### Show Smart Defaults
+
+DataFrame platforms only.
 
 ```bash
 benchbox tuning defaults --platform polars
