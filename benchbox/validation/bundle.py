@@ -607,10 +607,10 @@ def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
 
     Mirrors the query-row conventions used elsewhere in this module: an
     absent ``run_type`` defaults to measurement, and only SUCCESS rows
-    count as measurement evidence. Rows with unparseable or non-positive
-    ``ms`` are dropped — all-zero runs are owned by the queries-section
-    gate, and sub-millisecond minima would make spread ratios
-    noise-dominated.
+    count as measurement evidence. Rows with unparseable, non-positive,
+    or sub-millisecond ``ms`` are dropped — all-zero runs are owned by
+    the queries-section gate, and sub-millisecond minima would make
+    spread ratios noise-dominated (timer resolution, not engine speed).
     """
     queries = data.get("queries")
     if not isinstance(queries, list):
@@ -632,7 +632,7 @@ def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
             ms = float(q.get("ms"))
         except (TypeError, ValueError):
             continue
-        if not math.isfinite(ms) or ms <= 0:
+        if not math.isfinite(ms) or ms < 1.0:
             continue
         grouped.setdefault(qid, []).append(ms)
     return grouped
@@ -643,7 +643,11 @@ def _bundle_benchmark_id(data: dict[str, Any]) -> str | None:
     if not isinstance(benchmark, dict):
         return None
     bm_id = benchmark.get("id")
-    return bm_id if isinstance(bm_id, str) and bm_id else None
+    if not isinstance(bm_id, str) or not bm_id.strip():
+        return None
+    # "TPCH" names the same family as "tpch" for scoping, cohorting, and
+    # messages alike; casing or padding must not change the verdict.
+    return bm_id.strip().casefold()
 
 
 def _bundle_platform_key(data: dict[str, Any]) -> str | None:
@@ -675,20 +679,23 @@ def _bundle_passed_validation(data: dict[str, Any]) -> bool:
 
 
 def _bundle_geomean_ms(data: dict[str, Any]) -> float | None:
+    """Geometric-mean timing for cross-bundle comparison, or None.
+
+    Geometric only: falling back to an arithmetic mean would compare mixed
+    metrics across bundles while the warning message claims "geomean".
+    A bundle without a recorded geometric mean simply does not participate.
+    """
     summary = data.get("summary")
     if not isinstance(summary, dict):
         return None
     timing = summary.get("timing")
     if not isinstance(timing, dict):
         return None
-    for key in ("geometric_mean_ms", "avg_ms"):
-        try:
-            value = float(timing.get(key))
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(value) and value > 0:
-            return value
-    return None
+    try:
+        value = float(timing.get("geometric_mean_ms"))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
 
 
 def _bundle_rows_loaded(data: dict[str, Any]) -> int | None:
@@ -701,9 +708,13 @@ def _bundle_rows_loaded(data: dict[str, Any]) -> int | None:
     rows = payload.get("rows_loaded")
     if isinstance(rows, bool):
         return None
+    if isinstance(rows, float) and not math.isfinite(rows):
+        # JSON numbers like 1e309 parse to inf; int() would raise
+        # OverflowError, so treat non-finite floats as unreported.
+        return None
     try:
         value = int(rows)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return value if value >= 0 else None
 
@@ -726,8 +737,7 @@ def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
             "timing-plateau",
             f"timing-plateau: benchmark {bm_id!r} per-query means span "
             f"{floor:.0f}-{peak:.0f}ms (max/min {ratio:.2f}, CV {cv:.2f}); "
-            "heterogeneous queries should vary more — check for fixed-overhead-dominated "
-            "measurement (evidence: queries[].ms grouped by queries[].id)",
+            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement",
         )
 
 
@@ -749,8 +759,7 @@ def _warn_small_scale_floor(data: dict[str, Any], vr: ValidationResult) -> None:
     vr.require_override(
         "small-scale-floor",
         f"small-scale-floor: scale factor {sf:g} ({rows_note}) but fastest measurement is "
-        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this "
-        "data volume (evidence: queries[].ms, summary.data.rows_loaded)",
+        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume",
     )
 
 
@@ -763,7 +772,10 @@ def _passed_cohorts(
     """Group clean-validation bundles by platform cohort and peer set.
 
     Only bundles claiming clean validation participate, so mirror-lane
-    partials never distort a comparison.
+    partials never distort a comparison. Cohorts are further scoped to
+    heterogeneous benchmarks — micro-benchmarks are uniform by
+    construction, so a tight band or a flat scale curve there is expected
+    signal, not a plausibility finding (same rationale as the C1 scope).
     """
     cohorts: dict[tuple[str, str], list[tuple[dict[str, Any], ValidationResult]]] = {}
     peers: dict[tuple[str, float], list[tuple[dict[str, Any], ValidationResult]]] = {}
@@ -771,6 +783,8 @@ def _passed_cohorts(
         if not _bundle_passed_validation(data):
             continue
         bm_id = _bundle_benchmark_id(data)
+        if bm_id not in TIMING_PLAUSIBILITY_HETEROGENEOUS_BENCHMARKS:
+            continue
         platform = _bundle_platform_key(data)
         sf = _bundle_scale_factor(data)
         if bm_id is None:
@@ -814,14 +828,14 @@ def _warn_scale_invariance(
         detail = (f"geomean x{geo_ratio:.2f}" if geo_ratio is not None else "geomean unevaluable") + (
             f", per-query median x{per_query_ratio:.2f}" if per_query_ratio is not None else ", per-query unevaluable"
         )
+        span = hi / lo
         for data, vr in members:
             if _bundle_scale_factor(data) in (lo, hi):
                 vr.require_override(
                     "scale-invariant",
-                    f"scale-invariant: benchmark {bm_id!r} grows {lo:g}x in scale "
+                    f"scale-invariant: benchmark {bm_id!r} grows {span:g}x in scale "
                     f"but timings barely move ({detail}); check for result caching or "
-                    "fixed-overhead-dominated measurement "
-                    "(evidence: queries[].ms, summary.timing.geometric_mean_ms)",
+                    "fixed-overhead-dominated measurement",
                 )
 
 
@@ -844,6 +858,10 @@ def _warn_floor_outlier(
 ) -> None:
     """Warn when one bundle's fastest query dwarfs the peer median.
 
+    Peers are distinct platforms: same-platform reruns are consolidated to
+    one floor per platform (and never count toward the peer quorum), so
+    repeated runs of one engine cannot mark themselves an outlier.
+
     Informational only: a genuinely slower engine must never be refused by
     peer comparison alone.
     """
@@ -851,14 +869,24 @@ def _warn_floor_outlier(
         if len(members) < FLOOR_OUTLIER_MIN_PEERS + 1:
             continue
         floors = _peer_floor_timings(members)
+        platforms = [_bundle_platform_key(data) for data, _ in members]
         for index, (_data, vr) in enumerate(members):
             own = floors.get(index)
             if own is None:
                 continue
-            others = [value for other, value in floors.items() if other != index]
-            if len(others) < FLOOR_OUTLIER_MIN_PEERS:
+            own_platform = platforms[index]
+            by_platform: dict[str, list[float]] = {}
+            for other, value in floors.items():
+                if other == index:
+                    continue
+                key = platforms[other]
+                if key is None or key == own_platform:
+                    continue
+                by_platform.setdefault(key, []).append(value)
+            if len(by_platform) < FLOOR_OUTLIER_MIN_PEERS:
                 continue
-            if own > FLOOR_OUTLIER_PEER_MULTIPLE * statistics.median(others):
+            peer_median = statistics.median(statistics.median(values) for values in by_platform.values())
+            if own > FLOOR_OUTLIER_PEER_MULTIPLE * peer_median:
                 vr.warn(
                     f"floor-outlier (informational): fastest measurement {own:.0f}ms is "
                     f"more than {FLOOR_OUTLIER_PEER_MULTIPLE:g}x the peer median "

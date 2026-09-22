@@ -71,6 +71,13 @@ _DATE_INTERVAL_RE = re.compile(
     re.IGNORECASE,
 )
 _DATE_NOW_RE = re.compile(r"DATE\s*\(\s*['\"]now['\"]\s*\)", re.IGNORECASE)
+DATAFRAME_ETL_TABLE_DIR = "dataframe-etl-tables"
+"""Directory (under output_dir) holding DataFrame-mode ETL tables.
+
+DataFrame ETL writes tables here instead of the caller CWD so runs do not
+scatter relative directories; paths from earlier releases that wrote to the
+CWD are not migrated automatically."""
+
 _DOUBLE_COUNT_RE = re.compile(
     r"\(\s*SELECT\s+COUNT\s*\(\s*\*\s*\)\s+FROM\s+\(\s*(?:(?:/\*[^*]*\*/|--[^\n]*)\s*)?"
     r"SELECT\s+COUNT\s*\(\s*\*\s*\)\s+AS\s+\w+\s+(FROM\s+[^)]+)\)\s*\)",
@@ -1034,7 +1041,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         backend = DataFrameETLBackend(
             maintenance_ops=maintenance_ops,
             platform_name=platform_name,
-            table_root=Path(self.output_dir) / "dataframe-etl-tables",
+            table_root=Path(self.output_dir) / DATAFRAME_ETL_TABLE_DIR,
         )
         return results + self._execute_etl_stage_queries(
             backend=backend,
@@ -1800,8 +1807,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         """Transform a JSON file to a table DataFrame."""
         transformations = ["json_parsing", "json_normalization", "schema_mapping"]
 
-        # Read JSON file using pandas
-        df = pd.read_json(file_path)
+        # Read JSON file using pandas. convert_dates=False keeps date-like
+        # payloads as text through ingest: pandas infers datetimes by column
+        # name (a column literally named "date" becomes datetime64), and
+        # downstream loads treat these fields as strings.
+        df = pd.read_json(file_path, convert_dates=False)
 
         # Add batch metadata
         df["batch_id"] = batch_type
@@ -1815,6 +1825,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "status",
             "account_desc",
             "tax_status",
+            "date",
             "opening_date",
             "batch_id",
             "load_timestamp",
