@@ -89,6 +89,11 @@ class TestTableFormat:
         adapter = StubSparkAdapter(requested_table_format=None, table_format=None)
         assert adapter._external_table_format() == "parquet"
 
+    def test_rejects_unknown_format(self):
+        adapter = StubSparkAdapter(requested_table_format="excel")
+        with pytest.raises(ConfigurationError, match="Unsupported external table format"):
+            adapter._external_table_format()
+
 
 class TestRegisterHook:
     def test_default_hook_is_not_implemented(self):
@@ -151,6 +156,19 @@ class TestCreateExternalTables:
         adapter = StubSparkAdapter(s3_staging_dir=None)
         with pytest.raises(ValueError, match="staging location"):
             adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+
+    def test_empty_table_list_raises(self, tmp_path: Path):
+        adapter = StubSparkAdapter()
+        with pytest.raises(ConfigurationError, match="No benchmark tables resolved"):
+            adapter.create_external_tables(_benchmark(), None, tmp_path)
+
+    def test_missing_upload_warns(self, tmp_path: Path, caplog):
+        adapter = StubSparkAdapter(counts={"lineitem": 1})
+        adapter._staging.upload_tables.return_value = {}
+        with caplog.at_level("WARNING", logger="benchbox.platforms.base.cloud_spark.external_tables"):
+            stats, _, _ = adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+        assert stats == {"lineitem": 1}
+        assert any("No source files uploaded for table 'lineitem'" in message for message in caplog.messages)
 
 
 class TestCountRows:

@@ -470,11 +470,16 @@ spark.stop()
         self._validate_external_identifier(self.database, "database name")
         safe_location = self._escape_external_location(location)
         create_table_query = f"""
-            CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name}
+            CREATE OR REPLACE TABLE {self.database}.{table_name}
             USING {file_format.upper()}
             LOCATION '{safe_location}'
         """
-        self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
+        batch_id, state = self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
+        if state not in DataprocBatchState.SUCCESS_STATES:
+            raise RuntimeError(
+                f"Dataproc Serverless external table registration failed for "
+                f"'{self.database}.{table_name}' with state: {state} (batch {batch_id})"
+            )
         logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(

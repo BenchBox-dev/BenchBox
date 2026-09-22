@@ -351,6 +351,7 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         table_name: str,
         file_format: str,
         s3_location: str,
+        replace: bool = False,
     ) -> None:
         """Create a table in Glue Data Catalog.
 
@@ -358,6 +359,9 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             table_name: Name of the table.
             file_format: Data format (parquet, csv, etc.).
             s3_location: S3 path to table data.
+            replace: When True, delete any existing registration first so a
+                stale pointer (different location or format from an earlier
+                run) can never survive.
         """
         client = self._get_glue_client()
 
@@ -394,11 +398,18 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
             },
         }
 
+        if replace:
+            try:
+                client.delete_table(DatabaseName=self.database, Name=table_name)
+            except ClientError as e:
+                if e.response.get("Error", {}).get("Code") != "EntityNotFoundException":
+                    raise
+
         try:
             client.create_table(DatabaseName=self.database, TableInput=table_input)
             logger.info(f"Created table '{self.database}.{table_name}'")
         except ClientError as e:
-            if e.response.get("Error", {}).get("Code") == "AlreadyExistsException":
+            if e.response.get("Error", {}).get("Code") == "AlreadyExistsException" and not replace:
                 logger.debug(f"Table '{table_name}' already exists, skipping")
             else:
                 raise
@@ -407,7 +418,7 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
         """Register one external table in the Glue Data Catalog."""
         self._validate_external_identifier(table_name, "table name")
         self._validate_external_identifier(self.database, "database name")
-        self._create_catalog_table(table_name, file_format, location)
+        self._create_catalog_table(table_name, file_format, location, replace=True)
         logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(

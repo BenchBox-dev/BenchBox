@@ -58,11 +58,16 @@ class TestRegisterExternalTable:
             adapter._register_external_table("lineitem", "s3://my-bucket/benchbox-data/lineitem/", "parquet")
 
         sql = submit.call_args[0][0]
-        assert "CREATE EXTERNAL TABLE IF NOT EXISTS benchbox.lineitem" in sql
+        assert "CREATE OR REPLACE TABLE benchbox.lineitem" in sql
         assert "USING PARQUET" in sql
         assert "LOCATION 's3://my-bucket/benchbox-data/lineitem/'" in sql
         assert submit.call_args[1].get("code_type") == "SQL"
         assert submit.call_args[1].get("wait_for_completion") is True
+
+    def test_failed_calculation_raises(self, adapter):
+        with patch.object(adapter, "_submit_calculation", return_value=("calc-9", "FAILED")):
+            with pytest.raises(RuntimeError, match="calc-9"):
+                adapter._register_external_table("lineitem", "s3://my-bucket/benchbox-data/lineitem/", "parquet")
 
 
 class TestCreateExternalTables:

@@ -59,10 +59,15 @@ class TestRegisterExternalTable:
             adapter._register_external_table("lineitem", "gs://test-bucket/benchbox-data/lineitem/", "parquet")
 
         sql = submit.call_args[0][0]
-        assert "CREATE EXTERNAL TABLE IF NOT EXISTS benchbox.lineitem" in sql
+        assert "CREATE OR REPLACE TABLE benchbox.lineitem" in sql
         assert "USING PARQUET" in sql
         assert "LOCATION 'gs://test-bucket/benchbox-data/lineitem/'" in sql
         assert submit.call_args[1].get("wait_for_completion") is True
+
+    def test_failed_batch_raises(self, adapter):
+        with patch.object(adapter, "_submit_spark_sql_batch", return_value=("b-9", "FAILED")):
+            with pytest.raises(RuntimeError, match="b-9"):
+                adapter._register_external_table("lineitem", "gs://test-bucket/benchbox-data/lineitem/", "parquet")
 
 
 class TestCreateExternalTables:

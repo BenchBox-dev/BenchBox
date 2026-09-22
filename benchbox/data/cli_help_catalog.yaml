@@ -137,11 +137,11 @@ command_examples:
     - benchbox run --platform athena --benchmark tpch --table-mode external \
     - '  --platform-option staging_root=s3://my-bucket/benchbox/  # Skip CTAS materialization'
     - '# Athena Spark: select Spark engine version'
-    - benchbox run --platform athena --benchmark tpch \
+    - benchbox run --platform athena-spark --benchmark tpch \
     - '  --platform-option workgroup=my-spark-workgroup \'
     - '  --platform-option s3_staging_dir=s3://my-bucket/staging/ \'
     - '  --platform-option "engine_version=PySpark engine version 3"'
-    - benchbox run --platform athena --benchmark tpch --table-mode external \
+    - benchbox run --platform athena-spark --benchmark tpch --table-mode external \
     - '  --platform-option workgroup=my-spark-workgroup \'
     - '  --platform-option s3_staging_dir=s3://my-bucket/staging/ \'
     - '  --platform-option "engine_version=PySpark engine version 3"  # External tables over staged Parquet'

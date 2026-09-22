@@ -56,19 +56,22 @@ class TestCapability:
 class TestRegisterExternalTable:
     def test_submits_ddl_and_waits(self, adapter):
         with (
+            patch.object(adapter, "_ensure_application_started") as ensure,
             patch.object(adapter, "_submit_job_run", return_value="job-1") as submit,
             patch.object(adapter, "_wait_for_job_run", return_value=("SUCCESS", {})) as wait,
         ):
             adapter._register_external_table("lineitem", "s3://my-bucket/benchbox-data/lineitem/", "parquet")
 
         sql = submit.call_args[0][0]
-        assert "CREATE EXTERNAL TABLE IF NOT EXISTS benchbox.lineitem" in sql
+        assert "CREATE OR REPLACE TABLE benchbox.lineitem" in sql
         assert "USING PARQUET" in sql
         assert "LOCATION 's3://my-bucket/benchbox-data/lineitem/'" in sql
+        ensure.assert_called_once_with()
         wait.assert_called_once_with("job-1")
 
     def test_wait_failure_propagates(self, adapter):
         with (
+            patch.object(adapter, "_ensure_application_started"),
             patch.object(adapter, "_submit_job_run", return_value="job-1"),
             patch.object(adapter, "_wait_for_job_run", side_effect=RuntimeError("FAILED")),
         ):
@@ -89,6 +92,7 @@ class TestCreateExternalTables:
             return {"status": "SUCCESS", "results": [{"row_count": 1500}]}
 
         with (
+            patch.object(adapter, "_ensure_application_started"),
             patch.object(adapter, "_submit_job_run", return_value="job-1"),
             patch.object(adapter, "_wait_for_job_run", return_value=("SUCCESS", {})),
             patch.object(adapter, "create_schema", return_value=0.0),

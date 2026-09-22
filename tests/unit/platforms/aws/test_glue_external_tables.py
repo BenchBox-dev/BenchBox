@@ -57,7 +57,30 @@ class TestRegisterExternalTable:
         with patch.object(adapter, "_create_catalog_table") as create:
             adapter._register_external_table("lineitem", "s3://my-bucket/benchbox-data/lineitem/", "parquet")
 
-        create.assert_called_once_with("lineitem", "parquet", "s3://my-bucket/benchbox-data/lineitem/")
+        create.assert_called_once_with("lineitem", "parquet", "s3://my-bucket/benchbox-data/lineitem/", replace=True)
+
+    def test_replace_deletes_before_create(self, adapter):
+        ClientError = pytest.importorskip("botocore.exceptions").ClientError
+
+        mock_client = MagicMock()
+        mock_client.delete_table.side_effect = ClientError(
+            {"Error": {"Code": "EntityNotFoundException"}}, "DeleteTable"
+        )
+        with patch.object(adapter, "_get_glue_client", return_value=mock_client):
+            adapter._create_catalog_table("lineitem", "parquet", "s3://b/lineitem/", replace=True)
+
+        mock_client.delete_table.assert_called_once_with(DatabaseName=adapter.database, Name="lineitem")
+        mock_client.create_table.assert_called_once()
+
+    def test_replace_surfaces_unexpected_delete_errors(self, adapter):
+        ClientError = pytest.importorskip("botocore.exceptions").ClientError
+
+        mock_client = MagicMock()
+        mock_client.delete_table.side_effect = ClientError({"Error": {"Code": "AccessDeniedException"}}, "DeleteTable")
+        with patch.object(adapter, "_get_glue_client", return_value=mock_client):
+            with pytest.raises(ClientError):
+                adapter._create_catalog_table("lineitem", "parquet", "s3://b/lineitem/", replace=True)
+        mock_client.create_table.assert_not_called()
 
 
 class TestCreateExternalTables:
@@ -79,5 +102,5 @@ class TestCreateExternalTables:
 
         assert stats == {"lineitem": 6000}
         assert elapsed >= 0.0
-        create.assert_called_once_with("lineitem", "parquet", "s3://my-bucket/benchbox-data/lineitem/")
+        create.assert_called_once_with("lineitem", "parquet", "s3://my-bucket/benchbox-data/lineitem/", replace=True)
         assert meta == {"table_uris": {"lineitem": "s3://my-bucket/benchbox-data/lineitem/"}}

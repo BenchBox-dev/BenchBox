@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.exceptions import ConfigurationError
+from benchbox.platforms.base.cloud_spark.mixins import SparkTableFormat
 from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_names
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -99,14 +100,24 @@ class SparkExternalTableMixin:
         """Return the file format used for staged external tables."""
         requested = getattr(self, "requested_table_format", None)
         configured = getattr(self, "table_format", None)
-        return str(requested or configured or "parquet").lower()
+        file_format = str(requested or configured or "parquet").lower()
+        # SparkTableFormat covers the DDL-generatable lakehouse formats; csv
+        # is additionally stageable (globbed and registered as USING CSV).
+        allowed = {member.value for member in SparkTableFormat} | {"csv"}
+        if file_format not in allowed:
+            raise ConfigurationError(
+                f"Unsupported external table format {file_format!r}: expected one of {sorted(allowed)}."
+            )
+        return file_format
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
         """Register one external table over staged files.
 
         Implemented per adapter using its own execution path (Spark SQL
-        submission or catalog API). Must be idempotent for already
-        registered tables.
+        submission or catalog API). Must replace any existing registration
+        so a stale pointer (different location or format from an earlier
+        run) can never survive; dropping and recreating metadata is cheap
+        and keeps reruns honest.
         """
         raise NotImplementedError(
             f"{type(self).__name__} must implement _register_external_table() to support --table-mode external."
@@ -199,6 +210,8 @@ class SparkExternalTableMixin:
         start_time = mono_time()
         source_path = Path(data_dir)
         tables = _resolve_benchmark_table_names(benchmark)
+        if not tables:
+            raise ConfigurationError("No benchmark tables resolved for external table mode.")
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
         file_format = self._external_table_format()
@@ -225,7 +238,11 @@ class SparkExternalTableMixin:
                 source_dir=source_path,
                 file_format=file_format,
             )
-            table_uris = {table: (uploaded or {}).get(table) or staging.get_table_uri(table) for table in tables}
+            uploaded = uploaded or {}
+            for table in tables:
+                if table not in uploaded:
+                    logger.warning(f"No source files uploaded for table '{table}'; registering staged location as-is")
+            table_uris = {table: uploaded.get(table) or staging.get_table_uri(table) for table in tables}
 
         table_stats: dict[str, int] = {}
         for table in tables:

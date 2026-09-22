@@ -487,9 +487,10 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExterna
         self._validate_external_identifier(self.database, "database name")
         safe_location = self._escape_external_location(location)
         create_sql = (
-            f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name} "
+            f"CREATE OR REPLACE TABLE {self.database}.{table_name} "
             f"USING {file_format.upper()} LOCATION '{safe_location}'"
         )
+        self._ensure_application_started()
         job_run_id = self._submit_job_run(create_sql)
         self._wait_for_job_run(job_run_id)
         logger.info(f"Registered external table {self.database}.{table_name}")
