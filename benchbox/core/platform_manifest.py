@@ -1559,7 +1559,12 @@ _PLATFORM_MANIFEST_JSON = """[
   },
   {
     "key": "pg-duckdb",
-    "aliases": [],
+    "aliases": [
+      {
+        "name": "pg_duckdb",
+        "scopes": ["registry"]
+      }
+    ],
     "adapter": {
       "module": "benchbox.platforms.pg_duckdb",
       "class_name": "PgDuckDBAdapter",

@@ -17,6 +17,7 @@ from benchbox.platforms.base.format_capabilities import (
     is_format_supported,
     normalize_platform_key,
 )
+from benchbox.utils.format_selection import FormatSelector
 
 pytestmark = [
     pytest.mark.unit,
@@ -86,6 +87,25 @@ class TestNormalizePlatformKey:
         assert "parquet" in formats
         assert "iceberg" not in formats
 
+    def test_pg_duckdb_spelling_variance(self):
+        """CLI 'pg-duckdb' and adapter 'pg_duckdb' resolve to the same key."""
+        assert normalize_platform_key("pg-duckdb") == "pg_duckdb"
+        assert normalize_platform_key("pg_duckdb") == "pg_duckdb"
+        assert normalize_platform_key("fabric-dw") == "fabric_dw"
+        assert get_supported_formats("pg-duckdb") == get_supported_formats("pg_duckdb")
+
+    def test_no_folded_key_collisions(self):
+        """No two preference keys may coincide under hyphen/underscore folding."""
+        folded = [key.replace("-", "_") for key in PLATFORM_FORMAT_PREFERENCES]
+        assert len(set(folded)) == len(folded)
+
+    def test_pg_duckdb_rejects_unbacked_user_format(self):
+        """An explicit delta/iceberg request on pg_duckdb fails fast by name."""
+        with pytest.raises(ValueError, match="pg_duckdb"):
+            FormatSelector.select_format("pg_duckdb", ["tbl", "delta"], user_preference="delta")
+        with pytest.raises(ValueError, match="pg-duckdb"):
+            FormatSelector.select_format("pg-duckdb", ["tbl", "iceberg"], user_preference="iceberg")
+
     def test_normalization_used_by_is_format_supported(self):
         """Test that is_format_supported works with display names."""
         assert is_format_supported("ClickHouse Cloud", "parquet") is True
@@ -117,6 +137,7 @@ class TestFormatCapabilities:
         assert PARQUET_CAPABILITY.supported_platforms.get("datafusion") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("athena") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("postgresql") == SupportLevel.EXTENSION
+        assert PARQUET_CAPABILITY.supported_platforms.get("pg_duckdb") == SupportLevel.EXTENSION
 
     def test_parquet_spark_platform_support(self):
         """Test Parquet support for Spark-based platforms."""
@@ -350,6 +371,13 @@ class TestGetSupportedFormats:
         # Text files preferred over binary formats for native loading
         assert formats.index("tbl") < formats.index("parquet")
 
+    def test_pg_duckdb_supported_formats(self):
+        """pg_duckdb native loads stay tbl-first; delta/iceberg not load-selected."""
+        formats = get_supported_formats("pg_duckdb")
+        assert formats == ["tbl", "parquet", "csv"]
+        assert "delta" not in formats
+        assert "iceberg" not in formats
+
     def test_datafusion_supported_formats(self):
         """Test DataFusion supported formats."""
         formats = get_supported_formats("datafusion")
@@ -512,6 +540,11 @@ class TestGetPreferredFormat:
         preferred = get_preferred_format("duckdb", ["tbl", "parquet"])
         assert preferred == "tbl"
 
+    def test_pg_duckdb_preferred_format(self):
+        """pg_duckdb prefers tbl like postgresql, even when parquet is available."""
+        assert get_preferred_format("pg_duckdb") == "tbl"
+        assert get_preferred_format("pg_duckdb", ["parquet", "tbl"]) == "tbl"
+
     def test_databricks_preferred_format(self):
         """Test Databricks preferred format."""
         preferred = get_preferred_format("databricks")
@@ -564,12 +597,14 @@ class TestIsFormatSupported:
         """Test Parquet support detection."""
         assert is_format_supported("duckdb", "parquet") is True
         assert is_format_supported("datafusion", "parquet") is True
+        assert is_format_supported("pg_duckdb", "parquet") is True
         assert is_format_supported("unknown_platform", "parquet") is False
 
     def test_delta_support(self):
         """Test Delta Lake support detection."""
         assert is_format_supported("databricks", "delta") is True
         assert is_format_supported("duckdb", "delta") is True
+        assert is_format_supported("pg_duckdb", "delta") is False
         assert is_format_supported("datafusion", "delta") is True
         assert is_format_supported("trino", "delta") is True
         assert is_format_supported("snowflake", "delta") is False
@@ -614,6 +649,7 @@ class TestIsFormatSupported:
     def test_iceberg_support(self):
         """Test Iceberg support detection."""
         assert is_format_supported("duckdb", "iceberg") is True
+        assert is_format_supported("pg_duckdb", "iceberg") is False
         assert is_format_supported("trino", "iceberg") is True
         assert is_format_supported("snowflake", "iceberg") is False
         assert is_format_supported("clickhouse", "iceberg") is False

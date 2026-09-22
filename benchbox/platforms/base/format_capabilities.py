@@ -61,6 +61,10 @@ PARQUET_CAPABILITY = FormatCapability(
         "bigquery": SupportLevel.NATIVE,
         "redshift": SupportLevel.NATIVE,
         "postgresql": SupportLevel.EXTENSION,
+        # Inherits the PostgreSQL pyarrow->COPY Parquet load path
+        # (see _write_parquet_to_copy); the embedded DuckDB engine is not
+        # used for file reads.
+        "pg_duckdb": SupportLevel.EXTENSION,
         "sqlite": SupportLevel.EXTENSION,
         "spark": SupportLevel.NATIVE,
         "emr-serverless": SupportLevel.NATIVE,
@@ -94,6 +98,11 @@ DELTA_CAPABILITY = FormatCapability(
     supported_platforms={
         "databricks": SupportLevel.NATIVE,
         "duckdb": SupportLevel.EXTENSION,  # delta extension
+        # NOTE: pg_duckdb is deliberately absent here. The embedded engine could
+        # read Delta via the DuckDB delta extension, but BenchBox has no adapter
+        # read path for it, and this registry gates FormatSelector dispatch -
+        # registering it would turn a clean up-front rejection into a late
+        # load failure. See docs/platforms/pg_duckdb.md.
         "datafusion": SupportLevel.EXTENSION,  # via deltalake Python library
         "trino": SupportLevel.EXTENSION,  # via delta catalog connector
         "presto": SupportLevel.EXTENSION,  # via delta catalog connector
@@ -124,6 +133,8 @@ ICEBERG_CAPABILITY = FormatCapability(
     },
     supported_platforms={
         "duckdb": SupportLevel.EXPERIMENTAL,  # iceberg extension
+        # NOTE: pg_duckdb is deliberately absent here, for the same reason as
+        # Delta above - no adapter read path, and this registry gates dispatch.
         "datafusion": SupportLevel.EXTENSION,  # via pyiceberg Python library
         "trino": SupportLevel.EXTENSION,  # via iceberg catalog connector
         "presto": SupportLevel.EXTENSION,  # via iceberg catalog connector
@@ -216,6 +227,8 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "snowflake": ["tbl", "parquet", "csv"],
     "redshift": ["tbl", "parquet", "csv"],
     "postgresql": ["tbl", "parquet", "csv"],
+    # No delta/iceberg: no adapter read path (see docs/platforms/pg_duckdb.md).
+    "pg_duckdb": ["tbl", "parquet", "csv"],
     "sqlite": ["tbl", "parquet", "csv"],
     # Athena's native load path stages delimited text into S3, then optionally
     # converts it to Parquet with CTAS. Native loads should not select Parquet
@@ -320,6 +333,14 @@ def normalize_platform_key(platform_name: str) -> str:
     hyphenated = key.replace(" ", "-")
     if hyphenated in PLATFORM_FORMAT_PREFERENCES:
         return hyphenated
+
+    # Underscore/hyphen spelling variance (e.g., CLI "pg-duckdb" vs adapter
+    # "pg_duckdb"). Only reached when the hyphenated spelling is not itself
+    # a registered key, so existing hyphenated keys are unaffected.
+    if "-" in key:
+        underscored = key.replace("-", "_")
+        if underscored in PLATFORM_FORMAT_PREFERENCES:
+            return underscored
 
     return key
 
