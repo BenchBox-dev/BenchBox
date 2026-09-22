@@ -83,6 +83,18 @@ class TestRegisterExternalTable:
         mock_client.create_table.assert_not_called()
 
 
+class TestJobScript:
+    def test_script_resolves_job_run_id(self, adapter):
+        """The runner script must list JOB_RUN_ID or every run fails with KeyError."""
+        mock_s3 = MagicMock()
+        with patch.object(adapter, "_get_s3_client", return_value=mock_s3):
+            adapter._upload_job_script()
+
+        body = mock_s3.put_object.call_args[1]["Body"].decode("utf-8")
+        assert "'JOB_RUN_ID'" in body
+        assert "args['JOB_RUN_ID']" in body
+
+
 class TestCreateExternalTables:
     def test_end_to_end_with_counts(self, adapter, tmp_path):
         staging = MagicMock()

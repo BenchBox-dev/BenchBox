@@ -31,6 +31,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from pathlib import Path
@@ -51,6 +52,16 @@ _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
 # Staging URI schemes accepted for external mode. Rejects bare paths and
 # unknown schemes before any upload or DDL runs.
 _ALLOWED_STAGING_SCHEMES = ("s3://", "gs://", "abfss://", "adl://", "hdfs://", "file://")
+
+# Source-file extensions mapped to the format Spark would register them as.
+# Extensions absent here (uploader markers, checksums) are ignored by format
+# detection rather than treated as a format.
+_SOURCE_FORMAT_BY_EXTENSION = {
+    ".parquet": "parquet",
+    ".csv": "csv",
+    ".tbl": "tbl",
+    ".json": "json",
+}
 
 
 class SparkExternalTableMixin:
@@ -109,6 +120,93 @@ class SparkExternalTableMixin:
                 f"Unsupported external table format {file_format!r}: expected one of {sorted(allowed)}."
             )
         return file_format
+
+    @staticmethod
+    def _detect_table_source_format(source_dir: Path, table: str) -> str | None:
+        """Detect a table's on-disk source format, if it is unambiguous.
+
+        Returns ``parquet``, ``csv``, ``tbl``, ``delta``, or ``iceberg`` for
+        a single-format source, else None when nothing (or nothing
+        recognizable, such as uploader marker files) is present.
+        """
+        candidates = [c for c in sorted(source_dir.glob(f"{table}*")) if c.is_file() or c.is_dir()]
+        if not candidates:
+            return None
+        for candidate in candidates:
+            if candidate.is_dir():
+                if (candidate / "_delta_log").is_dir():
+                    return "delta"
+                metadata_dir = candidate / "metadata"
+                # Iceberg table layout (mirrors benchbox.utils.iceberg_layout
+                # on newer branches; kept local until that helper lands).
+                if metadata_dir.is_dir() and (
+                    (metadata_dir / "version-hint.text").exists() or list(metadata_dir.glob("*.metadata.json"))
+                ):
+                    return "iceberg"
+        recognized = {
+            _SOURCE_FORMAT_BY_EXTENSION[candidate.suffix.lower()]
+            for candidate in candidates
+            if candidate.is_file() and candidate.suffix.lower() in _SOURCE_FORMAT_BY_EXTENSION
+        }
+        if len(recognized) == 1:
+            return next(iter(recognized))
+        return None
+
+    def _resolve_external_source_format(self, source_dir: Path, tables: list[str]) -> str:
+        """Reconcile the requested format with the actual staged sources.
+
+        An explicit ``--table-format`` must match the sources; without one,
+        self-describing sources (parquet, delta, iceberg) are adopted, while
+        anything else fails fast — registering ``.tbl`` files as
+        ``USING PARQUET`` silently benchmarks the wrong bytes.
+        """
+        requested = getattr(self, "requested_table_format", None)
+        detected = {table: self._detect_table_source_format(source_dir, table) for table in tables}
+        known = {table: fmt for table, fmt in detected.items() if fmt is not None}
+        if requested is not None:
+            mismatched = {table: fmt for table, fmt in known.items() if fmt != str(requested).lower()}
+            if mismatched:
+                detail = ", ".join(f"{table} ({fmt})" for table, fmt in sorted(mismatched.items()))
+                raise ConfigurationError(
+                    f"External table format {str(requested).lower()!r} does not match staged sources: "
+                    f"{detail}. Provide sources in the requested format or drop --table-format."
+                )
+            return self._external_table_format()
+        distinct = set(known.values())
+        if not distinct:
+            return self._external_table_format()
+        if len(distinct) > 1:
+            detail = ", ".join(f"{table} ({fmt})" for table, fmt in sorted(known.items()))
+            raise ConfigurationError(
+                f"External table sources have mixed formats: {detail}. "
+                "Stage a single format or pass --table-format explicitly."
+            )
+        only = next(iter(distinct))
+        if only in {"parquet", "delta", "iceberg"}:
+            return only
+        if only == "csv":
+            raise ConfigurationError(
+                "External table sources are CSV; pass --table-format csv explicitly to register "
+                "them (headers required), or stage Parquet sources instead."
+            )
+        raise ConfigurationError(
+            f"External table sources are {only.upper()} files, which Spark cannot register; "
+            "stage Parquet/CSV/Delta/Iceberg sources instead."
+        )
+
+    def _staged_dataset_fingerprint(self, benchmark: Any, file_format: str) -> str:
+        """Hash the staged dataset identity so reuse cannot cross datasets.
+
+        Covers the benchmark, scale factor, seed, requested format, and table
+        list: reusing a staging root across any of those changes must
+        re-upload rather than benchmark stale files.
+        """
+        name = getattr(benchmark, "name", None) or type(benchmark).__name__
+        scale = getattr(benchmark, "scale_factor", getattr(benchmark, "scale", "unknown"))
+        seed = getattr(benchmark, "seed", "unknown")
+        tables = ",".join(sorted(_resolve_benchmark_table_names(benchmark)))
+        raw = f"{name}|{scale}|{seed}|{file_format}|{tables}"
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
         """Register one external table over staged files.
@@ -214,7 +312,7 @@ class SparkExternalTableMixin:
             raise ConfigurationError("No benchmark tables resolved for external table mode.")
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
-        file_format = self._external_table_format()
+        file_format = self._resolve_external_source_format(source_path, tables)
 
         staging = getattr(self, "_staging", None)
         if staging is None:
@@ -228,7 +326,8 @@ class SparkExternalTableMixin:
         # adapters, which external tables also require.
         self.create_schema(benchmark, connection)
 
-        if staging.tables_exist(tables):
+        fingerprint = self._staged_dataset_fingerprint(benchmark, file_format)
+        if staging.tables_exist(tables, file_format, fingerprint):
             logger.info("Tables already exist in staging, skipping upload")
             table_uris = {table: staging.get_table_uri(table) for table in tables}
         else:
@@ -237,6 +336,7 @@ class SparkExternalTableMixin:
                 tables=tables,
                 source_dir=source_path,
                 file_format=file_format,
+                fingerprint=fingerprint,
             )
             uploaded = uploaded or {}
             for table in tables:

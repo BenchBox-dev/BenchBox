@@ -552,7 +552,7 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 import json
 
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 'database', 'output_path', 'query'])
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 'JOB_RUN_ID', 'database', 'output_path', 'query'])
 
 sc = SparkContext()
 glueContext = GlueContext(sc)

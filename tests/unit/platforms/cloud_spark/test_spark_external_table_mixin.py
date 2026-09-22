@@ -170,6 +170,42 @@ class TestCreateExternalTables:
         assert stats == {"lineitem": 1}
         assert any("No source files uploaded for table 'lineitem'" in message for message in caplog.messages)
 
+    def test_tbl_sources_without_request_raise(self, tmp_path: Path):
+        adapter = StubSparkAdapter(counts={"lineitem": 1})
+        (tmp_path / "lineitem.tbl").write_text("1|a|\n")
+        with pytest.raises(ConfigurationError, match="TBL"):
+            adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+
+    def test_explicit_format_mismatch_raises(self, tmp_path: Path):
+        adapter = StubSparkAdapter(requested_table_format="parquet")
+        (tmp_path / "lineitem.tbl").write_text("1|a|\n")
+        with pytest.raises(ConfigurationError, match="does not match"):
+            adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+
+    def test_parquet_sources_adopted_over_configured_default(self, tmp_path: Path):
+        adapter = StubSparkAdapter(counts={"lineitem": 5}, table_format="csv")
+        (tmp_path / "lineitem.parquet").write_bytes(b"PAR1")
+        stats, _, _ = adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+        assert stats == {"lineitem": 5}
+        assert adapter.registered == [("lineitem", "s3://bucket/staging/lineitem/", "parquet")]
+
+    def test_fingerprint_passed_to_staging(self, tmp_path: Path):
+        adapter = StubSparkAdapter(counts={"lineitem": 1})
+        benchmark = _benchmark("lineitem")
+        adapter.create_external_tables(benchmark, None, tmp_path)
+        _, kwargs = adapter._staging.upload_tables.call_args
+        assert kwargs["fingerprint"] == adapter._staged_dataset_fingerprint(benchmark, "parquet")
+
+    def test_fingerprint_changes_with_scale(self):
+        from types import SimpleNamespace
+
+        adapter = StubSparkAdapter()
+        small = SimpleNamespace(tables=["lineitem"], scale_factor=0.01)
+        large = SimpleNamespace(tables=["lineitem"], scale_factor=1.0)
+        assert adapter._staged_dataset_fingerprint(small, "parquet") != adapter._staged_dataset_fingerprint(
+            large, "parquet"
+        )
+
 
 class TestCountRows:
     def test_failed_status_raises(self, tmp_path: Path):
