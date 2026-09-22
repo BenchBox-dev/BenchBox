@@ -741,7 +741,7 @@ def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
     for q in queries:
         if not isinstance(q, dict):
             continue
-        run_type = str(q.get("run_type") or "measurement").lower()
+        run_type = str(q.get("run_type") or "measurement").strip().lower()
         if run_type != "measurement":
             continue
         status = q.get("status")
@@ -1128,7 +1128,7 @@ def _warn_empty_result_rows(data: dict[str, Any], vr: ValidationResult) -> None:
     for q in queries:
         if not isinstance(q, dict):
             continue
-        run_type = str(q.get("run_type") or "measurement").lower()
+        run_type = str(q.get("run_type") or "measurement").strip().lower()
         if run_type != "measurement":
             continue
         status = q.get("status")
@@ -1803,7 +1803,7 @@ def _validate_queries_section(queries: Any, version: Any, vr: ValidationResult) 
     for i, q in enumerate(queries):
         if _validate_single_query(i, q, version, vr):
             any_nonzero = True
-            run_type = str(q.get("run_type") or "measurement").lower() if isinstance(q, dict) else ""
+            run_type = str(q.get("run_type") or "measurement").strip().lower() if isinstance(q, dict) else ""
             if run_type == "measurement":
                 any_nonzero_measurement = True
 
