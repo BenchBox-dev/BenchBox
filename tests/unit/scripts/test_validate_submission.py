@@ -909,6 +909,154 @@ class TestValidateBundle:
 
 
 # ---------------------------------------------------------------------------
+# cache-control receipt gate + empty result rows tripwire
+# ---------------------------------------------------------------------------
+
+
+def _bundle_with_cache_control(receipt, platform_name="Snowflake", **compute_fields):
+    data = _minimal_bundle()
+    compute = dict(compute_fields)
+    if receipt is not None:
+        compute["cache_control"] = receipt
+    data["platform"] = {"name": platform_name, "version": "9.0", "compute": compute}
+    return data
+
+
+class TestCacheControlGate:
+    def test_absent_receipt_grandfathered(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(None), vr)
+        assert vr.ok, vr.errors
+
+    def test_confirmed_disabled_passes(self):
+        receipt = {"validated": True, "cache_disabled": True, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert vr.ok, vr.errors
+
+    def test_unconfirmed_receipt_refused(self):
+        receipt = {"validated": False, "cache_disabled": False, "settings": {}, "warnings": [], "errors": ["boom"]}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("unconfirmed" in e for e in vr.errors)
+
+    def test_confirmed_enabled_refused(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
+
+    def test_malformed_receipt_refused(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control("disabled"), vr)
+        assert not vr.ok
+        assert any("must be an object" in e for e in vr.errors)
+
+    def test_mirror_lane_exempt(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        data = _bundle_with_cache_control(receipt)
+        data["summary"]["validation"] = "partial"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_declared_enabled_cache_refused(self):
+        # A receipt-capable platform declaring result_cache_enabled without a
+        # receipt advertises cached timings with no disabling evidence.
+        for platform_name in ("Snowflake", "Redshift"):
+            vr = ValidationResult("test")
+            data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
+            _validate_bundle(data, vr)
+            assert not vr.ok, platform_name
+            assert any("without a cache_control receipt" in e for e in vr.errors), vr.errors
+
+    def test_absent_receipt_with_declared_disabled_cache_grandfathered(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=False)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
+        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # legacy exemption even when they declare an enabled cache.
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_exempt_in_mirror_lane(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=True)
+        data["summary"]["validation"] = "partial"
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_explicit_enabled_cache_receipt_refused(self):
+        # End to end: the receipt adapters record for disable_result_cache=False
+        # carries confirmed-enabled evidence, which cannot stand as clean.
+        from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
+
+        receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
+
+
+def _bundle_with_rows(row_values, rows_loaded=866602):
+    data = _minimal_bundle()
+    data["queries"] = [
+        {"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "rows": value} for i, value in enumerate(row_values)
+    ]
+    data["summary"]["queries"] = {"total": len(row_values), "passed": len(row_values), "failed": 0}
+    if rows_loaded is None:
+        data["summary"].pop("data", None)
+    else:
+        data["summary"]["data"] = {"rows_loaded": rows_loaded}
+    return data
+
+
+class TestEmptyResultRows:
+    def test_all_empty_against_loaded_data_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0]), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_missing_rows_with_unreported_volume_warns(self):
+        data = _bundle_with_rows([0, 0], rows_loaded=None)
+        for q in data["queries"]:
+            q.pop("rows")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w and "unreported" in w for w in vr.warnings)
+
+    def test_mixed_zero_and_nonzero_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 41]), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_zero_loaded_volume_excuses_empty_results(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0], rows_loaded=0), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_no_success_rows_is_silent(self):
+        data = _bundle_with_rows([0, 0])
+        for q in data["queries"]:
+            q["status"] = "FAILED"
+        data["summary"]["validation"] = "failed"
+        data["summary"]["queries"] = {"total": 2, "passed": 0, "failed": 2}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+
 # timing plausibility warnings (C1-C4; warnings only, never refuse)
 # ---------------------------------------------------------------------------
 

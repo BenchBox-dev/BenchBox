@@ -180,6 +180,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
 
+        # Last session cache-control receipt (sanitized). Recorded when
+        # session cache validation runs and persisted into platform_compute
+        # as deterministic cache-state evidence. None until validated.
+        self._cache_control_receipt: dict[str, Any] | None = None
+
         # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
 
@@ -488,7 +493,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         metadata["platform_deployment"] = self._redshift_deployment_metadata(config)
         metadata["platform_cloud"] = self._redshift_cloud_metadata(config)
-        metadata["platform_compute"] = self._redshift_compute_metadata(config, compute)
+        metadata["platform_compute"] = self._redshift_compute_metadata(
+            config, compute, cache_control=getattr(self, "_cache_control_receipt", None)
+        )
         metadata["platform_storage"] = self._redshift_storage_metadata(config)
         return metadata
 
@@ -547,6 +554,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         cls,
         config: Mapping[str, Any],
         compute: Mapping[str, Any],
+        cache_control: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         service_model = cls._redshift_service_model(config)
         rpu = config.get("base_capacity_rpu") or config.get("current_rpu_capacity")
@@ -585,6 +593,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "enhanced_vpc_routing": config.get("enhanced_vpc_routing"),
                 "encrypted": config.get("encrypted"),
                 "result_cache_enabled": config.get("result_cache_enabled"),
+                "cache_control": dict(cache_control) if isinstance(cache_control, Mapping) else None,
                 "compupdate": config.get("compupdate"),
                 "wlm_query_slot_count": config.get("wlm_query_slot_count"),
                 "wlm_query_queue_name": config.get("wlm_query_queue_name"),
@@ -2052,6 +2061,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if self.disable_result_cache or critical_failures:
                 self.logger.debug("Validating cache control settings...")
                 validation_result = self.validate_session_cache_control(connection)
+                from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(validation_result)
 
                 if not validation_result["validated"]:
                     self.logger.warning(f"Cache control validation failed: {validation_result.get('errors', [])}")
@@ -2059,6 +2071,19 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     self.logger.info(
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
+            else:
+                # The result cache was explicitly left enabled, so there is no
+                # disabled state to probe. Record the configured enabled state
+                # so the bundle carries enabled-cache evidence instead of an
+                # absent receipt that the submission gate would grandfather.
+                from benchbox.platforms.cloud_shared import (
+                    explicit_cache_enabled_receipt,
+                    sanitize_cache_control_receipt,
+                )
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(
+                    explicit_cache_enabled_receipt("enable_result_cache_for_session", "ON")
+                )
 
             # Run VACUUM and ANALYZE on all tables if configured.
             # These operations use a **separate connection** because they are

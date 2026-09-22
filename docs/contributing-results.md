@@ -114,6 +114,7 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Schema compliance** - the bundle is valid schema-v2 JSON with all required fields
 - **Hash verification** - the SHA-256 hash in the manifest matches the bundle contents
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
+- **Cache evidence** - a recorded session cache-control receipt must confirm the cache is disabled; on Snowflake/Redshift a bundle declaring an enabled result cache without a disabling receipt is refused; all-SUCCESS runs with zero rows everywhere are flagged
 - **Timing plausibility (warnings only)** - `timing-plateau` (implausibly tight per-query band), `small-scale-floor` (tiny data answered slowly), `scale-invariant` (timings flat across a 10x scale span), and informational `floor-outlier` (fastest query far above the peer median). Warnings never fail validation; sub-millisecond rows are timer noise and excluded from the evidence
 - **Compliance gate** - unofficial `compliance_class` values are refused; only `official` may be submitted
 - **Query-set coverage** - the normalized query IDs must cover the benchmark's canonical query set (e.g. TPC-H Q1–Q22 in any Q-prefixed, bare, or padded spelling); the benchmark id is matched case-insensitively

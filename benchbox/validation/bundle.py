@@ -1015,6 +1015,118 @@ def _warn_cross_bundle_timing(entries: list[tuple[dict[str, Any], ValidationResu
     _warn_floor_outlier(peers)
 
 
+#: Platforms whose adapters record a session cache-control receipt into
+#: ``platform.compute.cache_control``. Only these platforms can produce an
+#: absent receipt that contradicts a declared cache state; every other
+#: platform keeps the legacy absent-receipt exemption.
+_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift"})
+
+
+def _platform_records_cache_receipt(platform: dict) -> bool:
+    """Return True when the platform's adapter persists a cache receipt."""
+    name = platform.get("name")
+    return isinstance(name, str) and name.lower().replace(" ", "-") in _CACHE_RECEIPT_PLATFORMS
+
+
+def _validate_cache_control_section(
+    platform: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse clean claims whose runtime cache receipt contradicts them.
+
+    Cloud adapters record the sanitized session cache-control receipt at
+    ``platform.compute.cache_control`` when session validation runs. An
+    absent receipt passes for legacy bundles that predate runtime
+    persistence (grandfathered) and for platforms without receipt
+    machinery — unless the bundle affirmatively declares an enabled
+    result cache on a receipt-capable platform. Such a bundle advertises
+    cached timings with no disabling evidence, which is exactly what this
+    gate excludes. A present receipt must confirm ``validated`` and
+    ``cache_disabled`` — anything else means the timings were measured
+    under an unconfirmed or enabled cache and cannot stand as clean
+    evidence. The trusted mirror lane stays lenient to preserve
+    pre-gate cohorts as non-ranking evidence.
+    """
+    if allow_partial_validation:
+        return
+    if not isinstance(platform, dict):
+        return  # _validate_platform_section owns the shape error.
+    compute = platform.get("compute")
+    if not isinstance(compute, dict):
+        return
+    receipt = compute.get("cache_control")
+    if receipt is None:
+        if compute.get("result_cache_enabled") and _platform_records_cache_receipt(platform):
+            vr.error(
+                "platform.compute declares an enabled result cache without a "
+                "cache_control receipt; cached timings are not comparable evidence "
+                "(rerun with the result cache disabled so session validation records a receipt)"
+            )
+        return
+    if not isinstance(receipt, dict):
+        vr.error("platform.compute.cache_control must be an object")
+        return
+    if receipt.get("validated") is not True:
+        vr.error(
+            "platform.compute.cache_control is unconfirmed (validated is not true); "
+            "rerun with session cache validation before submitting as clean"
+        )
+        return
+    if receipt.get("cache_disabled") is not True:
+        vr.error(
+            "platform.compute.cache_control confirms the result cache is enabled; "
+            "cached timings are not comparable evidence"
+        )
+
+
+def _warn_empty_result_rows(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Warn when an all-SUCCESS run returns no result rows anywhere.
+
+    Per-query zeros stay silent — empty results are legitimate — but a run
+    whose every measurement SUCCESS reports zero or missing rows against
+    loaded data is silently-empty execution until proven otherwise. A zero
+    loaded volume excuses it (consistent empty-table run); an unreported
+    volume warns explicitly instead of silently passing.
+    """
+    if not isinstance(data, dict):
+        return
+    queries = data.get("queries")
+    if not isinstance(queries, list):
+        return  # _validate_queries_section owns the shape error.
+    success_rows: list[Any] = []
+    for q in queries:
+        if not isinstance(q, dict):
+            continue
+        run_type = str(q.get("run_type") or "measurement").lower()
+        if run_type != "measurement":
+            continue
+        status = q.get("status")
+        if not isinstance(status, str) or status.upper() not in ("SUCCESS", "PASS"):
+            continue
+        success_rows.append(q.get("rows"))
+    if not success_rows:
+        return
+    if not all((value or 0) == 0 for value in success_rows):
+        return
+    loaded = _bundle_rows_loaded(data)
+    if loaded is not None and loaded <= 0:
+        return
+    if loaded is None:
+        vr.warn(
+            "result-rows-empty: every measurement SUCCESS reports zero or missing rows "
+            "with rows_loaded unreported — confirm the run executed against loaded data "
+            "(evidence: queries[].rows, summary.data.rows_loaded)"
+        )
+    else:
+        vr.warn(
+            f"result-rows-empty: every measurement SUCCESS reports zero rows against "
+            f"{loaded} loaded rows — check for silently empty execution "
+            "(evidence: queries[].rows, summary.data.rows_loaded)"
+        )
+
+
 def _validate_compliance_section(
     benchmark: Any,
     vr: ValidationResult,
@@ -1761,6 +1873,11 @@ def _validate_bundle(
         allow_partial_validation=allow_partial_validation,
     )
     _validate_platform_section(data.get("platform", {}), vr)
+    _validate_cache_control_section(
+        data.get("platform", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_summary_section(
         data.get("summary", {}),
         vr,
@@ -1773,6 +1890,7 @@ def _validate_bundle(
     _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
+    _warn_empty_result_rows(data, vr)
     _warn_timing_plateau(data, vr)
     _warn_small_scale_floor(data, vr)
     _validate_query_coverage(data, vr, allow_partial_validation=allow_partial_validation)
