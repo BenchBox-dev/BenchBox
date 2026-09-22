@@ -16120,6 +16120,13 @@
       "status": "open",
       "title": "Submission gates: compliance check, query-set coverage, cost docs"
     },
+    "submission-gates-timing-plausibility": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Submission gates: timing plausibility C1-C4 as warnings"
+    },
     "submission-validator-drift-develop-vs-published-results": {
       "claim": null,
       "needs": [],

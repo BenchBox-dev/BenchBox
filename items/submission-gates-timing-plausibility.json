@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "C1 computed on per-query-id aggregates of measurement run_type only, with test_type/stream filtering and defined zero/sub-ms handling",
+    "C1 scoped to heterogeneous benchmarks; primitives excluded by default",
+    "C2 uses within-PR scale sets first, corpus peers second, else info/insufficient-history",
+    "Every rule states its missing-input verdict; missing tables/rows never silently pass",
+    "Unit fixtures include Sep-18/19 Snowflake + Databricks shapes (archived, reproducible) plus passing peers"
+  ],
+  "context": "Revised proposal v2 after adversarial findings 5-8 accepted (finding 5 narrowed: within-PR scales make C2 viable for the motivating batch). Thresholds: C1 max/min 2.0 or CV 0.15; C2 sf10/sf0.1 geomean 1.5, median per-query 1.3; C3 peer-min 3x (info only); C4 sf0.1 min 2000ms at <1M rows. Emit warnings + structured findings only until the severity/override contract lands.",
+  "description": "Implement timing-plausibility checks C1-C4 (timing-plateau, scale-invariant, floor-outlier, small-scale-floor) with the reviewer's correctness fixes. No refusal behavior in this item: output warnings and machine-readable findings consumed later by the override contract. False-positive guardrails: benchmark scoping, aggregation rules, single-scale info fallback, archived calibration fixtures."
+}
