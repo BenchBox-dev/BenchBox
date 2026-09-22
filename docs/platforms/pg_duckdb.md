@@ -55,26 +55,28 @@ export MOTHERDUCK_TOKEN=your-token-here
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
 
-## Data Lake Queries (S3 Parquet/Iceberg)
+## Data Lake Support Status
 
-pg_duckdb routes analytical queries through its embedded DuckDB engine, so
-BenchBox registers `pg-duckdb` (manifest canonical spelling; the adapter
-reports `pg_duckdb` and format normalization accepts both) in
-`benchbox/platforms/base/format_capabilities.py` at the same levels as
-standalone DuckDB: Parquet through the embedded engine (Parquet is core in
-DuckDB, reached here via the pg_duckdb extension), Delta Lake via the
-DuckDB delta extension, and Iceberg as experimental. Native loads stay
-tbl-first like `postgresql`; Delta and Iceberg follow `csv` in the
-preferences as extension/experimental read paths. These registrations
-describe engine capability, not verified end-to-end BenchBox read paths.
+Parquet loads work through the inherited PostgreSQL path: the Parquet file
+is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`
+(which is why `pg_duckdb` is registered for Parquet at the same
+`EXTENSION` level). The embedded DuckDB engine is not used for file reads.
+Native loads stay tbl-first like `postgresql`.
+
+BenchBox has no Delta Lake or Iceberg read path for pg_duckdb today, so
+neither format is registered in
+`benchbox/platforms/base/format_capabilities.py` - an explicit `--format
+delta` request fails fast with a platform-named error instead of a late
+load failure. The embedded engine could read both via DuckDB extensions in
+the future; that needs adapter-side extension/secret setup first.
 
 Cloud reads need credentials at query time, never in code or committed
 config. MotherDuck mode remains the supported cloud variant (token via the
-`MOTHERDUCK_TOKEN` environment variable). Direct S3 Parquet/Iceberg reads
-through the embedded engine additionally need object-storage credentials
-and Parquet file management, and live verification is still pending -
-that is tracked separately and requires explicit approval for live cloud
-tests before any S3 read path is claimed as supported.
+`MOTHERDUCK_TOKEN` environment variable). Direct S3 Parquet reads
+additionally need object-storage credentials and Parquet file management,
+and live verification is still pending - that is tracked separately and
+requires explicit approval for live cloud tests before any S3 read path is
+claimed as supported.
 
 ## Installation
 
@@ -170,6 +172,7 @@ pg_duckdb accelerates queries by routing them through DuckDB's vectorized execut
 - **Row-oriented storage** - Queries operate on PostgreSQL's row-oriented heap tables, missing DuckDB's columnar compression benefits.
 - **Server installation required** - pg_duckdb must be pre-installed on the PostgreSQL server; BenchBox cannot install it remotely.
 - **GUC permissions** - Thread count tuning may require superuser or pg_duckdb role privileges.
+- **No data-lake read paths** - No Delta Lake/Iceberg support and no verified S3 reads; see Data Lake Support Status above.
 
 ## Recommended Benchmarks
 

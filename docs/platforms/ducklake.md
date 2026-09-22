@@ -243,7 +243,7 @@ for why this is documented rather than instrumented.
 ## Lakehouse-Feature Benchmarks (Time Travel, Schema Evolution, Snapshots)
 
 DuckLake parity today means TPC-H/TPC-DS parity with DuckDB plus the
-run-phase `maintenance` operations shared with the other lakehouse paths
+run-phase `maintenance` operations shared with the other lakehouse presets in that interface
 (insert/delete/update/merge via `benchbox/platforms/dataframe/ducklake_maintenance.py`,
 with time-travel support flagged in the maintenance capabilities). There is
 no dedicated time-travel, schema-evolution, or snapshot/maintenance
