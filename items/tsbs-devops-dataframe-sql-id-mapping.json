@@ -1,0 +1,4 @@
+{
+  "context": "Confirm an independent SQL<->DataFrame query-id correspondence for tsbs_devops. Documentation-plus-test change; gate wiring is downstream, not part of this item. Do NOT guess id mappings.",
+  "description": "Confirm independent SQL<->DataFrame id mapping for tsbs_devops or declare it a poor gate candidate."
+}

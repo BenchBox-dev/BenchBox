@@ -17344,6 +17344,13 @@
       "status": "done",
       "title": "Trino Platform Adapter"
     },
+    "tsbs-devops-dataframe-sql-id-mapping": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Confirm tsbs_devops DataFrame-SQL id mapping"
+    },
     "tuning-adr-baseline-definition-and-renderer-20260712": {
       "claim": null,
       "needs": [],
