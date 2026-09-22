@@ -2264,10 +2264,15 @@
       "title": "Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)"
     },
     "clickhouse-delta-adapter-wiring-e2e": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-23T23:24:06Z",
+        "generation": "5321a4a222534079a9b87ad5b0500578",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:7bbe5630a3d5658258476053"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Wire ClickHouse native Delta reads into adapter with end-to-end test"
     },
     "clickhouse-delta-native-reads": {
