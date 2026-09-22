@@ -53,7 +53,10 @@ def _expr_filter(ctx: DataFrameContext, hits: Any, code: str) -> Any:
     if code == "google_title":
         return hits.filter(
             (col("Title").str.contains(lit("Google")))
-            & (~col("URL").str.contains(lit(".google.")))
+            # Regex-escaped: UnifiedStrExpr.contains is regex on every
+            # expression backend while the pandas twin matches regex=False,
+            # so the dots in ".google." must not act as wildcards.
+            & (~col("URL").str.contains(lit("\\.google\\.")))
             & (col("SearchPhrase") != lit(""))
         )
     if code == "user_lookup":

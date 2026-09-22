@@ -143,8 +143,8 @@ class TestObtQueryExecution:
         query = REGISTRY.get("Q4")
         assert query is not None
         expected = {"catalog": 108.0, "store": 109.5, "web": 66.5}
-        for ctx in (expr_ctx, pandas_ctx):
-            result = _to_pandas_result(query.expression_impl(ctx) if ctx is expr_ctx else query.pandas_impl(ctx))
+        for impl, ctx in ((query.expression_impl, expr_ctx), (query.pandas_impl, pandas_ctx)):
+            result = _to_pandas_result(impl(ctx))
             assert dict(zip(result["channel"], result["revenue"])) == expected
 
     def test_q13_distinct_items(self, expr_ctx, pandas_ctx):

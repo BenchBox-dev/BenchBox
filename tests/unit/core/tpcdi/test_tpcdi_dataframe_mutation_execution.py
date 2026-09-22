@@ -209,3 +209,61 @@ class TestBackendContracts:
         _, condition, updates = seen["update"]
         assert condition == {"IsCurrent": True, "CustomerID": 101}
         assert updates == {"IsCurrent": False}
+
+    def test_render_literal_supports_frame_scalar_types(self) -> None:
+        np = pytest.importorskip("numpy")
+        from benchbox.core.tpcdi.etl.dataframe_backend import _render_literal
+
+        assert _render_literal(np.int64(101)) == "101"
+        assert _render_literal(np.bool_(True)) == "TRUE"
+        assert _render_literal(np.float64(1.5)) == "1.5"
+
+    def test_render_literal_supports_temporal_and_decimal(self) -> None:
+        from datetime import date, datetime, timezone
+        from decimal import Decimal
+
+        from benchbox.core.tpcdi.etl.dataframe_backend import _render_literal
+
+        assert _render_literal(date(2020, 1, 1)) == "'2020-01-01'"
+        assert _render_literal(datetime(2020, 1, 1, 12, 30, 0)) == "'2020-01-01 12:30:00'"
+        assert _render_literal(datetime(2020, 1, 1, 12, 30, 0, 123456)) == "'2020-01-01 12:30:00.123456'"
+        assert _render_literal(datetime(2020, 1, 1, 12, 30, 0, tzinfo=timezone.utc)) == "'2020-01-01 12:30:00+00:00'"
+        assert _render_literal(Decimal("10.5")) == "10.5"
+
+    def test_render_literal_rejects_non_finite_floats(self) -> None:
+        from benchbox.core.tpcdi.etl.dataframe_backend import _render_literal
+
+        with pytest.raises(ValueError, match="Non-finite float"):
+            _render_literal(float("nan"))
+        with pytest.raises(ValueError, match="Non-finite float"):
+            _render_literal(float("inf"))
+
+    def test_string_condition_rejected_for_non_sql_adapters(self, tmp_path: Path) -> None:
+        ops, seen = _recording_ops()
+        ops.get_capabilities = lambda: SimpleNamespace(accepts_sql_predicates=False)
+        backend = DataFrameETLBackend(maintenance_ops=ops, platform_name="iceberg", table_root=tmp_path)
+
+        with pytest.raises(TypeError, match="does not accept SQL predicate text"):
+            backend.execute_scd2_expire(
+                "DimCustomer",
+                '"IsCurrent" = TRUE AND "CustomerID" = 101',
+                {"IsCurrent": False},
+            )
+        assert "update" not in seen
+
+    def test_native_dict_condition_validates_column_names(self, tmp_path: Path) -> None:
+        ops, _ = _recording_ops()
+        ops.get_capabilities = lambda: SimpleNamespace(accepts_sql_predicates=False)
+        backend = DataFrameETLBackend(maintenance_ops=ops, platform_name="iceberg", table_root=tmp_path)
+
+        with pytest.raises(ValueError, match="Unsafe column name"):
+            backend.execute_scd2_expire("DimCustomer", {"IsCurrent; DROP TABLE x": True}, {"IsCurrent": False})
+
+    def test_string_condition_rejects_unsafe_tokens(self, tmp_path: Path) -> None:
+        ops, _ = _recording_ops()
+        backend = DataFrameETLBackend(maintenance_ops=ops, platform_name="polars-df", table_root=tmp_path)
+
+        with pytest.raises(ValueError, match="Unsafe SQL tokens"):
+            backend.execute_scd2_expire("DimCustomer", '"IsCurrent" = TRUE; DROP TABLE x', {"IsCurrent": False})
+        with pytest.raises(ValueError, match="DML/DDL keywords"):
+            backend.execute_scd2_expire("DimCustomer", '"IsCurrent" = TRUE OR UPDATE x', {"IsCurrent": False})

@@ -41,6 +41,7 @@ from benchbox.core.dataframe.benchmark_suite import (
     PlatformCategory,
     QueryBenchmarkResult,
     SQLComparisonResult,
+    SQLVsDataFrameBenchmark,
     SQLVsDataFrameSummary,
     resolve_table_paths,
 )
@@ -1462,3 +1463,37 @@ class TestResolveTablePaths:
         assert loaded["lineitem"] == [tmp_path / "lineitem.1.parquet", tmp_path / "lineitem.2.parquet"]
         assert loaded["nation"] == [tmp_path / "nation.parquet"]
         assert "orders" not in loaded
+
+    def test_single_plus_shards_warns_and_prefers_single(self, tmp_path, caplog):
+        single = tmp_path / "lineitem.parquet"
+        single.write_text("stub")
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+
+        with caplog.at_level("WARNING", logger="benchbox.core.dataframe.benchmark_suite"):
+            assert resolve_table_paths(tmp_path, "lineitem") == [single]
+        assert "lineitem.parquet" in caplog.text
+
+    def test_duckdb_connect_loads_shards_via_parameter(self, tmp_path):
+        pytest.importorskip("duckdb")
+        pd = pytest.importorskip("pandas")
+        odd_dir = tmp_path / "odd'dir"
+        odd_dir.mkdir()
+        pd.DataFrame({"a": [1, 2]}).to_parquet(odd_dir / "nation.1.parquet", index=False)
+        pd.DataFrame({"a": [3]}).to_parquet(odd_dir / "nation.2.parquet", index=False)
+
+        conn = SQLVsDataFrameBenchmark._connect_duckdb(odd_dir)
+        try:
+            assert conn.execute("SELECT COUNT(*) FROM nation").fetchone()[0] == 3
+        finally:
+            conn.close()
+
+    def test_sqlite_connect_loads_shards_incrementally(self, tmp_path):
+        pd = pytest.importorskip("pandas")
+        pd.DataFrame({"a": [1, 2]}).to_parquet(tmp_path / "nation.1.parquet", index=False)
+        pd.DataFrame({"a": [3, 4, 5]}).to_parquet(tmp_path / "nation.2.parquet", index=False)
+
+        conn = SQLVsDataFrameBenchmark._connect_sqlite(tmp_path)
+        try:
+            assert conn.execute("SELECT COUNT(*) FROM nation").fetchone()[0] == 5
+        finally:
+            conn.close()

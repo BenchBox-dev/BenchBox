@@ -369,7 +369,7 @@ DataFrame Platform Status
 ============================================================
 Platform        Family       Available  Version
 ------------------------------------------------------------
-Pandas          pandas       ✓          2.1.4
+Pandas          pandas       ✓          3.0.5
 Polars          expression   ✓          1.15.0
 Dask            pandas       ✗          N/A
 PySpark         expression   ✗          N/A
