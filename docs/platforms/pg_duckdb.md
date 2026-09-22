@@ -58,11 +58,14 @@ benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ## Data Lake Queries (S3 Parquet/Iceberg)
 
 pg_duckdb routes analytical queries through its embedded DuckDB engine, so
-lakehouse reads use the same DuckDB extension path as standalone DuckDB:
-Parquet via the extension path, Delta Lake via the DuckDB delta extension,
-and Iceberg as experimental. BenchBox registers these levels in
-`benchbox/platforms/base/format_capabilities.py` under the `pg_duckdb` key,
-with native loads staying tbl-first like `postgresql`.
+BenchBox registers `pg_duckdb` in
+`benchbox/platforms/base/format_capabilities.py` at the same levels as
+standalone DuckDB: Parquet through the embedded engine (Parquet is core in
+DuckDB, reached here via the pg_duckdb extension), Delta Lake via the
+DuckDB delta extension, and Iceberg as experimental. Native loads stay
+tbl-first like `postgresql`, and Delta/Iceberg are not in the native load
+preferences. These registrations describe engine capability, not verified
+end-to-end BenchBox read paths.
 
 Cloud reads need credentials at query time, never in code or committed
 config. MotherDuck mode remains the supported cloud variant (token via the

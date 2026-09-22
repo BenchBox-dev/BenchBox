@@ -61,6 +61,8 @@ PARQUET_CAPABILITY = FormatCapability(
         "bigquery": SupportLevel.NATIVE,
         "redshift": SupportLevel.NATIVE,
         "postgresql": SupportLevel.EXTENSION,
+        # Reached through the pg_duckdb extension around embedded DuckDB
+        # (Parquet itself is core in DuckDB, not a loadable extension).
         "pg_duckdb": SupportLevel.EXTENSION,
         "sqlite": SupportLevel.EXTENSION,
         "spark": SupportLevel.NATIVE,
@@ -95,7 +97,9 @@ DELTA_CAPABILITY = FormatCapability(
     supported_platforms={
         "databricks": SupportLevel.NATIVE,
         "duckdb": SupportLevel.EXTENSION,  # delta extension
-        "pg_duckdb": SupportLevel.EXTENSION,  # DuckDB delta extension via embedded engine
+        # DuckDB delta extension via the embedded engine. Engine capability only:
+        # live end-to-end verification through BenchBox is still pending.
+        "pg_duckdb": SupportLevel.EXTENSION,
         "datafusion": SupportLevel.EXTENSION,  # via deltalake Python library
         "trino": SupportLevel.EXTENSION,  # via delta catalog connector
         "presto": SupportLevel.EXTENSION,  # via delta catalog connector
@@ -126,7 +130,9 @@ ICEBERG_CAPABILITY = FormatCapability(
     },
     supported_platforms={
         "duckdb": SupportLevel.EXPERIMENTAL,  # iceberg extension
-        "pg_duckdb": SupportLevel.EXPERIMENTAL,  # DuckDB iceberg extension via embedded engine
+        # DuckDB iceberg extension via the embedded engine. Engine capability only:
+        # live end-to-end verification through BenchBox is still pending.
+        "pg_duckdb": SupportLevel.EXPERIMENTAL,
         "datafusion": SupportLevel.EXTENSION,  # via pyiceberg Python library
         "trino": SupportLevel.EXTENSION,  # via iceberg catalog connector
         "presto": SupportLevel.EXTENSION,  # via iceberg catalog connector
@@ -324,6 +330,14 @@ def normalize_platform_key(platform_name: str) -> str:
     hyphenated = key.replace(" ", "-")
     if hyphenated in PLATFORM_FORMAT_PREFERENCES:
         return hyphenated
+
+    # Underscore/hyphen spelling variance (e.g., CLI "pg-duckdb" vs adapter
+    # "pg_duckdb"). Only reached when the hyphenated spelling is not itself
+    # a registered key, so existing hyphenated keys are unaffected.
+    if "-" in key:
+        underscored = key.replace("-", "_")
+        if underscored in PLATFORM_FORMAT_PREFERENCES:
+            return underscored
 
     return key
 
