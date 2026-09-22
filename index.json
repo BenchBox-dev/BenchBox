@@ -16137,15 +16137,10 @@
       "title": "Submission gates: compliance check, query-set coverage, cost docs"
     },
     "submission-gates-timing-plausibility": {
-      "claim": {
-        "expires_at": "2026-09-23T12:41:05Z",
-        "generation": "e5ffeeb93a0b400a95d73017ca14445f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fb22ec513f5189c4ea828e84"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Submission gates: timing plausibility C1-C4 as warnings"
     },
     "submission-override-artifact-workflow": {
