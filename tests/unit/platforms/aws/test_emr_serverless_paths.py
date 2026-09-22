@@ -16,7 +16,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from botocore.exceptions import ClientError
+
+botocore_exceptions = pytest.importorskip("botocore.exceptions")
+ClientError = botocore_exceptions.ClientError
 
 from benchbox.core.exceptions import ConfigurationError
 
@@ -69,6 +71,7 @@ class TestApplicationLifecycle:
         adapter._emr_serverless_client = client
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.time.sleep"),
+            patch("benchbox.platforms.aws.emr_serverless_adapter.mono_time", side_effect=[0.0, 10.0]),
             pytest.raises(ConfigurationError, match="Timeout waiting"),
         ):
             adapter._wait_for_application_state("app-123", ["STARTED"], timeout_seconds=1)
@@ -314,7 +317,8 @@ class TestFromConfigTuning:
                     "tuning_source": "cli",
                 }
             )
-        assert adapter is not None
+        assert adapter.tuning_enabled is True
+        assert adapter.tuning_source == "cli"
 
 
 class TestImportFallback:
@@ -336,4 +340,5 @@ class TestImportFallback:
                 sys.modules.pop(k, None)
             sys.modules.update(saved)
             importlib.reload(mod)
-        assert mod.BOTO3_AVAILABLE is True
+        # No assertion on the restored module: whether the real boto3 is
+        # importable depends on the ambient environment, not this code.

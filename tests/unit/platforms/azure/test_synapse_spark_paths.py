@@ -345,7 +345,8 @@ class TestTuningNoOps:
                     "tuning_source": "cli",
                 }
             )
-        assert adapter is not None
+        assert adapter.tuning_enabled is True
+        assert adapter.tuning_source == "cli"
 
 
 class TestImportFallback:
@@ -377,14 +378,14 @@ class TestImportFallback:
 
         import benchbox.platforms.azure.synapse_spark_adapter as mod
 
-        saved = dict(sys.modules)
+        saved = {k: sys.modules[k] for k in ("requests",) if k in sys.modules}
         sys.modules["requests"] = None
         try:
             mod = self._reload()
             assert mod.REQUESTS_AVAILABLE is False
             assert mod.requests is None
         finally:
-            sys.modules.clear()
+            sys.modules.pop("requests", None)
             sys.modules.update(saved)
             self._reload()
         assert mod.REQUESTS_AVAILABLE is True

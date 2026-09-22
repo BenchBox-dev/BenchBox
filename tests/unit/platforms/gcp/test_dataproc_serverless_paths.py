@@ -259,7 +259,8 @@ class TestFromConfigTuning:
                     "tuning_source": "cli",
                 }
             )
-        assert adapter is not None
+        assert adapter.tuning_enabled is False
+        assert adapter.tuning_source == "cli"
 
 
 class TestImportFallback:
@@ -292,4 +293,5 @@ class TestImportFallback:
                 sys.modules.pop(k, None)
             sys.modules.update(saved)
             importlib.reload(mod)
-        assert mod.GOOGLE_CLOUD_AVAILABLE is False
+        # No assertion on the restored module: whether the real google-cloud
+        # SDKs are importable depends on the ambient environment, not this code.
