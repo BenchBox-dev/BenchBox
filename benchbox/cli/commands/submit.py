@@ -239,8 +239,15 @@ def _refuse_non_submittable_result(ctx: click.Context, result: object, submit_st
     ctx.exit(1)
 
 
-def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Path) -> None:
-    """Run the same local bundle validator used by published-results CI."""
+def _validate_submission_bundle(ctx: click.Context, source_path: Path) -> None:
+    """Run the same local bundle validator used by published-results CI.
+
+    Every submit path (PR package and hosted upload, dry-run or not) runs
+    this gate before anything is written or sent: a clean
+    ``classify_loaded_result`` verdict alone must not let the CLI emit an
+    artifact (short query coverage, unofficial compliance, …) that
+    published-results CI is guaranteed to refuse.
+    """
 
     try:
         validation_results = validate_bundles([source_path])
@@ -283,12 +290,13 @@ def _dispatch_service_mode(
     auth, uploads the canonical bundle, and optionally polls for hosted
     publication status.
 
-    Dry-run validation policy: `submit()` runs the same
+    Validation policy: `submit()` runs the same
     ``benchbox.validation.bundle`` checks used by published-results CI
-    before dispatching into this mode. The real hosted upload still relies
-    on server-side validation so older clients are not blocked by
-    develop-tip validator changes after credentials have already been
-    configured.
+    before dispatching into this mode, for dry runs and real uploads
+    alike. The real hosted upload still relies on server-side validation
+    as well, so a bundle that passes here can still be refused downstream.
+    Older clients predate the client-side gate but are not blocked by it;
+    the server remains the final authority.
 
     Hash contract for the dry-run: the values printed are SHA-256 of the
     canonical JSON bytes that the real hosted path uploads. This matches the
@@ -722,8 +730,10 @@ def submit(
         p for suffix in COMPANION_SUFFIXES if (p := source_path.with_name(source_path.stem + suffix)).exists()
     ]
 
-    if dry_run:
-        _validate_submission_bundle_for_dry_run(ctx, source_path)
+    # Same gate for dry-run previews, PR packages, and hosted uploads: the
+    # CLI must not produce a submission that published-results CI will
+    # refuse (e.g. short query coverage on a clean-classified subset run).
+    _validate_submission_bundle(ctx, source_path)
 
     if service_url is not None:
         _dispatch_service_mode(

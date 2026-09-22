@@ -144,6 +144,85 @@ CANONICAL_LOGICAL_QUERY_COUNTS: dict[str, int] = {
     "clickbench": 43,
 }
 
+_TPCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 23))
+_TPCDS_CANONICAL_IDS = frozenset(str(i) for i in range(1, 100))
+_SSB_CANONICAL_IDS = frozenset(
+    {
+        "1.1",
+        "1.2",
+        "1.3",
+        "2.1",
+        "2.2",
+        "2.3",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+    }
+)
+_CLICKBENCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 44))
+
+# Canonical logical query IDs per benchmark family: the membership set for
+# the query-set coverage gate below. Counts alone accept any 22 distinct
+# labels (e.g. FAKE0-FAKE21 for TPC-H); comparing normalized IDs against
+# this set keeps such bundles out of ranking-eligible cohorts. IDs are
+# stored in producer-normalized form (see _normalize_coverage_query_id, kept
+# in lockstep with benchbox/core/results/query_normalizer.py::
+# normalize_query_id by hand for the same slim-mirror reason as the counts
+# above). Every key/denominator pair must agree with
+# CANONICAL_LOGICAL_QUERY_COUNTS.
+CANONICAL_LOGICAL_QUERY_IDS: dict[str, frozenset[str]] = {
+    "tpch": _TPCH_CANONICAL_IDS,
+    "tpch_skew": _TPCH_CANONICAL_IDS,
+    "tpchavoc": _TPCH_CANONICAL_IDS,
+    "tpcds": _TPCDS_CANONICAL_IDS,
+    "ssb": _SSB_CANONICAL_IDS,
+    "star_schema": _SSB_CANONICAL_IDS,
+    "clickbench": _CLICKBENCH_CANONICAL_IDS,
+}
+
+
+def _normalize_coverage_query_id(raw_id: Any) -> str | None:
+    """Normalize a bundle query ID for coverage membership, or None.
+
+    Mirrors ``benchbox.core.results.query_normalizer.normalize_query_id``
+    for string inputs (``Q1``/``q1``/``query_1``/`` 1 `` all name query
+    ``1``; SSB ``Q1.1`` names ``1.1``) without importing the package, which
+    the slim published-results branch mirror cannot do. Non-string and
+    blank IDs return None: they contribute nothing to coverage (fail
+    closed) instead of passing as distinct unknowns.
+    """
+    if not isinstance(raw_id, str):
+        return None
+    text = raw_id.strip()
+    if not text:
+        return None
+    upper = text.upper()
+    if upper.startswith("QUERY_"):
+        text = text[6:]
+    elif upper.startswith("QUERY"):
+        text = text[5:]
+    elif upper.startswith("Q") and len(text) > 1 and (text[1].isdigit() or text[1].islower()):
+        text = text[1:]
+    text = text.strip()
+    if not text:
+        return None
+    if "." in text:
+        base, _, ext = text.rpartition(".")
+        if ext.isalpha():  # "sql", "q", "txt" -> strip; "1", "2" -> keep.
+            text = base.strip()
+            if not text:
+                return None
+    match = re.fullmatch(r"(\d+)([A-Za-z]+)?", text)
+    if match:
+        digits, suffix = match.groups()
+        return f"{digits}{suffix.lower() if suffix else ''}"
+    return text
+
+
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
     "tpch",
@@ -408,12 +487,15 @@ def _validate_query_coverage(
     *,
     allow_partial_validation: bool = False,
 ) -> None:
-    """Refuse bundles whose distinct query evidence falls short of canonical.
+    """Refuse bundles whose query evidence misses canonical query IDs.
 
     A run covering 5 of TPC-H's 22 queries must not present as a complete
     result: the explorer derives its logical denominator from observed query
-    IDs, so short coverage would rank as complete. The trusted mirror lane
-    is exempt (it preserves partial cohorts by design); community partials
+    IDs, so short coverage would rank as complete. Cardinality alone is not
+    enough either: 22 timings named FAKE0-FAKE21 name none of the canonical
+    queries, so the gate compares normalized IDs against the benchmark's
+    canonical set and refuses on any miss. The trusted mirror lane is
+    exempt (it preserves partial cohorts by design); community partials
     stay refused by the summary-validation gate regardless.
     """
     if allow_partial_validation:
@@ -425,26 +507,39 @@ def _validate_query_coverage(
     # Normalize before the lookup: "TPCH" or "tpch " names the same family as
     # "tpch", and must not slip past the gate on casing or padding.
     normalized_id = bm_id.strip().casefold() if isinstance(bm_id, str) else None
-    known = CANONICAL_LOGICAL_QUERY_COUNTS.get(normalized_id) if normalized_id else None
-    if not known:
-        return  # No canonical denominator: nothing deterministic to enforce.
+    canonical = CANONICAL_LOGICAL_QUERY_IDS.get(normalized_id) if normalized_id else None
+    if not canonical:
+        return  # No canonical set: nothing deterministic to enforce.
     queries = data.get("queries")
     if not isinstance(queries, list):
         return  # _validate_queries_section owns the shape error.
     # Only non-empty string ids count as query evidence. Non-string ids
     # (legacy integers) and blanks fail closed: they contribute nothing to
     # coverage instead of passing as distinct unknowns.
-    distinct = {
-        q.get("id") for q in queries if isinstance(q, dict) and isinstance(q.get("id"), str) and q.get("id").strip()
-    }
-    if len(distinct) < known:
-        uncounted = sum(
-            1 for q in queries if isinstance(q, dict) and not (isinstance(q.get("id"), str) and q.get("id").strip())
-        )
+    observed: set[str] = set()
+    uncounted = 0
+    for q in queries:
+        if not isinstance(q, dict):
+            continue  # _validate_queries_section owns the shape error.
+        normalized_qid = _normalize_coverage_query_id(q.get("id"))
+        if normalized_qid is None:
+            uncounted += 1
+        else:
+            observed.add(normalized_qid)
+    missing = sorted(
+        canonical - observed,
+        key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
+    )
+    if missing:
+        covered = len(observed & canonical)
+        shown = ", ".join(missing[:12])
+        if len(missing) > 12:
+            shown += f", … (+{len(missing) - 12} more)"
         hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
         vr.error(
-            f"benchmark {bm_id!r} covers {len(distinct)} of {known} canonical queries{hint}; "
-            "partial runs remain local artifacts unless validated through the trusted mirror path"
+            f"benchmark {bm_id!r} covers {covered} of {len(canonical)} canonical queries{hint} "
+            f"(missing: {shown}); partial runs remain local artifacts "
+            "unless validated through the trusted mirror path"
         )
 
 

@@ -1011,6 +1011,80 @@ class TestSubmissionDeterministicGates:
 
         assert CANONICAL_LOGICAL_QUERY_COUNTS == _KNOWN_LOGICAL_QUERY_COUNTS
 
+    def test_matching_cardinality_with_wrong_ids_is_refused(self):
+        # 22 distinct labels, none of them canonical: cardinality alone
+        # must not pass the gate.
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"FAKE{i}", "ms": 100, "status": "SUCCESS"} for i in range(22)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("covers 0 of 22 canonical queries" in e for e in vr.errors)
+        assert any("missing:" in e for e in vr.errors)
+
+    def test_canonical_membership_accepts_producer_id_variants(self):
+        # Q-prefix, bare, padded, and query_-prefixed spellings all name
+        # the same canonical queries once normalized.
+        variants = [f"Q{i}" for i in range(1, 8)] + [str(i) for i in range(8, 15)]
+        variants += [f"query_{i}" for i in range(15, 20)] + [f"  q{i} " for i in range(20, 23)]
+        data = _minimal_bundle()
+        data["queries"] = [{"id": v, "ms": 100, "status": "SUCCESS"} for v in variants]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_membership_allows_extra_ids(self):
+        data = _minimal_bundle()
+        data["queries"] = data["queries"] + [{"id": "EXTRA", "ms": 100, "status": "SUCCESS"}]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_id_sets_agree_with_counts(self):
+        from benchbox.validation.bundle import (
+            CANONICAL_LOGICAL_QUERY_COUNTS,
+            CANONICAL_LOGICAL_QUERY_IDS,
+        )
+
+        assert set(CANONICAL_LOGICAL_QUERY_IDS) == set(CANONICAL_LOGICAL_QUERY_COUNTS)
+        for family, ids in CANONICAL_LOGICAL_QUERY_IDS.items():
+            assert len(ids) == CANONICAL_LOGICAL_QUERY_COUNTS[family], family
+
+    def test_ssb_and_clickbench_membership(self):
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_IDS
+
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["ssb"]) == 13
+        assert "1.1" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert "4.3" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["clickbench"]) == 43
+        # SSB flight IDs in producer Q-prefixed form validate.
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "ssb"
+        data["queries"] = [
+            {"id": qid, "ms": 100, "status": "SUCCESS"}
+            for qid in (
+                "Q1.1",
+                "Q1.2",
+                "Q1.3",
+                "Q2.1",
+                "Q2.2",
+                "Q2.3",
+                "Q3.1",
+                "Q3.2",
+                "Q3.3",
+                "Q3.4",
+                "Q4.1",
+                "Q4.2",
+                "Q4.3",
+            )
+        ]
+        data["summary"]["queries"] = {"total": 13, "passed": 13, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
 
 # ---------------------------------------------------------------------------
 # _validate_manifest_hash

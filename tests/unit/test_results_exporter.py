@@ -30,6 +30,8 @@ pytestmark = [
 
 
 def _minimal_result(platform: str) -> BenchmarkResults:
+    # Full canonical TPC-H coverage: the submission validator refuses
+    # short query sets, so admission-check fixtures must carry all 22.
     return BenchmarkResults(
         benchmark_name="TPCH",
         platform=platform,
@@ -37,10 +39,12 @@ def _minimal_result(platform: str) -> BenchmarkResults:
         execution_id=f"cost-{platform}",
         timestamp=datetime(2026, 5, 3),
         duration_seconds=1.0,
-        total_queries=1,
-        successful_queries=1,
+        total_queries=22,
+        successful_queries=22,
         failed_queries=0,
-        query_results=[{"query_id": "Q1", "execution_time_ms": 1, "rows_returned": 1, "status": "SUCCESS"}],
+        query_results=[
+            {"query_id": f"Q{i}", "execution_time_ms": 1, "rows_returned": 1, "status": "SUCCESS"} for i in range(1, 23)
+        ],
     )
 
 
