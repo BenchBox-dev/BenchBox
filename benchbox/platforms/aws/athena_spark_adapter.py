@@ -433,12 +433,15 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalT
 
         client = self._get_athena_client()
 
-        # For SQL, wrap in spark.sql() for proper execution
+        # For SQL, wrap in spark.sql() for proper execution. The statement is
+        # JSON-embedded so quotes or backslashes in it cannot break out of
+        # the generated script (same hardening as the EMR/Dataproc runners).
         if code_type == "SQL":
             # Ensure we're using the correct database
+            code_literal = json.dumps(code)
             execution_code = f"""
 spark.sql("USE {self.database}")
-result = spark.sql('''{code}''')
+result = spark.sql({code_literal})
 result.show(100, truncate=False)
 """
         else:

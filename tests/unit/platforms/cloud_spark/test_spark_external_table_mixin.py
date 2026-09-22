@@ -165,10 +165,41 @@ class TestCreateExternalTables:
     def test_missing_upload_warns(self, tmp_path: Path, caplog):
         adapter = StubSparkAdapter(counts={"lineitem": 1})
         adapter._staging.upload_tables.return_value = {}
+        adapter._staging.table_has_fingerprint.return_value = True
         with caplog.at_level("WARNING", logger="benchbox.platforms.base.cloud_spark.external_tables"):
             stats, _, _ = adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
         assert stats == {"lineitem": 1}
         assert any("No source files uploaded for table 'lineitem'" in message for message in caplog.messages)
+
+    def test_stale_staged_fallback_raises(self, tmp_path: Path):
+        adapter = StubSparkAdapter(counts={"lineitem": 1})
+        adapter._staging.upload_tables.return_value = {}
+        adapter._staging.table_has_fingerprint.return_value = False
+        with pytest.raises(ConfigurationError, match="refusing to register stale data"):
+            adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+        assert adapter.registered == []
+
+    def test_fingerprint_changes_with_source_bytes(self, tmp_path: Path):
+        adapter = StubSparkAdapter()
+        source = tmp_path / "data"
+        source.mkdir()
+        (source / "lineitem.parquet").write_bytes(b"v1")
+        first = adapter._staged_dataset_fingerprint(_benchmark("lineitem"), "parquet", source)
+        (source / "lineitem.parquet").write_bytes(b"v2-regenerated")
+        second = adapter._staged_dataset_fingerprint(_benchmark("lineitem"), "parquet", source)
+        assert first != second
+
+    def test_fingerprint_stable_without_source_dir(self):
+        adapter = StubSparkAdapter()
+        benchmark = _benchmark("lineitem")
+        assert adapter._staged_dataset_fingerprint(benchmark, "parquet") == adapter._staged_dataset_fingerprint(
+            benchmark, "parquet"
+        )
+
+    def test_records_external_format(self, tmp_path: Path):
+        adapter = StubSparkAdapter(counts={"lineitem": 1})
+        adapter.create_external_tables(_benchmark("lineitem"), None, tmp_path)
+        assert adapter.external_format == "parquet"
 
     def test_tbl_sources_without_request_raise(self, tmp_path: Path):
         adapter = StubSparkAdapter(counts={"lineitem": 1})
@@ -194,7 +225,7 @@ class TestCreateExternalTables:
         benchmark = _benchmark("lineitem")
         adapter.create_external_tables(benchmark, None, tmp_path)
         _, kwargs = adapter._staging.upload_tables.call_args
-        assert kwargs["fingerprint"] == adapter._staged_dataset_fingerprint(benchmark, "parquet")
+        assert kwargs["fingerprint"] == adapter._staged_dataset_fingerprint(benchmark, "parquet", tmp_path)
 
     def test_fingerprint_changes_with_scale(self):
         from types import SimpleNamespace
@@ -251,7 +282,7 @@ class TestCountRows:
 class TestStagingSchemeValidation:
     def test_rejects_bare_path(self):
         adapter = StubSparkAdapter(s3_staging_dir="/tmp/staging")
-        with pytest.raises(ValueError, match="cloud URI"):
+        with pytest.raises(ValueError, match="supported staging URI"):
             adapter.validate_external_table_requirements()
 
     def test_rejects_scheme_without_bucket(self):
@@ -261,8 +292,17 @@ class TestStagingSchemeValidation:
 
     def test_rejects_unknown_scheme(self):
         adapter = StubSparkAdapter(s3_staging_dir="ftp://bucket/path")
-        with pytest.raises(ValueError, match="cloud URI"):
+        with pytest.raises(ValueError, match="supported staging URI"):
             adapter.validate_external_table_requirements()
+
+    def test_rejects_unconstructible_scheme(self):
+        adapter = StubSparkAdapter(s3_staging_dir="hdfs://namenode:8020/data")
+        with pytest.raises(ValueError, match="supported staging URI"):
+            adapter.validate_external_table_requirements()
+
+    def test_accepts_s3a_scheme(self):
+        adapter = StubSparkAdapter(s3_staging_dir="s3a://bucket/data")
+        adapter.validate_external_table_requirements()
 
 
 class TestIdentifierValidation:

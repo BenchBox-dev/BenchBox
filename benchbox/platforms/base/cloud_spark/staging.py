@@ -472,6 +472,20 @@ class CloudSparkStaging(ABC):
                     return False
         return True
 
+    def table_has_fingerprint(self, table_name: str, fingerprint: str) -> bool:
+        """Return whether the staged table dir carries a dataset fingerprint.
+
+        Args:
+            table_name: Name of the table.
+            fingerprint: Dataset identity whose reuse manifest must be present.
+
+        Returns:
+            True if the staged table directory carries the manifest.
+        """
+        files = self.list_files(f"{table_name}/")
+        wanted = self.dataset_manifest_name(fingerprint)
+        return wanted in {entry.rsplit("/", 1)[-1] for entry in files}
+
     def get_table_uri(self, table_name: str) -> str:
         """Get the full URI for a table's data.
 
