@@ -16123,10 +16123,15 @@
       "title": "Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module"
     },
     "submission-cache-correctness-evidence": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-23T12:57:23Z",
+        "generation": "f29b629d120d4b3881115cfb7b344b1e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fb22ec513f5189c4ea828e84"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Cache receipt persistence + result-correctness plausibility"
     },
     "submission-gates-deterministic": {
