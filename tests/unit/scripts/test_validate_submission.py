@@ -1632,3 +1632,78 @@ class TestMain:
         output = capsys.readouterr().out
         assert "PLANS.JSON" in output
         assert "private absolute paths" in output
+
+
+# ---------------------------------------------------------------------------
+# warn-require-override contract (model, exit code, version, rendering)
+# ---------------------------------------------------------------------------
+
+
+class TestOverrideContract:
+    def test_require_override_dual_records_and_keeps_ok(self):
+        from benchbox.validation.bundle import RULES, RULES_VERSION
+
+        vr = ValidationResult("test")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        assert vr.ok
+        assert vr.override_required == ["timing-plateau"]
+        assert vr.warnings.count("span 4400-4500ms") == 2
+        assert RULES_VERSION == "1"
+        assert {r[0]: r[2] for r in RULES} == {
+            "timing-plateau": "warn-require-override",
+            "scale-invariant": "warn-require-override",
+            "floor-outlier": "info",
+            "small-scale-floor": "warn-require-override",
+        }
+
+    def test_plateau_and_floor_promoted_to_overrides(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0)), vr)
+        assert vr.ok, vr.errors
+        assert sorted(vr.override_required) == ["small-scale-floor", "timing-plateau"]
+
+    def test_floor_outlier_stays_informational(self, tmp_path):
+        slow, _, _ = TestFloorOutlier()._peer_set(tmp_path, [4500.0, 350.0, 300.0])
+        assert slow.ok
+        assert "floor-outlier" not in slow.override_required
+        assert any("floor-outlier" in w for w in slow.warnings)
+
+    def test_unsatisfied_mapping(self):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        vr = ValidationResult("b.json")
+        vr.require_override("timing-plateau", "flat")
+        assert unsatisfied_override_rules([vr]) == {"b.json": ["timing-plateau"]}
+        assert unsatisfied_override_rules([ValidationResult("clean.json")]) == {}
+
+    def test_pr_comment_strict_fails_header_with_overrides(self):
+        from benchbox.validation.bundle import format_pr_comment
+
+        vr = ValidationResult("flat.json")
+        vr.require_override("timing-plateau", "flat")
+        strict = format_pr_comment([vr])
+        assert "## Submission Validation: FAILED" in strict
+        assert "### Overrides required (rules v1)" in strict
+        assert "`timing-plateau`" in strict
+        mirror = format_pr_comment([vr], strict_overrides=False)
+        assert "## Submission Validation: PASSED" in mirror
+        assert "advisory only" in mirror
+
+    def test_exit_contract_community_vs_mirror(self, tmp_path):
+        bundle = tmp_path / "flat.json"
+        bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+        assert main([str(bundle)]) == 1
+        assert main([str(bundle), "--allow-partial-validation"]) == 0
+
+    def test_rules_version_flag(self, capsys):
+        assert main(["--rules-version"]) == 0
+        out = capsys.readouterr().out
+        assert "rules version: 1" in out
+        assert "timing-plateau" in out
+
+    def test_unknown_flag_fails_closed(self, tmp_path, capsys):
+        bundle = tmp_path / "b.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        assert main([str(bundle), "--bogus-flag"]) == 2
+        assert "unrecognized flag" in capsys.readouterr().err
