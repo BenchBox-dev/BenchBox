@@ -124,6 +124,9 @@ PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
 # non-clean state, including ``not_run``.
 PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not_run"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
+# The two known-unofficial classes. The community submission gate below is a
+# whitelist (only "official" passes), but admission, UAT phases, and
+# per-benchmark compliance tests still match on these values directly.
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
 # Canonical logical query counts per benchmark family: the deterministic
@@ -386,7 +389,11 @@ def _validate_compliance_section(
     compliance = benchmark.get("compliance_class")
     if compliance is None:
         return
-    if compliance in CLI_REFUSED_COMPLIANCE_CLASSES:
+    # Whitelist, not blacklist: any stamped value other than exactly
+    # "official" is refused, so "Official", "official " or an unexpected type
+    # cannot slip past on spelling. Absent stays grandfathered for legacy
+    # pre-stamp bundles; the trusted mirror lane stays exempt.
+    if compliance != "official":
         if allow_partial_validation:
             return
         vr.error(
@@ -415,16 +422,28 @@ def _validate_query_coverage(
     if not isinstance(benchmark, dict):
         return  # _validate_benchmark_section owns the shape error.
     bm_id = benchmark.get("id")
-    known = CANONICAL_LOGICAL_QUERY_COUNTS.get(bm_id) if isinstance(bm_id, str) else None
+    # Normalize before the lookup: "TPCH" or "tpch " names the same family as
+    # "tpch", and must not slip past the gate on casing or padding.
+    normalized_id = bm_id.strip().casefold() if isinstance(bm_id, str) else None
+    known = CANONICAL_LOGICAL_QUERY_COUNTS.get(normalized_id) if normalized_id else None
     if not known:
         return  # No canonical denominator: nothing deterministic to enforce.
     queries = data.get("queries")
     if not isinstance(queries, list):
         return  # _validate_queries_section owns the shape error.
-    distinct = {q.get("id") for q in queries if isinstance(q, dict) and q.get("id")}
+    # Only non-empty string ids count as query evidence. Non-string ids
+    # (legacy integers) and blanks fail closed: they contribute nothing to
+    # coverage instead of passing as distinct unknowns.
+    distinct = {
+        q.get("id") for q in queries if isinstance(q, dict) and isinstance(q.get("id"), str) and q.get("id").strip()
+    }
     if len(distinct) < known:
+        uncounted = sum(
+            1 for q in queries if isinstance(q, dict) and not (isinstance(q.get("id"), str) and q.get("id").strip())
+        )
+        hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
         vr.error(
-            f"benchmark {bm_id!r} covers {len(distinct)} of {known} canonical queries; "
+            f"benchmark {bm_id!r} covers {len(distinct)} of {known} canonical queries{hint}; "
             "partial runs remain local artifacts unless validated through the trusted mirror path"
         )
 

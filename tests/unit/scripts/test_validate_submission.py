@@ -974,6 +974,35 @@ class TestSubmissionDeterministicGates:
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 
+    def test_case_variant_benchmark_id_still_gated(self):
+        for bm_id in ("TPCH", "tpch ", " Tpch"):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = bm_id
+            data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+            data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("canonical queries" in e for e in vr.errors)
+
+    def test_non_string_query_ids_do_not_count_toward_coverage(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": i, "ms": 100, "status": "SUCCESS"} for i in range(1, 23)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("non-string or blank id" in e for e in vr.errors)
+
+    def test_non_official_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial", "Official", "official ", 123, True):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok, compliance
+            assert any("compliance_class" in e for e in vr.errors)
+
     def test_canonical_counts_match_explorer_transformer(self):
         from _project.scripts.explorer_pipeline.transformer import (
             _KNOWN_LOGICAL_QUERY_COUNTS,

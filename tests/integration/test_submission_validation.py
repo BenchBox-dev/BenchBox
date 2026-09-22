@@ -41,13 +41,13 @@ _FAKE_BUNDLE = {
         "power_score": 1.0,
         "geomean_ms": 1.0,
         "total_duration_s": 0.1,
-        "queries": {"total": 2},
+        "queries": {"total": 22, "passed": 22, "failed": 0},
         "validation": "passed",
     },
-    "queries": [
-        {"id": 1, "ms": 1.0},
-        {"id": 6, "ms": 1.0},
-    ],
+    # Full canonical coverage with producer-shaped string ids: the
+    # round-trip fixtures must satisfy the query-set coverage gate, the
+    # same way a genuine complete submission does.
+    "queries": [{"id": str(i), "ms": 1.0} for i in range(1, 23)],
 }
 
 
