@@ -24,6 +24,7 @@ from .delta_live_helpers import delta_live_skip_reason, make_delta_spark_session
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.live_integration,
+    pytest.mark.live_delta,
     pytest.mark.skipif(
         delta_live_skip_reason() is not None,
         reason=delta_live_skip_reason() or "PySpark + Delta Lake runtime unavailable",

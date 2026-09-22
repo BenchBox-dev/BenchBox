@@ -2,7 +2,7 @@
 
 These helpers start a local PySpark session with the Delta Lake extension
 using the repository's own JDK compatibility logic
-(:func:`benchbox.platforms.spark._ensure_compatible_java`), so the tests
+(:func:`benchbox.platforms.pyspark.ensure_compatible_java`), so the tests
 work on machines whose default Java is too new for Spark.
 
 The suites using these helpers are marked ``live_integration`` and are
@@ -33,12 +33,11 @@ def delta_live_skip_reason() -> str | None:
     except ImportError as exc:
         return f"PySpark + Delta Lake runtime not installed: {exc}"
 
-    try:
-        from benchbox.platforms.spark import _ensure_compatible_java
+    from benchbox.platforms.pyspark import get_java_skip_reason
 
-        _ensure_compatible_java()
-    except Exception as exc:
-        return f"No compatible Java for PySpark: {exc}"
+    reason = get_java_skip_reason()
+    if reason:
+        return f"No compatible Java for PySpark: {reason}"
 
     return None
 
@@ -53,9 +52,9 @@ def make_delta_spark_session(warehouse_dir: Path | str, app_name: str = "benchbo
     Returns:
         A running ``SparkSession`` with the Delta extension configured.
     """
-    from benchbox.platforms.spark import _ensure_compatible_java
+    from benchbox.platforms.pyspark import ensure_compatible_java
 
-    _ensure_compatible_java()
+    ensure_compatible_java()
 
     from delta import configure_spark_with_delta_pip
     from pyspark.sql import SparkSession

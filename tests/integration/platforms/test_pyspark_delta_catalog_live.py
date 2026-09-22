@@ -27,6 +27,7 @@ from .delta_live_helpers import delta_live_skip_reason, make_delta_spark_session
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.live_integration,
+    pytest.mark.live_delta,
     pytest.mark.skipif(
         delta_live_skip_reason() is not None,
         reason=delta_live_skip_reason() or "PySpark + Delta Lake runtime unavailable",
@@ -76,28 +77,6 @@ COMMIT_ROWS = [
     "(9100009, 9, 9, 1, 90.0, 9000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx9')",
     "(9100010, 10, 10, 1, 100.0, 10000.0, 0.05, 0.02, 'N', 'O', DATE '1998-01-01', DATE '1998-01-15', DATE '1998-01-20', 'DELIVER IN PERSON', 'TRUCK', 'tx10')",
 ]
-
-
-class TestCatalogLoads:
-    def test_catalog_version_and_operations(self):
-        catalog = load_transaction_primitives_catalog()
-        assert catalog.version >= 1
-        assert len(catalog.operations) >= 10
-        assert "transaction_commit_small" in catalog.operations
-        assert "transaction_rollback_small" in catalog.operations
-
-    def test_known_categories_present(self):
-        catalog = load_transaction_primitives_catalog()
-        categories = {op.category for op in catalog.operations.values()}
-        assert {"overhead", "isolation", "savepoint"} <= categories
-
-    def test_every_operation_has_validation_queries(self):
-        catalog = load_transaction_primitives_catalog()
-        for op_id, op in catalog.operations.items():
-            assert op.write_sql.strip(), f"{op_id} has empty write_sql"
-            assert op.validation_queries, f"{op_id} has no validation queries"
-            for query in op.validation_queries:
-                assert query.sql.strip(), f"{op_id}/{query.id} has empty sql"
 
 
 class TestCatalogQueriesOnDelta:

@@ -76,7 +76,11 @@ def _validate_export_paths(table_dir: Path, out_dir: Path, file_name: str) -> No
         raise DeltaExportError(f"Invalid file_name {file_name!r}: expected a '.parquet' file.")
     table_resolved = table_dir.resolve()
     out_resolved = out_dir.resolve() if out_dir.exists() else (out_dir.parent.resolve() / out_dir.name)
-    if out_resolved == table_resolved or table_resolved in out_resolved.parents:
+    if (
+        out_resolved == table_resolved
+        or table_resolved in out_resolved.parents
+        or out_resolved in table_resolved.parents
+    ):
         raise DeltaExportError(
             f"Refusing to export into '{out_dir}': output must not overlap the Delta table directory."
         )
@@ -96,12 +100,14 @@ def export_delta_to_parquet(
     exports stay bounded in memory regardless of table size. Partitioned
     tables keep their Hive-style layout (one file group per partition);
     unpartitioned tables that fit in one chunk land in ``file_name``.
-    Files are staged in a sibling temp directory and moved into place only
-    on full success, so a failed export never leaves partial artifacts in
-    ``output_dir`` (safe to retry or to glob from ClickHouse). Prior
-    ``.parquet`` files in ``output_dir`` are removed before publishing, so
-    reusing the directory with a different file name cannot leave stale
-    snapshots behind for a glob to double-read.
+    The new tree is staged in a sibling temp directory and published with
+    an atomic directory swap, so ``output_dir`` is either the complete new
+    export or the previous one — never partial, and reusing the directory
+    with a different file name or layout cannot leave stale snapshots
+    behind (safe to retry or to glob from ClickHouse). Consumers of
+    partitioned outputs must glob ``**/*.parquet`` (or iterate
+    ``result.parquet_files``): a flat ``*.parquet`` glob misses the Hive
+    subdirectories by design.
 
     Args:
         table_path: Local path to the Delta table directory (must contain
@@ -138,9 +144,11 @@ def export_delta_to_parquet(
     except Exception as exc:
         raise DeltaExportError(f"Failed to read Delta table at '{table_dir}': {exc}") from exc
 
-    out_dir.mkdir(parents=True, exist_ok=True)
-    staging_dir = out_dir.parent / f".{out_dir.name}.export-tmp-{uuid.uuid4().hex[:12]}"
+    run_id = uuid.uuid4().hex[:12]
+    staging_dir = out_dir.parent / f".{out_dir.name}.export-tmp-{run_id}"
+    backup_dir = out_dir.parent / f".{out_dir.name}.export-backup-{run_id}"
     try:
+        out_dir.parent.mkdir(parents=True, exist_ok=True)
         import pyarrow as pa
         import pyarrow.dataset as ds
 
@@ -162,30 +170,33 @@ def export_delta_to_parquet(
             max_rows_per_file=max_rows_per_file,
             max_rows_per_group=max_rows_per_file,
         )
+        # An empty table writes no files (and possibly no directory); the
+        # swap below still publishes an empty output tree.
+        staging_dir.mkdir(parents=True, exist_ok=True)
         staged = sorted(p for p in staging_dir.rglob("*") if p.is_file())
         row_count = dataset.count_rows()
         column_names = dataset.schema.names
 
-        # Remove prior export files before publishing: reusing output_dir
-        # with a different file_name (or layout) would otherwise leave stale
-        # .parquet files that a ClickHouse glob would read as duplicate rows.
-        for stale in sorted(out_dir.rglob("*.parquet")):
-            logger.info(f"Removing stale export file '{stale}' superseded by version {resolved_version}")
-            stale.unlink()
-
-        moved: list[Path] = []
         if len(staged) == 1 and not partition_columns:
-            target = out_dir / file_name
-            os.replace(staged[0], target)
-            moved.append(target)
-        else:
-            for staged_file in staged:
-                relative = staged_file.relative_to(staging_dir)
-                target = out_dir / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(staged_file, target)
-                moved.append(target)
+            os.replace(staged[0], staging_dir / file_name)
+
+        # Atomic publish: the previous tree (if any) moves aside, the new
+        # tree swaps in, then the backup is dropped. Readers see either the
+        # complete old export or the complete new one.
+        if out_dir.exists() or out_dir.is_symlink():
+            os.replace(out_dir, backup_dir)
+        os.replace(staging_dir, out_dir)
+        if backup_dir.is_symlink() or backup_dir.is_file():
+            backup_dir.unlink(missing_ok=True)
+        elif backup_dir.is_dir():
+            shutil.rmtree(backup_dir, ignore_errors=True)
+        moved = sorted(p for p in out_dir.rglob("*") if p.is_file())
     except Exception as exc:
+        if backup_dir.exists() and not out_dir.exists():
+            try:
+                os.replace(backup_dir, out_dir)
+            except OSError:
+                logger.warning(f"Could not restore previous export at '{out_dir}' after failed publish")
         raise DeltaExportError(f"Failed to export Delta table at '{table_dir}': {exc}") from exc
     finally:
         shutil.rmtree(staging_dir, ignore_errors=True)

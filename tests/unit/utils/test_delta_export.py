@@ -111,6 +111,12 @@ class TestExportErrors:
         with pytest.raises(DeltaExportError, match="must not overlap"):
             export_delta_to_parquet(delta_table, delta_table / "nested-out")
 
+    def test_output_containing_table_raises(self, delta_table: Path):
+        """An output_dir above the table must not trigger recursive cleanup of the table."""
+        with pytest.raises(DeltaExportError, match="must not overlap"):
+            export_delta_to_parquet(delta_table, delta_table.parent)
+        assert (delta_table / "_delta_log").is_dir()
+
 
 class TestExportShapes:
     def test_empty_table_exports_no_files(self, tmp_path: Path):
