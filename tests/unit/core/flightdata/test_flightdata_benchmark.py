@@ -5,13 +5,17 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import csv
+import io
 import tempfile
+import zipfile
 from datetime import date
 from pathlib import Path
 
 import pytest
 
 from benchbox.core.flightdata.benchmark import FlightDataBenchmark
+from benchbox.core.flightdata.downloader import FlightDataDownloader
 from benchbox.core.flightdata.schema import FLIGHT_SCHEMA
 
 pytestmark = [
@@ -231,6 +235,52 @@ class TestCsvLoadingConfig:
             "auto_detect=true",
             "ignore_errors=true",
         ]
+
+
+class TestBtsSourceDecoding:
+    """Tests for historical BTS source-file decoding."""
+
+    def test_february_2002_cp1252_tail_number_does_not_abort_month(self, tmp_path, monkeypatch):
+        """The legacy byte observed in the February 2002 tail number decodes losslessly."""
+        csv_bytes = (
+            b"FlightDate,Year,Month,DayofMonth,DayOfWeek,Reporting_Airline,Tail_Number\n"
+            b"2002-02-02,2002,2,2,6,UA,N835\xe41\n"
+        )
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, "w") as zf:
+            zf.writestr("2002_02.csv", csv_bytes)
+
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def read(self):
+                return archive.getvalue()
+
+        monkeypatch.setattr(
+            "benchbox.core.flightdata.downloader.urllib.request.urlopen", lambda *_args, **_kwargs: Response()
+        )
+        downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path)
+        decoded_source = {}
+        transform = downloader._transform_bts_row
+
+        def capture_source(bts, flight_id):
+            decoded_source.update(bts)
+            return transform(bts, flight_id)
+
+        monkeypatch.setattr(downloader, "_transform_bts_row", capture_source)
+        output = io.StringIO()
+
+        rows = downloader._download_bts_month(csv.writer(output), "https://example.invalid/bts.zip", 2002, 2, 1)
+
+        assert rows == 1
+        assert decoded_source["Tail_Number"] == "N835ä1"
+        generated = next(csv.reader(io.StringIO(output.getvalue())))
+        assert generated[1:7] == ["2002-02-02", "2002", "2", "2", "6", "UA"]
+        assert "\ufffd" not in output.getvalue()
 
 
 class TestPublicWrapper:

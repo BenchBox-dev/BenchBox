@@ -67,6 +67,7 @@ _FLIGHT_SHARDS = _DOWNLOADER_SPECS["flight_shards"]
 # BTS TranStats On-Time Performance download URL template
 # Format: YEAR_MONTH (e.g., 2023_1 for January 2023)
 BTS_BASE_URL = _DOWNLOADER_SPECS["bts_base_url"]
+BTS_CSV_ENCODING = str(_DOWNLOADER_SPECS["csv_encoding"])
 
 # Data coverage
 FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
@@ -808,7 +809,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 raise ValueError(f"No CSV found in ZIP from {url}")
 
             with zf.open(csv_names[0]) as csv_file:
-                reader = csv.DictReader(io.TextIOWrapper(csv_file, encoding="utf-8"))
+                # Historical BTS exports are Windows-1252 CSVs. Using their
+                # declared legacy encoding preserves bytes such as the 0xE4 in
+                # February 2002 tail numbers without lossy replacement.
+                reader = csv.DictReader(io.TextIOWrapper(csv_file, encoding=BTS_CSV_ENCODING))
 
                 for bts_row in reader:
                     row = self._transform_bts_row(bts_row, start_id + rows_written)
@@ -1111,6 +1115,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         return {
             "source": "bts-transtats",
             "base_url": BTS_BASE_URL,
+            "csv_encoding": BTS_CSV_ENCODING,
             "months": list(self._months),
             "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
             "expected_sha256": {

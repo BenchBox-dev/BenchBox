@@ -1005,7 +1005,7 @@ class SnowflakeAdapter(PlatformAdapter):
     ) -> str:
         """Select Snowflake file format object based on resolved CSV dialect."""
         dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
-        if dialect.null_marker is not None:
+        if dialect.delimiter == "|":
             self.log_very_verbose(f"Using TBL file format for {table_name}")
             return f"{self.schema}.BENCHBOX_TBL_FORMAT"
         self.log_very_verbose(f"Using CSV file format for {table_name}")
@@ -1019,16 +1019,16 @@ class SnowflakeAdapter(PlatformAdapter):
         data_source: DataSource,
         benchmark: Any,
     ) -> str | None:
-        """Create and return a per-dialect file format preserving empty strings.
+        """Create and return a per-dialect file format for non-static CSV semantics.
 
-        Returns the qualified format name when the resolved dialect carries a
-        truthy null-marker sentinel: only that literal loads as NULL while
-        empty fields stay empty strings (required by NOT NULL schemas such as
-        ClickBench). Returns None otherwise so the caller keeps the static
-        CSV/TBL format choice.
+        Header-aware inputs need their own SKIP_HEADER setting. A truthy
+        null-marker sentinel also needs a format where only that literal loads
+        as NULL while empty fields stay empty strings (required by NOT NULL
+        schemas such as ClickBench). Returns None when the static CSV/TBL
+        formats already match the resolved dialect.
         """
         dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
-        if not dialect.null_marker:
+        if not dialect.null_marker and not dialect.has_header:
             return None
         key = f"{dialect.delimiter}\x1f{dialect.null_marker}\x1f{int(dialect.has_header)}\x1f{self.compression}"
         digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12].upper()
@@ -1036,7 +1036,9 @@ class SnowflakeAdapter(PlatformAdapter):
         delimiter = dialect.delimiter.replace("'", "''")
         marker = dialect.null_marker.replace("'", "''")
         skip_header = 1 if dialect.has_header else 0
-        self.log_very_verbose(f"Ensuring preserve-empty-strings file format {format_name} for {table_name}")
+        empty_field_as_null = "FALSE" if marker else "TRUE"
+        null_if = f"NULL_IF = ('{marker}')" if marker else ""
+        self.log_very_verbose(f"Ensuring per-dialect file format {format_name} for {table_name}")
         cursor.execute(f"""
             CREATE FILE FORMAT IF NOT EXISTS {format_name}
             TYPE = 'CSV'
@@ -1045,8 +1047,8 @@ class SnowflakeAdapter(PlatformAdapter):
             SKIP_HEADER = {skip_header}
             ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
             REPLACE_INVALID_CHARACTERS = TRUE
-            EMPTY_FIELD_AS_NULL = FALSE
-            NULL_IF = ('{marker}')
+            EMPTY_FIELD_AS_NULL = {empty_field_as_null}
+            {null_if}
             FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             COMPRESSION = '{self.compression}'
         """)

@@ -182,8 +182,11 @@ def rewrite_tpcdi_sqlite_idioms(
       ``re.sub`` replacement templates where ``\\1``/``\\2`` are the column
       name and optional backtick (e.g. ``r"\\1\\2 = TRUE"``).
     - ``DATE('now')`` becomes ``CURRENT_DATE()`` and
-      ``DATE('now', '-N days')`` uses the engine-specific
-      ``relative_date_replacement`` template, where ``\\1`` is the day count.
+      ``DATE('now', '-N days')`` is rendered with
+      ``relative_date_replacement``, an ``re.sub`` replacement template
+      where ``\\1`` is the day count (e.g. BigQuery needs
+      ``r"DATE_SUB(CURRENT_DATE(), INTERVAL \\1 DAY)"`` while Spark-style
+      ``DATE_SUB(CURRENT_DATE(), N)`` takes a bare integer).
     - ``JULIANDAY(d)`` is rendered with ``julianday_replacement``, an
       ``re.sub`` replacement template where ``\\1`` is the inner expression
       (e.g. ``r"(UNIX_DATE(\\1) + 2440588)"``).
@@ -193,6 +196,7 @@ def rewrite_tpcdi_sqlite_idioms(
         flag_true: Replacement for ``<flag> = 1`` comparisons.
         flag_false: Replacement for ``<flag> = 0`` comparisons.
         julianday_replacement: Engine-specific JULIANDAY rendering.
+        relative_date_replacement: Engine-specific DATE('now', '-N days') rendering.
 
     Returns:
         Query with portable equivalents. Day-number arithmetic is

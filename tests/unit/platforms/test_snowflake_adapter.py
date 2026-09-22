@@ -868,6 +868,24 @@ benchbox-fixture-key-material
         assert adapter._get_file_format_for_table("orders", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_get_file_format_for_table_manifest_csv_with_empty_null_marker_picks_csv_format(self, mock_snowflake):
+        """Manifest comma dialect with empty (not null) marker must select BENCHBOX_CSV_FORMAT."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        file_path = Path("trips.csv.gz")
+        ds = resolver_data_source("trips", file_path, {"csv_delimiter": ",", "csv_null_marker": ""})
+
+        assert adapter._get_file_format_for_table("trips", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_ensure_preserve_file_format_returns_none_without_sentinel(self, mock_snowflake):
         """Falsy null markers keep the static CSV/TBL format choice (no new format)."""
         from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
@@ -912,6 +930,35 @@ benchbox-fixture-key-material
         assert "FIELD_DELIMITER = '|'" in create_sql
         assert "EMPTY_FIELD_AS_NULL = FALSE" in create_sql
         assert "NULL_IF = ('__NULL__')" in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_creates_header_aware_format_without_sentinel(self, mock_snowflake):
+        """Header CSVs get SKIP_HEADER even when empty fields retain default NULL handling."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("trips.csv.gz")
+        ds = resolver_data_source(
+            "trips",
+            file_path,
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""},
+        )
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "trips", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "SKIP_HEADER = 1" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = TRUE" in create_sql
+        assert "NULL_IF" not in create_sql
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):

@@ -55,6 +55,7 @@ def test_source_contract_lists_exact_remote_files(tmp_path):
     contract = downloader.source_contract()
     assert contract["source"] == "bts-transtats"
     assert contract["base_url"] == BTS_BASE_URL
+    assert contract["csv_encoding"] == "cp1252"
     assert contract["months"] == [(2024, 12)]
     assert contract["urls"] == [BTS_BASE_URL.format(year=2024, month=12)]
 
