@@ -133,6 +133,8 @@ Current Databricks defaults preserve the legacy `*_tuned.yaml` Z-ORDER rendering
 Use `*_liquid_tuned.yaml` to request Liquid AUTO by passing the template as an explicit path (there is no `liquid` keyword; `--tuning tuned` only resolves `<benchmark>_tuned.yaml`):
 
 ```bash
+# Source checkout only: examples/ is not installed with the package, and the
+# packaged templates ship Z-ORDER renderings, not the Liquid variants.
 benchbox run --platform databricks --benchmark tpch --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml
 ```
 

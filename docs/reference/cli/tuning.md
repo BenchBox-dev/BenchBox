@@ -132,8 +132,12 @@ benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 
 ### Validate Configuration
 
-DataFrame platforms only; `--platform` is required and SQL platform
-configurations are rejected.
+DataFrame platforms only; `--platform` is required and must name a
+DataFrame platform (SQL platform names are rejected). SQL-format YAML
+files are not rejected: SQL-only sections such as `primary_keys` and
+`table_tunings` are silently ignored and only the DataFrame sections
+are validated, so a "valid" result does not mean the SQL content was
+checked. Validate the file your platform will actually load.
 
 ```bash
 benchbox tuning validate polars_tuning.yaml --platform polars
