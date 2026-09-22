@@ -168,3 +168,22 @@ class TestSanitizeCacheControlReceipt:
         assert clean["settings"] == {"k": "1"}
         assert clean["warnings"] == ["1"]
         assert clean["errors"] == []
+
+
+class TestExplicitCacheEnabledReceipt:
+    """Receipt recorded when the operator leaves the result cache enabled."""
+
+    def test_records_confirmed_enabled_state(self):
+        from benchbox.platforms.cloud_shared import (
+            explicit_cache_enabled_receipt,
+            sanitize_cache_control_receipt,
+        )
+
+        receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+        assert receipt["validated"] is True
+        assert receipt["cache_disabled"] is False
+        assert receipt["settings"] == {"USE_CACHED_RESULT": "TRUE"}
+        assert receipt["errors"] == []
+        assert any("explicitly left enabled" in w for w in receipt["warnings"])
+        # The deterministic receipt must survive sanitization intact.
+        assert sanitize_cache_control_receipt(receipt) == receipt

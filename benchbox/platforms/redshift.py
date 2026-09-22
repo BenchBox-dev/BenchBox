@@ -1941,6 +1941,19 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     self.logger.info(
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
+            else:
+                # The result cache was explicitly left enabled, so there is no
+                # disabled state to probe. Record the configured enabled state
+                # so the bundle carries enabled-cache evidence instead of an
+                # absent receipt that the submission gate would grandfather.
+                from benchbox.platforms.cloud_shared import (
+                    explicit_cache_enabled_receipt,
+                    sanitize_cache_control_receipt,
+                )
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(
+                    explicit_cache_enabled_receipt("enable_result_cache_for_session", "ON")
+                )
 
             # Run VACUUM and ANALYZE on all tables if configured.
             # These operations use a **separate connection** because they are

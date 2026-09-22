@@ -917,11 +917,12 @@ class TestValidateBundle:
 # ---------------------------------------------------------------------------
 
 
-def _bundle_with_cache_control(receipt):
+def _bundle_with_cache_control(receipt, platform_name="Snowflake", **compute_fields):
     data = _minimal_bundle()
-    data["platform"] = {"name": "Snowflake", "version": "9.0", "compute": {}}
+    compute = dict(compute_fields)
     if receipt is not None:
-        data["platform"]["compute"] = {"cache_control": receipt}
+        compute["cache_control"] = receipt
+    data["platform"] = {"name": platform_name, "version": "9.0", "compute": compute}
     return data
 
 
@@ -964,6 +965,48 @@ class TestCacheControlGate:
         vr = ValidationResult("test")
         _validate_bundle(data, vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_declared_enabled_cache_refused(self):
+        # A receipt-capable platform declaring result_cache_enabled without a
+        # receipt advertises cached timings with no disabling evidence.
+        for platform_name in ("Snowflake", "Redshift"):
+            vr = ValidationResult("test")
+            data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
+            _validate_bundle(data, vr)
+            assert not vr.ok, platform_name
+            assert any("without a cache_control receipt" in e for e in vr.errors), vr.errors
+
+    def test_absent_receipt_with_declared_disabled_cache_grandfathered(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=False)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
+        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # legacy exemption even when they declare an enabled cache.
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_exempt_in_mirror_lane(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=True)
+        data["summary"]["validation"] = "partial"
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_explicit_enabled_cache_receipt_refused(self):
+        # End to end: the receipt adapters record for disable_result_cache=False
+        # carries confirmed-enabled evidence, which cannot stand as clean.
+        from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
+
+        receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
 
 
 def _bundle_with_rows(row_values, rows_loaded=866602):

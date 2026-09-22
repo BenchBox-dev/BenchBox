@@ -351,6 +351,19 @@ def _validate_benchmark_section(benchmark: Any, vr: ValidationResult) -> None:
         vr.error(f"scale_factor must be positive: {sf_f}")
 
 
+#: Platforms whose adapters record a session cache-control receipt into
+#: ``platform.compute.cache_control``. Only these platforms can produce an
+#: absent receipt that contradicts a declared cache state; every other
+#: platform keeps the legacy absent-receipt exemption.
+_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift"})
+
+
+def _platform_records_cache_receipt(platform: dict) -> bool:
+    """Return True when the platform's adapter persists a cache receipt."""
+    name = platform.get("name")
+    return isinstance(name, str) and name.lower().replace(" ", "-") in _CACHE_RECEIPT_PLATFORMS
+
+
 def _validate_cache_control_section(
     platform: Any,
     vr: ValidationResult,
@@ -361,9 +374,12 @@ def _validate_cache_control_section(
 
     Cloud adapters record the sanitized session cache-control receipt at
     ``platform.compute.cache_control`` when session validation runs. An
-    absent receipt passes: legacy bundles predate runtime persistence
-    (grandfathered), as do runs whose configuration never attempted
-    validation. A present receipt must confirm ``validated`` and
+    absent receipt passes for legacy bundles that predate runtime
+    persistence (grandfathered) and for platforms without receipt
+    machinery — unless the bundle affirmatively declares an enabled
+    result cache on a receipt-capable platform. Such a bundle advertises
+    cached timings with no disabling evidence, which is exactly what this
+    gate excludes. A present receipt must confirm ``validated`` and
     ``cache_disabled`` — anything else means the timings were measured
     under an unconfirmed or enabled cache and cannot stand as clean
     evidence. The trusted mirror lane stays lenient to preserve
@@ -376,9 +392,15 @@ def _validate_cache_control_section(
     compute = platform.get("compute")
     if not isinstance(compute, dict):
         return
-    if "cache_control" not in compute:
+    receipt = compute.get("cache_control")
+    if receipt is None:
+        if compute.get("result_cache_enabled") and _platform_records_cache_receipt(platform):
+            vr.error(
+                "platform.compute declares an enabled result cache without a "
+                "cache_control receipt; cached timings are not comparable evidence "
+                "(rerun with the result cache disabled so session validation records a receipt)"
+            )
         return
-    receipt = compute["cache_control"]
     if not isinstance(receipt, dict):
         vr.error("platform.compute.cache_control must be an object")
         return

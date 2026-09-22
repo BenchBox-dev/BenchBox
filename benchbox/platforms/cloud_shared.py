@@ -53,6 +53,27 @@ def sanitize_cache_control_receipt(receipt: Any) -> dict[str, Any] | None:
     return clean
 
 
+def explicit_cache_enabled_receipt(setting_key: str, enabled_value: str) -> dict[str, Any]:
+    """Return the deterministic receipt for an explicitly enabled result cache.
+
+    When the operator sets ``disable_result_cache=False`` the adapter applies
+    the enabled state by configuration, so there is no disabled state to
+    probe: the enabled outcome is known without a session query. Recording it
+    keeps cache-enabled runs from serializing to an absent receipt, which the
+    submission gate would otherwise grandfather as legacy evidence.
+    """
+    return {
+        "validated": True,
+        "cache_disabled": False,
+        "settings": {setting_key: enabled_value},
+        "warnings": [
+            "result cache explicitly left enabled (disable_result_cache=False); "
+            "timings measured under an enabled cache are not comparable clean evidence"
+        ],
+        "errors": [],
+    }
+
+
 def validate_session_cache_control(
     *,
     connection: Any,

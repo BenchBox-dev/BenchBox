@@ -1738,3 +1738,37 @@ class TestCacheControlReceiptPersistence:
 
         payload = SnowflakeAdapter._snowflake_compute_metadata({}, {})
         assert "cache_control" not in payload
+
+    def test_explicitly_enabled_cache_records_receipt_without_session_probe(self):
+        from unittest.mock import Mock, patch
+
+        adapter = _make_adapter(disable_result_cache=False)
+        assert adapter._cache_control_receipt is None
+
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = Mock()
+        with patch.object(adapter, "validate_session_cache_control") as mock_validate:
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        mock_validate.assert_not_called()
+        assert adapter._cache_control_receipt == {
+            "validated": True,
+            "cache_disabled": False,
+            "settings": {"USE_CACHED_RESULT": "TRUE"},
+            "warnings": [
+                "result cache explicitly left enabled (disable_result_cache=False); "
+                "timings measured under an enabled cache are not comparable clean evidence"
+            ],
+            "errors": [],
+        }
+
+    def test_enabled_receipt_flows_into_compute_metadata(self):
+        from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+        payload = SnowflakeAdapter._snowflake_compute_metadata(
+            {"result_cache_enabled": True}, {}, cache_control=receipt
+        )
+        assert payload["result_cache_enabled"] is True
+        assert payload["cache_control"]["cache_disabled"] is False
