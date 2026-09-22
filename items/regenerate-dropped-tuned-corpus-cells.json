@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "ai_primitives, joinorder_synthetic, and vector_search each have at least one bundle in results-data/bundles and appear in corpus-inventory.json",
+    "Regenerated tuned bundles carry a genuine applied ledger with an honest validation_status (corroborated or applied_unverified, never silently verified)",
+    "results-data/REGENERATION.md checklist marks restored cells or records explicit waivers"
+  ],
+  "context": "Follow-up to done item tuning-corpus-drop-pre-provenance-tuned-bundles-20260716 (w3), which removed 325 physically-untuned bundles and left a 48-cell regeneration checklist in results-data/REGENERATION.md with no tracker coverage. Verified 2026-09-22: only 5 duckdb SF1 tuned bundles exist (all applied_unverified, 2026-08-29); ai_primitives, joinorder_synthetic, and vector_search still have zero corpus coverage. Per-cell command in the checklist: benchbox run --platform <platform> --benchmark <benchmark> --scale <sf> --tuning tuned --phases generate,load,power after confirming the platform tuned path.",
+  "description": "Regenerate the tuned corpus cells dropped in 2026-07-16: prioritize restoring ai_primitives, joinorder_synthetic, and vector_search (zero coverage since the drop), then local-platform tuned cells from the 48-cell checklist in results-data/REGENERATION.md. Each regenerated bundle must show a real applied ledger; update the checklist as cells are restored or waived.",
+  "links": [
+    "results-data/REGENERATION.md",
+    "results-data/bundles",
+    "results-data/corpus-inventory.json"
+  ]
+}
