@@ -137,23 +137,86 @@ class TestIcebergVacuum:
     def test_vacuum_dry_run_reports_without_expiring(self, tmp_path: Path) -> None:
         ops, identifier = self._two_snapshot_table(tmp_path)
 
-        result = ops.vacuum_table(identifier, dry_run=True)
+        result = ops.vacuum_table(identifier, retention_hours=0, dry_run=True)
 
         assert result.success is True
         assert result.operation_type.value == "vacuum"
         assert result.rows_affected == 1
+        assert result.metrics["reclaimable_files"] >= 1
+        assert result.metrics["reclaimable_bytes"] > 0
         assert len(ops.catalog.load_table(identifier).snapshots()) == 2
 
     def test_vacuum_expires_old_snapshots(self, tmp_path: Path) -> None:
         ops, identifier = self._two_snapshot_table(tmp_path)
 
+        result = ops.vacuum_table(identifier, retention_hours=0, dry_run=False)
+
+        assert result.success is True
+        assert result.rows_affected == 1
+        assert result.metrics["file_cleanup"] == "full"
+        assert result.metrics["reclaimed_files"] >= 1
+        assert result.metrics["reclaimed_bytes"] > 0
+        remaining = ops.catalog.load_table(identifier).snapshots()
+        assert len(remaining) == 1
+        assert remaining[0].snapshot_id not in result.metrics["expired_snapshot_ids"]
+        # The surviving snapshot still scans.
+        assert ops.catalog.load_table(identifier).scan().to_arrow().num_rows == 2
+
+    def test_vacuum_default_preserves_fresh_history(self, tmp_path: Path) -> None:
+        """No retention_hours honors the backend default (5-day max age)."""
+        ops, identifier = self._two_snapshot_table(tmp_path)
+
+        result = ops.vacuum_table(identifier, dry_run=False)
+
+        assert result.success is True
+        assert result.rows_affected == 0
+        assert len(ops.catalog.load_table(identifier).snapshots()) == 2
+
+    def test_vacuum_default_uses_table_properties(self, tmp_path: Path) -> None:
+        """A zero max-snapshot-age property makes the default expire everything old."""
+        ops, identifier = self._two_snapshot_table(tmp_path)
+        table = ops.catalog.load_table(identifier)
+        transaction = table.transaction()
+        transaction.set_properties({"history.expire.max-snapshot-age-ms": "0"})
+        transaction.commit_transaction()
+
         result = ops.vacuum_table(identifier, dry_run=False)
 
         assert result.success is True
         assert result.rows_affected == 1
-        remaining = ops.catalog.load_table(identifier).snapshots()
-        assert len(remaining) == 1
-        assert remaining[0].snapshot_id not in result.metrics["expired_snapshot_ids"]
+        assert len(ops.catalog.load_table(identifier).snapshots()) == 1
+
+    def test_vacuum_respects_min_snapshots_to_keep(self, tmp_path: Path) -> None:
+        ops, identifier = self._two_snapshot_table(tmp_path)
+        table = ops.catalog.load_table(identifier)
+        table.append(_arrow_batch([{"id": 3, "v": "c"}]))
+        assert len(ops.catalog.load_table(identifier).snapshots()) == 3
+        transaction = ops.catalog.load_table(identifier).transaction()
+        transaction.set_properties(
+            {"history.expire.max-snapshot-age-ms": "0", "history.expire.min-snapshots-to-keep": "2"}
+        )
+        transaction.commit_transaction()
+
+        result = ops.vacuum_table(identifier, dry_run=False)
+
+        assert result.success is True
+        assert result.rows_affected == 1
+        assert len(ops.catalog.load_table(identifier).snapshots()) == 2
+
+    def test_vacuum_skips_tagged_snapshots(self, tmp_path: Path) -> None:
+        """Snapshots referenced by a tag are protected from expiration."""
+        ops, identifier = self._two_snapshot_table(tmp_path)
+        table = ops.catalog.load_table(identifier)
+        old_id = [
+            snap.snapshot_id for snap in table.snapshots() if snap.snapshot_id != table.current_snapshot().snapshot_id
+        ][0]
+        table.manage_snapshots().create_tag(old_id, "protected").commit()
+
+        result = ops.vacuum_table(identifier, retention_hours=0, dry_run=False)
+
+        assert result.success is True
+        assert result.rows_affected == 0
+        assert len(ops.catalog.load_table(identifier).snapshots()) == 2
 
     def test_optimize_raises_not_implemented(self, tmp_path: Path) -> None:
         ops, identifier = self._two_snapshot_table(tmp_path)

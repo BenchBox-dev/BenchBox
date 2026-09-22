@@ -204,7 +204,7 @@ ICEBERG_CAPABILITIES = DataFrameMaintenanceCapabilities(
     supports_row_level_delete=True,
     supports_time_travel=True,
     supports_optimize=False,  # pyiceberg has no binpack rewrite; use Spark rewrite_data_files
-    supports_vacuum=True,  # Snapshot expiration via table.maintenance.expire_snapshots
+    supports_vacuum=True,  # Snapshot expiration plus orphan-file reclamation on local tables
     max_batch_size=1000000,
     notes="Full ACID compliance via Apache Iceberg",
     # The Iceberg condition parser handles single unquoted comparisons only;
