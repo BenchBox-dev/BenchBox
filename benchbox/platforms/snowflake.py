@@ -98,6 +98,11 @@ class SnowflakeAdapter(PlatformAdapter):
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
 
+        # Last session cache-control receipt (sanitized). Recorded when
+        # session cache validation runs and persisted into platform_compute
+        # as deterministic cache-state evidence. None until validated.
+        self._cache_control_receipt: dict[str, Any] | None = None
+
         # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
 
@@ -391,7 +396,9 @@ class SnowflakeAdapter(PlatformAdapter):
 
         metadata["platform_deployment"] = self._snowflake_deployment_metadata(config)
         metadata["platform_cloud"] = self._snowflake_cloud_metadata(info, config)
-        metadata["platform_compute"] = self._snowflake_compute_metadata(config, compute)
+        metadata["platform_compute"] = self._snowflake_compute_metadata(
+            config, compute, cache_control=getattr(self, "_cache_control_receipt", None)
+        )
         metadata["platform_storage"] = self._snowflake_storage_metadata(config)
         return metadata
 
@@ -434,7 +441,11 @@ class SnowflakeAdapter(PlatformAdapter):
         return _compact_metadata(payload)
 
     @staticmethod
-    def _snowflake_compute_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+    def _snowflake_compute_metadata(
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+        cache_control: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         observed = any(
             compute.get(key) is not None
             for key in (
@@ -468,6 +479,7 @@ class SnowflakeAdapter(PlatformAdapter):
             "query_acceleration_max_scale_factor": compute.get("query_acceleration_max_scale_factor"),
             "scaling_policy": compute.get("scaling_policy"),
             "result_cache_enabled": config.get("result_cache_enabled"),
+            "cache_control": dict(cache_control) if isinstance(cache_control, Mapping) else None,
             "source": "observed" if observed else "requested",
             "collection_status": collection_status,
             "collection_error_class": collection_error,
@@ -1238,6 +1250,9 @@ class SnowflakeAdapter(PlatformAdapter):
             if self.disable_result_cache or critical_failures:
                 self.logger.debug("Validating cache control settings...")
                 validation_result = self.validate_session_cache_control(connection)
+                from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(validation_result)
 
                 if not validation_result["validated"]:
                     self.logger.warning(f"Cache control validation failed: {validation_result.get('errors', [])}")

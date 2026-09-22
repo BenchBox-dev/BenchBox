@@ -3823,3 +3823,48 @@ class TestCreateSchema:
 
         executed_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
         assert any("DROP TABLE IF EXISTS" in sql for sql in executed_sqls)
+
+
+# ---------------------------------------------------------------------------
+# configure_for_benchmark: cache-control receipt persistence
+# ---------------------------------------------------------------------------
+
+
+class TestCacheControlReceiptPersistence:
+    """The session receipt must reach platform_compute as bundle evidence."""
+
+    def test_receipt_stored_on_validation(self):
+        from unittest.mock import Mock, patch
+
+        adapter = _make_adapter(disable_result_cache=True)
+        assert adapter._cache_control_receipt is None
+
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = Mock()
+        with patch.object(
+            adapter,
+            "validate_session_cache_control",
+            return_value={"validated": True, "cache_disabled": True},
+        ):
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        assert adapter._cache_control_receipt == {
+            "validated": True,
+            "cache_disabled": True,
+            "settings": {},
+            "warnings": [],
+            "errors": [],
+        }
+
+    def test_receipt_flows_into_compute_metadata(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        receipt = {"validated": True, "cache_disabled": True}
+        payload = RedshiftAdapter._redshift_compute_metadata({}, {}, cache_control=receipt)
+        assert payload["cache_control"] == receipt
+
+    def test_compute_metadata_omits_absent_receipt(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        payload = RedshiftAdapter._redshift_compute_metadata({"number_of_nodes": 2}, {"num_compute_nodes": 2})
+        assert "cache_control" not in payload

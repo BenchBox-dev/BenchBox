@@ -111,8 +111,8 @@ def _minimal_bundle() -> dict:
         },
         "phases": {"validation": {"status": "PASSED"}},
         "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
+            {"id": "Q1", "ms": 100, "status": "SUCCESS", "rows": 6},
+            {"id": "Q2", "ms": 200, "status": "SUCCESS", "rows": 12},
         ],
     }
 
@@ -910,6 +910,112 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("concrete billing_unit" in e for e in vr.errors)
+
+
+# ---------------------------------------------------------------------------
+# cache-control receipt gate + empty result rows tripwire
+# ---------------------------------------------------------------------------
+
+
+def _bundle_with_cache_control(receipt):
+    data = _minimal_bundle()
+    data["platform"] = {"name": "Snowflake", "version": "9.0", "compute": {}}
+    if receipt is not None:
+        data["platform"]["compute"] = {"cache_control": receipt}
+    return data
+
+
+class TestCacheControlGate:
+    def test_absent_receipt_grandfathered(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(None), vr)
+        assert vr.ok, vr.errors
+
+    def test_confirmed_disabled_passes(self):
+        receipt = {"validated": True, "cache_disabled": True, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert vr.ok, vr.errors
+
+    def test_unconfirmed_receipt_refused(self):
+        receipt = {"validated": False, "cache_disabled": False, "settings": {}, "warnings": [], "errors": ["boom"]}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("unconfirmed" in e for e in vr.errors)
+
+    def test_confirmed_enabled_refused(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
+
+    def test_malformed_receipt_refused(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control("disabled"), vr)
+        assert not vr.ok
+        assert any("must be an object" in e for e in vr.errors)
+
+    def test_mirror_lane_exempt(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        data = _bundle_with_cache_control(receipt)
+        data["summary"]["validation"] = "partial"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+
+def _bundle_with_rows(row_values, rows_loaded=866602):
+    data = _minimal_bundle()
+    data["queries"] = [
+        {"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "rows": value} for i, value in enumerate(row_values)
+    ]
+    data["summary"]["queries"] = {"total": len(row_values), "passed": len(row_values), "failed": 0}
+    if rows_loaded is None:
+        data["summary"].pop("data", None)
+    else:
+        data["summary"]["data"] = {"rows_loaded": rows_loaded}
+    return data
+
+
+class TestEmptyResultRows:
+    def test_all_empty_against_loaded_data_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0]), vr)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_missing_rows_with_unreported_volume_warns(self):
+        data = _bundle_with_rows([0, 0], rows_loaded=None)
+        for q in data["queries"]:
+            q.pop("rows")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w and "unreported" in w for w in vr.warnings)
+
+    def test_mixed_zero_and_nonzero_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 41]), vr)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_zero_loaded_volume_excuses_empty_results(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0], rows_loaded=0), vr)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_no_success_rows_is_silent(self):
+        data = _bundle_with_rows([0, 0])
+        for q in data["queries"]:
+            q["status"] = "FAILED"
+        data["summary"]["validation"] = "failed"
+        data["summary"]["queries"] = {"total": 2, "passed": 0, "failed": 2}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("result-rows-empty" in w for w in vr.warnings)
 
 
 # ---------------------------------------------------------------------------

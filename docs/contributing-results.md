@@ -114,6 +114,7 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Schema compliance** - the bundle is valid schema-v2 JSON with all required fields
 - **Hash verification** - the SHA-256 hash in the manifest matches the bundle contents
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
+- **Cache evidence** - a recorded session cache-control receipt must confirm the cache is disabled; all-SUCCESS runs with zero rows everywhere are flagged
 - **Metadata extraction** - a summary comment is posted on the PR showing what the submission adds
 
 Community submissions must include a manifest, execute at least one query, and
