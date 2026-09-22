@@ -16127,6 +16127,13 @@
       "status": "open",
       "title": "Submission gates: timing plausibility C1-C4 as warnings"
     },
+    "submission-severity-override-contract": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Severity migration: warn-require-override contract + mirror"
+    },
     "submission-validator-drift-develop-vs-published-results": {
       "claim": null,
       "needs": [],

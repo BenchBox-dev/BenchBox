@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "ValidationResult supports refuse / warn-require-override / info with explicit exit contract consumed by both submission and mirror workflows",
+    "PR comment renders per-rule table with id+version, key numbers, and field paths",
+    "--rules-version prints the active set; unknown flags are rejected, never treated as paths",
+    "New rule modules are stdlib-only and added to the published-results mirror allowlist + self-green guard"
+  ],
+  "context": "Adversarial findings 2 and 9 accepted: rules/registry design must survive the slim published-results mirror, and the third severity changes exit contracts. Decision gate: exit-code and workflow-consumption contract approved before any warn-require-override rule goes live.",
+  "description": "Own the severity migration: extend the validator result model beyond errors/warnings, define the binary-plus-override exit contract, update format_pr_comment and both workflow consumers, add --rules-version with unknown-flag rejection, and document the mirror-allowlist obligation for every new rule module. No threshold changes in this item."
+}
