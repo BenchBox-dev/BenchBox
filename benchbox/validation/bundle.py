@@ -517,9 +517,13 @@ def _bundle_rows_loaded(data: dict[str, Any]) -> int | None:
     rows = payload.get("rows_loaded")
     if isinstance(rows, bool):
         return None
+    if isinstance(rows, float) and not math.isfinite(rows):
+        # JSON numbers like 1e309 parse to inf; int() would raise
+        # OverflowError, so treat non-finite floats as unreported.
+        return None
     try:
         value = int(rows)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return value if value >= 0 else None
 
@@ -631,10 +635,11 @@ def _warn_scale_invariance(
         detail = (f"geomean x{geo_ratio:.2f}" if geo_ratio is not None else "geomean unevaluable") + (
             f", per-query median x{per_query_ratio:.2f}" if per_query_ratio is not None else ", per-query unevaluable"
         )
+        span = hi / lo
         for data, vr in members:
             if _bundle_scale_factor(data) in (lo, hi):
                 vr.warn(
-                    f"scale-invariant: benchmark {bm_id!r} grows {lo:g}x in scale "
+                    f"scale-invariant: benchmark {bm_id!r} grows {span:g}x in scale "
                     f"but timings barely move ({detail}); check for result caching or "
                     "fixed-overhead-dominated measurement"
                 )
@@ -659,6 +664,10 @@ def _warn_floor_outlier(
 ) -> None:
     """Warn when one bundle's fastest query dwarfs the peer median.
 
+    Peers are distinct platforms: same-platform reruns are consolidated to
+    one floor per platform (and never count toward the peer quorum), so
+    repeated runs of one engine cannot mark themselves an outlier.
+
     Informational only: a genuinely slower engine must never be refused by
     peer comparison alone.
     """
@@ -666,14 +675,24 @@ def _warn_floor_outlier(
         if len(members) < FLOOR_OUTLIER_MIN_PEERS + 1:
             continue
         floors = _peer_floor_timings(members)
+        platforms = [_bundle_platform_key(data) for data, _ in members]
         for index, (_data, vr) in enumerate(members):
             own = floors.get(index)
             if own is None:
                 continue
-            others = [value for other, value in floors.items() if other != index]
-            if len(others) < FLOOR_OUTLIER_MIN_PEERS:
+            own_platform = platforms[index]
+            by_platform: dict[str, list[float]] = {}
+            for other, value in floors.items():
+                if other == index:
+                    continue
+                key = platforms[other]
+                if key is None or key == own_platform:
+                    continue
+                by_platform.setdefault(key, []).append(value)
+            if len(by_platform) < FLOOR_OUTLIER_MIN_PEERS:
                 continue
-            if own > FLOOR_OUTLIER_PEER_MULTIPLE * statistics.median(others):
+            peer_median = statistics.median(statistics.median(values) for values in by_platform.values())
+            if own > FLOOR_OUTLIER_PEER_MULTIPLE * peer_median:
                 vr.warn(
                     f"floor-outlier (informational): fastest measurement {own:.0f}ms is "
                     f"more than {FLOOR_OUTLIER_PEER_MULTIPLE:g}x the peer median "

@@ -1041,6 +1041,26 @@ class TestSmallScaleFloor:
         assert vr.ok, vr.errors
         assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
 
+    def test_nonfinite_rows_loaded_is_unreported_not_fatal(self):
+        # A JSON number like 1e309 parses to inf; int() would raise
+        # OverflowError. The validator must treat it as unreported.
+        for bad_rows in (float("inf"), float("-inf"), float("nan")):
+            vr = ValidationResult("test")
+            _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=bad_rows), vr)
+            assert vr.ok, vr.errors
+            assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
+
+    def test_json_overflow_rows_loaded_does_not_abort_multibundle(self, tmp_path):
+        good = _write_timing_bundle(tmp_path, "good.json", _varied_queries(), platform="Snowflake")
+        bad_bundle = _timing_bundle(_flat_queries(base=4400.0), platform="Snowflake", rows_loaded=866602)
+        text = json.dumps(bad_bundle).replace('"rows_loaded": 866602', '"rows_loaded": 1e309')
+        assert "1e309" in text
+        bad = tmp_path / "bad.json"
+        bad.write_text(text, encoding="utf-8")
+        results = validate_bundles([bad, good])
+        assert len(results) == 2
+        assert all(vr.ok for vr in results)
+
 
 def _write_timing_bundle(tmp_path, name, per_query_ms, **kwargs):
     path = tmp_path / name
@@ -1070,6 +1090,30 @@ class TestScaleInvariance:
         results = validate_bundles([lo, hi])
         assert all(vr.ok for vr in results)
         assert all(any("scale-invariant" in w for w in vr.warnings) for vr in results)
+
+    def test_warning_reports_actual_scale_span(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        # The 0.1 -> 10 span is 100x, not the 0.1x lower endpoint.
+        assert all("grows 100x in scale" in w for w in warned)
 
     def test_single_scale_is_silent(self, tmp_path):
         (ofar,) = validate_bundles([_write_timing_bundle(tmp_path, "only.json", _flat_queries(), platform="Snowflake")])
@@ -1173,7 +1217,7 @@ class TestScaleInvariance:
 
 
 class TestFloorOutlier:
-    def _peer_set(self, tmp_path, floors):
+    def _peer_set(self, tmp_path, floors, platforms=None):
         paths = []
         for i, floor in enumerate(floors):
             paths.append(
@@ -1183,7 +1227,7 @@ class TestFloorOutlier:
                     {"Q1": floor, "Q2": floor + 500, "Q3": floor + 1000},
                     scale_factor=1.0,
                     geomean_ms=floor + 500,
-                    platform=f"Engine{i}",
+                    platform=f"Engine{i}" if platforms is None else platforms[i],
                     rows_loaded=8_661_245,
                 )
             )
@@ -1200,6 +1244,25 @@ class TestFloorOutlier:
         first, second = self._peer_set(tmp_path, [4500.0, 300.0])
         assert first.ok and second.ok
         assert not any("floor-outlier" in w for vr in (first, second) for w in vr.warnings)
+
+    def test_same_platform_reruns_are_not_peers(self, tmp_path):
+        # Three reruns of one engine satisfy the bundle-count quorum but
+        # offer zero cross-platform evidence: no outlier may be declared.
+        results = self._peer_set(tmp_path, [4500.0, 350.0, 300.0], platforms=["SameEngine"] * 3)
+        assert all(vr.ok for vr in results)
+        assert not any("floor-outlier" in w for vr in results for w in vr.warnings)
+
+    def test_own_platform_rerun_does_not_dilute_peers(self, tmp_path):
+        # A fast rerun of the slow engine shares its platform key, so it is
+        # consolidated away; the two genuinely distinct peers still convict.
+        slow, _mid, _fast, rerun = self._peer_set(
+            tmp_path,
+            [4500.0, 350.0, 300.0, 360.0],
+            platforms=["SlowEngine", "EngineB", "EngineC", "SlowEngine"],
+        )
+        assert all(vr.ok for vr in (slow, rerun))
+        assert any("floor-outlier" in w for w in slow.warnings)
+        assert not any("floor-outlier" in w for w in rerun.warnings)
 
 
 # ---------------------------------------------------------------------------
