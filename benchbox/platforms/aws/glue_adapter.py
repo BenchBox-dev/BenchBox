@@ -405,6 +405,8 @@ class AWSGlueAdapter(SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter)
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
         """Register one external table in the Glue Data Catalog."""
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
         self._create_catalog_table(table_name, file_format, location)
         logger.info(f"Registered external table {self.database}.{table_name}")
 

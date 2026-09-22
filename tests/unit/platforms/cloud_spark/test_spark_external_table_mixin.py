@@ -192,3 +192,74 @@ class TestCountRows:
     def test_count_sql_without_database(self):
         adapter = StubSparkAdapter(database="")
         assert adapter._external_count_sql("lineitem") == "SELECT COUNT(*) AS row_count FROM lineitem"
+
+
+class TestStagingSchemeValidation:
+    def test_rejects_bare_path(self):
+        adapter = StubSparkAdapter(s3_staging_dir="/tmp/staging")
+        with pytest.raises(ValueError, match="cloud URI"):
+            adapter.validate_external_table_requirements()
+
+    def test_rejects_scheme_without_bucket(self):
+        adapter = StubSparkAdapter(s3_staging_dir="s3://")
+        with pytest.raises(ValueError, match="bucket"):
+            adapter.validate_external_table_requirements()
+
+    def test_rejects_unknown_scheme(self):
+        adapter = StubSparkAdapter(s3_staging_dir="ftp://bucket/path")
+        with pytest.raises(ValueError, match="cloud URI"):
+            adapter.validate_external_table_requirements()
+
+
+class TestIdentifierValidation:
+    def test_rejects_unsafe_table_name(self):
+        adapter = StubSparkAdapter()
+        with pytest.raises(ValueError, match="table name"):
+            adapter._external_count_sql("lineitem; DROP TABLE x")
+
+    def test_rejects_unsafe_database_name(self):
+        adapter = StubSparkAdapter(database="benchbox; DROP")
+        with pytest.raises(ValueError, match="database name"):
+            adapter._external_count_sql("lineitem")
+
+    def test_escapes_location_single_quote(self):
+        assert StubSparkAdapter._escape_external_location("s3://b/it's") == "s3://b/it''s"
+
+
+class TestAthenaStdOutCountParsing:
+    def test_parses_show_text_rows(self):
+        adapter = StubSparkAdapter()
+
+        def _show_text(connection, query, query_id, **kwargs):
+            return {
+                "status": "SUCCESS",
+                "results": [
+                    {"output": "+--------+"},
+                    {"output": "|row_count|"},
+                    {"output": "+--------+"},
+                    {"output": "|  6000  |"},
+                    {"output": "+--------+"},
+                ],
+            }
+
+        adapter.execute_query = _show_text
+        assert adapter._count_external_table_rows(None, "lineitem") == 6000
+
+    def test_parses_comma_formatted_count(self):
+        adapter = StubSparkAdapter()
+
+        def _comma(connection, query, query_id, **kwargs):
+            return {"status": "SUCCESS", "results": [{"row_count": "6,000"}]}
+
+        adapter.execute_query = _comma
+        assert adapter._count_external_table_rows(None, "lineitem") == 6000
+
+    def test_unparseable_text_raises(self):
+        adapter = StubSparkAdapter()
+
+        def _borders_only(connection, query, query_id, **kwargs):
+            return {"status": "SUCCESS", "results": [{"output": "+------+"}, {"output": "+------+"}]}
+
+        adapter.execute_query = _borders_only
+        with pytest.raises(RuntimeError, match="no parseable integer"):
+            adapter._count_external_table_rows(None, "lineitem")

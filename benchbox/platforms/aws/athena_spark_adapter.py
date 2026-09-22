@@ -610,10 +610,13 @@ result.show(100, truncate=False)
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
         """Register one external table over staged files via Spark SQL."""
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
+        safe_location = self._escape_external_location(location)
         create_table_sql = f"""
             CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name}
             USING {file_format.upper()}
-            LOCATION '{location}'
+            LOCATION '{safe_location}'
         """
         self._submit_calculation(create_table_sql, code_type="SQL", wait_for_completion=True)
         logger.info(f"Registered external table {self.database}.{table_name}")

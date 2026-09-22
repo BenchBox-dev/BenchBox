@@ -32,6 +32,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,15 @@ from benchbox.platforms.base.phase_tracking import _resolve_benchmark_table_name
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
+
+# Safe SQL identifiers for Spark database/table names. Mirrors
+# HiveExternalTableMixin._IDENTIFIER_RE so the shared external-mode component
+# carries the same quoting discipline as the existing Trino/Presto path.
+_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_-]*$")
+
+# Staging URI schemes accepted for external mode. Rejects bare paths and
+# unknown schemes before any upload or DDL runs.
+_ALLOWED_STAGING_SCHEMES = ("s3://", "gs://", "abfss://", "adl://", "hdfs://", "file://")
 
 
 class SparkExternalTableMixin:
@@ -58,13 +68,31 @@ class SparkExternalTableMixin:
         return getattr(self, "s3_staging_dir", None) or getattr(self, "gcs_staging_dir", None)
 
     def validate_external_table_requirements(self) -> None:
-        """Validate that a staging location is configured for external mode."""
-        if not self._external_staging_root():
-            platform = getattr(self, "platform_name", type(self).__name__)
+        """Validate that a usable staging URI is configured for external mode.
+
+        Rejects missing values, unknown schemes, and bare paths (no bucket or
+        container). Existence/access is not probed here; the staging client
+        surfaces credential or permission failures at upload time.
+        """
+        root = self._external_staging_root()
+        platform = getattr(self, "platform_name", type(self).__name__)
+        if not root:
             raise ValueError(
                 f"{platform} external mode requires a staging location. "
                 "Set --platform-option s3_staging_dir=s3://bucket/path (AWS) or "
                 "--platform-option gcs_staging_dir=gs://bucket/path (Dataproc)."
+            )
+        normalized = str(root).strip()
+        lowered = normalized.lower()
+        if not lowered.startswith(_ALLOWED_STAGING_SCHEMES):
+            raise ValueError(
+                f"{platform} external mode staging location must be a cloud URI "
+                f"({', '.join(_ALLOWED_STAGING_SCHEMES)}), got {root!r}."
+            )
+        remainder = normalized.split("://", 1)[1] if "://" in normalized else ""
+        if not remainder or remainder.strip("/") == "":
+            raise ValueError(
+                f"{platform} external mode staging location must include a bucket or container path, got {root!r}."
             )
 
     def _external_table_format(self) -> str:
@@ -84,14 +112,37 @@ class SparkExternalTableMixin:
             f"{type(self).__name__} must implement _register_external_table() to support --table-mode external."
         )
 
+    @staticmethod
+    def _validate_external_identifier(value: str, label: str) -> str:
+        """Validate a Spark database or table identifier."""
+        if not isinstance(value, str) or not _IDENTIFIER_RE.match(value):
+            raise ValueError(f"Invalid external table {label} {value!r}: must match {_IDENTIFIER_RE.pattern}.")
+        return value
+
+    @staticmethod
+    def _escape_external_location(location: str) -> str:
+        """Escape a staging URI for single-quoted Spark DDL."""
+        return str(location).replace("'", "''")
+
     def _external_count_sql(self, table_name: str) -> str:
         """Build the row-count query for a registered external table."""
         database = getattr(self, "database", "") or ""
-        qualified = f"{database}.{table_name}" if database else table_name
+        self._validate_external_identifier(table_name, "table name")
+        if database:
+            self._validate_external_identifier(database, "database name")
+            qualified = f"{database}.{table_name}"
+        else:
+            qualified = table_name
         return f"SELECT COUNT(*) AS row_count FROM {qualified}"
 
     def _count_external_table_rows(self, connection: Any, table_name: str) -> int:
-        """Return the row count of a registered external table."""
+        """Return the row count of a registered external table.
+
+        Handles both structured result rows (``{"row_count": 123}``) and
+        Athena Spark StdOut text rows (``{"output": "+-----+"}`` /
+        ``{"output": "| 123 |"}`` from ``show()``), where the count must be
+        extracted from formatted table text instead of parsed directly.
+        """
         result = self.execute_query(
             connection,
             self._external_count_sql(table_name),
@@ -104,11 +155,35 @@ class SparkExternalTableMixin:
         rows = result.get("results") or []
         if not rows:
             raise RuntimeError(f"External table row count returned no rows for '{table_name}'")
-        first = rows[0]
-        values = list(first.values()) if isinstance(first, dict) else [first]
-        if not values:
-            raise RuntimeError(f"External table row count returned an empty row for '{table_name}'")
-        return int(values[0])
+        for row in rows:
+            values = list(row.values()) if isinstance(row, dict) else [row]
+            if not values:
+                raise RuntimeError(f"External table row count returned an empty row for '{table_name}'")
+            for value in values:
+                if value is None:
+                    continue
+                if isinstance(value, bool):
+                    continue
+                if isinstance(value, int):
+                    return value
+                if isinstance(value, float):
+                    if value.is_integer():
+                        return int(value)
+                    continue
+                text = str(value).strip().replace(",", "")
+                if not text:
+                    continue
+                try:
+                    return int(text)
+                except (ValueError, TypeError):
+                    pass
+                match = re.search(r"\b\d+\b", text)
+                if match:
+                    try:
+                        return int(match.group(0))
+                    except (ValueError, TypeError):
+                        continue
+        raise RuntimeError(f"External table row count returned no parseable integer for '{table_name}': {rows!r}")
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path

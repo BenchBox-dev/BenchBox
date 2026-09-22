@@ -483,9 +483,12 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExterna
         native parquet loads) so registration shares the single job-run path
         that external-mode row counts require anyway.
         """
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
+        safe_location = self._escape_external_location(location)
         create_sql = (
             f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table_name} "
-            f"USING {file_format.upper()} LOCATION '{location}'"
+            f"USING {file_format.upper()} LOCATION '{safe_location}'"
         )
         job_run_id = self._submit_job_run(create_sql)
         self._wait_for_job_run(job_run_id)
