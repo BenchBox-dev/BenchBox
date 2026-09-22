@@ -511,6 +511,13 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         3. Apply when_matched updates
         4. Insert when_not_matched rows
 
+        Contract: the source frame must carry exactly the target table's
+        columns in a compatible type — ``when_not_matched`` only gates which
+        source rows are appended, it does not project or remap columns.
+        Results are rebuilt against the target Arrow schema so pandas
+        round-trips (nulls inferring float, decimals collapsing) cannot drift
+        the table schema on overwrite.
+
         Args:
             table_path: Table identifier (namespace.table_name)
             source_dataframe: Source DataFrame
@@ -567,12 +574,19 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             rows_inserted = len(new_rows)
 
             if rows_inserted > 0:
+                # Rebuild both frames against the target schema first: a bare
+                # from_pandas round-trip would infer float64 for null-bearing
+                # int columns (or collapse decimals) and break the concat.
                 target_df = pa.concat_tables(
-                    [pa.Table.from_pandas(target_df), pa.Table.from_pandas(new_rows)]
+                    [
+                        pa.Table.from_pandas(target_df, schema=target_arrow.schema),
+                        pa.Table.from_pandas(new_rows, schema=target_arrow.schema),
+                    ]
                 ).to_pandas()
 
-        # Overwrite table with merged data
-        result_arrow = pa.Table.from_pandas(target_df)
+        # Overwrite table with merged data, preserving the target schema so the
+        # pandas round-trip cannot drift column types (e.g. nulls -> float64).
+        result_arrow = pa.Table.from_pandas(target_df, schema=target_arrow.schema)
         iceberg_table.overwrite(result_arrow)
 
         total_affected = int(rows_updated) + int(rows_inserted)

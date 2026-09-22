@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.file_format import detect_compression, detect_data_format
+from benchbox.utils.iceberg_layout import resolve_iceberg_metadata_file
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
@@ -1552,27 +1553,26 @@ class BigQueryAdapter(PlatformAdapter):
 
         return uris
 
-    @staticmethod
-    def _is_iceberg_directory(path: Path) -> bool:
-        """Return whether a local path is an Iceberg table directory."""
-        metadata = path / "metadata"
-        if not path.is_dir() or not metadata.is_dir():
-            return False
-        return (metadata / "version-hint.text").exists() or bool(list(metadata.glob("*.metadata.json")))
-
     def _prepare_external_iceberg_uris(self, bucket: Any, table_name: str, file_paths: list[Path]) -> list[str]:
-        """Prepare BigQuery Iceberg table root URIs from local or cloud directory inputs."""
+        """Prepare BigQuery Iceberg metadata-file URIs from local or cloud inputs.
+
+        BigLake ``format = 'ICEBERG'`` external tables require ``uris`` to point
+        at the table's current JSON metadata file, not the table root. Local
+        table directories are uploaded to GCS and the uploaded metadata file is
+        returned; cloud inputs must already reference a ``*.metadata.json`` file.
+        """
         uris: list[str] = []
 
         for file_path in file_paths:
             file_path_str = str(file_path)
             if is_cloud_path(file_path_str):
-                if "/metadata/" in file_path_str:
-                    uris.append(file_path_str.split("/metadata/", 1)[0] + "/")
+                if file_path_str.lower().endswith(".metadata.json"):
+                    uris.append(file_path_str)
                 continue
 
             path = Path(file_path)
-            if not self._is_iceberg_directory(path):
+            metadata_file = resolve_iceberg_metadata_file(path)
+            if metadata_file is None:
                 continue
 
             table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
@@ -1582,7 +1582,8 @@ class BigQueryAdapter(PlatformAdapter):
                 relative = source_file.relative_to(path)
                 blob = bucket.blob(f"{table_prefix}{relative.as_posix()}")
                 blob.upload_from_filename(str(source_file))
-            uris.append(f"gs://{self.storage_bucket}/{table_prefix}")
+            metadata_relative = metadata_file.relative_to(path).as_posix()
+            uris.append(f"gs://{self.storage_bucket}/{table_prefix}{metadata_relative}")
 
         return uris
 

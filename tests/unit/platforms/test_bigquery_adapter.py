@@ -585,6 +585,46 @@ class TestBigQueryAdapter:
                 adapter._prepare_external_table_uris(Mock(), "lineitem", [iceberg_dir])
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_points_at_metadata_file(self, mock_bigquery, dependencies_available):
+        """Iceberg uris must reference the current metadata file, not the table root."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        mock_bucket = Mock()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iceberg_dir = Path(tmpdir) / "lineitem"
+            (iceberg_dir / "metadata").mkdir(parents=True)
+            (iceberg_dir / "metadata" / "00000-aaa.metadata.json").write_text("{}")
+            (iceberg_dir / "metadata" / "00001-bbb.metadata.json").write_text("{}")
+
+            uris = adapter._prepare_external_iceberg_uris(mock_bucket, "lineitem", [iceberg_dir])
+
+        assert uris == ["gs://benchbox-bucket/benchbox-data/lineitem/metadata/00001-bbb.metadata.json"]
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_accepts_cloud_metadata_file(self, mock_bigquery, dependencies_available):
+        """Cloud inputs must already reference a metadata file; roots are skipped."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        metadata_uri = "gs://other-bucket/table/metadata/00003-ccc.metadata.json"
+        uris = adapter._prepare_external_iceberg_uris(Mock(), "lineitem", [metadata_uri])
+        assert uris == [metadata_uri]
+
+        uris = adapter._prepare_external_iceberg_uris(Mock(), "lineitem", ["gs://other-bucket/table/"])
+        assert uris == []
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_delta_requires_biglake_connection(self, mock_bigquery, dependencies_available):
         """Delta external mode should reject runs without BigLake connection config."""
         adapter = BigQueryAdapter(
