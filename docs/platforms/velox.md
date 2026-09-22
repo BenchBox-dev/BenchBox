@@ -96,8 +96,14 @@ rest are adapter constructor parameters only.
 | `spark_config` | no | `{}` | Extra Spark configuration (dict). `spark.shuffle.manager` cannot be overridden in `local` mode. |
 | `disable_cache` | no | `true` | Disables `spark.sql.inMemoryColumnarStorage.enabled` for clean timings |
 
-The table format is set with the `benchbox run --table-format` option
-(`parquet` or `orc`), not a platform option.
+The table format is a first-class Velox platform option (`parquet`, `orc`,
+`delta`, `iceberg`, `hudi`; default `parquet`), set via `--platform-option
+table_format=<format>` or the `table_format` config key. For `delta`,
+`iceberg`, and `hudi` the adapter emits the matching SQL extension plus
+session-catalog wiring so Gluten has a readable table to accelerate. Those
+extensions require the corresponding Delta/Iceberg/Hudi JARs on the Spark
+classpath (user-provided via `spark.jars` or the cluster image); the conf
+alone is necessary but not sufficient without the jars.
 
 ### Mandatory Gluten Configuration (Local Mode)
 
