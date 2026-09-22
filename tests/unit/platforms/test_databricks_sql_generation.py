@@ -207,17 +207,31 @@ class TestDatabricksHudiSupport:
             _make_adapter(table_format="hudi", hudi_table_type="cow_mor")
 
     def test_hudi_tuning_clause(self):
+        from benchbox.core.tuning.interface import TuningType
+
         adapter = _make_hudi_adapter()
         tuning = Mock()
         part_col = Mock()
         part_col.name = "l_shipdate"
         part_col.order = 0
+        cluster_col = Mock()
+        cluster_col.name = "l_orderkey"
+        cluster_col.order = 1
         tuning.has_any_tuning.return_value = True
-        tuning.get_columns_by_type.side_effect = lambda t: [part_col] if "partitioning" in str(t).lower() else []
+
+        def _columns(tuning_type):
+            if tuning_type == TuningType.PARTITIONING:
+                return [part_col]
+            if tuning_type == TuningType.CLUSTERING:
+                return [cluster_col]
+            return []
+
+        tuning.get_columns_by_type.side_effect = _columns
         result = adapter.generate_tuning_clause(tuning)
         assert "USING HUDI" in result
         assert "PARTITIONED BY (l_shipdate)" in result
         assert "CLUSTER BY" not in result
+        assert "ZORDER" not in result
 
     def test_optimize_table_skipped_for_hudi(self):
         adapter = _make_hudi_adapter()
@@ -262,3 +276,101 @@ class TestDatabricksHudiSupport:
         assert configuration["hudi_primary_key"] == "l_orderkey"
         assert configuration["hudi_precombine_field"] == "l_commitdate"
         assert configuration["hudi_table_type"] == "cow"
+
+    def test_load_data_raises_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        with pytest.raises(ValueError, match="COPY INTO targets Delta"):
+            adapter.load_data(MagicMock(), MagicMock(), MagicMock())
+
+    def test_hudi_ddl_replaces_using_delta(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (id INT) USING DELTA")
+        assert "USING HUDI" in result
+        assert "USING DELTA" not in result
+        assert "'type' = 'cow'" in result
+
+    def test_hudi_ddl_merges_existing_tblproperties(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE t (id INT) USING DELTA TBLPROPERTIES ('delta.autoOptimize.optimizeWrite' = 'true')"
+        )
+        assert "USING HUDI" in result
+        assert "USING DELTA" not in result
+        assert result.count("TBLPROPERTIES") == 1
+        assert "'primaryKey' = 'l_orderkey'" in result
+        assert "delta.autoOptimize.optimizeWrite" in result
+
+    def test_hudi_ddl_does_not_duplicate_present_keys(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE t (id INT) TBLPROPERTIES ('type' = 'mor', 'primaryKey' = 'id')"
+        )
+        assert result.count("'type'") == 1
+        assert result.count("'primaryKey'") == 1
+        assert "'preCombineField' = 'l_commitdate'" in result
+
+    def test_invalid_hudi_primary_key_rejected(self):
+        from benchbox.platforms.base.data_loading import DataLoadingError
+
+        with pytest.raises(DataLoadingError):
+            _make_adapter(table_format="hudi", hudi_primary_key="l_orderkey'; DROP TABLE t; --")
+
+    def test_whitespace_table_format_accepted(self):
+        adapter = _make_adapter(table_format=" HUDI ", hudi_table_type=" COW ")
+        assert adapter.table_format == "hudi"
+        assert adapter.hudi_table_type == "cow"
+
+    def test_optimize_table_records_skip_when_flag_off(self):
+        adapter = _make_hudi_adapter(enable_delta_optimization=False)
+        connection = MagicMock()
+        adapter.optimize_table(connection, "lineitem")
+        connection.cursor.assert_not_called()
+        skipped = adapter._skipped_layout_operations[-1]
+        assert skipped["mechanism"] == "optimize"
+        assert skipped["status"] == "skipped"
+        assert skipped["statement"] == "OPTIMIZE LINEITEM"
+
+    def test_vacuum_table_records_skip_for_hudi(self):
+        adapter = _make_hudi_adapter()
+        connection = MagicMock()
+        adapter.vacuum_table(connection, "lineitem")
+        connection.cursor.assert_not_called()
+        skipped = adapter._skipped_layout_operations[-1]
+        assert skipped["mechanism"] == "vacuum"
+        assert skipped["status"] == "skipped"
+
+    def test_skip_statements_are_plain_clauses(self):
+        adapter = _make_hudi_adapter()
+        cursor = MagicMock()
+        adapter._apply_delta_optimize(cursor, "LINEITEM", phase="post_load")
+        adapter._apply_zorder_optimization(cursor, "LINEITEM", ["l_orderkey"])
+        statements = [op["statement"] for op in adapter._skipped_layout_operations[-2:]]
+        assert statements == [
+            "OPTIMIZE LINEITEM",
+            "OPTIMIZE LINEITEM ZORDER BY (l_orderkey)",
+        ]
+
+    def test_apply_table_tunings_records_skips_for_hudi(self):
+        from benchbox.core.tuning.interface import TuningType
+
+        adapter = _make_hudi_adapter()
+        tuning = Mock()
+        tuning.table_name = "lineitem"
+        tuning.has_any_tuning.return_value = True
+        cluster_col = Mock()
+        cluster_col.name = "l_orderkey"
+        cluster_col.order = 1
+        tuning.get_columns_by_type.side_effect = lambda t: [cluster_col] if t == TuningType.CLUSTERING else []
+        cursor = MagicMock()
+        cursor.fetchall.return_value = [("Database", "main"), ("Provider", "hudi")]
+        connection = MagicMock()
+        connection.cursor.return_value = cursor
+
+        adapter.apply_table_tunings(tuning, connection)
+
+        executed = [call.args[0] for call in cursor.execute.call_args_list if call.args]
+        assert not any("OPTIMIZE" in sql for sql in executed)
+        assert not any("CLUSTER BY" in sql for sql in executed)
+        mechanisms = {op["mechanism"] for op in adapter._skipped_layout_operations if op["status"] == "skipped"}
+        assert "z_order" in mechanisms
+        assert "optimize" in mechanisms
