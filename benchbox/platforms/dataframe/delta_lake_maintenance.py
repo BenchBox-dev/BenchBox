@@ -23,9 +23,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from benchbox.utils.clock import mono_time
 
 try:
     from deltalake import DeltaTable, write_deltalake
@@ -333,7 +334,7 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         meaningful work unit for file layout operations.
         """
         operation = MaintenanceOperationType.OPTIMIZE
-        start_time = time.time()
+        start_time = mono_time()
         try:
             self._check_capability(operation)
             normalized = strategy.lower()
@@ -353,7 +354,7 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
                 metrics = dt.optimize.z_order(list(columns or []), partition_filters=partition_filter)
             metrics = dict(metrics or {})
             files_affected = int(metrics.get("numFilesAdded", 0)) + int(metrics.get("numFilesRemoved", 0))
-            end_time = time.time()
+            end_time = mono_time()
             self.logger.info(f"Optimized Delta table at {table_path} ({normalized}): {metrics}")
             return MaintenanceResult(
                 operation_type=operation,
@@ -368,7 +369,16 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             raise
         except Exception as e:
             self.logger.error(f"OPTIMIZE failed: {e}")
-            return MaintenanceResult.failure(operation, str(e), start_time)
+            end_time = mono_time()
+            return MaintenanceResult(
+                operation_type=operation,
+                success=False,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=0,
+                error_message=str(e),
+            )
 
     def vacuum_table(
         self,
@@ -384,7 +394,7 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         files; their paths are carried in metrics.
         """
         operation = MaintenanceOperationType.VACUUM
-        start_time = time.time()
+        start_time = mono_time()
         try:
             self._check_capability(operation)
             try:
@@ -399,7 +409,7 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
                 )
                 or []
             )
-            end_time = time.time()
+            end_time = mono_time()
             self.logger.info(f"Vacuumed Delta table at {table_path} (dry_run={dry_run}): {len(deleted)} files")
             return MaintenanceResult(
                 operation_type=operation,
@@ -414,7 +424,16 @@ class DeltaLakeMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             raise
         except Exception as e:
             self.logger.error(f"VACUUM failed: {e}")
-            return MaintenanceResult.failure(operation, str(e), start_time)
+            end_time = mono_time()
+            return MaintenanceResult(
+                operation_type=operation,
+                success=False,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=0,
+                error_message=str(e),
+            )
 
 
 def get_delta_lake_maintenance_operations(

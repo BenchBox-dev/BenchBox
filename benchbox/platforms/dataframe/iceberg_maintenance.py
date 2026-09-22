@@ -28,10 +28,11 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from benchbox.utils.clock import mono_time
 
 try:
     from pyiceberg.catalog import Catalog, load_catalog
@@ -641,9 +642,12 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         expirable set without committing. rows_affected counts expired
         snapshots; their ids are carried in metrics.
         """
-        _ = enforce_retention
+        if not enforce_retention:
+            self.logger.warning(
+                "Iceberg vacuum ignores enforce_retention=False; snapshot expiration always enforces retention."
+            )
         operation = MaintenanceOperationType.VACUUM
-        start_time = time.time()
+        start_time = mono_time()
         try:
             self._check_capability(operation)
             identifier = self._normalize_table_identifier(str(table_path))
@@ -664,7 +668,7 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
                 expirable = [snapshot.snapshot_id for snapshot in snapshots if snapshot.snapshot_id != current_id]
             if not dry_run and expirable:
                 table.maintenance.expire_snapshots().by_ids(expirable).commit()
-            end_time = time.time()
+            end_time = mono_time()
             self.logger.info(f"Vacuumed Iceberg table {identifier} (dry_run={dry_run}): {len(expirable)} snapshots")
             return MaintenanceResult(
                 operation_type=operation,
@@ -679,7 +683,16 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             raise
         except Exception as e:
             self.logger.error(f"VACUUM failed: {e}")
-            return MaintenanceResult.failure(operation, str(e), start_time)
+            end_time = mono_time()
+            return MaintenanceResult(
+                operation_type=operation,
+                success=False,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=0,
+                error_message=str(e),
+            )
 
 
 def get_iceberg_maintenance_operations(

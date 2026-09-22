@@ -223,6 +223,54 @@ class TestHudiProcedures:
             ops.vacuum_table("mydb.tbl", dry_run=True)
         spark.sql.assert_not_called()
 
+    def test_vacuum_path_form_rejected(self) -> None:
+        ops, spark = self._ops()
+
+        with pytest.raises(ValueError, match="path form is unverified"):
+            ops.vacuum_table("/tmp/hoodie/tbl", dry_run=False)
+        spark.sql.assert_not_called()
+
+    def test_run_procedure_parses_deleted_counts(self) -> None:
+        ops, spark = self._ops()
+
+        row = MagicMock()
+        row.asDict.return_value = {"deleted_files": 7, "other": "x"}
+        frame = MagicMock()
+        frame.collect.return_value = [row]
+        spark.sql.return_value = frame
+
+        result = ops.vacuum_table("mydb.tbl", dry_run=False)
+
+        assert result.success is True
+        assert result.rows_affected == 7
+        assert result.metrics["result_rows"] == [{"deleted_files": 7, "other": "x"}]
+
+    def test_durations_use_monotonic_clock(self) -> None:
+        ops, _ = self._ops()
+
+        result = ops.optimize_table("mydb.tbl", strategy="compact")
+
+        assert result.success is True
+        assert result.duration >= 0.0
+        assert result.duration == pytest.approx(result.end_time - result.start_time)
+
+    def test_optimize_ignored_args_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        ops, _ = self._ops()
+
+        with caplog.at_level("WARNING"):
+            ops.optimize_table("mydb.tbl", strategy="compact", columns=["a"], partition_filter="x=1")
+
+        assert any("ignores columns" in record.message for record in caplog.records)
+        assert any("ignores partition_filter" in record.message for record in caplog.records)
+
+    def test_vacuum_ignored_retention_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        ops, _ = self._ops()
+
+        with caplog.at_level("WARNING"):
+            ops.vacuum_table("mydb.tbl", dry_run=False, enforce_retention=False)
+
+        assert any("ignores enforce_retention" in record.message for record in caplog.records)
+
 
 class TestOptimizationContracts:
     def test_capability_flags(self) -> None:
