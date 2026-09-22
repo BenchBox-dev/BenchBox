@@ -70,6 +70,35 @@ benchbox run --platform databricks --benchmark tpch --scale 1.0 \
 | `volume_path` | (auto) | Path within volume |
 | `driver_version` | (latest) | Pin the Databricks SQL connector version (e.g. `3.3.0`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
+| `table_format` | `delta` | Table format: `delta` or `hudi` (Hudi emits `USING HUDI` DDL) |
+| `hudi_primary_key` | (none) | Hudi record key column (required for Hudi tables) |
+| `hudi_precombine_field` | (none) | Hudi precombine (ordering) field |
+| `hudi_table_type` | `cow` | Hudi table type: `cow` (copy-on-write) or `mor` (merge-on-read) |
+
+### Apache Hudi Tables
+
+```bash
+benchbox run --platform databricks --benchmark tpch \
+  --platform-option table_format=hudi \
+  --platform-option hudi_primary_key=l_orderkey \
+  --platform-option hudi_precombine_field=l_commitdate
+```
+
+Hudi support is DDL-level and validated by unit tests only (no live-warehouse
+validation yet). Requirements and limits:
+
+- The target runtime must support Hudi (Databricks Runtime with Hudi support
+  and the Hudi Spark bundle / `HoodieSparkSessionExtension` where needed);
+  BenchBox only emits the `USING HUDI` DDL and does not install libraries.
+- `hudi_primary_key` should be set: Hudi needs a record key, and BenchBox
+  passes it through as the `primaryKey` table property. Each key is emitted
+  only for tables whose DDL defines that column, so one global key never
+  leaks into the other tables of a multi-table benchmark; tables without
+  the column still get `USING HUDI` plus the table type.
+- Managed data loads (`COPY INTO`) are Delta-only, so `load_data` raises for
+  Hudi tables: load Hudi tables through a Hudi-aware Spark job. Delta-only
+  maintenance (`OPTIMIZE`, `VACUUM`, `ZORDER`, Liquid Clustering) is recorded
+  as skipped for Hudi tables instead of emitting invalid SQL.
 
 ### Testing a Specific Databricks Connector Version
 

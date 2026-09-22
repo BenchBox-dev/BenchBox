@@ -823,6 +823,8 @@ sqlite|database_path|Path to the SQLite database file (auto-generated from --ben
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+synapse-spark|adaptive_enabled|Enable or disable Synapse Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+fabric-spark|adaptive_enabled|Enable or disable Fabric Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 spark|java_home|Path to the JDK Spark should run under|{}
 spark|driver_memory|Spark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
 pyspark|driver_memory|PySpark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
@@ -846,6 +848,8 @@ velox|offheap_size|Off-heap memory for Velox native engine (e.g., '8g', '16g')|{
 velox|driver_memory|Spark driver JVM heap memory (e.g., '4g')|{'default': '4g'}
 velox|shuffle_partitions|Number of shuffle partitions|{'parser': 'int', 'default': '200'}
 velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_bool', 'default': 'true'}
+velox|table_format|Lakehouse table format for accelerated reads (parquet, orc, delta, iceberg, hudi)|{'choices': ('parquet', 'orc', 'delta', 'iceberg', 'hudi'), 'default': 'parquet'}
+velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads (local paths, URIs, or Maven coordinates; required for lakehouse formats in local mode)|{}
 """
 
     _SPEC_PARSERS = {"int": int, "float": float, "parse_bool": parse_bool}
