@@ -1,0 +1,4 @@
+{
+  "context": "3 DataFrame vs 89 SQL queries. Decide whether a clean correspondence is achievable at all; abandon is a valid verdict. Do NOT guess id mappings.",
+  "description": "Decide whether tpcds_obt can ever have a clean SQL<->DataFrame correspondence; abandon is valid."
+}

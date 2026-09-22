@@ -17082,6 +17082,13 @@
       "status": "done",
       "title": "Add TPC-DS-OBT (One Big Table) Benchmark Implementation"
     },
+    "tpcds-obt-dataframe-sql-id-mapping-decision": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide tpcds_obt DataFrame-SQL correspondence achievability"
+    },
     "tpcds-obt-query-expansion": {
       "claim": null,
       "needs": [],
