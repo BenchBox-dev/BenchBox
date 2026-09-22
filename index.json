@@ -2264,10 +2264,15 @@
       "title": "Add ClickHouse dialect overrides for coffeeshop QSA4 (sumIf) and QTM1 (TIME type)"
     },
     "clickhouse-delta-native-reads": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-23T15:15:38Z",
+        "generation": "4dddda825c664104af1a2f355d8b5a69",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:7bbe5630a3d5658258476053"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "ClickHouse native Delta Lake reads via deltaLake table function"
     },
     "clickhouse-delta-support-via-conversion-or-external-tooling": {
