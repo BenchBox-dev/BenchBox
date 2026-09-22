@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "publication" / "create_ledger_seed.py"
 SEED_PATH = REPO_ROOT / "publication" / "ledger-seed.json"
 CORPUS_PREFIX = "results-data/bundles/"
-IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".gitkeep")
+IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".override.json", ".gitkeep")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 

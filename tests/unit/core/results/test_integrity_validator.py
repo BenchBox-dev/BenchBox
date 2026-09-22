@@ -432,6 +432,9 @@ class TestIntegrityValidatorSyntheticData:
             filepath.write_text(json.dumps(data))
         # Also create a .plans.json file that should be excluded
         (tmp_path / "result_0.plans.json").write_text("{}")
+        # An .override.json companion must be excluded as well, not
+        # validated as a result bundle.
+        (tmp_path / "result_0.override.json").write_text("{}")
         reports = validate_directory(tmp_path)
         assert len(reports) == 3
         assert all(r.passed() for r in reports)

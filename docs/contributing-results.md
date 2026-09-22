@@ -130,7 +130,9 @@ The artifact lists the covered rules with exact registry pins, the
 reason, an evidence link, an expiry date (`YYYY-MM-DD`) or
 `single-batch`, and the approver. The approver must differ from the PR author, and an APPROVED
 review from the approver must exist — file content alone never
-authorizes. Overrides never substitute for the `unofficial-research`
+authorizes. Approval is required on every PR that adds or touches a
+covered bundle, including PRs that reuse an unchanged override.
+Overrides never substitute for the `unofficial-research`
 compliance label and vice versa. Expired or malformed artifacts fail
 validation; the mirror lane renders overrides advisory.
 

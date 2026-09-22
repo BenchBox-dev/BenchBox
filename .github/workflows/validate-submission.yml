@@ -480,8 +480,27 @@ jobs:
           OVERRIDES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.override.json' ':(icase,glob)results-data/bundles/**/*.override.json' \
             || true)
+          # Reused artifacts need approval too: touching a bundle covered by
+          # an unchanged override would otherwise inherit the old artifact
+          # with no review on this PR. Enumerate the override sibling of
+          # every changed primary bundle alongside changed overrides.
+          CHANGED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -viE '\.(manifest|plans|tuning|applied|override)\.json$' \
+            | grep -vi 'corpus-inventory\.json$' \
+            | grep -vi 'submission-manifest\.json$' \
+            || true)
+          ASSOCIATED=""
+          while IFS= read -r bundle; do
+            [ -n "$bundle" ] || continue
+            candidate="${bundle%.json}.override.json"
+            if git cat-file -e "$EFFECTIVE_MERGE:$candidate" 2>/dev/null; then
+              ASSOCIATED=$(printf '%s\n%s' "$ASSOCIATED" "$candidate")
+            fi
+          done <<< "$CHANGED_BUNDLES"
+          OVERRIDES=$(printf '%s\n%s' "$OVERRIDES" "$ASSOCIATED" | sed '/^[[:space:]]*$/d' | sort -u)
           if [ -z "$OVERRIDES" ]; then
-            echo "No override artifacts changed."
+            echo "No override artifacts changed or associated."
             exit 0
           fi
           if [ "${PR_AUTHOR:-}" = "github-actions[bot]" ]; then
@@ -503,8 +522,8 @@ jobs:
               failed=1
               continue
             fi
-            approved=$(WANT="$approver" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null \
-              | WANT="$approver" python3 -c "import json,os,sys; all_reviews=list(json.load(sys.stdin)); want=os.environ.get('WANT','').lower(); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED')), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
+            approved=$(WANT="$approver" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
+              | WANT="$approver" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED')), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
             if [ "$approved" != "yes" ]; then
               echo "::error file=${artifact}::No APPROVED review from override approver '${approver}'."
               failed=1

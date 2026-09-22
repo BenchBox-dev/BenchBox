@@ -37,7 +37,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 CORPUS_PREFIX = "results-data/bundles/"
-IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".gitkeep")
+IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".override.json", ".gitkeep")
 _DEFAULT_ARTIFACT = ROOT / "publication/out/site/results/data/results.duckdb"
 
 

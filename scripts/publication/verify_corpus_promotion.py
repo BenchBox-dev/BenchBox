@@ -26,7 +26,7 @@ from scripts.publication.check_corpus_bijection import BijectionError, check as 
 from scripts.publication.verify_shadow_site import verify_site_directory
 
 CORPUS_PREFIX = "results-data/bundles/"
-IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".gitkeep")
+IGNORED_SUFFIXES = (".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".override.json", ".gitkeep")
 INVENTORY_FILE = REPO_ROOT / "results-data" / "corpus-inventory.json"
 
 
