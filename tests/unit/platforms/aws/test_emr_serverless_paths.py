@@ -69,12 +69,17 @@ class TestApplicationLifecycle:
         client = MagicMock()
         client.get_application.return_value = {"application": {"state": "STARTING"}}
         adapter._emr_serverless_client = client
+        # The loop reads two clock bindings: start_time from the adapter
+        # module, the guard through elapsed_seconds in benchbox.utils.clock.
+        # Freeze both so the test polls once, then times out, deterministically.
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.time.sleep"),
-            patch("benchbox.platforms.aws.emr_serverless_adapter.mono_time", side_effect=[0.0, 10.0]),
+            patch("benchbox.platforms.aws.emr_serverless_adapter.mono_time", return_value=0.0),
+            patch("benchbox.utils.clock.mono_time", side_effect=[0.5, 10.0]),
             pytest.raises(ConfigurationError, match="Timeout waiting"),
         ):
             adapter._wait_for_application_state("app-123", ["STARTED"], timeout_seconds=1)
+        assert client.get_application.call_count == 1
 
     def test_ensure_started_creates_when_requested(self, adapter):
         adapter.application_id = None
@@ -234,6 +239,8 @@ class TestExecuteAndClose:
 
     def test_staging_init_failure_warns(self, caplog):
         with (
+            patch("benchbox.platforms.aws.emr_serverless_adapter.BOTO3_AVAILABLE", True),
+            patch("benchbox.platforms.aws.emr_serverless_adapter.boto3", MagicMock()),
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
             mock_staging.from_uri.side_effect = RuntimeError("bad uri")

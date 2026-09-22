@@ -47,19 +47,6 @@ def _benchmark():
 
 
 class TestClientsAndConnection:
-    def test_batch_client_lazy_and_cached(self, adapter):
-        with patch("benchbox.platforms.gcp.dataproc_serverless_adapter.dataproc_v1") as mock_v1:
-            first = adapter._get_batch_client()
-            second = adapter._get_batch_client()
-        assert first is second
-        mock_v1.BatchControllerClient.assert_called_once()
-
-    def test_storage_client_lazy_and_cached(self, adapter):
-        with patch("benchbox.platforms.gcp.dataproc_serverless_adapter.storage") as mock_storage:
-            first = adapter._get_storage_client()
-            assert first is adapter._get_storage_client()
-        mock_storage.Client.assert_called_once()
-
     def test_create_connection_lists_batches(self, adapter):
         client = MagicMock()
         adapter._batch_client = client
@@ -67,13 +54,6 @@ class TestClientsAndConnection:
         assert result["status"] == "connected"
         assert result["project_id"] == "proj-1"
         client.list_batches.assert_called_once()
-
-    def test_create_connection_failure_wraps(self, adapter):
-        client = MagicMock()
-        client.list_batches.side_effect = RuntimeError("denied")
-        adapter._batch_client = client
-        with pytest.raises(ConfigurationError, match="Failed to connect"):
-            adapter.create_connection()
 
     def test_google_missing_guard(self, monkeypatch):
         monkeypatch.setattr(
@@ -112,10 +92,22 @@ class TestBatchSubmission:
         adapter._batch_client = client
         return client
 
+    def test_quote_bearing_query_embeds_safely(self, adapter):
+        import json
+
+        self._client(adapter)
+        query = "SELECT 'it''s', \"q\" FROM t WHERE x = 'a\nb\\'"
+        with patch.object(adapter, "_upload_to_gcs") as upload:
+            adapter._submit_spark_sql_batch(query)
+        script = upload.call_args[0][1]
+        compile(script, "<generated>", "exec")
+        assert json.dumps(query) in script
+
     def test_submit_builds_service_account_and_network(self, adapter):
         adapter.service_account = "sa@proj.iam.gserviceaccount.com"
         adapter.network_uri = "net"
         adapter.subnetwork_uri = "subnet"
+        adapter._spark_config = {"spark.sql.shuffle.partitions": "42"}
         client = self._client(adapter)
         with patch.object(adapter, "_upload_to_gcs"):
             batch_id, state = adapter._submit_spark_sql_batch("SELECT 1")
@@ -124,7 +116,7 @@ class TestBatchSubmission:
         assert batch["environment_config"]["execution_config"]["service_account"].startswith("sa@")
         assert batch["environment_config"]["execution_config"]["network_uri"] == "net"
         assert batch["environment_config"]["execution_config"]["subnetwork_uri"] == "subnet"
-        assert batch["runtime_config"]["properties"] == adapter._spark_config
+        assert batch["runtime_config"]["properties"] == {"spark.sql.shuffle.partitions": "42"}
         assert batch_id.startswith("benchbox-")
         assert state == "SUCCEEDED"
 

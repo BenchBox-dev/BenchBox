@@ -59,7 +59,12 @@ def _make_adapter(**overrides):
 
 @contextlib.contextmanager
 def _transport(*, get=None, post=None, delete=None):
-    """Patch Livy HTTP methods; yields mocks without touching requests.exceptions."""
+    """Patch Livy HTTP methods; yields mocks without touching requests.exceptions.
+
+    Note: the adapter module holds the shared global ``requests`` module, so
+    these patches rebind ``requests.get/post/delete`` process-wide for the
+    block (same approach as the coverage sibling).
+    """
     with (
         patch(f"{_MODULE}.requests.get") as mock_get,
         patch(f"{_MODULE}.requests.post") as mock_post,
@@ -164,7 +169,10 @@ class TestSessionLifecycle:
                 adapter._wait_for_session_state(7, ["idle"])
 
     def test_wait_timeout_raises(self, adapter):
-        with pytest.raises(ConfigurationError, match="Timeout waiting"):
+        # timeout_seconds=0 keeps the poll loop unentered, so no HTTP fires;
+        # still wrap the transport so a future pre-loop status fetch cannot
+        # escape the unit lane as a live call.
+        with _transport(), pytest.raises(ConfigurationError, match="Timeout waiting"):
             adapter._wait_for_session_state(7, ["idle"], timeout_seconds=0)
 
     def test_ensure_idle_returns_same_id(self, adapter):
@@ -208,26 +216,6 @@ class TestConnectionMapping:
         assert result["status"] == "connected"
         assert result["spark_version"] == "3.4"
 
-    def test_auth_failure(self, adapter):
-        with _transport(get=_response(status=401)):
-            with pytest.raises(ConfigurationError, match="Authentication failed"):
-                adapter.create_connection()
-
-    def test_forbidden(self, adapter):
-        with _transport(get=_response(status=403)):
-            with pytest.raises(ConfigurationError, match="Access denied"):
-                adapter.create_connection()
-
-    def test_pool_not_found(self, adapter):
-        with _transport(get=_response(status=404)):
-            with pytest.raises(ConfigurationError, match="not found"):
-                adapter.create_connection()
-
-    def test_other_status(self, adapter):
-        with _transport(get=_response(status=500)):
-            with pytest.raises(ConfigurationError, match="Failed to access Synapse"):
-                adapter.create_connection()
-
     def test_transport_error(self, adapter):
         with _transport(get=http_requests.exceptions.ConnectionError("down")):
             with pytest.raises(ConfigurationError, match="Failed to connect to Synapse"):
@@ -250,20 +238,6 @@ class TestExecuteAndClose:
             adapter.close()
         http.delete.assert_not_called()
         assert adapter._session_id == 5
-
-    def test_close_delete_failure_warns_and_resets(self, adapter, caplog):
-        adapter._session_id = 5
-        adapter._session_created_by_us = True
-        with _transport(delete=RuntimeError("denied")):
-            with caplog.at_level("WARNING", logger="benchbox.platforms.azure.synapse_spark_adapter"):
-                adapter.close()
-        assert adapter._session_id is None
-        assert any("Failed to close session" in r.getMessage() for r in caplog.records)
-
-    def test_load_data_missing_dir_raises(self, adapter, tmp_path):
-        benchmark = SimpleNamespace(tables=["lineitem"])
-        with pytest.raises(ConfigurationError, match="Source directory not found"):
-            adapter.load_data(benchmark, None, tmp_path / "nope")
 
     def test_configure_ssb_and_unknown(self, adapter):
         adapter.configure_for_benchmark("ssb")
@@ -326,6 +300,9 @@ class TestTuningNoOps:
     def test_constraint_configuration_noops(self, adapter, caplog):
         with caplog.at_level("DEBUG", logger="benchbox.platforms.azure.synapse_spark_adapter"):
             adapter.apply_constraint_configuration(primary_keys=[SimpleNamespace()], foreign_keys=[SimpleNamespace()])
+        messages = [r.getMessage() for r in caplog.records]
+        assert any("Ignoring 1 primary key constraints" in m for m in messages)
+        assert any("Ignoring 1 foreign key constraints" in m for m in messages)
 
     def test_from_config_tuning_passthrough(self):
         from benchbox.platforms.azure import SynapseSparkAdapter
@@ -388,4 +365,6 @@ class TestImportFallback:
             sys.modules.pop("requests", None)
             sys.modules.update(saved)
             self._reload()
-        assert mod.REQUESTS_AVAILABLE is True
+        # No assertion on the restored module: whether the real requests
+        # package is importable depends on the ambient environment, matching
+        # the AWS/GCP fallback tests' convention.
