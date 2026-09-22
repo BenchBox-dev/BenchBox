@@ -326,6 +326,9 @@ definitions over staged Parquet files.
 
 Shared logic for Hive-style external tables (Trino, Presto) lives in
 `HiveExternalTableMixin` (`benchbox/platforms/base/external_table_mixin.py`).
+Shared logic for managed Spark external tables (Athena Spark, EMR Serverless,
+Dataproc Serverless, Glue) lives in `SparkExternalTableMixin`
+(`benchbox/platforms/base/cloud_spark/external_tables.py`).
 Platforms that need pre-flight validation (e.g. Athena checking for an S3 bucket)
 can implement `validate_external_table_requirements()`, which the runner calls
 before proceeding.

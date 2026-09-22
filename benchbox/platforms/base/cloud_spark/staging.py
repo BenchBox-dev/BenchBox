@@ -32,8 +32,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import tempfile
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -380,12 +382,30 @@ class CloudSparkStaging(ABC):
 
         return uploaded
 
+    @staticmethod
+    def dataset_manifest_name(fingerprint: str) -> str:
+        """Return the per-table reuse-manifest file name for a dataset fingerprint."""
+        return f"_benchbox_manifest_{fingerprint}.json"
+
+    def _write_dataset_manifests(self, tables: list[str], fingerprint: str) -> None:
+        """Record the staged dataset identity beside each uploaded table."""
+        payload = json.dumps({"dataset_fingerprint": fingerprint}).encode("utf-8")
+        fd, tmp_name = tempfile.mkstemp(prefix="benchbox-manifest-", suffix=".json")
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(payload)
+            for table_name in tables:
+                self.upload_file(Path(tmp_name), f"{table_name}/{self.dataset_manifest_name(fingerprint)}")
+        finally:
+            os.unlink(tmp_name)
+
     def upload_tables(
         self,
         tables: list[str],
         source_dir: Path,
         file_format: str = "parquet",
         progress_callback: Callable[[UploadProgress], None] | None = None,
+        fingerprint: str | None = None,
     ) -> dict[str, str]:
         """Upload multiple tables to cloud storage.
 
@@ -394,6 +414,9 @@ class CloudSparkStaging(ABC):
             source_dir: Local directory containing table data
             file_format: File format (parquet, csv, etc.)
             progress_callback: Optional callback for progress updates
+            fingerprint: Optional dataset identity recorded beside each
+                uploaded table so reuse can verify the staged dataset
+                instead of trusting table names alone.
 
         Returns:
             Dict mapping table names to their remote URIs
@@ -416,14 +439,25 @@ class CloudSparkStaging(ABC):
 
             data_files[table_name] = table_files
 
-        return self.upload_data_files(data_files, progress_callback)
+        uploaded = self.upload_data_files(data_files, progress_callback)
+        if fingerprint:
+            self._write_dataset_manifests([table for table in tables if table in uploaded], fingerprint)
+        return uploaded
 
-    def tables_exist(self, tables: list[str], file_format: str = "parquet") -> bool:
+    def tables_exist(
+        self,
+        tables: list[str],
+        file_format: str = "parquet",
+        fingerprint: str | None = None,
+    ) -> bool:
         """Check if all tables already exist in staging.
 
         Args:
             tables: List of table names to check
             file_format: Expected file format
+            fingerprint: Optional dataset identity; when given, each table
+                must also carry its reuse manifest, otherwise staged files
+                from a different dataset must not be reused.
 
         Returns:
             True if all tables have at least one file
@@ -432,7 +466,25 @@ class CloudSparkStaging(ABC):
             files = self.list_files(f"{table_name}/")
             if not files:
                 return False
+            if fingerprint:
+                wanted = self.dataset_manifest_name(fingerprint)
+                if wanted not in {entry.rsplit("/", 1)[-1] for entry in files}:
+                    return False
         return True
+
+    def table_has_fingerprint(self, table_name: str, fingerprint: str) -> bool:
+        """Return whether the staged table dir carries a dataset fingerprint.
+
+        Args:
+            table_name: Name of the table.
+            fingerprint: Dataset identity whose reuse manifest must be present.
+
+        Returns:
+            True if the staged table directory carries the manifest.
+        """
+        files = self.list_files(f"{table_name}/")
+        wanted = self.dataset_manifest_name(fingerprint)
+        return wanted in {entry.rsplit("/", 1)[-1] for entry in files}
 
     def get_table_uri(self, table_name: str) -> str:
         """Get the full URI for a table's data.

@@ -47,6 +47,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkConfigMixin,
     CloudSparkStaging,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -113,7 +114,7 @@ class AthenaSparkCalculationState:
     SUCCESS_STATES = {COMPLETED}
 
 
-class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """Amazon Athena for Apache Spark platform adapter.
 
     Athena Spark provides interactive Spark execution with sub-second startup.
@@ -432,12 +433,15 @@ class AthenaSparkAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapte
 
         client = self._get_athena_client()
 
-        # For SQL, wrap in spark.sql() for proper execution
+        # For SQL, wrap in spark.sql() for proper execution. The statement is
+        # JSON-embedded so quotes or backslashes in it cannot break out of
+        # the generated script (same hardening as the EMR/Dataproc runners).
         if code_type == "SQL":
             # Ensure we're using the correct database
+            code_literal = json.dumps(code)
             execution_code = f"""
 spark.sql("USE {self.database}")
-result = spark.sql('''{code}''')
+result = spark.sql({code_literal})
 result.show(100, truncate=False)
 """
         else:
@@ -606,6 +610,24 @@ result.show(100, truncate=False)
             logger.info(f"Created table {self.database}.{table}")
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table over staged files via Spark SQL."""
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
+        safe_location = self._escape_external_location(location)
+        create_table_sql = f"""
+            CREATE OR REPLACE TABLE {self.database}.{table_name}
+            USING {file_format.upper()}
+            LOCATION '{safe_location}'
+        """
+        calculation_id, state = self._submit_calculation(create_table_sql, code_type="SQL", wait_for_completion=True)
+        if state not in AthenaSparkCalculationState.SUCCESS_STATES:
+            raise RuntimeError(
+                f"Athena Spark external table registration failed for "
+                f"'{self.database}.{table_name}' with state: {state} (calculation {calculation_id})"
+            )
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(
         self,

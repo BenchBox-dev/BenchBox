@@ -13,6 +13,7 @@ Components:
     CloudSparkStaging: Unified cloud storage upload API for S3, GCS, Azure, DBFS
     CloudSparkSessionManager: Remote Spark session lifecycle management
     SparkConfigOptimizer: Benchmark-specific Spark configuration optimization
+    SparkExternalTableMixin: Shared --table-mode external flow for managed Spark adapters
 
 Usage:
     from benchbox.platforms.base.cloud_spark import (
@@ -34,6 +35,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 from benchbox.platforms.base.cloud_spark.config import SparkConfigOptimizer
+from benchbox.platforms.base.cloud_spark.external_tables import SparkExternalTableMixin
 from benchbox.platforms.base.cloud_spark.mixins import (
     CloudSparkConfigMixin,
     SparkDDLGeneratorMixin,
@@ -49,6 +51,7 @@ __all__ = [
     "CloudSparkSessionManager",
     "SparkConfigOptimizer",
     "SparkDDLGeneratorMixin",
+    "SparkExternalTableMixin",
     "SparkTableFormat",
     "SparkTuningMixin",
 ]
