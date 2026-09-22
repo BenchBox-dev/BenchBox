@@ -15,6 +15,7 @@ import importlib.util
 import json
 import math
 import re
+import statistics
 import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -124,7 +125,104 @@ PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
 # non-clean state, including ``not_run``.
 PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not_run"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
+# The two known-unofficial classes. The community submission gate below is a
+# whitelist (only "official" passes), but admission, UAT phases, and
+# per-benchmark compliance tests still match on these values directly.
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
+
+# Canonical logical query counts per benchmark family: the deterministic
+# denominator for the query-set coverage gate below. Kept in lockstep with
+# _project/scripts/explorer_pipeline/transformer.py::_KNOWN_LOGICAL_QUERY_COUNTS
+# by hand: this module must stay importable without the installable package
+# (slim published-results branch mirror), so it cannot import the transformer.
+CANONICAL_LOGICAL_QUERY_COUNTS: dict[str, int] = {
+    "tpch": 22,
+    "tpch_skew": 22,
+    "tpchavoc": 22,
+    "tpcds": 99,
+    "ssb": 13,
+    "star_schema": 13,
+    "clickbench": 43,
+}
+
+_TPCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 23))
+_TPCDS_CANONICAL_IDS = frozenset(str(i) for i in range(1, 100))
+_SSB_CANONICAL_IDS = frozenset(
+    {
+        "1.1",
+        "1.2",
+        "1.3",
+        "2.1",
+        "2.2",
+        "2.3",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+    }
+)
+_CLICKBENCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 44))
+
+# Canonical logical query IDs per benchmark family: the membership set for
+# the query-set coverage gate below. Counts alone accept any 22 distinct
+# labels (e.g. FAKE0-FAKE21 for TPC-H); comparing normalized IDs against
+# this set keeps such bundles out of ranking-eligible cohorts. IDs are
+# stored in producer-normalized form (see _normalize_coverage_query_id, kept
+# in lockstep with benchbox/core/results/query_normalizer.py::
+# normalize_query_id by hand for the same slim-mirror reason as the counts
+# above). Every key/denominator pair must agree with
+# CANONICAL_LOGICAL_QUERY_COUNTS.
+CANONICAL_LOGICAL_QUERY_IDS: dict[str, frozenset[str]] = {
+    "tpch": _TPCH_CANONICAL_IDS,
+    "tpch_skew": _TPCH_CANONICAL_IDS,
+    "tpchavoc": _TPCH_CANONICAL_IDS,
+    "tpcds": _TPCDS_CANONICAL_IDS,
+    "ssb": _SSB_CANONICAL_IDS,
+    "star_schema": _SSB_CANONICAL_IDS,
+    "clickbench": _CLICKBENCH_CANONICAL_IDS,
+}
+
+
+def _normalize_coverage_query_id(raw_id: Any) -> str | None:
+    """Normalize a bundle query ID for coverage membership, or None.
+
+    Mirrors ``benchbox.core.results.query_normalizer.normalize_query_id``
+    for string inputs (``Q1``/``q1``/``query_1``/`` 1 `` all name query
+    ``1``; SSB ``Q1.1`` names ``1.1``) without importing the package, which
+    the slim published-results branch mirror cannot do. Non-string and
+    blank IDs return None: they contribute nothing to coverage (fail
+    closed) instead of passing as distinct unknowns.
+    """
+    if not isinstance(raw_id, str):
+        return None
+    text = raw_id.strip()
+    if not text:
+        return None
+    upper = text.upper()
+    if upper.startswith("QUERY_"):
+        text = text[6:]
+    elif upper.startswith("QUERY"):
+        text = text[5:]
+    elif upper.startswith("Q") and len(text) > 1 and (text[1].isdigit() or text[1].islower()):
+        text = text[1:]
+    text = text.strip()
+    if not text:
+        return None
+    if "." in text:
+        base, _, ext = text.rpartition(".")
+        if ext.isalpha():  # "sql", "q", "txt" -> strip; "1", "2" -> keep.
+            text = base.strip()
+            if not text:
+                return None
+    match = re.fullmatch(r"(\d+)([A-Za-z]+)?", text)
+    if match:
+        digits, suffix = match.groups()
+        return f"{digits}{suffix.lower() if suffix else ''}"
+    return text
+
 
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
@@ -349,6 +447,473 @@ def _validate_benchmark_section(benchmark: Any, vr: ValidationResult) -> None:
         return
     if sf_f <= 0:
         vr.error(f"scale_factor must be positive: {sf_f}")
+
+
+# ---------------------------------------------------------------------------
+# Timing plausibility (warnings only)
+#
+# These gates catch obviously incorrect measurement regimes — overhead-
+# dominated runs whose timings cannot reflect query execution — without
+# refusing anything. Every rule emits ``vr.warn`` so the finding is visible
+# in the PR comment and available to the later warn-require-override
+# contract, but validation still passes. Thresholds were calibrated on the
+# September cloud TPC-H runs (Snowflake flat at ~4.5s across 100x data with
+# max/min 1.43 and CV 0.08, versus BigQuery 4.51/0.34 and Databricks
+# 11.01/0.89 at the same scale).
+# ---------------------------------------------------------------------------
+
+# Benchmarks whose queries vary by design. Micro-benchmarks (primitives and
+# friends) are uniform by construction — a tight band there is expected, not
+# a defect — so the plateau gate stays scoped to this allowlist.
+TIMING_PLAUSIBILITY_HETEROGENEOUS_BENCHMARKS = frozenset(
+    {
+        "tpch",
+        "tpch_skew",
+        "tpchavoc",
+        "tpcds",
+        "ssb",
+        "star_schema",
+        "clickbench",
+    }
+)
+
+# Within-run spread below both of these marks a plateau. The two conditions
+# are near-redundant by construction; both are reported so the PR comment
+# carries the raw numbers for human judgment.
+PLATEAU_MAX_MIN_RATIO = 2.0
+PLATEAU_MAX_CV = 0.15
+# Spreads over fewer distinct queries are unevaluable noise, not evidence.
+PLATEAU_MIN_DISTINCT_QUERIES = 3
+
+# Cross-scale comparison only runs across a 10x or wider scale span; below
+# that, engine noise dominates and the rule stays silent (insufficient
+# history, not a pass).
+SCALE_INVARIANCE_MIN_SPAN = 10.0
+SCALE_INVARIANCE_MIN_GEOMEAN_RATIO = 1.5
+SCALE_INVARIANCE_MIN_PER_QUERY_MEDIAN_RATIO = 1.3
+
+# Cross-platform floor comparison needs at least this many peers before the
+# median is trustworthy, and stays informational: a genuinely slower engine
+# must never be refused by peer comparison alone.
+FLOOR_OUTLIER_PEER_MULTIPLE = 3.0
+FLOOR_OUTLIER_MIN_PEERS = 2
+
+# Absolute floor for tiny data: a sub-second dataset answering no query
+# faster than this is overhead-dominated. Rows evidence is optional — when
+# ``rows_loaded`` is absent the warning says so instead of silently passing.
+SMALL_SCALE_MAX_FACTOR = 0.1
+SMALL_SCALE_FLOOR_MIN_MS = 2000.0
+SMALL_SCALE_MAX_ROWS_LOADED = 1_000_000
+
+_PASS_TIMING_STATUSES = frozenset({"SUCCESS", "PASS"})
+
+
+def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
+    """Group positive SUCCESS measurement timings by query id.
+
+    Mirrors the query-row conventions used elsewhere in this module: an
+    absent ``run_type`` defaults to measurement, and only SUCCESS rows
+    count as measurement evidence. Rows with unparseable, non-positive,
+    or sub-millisecond ``ms`` are dropped — all-zero runs are owned by
+    the queries-section gate, and sub-millisecond minima would make
+    spread ratios noise-dominated (timer resolution, not engine speed).
+    """
+    queries = data.get("queries")
+    if not isinstance(queries, list):
+        return {}
+    grouped: dict[str, list[float]] = {}
+    for q in queries:
+        if not isinstance(q, dict):
+            continue
+        run_type = str(q.get("run_type") or "measurement").lower()
+        if run_type != "measurement":
+            continue
+        status = q.get("status")
+        if not isinstance(status, str) or status.upper() not in _PASS_TIMING_STATUSES:
+            continue
+        qid = q.get("id")
+        if not isinstance(qid, str) or not qid:
+            continue
+        try:
+            ms = float(q.get("ms"))
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(ms) or ms < 1.0:
+            continue
+        grouped.setdefault(qid, []).append(ms)
+    return grouped
+
+
+def _bundle_benchmark_id(data: dict[str, Any]) -> str | None:
+    benchmark = data.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return None
+    bm_id = benchmark.get("id")
+    if not isinstance(bm_id, str) or not bm_id.strip():
+        return None
+    # "TPCH" names the same family as "tpch" for scoping, cohorting, and
+    # messages alike; casing or padding must not change the verdict.
+    return bm_id.strip().casefold()
+
+
+def _bundle_platform_key(data: dict[str, Any]) -> str | None:
+    platform = data.get("platform")
+    if not isinstance(platform, dict):
+        return None
+    name = platform.get("name")
+    return str(name).strip().lower() if name is not None and str(name).strip() else None
+
+
+def _bundle_scale_factor(data: dict[str, Any]) -> float | None:
+    benchmark = data.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return None
+    try:
+        sf = float(benchmark.get("scale_factor"))
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(sf) or sf <= 0:
+        return None
+    return sf
+
+
+def _bundle_passed_validation(data: dict[str, Any]) -> bool:
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return False
+    return _normalize_status(summary.get("validation")) == PUBLIC_CLEAN_VALIDATION_STATUS
+
+
+def _bundle_geomean_ms(data: dict[str, Any]) -> float | None:
+    """Geometric-mean timing for cross-bundle comparison, or None.
+
+    Geometric only: falling back to an arithmetic mean would compare mixed
+    metrics across bundles while the warning message claims "geomean".
+    A bundle without a recorded geometric mean simply does not participate.
+    """
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    timing = summary.get("timing")
+    if not isinstance(timing, dict):
+        return None
+    try:
+        value = float(timing.get("geometric_mean_ms"))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
+
+
+def _bundle_rows_loaded(data: dict[str, Any]) -> int | None:
+    summary = data.get("summary")
+    if not isinstance(summary, dict):
+        return None
+    payload = summary.get("data")
+    if not isinstance(payload, dict):
+        return None
+    rows = payload.get("rows_loaded")
+    if isinstance(rows, bool):
+        return None
+    if isinstance(rows, float) and not math.isfinite(rows):
+        # JSON numbers like 1e309 parse to inf; int() would raise
+        # OverflowError, so treat non-finite floats as unreported.
+        return None
+    try:
+        value = int(rows)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return value if value >= 0 else None
+
+
+def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Warn when a heterogeneous benchmark shows an implausibly tight band."""
+    bm_id = _bundle_benchmark_id(data)
+    if bm_id not in TIMING_PLAUSIBILITY_HETEROGENEOUS_BENCHMARKS:
+        return
+    grouped = _measurement_ms_by_query(data)
+    if len(grouped) < PLATEAU_MIN_DISTINCT_QUERIES:
+        return
+    means = [statistics.fmean(samples) for samples in grouped.values()]
+    peak = max(means)
+    floor = min(means)
+    ratio = peak / floor
+    cv = statistics.pstdev(means) / statistics.fmean(means)
+    if ratio < PLATEAU_MAX_MIN_RATIO and cv < PLATEAU_MAX_CV:
+        vr.warn(
+            f"timing-plateau: benchmark {bm_id!r} per-query means span "
+            f"{floor:.0f}-{peak:.0f}ms (max/min {ratio:.2f}, CV {cv:.2f}); "
+            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement"
+        )
+
+
+def _warn_small_scale_floor(data: dict[str, Any], vr: ValidationResult) -> None:
+    """Warn when tiny data answers nothing fast."""
+    sf = _bundle_scale_factor(data)
+    if sf is None or sf > SMALL_SCALE_MAX_FACTOR:
+        return
+    grouped = _measurement_ms_by_query(data)
+    if not grouped:
+        return
+    floor = min(ms for samples in grouped.values() for ms in samples)
+    if floor <= SMALL_SCALE_FLOOR_MIN_MS:
+        return
+    rows = _bundle_rows_loaded(data)
+    if rows is not None and rows >= SMALL_SCALE_MAX_ROWS_LOADED:
+        return
+    rows_note = f"{rows} rows loaded" if rows is not None else "rows_loaded unreported"
+    vr.warn(
+        f"small-scale-floor: scale factor {sf:g} ({rows_note}) but fastest measurement is "
+        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume"
+    )
+
+
+def _passed_cohorts(
+    entries: list[tuple[dict[str, Any], ValidationResult]],
+) -> tuple[
+    dict[tuple[str, str], list[tuple[dict[str, Any], ValidationResult]]],
+    dict[tuple[str, float], list[tuple[dict[str, Any], ValidationResult]]],
+]:
+    """Group clean-validation bundles by platform cohort and peer set.
+
+    Only bundles claiming clean validation participate, so mirror-lane
+    partials never distort a comparison. Cohorts are further scoped to
+    heterogeneous benchmarks — micro-benchmarks are uniform by
+    construction, so a tight band or a flat scale curve there is expected
+    signal, not a plausibility finding (same rationale as the C1 scope).
+    """
+    cohorts: dict[tuple[str, str], list[tuple[dict[str, Any], ValidationResult]]] = {}
+    peers: dict[tuple[str, float], list[tuple[dict[str, Any], ValidationResult]]] = {}
+    for data, vr in entries:
+        if not _bundle_passed_validation(data):
+            continue
+        bm_id = _bundle_benchmark_id(data)
+        if bm_id not in TIMING_PLAUSIBILITY_HETEROGENEOUS_BENCHMARKS:
+            continue
+        platform = _bundle_platform_key(data)
+        sf = _bundle_scale_factor(data)
+        if bm_id is None:
+            continue
+        if platform is not None:
+            cohorts.setdefault((bm_id, platform), []).append((data, vr))
+        if sf is not None:
+            peers.setdefault((bm_id, sf), []).append((data, vr))
+    return cohorts, peers
+
+
+def _warn_scale_invariance(
+    cohorts: dict[tuple[str, str], list[tuple[dict[str, Any], ValidationResult]]],
+) -> None:
+    """Warn when timings barely move across a 10x-or-wider scale span."""
+    for (bm_id, _platform), members in cohorts.items():
+        scales = sorted({sf for data, _ in members if (sf := _bundle_scale_factor(data)) is not None})
+        if len(scales) < 2 or scales[-1] / scales[0] < SCALE_INVARIANCE_MIN_SPAN:
+            continue
+        lo, hi = scales[0], scales[-1]
+        lo_geo = [
+            g for data, _ in members if _bundle_scale_factor(data) == lo and (g := _bundle_geomean_ms(data)) is not None
+        ]
+        hi_geo = [
+            g for data, _ in members if _bundle_scale_factor(data) == hi and (g := _bundle_geomean_ms(data)) is not None
+        ]
+        lo_queries = _merged_query_samples(members, lo)
+        hi_queries = _merged_query_samples(members, hi)
+        shared = [qid for qid in lo_queries if qid in hi_queries]
+        geo_ratio = statistics.fmean(hi_geo) / statistics.fmean(lo_geo) if lo_geo and hi_geo else None
+        per_query_ratio = (
+            statistics.median(statistics.fmean(hi_queries[qid]) / statistics.fmean(lo_queries[qid]) for qid in shared)
+            if shared
+            else None
+        )
+        tripped = (geo_ratio is not None and geo_ratio < SCALE_INVARIANCE_MIN_GEOMEAN_RATIO) or (
+            per_query_ratio is not None and per_query_ratio < SCALE_INVARIANCE_MIN_PER_QUERY_MEDIAN_RATIO
+        )
+        if (geo_ratio is None and per_query_ratio is None) or not tripped:
+            continue
+        detail = (f"geomean x{geo_ratio:.2f}" if geo_ratio is not None else "geomean unevaluable") + (
+            f", per-query median x{per_query_ratio:.2f}" if per_query_ratio is not None else ", per-query unevaluable"
+        )
+        span = hi / lo
+        for data, vr in members:
+            if _bundle_scale_factor(data) in (lo, hi):
+                vr.warn(
+                    f"scale-invariant: benchmark {bm_id!r} grows {span:g}x in scale "
+                    f"but timings barely move ({detail}); check for result caching or "
+                    "fixed-overhead-dominated measurement"
+                )
+
+
+def _merged_query_samples(
+    members: list[tuple[dict[str, Any], ValidationResult]],
+    scale: float,
+) -> dict[str, list[float]]:
+    """Merge measurement samples per query id across members at one scale."""
+    merged: dict[str, list[float]] = {}
+    for data, _vr in members:
+        if _bundle_scale_factor(data) != scale:
+            continue
+        for qid, samples in _measurement_ms_by_query(data).items():
+            merged.setdefault(qid, []).extend(samples)
+    return merged
+
+
+def _warn_floor_outlier(
+    peers: dict[tuple[str, float], list[tuple[dict[str, Any], ValidationResult]]],
+) -> None:
+    """Warn when one bundle's fastest query dwarfs the peer median.
+
+    Peers are distinct platforms: same-platform reruns are consolidated to
+    one floor per platform (and never count toward the peer quorum), so
+    repeated runs of one engine cannot mark themselves an outlier.
+
+    Informational only: a genuinely slower engine must never be refused by
+    peer comparison alone.
+    """
+    for (bm_id, sf), members in peers.items():
+        if len(members) < FLOOR_OUTLIER_MIN_PEERS + 1:
+            continue
+        floors = _peer_floor_timings(members)
+        platforms = [_bundle_platform_key(data) for data, _ in members]
+        for index, (_data, vr) in enumerate(members):
+            own = floors.get(index)
+            if own is None:
+                continue
+            own_platform = platforms[index]
+            by_platform: dict[str, list[float]] = {}
+            for other, value in floors.items():
+                if other == index:
+                    continue
+                key = platforms[other]
+                if key is None or key == own_platform:
+                    continue
+                by_platform.setdefault(key, []).append(value)
+            if len(by_platform) < FLOOR_OUTLIER_MIN_PEERS:
+                continue
+            peer_median = statistics.median(statistics.median(values) for values in by_platform.values())
+            if own > FLOOR_OUTLIER_PEER_MULTIPLE * peer_median:
+                vr.warn(
+                    f"floor-outlier (informational): fastest measurement {own:.0f}ms is "
+                    f"more than {FLOOR_OUTLIER_PEER_MULTIPLE:g}x the peer median "
+                    f"at benchmark {bm_id!r} scale {sf:g} — never refused on this signal alone"
+                )
+
+
+def _peer_floor_timings(
+    members: list[tuple[dict[str, Any], ValidationResult]],
+) -> dict[int, float]:
+    """Fastest positive measurement per member, by member index."""
+    floors: dict[int, float] = {}
+    for index, (data, _vr) in enumerate(members):
+        grouped = _measurement_ms_by_query(data)
+        if grouped:
+            floors[index] = min(ms for samples in grouped.values() for ms in samples)
+    return floors
+
+
+def _warn_cross_bundle_timing(entries: list[tuple[dict[str, Any], ValidationResult]]) -> None:
+    """Warn on scale-invariant and peer-floor outliers within one validation set.
+
+    Operates on bundles validated together (e.g. one submission PR): groups
+    with a single scale or without peers stay silent — insufficient history
+    is not a pass, it is no finding.
+    """
+    cohorts, peers = _passed_cohorts(entries)
+    _warn_scale_invariance(cohorts)
+    _warn_floor_outlier(peers)
+
+
+def _validate_compliance_section(
+    benchmark: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse unofficial compliance classes on the community path.
+
+    ``benchbox submit`` and ``benchbox publish`` refuse these classes from
+    loaded result objects; without this rule a hand-authored bundle could
+    bypass that gate by arriving as a PR directly. An absent
+    ``compliance_class`` passes: legacy pre-stamp bundles are grandfathered,
+    and the trusted mirror lane (``allow_partial_validation``) preserves
+    pre-gate unofficial evidence as non-ranking cohorts.
+    """
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    compliance = benchmark.get("compliance_class")
+    if compliance is None:
+        return
+    # Whitelist, not blacklist: any stamped value other than exactly
+    # "official" is refused, so "Official", "official " or an unexpected type
+    # cannot slip past on spelling. Absent stays grandfathered for legacy
+    # pre-stamp bundles; the trusted mirror lane stays exempt.
+    if compliance != "official":
+        if allow_partial_validation:
+            return
+        vr.error(
+            f"benchmark.compliance_class={compliance!r} is not accepted for public submissions; "
+            "only compliance_class=official may be submitted"
+        )
+
+
+def _validate_query_coverage(
+    data: dict[str, Any],
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse bundles whose query evidence misses canonical query IDs.
+
+    A run covering 5 of TPC-H's 22 queries must not present as a complete
+    result: the explorer derives its logical denominator from observed query
+    IDs, so short coverage would rank as complete. Cardinality alone is not
+    enough either: 22 timings named FAKE0-FAKE21 name none of the canonical
+    queries, so the gate compares normalized IDs against the benchmark's
+    canonical set and refuses on any miss. The trusted mirror lane is
+    exempt (it preserves partial cohorts by design); community partials
+    stay refused by the summary-validation gate regardless.
+    """
+    if allow_partial_validation:
+        return
+    benchmark = data.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    bm_id = benchmark.get("id")
+    # Normalize before the lookup: "TPCH" or "tpch " names the same family as
+    # "tpch", and must not slip past the gate on casing or padding.
+    normalized_id = bm_id.strip().casefold() if isinstance(bm_id, str) else None
+    canonical = CANONICAL_LOGICAL_QUERY_IDS.get(normalized_id) if normalized_id else None
+    if not canonical:
+        return  # No canonical set: nothing deterministic to enforce.
+    queries = data.get("queries")
+    if not isinstance(queries, list):
+        return  # _validate_queries_section owns the shape error.
+    # Only non-empty string ids count as query evidence. Non-string ids
+    # (legacy integers) and blanks fail closed: they contribute nothing to
+    # coverage instead of passing as distinct unknowns.
+    observed: set[str] = set()
+    uncounted = 0
+    for q in queries:
+        if not isinstance(q, dict):
+            continue  # _validate_queries_section owns the shape error.
+        normalized_qid = _normalize_coverage_query_id(q.get("id"))
+        if normalized_qid is None:
+            uncounted += 1
+        else:
+            observed.add(normalized_qid)
+    missing = sorted(
+        canonical - observed,
+        key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
+    )
+    if missing:
+        covered = len(observed & canonical)
+        shown = ", ".join(missing[:12])
+        if len(missing) > 12:
+            shown += f", … (+{len(missing) - 12} more)"
+        hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
+        vr.error(
+            f"benchmark {bm_id!r} covers {covered} of {len(canonical)} canonical queries{hint} "
+            f"(missing: {shown}); partial runs remain local artifacts "
+            "unless validated through the trusted mirror path"
+        )
 
 
 def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
@@ -996,6 +1561,11 @@ def _validate_bundle(
     _validate_version(version, vr)
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
+    _validate_compliance_section(
+        data.get("benchmark", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_platform_section(data.get("platform", {}), vr)
     _validate_summary_section(
         data.get("summary", {}),
@@ -1009,6 +1579,9 @@ def _validate_bundle(
     _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
+    _warn_timing_plateau(data, vr)
+    _warn_small_scale_floor(data, vr)
+    _validate_query_coverage(data, vr, allow_partial_validation=allow_partial_validation)
     _validate_execution_consistency(data, vr)
     _validate_validation_phase_consistency(data, vr)
 
@@ -1311,8 +1884,16 @@ def validate_bundles(
     the trusted maintainer mirror path only: the seed corpus intentionally
     retains partial and legacy unvalidated evidence. Community submissions
     must leave the flag off so every non-clean status remains refused.
+
+    The same lane split governs the two deterministic submission gates:
+    unofficial ``compliance_class`` values and short canonical query-set
+    coverage are errors in community mode but pass under the mirror flag,
+    which preserves pre-gate unofficial and partial cohorts as non-ranking
+    evidence. An absent ``compliance_class`` passes in both modes (legacy
+    pre-stamp grandfathering).
     """
     results = []
+    parsed: list[tuple[dict[str, Any], ValidationResult]] = []
     for bundle_path in paths:
         if _is_submission_manifest_path(bundle_path):
             continue
@@ -1341,6 +1922,7 @@ def validate_bundles(
             continue
 
         _validate_bundle(data, vr, allow_partial_validation=allow_partial_validation)
+        parsed.append((data, vr))
 
         # Bound an adjacent applied companion even if a hand-authored manifest
         # omitted it. The manifest hash contract is checked separately below;
@@ -1375,6 +1957,11 @@ def validate_bundles(
             )
 
         results.append(vr)
+
+    # Cross-bundle timing plausibility over the validated set (e.g. one
+    # submission PR). Warnings only; groups without scale span or peers
+    # stay silent.
+    _warn_cross_bundle_timing(parsed)
     return results
 
 
