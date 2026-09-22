@@ -266,14 +266,21 @@ class TestVeloxTableFormatConf:
     def test_delta_conf(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 
-        conf = VeloxAdapter(table_format="delta")._get_spark_conf()
+        conf = VeloxAdapter(
+            table_format="delta",
+            lakehouse_jars="io.delta:delta-spark_2.12:3.2.0",
+        )._get_spark_conf()
         assert conf["spark.sql.extensions"] == "io.delta.sql.DeltaSparkSessionExtension"
         assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.spark.sql.delta.catalog.DeltaCatalog"
+        assert "io.delta:delta-spark_2.12:3.2.0" in conf["spark.jars"]
 
     def test_iceberg_conf(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 
-        conf = VeloxAdapter(table_format="iceberg")._get_spark_conf()
+        conf = VeloxAdapter(
+            table_format="iceberg",
+            lakehouse_jars="org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0",
+        )._get_spark_conf()
         assert conf["spark.sql.extensions"] == "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
         assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.iceberg.spark.SparkSessionCatalog"
         assert conf["spark.sql.catalog.spark_catalog.type"] == "hive"
@@ -281,9 +288,30 @@ class TestVeloxTableFormatConf:
     def test_hudi_conf(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 
-        conf = VeloxAdapter(table_format="hudi")._get_spark_conf()
+        conf = VeloxAdapter(
+            table_format="hudi",
+            lakehouse_jars="org.apache.hudi:hudi-spark-bundle:1.0.0",
+        )._get_spark_conf()
         assert conf["spark.sql.extensions"] == "org.apache.spark.sql.hudi.HoodieSparkSessionExtension"
         assert conf["spark.sql.catalog.spark_catalog"] == "org.apache.spark.sql.hudi.catalog.HoodieCatalog"
+
+    def test_lakehouse_format_requires_jars_in_local_mode(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="requires connector jars"):
+            VeloxAdapter(table_format="delta")._get_spark_conf()
+
+    def test_missing_local_jar_path_rejected(self, mock_pyspark, tmp_path):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        with pytest.raises(ValueError, match="not found"):
+            VeloxAdapter(table_format="iceberg", lakehouse_jars=str(tmp_path / "missing.jar"))._get_spark_conf()
+
+    def test_parquet_needs_no_jars(self, mock_pyspark):
+        from benchbox.platforms.velox import VeloxAdapter
+
+        conf = VeloxAdapter(table_format="parquet")._get_spark_conf()
+        assert "spark.jars" not in conf
 
     def test_format_conf_applies_in_remote_mode(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
@@ -296,6 +324,7 @@ class TestVeloxTableFormatConf:
 
         adapter = VeloxAdapter(
             table_format="delta",
+            lakehouse_jars="io.delta:delta-spark_2.12:3.2.0",
             spark_config={"spark.sql.extensions": "com.example.CustomExtensions"},
         )
         assert adapter._get_spark_conf()["spark.sql.extensions"] == "com.example.CustomExtensions"
@@ -309,7 +338,7 @@ class TestVeloxTableFormatConf:
     def test_format_name_is_case_insensitive(self, mock_pyspark):
         from benchbox.platforms.velox import VeloxAdapter
 
-        adapter = VeloxAdapter(table_format="Delta")
+        adapter = VeloxAdapter(table_format="Delta", lakehouse_jars="io.delta:delta-spark_2.12:3.2.0")
         assert adapter.table_format == "delta"
         assert (
             adapter._get_spark_conf()["spark.sql.catalog.spark_catalog"]
@@ -797,6 +826,49 @@ class TestVeloxTableOptimization:
 
         sql = "SELECT * FROM orders"
         assert optimize_spark_table_definition(sql, table_format="parquet") == sql
+
+    def test_delta_preserves_v2_schema(self):
+        """Delta create_schema keeps constraints and SMALLINT (V2 table)."""
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.velox import VeloxAdapter
+
+        adapter = VeloxAdapter(
+            table_format="delta",
+            lakehouse_jars="io.delta:delta-spark_2.12:3.2.0",
+        )
+        ddl = "CREATE TABLE orders (id INT PRIMARY KEY, qty SMALLINT)"
+        adapter._create_schema_with_tuning = MagicMock(return_value=ddl)
+        captured = {}
+        with patch(
+            "benchbox.platforms.velox.run_spark_schema_creation_loop",
+            side_effect=lambda spark, statements, optimize, **kwargs: captured.update(optimize=optimize),
+        ):
+            adapter.create_schema(MagicMock(), MagicMock())
+
+        result = captured["optimize"](ddl)
+        assert "PRIMARY KEY" in result
+        assert "SMALLINT" in result
+
+    def test_parquet_strips_v1_schema(self):
+        """Parquet create_schema strips constraints and upcasts SMALLINT (V1 table)."""
+        from unittest.mock import MagicMock, patch
+
+        from benchbox.platforms.velox import VeloxAdapter
+
+        adapter = VeloxAdapter(table_format="parquet")
+        ddl = "CREATE TABLE orders (id INT PRIMARY KEY, qty SMALLINT)"
+        adapter._create_schema_with_tuning = MagicMock(return_value=ddl)
+        captured = {}
+        with patch(
+            "benchbox.platforms.velox.run_spark_schema_creation_loop",
+            side_effect=lambda spark, statements, optimize, **kwargs: captured.update(optimize=optimize),
+        ):
+            adapter.create_schema(MagicMock(), MagicMock())
+
+        result = captured["optimize"](ddl)
+        assert "PRIMARY KEY" not in result
+        assert "SMALLINT" not in result
 
 
 class TestVeloxRegistration:

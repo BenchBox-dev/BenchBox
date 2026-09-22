@@ -102,8 +102,11 @@ table_format=<format>` or the `table_format` config key. For `delta`,
 `iceberg`, and `hudi` the adapter emits the matching SQL extension plus
 session-catalog wiring so Gluten has a readable table to accelerate. Those
 extensions require the corresponding Delta/Iceberg/Hudi JARs on the Spark
-classpath (user-provided via `spark.jars` or the cluster image); the conf
-alone is necessary but not sufficient without the jars.
+classpath; the conf alone is necessary but not sufficient without the jars.
+Supply them via `--platform-option lakehouse_jars=<jar1,jar2>` (local paths,
+remote URIs, or Maven coordinates; required for lakehouse formats in `local`
+mode, where missing jars fail session creation instead of failing later with
+a class-not-found error). In `remote` mode the server owns its classpath.
 
 ### Mandatory Gluten Configuration (Local Mode)
 
