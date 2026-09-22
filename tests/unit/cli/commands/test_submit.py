@@ -302,6 +302,76 @@ def test_submit_dry_run_validation_rejects_pr_package_errors(monkeypatch: pytest
     assert not out_dir.exists()
 
 
+def _write_flat_plateau_bundle(path: Path) -> None:
+    """Bundle whose per-query means form a slow tight band (timing-plateau).
+
+    Scale factor 1.0 keeps small-scale-floor out of scope so the test pins the
+    plateau rule; a single bundle keeps the cross-bundle rules unevaluable.
+    """
+    queries = [{"id": f"Q{i}", "ms": 4400.0 + (i % 5) * 15.0, "status": "SUCCESS"} for i in range(1, 23)]
+    bundle = {
+        "version": "2.1",
+        "run": {"id": "plateau", "timestamp": "2026-05-03T00:00:00", "total_duration_ms": 100000},
+        "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 1.0},
+        "platform": {"name": "duckdb", "version": "1.3.0"},
+        "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
+        "phases": {"validation": {"status": "PASSED"}},
+        "queries": queries,
+    }
+    path.write_text(json.dumps(bundle), encoding="utf-8")
+
+
+def _write_sibling_override_artifact(bundle_path: Path) -> None:
+    bundle_path.with_name(f"{bundle_path.stem}.override.json").write_text(
+        json.dumps(
+            {
+                "rules": [{"rule": "timing-plateau", "rule_version": "1"}],
+                "reason": "verified fixed-overhead regime against profiler trace",
+                "evidence": "https://example.com/trace",
+                "expires": "single-batch",
+                "approver": "reviewer2",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_submit_dry_run_refuses_unsatisfied_overrides(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """P1: dry-run must refuse a bundle the validator CLI would reject.
+
+    The plateau finding leaves ValidationResult.ok true, so without the
+    pending-overrides check the preview prints submission instructions for a
+    bundle CI rejects through unsatisfied_override_rules.
+    """
+    src = tmp_path / "tpch_duckdb_plateau.json"
+    _write_flat_plateau_bundle(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "Submission validation failed" in result.output
+    assert "requires overrides" in result.output
+    assert "timing-plateau" in result.output
+    assert "Dry-run preview" not in result.output
+    assert not out_dir.exists()
+
+
+def test_submit_dry_run_accepts_satisfied_override(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A committed sibling override artifact satisfies the dry-run gate."""
+    src = tmp_path / "tpch_duckdb_plateau.json"
+    _write_flat_plateau_bundle(src)
+    _write_sibling_override_artifact(src)
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--dry-run", "--output", str(out_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "Dry-run preview" in result.output
+
+
 # ---------------------------------------------------------------------------
 # 4d. Dry-run validation uses the packaged library, not a cwd-loadable script.
 # ---------------------------------------------------------------------------

@@ -978,6 +978,30 @@ class TestTimingPlateau:
         assert vr.ok, vr.errors
         assert not any("timing-plateau" in w for w in vr.warnings)
 
+    def test_fast_flat_run_is_silent(self):
+        # P2: a tight band of genuinely fast queries is fast execution, not
+        # fixed-overhead dominance. Mirrors the checked-in TPC-H SF0.01 DuckDB
+        # bundle (per-query means span 5-8ms, max/min 1.48, CV 0.09).
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle({f"Q{i}": 5.0 + (i % 4) for i in range(1, 23)}), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+        assert "timing-plateau" not in vr.override_required
+
+    def test_subsecond_peak_stays_silent(self):
+        # Peak 960ms sits below the absolute floor; the relative spread alone
+        # must not block it.
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=900.0, spread=60.0)), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_plateau_at_or_above_absolute_floor_still_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=1100.0, spread=60.0)), vr)
+        assert vr.ok, vr.errors
+        assert any("timing-plateau" in w for w in vr.warnings)
+
     def test_uniform_benchmark_is_out_of_scope(self):
         vr = ValidationResult("test")
         _validate_bundle(_timing_bundle(_flat_queries(), benchmark="read_primitives"), vr)
@@ -1681,6 +1705,19 @@ class TestOverrideContract:
         vr.require_override("timing-plateau", "flat")
         assert unsatisfied_override_rules([vr]) == {"b.json": ["timing-plateau"]}
         assert unsatisfied_override_rules([ValidationResult("clean.json")]) == {}
+
+    def test_validation_failed_contract(self):
+        from benchbox.validation.bundle import validation_failed
+
+        assert not validation_failed([ValidationResult("clean.json")])
+        finding = ValidationResult("flat.json")
+        finding.require_override("timing-plateau", "flat")
+        assert validation_failed([finding])
+        assert not validation_failed([finding], strict_overrides=False)
+        errored = ValidationResult("bad.json")
+        errored.error("boom")
+        assert validation_failed([errored])
+        assert validation_failed([errored], strict_overrides=False)
 
     def test_pr_comment_strict_fails_header_with_overrides(self):
         from benchbox.validation.bundle import format_pr_comment

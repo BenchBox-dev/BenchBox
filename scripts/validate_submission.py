@@ -31,6 +31,7 @@ try:
         format_summary,
         unsatisfied_override_rules,
         validate_bundles,
+        validation_failed,
     )
 except ImportError:
     bundle_path = CHECKOUT_ROOT / "benchbox" / "validation" / "bundle.py"
@@ -49,6 +50,7 @@ except ImportError:
     format_summary = bundle.format_summary
     unsatisfied_override_rules = bundle.unsatisfied_override_rules
     validate_bundles = bundle.validate_bundles
+    validation_failed = bundle.validation_failed
 
 try:
     from benchbox.core.results.anonymization import find_public_path_leaks
@@ -412,7 +414,7 @@ def main(argv: list[str] | None = None) -> int:
     pending = {} if allow_partial_validation else unsatisfied_override_rules(results)
     for path, rule_ids in sorted(pending.items()):
         print(f"ERROR: {path} requires overrides: {', '.join(sorted(rule_ids))}")
-    failed = bool(rejected) or any(not result.ok for result in results) or bool(pending)
+    failed = bool(rejected) or validation_failed(results, strict_overrides=not allow_partial_validation)
     for reason in rejected:
         print(f"ERROR: disallowed corpus path: {reason}")
     print(format_summary(results))

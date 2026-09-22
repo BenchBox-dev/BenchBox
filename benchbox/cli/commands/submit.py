@@ -48,6 +48,7 @@ from benchbox.validation.bundle import (
     _hash_bytes,
     _hash_file,
     format_summary,
+    unsatisfied_override_rules,
     validate_bundles,
 )
 
@@ -256,6 +257,23 @@ def _validate_submission_bundle_for_dry_run(ctx: click.Context, source_path: Pat
 
     if any(not result.ok for result in validation_results):
         console.print("\n[red]Submission validation failed:[/red]")
+        console.print(format_summary(validation_results))
+        ctx.exit(1)
+        return
+
+    # The validator CLI rejects the same bundle through unsatisfied_override_rules;
+    # the dry-run preview must refuse with the same wording instead of printing
+    # submission instructions for a bundle CI would reject.
+    pending = unsatisfied_override_rules(validation_results)
+    if pending:
+        console.print("\n[red]Submission validation failed:[/red]")
+        for path, rule_ids in sorted(pending.items()):
+            # soft_wrap: the wording must match the validator CLI exactly at any
+            # terminal width instead of folding mid-phrase on narrow consoles.
+            console.print(
+                f"ERROR: {path} requires overrides: {', '.join(sorted(rule_ids))}",
+                soft_wrap=True,
+            )
         console.print(format_summary(validation_results))
         ctx.exit(1)
         return
