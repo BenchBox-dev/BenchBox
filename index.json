@@ -4047,6 +4047,15 @@
       "status": "done",
       "title": "Staged Data Vault cross-surface gate plus static frame-API check"
     },
+    "datavault-cross-surface-gate-promotion": {
+      "claim": null,
+      "needs": [
+        "cross-surface-gate-rollout-followups"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Promote datavault cross-surface gate from staged to enforced"
+    },
     "datavault-cross-surface-query-execution-burn-down": {
       "claim": null,
       "needs": [],

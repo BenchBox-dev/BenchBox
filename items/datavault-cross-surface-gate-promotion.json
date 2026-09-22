@@ -1,0 +1,4 @@
+{
+  "context": "Parent rollup is cross-surface-gate-rollout-followups. datavault is registered in STAGED_GATES with _DATAVAULT_SCALE=0.01 and its burn-down (datavault-cross-surface-query-execution-burn-down) is done. Decide whether it can move to GATES. Caveat: sweep reports 0 raw id overlap across 22/22 yet a builder exists — confirm id mapping is independent, not guessed, before promoting. Promotion must refresh registry + coverage map + sweep artifact + registry tests together; do not baseline residual divergences; run gate cells in report mode to verify greenness first.",
+  "description": "Promote datavault staged gate to enforced GATES once its id mapping is confirmed independent and the cell is green."
+}
