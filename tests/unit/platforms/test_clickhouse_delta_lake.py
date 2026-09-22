@@ -238,7 +238,7 @@ class TestSelectAndCount:
 class TestSupportProbe:
     def test_function_probe_lists_all_emitted_functions(self) -> None:
         assert delta_function_probe_sql() == (
-            "SELECT name FROM system.functions WHERE name IN "
+            "SELECT name FROM system.table_functions WHERE name IN "
             "('deltaLake', 'deltaLakeS3', 'deltaLakeLocal', 'deltaLakeAzure')"
         )
         assert set(DELTA_TABLE_FUNCTION_NAMES) == {"deltaLake", "deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure"}

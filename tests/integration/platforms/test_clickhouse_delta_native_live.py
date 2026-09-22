@@ -59,6 +59,8 @@ def clickhouse_adapter():
         port=9000,
         deployment_mode="server",
         database="benchbox_test",
+        # Matches docker/clickhouse/docker-compose.yml (CLICKHOUSE_PASSWORD).
+        password="benchbox",
     )
     adapter.skip_database_management = True
     yield adapter

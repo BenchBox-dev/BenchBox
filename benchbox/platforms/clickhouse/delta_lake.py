@@ -8,13 +8,16 @@ or a locally mounted filesystem (``deltaLakeLocal``). This module builds those
 SQL expressions with safe literal/identifier quoting so BenchBox can generate
 native Delta reads instead of shelling out to ad-hoc string formatting.
 
-Support is deployment dependent: the engine covers S3/GCS/Azure locations,
-local reads go through the ``deltaLakeLocal`` table function, and minimal or
-embedded builds may not register the Delta integration at all. When native
-reads are unavailable, fall back to the Parquet snapshot export in
-:mod:`benchbox.utils.delta_export`; :func:`has_native_delta_support` answers
-the availability question from the server's system tables, while choosing
-between the paths inside an adapter run is follow-up work.
+Support is deployment dependent: the engine takes object-storage bucket URLs
+(S3/GCS/Azure) and rejects local paths (``Code: 36. ... Host is empty in S3
+URI``), while local reads go through the ``deltaLakeLocal`` table function
+(count and row reads verified on ``clickhouse/clickhouse-server:25.8``, server
+``25.8.33.6``). Minimal or embedded builds may not register the Delta
+integration at all. When native reads are unavailable, fall back to the Parquet
+snapshot export in :mod:`benchbox.utils.delta_export`;
+:func:`has_native_delta_registration` answers the availability question from
+the server's system tables, while choosing between the paths inside an adapter
+run is follow-up work.
 
 Evidence: the ``DeltaLake`` table engine and ``deltaLake`` table-function family
 in the ClickHouse documentation, corroborated in-repo by the Docker-gated
@@ -325,17 +328,19 @@ def delta_lake_azure_table_function(
 
 
 def delta_function_probe_sql() -> str:
-    """Build the ``system.functions`` query probing native Delta support.
+    """Build the ``system.table_functions`` query probing native Delta support.
 
-    Whether ClickHouse registers table functions in ``system.functions`` or in
-    ``system.table_functions`` is settled by running both probes on a Docker
-    host (follow-up work); until then this targets ``system.functions``.
+    Table functions register in ``system.table_functions``, not
+    ``system.functions`` (observed on ``clickhouse/clickhouse-server:25.8``,
+    server ``25.8.33.6``: the former lists ``deltaLake``/``deltaLakeS3``/
+    ``deltaLakeLocal``/``deltaLakeAzure`` plus ``deltaLakeCluster``, while
+    ``system.functions`` lists none of them).
 
     Returns:
         SELECT statement listing the registered native Delta table functions.
     """
     names = ", ".join(quote_literal(name) for name in DELTA_TABLE_FUNCTION_NAMES)
-    return f"SELECT name FROM system.functions WHERE name IN ({names})"
+    return f"SELECT name FROM system.table_functions WHERE name IN ({names})"
 
 
 def delta_engine_probe_sql() -> str:
