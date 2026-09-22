@@ -1,19 +1,16 @@
-"""Regression tests for TPC-DI ingest dtype stability on pandas 3.x.
+"""Ingest dtype contract tests for TPC-DI file transforms on pandas 3.x.
 
-pandas 3 defaults to microsecond resolution for inferred datetimes (vs.
-nanoseconds on 2.x). The TPC-DI file transforms must keep date-like payloads
-as text through ingest: downstream loads treat them as strings, and a silent
-datetime64 inference would change stored values. These tests pin the ingest
-dtypes for the CSV, fixed-width, and JSON transform paths.
-
-Copyright 2026 Joe Harris / BenchBox Project
+The TPC-DI file transforms must keep date-like payloads as text through
+ingest: downstream loads treat them as strings, and a silent datetime64
+inference would change stored values. These tests pin the exact ingest
+dtypes for the CSV, fixed-width, and JSON transform paths so any dtype
+drift (including datetime64 inference) fails loudly.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
@@ -25,10 +22,10 @@ pytestmark = [
 
 
 def _make_benchmark(tmp_path: Path) -> TPCDIBenchmark:
-    return TPCDIBenchmark(scale_factor=0.01, output_dir=tmp_path, max_workers=1)
+    return TPCDIBenchmark(scale_factor=0.01, output_dir=tmp_path)
 
 
-def test_csv_transform_keeps_text_columns_as_strings(tmp_path: Path) -> None:
+def test_csv_transform_dtype_contract(tmp_path: Path) -> None:
     benchmark = _make_benchmark(tmp_path)
     source = tmp_path / "trade_history.csv"
     source.write_text(
@@ -40,28 +37,46 @@ def test_csv_transform_keeps_text_columns_as_strings(tmp_path: Path) -> None:
 
     frame = result["dataframe"]
     assert result["records_processed"] == 2
-    assert str(frame["TradeDate"].dtype) in {"str", "string", "object"}
+    assert {name: str(dtype) for name, dtype in frame.dtypes.items()} == {
+        "TradeID": "int64",
+        "Symbol": "str",
+        "TradeDate": "str",
+        "Quantity": "int64",
+        "BatchID": "int64",
+    }
     assert frame["TradeDate"].tolist() == ["2023-01-15", "2023-01-16"]
 
 
-def test_fixed_width_transform_keeps_text_columns_as_strings(tmp_path: Path) -> None:
+def test_fixed_width_transform_dtype_contract(tmp_path: Path) -> None:
     benchmark = _make_benchmark(tmp_path)
     source = tmp_path / "securities.dat"
-    source.write_text("AAA11111exch1name 100\nBBB22222exch2name 200\n", encoding="utf-8")
+    # Real column widths: symbol 8, name 30, exchange 10, shares 15.
+    rows = [
+        f"{'AAA11111'}{'Acme Corp One':<30}{'NYSE':<10}{'100':<15}",
+        f"{'BBB22222'}{'Beta Industries Two':<30}{'NASDAQ':<10}{'200':<15}",
+    ]
+    source.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     result = benchmark._transform_fixed_width_file(str(source), "historical")
 
     frame = result["dataframe"]
     assert result["records_processed"] == 2
-    assert str(frame["symbol"].dtype) in {"str", "string", "object"}
+    assert frame["symbol"].tolist() == ["AAA11111", "BBB22222"]
+    assert frame["name"].tolist() == ["Acme Corp One", "Beta Industries Two"]
+    assert frame["exchange"].tolist() == ["NYSE", "NASDAQ"]
+    assert frame["shares_outstanding"].tolist() == [100, 200]
+    assert str(frame["symbol"].dtype) == "str"
+    assert str(frame["shares_outstanding"].dtype) == "int64"
 
 
-def test_json_transform_keeps_opening_date_as_string(tmp_path: Path) -> None:
+def test_json_transform_keeps_dates_as_strings(tmp_path: Path) -> None:
     benchmark = _make_benchmark(tmp_path)
     source = tmp_path / "accounts.json"
+    # "date" is the adversarial case: pandas infers datetimes by column
+    # name, so a literal "date" column is what convert_dates would catch.
     source.write_text(
-        '[{"account_id": 1, "customer_id": 101, "opening_date": "2023-01-01", "status": "Active"},'
-        ' {"account_id": 2, "customer_id": 102, "opening_date": "2023-02-01", "status": "Active"}]',
+        '[{"account_id": 1, "date": "2023-01-01", "opening_date": "2023-01-01", "status": "Active"},'
+        ' {"account_id": 2, "date": "2023-02-01", "opening_date": "2023-02-01", "status": "Active"}]',
         encoding="utf-8",
     )
 
@@ -69,9 +84,22 @@ def test_json_transform_keeps_opening_date_as_string(tmp_path: Path) -> None:
 
     frame = result["dataframe"]
     assert result["records_processed"] == 2
-    assert str(frame["opening_date"].dtype) in {"str", "string", "object"}
-    assert frame["opening_date"].tolist() == ["2023-01-01", "2023-02-01"]
+    assert str(frame["date"].dtype) == "str"
+    assert str(frame["opening_date"].dtype) == "str"
+    assert frame["date"].tolist() == ["2023-01-01", "2023-02-01"]
 
 
-def test_pandas_major_version_is_declared() -> None:
-    assert int(pd.__version__.split(".")[0]) >= 3
+def test_pandas_floor_is_declared_in_packaging_metadata() -> None:
+    """The pandas>=3 floor lives in pyproject.toml, not the environment."""
+    import re
+
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    pyproject = Path(__file__).resolve().parents[4] / "pyproject.toml"
+    pandas_pins = re.findall(r'"pandas(>=?[^"]*)"', pyproject.read_text(encoding="utf-8"))
+    assert pandas_pins, "no pandas pin found in pyproject.toml"
+    for pin in pandas_pins:
+        spec = SpecifierSet(pin)
+        assert spec.contains(Version("3.0.0")), f"pandas{pin} excludes 3.0.0"
+        assert not spec.contains(Version("2.9.9")), f"pandas{pin} still allows 2.x"

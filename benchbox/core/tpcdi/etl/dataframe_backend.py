@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+import math
 import re
+from datetime import date, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +14,71 @@ import pandas as pd
 
 from benchbox.core.dataframe.maintenance_interface import DataFrameMaintenanceOperations
 
+logger = logging.getLogger(__name__)
+
+# Statement-terminating or comment tokens are never valid inside a predicate
+# (mirrors SQLETLBackend._validate_sql_where_clause).
+_UNSAFE_CONDITION_TOKENS = (";", "--", "/*", "*/")
+_FORBIDDEN_CONDITION_KEYWORDS = frozenset(
+    {
+        "DROP",
+        "DELETE",
+        "INSERT",
+        "UPDATE",
+        "ALTER",
+        "CREATE",
+        "ATTACH",
+        "DETACH",
+        "PRAGMA",
+    }
+)
+_COLUMN_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _validate_condition_column(column: str) -> str:
+    """Validate a dict-condition column name, mirroring the SQL backend."""
+    if not _COLUMN_NAME_PATTERN.fullmatch(column):
+        raise ValueError(f"Unsafe column name in SCD2 expire condition: {column!r}")
+    return column
+
+
+def _check_condition_text(normalized: str) -> str:
+    """Reject unsafe tokens/keywords in a raw SQL predicate string."""
+    if any(token in normalized for token in _UNSAFE_CONDITION_TOKENS):
+        raise ValueError("Unsafe SQL tokens are not allowed in SCD2 expire condition")
+    if any(re.search(rf"\b{keyword}\b", normalized.upper()) for keyword in _FORBIDDEN_CONDITION_KEYWORDS):
+        raise ValueError("DML/DDL keywords are not allowed in SCD2 expire condition")
+    return normalized
+
 
 def _render_literal(value: Any) -> str:
     """Render a Python scalar as a SQL literal for maintenance predicates."""
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, (int, float)):
+    # SCD2 conditions are built from pandas frames, so numpy scalars are the
+    # norm (business keys arrive as np.int64, flags as np.bool_): normalize
+    # them to Python scalars before dispatch.
+    try:
+        import numpy as np
+
+        if isinstance(value, np.generic):
+            value = value.item()
+    except ImportError:
+        pass
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, int):
         return str(value)
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            raise ValueError(f"Non-finite float cannot be rendered as a SQL literal: {value!r}")
+        return repr(value)
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, datetime):
+        return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
+    if isinstance(value, date):
+        return f"'{value.strftime('%Y-%m-%d')}'"
     if isinstance(value, str):
         return "'" + value.replace("'", "''") + "'"
     raise TypeError(f"Unsupported literal value for SCD2 operation: {value!r}")
@@ -25,22 +87,22 @@ def _render_literal(value: Any) -> str:
 def _condition_to_sql(condition: str | Any) -> str:
     """Normalize an SCD2 expire condition to a SQL predicate string.
 
-    Maintenance operations accept SQL predicate strings (polars SQL, Delta
-    predicates); dict conditions are rendered to ``"col" = <literal>`` Equality
-    clauses mirroring the SQL backend's parameterized where-clause builder.
+    String conditions are interpolated verbatim into the maintenance SQL
+    after the same unsafe-token/keyword screening the SQL backend applies
+    (column names are the caller's responsibility); dict conditions are
+    rendered to ``"col" = <literal>`` equality clauses with validated column
+    names.
     """
     if isinstance(condition, str):
         if not condition.strip():
             raise ValueError("SCD2 expire condition cannot be empty")
-        return condition
+        return _check_condition_text(condition.strip())
     if isinstance(condition, dict):
         if not condition:
             raise ValueError("SCD2 expire condition dictionary cannot be empty")
         clauses: list[str] = []
         for raw_column, value in condition.items():
-            column = str(raw_column)
-            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", column):
-                raise ValueError(f"Unsafe column name in SCD2 expire condition: {column!r}")
+            column = _validate_condition_column(str(raw_column))
             if value is None:
                 clauses.append(f'"{column}" IS NULL')
             else:
@@ -127,14 +189,22 @@ class DataFrameETLBackend:
             return True
         try:
             return bool(get_capabilities().accepts_sql_predicates)
-        except Exception:
+        except AttributeError:
+            logger.warning("Maintenance adapter capabilities lack accepts_sql_predicates; assuming SQL predicates")
             return True
 
     def execute_scd2_expire(self, table_name: str, condition: str | Any, updates: dict[str, Any]) -> dict[str, Any]:
         """Expire current rows using UPDATE maintenance operation."""
         if not updates:
             return {"success": True, "rows_affected": 0}
-        if isinstance(condition, dict) and not self._adapter_accepts_sql_predicates():
+        if not self._adapter_accepts_sql_predicates():
+            if not isinstance(condition, dict):
+                raise TypeError(
+                    "This maintenance adapter does not accept SQL predicate text; "
+                    "pass the SCD2 expire condition as dict[str, Any]"
+                )
+            for raw_column in condition:
+                _validate_condition_column(str(raw_column))
             predicate: str | Any = condition
             rendered_updates = {str(column): value for column, value in updates.items()}
         else:
