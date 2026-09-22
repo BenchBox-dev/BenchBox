@@ -21,6 +21,25 @@ pytestmark = [
 ]
 
 
+def _make_real_iceberg_table(table_dir: Path) -> None:
+    """Build a minimal real Iceberg table with one data file."""
+    pytest.importorskip("pyiceberg", reason="iceberg staging tests need pyiceberg")
+    pa = pytest.importorskip("pyarrow", reason="iceberg staging tests need pyarrow")
+    from pyiceberg.catalog.sql import SqlCatalog
+    from pyiceberg.schema import Schema
+    from pyiceberg.types import LongType, NestedField
+
+    catalog = SqlCatalog("rs-test", uri=f"sqlite:///{table_dir.parent}/cat.db", warehouse=str(table_dir.parent))
+    catalog.create_namespace_if_not_exists("ns")
+    table = catalog.create_table(
+        "ns.t",
+        schema=Schema(NestedField(1, "o_orderkey", LongType())),
+        location=table_dir.as_uri(),
+        properties={"format-version": "2"},
+    )
+    table.overwrite(pa.table({"o_orderkey": [1]}))
+
+
 class TestRedshiftAdapter:
     """Test Redshift platform adapter functionality."""
 
@@ -1091,13 +1110,12 @@ class TestRedshiftAdapter:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             iceberg_dir = Path(tmpdir) / "orders"
-            (iceberg_dir / "metadata").mkdir(parents=True)
-            (iceberg_dir / "metadata" / "v1.metadata.json").write_text("{}")
-            (iceberg_dir / "part-000.parquet").write_bytes(b"PAR1")
+            _make_real_iceberg_table(iceberg_dir)
             mock_benchmark.tables = {"orders": [iceberg_dir]}
 
+            mock_s3 = Mock()
             with (
-                patch.object(adapter, "_create_s3_client", return_value=Mock()),
+                patch.object(adapter, "_create_s3_client", return_value=mock_s3),
                 patch.object(adapter, "_create_glue_client", return_value=mock_glue),
             ):
                 table_stats, _, _ = adapter.create_external_tables(mock_benchmark, mock_connection, Path(tmpdir))
@@ -1113,9 +1131,14 @@ class TestRedshiftAdapter:
         assert table_input["StorageDescriptor"]["Location"].startswith("s3://benchbox-test-bucket/")
         assert table_input["StorageDescriptor"]["Location"].endswith("/orders/")
         assert table_input["StorageDescriptor"]["Columns"] == [{"Name": "o_orderkey", "Type": "BIGINT"}]
-        assert table_input["Parameters"]["metadata_location"] == (
-            table_input["StorageDescriptor"]["Location"] + "metadata/v1.metadata.json"
-        )
+        metadata_location = table_input["Parameters"]["metadata_location"]
+        assert metadata_location.startswith(table_input["StorageDescriptor"]["Location"] + "metadata/")
+        assert metadata_location.endswith(".metadata.json")
+        # Data files and the relocated graph were uploaded; no stale graph files.
+        uploaded_keys = {call.args[2] for call in mock_s3.upload_file.call_args_list}
+        assert any(key.endswith(".parquet") for key in uploaded_keys)
+        assert any(key.endswith(".avro") for key in uploaded_keys)
+        assert metadata_location[len("s3://benchbox-test-bucket/") :] in uploaded_keys
 
     def test_iceberg_glue_registration_replaces_existing_table(self):
         """Glue registration should swallow EntityNotFound on replace but surface real errors."""

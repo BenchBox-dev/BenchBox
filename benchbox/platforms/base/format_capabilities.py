@@ -254,8 +254,8 @@ EXTERNAL_PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "athena": ["parquet"],
     "clickhouse-cloud": ["iceberg", "parquet", "tbl", "csv"],
     "snowflake": ["iceberg", "delta", "parquet", "tbl", "csv"],
-    "bigquery": ["delta", "parquet", "tbl", "csv"],
-    "redshift": ["delta", "parquet", "tbl", "csv"],
+    "bigquery": ["delta", "iceberg", "parquet", "tbl", "csv"],
+    "redshift": ["delta", "iceberg", "parquet", "tbl", "csv"],
 }
 
 
@@ -354,14 +354,14 @@ def _has_required_external_config(
     if platform_key == "bigquery":
         if not (_config_value(platform_config, "storage_bucket") or _config_value(platform_config, "staging_root")):
             return False
-        if format_name == "delta":
+        if format_name in {"delta", "iceberg"}:
             return bool(_config_value(platform_config, "biglake_connection"))
         return True
 
     if platform_key == "redshift":
         if not (_config_value(platform_config, "s3_bucket") or _config_value(platform_config, "staging_root")):
             return False
-        if format_name == "delta":
+        if format_name in {"delta", "iceberg"}:
             return bool(_config_value(platform_config, "iam_role"))
         return True
 
@@ -393,7 +393,7 @@ def _get_support_level(
             return None
         if platform_key == "snowflake" and format_name in {"delta", "iceberg"}:
             return SupportLevel.EXTENSION
-        if platform_key in {"bigquery", "redshift"} and format_name == "delta":
+        if platform_key in {"bigquery", "redshift"} and format_name in {"delta", "iceberg"}:
             return SupportLevel.EXTENSION
         if platform_key == "clickhouse-cloud" and format_name == "iceberg":
             return SupportLevel.EXTENSION

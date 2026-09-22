@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,7 +20,7 @@ from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
-from benchbox.utils.iceberg_layout import is_iceberg_directory, resolve_iceberg_metadata_file
+from benchbox.utils.iceberg_layout import is_iceberg_directory, relocate_iceberg_table
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
@@ -1767,16 +1768,24 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             s3_client.upload_file(str(file_path), self.s3_bucket, s3_key)
         return f"s3://{self.s3_bucket}/{s3_prefix}/"
 
+    def _external_s3_table_uri(self, table_name: str) -> tuple[str, str]:
+        """Return the (bucket, key prefix) for an external-mode table."""
+        s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name.lower()}"
+        return self.s3_bucket, s3_prefix
+
+    def _upload_local_file_to_s3(self, s3_client: Any, local_path: Path, bucket: str, key: str) -> None:
+        """Upload one local file to S3."""
+        s3_client.upload_file(str(local_path), bucket, key)
+
     def _upload_external_directory_to_s3(self, s3_client: Any, table_name: str, directory: Path) -> str:
         """Upload a directory tree for external Delta-style registration."""
-        table_name_lower = table_name.lower()
-        s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name_lower}"
+        s3_bucket, s3_prefix = self._external_s3_table_uri(table_name)
         for file_path in directory.rglob("*"):
             if not file_path.is_file():
                 continue
             relative = file_path.relative_to(directory).as_posix()
-            s3_client.upload_file(str(file_path), self.s3_bucket, f"{s3_prefix}/{relative}")
-        return f"s3://{self.s3_bucket}/{s3_prefix}/"
+            self._upload_local_file_to_s3(s3_client, file_path, s3_bucket, f"{s3_prefix}/{relative}")
+        return f"s3://{s3_bucket}/{s3_prefix}/"
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
@@ -1826,7 +1835,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     location = self._upload_external_directory_to_s3(s3_client, table_name_lower, delta_dirs[0])
                     source_format = "delta"
                 elif iceberg_dirs:
-                    location = self._upload_external_directory_to_s3(s3_client, table_name_lower, iceberg_dirs[0])
+                    # Relocated upload happens in the Iceberg branch below so
+                    # stale file:// graph files never reach S3.
+                    location = ""
                     source_format = "iceberg"
                 elif parquet_files:
                     location = self._upload_external_parquet_files_to_s3(s3_client, table_name_lower, parquet_files)
@@ -1840,20 +1851,31 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 if source_format == "iceberg":
                     # Spectrum reads Iceberg only through the Glue catalog, so
                     # register the uploaded table instead of issuing ad-hoc DDL.
+                    # A byte copy would leave file:// references throughout the
+                    # metadata graph, so relocate it to S3 before uploading.
                     glue_client = self._create_glue_client()
                     glue_database = f"{self.database.lower()}_external"
-                    metadata_file = resolve_iceberg_metadata_file(iceberg_dirs[0])
-                    metadata_location = (
-                        f"{location}{metadata_file.relative_to(iceberg_dirs[0]).as_posix()}"
-                        if metadata_file is not None
-                        else None
-                    )
+                    s3_bucket, s3_prefix = self._external_s3_table_uri(table_name_lower)
+                    dest_uri = f"s3://{s3_bucket}/{s3_prefix}"
+                    with tempfile.TemporaryDirectory(prefix="benchbox-iceberg-reloc-") as staging:
+                        relocated = relocate_iceberg_table(iceberg_dirs[0], dest_uri, staging)
+                        for rel in relocated.data_files:
+                            self._upload_local_file_to_s3(
+                                s3_client, iceberg_dirs[0] / rel, s3_bucket, f"{s3_prefix}/{rel}"
+                            )
+                        for rel, staged in relocated.graph_files.items():
+                            self._upload_local_file_to_s3(s3_client, staged, s3_bucket, f"{s3_prefix}/{rel}")
                     column_list = self._build_external_column_list(benchmark, table_name_lower)
                     self.log_notice(
                         f"Registering Redshift Iceberg table in Glue catalog: {glue_database}.{table_name_lower}"
                     )
                     self._register_iceberg_table_in_glue(
-                        glue_client, glue_database, table_name_lower, location, column_list, metadata_location
+                        glue_client,
+                        glue_database,
+                        table_name_lower,
+                        dest_uri + "/",
+                        column_list,
+                        relocated.metadata_location,
                     )
                     cursor.execute(f"SELECT COUNT(*) FROM {external_schema}.{table_name_lower}")
                     result = cursor.fetchone()

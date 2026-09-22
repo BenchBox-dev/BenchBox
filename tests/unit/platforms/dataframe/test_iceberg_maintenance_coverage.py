@@ -282,6 +282,31 @@ class TestIcebergMaintenanceCoverage:
         )
         assert count >= 0
 
+    def test_do_merge_applies_insert_mapping(self, tmp_path):
+        """when_not_matched maps target columns from renamed source columns."""
+        import pyarrow as pa
+
+        ops = im.IcebergMaintenanceOperations(working_dir=tmp_path)
+
+        target = pa.table({"id": pa.array([1], type=pa.int64()), "value": pa.array([10], type=pa.int64())})
+        ops._do_insert("default.merge_map_tbl", target, None, "append")
+
+        # Source column is named differently from the target column.
+        source = pa.table({"id": pa.array([2], type=pa.int64()), "new_value": pa.array([20], type=pa.int64())})
+
+        affected = ops._do_merge(
+            "default.merge_map_tbl",
+            source,
+            "target.id = source.id",
+            when_matched=None,
+            when_not_matched={"id": "source.id", "value": "source.new_value"},
+        )
+
+        assert affected == 1
+        merged = ops.catalog.load_table("default.merge_map_tbl").scan().to_arrow()
+        assert sorted(merged.column("id").to_pylist()) == [1, 2]
+        assert sorted(merged.column("value").to_pylist()) == [10, 20]
+
     def test_default_catalog_config(self, tmp_path):
         """Cover _default_catalog_config."""
         ops = im.IcebergMaintenanceOperations(working_dir=tmp_path)

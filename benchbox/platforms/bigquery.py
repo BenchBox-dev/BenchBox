@@ -14,6 +14,7 @@ import argparse
 import importlib
 import json
 import logging
+import tempfile
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.file_format import detect_compression, detect_data_format
-from benchbox.utils.iceberg_layout import resolve_iceberg_metadata_file
+from benchbox.utils.iceberg_layout import relocate_iceberg_table, resolve_iceberg_metadata_file
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
@@ -1558,10 +1559,13 @@ class BigQueryAdapter(PlatformAdapter):
 
         BigLake ``format = 'ICEBERG'`` external tables require ``uris`` to point
         at the table's current JSON metadata file, not the table root. Local
-        table directories are uploaded to GCS and the uploaded metadata file is
-        returned; cloud inputs must already reference a ``*.metadata.json`` file.
+        table directories are relocated to GCS — a byte copy would leave
+        ``file://`` references throughout the metadata graph — and the
+        relocated metadata file is returned; cloud inputs must already
+        reference a ``*.metadata.json`` file.
         """
         uris: list[str] = []
+        local_dirs: list[Path] = []
 
         for file_path in file_paths:
             file_path_str = str(file_path)
@@ -1571,19 +1575,27 @@ class BigQueryAdapter(PlatformAdapter):
                 continue
 
             path = Path(file_path)
-            metadata_file = resolve_iceberg_metadata_file(path)
-            if metadata_file is None:
+            if resolve_iceberg_metadata_file(path) is None:
                 continue
+            local_dirs.append(path)
 
+        if (uris or local_dirs) and not self.biglake_connection:
+            raise ValueError(
+                "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+            )
+
+        for path in local_dirs:
             table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
-            for source_file in path.rglob("*"):
-                if not source_file.is_file():
-                    continue
-                relative = source_file.relative_to(path)
-                blob = bucket.blob(f"{table_prefix}{relative.as_posix()}")
-                blob.upload_from_filename(str(source_file))
-            metadata_relative = metadata_file.relative_to(path).as_posix()
-            uris.append(f"gs://{self.storage_bucket}/{table_prefix}{metadata_relative}")
+            dest_uri = f"gs://{self.storage_bucket}/{table_prefix.rstrip('/')}"
+            with tempfile.TemporaryDirectory(prefix="benchbox-iceberg-reloc-") as staging:
+                relocated = relocate_iceberg_table(path, dest_uri, staging)
+                for rel in relocated.data_files:
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(path / rel))
+                for rel, staged in relocated.graph_files.items():
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(staged))
+            uris.append(relocated.metadata_location)
 
         return uris
 

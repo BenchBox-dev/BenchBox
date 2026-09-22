@@ -30,6 +30,25 @@ def dependencies_available():
         yield
 
 
+def _make_real_iceberg_table(table_dir: Path) -> None:
+    """Build a minimal real Iceberg table with one data file."""
+    pytest.importorskip("pyiceberg", reason="iceberg staging tests need pyiceberg")
+    pa = pytest.importorskip("pyarrow", reason="iceberg staging tests need pyarrow")
+    from pyiceberg.catalog.sql import SqlCatalog
+    from pyiceberg.schema import Schema
+    from pyiceberg.types import LongType, NestedField, StringType
+
+    catalog = SqlCatalog("bq-test", uri=f"sqlite:///{table_dir.parent}/cat.db", warehouse=str(table_dir.parent))
+    catalog.create_namespace_if_not_exists("ns")
+    table = catalog.create_table(
+        "ns.t",
+        schema=Schema(NestedField(1, "id", LongType()), NestedField(2, "name", StringType())),
+        location=table_dir.as_uri(),
+        properties={"format-version": "2"},
+    )
+    table.overwrite(pa.table({"id": [1], "name": ["a"]}))
+
+
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQueryAdapter:
     """Test BigQuery platform adapter functionality."""
@@ -598,13 +617,18 @@ class TestBigQueryAdapter:
         mock_bucket = Mock()
         with tempfile.TemporaryDirectory() as tmpdir:
             iceberg_dir = Path(tmpdir) / "lineitem"
-            (iceberg_dir / "metadata").mkdir(parents=True)
-            (iceberg_dir / "metadata" / "00000-aaa.metadata.json").write_text("{}")
-            (iceberg_dir / "metadata" / "00001-bbb.metadata.json").write_text("{}")
+            _make_real_iceberg_table(iceberg_dir)
 
             uris = adapter._prepare_external_iceberg_uris(mock_bucket, "lineitem", [iceberg_dir])
 
-        assert uris == ["gs://benchbox-bucket/benchbox-data/lineitem/metadata/00001-bbb.metadata.json"]
+        assert len(uris) == 1
+        assert uris[0].startswith("gs://benchbox-bucket/benchbox-data/lineitem/metadata/")
+        assert uris[0].endswith(".metadata.json")
+        # Data files and the rewritten graph were all uploaded.
+        uploaded = {call.args[0] for call in mock_bucket.blob.call_args_list}
+        assert any(name.endswith(".parquet") for name in uploaded)
+        assert any(name.endswith(".metadata.json") for name in uploaded)
+        assert any(name.endswith(".avro") for name in uploaded)
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_prepare_iceberg_uris_accepts_cloud_metadata_file(self, mock_bigquery, dependencies_available):
