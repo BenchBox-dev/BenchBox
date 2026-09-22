@@ -808,6 +808,9 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
         "presto": TrinoDDLGenerator,
         "athena": AthenaDDLGenerator,
         # Spark family (including Fabric Warehouse which uses Delta)
+        # NOTE: databricks previews always render Delta DDL, even when the
+        # adapter runs with table_format="hudi" (only executed DDL goes
+        # through the Hudi conversion); see docs/platforms/databricks.md.
         "databricks": DeltaDDLGenerator,
         "spark": DeltaDDLGenerator,
         "delta": DeltaDDLGenerator,

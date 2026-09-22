@@ -77,6 +77,41 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
 
 
+def _normalize_table_format(config: Mapping[str, Any]) -> str:
+    """Normalize the configured Databricks table format ("delta"/"hudi")."""
+    return str(config.get("table_format") or "delta").strip().lower()
+
+
+def _table_name_paren_start(statement: str) -> int | None:
+    """Offset of the "(" opening the column-definition list, if adjacent."""
+    table_match = re.match(
+        r"(?i)CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)\s*\(",
+        statement,
+    )
+    if not table_match:
+        return None
+    return table_match.end() - 1
+
+
+def _split_top_level_commas(body: str) -> list[str]:
+    """Split on commas that are not nested inside parentheses."""
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for char in body:
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    return parts
+
+
 _COMMIT_HASH_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 _CURRENT_VERSION_KEYS = ("dbr_version", "dbsql_version", "u_build_hash", "r_build_hash")
@@ -307,7 +342,7 @@ class DatabricksAdapter(PlatformAdapter):
         # layout operations (OPTIMIZE, ZORDER, Liquid) are recorded as skipped
         # for Hudi tables instead of emitting invalid SQL. Managed data loads
         # (COPY INTO) remain Delta-only: load_data raises for Hudi tables.
-        table_format = str(config.get("table_format") or "delta").strip().lower()
+        table_format = _normalize_table_format(config)
         if table_format not in ("delta", "hudi"):
             raise ValueError(f"Unsupported Databricks table_format '{table_format}'. Use 'delta' or 'hudi'.")
         self.table_format = table_format
@@ -1020,7 +1055,7 @@ class DatabricksAdapter(PlatformAdapter):
         has_storage = bool(staging_location or config.get("catalog") or config.get("schema"))
         return _compact_metadata(
             {
-                "table_format": str(config.get("table_format") or "delta").lower(),
+                "table_format": _normalize_table_format(config),
                 "staging_location": staging_location,
                 "catalog": config.get("catalog"),
                 "schema": config.get("schema"),
@@ -2255,14 +2290,17 @@ class DatabricksAdapter(PlatformAdapter):
 
         optimize_time = 0.0
         if self.table_format == "hudi":
-            self._record_layout_operation(
-                mechanism="optimize",
-                table=table_name_upper,
-                statement=f"OPTIMIZE {table_name_upper}",
-                status="skipped",
-                phase="post_load",
-            )
-            self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
+            # Gated on the flag like the Delta path: with optimization
+            # disabled neither format records anything.
+            if self.enable_delta_optimization:
+                self._record_layout_operation(
+                    mechanism="optimize",
+                    table=table_name_upper,
+                    statement=f"OPTIMIZE {table_name_upper}",
+                    status="skipped",
+                    phase="post_load",
+                )
+                self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
         elif self.enable_delta_optimization:
             optimize_start = mono_time()
             optimize_statement = f"OPTIMIZE {table_name_upper}"
@@ -2718,7 +2756,7 @@ class DatabricksAdapter(PlatformAdapter):
         before, while table_format="hudi" renders USING HUDI with record-key
         TBLPROPERTIES instead.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        if not re.match(r"(?i)CREATE\s+(OR\s+REPLACE\s+)?TABLE\b", statement):
             return statement
 
         # Ensure idempotency with OR REPLACE, unless the statement already has
@@ -2766,31 +2804,51 @@ class DatabricksAdapter(PlatformAdapter):
 
         Emits USING HUDI with TBLPROPERTIES carrying the table type and,
         when configured, the record key and precombine field. Each key is
-        emitted only for statements that define the column, so one global
-        key never leaks into other tables of a multi-table benchmark.
-        Delta-only auto-optimize properties are never emitted for Hudi
-        tables. A
-        pre-existing USING clause is replaced (never left as USING DELTA),
-        and Hudi keys missing from pre-existing TBLPROPERTIES are merged in.
-        Record-key values are validated as SQL identifiers at init, so the
-        f-string interpolation below cannot break quoting.
+        emitted only for statements whose column-definition list defines
+        that column (matched case-insensitively, emitted as spelled in the
+        DDL), so one global key never leaks into other tables of a
+        multi-table benchmark. This converter adds Hudi properties but never
+        strips pre-existing TBLPROPERTIES. A pre-existing USING clause is
+        replaced (never left as USING DELTA), and Delta-only CLUSTER BY is
+        removed. Record-key values are validated as SQL identifiers at init,
+        so the f-string interpolation below cannot break quoting.
         """
+        paren_end = self._column_definitions_end(statement)
         if "USING" not in statement.upper():
-            paren_count = 0
-            using_pos = len(statement)
-
-            for i, char in enumerate(statement):
-                if char == "(":
-                    paren_count += 1
-                elif char == ")":
-                    paren_count -= 1
-                    if paren_count == 0:
-                        using_pos = i + 1
-                        break
-
-            statement = statement[:using_pos] + " USING HUDI" + statement[using_pos:]
-        else:
+            if paren_end is None:
+                as_match = re.search(r"(?i)\sAS\s+", statement)
+                if as_match:
+                    statement = statement[: as_match.start()] + " USING HUDI" + statement[as_match.start() :]
+                else:
+                    statement += " USING HUDI"
+            else:
+                statement = statement[:paren_end] + " USING HUDI" + statement[paren_end:]
+        elif paren_end is None:
             statement = re.sub(r"(?i)\bUSING\s+\w+", "USING HUDI", statement, count=1)
+        else:
+            head, tail = statement[:paren_end], statement[paren_end:]
+            tail = re.sub(r"(?i)\bUSING\s+\w+", "USING HUDI", tail, count=1)
+            # A USING inside a comment or string literal before the column
+            # list is left alone; only the real clause (after the columns)
+            # is rewritten.
+            statement = head + tail
+        if "USING HUDI" not in statement.upper():
+            # "USING" appeared only in a comment or string literal: insert
+            # the real clause at the column list (or before AS / at the end).
+            if paren_end is None:
+                as_match = re.search(r"(?i)\sAS\s+", statement)
+                if as_match:
+                    statement = statement[: as_match.start()] + " USING HUDI" + statement[as_match.start() :]
+                else:
+                    statement += " USING HUDI"
+            else:
+                statement = statement[:paren_end] + " USING HUDI" + statement[paren_end:]
+
+        # CLUSTER BY is Delta-only liquid clustering: invalid on Hudi tables.
+        stripped, n_subs = re.subn(r"(?i)\s*CLUSTER\s+BY\s*\([^()]*\)", "", statement)
+        if n_subs:
+            self.logger.warning("Removed Delta-only CLUSTER BY from Hudi DDL")
+            statement = stripped
 
         properties = self._hudi_table_properties(statement)
         if "TBLPROPERTIES" not in statement.upper():
@@ -2803,22 +2861,81 @@ class DatabricksAdapter(PlatformAdapter):
 
         return statement
 
+    @staticmethod
+    def _column_definitions_end(statement: str) -> int | None:
+        """End offset (just past ")") of the column-definition list.
+
+        Only the paren group directly following the table name counts, so
+        function-call parens in CTAS SELECT expressions are ignored.
+        """
+        paren_start = _table_name_paren_start(statement)
+        if paren_start is None:
+            return None
+        depth = 0
+        for i in range(paren_start, len(statement)):
+            char = statement[i]
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    return i + 1
+        return None
+
+    @staticmethod
+    def _ddl_column_names(statement: str) -> list[str]:
+        """Column names from the column-definition list, in DDL spelling.
+
+        Only the paren group directly following the table name counts, so
+        function-call parens in CTAS SELECT expressions never match.
+        """
+        paren_start = _table_name_paren_start(statement)
+        if paren_start is None:
+            return []
+        depth = 0
+        start = None
+        for i in range(paren_start, len(statement)):
+            char = statement[i]
+            if char == "(":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0 and start is not None:
+                    body = statement[start + 1 : i]
+                    break
+        else:
+            return []
+        names: list[str] = []
+        for part in _split_top_level_commas(body):
+            tokens = part.strip().split()
+            if tokens:
+                names.append(tokens[0].strip('"`[]'))
+        return names
+
     def _hudi_table_properties(self, statement: str) -> list[str]:
         """Build the Hudi TBLPROPERTIES entries for one CREATE TABLE statement.
 
         The table type always applies. The configured record key and
-        precombine field apply only when the statement defines that column:
-        multi-table benchmarks use different keys per table, so a global key
-        must not leak into tables that lack the column.
+        precombine field apply only when the statement's column-definition
+        list defines that column (case-insensitive): multi-table benchmarks
+        use different keys per table, so a global key must not leak into
+        tables that lack the column. Qualified table names and PARTITIONED
+        BY references never match, and the emitted name uses the DDL
+        spelling so case-mismatched config still produces a valid key.
         """
         properties = [f"'type' = '{self.hudi_table_type}'"]
+        columns = self._ddl_column_names(statement)
         key_options = (
             ("'primaryKey'", self.hudi_primary_key),
             ("'preCombineField'", self.hudi_precombine_field),
         )
         for option, field in key_options:
-            if field and re.search(rf"\b{re.escape(field)}\b", statement, re.IGNORECASE):
-                properties.append(f"{option} = '{field}'")
+            if field:
+                match = next((name for name in columns if name.lower() == field.lower()), None)
+                if match is not None:
+                    properties.append(f"{option} = '{match}'")
         return properties
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:  # noqa: C901
@@ -2924,14 +3041,15 @@ class DatabricksAdapter(PlatformAdapter):
         """
         table_name_upper = table_name.upper()
         if self.table_format == "hudi":
-            self._record_layout_operation(
-                mechanism="optimize",
-                table=table_name_upper,
-                statement=f"OPTIMIZE {table_name_upper}",
-                status="skipped",
-                phase="manual",
-            )
-            self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
+            if self.enable_delta_optimization:
+                self._record_layout_operation(
+                    mechanism="optimize",
+                    table=table_name_upper,
+                    statement=f"OPTIMIZE {table_name_upper}",
+                    status="skipped",
+                    phase="manual",
+                )
+                self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
             return
 
         if not self.enable_delta_optimization:
@@ -2970,14 +3088,15 @@ class DatabricksAdapter(PlatformAdapter):
         configurations, and Delta RETAIN syntax is not valid for them.
         """
         if self.table_format == "hudi":
-            self._record_layout_operation(
-                mechanism="vacuum",
-                table=table_name.upper(),
-                statement=f"VACUUM {table_name.upper()}",
-                status="skipped",
-                phase="manual",
-            )
-            self.logger.info(f"Skipped Delta-only VACUUM for Hudi table {table_name.upper()}")
+            if self.enable_delta_optimization:
+                self._record_layout_operation(
+                    mechanism="vacuum",
+                    table=table_name.upper(),
+                    statement=f"VACUUM {table_name.upper()}",
+                    status="skipped",
+                    phase="manual",
+                )
+                self.logger.info(f"Skipped Delta-only VACUUM for Hudi table {table_name.upper()}")
             return
 
         if not self.enable_delta_optimization:
@@ -3265,6 +3384,17 @@ class DatabricksAdapter(PlatformAdapter):
                 phase="pre_load",
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name}")
+            # The Delta tuning path runs ANALYZE after OPTIMIZE: record the
+            # statistics skip too (ANALYZE is not executed for Hudi tables
+            # because the layout path is unvalidated on live warehouses).
+            self._record_layout_operation(
+                mechanism="analyze",
+                table=table_name,
+                statement=f"ANALYZE TABLE {table_name} COMPUTE STATISTICS",
+                status="skipped",
+                phase="pre_load",
+            )
+            self.logger.info(f"Skipped ANALYZE for Hudi table {table_name}")
 
     def _apply_clustering_strategy(
         self,
@@ -3440,6 +3570,14 @@ class DatabricksAdapter(PlatformAdapter):
                 phase=phase,
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name}")
+            self._record_layout_operation(
+                mechanism="analyze",
+                table=table_name,
+                statement=f"ANALYZE TABLE {table_name} COMPUTE STATISTICS",
+                status="skipped",
+                phase=phase,
+            )
+            self.logger.info(f"Skipped ANALYZE for Hudi table {table_name}")
             return
         optimize_statement = f"OPTIMIZE {table_name}"
         try:

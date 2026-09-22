@@ -267,7 +267,8 @@ class TestDatabricksHudiSupport:
         cursor = MagicMock()
         adapter._apply_delta_optimize(cursor, "LINEITEM", phase="post_load")
         cursor.execute.assert_not_called()
-        assert adapter._skipped_layout_operations[-1]["mechanism"] == "optimize"
+        mechanisms = [op["mechanism"] for op in adapter._skipped_layout_operations]
+        assert mechanisms == ["optimize", "analyze"]
 
     def test_apply_zorder_skipped_for_hudi(self):
         adapter = _make_hudi_adapter()
@@ -339,15 +340,16 @@ class TestDatabricksHudiSupport:
         assert adapter.table_format == "hudi"
         assert adapter.hudi_table_type == "cow"
 
-    def test_optimize_table_records_skip_when_flag_off(self):
+    def test_optimize_table_records_nothing_when_flag_off(self):
+        # Symmetric with the Delta path: with optimization disabled neither
+        # format records anything.
         adapter = _make_hudi_adapter(enable_delta_optimization=False)
         connection = MagicMock()
         adapter.optimize_table(connection, "lineitem")
         connection.cursor.assert_not_called()
-        skipped = adapter._skipped_layout_operations[-1]
-        assert skipped["mechanism"] == "optimize"
-        assert skipped["status"] == "skipped"
-        assert skipped["statement"] == "OPTIMIZE LINEITEM"
+        assert adapter._skipped_layout_operations == []
+        adapter.vacuum_table(connection, "lineitem")
+        assert adapter._skipped_layout_operations == []
 
     def test_vacuum_table_records_skip_for_hudi(self):
         adapter = _make_hudi_adapter()
@@ -363,9 +365,10 @@ class TestDatabricksHudiSupport:
         cursor = MagicMock()
         adapter._apply_delta_optimize(cursor, "LINEITEM", phase="post_load")
         adapter._apply_zorder_optimization(cursor, "LINEITEM", ["l_orderkey"])
-        statements = [op["statement"] for op in adapter._skipped_layout_operations[-2:]]
+        statements = [op["statement"] for op in adapter._skipped_layout_operations[-3:]]
         assert statements == [
             "OPTIMIZE LINEITEM",
+            "ANALYZE TABLE LINEITEM COMPUTE STATISTICS",
             "OPTIMIZE LINEITEM ZORDER BY (l_orderkey)",
         ]
 
@@ -393,3 +396,60 @@ class TestDatabricksHudiSupport:
         mechanisms = {op["mechanism"] for op in adapter._skipped_layout_operations if op["status"] == "skipped"}
         assert "z_order" in mechanisms
         assert "optimize" in mechanisms
+        # The Delta tuning path runs ANALYZE after OPTIMIZE: the skip ledger
+        # must show statistics were considered too.
+        assert "analyze" in mechanisms
+        assert not any("ANALYZE" in sql for sql in executed)
+
+    def test_hudi_ddl_rewrites_create_or_replace(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE OR REPLACE TABLE t (l_orderkey BIGINT) USING DELTA")
+        assert "USING HUDI" in result
+        assert "USING DELTA" not in result
+        assert result.count("CREATE OR REPLACE TABLE") == 1
+        assert "'primaryKey' = 'l_orderkey'" in result
+
+    def test_hudi_ddl_rewrites_if_not_exists(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE IF NOT EXISTS t (l_orderkey BIGINT)")
+        assert "USING HUDI" in result
+        assert "OR REPLACE" not in result
+
+    def test_hudi_ddl_ctas_places_using_before_as(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT a, b FROM s")
+        assert "USING HUDI AS SELECT" in result
+
+    def test_hudi_ddl_strips_cluster_by(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE t (l_orderkey BIGINT) USING DELTA CLUSTER BY (l_orderkey)"
+        )
+        assert "USING HUDI" in result
+        assert "CLUSTER BY" not in result
+
+    def test_hudi_ddl_ignores_using_in_comment(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table(
+            "CREATE TABLE t (id INT COMMENT 'use using delta file', l_orderkey BIGINT)"
+        )
+        assert "use using delta file" in result
+        assert result.count("USING HUDI") == 1
+
+    def test_hudi_keys_require_column_definitions(self):
+        # Qualified table names and PARTITIONED BY references never match:
+        # "main"/"benchbox" are valid identifiers that must not leak.
+        adapter = _make_adapter(table_format="hudi", hudi_primary_key="main")
+        result = adapter._convert_to_delta_table("CREATE TABLE main.benchbox.region (r_regionkey BIGINT)")
+        assert "USING HUDI" in result
+        assert "primaryKey" not in result
+
+    def test_hudi_key_ignores_partitioned_by_reference(self):
+        adapter = _make_hudi_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (a BIGINT) PARTITIONED BY (l_orderkey)")
+        assert "primaryKey" not in result
+
+    def test_hudi_key_uses_ddl_spelling(self):
+        adapter = _make_adapter(table_format="hudi", hudi_precombine_field="L_COMMITDATE")
+        result = adapter._convert_to_delta_table("CREATE TABLE t (l_commitdate DATE)")
+        assert "'preCombineField' = 'l_commitdate'" in result

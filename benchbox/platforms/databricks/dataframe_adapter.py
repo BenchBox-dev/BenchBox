@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
-from benchbox.platforms.databricks.adapter import DatabricksAdapter
+from benchbox.platforms.databricks.adapter import DatabricksAdapter, _normalize_table_format
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.dependencies import get_package_install_message
 
@@ -119,17 +119,17 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
         self.cluster_id = config.pop("cluster_id", None)
         self.execution_mode = config.pop("execution_mode", "dataframe")
 
-        # Initialize parent adapter (handles SQL connection, UC Volumes, etc.)
-        super().__init__(**config)
-
-        # getattr: coverage tests may bypass parent __init__; a missing value
-        # means the default Delta format, which DataFrame mode supports.
-        if getattr(self, "table_format", "delta") == "hudi":
+        # Fail fast before parent validation: with table_format='hudi' the
+        # parent would validate Hudi keys first and raise a misleading error.
+        if _normalize_table_format(config) == "hudi":
             raise ValueError(
                 "DatabricksDataFrameAdapter does not support table_format='hudi': "
                 "the DataFrame write path has no Hudi handling. Use the SQL adapter "
                 "for Hudi DDL, or table_format='delta' for DataFrame mode."
             )
+
+        # Initialize parent adapter (handles SQL connection, UC Volumes, etc.)
+        super().__init__(**config)
 
         # Verify DataFrame mode dependencies
         if self.execution_mode == "dataframe" and not DATABRICKS_CONNECT_AVAILABLE:
