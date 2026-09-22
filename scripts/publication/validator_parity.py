@@ -159,6 +159,7 @@ def _discover_changed_bundles(base_sha: str, merge_sha: str) -> list[str]:  # no
             or lower.endswith(".tuning.json")
             or lower.endswith(".applied.json")
             or lower.endswith(".manifest.json")
+            or lower.endswith(".override.json")
             or lower.endswith("corpus-inventory.json")
             or lower.endswith("submission-manifest.json")
         ):
@@ -224,7 +225,11 @@ def _discover_changed_bundles(base_sha: str, merge_sha: str) -> list[str]:  # no
         diff_filter="ACMRD",
     )
     changed_companions = [
-        p for p in changed_companions_raw if p.lower().endswith(".plans.json") or p.lower().endswith(".tuning.json")
+        p
+        for p in changed_companions_raw
+        if p.lower().endswith(".plans.json")
+        or p.lower().endswith(".tuning.json")
+        or p.lower().endswith(".override.json")
     ]
     for companion in changed_companions:
         lower = companion.lower()
@@ -232,6 +237,8 @@ def _discover_changed_bundles(base_sha: str, merge_sha: str) -> list[str]:  # no
             stem = companion[:-11]
         elif lower.endswith(".tuning.json"):
             stem = companion[:-12]
+        elif lower.endswith(".override.json"):
+            stem = companion[:-14]
         else:
             continue
         bundle = _stem_to_bundle(stem)
@@ -307,7 +314,7 @@ def _run_validation_on_payload(
         to_extract: set[str] = set(bundle_paths)
         for bundle in bundle_paths:
             stem = bundle[:-5] if bundle.lower().endswith(".json") else bundle
-            for suffix in [".manifest.json", ".applied.json", ".plans.json", ".tuning.json"]:
+            for suffix in [".manifest.json", ".applied.json", ".plans.json", ".tuning.json", ".override.json"]:
                 candidate = f"{stem}{suffix}"
                 # Case-insensitive match against merge_files
                 for mf in merge_files:

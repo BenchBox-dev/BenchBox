@@ -147,8 +147,13 @@ SOUNDNESS_FILES = (
     "docs/reference/hosted-results-contract.md",
     "docs/reference/threat-model.md",
     "scripts/check_decision_records.py",
+    # Committed plausibility override artifacts: each one waives a
+    # warn-require-override finding for its bundle, so minting or editing
+    # one needs the same owner review as the validator itself.
+    "results-data/bundles/**/*.override.json",
 )
 _VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
+_OVERRIDE_RE = re.compile(r"^results-data/bundles/.+\.override\.json$")
 
 
 def normalize_path(path: str) -> str:
@@ -163,6 +168,7 @@ def is_soundness_path(path: str) -> bool:
         return False
     return (
         _VALIDATION_RE.match(normalized) is not None
+        or _OVERRIDE_RE.match(normalized) is not None
         or normalized in SOUNDNESS_FILES
         or normalized.startswith(SOUNDNESS_PREFIXES)
     )

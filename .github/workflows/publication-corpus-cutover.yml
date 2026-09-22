@@ -62,7 +62,8 @@ jobs:
           count_primary() {
             find "$1" -name '*.json' \
               ! -name '*.manifest.json' ! -name '*.applied.json' \
-              ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l | tr -d ' '
+              ! -name '*.plans.json' ! -name '*.tuning.json' \
+              ! -name '*.override.json' | wc -l | tr -d ' '
           }
           CORPUS_COUNT=$(count_primary lane_artifacts/corpus_archive)
           EXPECTED=$(python3 -c "import json; print(json.load(open('publication/ledger-seed.json'))['count'])")

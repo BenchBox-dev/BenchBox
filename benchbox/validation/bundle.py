@@ -6,10 +6,23 @@ submission manifest is present) matching SHA-256 hashes. The public
 CLI wrapper is `scripts/validate_submission.py`; this module is the
 shared implementation used by both develop and the slim published-results
 branch.
+
+Mirror-allowlist obligation: new validation rules must live in this
+module (or another file already mirrored) using stdlib only. A rule in
+a new module would silently not run on published-results, where only
+``scripts/validate_submission.py``, this module,
+``benchbox/core/results/query_status.py``,
+``benchbox/core/results/schema_policy.py``,
+``scripts/generate_corpus_inventory.py``, and the workflows exist —
+add the module to the sync allowlist
+(``sync-results-data-to-published.yml``) and the self-green guard
+(``validate-submission.yml``) in the same change, and register the rule
+in RULES below.
 """
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import importlib.util
 import json
@@ -115,7 +128,8 @@ ROW_COUNT_VALIDATION_REQUIRED_FIELDS = frozenset({"status", "expected", "actual"
 # applied tuning ledger + `applied_ledger_hash`; leaving it out of this tuple
 # dropped that evidence from public bundles and surfaced it as a standalone run
 # in discovery paths.
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
+OVERRIDE_SUFFIX = ".override.json"
+COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", OVERRIDE_SUFFIX)
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
@@ -350,12 +364,18 @@ TOP_LEVEL_DIRECT_COST_KEYS = ("cost_usd",)
 
 
 class ValidationResult:
-    """Collects errors and warnings for a single bundle."""
+    """Collects errors, warnings, and override findings for a single bundle."""
 
     def __init__(self, path: str) -> None:
         self.path = path
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        # Rule ids (see RULES) whose findings require a committed override
+        # before the bundle may publish. The finding text is dual-recorded
+        # in ``warnings`` so existing renderers and counters keep working;
+        # this list is the machine-readable subset the exit contract and
+        # the override workflow consume.
+        self.override_required: list[str] = []
         # Metadata extracted during validation, used by format_pr_comment.
         self.benchmark_id: str = "-"
         self.platform_name: str = "-"
@@ -367,9 +387,180 @@ class ValidationResult:
     def warn(self, msg: str) -> None:
         self.warnings.append(msg)
 
+    def require_override(self, rule_id: str, msg: str) -> None:
+        """Record a warn-require-override finding for ``rule_id``."""
+        self.warnings.append(msg)
+        if rule_id not in self.override_required:
+            self.override_required.append(rule_id)
+
     @property
     def ok(self) -> bool:
         return len(self.errors) == 0
+
+
+# Rubric rule registry. ``RULES_VERSION`` versions the active set for
+# ``validate_submission.py --rules-version``; bump it whenever a rule is
+# added or a severity changes. Severities: ``refuse`` (error),
+# ``warn-require-override`` (blocking warning pending a committed
+# override), ``info`` (advisory warning, never refused alone). The two
+# deterministic refuse gates (compliance-class, query-set-coverage)
+# register here when they land; keep this table in lockstep with the
+# checks below.
+RULES_VERSION = "1"
+RULES: tuple[tuple[str, str, str], ...] = (
+    # (rule id, rule version, severity)
+    ("timing-plateau", "1", "warn-require-override"),
+    ("scale-invariant", "1", "warn-require-override"),
+    ("floor-outlier", "1", "info"),
+    ("small-scale-floor", "1", "warn-require-override"),
+)
+
+
+# Committed override artifact: ``<bundle_stem>.override.json`` beside the
+# bundle it covers (one artifact per bundle, covering one or more rules).
+# Schema:
+#   rules (non-empty list of {rule, rule_version}: id in RULES with
+#     severity warn-require-override, plus the exact registry pin — a rule
+#     change forces re-review),
+#   reason + evidence (non-empty strings; evidence is a link),
+#   expires ("YYYY-MM-DD" UTC date or "single-batch"),
+#   approver (maintainer handle; separation from the submitter is enforced
+#     by the submission workflow via GitHub review, never by file content),
+#   bundles (optional list that must contain the artifact's own stem).
+# Unknown fields are refused so typos (``aprover``) fail loudly.
+OVERRIDE_REQUIRED_FIELDS = ("rules", "reason", "evidence", "expires", "approver")
+OVERRIDE_OPTIONAL_FIELDS = ("bundles",)
+OVERRIDE_RULE_ENTRY_FIELDS = ("rule", "rule_version")
+
+
+def _override_artifact_path(bundle_path: str | Path) -> Path | None:
+    """Return the sibling override path for a bundle, or None when N/A."""
+    try:
+        candidate = Path(bundle_path)
+    except (TypeError, ValueError):
+        return None
+    if not candidate.suffix == ".json":
+        return None
+    name = candidate.name
+    if name.lower().endswith(OVERRIDE_SUFFIX):
+        return None
+    return candidate.with_name(f"{candidate.stem}{OVERRIDE_SUFFIX}")
+
+
+def validate_override_document(payload: Any, *, bundle_stem: str) -> list[str]:
+    """Check an override artifact payload; return error strings (empty OK)."""
+    if not isinstance(payload, dict):
+        return ["override artifact must be a JSON object"]
+    unknown = sorted(k for k in payload if k not in OVERRIDE_REQUIRED_FIELDS + OVERRIDE_OPTIONAL_FIELDS)
+    errors = [f"override artifact has unknown fields: {unknown}"] if unknown else []
+    missing = [k for k in OVERRIDE_REQUIRED_FIELDS if k not in payload]
+    if missing:
+        errors.append(f"override artifact missing fields: {missing}")
+        return errors
+    registry = {rule_id: (version, severity) for rule_id, version, severity in RULES}
+    entries = payload["rules"]
+    if not isinstance(entries, list) or not entries:
+        errors.append("override artifact rules must be a non-empty list")
+        return errors
+    for index, entry in enumerate(entries):
+        errors.extend(_validate_override_rule_entry(entry, index, registry))
+    for key in ("reason", "evidence", "approver"):
+        if not isinstance(payload[key], str) or not payload[key].strip():
+            errors.append(f"override artifact {key} must be a non-empty string")
+    if "bundles" in payload:
+        bundles = payload["bundles"]
+        if (
+            not isinstance(bundles, list)
+            or not bundles
+            or any(not isinstance(b, str) or not b.strip() for b in bundles)
+        ):
+            errors.append("override artifact bundles must be a non-empty list of non-empty strings")
+        elif bundle_stem not in bundles:
+            errors.append(f"override artifact bundles does not contain its own stem {bundle_stem!r}")
+    expires = payload["expires"]
+    if expires == "single-batch":
+        return errors
+    if not isinstance(expires, str):
+        errors.append("override artifact expires must be a YYYY-MM-DD date or 'single-batch'")
+        return errors
+    try:
+        expiry = datetime.date.fromisoformat(expires)
+    except ValueError:
+        errors.append(f"override artifact expires {expires!r} is not a YYYY-MM-DD date or 'single-batch'")
+        return errors
+    if expiry < datetime.datetime.now(datetime.timezone.utc).date():
+        errors.append(f"override artifact expired on {expires}")
+    return errors
+
+
+def _validate_override_rule_entry(entry: Any, index: int, registry: dict[str, tuple[str, str]]) -> list[str]:
+    """Check one rules[] entry; return error strings (empty OK)."""
+    prefix = f"override artifact rules[{index}]"
+    if not isinstance(entry, dict):
+        return [f"{prefix} must be an object"]
+    errors = []
+    unknown_entry = sorted(k for k in entry if k not in OVERRIDE_RULE_ENTRY_FIELDS)
+    if unknown_entry:
+        errors.append(f"{prefix} has unknown fields: {unknown_entry}")
+    if sorted(entry) != ["rule", "rule_version"]:
+        return errors + [f"{prefix} must hold exactly rule and rule_version"]
+    rule, version = entry["rule"], entry["rule_version"]
+    if rule not in registry:
+        errors.append(f"{prefix} rule {rule!r} is not a known rubric rule")
+    elif registry[rule][1] != "warn-require-override":
+        errors.append(
+            f"{prefix} rule {rule!r} has severity {registry[rule][1]!r}, "
+            "only warn-require-override rules are overridable"
+        )
+    elif version != registry[rule][0]:
+        errors.append(
+            f"{prefix} rule_version {version!r} does not match registry version "
+            f"{registry[rule][0]!r}; re-review against the current rule"
+        )
+    return errors
+
+
+def accepted_override_rules(bundle_path: str | Path) -> tuple[set[str], list[str]]:
+    """Return (accepted rule ids, artifact errors) for a bundle's override file.
+
+    A missing artifact is not an error — it simply satisfies nothing, so
+    the rule stays unsatisfied and community validation keeps failing.
+    """
+    artifact = _override_artifact_path(bundle_path)
+    if artifact is None or not artifact.is_file():
+        return set(), []
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return set(), [f"override artifact {artifact.name} is unreadable: {exc}"]
+    errors = validate_override_document(payload, bundle_stem=artifact.name[: -len(OVERRIDE_SUFFIX)])
+    if errors:
+        return set(), [f"override artifact {artifact.name}: {message}" for message in errors]
+    return {entry["rule"] for entry in payload["rules"]}, []
+
+
+def unsatisfied_override_rules(results: list[ValidationResult]) -> dict[str, list[str]]:
+    """Map bundle path to override rule ids still requiring an override.
+
+    Rules covered by a valid committed sibling artifact are satisfied;
+    everything else fails closed in community mode. Findings fail closed
+    because a missing artifact satisfies nothing.
+    """
+    pending: dict[str, list[str]] = {}
+    for vr in results:
+        if not vr.override_required:
+            continue
+        accepted, _artifact_errors = accepted_override_rules(vr.path)
+        remaining = [rule for rule in vr.override_required if rule not in accepted]
+        if remaining:
+            pending[vr.path] = remaining
+    return pending
+
+
+def override_artifact_errors(bundle_path: str | Path) -> list[str]:
+    """Return schema errors for a bundle's sibling override file, if any."""
+    _accepted, errors = accepted_override_rules(bundle_path)
+    return errors
 
 
 def _capture_metadata(data: dict, vr: ValidationResult) -> None:
@@ -639,10 +830,11 @@ def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
     ratio = peak / floor
     cv = statistics.pstdev(means) / statistics.fmean(means)
     if ratio < PLATEAU_MAX_MIN_RATIO and cv < PLATEAU_MAX_CV:
-        vr.warn(
+        vr.require_override(
+            "timing-plateau",
             f"timing-plateau: benchmark {bm_id!r} per-query means span "
             f"{floor:.0f}-{peak:.0f}ms (max/min {ratio:.2f}, CV {cv:.2f}); "
-            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement"
+            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement",
         )
 
 
@@ -661,9 +853,10 @@ def _warn_small_scale_floor(data: dict[str, Any], vr: ValidationResult) -> None:
     if rows is not None and rows >= SMALL_SCALE_MAX_ROWS_LOADED:
         return
     rows_note = f"{rows} rows loaded" if rows is not None else "rows_loaded unreported"
-    vr.warn(
+    vr.require_override(
+        "small-scale-floor",
         f"small-scale-floor: scale factor {sf:g} ({rows_note}) but fastest measurement is "
-        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume"
+        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume",
     )
 
 
@@ -735,10 +928,11 @@ def _warn_scale_invariance(
         span = hi / lo
         for data, vr in members:
             if _bundle_scale_factor(data) in (lo, hi):
-                vr.warn(
+                vr.require_override(
+                    "scale-invariant",
                     f"scale-invariant: benchmark {bm_id!r} grows {span:g}x in scale "
                     f"but timings barely move ({detail}); check for result caching or "
-                    "fixed-overhead-dominated measurement"
+                    "fixed-overhead-dominated measurement",
                 )
 
 
@@ -1583,6 +1777,11 @@ def _validate_bundle(
     _warn_small_scale_floor(data, vr)
     _validate_query_coverage(data, vr, allow_partial_validation=allow_partial_validation)
     _validate_execution_consistency(data, vr)
+    # A malformed committed override corrupts the audit trail in every
+    # lane; a missing one simply satisfies nothing (handled by the exit
+    # contract via unsatisfied_override_rules).
+    for message in override_artifact_errors(vr.path):
+        vr.error(message)
     _validate_validation_phase_consistency(data, vr)
 
 
@@ -1970,10 +2169,12 @@ def format_summary(results: list[ValidationResult]) -> str:
     lines: list[str] = []
     total_errors = 0
     total_warnings = 0
+    total_overrides = 0
 
     for vr in results:
         total_errors += len(vr.errors)
         total_warnings += len(vr.warnings)
+        total_overrides += len(vr.override_required)
 
         status = "PASS" if vr.ok else "FAIL"
         lines.append(f"  {status}  {vr.path}")
@@ -1981,20 +2182,30 @@ def format_summary(results: list[ValidationResult]) -> str:
             lines.append(f"        ERROR: {e}")
         for w in vr.warnings:
             lines.append(f"        WARN:  {w}")
+        for rule_id in vr.override_required:
+            lines.append(f"        OVERRIDE-REQUIRED: {rule_id}")
 
-    header = f"Validated {len(results)} bundle(s): {total_errors} error(s), {total_warnings} warning(s)"
+    header = (
+        f"Validated {len(results)} bundle(s): {total_errors} error(s), "
+        f"{total_warnings} warning(s), {total_overrides} override(s) required"
+    )
     return header + "\n" + "\n".join(lines)
 
 
-def format_pr_comment(results: list[ValidationResult]) -> str:
-    """Format validation results as a GitHub PR comment (Markdown)."""
-    lines: list[str] = []
-    all_pass = all(vr.ok for vr in results)
+def format_pr_comment(results: list[ValidationResult], *, strict_overrides: bool = True) -> str:
+    """Format validation results as a GitHub PR comment (Markdown).
+
+    With ``strict_overrides`` (community mode), bundles carrying
+    unsatisfied override findings fail the header even when error-free;
+    the mirror lane passes ``False`` so pre-gate cohorts render advisory.
+    """
+    pending = unsatisfied_override_rules(results)
+    all_pass = all(vr.ok for vr in results) and not (strict_overrides and pending)
 
     if all_pass:
-        lines.append("## Submission Validation: PASSED")
+        lines = ["## Submission Validation: PASSED"]
     else:
-        lines.append("## Submission Validation: FAILED")
+        lines = ["## Submission Validation: FAILED"]
 
     lines.append("")
     lines.append(f"Validated **{len(results)}** bundle(s).")
@@ -2027,5 +2238,23 @@ def format_pr_comment(results: list[ValidationResult]) -> str:
             for w in vr.warnings:
                 lines.append(f"- WARN: {w}")
             lines.append("")
+
+    # Overrides required (rules version RULES_VERSION): per-bundle rule ids
+    # with the key numbers already present in the WARN text above.
+    if pending:
+        lines.append("")
+        lines.append(f"### Overrides required (rules v{RULES_VERSION})")
+        lines.append("")
+        lines.append("| Bundle | Rule |")
+        lines.append("|--------|------|")
+        for path, rule_ids in sorted(pending.items()):
+            name = Path(path).name.replace("|", "\\|")
+            for rule_id in sorted(rule_ids):
+                lines.append(f"| `{name}` | `{rule_id}` |")
+        lines.append("")
+        if strict_overrides:
+            lines.append("Add a committed override artifact for each rule to proceed.")
+        else:
+            lines.append("Mirror lane: advisory only, no override required.")
 
     return "\n".join(lines)

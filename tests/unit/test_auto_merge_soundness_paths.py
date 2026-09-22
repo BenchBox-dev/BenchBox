@@ -63,6 +63,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
+        # Committed plausibility override artifacts waive validator findings.
+        "results-data/bundles/tpch/duckdb/sf1.override.json",
+        "results-data/bundles/sf1.override.json",
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",
         ".github/workflows/docs.yml",
@@ -124,6 +127,10 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "benchbox/core/results/schema.py",
         "benchbox/core/results/anonymization.py.bak",
         "benchbox/core/results/anonymization_specs.yaml.example",
+        # Plain bundles and near-miss suffixes are not override artifacts.
+        "results-data/bundles/tpch/duckdb/sf1.json",
+        "results-data/bundles/tpch/duckdb/sf1.plans.json",
+        "results-data/corpus-inventory.json",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
@@ -253,6 +260,7 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "benchbox/core/results/schema_policy.py @joeharris76" in codeowners
     assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
     assert "scripts/validate_submission.py @joeharris76" in codeowners
+    assert "results-data/bundles/**/*.override.json @joeharris76" in codeowners
     assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
     assert ".github/workflows/auto-merge-on-open.yml @joeharris76" in codeowners
