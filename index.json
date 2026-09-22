@@ -16127,6 +16127,15 @@
       "status": "open",
       "title": "Submission gates: timing plausibility C1-C4 as warnings"
     },
+    "submission-override-artifact-workflow": {
+      "claim": null,
+      "needs": [
+        "submission-severity-override-contract"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Override artifact + PR workflow with approval separation"
+    },
     "submission-severity-override-contract": {
       "claim": null,
       "needs": [],

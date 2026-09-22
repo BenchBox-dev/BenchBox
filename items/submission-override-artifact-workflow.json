@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "Override is a committed <stem>.override.json companion (not PR-body text, not ledger-seed appends) with rule+version, bundles, reason, evidence link, expiry",
+    "Companion wired into COMPANION_SUFFIXES, privacy-scan suffixes, and companion_hashes tamper-evidence",
+    "CODEOWNERS-gated path plus GitHub review approval with approver != submitter; PR-body handles never authoritative",
+    "Bot mirror lane covered: mirrored bundles carry committed overrides or an explicit exemption",
+    "Threat model documented: harness/config-error detection, not anti-forgery"
+  ],
+  "context": "Needs submission-severity-override-contract. Adversarial findings 1, 10, 11, 16 accepted: PR bodies are unauthenticated and don't re-trigger CI; ledger-seed.json is generated and clobbered; thresholds are gameable so the threat model must be explicit.",
+  "description": "Build the override artifact and PR workflow: committed companion file with the three plumbing edits, CODEOWNERS authority, approval-separation and expiry enforcement in CI, mirror-lane handling for bot-authored sync PRs, quarterly rule-tuning feed. Decision gate: audit home = companion file (accepted). Guardrail: --label unofficial-research never substitutes for a plausibility override and vice versa."
+}
