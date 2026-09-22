@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   support ahead of CPython's end-of-life date in October 2026. BenchBox plans
   to require Python 3.12 in its first release after Python 3.11 reaches end of
   life in October 2027.
+- **BREAKING: pandas 3.x is now required for DataFrame platforms.** The
+  `pandas`, `dask`, `dataframe-pandas-family`, and related extras now require
+  `pandas>=3.0.0` with `dask[distributed]>=2025.1.0`. Existing pandas 2.x
+  installs report the `pandas-df` platform (and the dependent Dask paths) as
+  unavailable instead of running against an untested combination. TPC-DI JSON
+  ingest no longer infers datetimes by column name (`convert_dates=False`),
+  so date-like JSON fields stay text through ingest.
 
 ### Removed
 

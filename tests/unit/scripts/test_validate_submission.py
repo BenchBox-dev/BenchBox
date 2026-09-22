@@ -1021,6 +1021,18 @@ class TestTimingPlateau:
         assert not vr.ok  # owned by the queries-section gate
         assert not any("timing-plateau" in w for w in vr.warnings)
 
+    def test_sub_millisecond_rows_are_timer_noise_not_evidence(self):
+        data = _timing_bundle({f"Q{i}": 0.5 for i in range(1, 23)})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_case_variant_benchmark_id_still_gated(self):
+        data = _timing_bundle({f"Q{i}": 4510.0 + (i % 5) * 7.0 for i in range(1, 23)}, benchmark="TPCH")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert any("timing-plateau" in w for w in vr.warnings)
+
 
 class TestSmallScaleFloor:
     def test_slow_floor_on_tiny_data_warns(self):
@@ -1053,6 +1065,26 @@ class TestSmallScaleFloor:
         assert vr.ok, vr.errors
         assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
 
+    def test_nonfinite_rows_loaded_is_unreported_not_fatal(self):
+        # A JSON number like 1e309 parses to inf; int() would raise
+        # OverflowError. The validator must treat it as unreported.
+        for bad_rows in (float("inf"), float("-inf"), float("nan")):
+            vr = ValidationResult("test")
+            _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=bad_rows), vr)
+            assert vr.ok, vr.errors
+            assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
+
+    def test_json_overflow_rows_loaded_does_not_abort_multibundle(self, tmp_path):
+        good = _write_timing_bundle(tmp_path, "good.json", _varied_queries(), platform="Snowflake")
+        bad_bundle = _timing_bundle(_flat_queries(base=4400.0), platform="Snowflake", rows_loaded=866602)
+        text = json.dumps(bad_bundle).replace('"rows_loaded": 866602', '"rows_loaded": 1e309')
+        assert "1e309" in text
+        bad = tmp_path / "bad.json"
+        bad.write_text(text, encoding="utf-8")
+        results = validate_bundles([bad, good])
+        assert len(results) == 2
+        assert all(vr.ok for vr in results)
+
 
 def _write_timing_bundle(tmp_path, name, per_query_ms, **kwargs):
     path = tmp_path / name
@@ -1083,6 +1115,30 @@ class TestScaleInvariance:
         assert all(vr.ok for vr in results)
         assert all(any("scale-invariant" in w for w in vr.warnings) for vr in results)
 
+    def test_warning_reports_actual_scale_span(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        # The 0.1 -> 10 span is 100x, not the 0.1x lower endpoint.
+        assert all("grows 100x in scale" in w for w in warned)
+
     def test_single_scale_is_silent(self, tmp_path):
         (ofar,) = validate_bundles([_write_timing_bundle(tmp_path, "only.json", _flat_queries(), platform="Snowflake")])
         assert ofar.ok, ofar.errors
@@ -1110,6 +1166,56 @@ class TestScaleInvariance:
         assert all(vr.ok for vr in results)
         assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
 
+    def test_micro_benchmark_flat_scales_are_expected_not_suspicious(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            benchmark="read_primitives",
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            benchmark="read_primitives",
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_missing_geomean_is_disclosed_not_silently_averaged(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=None,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        # The per-query leg still evaluates, but the message must admit the
+        # geomean leg could not run — never a silent arithmetic-mean fallback.
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        assert all("geomean unevaluable" in w for w in warned)
+
     def test_partial_bundles_do_not_distort(self, tmp_path):
         lo = _write_timing_bundle(
             tmp_path,
@@ -1135,7 +1241,7 @@ class TestScaleInvariance:
 
 
 class TestFloorOutlier:
-    def _peer_set(self, tmp_path, floors):
+    def _peer_set(self, tmp_path, floors, platforms=None):
         paths = []
         for i, floor in enumerate(floors):
             paths.append(
@@ -1145,7 +1251,7 @@ class TestFloorOutlier:
                     {"Q1": floor, "Q2": floor + 500, "Q3": floor + 1000},
                     scale_factor=1.0,
                     geomean_ms=floor + 500,
-                    platform=f"Engine{i}",
+                    platform=f"Engine{i}" if platforms is None else platforms[i],
                     rows_loaded=8_661_245,
                 )
             )
@@ -1162,6 +1268,25 @@ class TestFloorOutlier:
         first, second = self._peer_set(tmp_path, [4500.0, 300.0])
         assert first.ok and second.ok
         assert not any("floor-outlier" in w for vr in (first, second) for w in vr.warnings)
+
+    def test_same_platform_reruns_are_not_peers(self, tmp_path):
+        # Three reruns of one engine satisfy the bundle-count quorum but
+        # offer zero cross-platform evidence: no outlier may be declared.
+        results = self._peer_set(tmp_path, [4500.0, 350.0, 300.0], platforms=["SameEngine"] * 3)
+        assert all(vr.ok for vr in results)
+        assert not any("floor-outlier" in w for vr in results for w in vr.warnings)
+
+    def test_own_platform_rerun_does_not_dilute_peers(self, tmp_path):
+        # A fast rerun of the slow engine shares its platform key, so it is
+        # consolidated away; the two genuinely distinct peers still convict.
+        slow, _mid, _fast, rerun = self._peer_set(
+            tmp_path,
+            [4500.0, 350.0, 300.0, 360.0],
+            platforms=["SlowEngine", "EngineB", "EngineC", "SlowEngine"],
+        )
+        assert all(vr.ok for vr in (slow, rerun))
+        assert any("floor-outlier" in w for w in slow.warnings)
+        assert not any("floor-outlier" in w for w in rerun.warnings)
 
 
 # ---------------------------------------------------------------------------

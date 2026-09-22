@@ -83,18 +83,34 @@ def resolve_table_paths(parquet_dir: Path, table: str) -> list[Path]:
         table: Table name (e.g., ``"lineitem"``).
 
     Returns:
-        Ordered list of parquet paths, empty when the table is absent.
+        Ordered list of parquet paths, empty when no single file and no
+        numerically-suffixed shards are found. Non-numeric suffixes such as
+        ``lineitem.bak.parquet`` are ignored.
+
+    Shard-suffix parsing mirrors the generator convention
+    (``benchbox/core/tpch/generator.py``): the suffix must satisfy
+    ``str.isdigit``.
     """
     single = parquet_dir / f"{table}.parquet"
-    if single.exists():
-        return [single]
     shards: list[tuple[int, Path]] = []
     for candidate in parquet_dir.glob(f"{table}.*.parquet"):
         try:
-            shard_index = int(candidate.stem.rsplit(".", 1)[1])
-        except (IndexError, ValueError):
+            suffix = candidate.stem.rsplit(".", 1)[1]
+        except IndexError:
             continue
-        shards.append((shard_index, candidate))
+        if not suffix.isdigit():
+            continue
+        shards.append((int(suffix), candidate))
+    if single.exists():
+        if shards:
+            logger.warning(
+                "Both %s and %d numerically-suffixed shard(s) exist; using the single file",
+                single,
+                len(shards),
+            )
+        return [single]
+    if not shards:
+        logger.warning("No parquet files found for table %s under %s", table, parquet_dir)
     return [path for _, path in sorted(shards)]
 
 
@@ -1184,8 +1200,10 @@ class SQLVsDataFrameBenchmark:
         for table in tables:
             table_paths = resolve_table_paths(parquet_dir, table)
             if table_paths:
-                path_list = ", ".join(f"'{path}'" for path in table_paths)
-                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM read_parquet([{path_list}])")
+                conn.execute(
+                    f"CREATE TABLE {table} AS SELECT * FROM read_parquet(?)",
+                    [[str(path) for path in table_paths]],
+                )
         return conn
 
     @staticmethod
@@ -1199,9 +1217,10 @@ class SQLVsDataFrameBenchmark:
         tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
         for table in tables:
             table_paths = resolve_table_paths(parquet_dir, table)
-            if table_paths:
-                df = pd.concat([pd.read_parquet(str(path)) for path in table_paths], ignore_index=True)
-                df.to_sql(table, conn, index=False)
+            for index, path in enumerate(table_paths):
+                pd.read_parquet(str(path)).to_sql(
+                    table, conn, index=False, if_exists="replace" if index == 0 else "append"
+                )
         return conn
 
     def _warmup_and_benchmark(self, conn: Any, sql: str) -> tuple[float, int]:
