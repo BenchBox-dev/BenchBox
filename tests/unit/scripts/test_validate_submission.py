@@ -107,13 +107,10 @@ def _minimal_bundle() -> dict:
         },
         "summary": {
             "validation": "passed",
-            "queries": {"total": 2, "passed": 2, "failed": 0},
+            "queries": {"total": 22, "passed": 22, "failed": 0},
         },
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i * 10, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -700,11 +697,10 @@ class TestValidateBundle:
 
     def test_failed_warmup_does_not_contradict_successful_measurements(self):
         data = _minimal_bundle()
-        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["summary"]["queries"] = {"total": 23, "passed": 23, "failed": 0}
         data["queries"] = [
             {"id": "Q1", "ms": 0, "status": "FAILED", "run_type": "warmup"},
-            {"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "measurement"},
-        ]
+        ] + [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "run_type": "measurement"} for i in range(1, 23)]
         vr = ValidationResult("test")
 
         _validate_bundle(data, vr)
@@ -767,7 +763,7 @@ class TestValidateBundle:
 
     def test_positive_sub_millisecond_timing_passes(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "SUCCESS"}]
+        data["queries"] = [{"id": f"Q{i}", "ms": 0.04, "status": "SUCCESS"} for i in range(1, 23)]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok
@@ -910,6 +906,81 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("concrete billing_unit" in e for e in vr.errors)
+
+
+# ---------------------------------------------------------------------------
+# compliance_class + canonical query-set coverage gates
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionDeterministicGates:
+    def test_unofficial_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial_nonstandard", "unofficial_subscale"):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("compliance_class" in e for e in vr.errors)
+
+    def test_official_compliance_passes(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "official"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_compliance_class_grandfathered(self):
+        data = _minimal_bundle()
+        assert "compliance_class" not in data["benchmark"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_unofficial_compliance_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "unofficial_subscale"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_short_query_coverage_refused_in_community_mode(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("canonical queries" in e for e in vr.errors)
+
+    def test_full_query_coverage_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_minimal_bundle(), vr)
+        assert vr.ok, vr.errors
+
+    def test_short_coverage_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_unknown_benchmark_skips_coverage(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "some_new_benchmark"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_counts_match_explorer_transformer(self):
+        from _project.scripts.explorer_pipeline.transformer import (
+            _KNOWN_LOGICAL_QUERY_COUNTS,
+        )
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_COUNTS
+
+        assert CANONICAL_LOGICAL_QUERY_COUNTS == _KNOWN_LOGICAL_QUERY_COUNTS
 
 
 # ---------------------------------------------------------------------------

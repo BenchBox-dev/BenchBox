@@ -114,6 +114,9 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Schema compliance** - the bundle is valid schema-v2 JSON with all required fields
 - **Hash verification** - the SHA-256 hash in the manifest matches the bundle contents
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
+- **Compliance gate** - unofficial `compliance_class` values are refused; only `official` may be submitted
+- **Query-set coverage** - the distinct query IDs must cover the benchmark's canonical query set (e.g. 22 for TPC-H)
+- **Cost provenance** - direct cost totals require `normalized_cost` provenance; totals alongside `cost_status: unavailable` are refused
 - **Metadata extraction** - a summary comment is posted on the PR showing what the submission adds
 
 Community submissions must include a manifest, execute at least one query, and

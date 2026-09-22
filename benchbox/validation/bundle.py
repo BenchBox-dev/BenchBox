@@ -126,6 +126,21 @@ PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 
+# Canonical logical query counts per benchmark family: the deterministic
+# denominator for the query-set coverage gate below. Kept in lockstep with
+# _project/scripts/explorer_pipeline/transformer.py::_KNOWN_LOGICAL_QUERY_COUNTS
+# by hand: this module must stay importable without the installable package
+# (slim published-results branch mirror), so it cannot import the transformer.
+CANONICAL_LOGICAL_QUERY_COUNTS: dict[str, int] = {
+    "tpch": 22,
+    "tpch_skew": 22,
+    "tpchavoc": 22,
+    "tpcds": 99,
+    "ssb": 13,
+    "star_schema": 13,
+    "clickbench": 43,
+}
+
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
     "tpch",
@@ -349,6 +364,69 @@ def _validate_benchmark_section(benchmark: Any, vr: ValidationResult) -> None:
         return
     if sf_f <= 0:
         vr.error(f"scale_factor must be positive: {sf_f}")
+
+
+def _validate_compliance_section(
+    benchmark: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse unofficial compliance classes on the community path.
+
+    ``benchbox submit`` and ``benchbox publish`` refuse these classes from
+    loaded result objects; without this rule a hand-authored bundle could
+    bypass that gate by arriving as a PR directly. An absent
+    ``compliance_class`` passes: legacy pre-stamp bundles are grandfathered,
+    and the trusted mirror lane (``allow_partial_validation``) preserves
+    pre-gate unofficial evidence as non-ranking cohorts.
+    """
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    compliance = benchmark.get("compliance_class")
+    if compliance is None:
+        return
+    if compliance in CLI_REFUSED_COMPLIANCE_CLASSES:
+        if allow_partial_validation:
+            return
+        vr.error(
+            f"benchmark.compliance_class={compliance!r} is not accepted for public submissions; "
+            "only compliance_class=official may be submitted"
+        )
+
+
+def _validate_query_coverage(
+    data: dict[str, Any],
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse bundles whose distinct query evidence falls short of canonical.
+
+    A run covering 5 of TPC-H's 22 queries must not present as a complete
+    result: the explorer derives its logical denominator from observed query
+    IDs, so short coverage would rank as complete. The trusted mirror lane
+    is exempt (it preserves partial cohorts by design); community partials
+    stay refused by the summary-validation gate regardless.
+    """
+    if allow_partial_validation:
+        return
+    benchmark = data.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    bm_id = benchmark.get("id")
+    known = CANONICAL_LOGICAL_QUERY_COUNTS.get(bm_id) if isinstance(bm_id, str) else None
+    if not known:
+        return  # No canonical denominator: nothing deterministic to enforce.
+    queries = data.get("queries")
+    if not isinstance(queries, list):
+        return  # _validate_queries_section owns the shape error.
+    distinct = {q.get("id") for q in queries if isinstance(q, dict) and q.get("id")}
+    if len(distinct) < known:
+        vr.error(
+            f"benchmark {bm_id!r} covers {len(distinct)} of {known} canonical queries; "
+            "partial runs remain local artifacts unless validated through the trusted mirror path"
+        )
 
 
 def _validate_platform_section(platform: Any, vr: ValidationResult) -> None:
@@ -996,6 +1074,11 @@ def _validate_bundle(
     _validate_version(version, vr)
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
+    _validate_compliance_section(
+        data.get("benchmark", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_platform_section(data.get("platform", {}), vr)
     _validate_summary_section(
         data.get("summary", {}),
@@ -1009,6 +1092,7 @@ def _validate_bundle(
     _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)
     _validate_queries_section(data.get("queries", []), version, vr)
+    _validate_query_coverage(data, vr, allow_partial_validation=allow_partial_validation)
     _validate_execution_consistency(data, vr)
     _validate_validation_phase_consistency(data, vr)
 
@@ -1311,6 +1395,13 @@ def validate_bundles(
     the trusted maintainer mirror path only: the seed corpus intentionally
     retains partial and legacy unvalidated evidence. Community submissions
     must leave the flag off so every non-clean status remains refused.
+
+    The same lane split governs the two deterministic submission gates:
+    unofficial ``compliance_class`` values and short canonical query-set
+    coverage are errors in community mode but pass under the mirror flag,
+    which preserves pre-gate unofficial and partial cohorts as non-ranking
+    evidence. An absent ``compliance_class`` passes in both modes (legacy
+    pre-stamp grandfathering).
     """
     results = []
     for bundle_path in paths:
