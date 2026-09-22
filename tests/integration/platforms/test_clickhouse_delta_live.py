@@ -1,7 +1,8 @@
-"""Live integration tests: ClickHouse Delta support via Parquet conversion.
+"""Live integration tests: ClickHouse Delta support via Parquet conversion fallback.
 
-ClickHouse cannot read Delta Lake tables directly. These tests prove the
-full conversion chain against a real runtime: a Spark-written Delta table
+ClickHouse reads Delta Lake tables natively where the server build supports
+it (see ``test_clickhouse_delta_native_live.py``). These tests prove the
+conversion fallback chain against a real runtime: a Spark-written Delta table
 is exported to plain Parquet with :func:`export_delta_to_parquet`, and the
 output is verified to satisfy the ClickHouse ingestion contract (a
 directory of ``.parquet`` files readable with the same schema and row
