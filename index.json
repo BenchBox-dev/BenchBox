@@ -16144,17 +16144,12 @@
       "title": "Submission gates: timing plausibility C1-C4 as warnings"
     },
     "submission-override-artifact-workflow": {
-      "claim": {
-        "expires_at": "2026-09-23T13:07:19Z",
-        "generation": "d370e3044625482895cdc7d44c4f816b",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fb22ec513f5189c4ea828e84"
-      },
+      "claim": null,
       "needs": [
         "submission-severity-override-contract"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Override artifact + PR workflow with approval separation"
     },
     "submission-severity-override-contract": {
