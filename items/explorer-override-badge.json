@@ -1,0 +1,9 @@
+{
+  "acceptance": [
+    "ManifestEntry/DetailResult carry override rule id + reason link through transformer and DuckDB columns",
+    "Explorer detail view shows override badge; TrustBadge change included",
+    "No silent display: overridden results never render as clean passes"
+  ],
+  "context": "Needs submission-override-artifact-workflow. Adversarial finding 12 accepted: the badge is a typed schema/transformer/DDL/UI change, not a display tweak.",
+  "description": "Surface accepted overrides in the explorer: extend the read model, DuckDB column lists, transformer wiring, and badge UI. Guardrail: overridden rows stay visibly marked with rule id and reason link wherever they appear."
+}

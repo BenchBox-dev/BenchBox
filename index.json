@@ -5837,6 +5837,15 @@
       "status": "done",
       "title": "Explorer: mobile-responsive dense leaderboard, filters, and charts"
     },
+    "explorer-override-badge": {
+      "claim": null,
+      "needs": [
+        "submission-override-artifact-workflow"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Explorer override badge (schema + UI)"
+    },
     "explorer-parity-tests-review-followups": {
       "claim": null,
       "needs": [],
