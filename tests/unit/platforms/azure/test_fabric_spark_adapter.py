@@ -579,6 +579,34 @@ class TestFabricSparkAdapterCLI:
             assert adapter.spark_pool_name == "config-pool"
             assert adapter.timeout_minutes == 90
 
+    def test_from_config_reads_nested_options_toggle(self):
+        """CLI --platform-option values nest under options without a builder."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            base = {
+                "workspace_id": "config-workspace",
+                "lakehouse_id": "config-lakehouse",
+                "tenant_id": "config-tenant",
+                "spark_pool_name": "config-pool",
+            }
+
+            adapter = FabricSparkAdapter.from_config({**base, "options": {"adaptive_enabled": False}})
+            assert adapter.adaptive_enabled is False
+
+            adapter = FabricSparkAdapter.from_config({**base, "adaptive_enabled": False})
+            assert adapter.adaptive_enabled is False
+
+            adapter = FabricSparkAdapter.from_config(dict(base))
+            assert adapter.adaptive_enabled is True
+
 
 class TestFabricSparkAdapterRegistry:
     """Test platform registry integration."""

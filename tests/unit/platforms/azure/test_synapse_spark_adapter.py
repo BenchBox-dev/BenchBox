@@ -531,6 +531,31 @@ class TestSynapseSparkAdapterCLI:
             assert adapter.tenant_id == "config-tenant"
             assert adapter.timeout_minutes == 90
 
+    def test_from_config_reads_nested_options_toggle(self):
+        """CLI --platform-option values nest under options without a builder."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            base = {
+                "workspace_name": "config-workspace",
+                "spark_pool_name": "config-pool",
+                "storage_account": "configstorage",
+                "storage_container": "configcontainer",
+            }
+
+            adapter = SynapseSparkAdapter.from_config({**base, "options": {"adaptive_enabled": False}})
+            assert adapter.adaptive_enabled is False
+
+            adapter = SynapseSparkAdapter.from_config(dict(base))
+            assert adapter.adaptive_enabled is True
+
 
 class TestSynapseSparkAdapterRegistry:
     """Test platform registry integration."""

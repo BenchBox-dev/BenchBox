@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     )
 
 from benchbox.core.exceptions import ConfigurationError
-from benchbox.platforms._spark_helpers import spark_aqe_conf_entries
+from benchbox.platforms._spark_helpers import adaptive_enabled_from_config, spark_aqe_conf_entries
 from benchbox.platforms.azure._credentials import AzureTokenProvider
 from benchbox.platforms.azure._livy_mixin import LivyStatementMixin
 from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
@@ -783,7 +783,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             "timeout_minutes": config.get("timeout_minutes", 60),
             "spark_config": config.get("spark_config"),
             "table_format": config.get("table_format"),
-            "adaptive_enabled": config.get("adaptive_enabled", True),
+            "adaptive_enabled": adaptive_enabled_from_config(config),
         }
 
         # Pass through tuning provenance/config

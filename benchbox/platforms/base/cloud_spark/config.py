@@ -255,6 +255,7 @@ class SparkConfigOptimizer:
                 enabled=adaptive_enabled,
                 coalesce_partitions_enabled=adaptive_enabled,
                 skew_join_enabled=adaptive_enabled,
+                local_shuffle_reader_enabled=adaptive_enabled,
                 skew_join_skewed_partition_factor=5.0,
             ),
         )
@@ -321,6 +322,7 @@ class SparkConfigOptimizer:
                 enabled=adaptive_enabled,
                 coalesce_partitions_enabled=adaptive_enabled,
                 skew_join_enabled=adaptive_enabled,
+                local_shuffle_reader_enabled=adaptive_enabled,
                 skew_join_skewed_partition_factor=3.0,  # More aggressive skew handling
                 skew_join_skewed_partition_threshold="128MB",
             ),
@@ -336,6 +338,7 @@ class SparkConfigOptimizer:
         cls,
         scale_factor: float = 1.0,
         platform: str | CloudPlatform = CloudPlatform.LOCAL,
+        adaptive_enabled: bool = True,
         **kwargs: Any,
     ) -> SparkConfig:
         """Create optimized configuration for Star Schema Benchmark.
@@ -348,13 +351,14 @@ class SparkConfigOptimizer:
         Args:
             scale_factor: SSB scale factor
             platform: Cloud platform
+            adaptive_enabled: Adaptive Query Execution on/off (default: True).
             **kwargs: Additional configuration
 
         Returns:
             Optimized SparkConfig for SSB
         """
         # SSB is simpler, use TPC-H config as base with lower resources
-        config = cls.for_tpch(scale_factor * 0.5, platform, **kwargs)
+        config = cls.for_tpch(scale_factor * 0.5, platform, adaptive_enabled=adaptive_enabled, **kwargs)
 
         # SSB queries are simpler, reduce partitions
         config.parallelism.shuffle_partitions = max(50, config.parallelism.shuffle_partitions // 2)
