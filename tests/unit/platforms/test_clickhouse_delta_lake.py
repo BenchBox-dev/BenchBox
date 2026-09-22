@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from benchbox.platforms.clickhouse.delta_lake import (
+    DELTA_BASE_FUNCTION,
     DELTA_ENGINE_NAME,
     DELTA_TABLE_FUNCTION_NAMES,
     delta_engine_probe_sql,
@@ -25,7 +26,7 @@ from benchbox.platforms.clickhouse.delta_lake import (
     delta_lake_local_table_function,
     delta_lake_select_sql,
     delta_lake_table_function,
-    has_native_delta_support,
+    has_native_delta_registration,
     quote_identifier,
     quote_literal,
 )
@@ -100,6 +101,14 @@ class TestTableFunction:
         with pytest.raises(ValueError, match="together or not at all"):
             delta_lake_table_function("s3://bucket/orders", access_key_id="AK")
 
+    def test_rejects_blank_url(self) -> None:
+        with pytest.raises(ValueError, match="non-empty URL"):
+            delta_lake_table_function("   ")
+
+    def test_rejects_blank_credential(self) -> None:
+        with pytest.raises(ValueError, match="access_key_id.*non-blank"):
+            delta_lake_table_function("s3://bucket/orders", access_key_id="  ", secret_access_key="SK")
+
 
 class TestLocalTableFunction:
     def test_builds_expression(self) -> None:
@@ -159,6 +168,20 @@ class TestAzureTableFunction:
         with pytest.raises(ValueError, match="together or not at all"):
             delta_lake_azure_table_function("https://acct.blob.core.windows.net", "lake", "orders", account_key="KEY")
 
+    def test_credential_values_are_quoted(self) -> None:
+        expression = delta_lake_azure_table_function(
+            "https://acct.blob.core.windows.net", "lake", "orders", account_name="a'c", account_key="k\\y"
+        )
+        assert expression == (
+            "deltaLakeAzure('https://acct.blob.core.windows.net', 'lake', 'orders', 'a\\'c', 'k\\\\y')"
+        )
+
+    def test_rejects_blank_account_key(self) -> None:
+        with pytest.raises(ValueError, match="account_key.*non-blank"):
+            delta_lake_azure_table_function(
+                "https://acct.blob.core.windows.net", "lake", "orders", account_name="acct", account_key=" "
+            )
+
 
 class TestSelectAndCount:
     def test_select_star_with_limit(self) -> None:
@@ -187,6 +210,21 @@ class TestSelectAndCount:
         with pytest.raises(ValueError, match="non-negative int"):
             delta_lake_select_sql("deltaLake('s3://b/t')", limit=True)
 
+    def test_select_rejects_float_and_string_limits(self) -> None:
+        with pytest.raises(ValueError, match="non-negative int"):
+            delta_lake_select_sql("deltaLake('s3://b/t')", limit=10.5)
+        with pytest.raises(ValueError, match="non-negative int"):
+            delta_lake_select_sql("deltaLake('s3://b/t')", limit="10")
+
+    def test_select_accepts_zero_limit_and_tuple_columns(self) -> None:
+        assert delta_lake_select_sql("deltaLake('s3://b/t')", columns=("id", "v"), limit=0) == (
+            "SELECT `id`, `v` FROM deltaLake('s3://b/t') LIMIT 0"
+        )
+
+    def test_select_rejects_empty_string_column(self) -> None:
+        with pytest.raises(ValueError, match="at least one"):
+            delta_lake_select_sql("deltaLake('s3://b/t')", columns="  ")
+
     def test_count(self) -> None:
         assert delta_lake_count_sql("deltaLake('s3://bucket/orders')") == (
             "SELECT count() FROM deltaLake('s3://bucket/orders')"
@@ -200,16 +238,21 @@ class TestSelectAndCount:
 class TestSupportProbe:
     def test_function_probe_lists_all_emitted_functions(self) -> None:
         assert delta_function_probe_sql() == (
-            "SELECT name FROM system.functions WHERE name IN ('deltaLake', 'deltaLakeS3', 'deltaLakeLocal')"
+            "SELECT name FROM system.functions WHERE name IN "
+            "('deltaLake', 'deltaLakeS3', 'deltaLakeLocal', 'deltaLakeAzure')"
         )
-        assert set(DELTA_TABLE_FUNCTION_NAMES) == {"deltaLake", "deltaLakeS3", "deltaLakeLocal"}
+        assert set(DELTA_TABLE_FUNCTION_NAMES) == {"deltaLake", "deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure"}
+        assert DELTA_TABLE_FUNCTION_NAMES[0] == DELTA_BASE_FUNCTION == "deltaLake"
 
     def test_engine_probe(self) -> None:
         assert delta_engine_probe_sql() == "SELECT name FROM system.table_engines WHERE name = 'DeltaLake'"
         assert DELTA_ENGINE_NAME == "DeltaLake"
 
-    def test_support_requires_function_and_engine(self) -> None:
-        assert has_native_delta_support(["deltaLake", "deltaLakeS3", "deltaLakeLocal"], ["DeltaLake"]) is True
-        assert has_native_delta_support(["deltaLakeS3", "deltaLakeLocal"], ["DeltaLake"]) is False
-        assert has_native_delta_support(["deltaLake"], ["MergeTree"]) is False
-        assert has_native_delta_support([], []) is False
+    def test_registration_requires_base_function_and_engine(self) -> None:
+        full = ["deltaLake", "deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure"]
+        assert has_native_delta_registration(full, ["DeltaLake"]) is True
+        assert (
+            has_native_delta_registration(["deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure"], ["DeltaLake"]) is False
+        )
+        assert has_native_delta_registration(["deltaLake"], ["MergeTree"]) is False
+        assert has_native_delta_registration([], []) is False

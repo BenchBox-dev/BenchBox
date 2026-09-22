@@ -16,16 +16,29 @@ reads are unavailable, fall back to the Parquet snapshot export in
 the availability question from the server's system tables, while choosing
 between the paths inside an adapter run is follow-up work.
 
+Evidence: the ``DeltaLake`` table engine and ``deltaLake`` table-function family
+in the ClickHouse documentation, corroborated in-repo by the Docker-gated
+registration probe in ``tests/integration/platforms/`` (which names the server
+version on failure). The format registry stays untouched until loading code
+exists. GCS locations use the same engine/table-function URL form; there is no
+separate GCS builder.
+
 Trust contract: ``url``, ``path``, table/database names, and credential values
 are quoted; ``source`` expressions and string-form ``columns`` are trusted
 caller-provided SQL fragments and are interpolated verbatim. Pass only
 module-built expressions (or constants) as ``source``, and prefer the
 ``list[str]`` column form, which is quoted per identifier.
 
+Locations are passed through without scheme checks: valid forms vary per
+backend (``s3://`` URLs, GCS XML-API URLs, Azure connection strings, local
+paths), so the server is the authority on location validity.
+
 Quoting note: these helpers escape backslash-then-quote for ClickHouse rather
 than reusing :mod:`benchbox.utils.input_validation`, which has no ClickHouse
 platform branch, vetoes identifiers containing reserved-word substrings, and
-escapes only quote doubling without backslash handling.
+escapes only quote doubling without backslash handling. The in-package staging
+loader (``clickhouse_cloud.py``) uses ``''``-doubling only; whether a backslash
+survives that path is unaudited follow-up work, not a premise of this module.
 
 See the ClickHouse documentation for the ``DeltaLake`` table engine and the
 ``deltaLake`` table function.
@@ -38,13 +51,39 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 #: S3-backed Delta Lake table functions sharing one argument shape.
-S3_TABLE_FUNCTIONS = frozenset({"deltaLake", "deltaLakeS3"})
+_S3_TABLE_FUNCTIONS = frozenset({"deltaLake", "deltaLakeS3"})
+
+#: Base Delta Lake table function; required for native reads.
+DELTA_BASE_FUNCTION = "deltaLake"
 
 #: Native Delta Lake table functions emitted by this module.
-DELTA_TABLE_FUNCTION_NAMES = ("deltaLake", "deltaLakeS3", "deltaLakeLocal")
+DELTA_TABLE_FUNCTION_NAMES = (DELTA_BASE_FUNCTION, "deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure")
 
 #: Native Delta Lake table engine name as registered in ``system.table_engines``.
 DELTA_ENGINE_NAME = "DeltaLake"
+
+__all__ = [
+    "DELTA_BASE_FUNCTION",
+    "DELTA_ENGINE_NAME",
+    "DELTA_TABLE_FUNCTION_NAMES",
+    "delta_engine_probe_sql",
+    "delta_function_probe_sql",
+    "delta_lake_azure_table_function",
+    "delta_lake_count_sql",
+    "delta_lake_engine_ddl",
+    "delta_lake_local_table_function",
+    "delta_lake_select_sql",
+    "delta_lake_table_function",
+    "has_native_delta_registration",
+    "quote_identifier",
+    "quote_literal",
+]
+
+
+def _require_credential(value: str | None, label: str) -> None:
+    """Reject a blank credential value, naming the offending parameter."""
+    if value is not None and not value.strip():
+        raise ValueError(f"Delta Lake {label} must be non-blank when provided.")
 
 
 def quote_literal(value: str) -> str:
@@ -104,14 +143,17 @@ def delta_lake_table_function(
         SQL expression such as ``deltaLake('s3://bucket/table')``.
 
     Raises:
-        ValueError: If the URL is empty, the function name is unknown, or only one credential is given.
+        ValueError: If the URL is empty or blank, the function name is unknown,
+            only one credential is given, or a credential is blank.
     """
     if not url or not url.strip():
         raise ValueError("Delta Lake table function requires a non-empty URL.")
-    if function not in S3_TABLE_FUNCTIONS:
+    if function not in _S3_TABLE_FUNCTIONS:
         raise ValueError(f"Unknown Delta Lake table function {function!r}: expected 'deltaLake' or 'deltaLakeS3'.")
     if (access_key_id is None) != (secret_access_key is None):
         raise ValueError("access_key_id and secret_access_key must be provided together or not at all.")
+    _require_credential(access_key_id, "access_key_id")
+    _require_credential(secret_access_key, "secret_access_key")
     expression = f"{function}({quote_literal(url)}"
     if access_key_id is not None and secret_access_key is not None:
         expression += f", {quote_literal(access_key_id)}, {quote_literal(secret_access_key)}"
@@ -156,7 +198,8 @@ def delta_lake_engine_ddl(
         DDL statement attaching to the Delta table without column definitions.
 
     Raises:
-        ValueError: If names/URL are empty or blank, or only one credential is given.
+        ValueError: If names/URL are empty or blank, only one credential is
+            given, or a credential is blank.
     """
     if not url or not url.strip():
         raise ValueError("DeltaLake engine DDL requires a non-empty URL.")
@@ -178,7 +221,7 @@ def delta_lake_engine_ddl(
 def delta_lake_select_sql(
     source: str,
     *,
-    columns: str | list[str] = "*",
+    columns: str | list[str] | tuple[str, ...] = "*",
     limit: int | None = None,
 ) -> str:
     """Build ``SELECT ... FROM <delta source>`` over a table-function expression or table name.
@@ -198,10 +241,12 @@ def delta_lake_select_sql(
 
     Raises:
         ValueError: If the source is empty or blank, no usable columns are
-            given, or the limit is negative or a bool.
+            given, or the limit is not a non-negative int.
     """
     if not source or not source.strip():
         raise ValueError("Delta Lake SELECT requires a non-empty source expression.")
+    if isinstance(columns, tuple):
+        columns = list(columns)
     if isinstance(columns, list):
         if not columns or any(not column or not column.strip() for column in columns):
             raise ValueError("Delta Lake SELECT requires at least one non-blank column.")
@@ -210,7 +255,7 @@ def delta_lake_select_sql(
         if not columns or not columns.strip():
             raise ValueError("Delta Lake SELECT requires at least one column.")
         column_sql = columns
-    if isinstance(limit, bool) or (limit is not None and limit < 0):
+    if isinstance(limit, bool) or (limit is not None and (not isinstance(limit, int) or limit < 0)):
         raise ValueError(f"Delta Lake SELECT limit must be a non-negative int, got {limit!r}.")
     statement = f"SELECT {column_sql} FROM {source}"
     if limit is not None:
@@ -256,14 +301,16 @@ def delta_lake_azure_table_function(
         SQL expression such as ``deltaLakeAzure('https://acct...', 'lake', 'orders')``.
 
     Raises:
-        ValueError: If a location part is empty or blank, or only one of
-            account name/key is given.
+        ValueError: If a location part is empty or blank, only one of account
+            name/key is given, or a credential is blank.
     """
     for label, part in (("account URL", account_url), ("container", container), ("blob path", blobpath)):
         if not part or not part.strip():
             raise ValueError(f"Delta Lake Azure table function requires a non-empty {label}.")
     if (account_name is None) != (account_key is None):
         raise ValueError("account_name and account_key must be provided together or not at all.")
+    _require_credential(account_name, "account_name")
+    _require_credential(account_key, "account_key")
     expression = f"deltaLakeAzure({quote_literal(account_url)}, {quote_literal(container)}, {quote_literal(blobpath)}"
     if account_name is not None and account_key is not None:
         expression += f", {quote_literal(account_name)}, {quote_literal(account_key)}"
@@ -272,6 +319,10 @@ def delta_lake_azure_table_function(
 
 def delta_function_probe_sql() -> str:
     """Build the ``system.functions`` query probing native Delta support.
+
+    Whether ClickHouse registers table functions in ``system.functions`` or in
+    ``system.table_functions`` is settled by running both probes on a Docker
+    host (follow-up work); until then this targets ``system.functions``.
 
     Returns:
         SELECT statement listing the registered native Delta table functions.
@@ -289,8 +340,12 @@ def delta_engine_probe_sql() -> str:
     return f"SELECT name FROM system.table_engines WHERE name = {quote_literal(DELTA_ENGINE_NAME)}"
 
 
-def has_native_delta_support(function_names: list[str], engine_names: list[str]) -> bool:
-    """Decide native Delta availability from probed system-table names.
+def has_native_delta_registration(function_names: list[str], engine_names: list[str]) -> bool:
+    """Decide native Delta registration from probed system-table names.
+
+    This certifies registration only: the base ``deltaLake`` function plus the
+    ``DeltaLake`` engine being present. It says nothing about per-backend
+    (S3/local/Azure) executability, which needs a data-level read.
 
     Args:
         function_names: Function names reported by :func:`delta_function_probe_sql`.
@@ -298,6 +353,6 @@ def has_native_delta_support(function_names: list[str], engine_names: list[str])
 
     Returns:
         True when the ``deltaLake`` function and the ``DeltaLake`` engine are
-        both registered; the S3/local aliases alone are not sufficient.
+        both registered; the S3/local/Azure aliases alone are not sufficient.
     """
-    return "deltaLake" in function_names and DELTA_ENGINE_NAME in engine_names
+    return DELTA_BASE_FUNCTION in function_names and DELTA_ENGINE_NAME in engine_names

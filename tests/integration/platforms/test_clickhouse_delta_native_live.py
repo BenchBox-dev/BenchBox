@@ -10,12 +10,13 @@ is required on capable servers. These tests probe a running ClickHouse
 instance (pinned image ``clickhouse/clickhouse-server:25.8``) for that
 capability: server version plus registration of the native Delta functions
 and engine in the system tables, decided with
-:func:`benchbox.platforms.clickhouse.delta_lake.has_native_delta_support`.
+:func:`benchbox.platforms.clickhouse.delta_lake.has_native_delta_registration`.
 
-A passing probe means BenchBox can issue the SQL built by
-:mod:`benchbox.platforms.clickhouse.delta_lake` straight at the server. A
-failure names the server version so the author can tell a missing
-integration (image too old or minimal build) apart from a regression.
+A passing probe means the server registers the integration the builders in
+:mod:`benchbox.platforms.clickhouse.delta_lake` target -- not that a generated
+statement has executed. A failure names the server version so the author can
+tell a missing integration (image too old or minimal build) apart from a
+regression.
 
 This probe asserts registration only: a data-level end-to-end read (create a
 Delta table, query it via ``deltaLake``) needs a table location the container
@@ -36,7 +37,7 @@ from benchbox.platforms.clickhouse.delta_lake import (
     DELTA_TABLE_FUNCTION_NAMES,
     delta_engine_probe_sql,
     delta_function_probe_sql,
-    has_native_delta_support,
+    has_native_delta_registration,
 )
 
 from .conftest import skip_unless_docker_service
@@ -80,6 +81,9 @@ class TestNativeDeltaCapability:
             clickhouse_adapter.close_connection(connection)
 
     def test_native_delta_support(self, clickhouse_adapter) -> None:
+        # Deliberately stricter than the helper: the helper fail-closes a runtime
+        # decision on base-function-plus-engine presence, while this probe fails loud
+        # on any alias drift so image changes surface here first.
         connection = clickhouse_adapter.create_connection()
         try:
             functions = _query_names(connection, delta_function_probe_sql())
@@ -87,8 +91,8 @@ class TestNativeDeltaCapability:
             version = str(connection.execute("SELECT version()")[0][0])
             missing = [name for name in DELTA_TABLE_FUNCTION_NAMES if name not in functions]
             assert not missing, f"Server {version} lacks Delta functions: {missing}"
-            assert has_native_delta_support(functions, engines), (
-                f"Server {version} lacks native Delta support: functions={functions} engines={engines}"
+            assert has_native_delta_registration(functions, engines), (
+                f"Server {version} lacks native Delta registration: functions={functions} engines={engines}"
             )
         finally:
             clickhouse_adapter.close_connection(connection)
