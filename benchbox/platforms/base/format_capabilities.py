@@ -63,7 +63,8 @@ PARQUET_CAPABILITY = FormatCapability(
         "postgresql": SupportLevel.EXTENSION,
         # Reached through the pg_duckdb extension around embedded DuckDB
         # (Parquet itself is core in DuckDB, not a loadable extension).
-        "pg_duckdb": SupportLevel.EXTENSION,
+        # Key uses the manifest canonical spelling "pg-duckdb".
+        "pg-duckdb": SupportLevel.EXTENSION,
         "sqlite": SupportLevel.EXTENSION,
         "spark": SupportLevel.NATIVE,
         "emr-serverless": SupportLevel.NATIVE,
@@ -99,7 +100,8 @@ DELTA_CAPABILITY = FormatCapability(
         "duckdb": SupportLevel.EXTENSION,  # delta extension
         # DuckDB delta extension via the embedded engine. Engine capability only:
         # live end-to-end verification through BenchBox is still pending.
-        "pg_duckdb": SupportLevel.EXTENSION,
+        # Key uses the manifest canonical spelling "pg-duckdb".
+        "pg-duckdb": SupportLevel.EXTENSION,
         "datafusion": SupportLevel.EXTENSION,  # via deltalake Python library
         "trino": SupportLevel.EXTENSION,  # via delta catalog connector
         "presto": SupportLevel.EXTENSION,  # via delta catalog connector
@@ -132,7 +134,8 @@ ICEBERG_CAPABILITY = FormatCapability(
         "duckdb": SupportLevel.EXPERIMENTAL,  # iceberg extension
         # DuckDB iceberg extension via the embedded engine. Engine capability only:
         # live end-to-end verification through BenchBox is still pending.
-        "pg_duckdb": SupportLevel.EXPERIMENTAL,
+        # Key uses the manifest canonical spelling "pg-duckdb".
+        "pg-duckdb": SupportLevel.EXPERIMENTAL,
         "datafusion": SupportLevel.EXTENSION,  # via pyiceberg Python library
         "trino": SupportLevel.EXTENSION,  # via iceberg catalog connector
         "presto": SupportLevel.EXTENSION,  # via iceberg catalog connector
@@ -225,7 +228,7 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "snowflake": ["tbl", "parquet", "csv"],
     "redshift": ["tbl", "parquet", "csv"],
     "postgresql": ["tbl", "parquet", "csv"],
-    "pg_duckdb": ["tbl", "parquet", "csv"],
+    "pg-duckdb": ["tbl", "parquet", "csv", "delta", "iceberg"],
     "sqlite": ["tbl", "parquet", "csv"],
     # Athena's native load path stages delimited text into S3, then optionally
     # converts it to Parquet with CTAS. Native loads should not select Parquet
@@ -332,12 +335,16 @@ def normalize_platform_key(platform_name: str) -> str:
         return hyphenated
 
     # Underscore/hyphen spelling variance (e.g., CLI "pg-duckdb" vs adapter
-    # "pg_duckdb"). Only reached when the hyphenated spelling is not itself
-    # a registered key, so existing hyphenated keys are unaffected.
+    # "pg_duckdb"). Accept both directions so the manifest canonical hyphen
+    # key and the adapter underscore spelling resolve to the same entry.
     if "-" in key:
         underscored = key.replace("-", "_")
         if underscored in PLATFORM_FORMAT_PREFERENCES:
             return underscored
+    if "_" in key:
+        hyphenated_key = key.replace("_", "-")
+        if hyphenated_key in PLATFORM_FORMAT_PREFERENCES:
+            return hyphenated_key
 
     return key
 

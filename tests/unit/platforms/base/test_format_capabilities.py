@@ -88,8 +88,8 @@ class TestNormalizePlatformKey:
 
     def test_pg_duckdb_spelling_variance(self):
         """CLI 'pg-duckdb' and adapter 'pg_duckdb' resolve to the same key."""
-        assert normalize_platform_key("pg-duckdb") == "pg_duckdb"
-        assert normalize_platform_key("pg_duckdb") == "pg_duckdb"
+        assert normalize_platform_key("pg-duckdb") == "pg-duckdb"
+        assert normalize_platform_key("pg_duckdb") == "pg-duckdb"
         assert get_supported_formats("pg-duckdb") == get_supported_formats("pg_duckdb")
 
     def test_normalization_used_by_is_format_supported(self):
@@ -123,7 +123,7 @@ class TestFormatCapabilities:
         assert PARQUET_CAPABILITY.supported_platforms.get("datafusion") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("athena") == SupportLevel.NATIVE
         assert PARQUET_CAPABILITY.supported_platforms.get("postgresql") == SupportLevel.EXTENSION
-        assert PARQUET_CAPABILITY.supported_platforms.get("pg_duckdb") == SupportLevel.EXTENSION
+        assert PARQUET_CAPABILITY.supported_platforms.get("pg-duckdb") == SupportLevel.EXTENSION
 
     def test_parquet_spark_platform_support(self):
         """Test Parquet support for Spark-based platforms."""
@@ -159,7 +159,7 @@ class TestFormatCapabilities:
         expected = {
             "databricks": SupportLevel.NATIVE,
             "duckdb": SupportLevel.EXTENSION,
-            "pg_duckdb": SupportLevel.EXTENSION,
+            "pg-duckdb": SupportLevel.EXTENSION,
             "datafusion": SupportLevel.EXTENSION,
             "trino": SupportLevel.EXTENSION,
             "presto": SupportLevel.EXTENSION,
@@ -195,7 +195,7 @@ class TestFormatCapabilities:
         """Test Iceberg platform support across all registered platforms."""
         expected = {
             "duckdb": SupportLevel.EXPERIMENTAL,
-            "pg_duckdb": SupportLevel.EXPERIMENTAL,
+            "pg-duckdb": SupportLevel.EXPERIMENTAL,
             "datafusion": SupportLevel.EXTENSION,
             "trino": SupportLevel.EXTENSION,
             "presto": SupportLevel.EXTENSION,
@@ -360,11 +360,14 @@ class TestGetSupportedFormats:
         assert formats.index("tbl") < formats.index("parquet")
 
     def test_pg_duckdb_supported_formats(self):
-        """pg_duckdb native loads stay tbl-first; delta/iceberg not load-selected."""
+        """pg-duckdb native loads stay tbl-first; delta/iceberg are read paths."""
         formats = get_supported_formats("pg_duckdb")
-        assert formats == ["tbl", "parquet", "csv"]
-        assert "delta" not in formats
-        assert "iceberg" not in formats
+        assert formats.index("tbl") < formats.index("parquet")
+        assert formats.index("parquet") < formats.index("delta")
+        assert "delta" in formats
+        assert "iceberg" in formats
+        assert is_format_supported("pg_duckdb", "delta") is True
+        assert is_format_supported("pg-duckdb", "iceberg") is True
 
     def test_datafusion_supported_formats(self):
         """Test DataFusion supported formats."""
