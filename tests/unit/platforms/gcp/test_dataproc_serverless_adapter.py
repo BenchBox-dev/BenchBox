@@ -540,3 +540,29 @@ class TestDataprocServerlessAdapterClose:
 
             # Verify logging was called
             mock_logger.info.assert_called()
+
+
+class TestDataprocServerlessUserConfigPrecedence:
+    """User spark_config entries must win over optimizer output (adapter level)."""
+
+    def test_user_entries_win_and_survive_reconfigure(self):
+        """Pre-seeded user entries persist in job properties across benchmarks."""
+        with patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging:
+            mock_staging.from_uri.return_value = MagicMock()
+
+            from benchbox.platforms.gcp import DataprocServerlessAdapter
+
+            adapter = DataprocServerlessAdapter(
+                project_id="my-project",
+                region="us-west1",
+                gcs_staging_dir="gs://my-bucket/benchbox-data",
+                database="my_benchmark_db",
+                spark_config={"spark.sql.shuffle.partitions": "42"},
+            )
+
+            adapter.configure_for_benchmark(None, "tpch")
+            assert adapter._spark_config["spark.sql.shuffle.partitions"] == "42"
+            assert "spark.sql.adaptive.enabled" in adapter._spark_config
+
+            adapter.configure_for_benchmark(None, "tpcds")
+            assert adapter._spark_config["spark.sql.shuffle.partitions"] == "42"

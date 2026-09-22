@@ -200,9 +200,12 @@ class CloudSparkConfigMixin:
         Uses SparkConfigOptimizer to generate optimized Spark configuration
         for the specified benchmark type and scale factor. The adapter's
         `adaptive_enabled` toggle (default True) flows into the optimizer so
-        AQE is honored, not force-enabled; explicit user entries present
-        before the first call win over optimizer output. Shared across all
-        mixin consumers by design.
+        AQE is honored, not force-enabled. Entries already present in
+        `_spark_config` before the first call win over optimizer output; only
+        hosts that pre-seed `_spark_config` from user configuration (today:
+        Dataproc Serverless) give user entries precedence — hosts starting
+        from an empty config merge optimizer output unchanged. Shared across
+        all mixin consumers by design.
 
         Args:
             connection: Connection object (unused, for interface compatibility).
@@ -240,10 +243,11 @@ class CloudSparkConfigMixin:
                 adaptive_enabled=adaptive_enabled,
             )
 
-        # User-config precedence: entries present before the first optimizer
-        # run are explicit user overrides, so re-apply them over optimizer
-        # output. Stashed once so reconfiguring for another benchmark cannot
-        # resurrect stale optimizer output as user entries.
+        # Config precedence: entries the host pre-seeded in _spark_config
+        # before the first optimizer run (user overrides on hosts that seed
+        # them) win over optimizer output, so re-apply them on top. Stashed
+        # once so reconfiguring for another benchmark cannot resurrect stale
+        # optimizer output as user entries.
         if "_user_spark_config" not in self.__dict__:
             self._user_spark_config = dict(self._spark_config)
         self._spark_config = {**spark_config.to_dict(), **self._user_spark_config}
