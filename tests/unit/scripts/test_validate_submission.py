@@ -997,6 +997,18 @@ class TestTimingPlateau:
         assert not vr.ok  # owned by the queries-section gate
         assert not any("timing-plateau" in w for w in vr.warnings)
 
+    def test_sub_millisecond_rows_are_timer_noise_not_evidence(self):
+        data = _timing_bundle({f"Q{i}": 0.5 for i in range(1, 23)})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_case_variant_benchmark_id_still_gated(self):
+        data = _timing_bundle({f"Q{i}": 4510.0 + (i % 5) * 7.0 for i in range(1, 23)}, benchmark="TPCH")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert any("timing-plateau" in w for w in vr.warnings)
+
 
 class TestSmallScaleFloor:
     def test_slow_floor_on_tiny_data_warns(self):
@@ -1085,6 +1097,56 @@ class TestScaleInvariance:
         results = validate_bundles([lo, hi])
         assert all(vr.ok for vr in results)
         assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_micro_benchmark_flat_scales_are_expected_not_suspicious(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            benchmark="read_primitives",
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            benchmark="read_primitives",
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_missing_geomean_is_disclosed_not_silently_averaged(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=None,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        # The per-query leg still evaluates, but the message must admit the
+        # geomean leg could not run — never a silent arithmetic-mean fallback.
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        assert all("geomean unevaluable" in w for w in warned)
 
     def test_partial_bundles_do_not_distort(self, tmp_path):
         lo = _write_timing_bundle(

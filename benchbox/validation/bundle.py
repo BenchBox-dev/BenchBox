@@ -416,10 +416,10 @@ def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
 
     Mirrors the query-row conventions used elsewhere in this module: an
     absent ``run_type`` defaults to measurement, and only SUCCESS rows
-    count as measurement evidence. Rows with unparseable or non-positive
-    ``ms`` are dropped — all-zero runs are owned by the queries-section
-    gate, and sub-millisecond minima would make spread ratios
-    noise-dominated.
+    count as measurement evidence. Rows with unparseable, non-positive,
+    or sub-millisecond ``ms`` are dropped — all-zero runs are owned by
+    the queries-section gate, and sub-millisecond minima would make
+    spread ratios noise-dominated (timer resolution, not engine speed).
     """
     queries = data.get("queries")
     if not isinstance(queries, list):
@@ -441,7 +441,7 @@ def _measurement_ms_by_query(data: dict[str, Any]) -> dict[str, list[float]]:
             ms = float(q.get("ms"))
         except (TypeError, ValueError):
             continue
-        if not math.isfinite(ms) or ms <= 0:
+        if not math.isfinite(ms) or ms < 1.0:
             continue
         grouped.setdefault(qid, []).append(ms)
     return grouped
@@ -452,7 +452,11 @@ def _bundle_benchmark_id(data: dict[str, Any]) -> str | None:
     if not isinstance(benchmark, dict):
         return None
     bm_id = benchmark.get("id")
-    return bm_id if isinstance(bm_id, str) and bm_id else None
+    if not isinstance(bm_id, str) or not bm_id.strip():
+        return None
+    # "TPCH" names the same family as "tpch" for scoping, cohorting, and
+    # messages alike; casing or padding must not change the verdict.
+    return bm_id.strip().casefold()
 
 
 def _bundle_platform_key(data: dict[str, Any]) -> str | None:
@@ -484,20 +488,23 @@ def _bundle_passed_validation(data: dict[str, Any]) -> bool:
 
 
 def _bundle_geomean_ms(data: dict[str, Any]) -> float | None:
+    """Geometric-mean timing for cross-bundle comparison, or None.
+
+    Geometric only: falling back to an arithmetic mean would compare mixed
+    metrics across bundles while the warning message claims "geomean".
+    A bundle without a recorded geometric mean simply does not participate.
+    """
     summary = data.get("summary")
     if not isinstance(summary, dict):
         return None
     timing = summary.get("timing")
     if not isinstance(timing, dict):
         return None
-    for key in ("geometric_mean_ms", "avg_ms"):
-        try:
-            value = float(timing.get(key))
-        except (TypeError, ValueError):
-            continue
-        if math.isfinite(value) and value > 0:
-            return value
-    return None
+    try:
+        value = float(timing.get("geometric_mean_ms"))
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) and value > 0 else None
 
 
 def _bundle_rows_loaded(data: dict[str, Any]) -> int | None:
@@ -568,7 +575,10 @@ def _passed_cohorts(
     """Group clean-validation bundles by platform cohort and peer set.
 
     Only bundles claiming clean validation participate, so mirror-lane
-    partials never distort a comparison.
+    partials never distort a comparison. Cohorts are further scoped to
+    heterogeneous benchmarks — micro-benchmarks are uniform by
+    construction, so a tight band or a flat scale curve there is expected
+    signal, not a plausibility finding (same rationale as the C1 scope).
     """
     cohorts: dict[tuple[str, str], list[tuple[dict[str, Any], ValidationResult]]] = {}
     peers: dict[tuple[str, float], list[tuple[dict[str, Any], ValidationResult]]] = {}
@@ -576,6 +586,8 @@ def _passed_cohorts(
         if not _bundle_passed_validation(data):
             continue
         bm_id = _bundle_benchmark_id(data)
+        if bm_id not in TIMING_PLAUSIBILITY_HETEROGENEOUS_BENCHMARKS:
+            continue
         platform = _bundle_platform_key(data)
         sf = _bundle_scale_factor(data)
         if bm_id is None:
