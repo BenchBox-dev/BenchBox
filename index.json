@@ -16130,15 +16130,10 @@
       "title": "Cache receipt persistence + result-correctness plausibility"
     },
     "submission-gates-deterministic": {
-      "claim": {
-        "expires_at": "2026-09-23T12:28:38Z",
-        "generation": "330e02b7ccb14d8582c48abc40acfe29",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fb22ec513f5189c4ea828e84"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Submission gates: compliance check, query-set coverage, cost docs"
     },
     "submission-gates-timing-plausibility": {
