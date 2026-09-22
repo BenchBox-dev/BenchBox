@@ -341,6 +341,19 @@ REQUIRED_VIEWS_V10: list[str] = list(REQUIRED_VIEWS_V9)
 
 REQUIRED_VIEWS_V11: list[str] = list(REQUIRED_VIEWS_V10)
 
+# Columns the frontend selects by name from views (not just the underlying
+# tables). A snapshot whose `results` table carries these columns but whose
+# view omits them would pass the table and view-existence checks yet fail
+# with a binder error on every load of that surface.
+REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
+    "result_detail_metrics": [
+        "override_rules",
+        "override_evidence",
+        "override_approver",
+        "override_expires",
+    ],
+}
+
 
 def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
     """Return the expected table column map for a given read-model version."""
@@ -470,7 +483,8 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
     ),
     (
         "Result detail metrics view",
-        "SELECT * FROM result_detail_metrics LIMIT 10",
+        "SELECT result_id, benchmark, scale_factor, platform, validation_status, override_rules, "
+        "override_evidence, override_approver, override_expires FROM result_detail_metrics LIMIT 10",
     ),
     (
         "Benchmark matrix cells scan",
@@ -584,6 +598,21 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     missing_views = sorted(set(expected_views) - existing_views)
     if missing_views:
         errors.append(f"missing required views for v{version_to_check}: {', '.join(missing_views)}")
+
+    # Views that exist must also expose the columns the frontend selects by
+    # name; a view that drops one fails at read time despite passing the
+    # table and view-existence checks above.
+    if version_to_check >= 11:
+        for view, required_cols in REQUIRED_VIEW_COLUMNS_V11.items():
+            if view not in existing_views:
+                continue
+            view_col_rows = con.execute(
+                f"SELECT column_name FROM information_schema.columns WHERE table_name = '{view}'"
+            ).fetchall()
+            actual_view_cols = {row[0] for row in view_col_rows}
+            missing_view_cols = sorted(set(required_cols) - actual_view_cols)
+            if missing_view_cols:
+                errors.append(f"view '{view}' missing required columns: {', '.join(missing_view_cols)}")
 
     return errors
 

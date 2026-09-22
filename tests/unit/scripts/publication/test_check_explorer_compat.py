@@ -153,6 +153,22 @@ def test_validate_database_schema_detects_missing_view() -> None:
         con.close()
 
 
+def test_validate_database_schema_detects_missing_view_column() -> None:
+    con = checker.create_in_memory_schema(11)
+    try:
+        # Table keeps the override columns but the view drops them: the
+        # table and view-existence checks pass, yet every result-detail
+        # load would fail with a binder error.
+        con.execute("CREATE OR REPLACE VIEW result_detail_metrics AS SELECT result_id FROM results")
+        errors = checker.validate_database_schema(con, expected_version=11)
+        assert any(
+            "view 'result_detail_metrics' missing required columns:" in err and "override_rules" in err
+            for err in errors
+        )
+    finally:
+        con.close()
+
+
 def test_validate_database_schema_version_mismatch() -> None:
     con = checker.create_in_memory_schema(11)
     try:
