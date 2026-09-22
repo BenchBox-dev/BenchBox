@@ -23,10 +23,13 @@ if str(CHECKOUT_ROOT) not in sys.path:
 
 try:
     from benchbox.validation.bundle import (
+        RULES,
+        RULES_VERSION,
         ValidationResult,
         discover_bundles,
         format_pr_comment,
         format_summary,
+        unsatisfied_override_rules,
         validate_bundles,
     )
 except ImportError:
@@ -38,10 +41,13 @@ except ImportError:
     sys.modules[spec.name] = bundle
     spec.loader.exec_module(bundle)
 
+    RULES = bundle.RULES
+    RULES_VERSION = bundle.RULES_VERSION
     ValidationResult = bundle.ValidationResult
     discover_bundles = bundle.discover_bundles
     format_pr_comment = bundle.format_pr_comment
     format_summary = bundle.format_summary
+    unsatisfied_override_rules = bundle.unsatisfied_override_rules
     validate_bundles = bundle.validate_bundles
 
 try:
@@ -99,7 +105,7 @@ __all__ = [
 ]
 
 
-_PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json")
+_PUBLIC_COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json", ".override.json")
 
 
 def _public_json_surfaces(bundle_path: Path) -> list[Path]:
@@ -151,7 +157,7 @@ def _append_public_privacy_errors(paths: list[Path], results: list[ValidationRes
 
 CORPUS_RELATIVE_ROOT = "results-data/bundles"
 _CORPUS_ROOT_PARTS = ("results-data", "bundles")
-_CORPUS_METADATA_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json")
+_CORPUS_METADATA_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", ".manifest.json", ".override.json")
 _CORPUS_METADATA_FILENAMES = ("corpus-inventory.json", "submission-manifest.json")
 # JSON-named files that are NOT corpus data: package/TS manifests and other
 # executable or tool surfaces that must not ride into the corpus tree even
@@ -293,40 +299,76 @@ def _validate_corpus_changed_paths_file(
     return None
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = argv if argv is not None else sys.argv[1:]
-    pr_comment_path: Path | None = None
-    corpus_changed_paths_path: Path | None = None
-    require_manifest = False
-    allow_partial_validation = False
-    positional: list[str] = []
+def _print_rules_version() -> int:
+    print(f"rules version: {RULES_VERSION}")
+    print("rule | version | severity")
+    for rule_id, rule_version, severity in RULES:
+        print(f"{rule_id} | {rule_version} | {severity}")
+    return 0
+
+
+class _Args:
+    """Parsed CLI surface for main()."""
+
+    def __init__(self) -> None:
+        self.pr_comment_path: Path | None = None
+        self.corpus_changed_paths_path: Path | None = None
+        self.require_manifest = False
+        self.allow_partial_validation = False
+        self.positional: list[str] = []
+
+
+def _parse_args(args: list[str], parsed: _Args) -> int | None:
+    """Fold argv into ``parsed``; return an exit code when parsing decides it."""
     i = 0
     while i < len(args):
         if args[i] == "--pr-comment" and i + 1 < len(args):
-            pr_comment_path = Path(args[i + 1])
+            parsed.pr_comment_path = Path(args[i + 1])
             i += 2
             continue
         if args[i] == "--corpus-changed-paths" and i + 1 < len(args):
-            corpus_changed_paths_path = Path(args[i + 1])
+            parsed.corpus_changed_paths_path = Path(args[i + 1])
             i += 2
             continue
         if args[i] == "--require-manifest":
-            require_manifest = True
+            parsed.require_manifest = True
             i += 1
             continue
         if args[i] == "--allow-partial-validation":
             # Trusted maintainer mirror only: seed corpus includes partial
             # cohorts. Community CI must not pass this flag.
-            allow_partial_validation = True
+            parsed.allow_partial_validation = True
             i += 1
             continue
-        positional.append(args[i])
+        if args[i] == "--rules-version":
+            return _print_rules_version()
+        if args[i].startswith("--"):
+            # Fail closed: an unrecognized flag must never silently degrade
+            # into a positional path (version pinning would otherwise no-op).
+            print(f"Error: unrecognized flag: {args[i]}", file=sys.stderr)
+            return 2
+        parsed.positional.append(args[i])
         i += 1
+    return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = argv if argv is not None else sys.argv[1:]
+    parsed = _Args()
+    decided = _parse_args(args, parsed)
+    if decided is not None:
+        return decided
+    pr_comment_path = parsed.pr_comment_path
+    corpus_changed_paths_path = parsed.corpus_changed_paths_path
+    require_manifest = parsed.require_manifest
+    allow_partial_validation = parsed.allow_partial_validation
+    positional = parsed.positional
 
     if not positional and corpus_changed_paths_path is None:
         print(
             "Usage: validate_submission.py [--pr-comment <path>] [--require-manifest] "
-            "[--allow-partial-validation] [--corpus-changed-paths <file>] <dir-or-files...>",
+            "[--allow-partial-validation] [--corpus-changed-paths <file>] "
+            "[--rules-version] <dir-or-files...>",
             file=sys.stderr,
         )
         return 1
@@ -363,14 +405,24 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print("No bundle files found.", file=sys.stderr)
 
-    failed = bool(rejected) or any(not result.ok for result in results)
+    # Exit contract: errors always fail. Unsatisfied warn-require-override
+    # findings fail community mode (no override path exists yet — the
+    # committed override artifact narrows this); the trusted mirror lane
+    # renders them advisory so pre-gate cohorts keep syncing.
+    pending = {} if allow_partial_validation else unsatisfied_override_rules(results)
+    for path, rule_ids in sorted(pending.items()):
+        print(f"ERROR: {path} requires overrides: {', '.join(sorted(rule_ids))}")
+    failed = bool(rejected) or any(not result.ok for result in results) or bool(pending)
     for reason in rejected:
         print(f"ERROR: disallowed corpus path: {reason}")
     print(format_summary(results))
 
     if pr_comment_path is not None:
         try:
-            pr_comment_path.write_text(format_pr_comment(results), encoding="utf-8")
+            pr_comment_path.write_text(
+                format_pr_comment(results, strict_overrides=not allow_partial_validation),
+                encoding="utf-8",
+            )
         except OSError as exc:
             print(f"Warning: failed to write PR comment file: {exc}", file=sys.stderr)
 
