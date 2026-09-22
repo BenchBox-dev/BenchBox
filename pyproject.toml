@@ -1094,4 +1094,9 @@ ignore_rules = [
 
     # w3-G7: Capability-matrix methods in metadata_primitives (each defines different platform set)
     { function_names = ["supports_acl_introspection", "supports_column_grants", "supports_role_hierarchy"], path_contains = ["benchbox/core/metadata_primitives/ddl.py"] },
+
+    # ClickHouse Delta Lake quoting pair: thin public wrappers over the shared
+    # _quote_wrapped core, differing only in quote char and error messages.
+    # Both names are pinned public API (delta builders + unit tests).
+    { function_names = ["quote_literal", "quote_identifier"], path_contains = ["benchbox/platforms/clickhouse/delta_lake.py"] },
 ]

@@ -86,6 +86,21 @@ def _require_credential(value: str | None, label: str) -> None:
         raise ValueError(f"Delta Lake {label} must be non-blank when provided.")
 
 
+_EMPTY_LITERAL_ERROR = "Cannot quote an empty string literal."
+_NUL_LITERAL_ERROR = "Cannot quote a string literal containing NUL."
+_EMPTY_IDENTIFIER_ERROR = "Cannot quote an empty identifier."
+_NUL_IDENTIFIER_ERROR = "Cannot quote an identifier containing NUL."
+
+
+def _quote_wrapped(value: str, quote: str, empty_error: str, nul_error: str) -> str:
+    """Wrap value in quote chars with backslash and quote escapes."""
+    if not value:
+        raise ValueError(empty_error)
+    if "\x00" in value:
+        raise ValueError(nul_error)
+    return quote + value.replace("\\", "\\\\").replace(quote, "\\" + quote) + quote
+
+
 def quote_literal(value: str) -> str:
     """Quote a string as a ClickHouse single-quoted literal.
 
@@ -98,11 +113,7 @@ def quote_literal(value: str) -> str:
     Raises:
         ValueError: If the value is empty or contains a NUL character.
     """
-    if not value:
-        raise ValueError("Cannot quote an empty string literal.")
-    if "\x00" in value:
-        raise ValueError("Cannot quote a string literal containing NUL.")
-    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+    return _quote_wrapped(value, "'", _EMPTY_LITERAL_ERROR, _NUL_LITERAL_ERROR)
 
 
 def quote_identifier(name: str) -> str:
@@ -117,11 +128,7 @@ def quote_identifier(name: str) -> str:
     Raises:
         ValueError: If the name is empty or contains a NUL character.
     """
-    if not name:
-        raise ValueError("Cannot quote an empty identifier.")
-    if "\x00" in name:
-        raise ValueError("Cannot quote an identifier containing NUL.")
-    return "`" + name.replace("\\", "\\\\").replace("`", "\\`") + "`"
+    return _quote_wrapped(name, "`", _EMPTY_IDENTIFIER_ERROR, _NUL_IDENTIFIER_ERROR)
 
 
 def delta_lake_table_function(
