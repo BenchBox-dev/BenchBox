@@ -73,12 +73,13 @@ extensions = [
 # Use Sphinx's built-in autodoc_mock_imports for cleaner mocking
 # These dependencies are not required for building docs but are imported by the code
 autodoc_mock_imports = [
-    # Data processing libraries
-    "pandas",
+    # Data processing libraries. NOTE: pandas, numpy, and pyarrow must stay
+    # unmocked (they are installed in the docs venv): datafusion calls
+    # pyarrow.scalar at module scope, and pyarrow's pandas/numpy shims
+    # import the real packages — mocks break those imports, which fails
+    # the datafusion API pages.
     "psutil",
     "sqlglot",
-    "numpy",
-    "pyarrow",
     # Google Cloud Platform
     "google.cloud.bigquery",
     "google.cloud.storage",
