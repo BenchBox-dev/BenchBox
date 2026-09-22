@@ -136,11 +136,12 @@ Use `*_liquid_tuned.yaml` to request Liquid AUTO by passing the template as an e
 benchbox run --platform databricks --benchmark tpch --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml
 ```
 
-Liquid templates must not
-carry `z_ordering_enabled`, `z_ordering_columns`, per-table `partitioning`, or
+Liquid templates must not enable ZORDER or carry per-table `partitioning` or
 per-table `distribution` fields; partition and ZORDER-era candidates are folded
 into Liquid workload intent, and automatic clustering does not prove that
-Databricks selected every listed column.
+Databricks selected every listed column. Explicit
+`z_ordering_enabled: false` with empty `z_ordering_columns` is permitted for
+schema completeness (as in `examples/tunings/databricks/tpch_liquid_tuned.yaml`).
 
 Do not compare a fully mapped tuned template to a basic-constraints fallback as
 if both are equivalent. The fallback means BenchBox could not find a
