@@ -15,11 +15,17 @@ from __future__ import annotations
 import pytest
 
 from benchbox.platforms.clickhouse.delta_lake import (
+    DELTA_ENGINE_NAME,
+    DELTA_TABLE_FUNCTION_NAMES,
+    delta_engine_probe_sql,
+    delta_function_probe_sql,
+    delta_lake_azure_table_function,
     delta_lake_count_sql,
     delta_lake_engine_ddl,
     delta_lake_local_table_function,
     delta_lake_select_sql,
     delta_lake_table_function,
+    has_native_delta_support,
     quote_identifier,
     quote_literal,
 )
@@ -39,7 +45,11 @@ class TestQuoteLiteral:
 
     def test_rejects_empty_value(self) -> None:
         with pytest.raises(ValueError, match="empty"):
-            quote_literal("   ")
+            quote_literal("")
+
+    def test_rejects_nul_value(self) -> None:
+        with pytest.raises(ValueError, match="NUL"):
+            quote_literal("ab\x00cd")
 
 
 class TestQuoteIdentifier:
@@ -52,6 +62,10 @@ class TestQuoteIdentifier:
     def test_rejects_empty_name(self) -> None:
         with pytest.raises(ValueError, match="empty"):
             quote_identifier("")
+
+    def test_rejects_nul_name(self) -> None:
+        with pytest.raises(ValueError, match="NUL"):
+            quote_identifier("ab\x00cd")
 
 
 class TestTableFunction:
@@ -115,9 +129,35 @@ class TestEngineDdl:
         with pytest.raises(ValueError, match="empty"):
             delta_lake_engine_ddl("", "s3://bucket/orders")
 
+    def test_rejects_blank_table_and_database(self) -> None:
+        with pytest.raises(ValueError, match="non-empty table name"):
+            delta_lake_engine_ddl("   ", "s3://bucket/orders")
+        with pytest.raises(ValueError, match="non-empty database name"):
+            delta_lake_engine_ddl("orders", "s3://bucket/orders", database="  ")
+
     def test_rejects_lone_credential(self) -> None:
         with pytest.raises(ValueError, match="together or not at all"):
             delta_lake_engine_ddl("orders", "s3://bucket/orders", secret_access_key="SK")
+
+
+class TestAzureTableFunction:
+    def test_bare_location(self) -> None:
+        assert delta_lake_azure_table_function("https://acct.blob.core.windows.net", "lake", "orders") == (
+            "deltaLakeAzure('https://acct.blob.core.windows.net', 'lake', 'orders')"
+        )
+
+    def test_with_account_credentials(self) -> None:
+        assert delta_lake_azure_table_function(
+            "https://acct.blob.core.windows.net", "lake", "orders", account_name="acct", account_key="KEY"
+        ) == ("deltaLakeAzure('https://acct.blob.core.windows.net', 'lake', 'orders', 'acct', 'KEY')")
+
+    def test_rejects_blank_location_part(self) -> None:
+        with pytest.raises(ValueError, match="non-empty container"):
+            delta_lake_azure_table_function("https://acct.blob.core.windows.net", "  ", "orders")
+
+    def test_rejects_lone_account_credential(self) -> None:
+        with pytest.raises(ValueError, match="together or not at all"):
+            delta_lake_azure_table_function("https://acct.blob.core.windows.net", "lake", "orders", account_key="KEY")
 
 
 class TestSelectAndCount:
@@ -132,12 +172,20 @@ class TestSelectAndCount:
         )
 
     def test_select_rejects_empty_columns(self) -> None:
-        with pytest.raises(ValueError, match="at least one column"):
+        with pytest.raises(ValueError, match="at least one"):
             delta_lake_select_sql("deltaLake('s3://b/t')", columns=[])
+
+    def test_select_rejects_blank_column_in_list(self) -> None:
+        with pytest.raises(ValueError, match="non-blank column"):
+            delta_lake_select_sql("deltaLake('s3://b/t')", columns=["id", "  "])
 
     def test_select_rejects_negative_limit(self) -> None:
         with pytest.raises(ValueError, match="non-negative"):
             delta_lake_select_sql("deltaLake('s3://b/t')", limit=-1)
+
+    def test_select_rejects_bool_limit(self) -> None:
+        with pytest.raises(ValueError, match="non-negative int"):
+            delta_lake_select_sql("deltaLake('s3://b/t')", limit=True)
 
     def test_count(self) -> None:
         assert delta_lake_count_sql("deltaLake('s3://bucket/orders')") == (
@@ -147,3 +195,21 @@ class TestSelectAndCount:
     def test_count_rejects_empty_source(self) -> None:
         with pytest.raises(ValueError, match="non-empty source"):
             delta_lake_count_sql("  ")
+
+
+class TestSupportProbe:
+    def test_function_probe_lists_all_emitted_functions(self) -> None:
+        assert delta_function_probe_sql() == (
+            "SELECT name FROM system.functions WHERE name IN ('deltaLake', 'deltaLakeS3', 'deltaLakeLocal')"
+        )
+        assert set(DELTA_TABLE_FUNCTION_NAMES) == {"deltaLake", "deltaLakeS3", "deltaLakeLocal"}
+
+    def test_engine_probe(self) -> None:
+        assert delta_engine_probe_sql() == "SELECT name FROM system.table_engines WHERE name = 'DeltaLake'"
+        assert DELTA_ENGINE_NAME == "DeltaLake"
+
+    def test_support_requires_function_and_engine(self) -> None:
+        assert has_native_delta_support(["deltaLake", "deltaLakeS3", "deltaLakeLocal"], ["DeltaLake"]) is True
+        assert has_native_delta_support(["deltaLakeS3", "deltaLakeLocal"], ["DeltaLake"]) is False
+        assert has_native_delta_support(["deltaLake"], ["MergeTree"]) is False
+        assert has_native_delta_support([], []) is False

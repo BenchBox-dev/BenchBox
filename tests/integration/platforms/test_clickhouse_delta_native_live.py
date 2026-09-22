@@ -1,9 +1,4 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-#
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
-"""
-Docker live capability probe for native ClickHouse Delta Lake reads.
+"""Docker live capability probe for native ClickHouse Delta Lake reads.
 
 Setup:
     make test-docker-up-clickhouse
@@ -13,21 +8,35 @@ ClickHouse reads Delta Lake tables directly through the ``DeltaLake`` table
 engine and the ``deltaLake`` table-function family -- no Parquet conversion
 is required on capable servers. These tests probe a running ClickHouse
 instance (pinned image ``clickhouse/clickhouse-server:25.8``) for that
-capability: server version plus registration of the ``deltaLake`` function
-and the ``DeltaLake`` engine in the system tables.
+capability: server version plus registration of the native Delta functions
+and engine in the system tables, decided with
+:func:`benchbox.platforms.clickhouse.delta_lake.has_native_delta_support`.
 
 A passing probe means BenchBox can issue the SQL built by
 :mod:`benchbox.platforms.clickhouse.delta_lake` straight at the server. A
 failure names the server version so the author can tell a missing
 integration (image too old or minimal build) apart from a regression.
+
+This probe asserts registration only: a data-level end-to-end read (create a
+Delta table, query it via ``deltaLake``) needs a table location the container
+can see -- host tmp paths are invisible to the Docker server -- and is tracked
+as follow-up work, not covered here.
+
+Copyright 2026 Joe Harris / BenchBox Project
+
+Licensed under the MIT License. See LICENSE file in the project root for details.
 """
+
+from __future__ import annotations
 
 import pytest
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 from benchbox.platforms.clickhouse.delta_lake import (
-    delta_lake_count_sql,
-    delta_lake_table_function,
+    DELTA_TABLE_FUNCTION_NAMES,
+    delta_engine_probe_sql,
+    delta_function_probe_sql,
+    has_native_delta_support,
 )
 
 from .conftest import skip_unless_docker_service
@@ -70,29 +79,16 @@ class TestNativeDeltaCapability:
         finally:
             clickhouse_adapter.close_connection(connection)
 
-    def test_delta_lake_table_function_registered(self, clickhouse_adapter) -> None:
+    def test_native_delta_support(self, clickhouse_adapter) -> None:
         connection = clickhouse_adapter.create_connection()
         try:
-            names = _query_names(
-                connection,
-                "SELECT name FROM system.functions WHERE name IN ('deltaLake', 'deltaLakeS3', 'deltaLakeLocal')",
+            functions = _query_names(connection, delta_function_probe_sql())
+            engines = _query_names(connection, delta_engine_probe_sql())
+            version = str(connection.execute("SELECT version()")[0][0])
+            missing = [name for name in DELTA_TABLE_FUNCTION_NAMES if name not in functions]
+            assert not missing, f"Server {version} lacks Delta functions: {missing}"
+            assert has_native_delta_support(functions, engines), (
+                f"Server {version} lacks native Delta support: functions={functions} engines={engines}"
             )
-            version = str(connection.execute("SELECT version()")[0][0])
-            assert "deltaLake" in names, f"Server {version} lacks the deltaLake table function"
         finally:
             clickhouse_adapter.close_connection(connection)
-
-    def test_delta_lake_engine_registered(self, clickhouse_adapter) -> None:
-        connection = clickhouse_adapter.create_connection()
-        try:
-            names = _query_names(connection, "SELECT name FROM system.table_engines WHERE name = 'DeltaLake'")
-            version = str(connection.execute("SELECT version()")[0][0])
-            assert names == ["DeltaLake"], f"Server {version} lacks the DeltaLake table engine"
-        finally:
-            clickhouse_adapter.close_connection(connection)
-
-    def test_native_sql_shape_matches_probe(self) -> None:
-        """The SQL builders must target exactly the probed function name."""
-        source = delta_lake_table_function("s3://bucket/orders")
-        assert source.startswith("deltaLake(")
-        assert delta_lake_count_sql(source) == "SELECT count() FROM deltaLake('s3://bucket/orders')"

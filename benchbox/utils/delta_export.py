@@ -4,10 +4,13 @@ ClickHouse can read Delta Lake tables natively via the ``DeltaLake`` table
 engine and the ``deltaLake`` table-function family (see
 :mod:`benchbox.platforms.clickhouse.delta_lake`); native reads are deployment
 dependent and unavailable in some embedded builds. This module provides the
-Parquet conversion layer for the remaining cases: it reads a Delta table
+Parquet conversion layer for those cases: it reads a Delta table
 directory (optionally at a pinned version, giving time travel for free) and
 writes plain Parquet files that ClickHouse can ingest via its
 ``s3(..., 'Parquet')`` table function or local ``.parquet`` files.
+Availability detection lives in :func:`has_native_delta_support
+<benchbox.platforms.clickhouse.delta_lake.has_native_delta_support>`;
+selecting between the paths inside an adapter run is follow-up work.
 
 The export uses the ``deltalake`` package only -- no JVM or Spark session is
 required, so it runs in the default unit-test lane.
