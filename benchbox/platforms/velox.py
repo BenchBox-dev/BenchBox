@@ -77,6 +77,33 @@ _COLUMNAR_SHUFFLE_MANAGER = "org.apache.spark.shuffle.sort.ColumnarShuffleManage
 # contract.  Treating it as one would silently mean "remote".
 SUPPORTED_VELOX_DEPLOYMENTS = frozenset({"local", "remote"})
 
+# Lakehouse table formats with validated read-acceleration configuration.
+# parquet/orc need no extra Spark conf; delta/iceberg/hudi each require their
+# SQL extension plus session-catalog wiring before Gluten can read them.
+# Delta/Iceberg keys mirror SparkAdapter (benchbox/platforms/spark.py).
+_SUPPORTED_TABLE_FORMATS = frozenset({"parquet", "orc", "delta", "iceberg", "hudi"})
+
+# Formats whose Spark SQL extensions live outside the Gluten bundle: session
+# creation fails with class-not-found unless their connector jars are on the
+# JVM classpath (see lakehouse_jars).
+_CONNECTOR_JAR_FORMATS = frozenset({"delta", "iceberg", "hudi"})
+
+_TABLE_FORMAT_SPARK_CONF: dict[str, dict[str, str]] = {
+    "delta": {
+        "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+        "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+    },
+    "iceberg": {
+        "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+        "spark.sql.catalog.spark_catalog": "org.apache.iceberg.spark.SparkSessionCatalog",
+        "spark.sql.catalog.spark_catalog.type": "hive",
+    },
+    "hudi": {
+        "spark.sql.extensions": "org.apache.spark.sql.hudi.HoodieSparkSessionExtension",
+        "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.hudi.catalog.HoodieCatalog",
+    },
+}
+
 
 class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutionMixin, PlatformAdapter):
     """Apache Gluten + Velox Spark acceleration platform adapter.
@@ -172,7 +199,16 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             config.get("shuffle_partitions") if config.get("shuffle_partitions") is not None else 200
         )
         self.adaptive_enabled = config.get("adaptive_enabled") if config.get("adaptive_enabled") is not None else True
-        self.table_format = config.get("table_format") or "parquet"
+        table_format = (config.get("table_format") or "parquet").lower()
+        if table_format not in _SUPPORTED_TABLE_FORMATS:
+            raise ValueError(
+                f"Unsupported Velox table_format '{table_format}'. "
+                f"Supported formats: {sorted(_SUPPORTED_TABLE_FORMATS)}."
+            )
+        self.table_format = table_format
+        # Connector jars for delta/iceberg/hudi reads (local paths, remote
+        # URIs, or Maven coordinates). Comma-separated in config/CLI.
+        self.lakehouse_jars = self._parse_jar_list(config.get("lakehouse_jars"))
         self.spark_config = config.get("spark_config") or {}
         self.disable_cache = config.get("disable_cache") if config.get("disable_cache") is not None else True
 
@@ -193,6 +229,49 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         The method is required because PlatformAdapter declares it abstract.
         """
         return None
+
+    @staticmethod
+    def _parse_jar_list(value: Any) -> list[str]:
+        """Normalize the lakehouse_jars option to a jar list.
+
+        Accepts a comma-separated string or an existing list; Maven
+        coordinates keep their colons (only commas separate entries).
+        """
+        if not value:
+            return []
+        if isinstance(value, str):
+            return [entry.strip() for entry in value.split(",") if entry.strip()]
+        return [str(entry).strip() for entry in value if str(entry).strip()]
+
+    def _validate_connector_jars(self) -> list[str]:
+        """Require connector jars for lakehouse formats in local mode.
+
+        The Gluten bundle does not ship Delta/Iceberg/Hudi SQL extensions,
+        so without these jars session creation fails with class-not-found.
+        Remote servers own their classpath, so they only get a warning.
+        """
+        if self.table_format not in _CONNECTOR_JAR_FORMATS:
+            return []
+        if not self.lakehouse_jars:
+            if self.deployment == "local":
+                raise ValueError(
+                    f"table_format '{self.table_format}' requires connector jars in local mode: the Gluten "
+                    "bundle does not ship Delta/Iceberg/Hudi SQL extensions. Supply them via "
+                    "--platform-option lakehouse_jars=<jar1,jar2> (local paths, remote URIs, or Maven "
+                    "coordinates). See docs/platforms/velox.md."
+                )
+            self.logger.warning(
+                f"table_format '{self.table_format}' needs connector jars on the Spark-Connect server; "
+                "lakehouse_jars is unset, so ensure the server classpath provides them."
+            )
+            return []
+        missing = [jar for jar in self.lakehouse_jars if "://" not in jar and ":" not in jar and not Path(jar).exists()]
+        if missing and self.deployment == "local":
+            raise ValueError(
+                f"lakehouse_jars not found: {', '.join(missing)}. "
+                "Supply existing local paths, remote URIs, or Maven coordinates."
+            )
+        return self.lakehouse_jars
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
@@ -215,6 +294,7 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
                     "shuffle_partitions",
                     "adaptive_enabled",
                     "table_format",
+                    "lakehouse_jars",
                     "spark_config",
                     "disable_cache",
                 ],
@@ -304,6 +384,11 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
         if self.disable_cache:
             conf["spark.sql.inMemoryColumnarStorage.enabled"] = "false"
 
+        # Lakehouse read acceleration: delta/iceberg/hudi need their SQL
+        # extension plus session-catalog wiring or Spark cannot read them and
+        # Gluten has nothing to accelerate. parquet/orc need no extra keys.
+        conf.update(_TABLE_FORMAT_SPARK_CONF.get(self.table_format, {}))
+
         if self.deployment == "local":
             # Mandatory Gluten configuration - omitting any of these silently
             # forfeits native acceleration or causes OOM.
@@ -311,17 +396,24 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             conf["spark.memory.offHeap.enabled"] = "true"
             conf["spark.memory.offHeap.size"] = self.offheap_size
             conf["spark.shuffle.manager"] = _COLUMNAR_SHUFFLE_MANAGER
+            classpath_jars = []
             if self.gluten_jar_path:
-                # spark.jars ships the jar to driver + executors at runtime.
-                # spark.{driver,executor}.extraClassPath is also required: the
-                # Gluten plugin class is loaded by SparkContext.initializeSparkContext
+                classpath_jars.append(self.gluten_jar_path)
+            # Lakehouse connector jars ride the same classpath entries: the
+            # SQL extensions must load at session-creation time.
+            classpath_jars.extend(self._validate_connector_jars())
+            if classpath_jars:
+                # spark.jars ships the jars to driver + executors at runtime.
+                # spark.{driver,executor}.extraClassPath is also required: plugin
+                # and extension classes load by SparkContext.initializeSparkContext
                 # *before* spark.jars adds entries to the executor classpath, so
-                # without extraClassPath the GlutenPlugin class is not on the JVM
-                # classpath at plugin-load time and the plugin silently no-ops.
-                # The docker/velox/entrypoint.sh server config sets the same pair.
-                conf["spark.jars"] = self.gluten_jar_path
-                conf["spark.driver.extraClassPath"] = self.gluten_jar_path
-                conf["spark.executor.extraClassPath"] = self.gluten_jar_path
+                # without extraClassPath they are not on the JVM classpath at
+                # load time. The docker/velox/entrypoint.sh server config sets
+                # the same pair.
+                joined = ",".join(classpath_jars)
+                conf["spark.jars"] = joined
+                conf["spark.driver.extraClassPath"] = joined
+                conf["spark.executor.extraClassPath"] = joined
 
         # Merge user-provided overrides last
         conf.update(self.spark_config)
@@ -503,10 +595,19 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             # (none today, but cheap insurance) would otherwise diverge between
             # statements.
             fmt = self.table_format
+            # Delta/Iceberg/Hudi are Spark V2 tables: keep constraints and
+            # SMALLINT as the Spark adapter does, so the created schema
+            # matches the requested benchmark schema.
+            v1_table = (fmt or "parquet").lower() in {"parquet", "orc"}
             run_spark_schema_creation_loop(
                 spark,
                 statements,
-                lambda stmt: optimize_spark_table_definition(stmt, table_format=fmt),
+                lambda stmt: optimize_spark_table_definition(
+                    stmt,
+                    table_format=fmt,
+                    strip_v1_constraints=v1_table,
+                    upcast_smallint=v1_table,
+                ),
                 logger=self.logger,
                 on_pre_loop=lambda s: purge_orphaned_warehouse_directory(s, logger=self.logger),
             )

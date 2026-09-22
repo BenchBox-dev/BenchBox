@@ -447,7 +447,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                 logger.debug(f"Table {table} already exists in Glue catalog")
             except ClientError as e:
                 if e.response.get("Error", {}).get("Code") == "EntityNotFoundException":
-                    if self.table_format == "parquet":
+                    if file_format == "parquet":
                         glue_client.create_table(
                             DatabaseName=self.database,
                             TableInput={
@@ -466,7 +466,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                     else:
                         create_sql = (
                             f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table} "
-                            f"USING {self.table_format.upper()} LOCATION '{table_uri}'"
+                            f"USING {file_format.upper()} LOCATION '{table_uri}'"
                         )
                         self._submit_job_run(create_sql)
                     logger.info(f"Created table {self.database}.{table}")
@@ -490,6 +490,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
         results_path = f"{self.s3_staging_dir}/results/{job_run_id}"
 
         # Create PySpark job script
+        query_literal = json.dumps(query)
         job_script = f'''
 from pyspark.sql import SparkSession
 
@@ -502,7 +503,7 @@ spark = SparkSession.builder \\
 
 spark.sql("USE {self.database}")
 
-result = spark.sql("""{query}""")
+result = spark.sql({query_literal})
 result.write.mode("overwrite").json("{results_path}")
 
 spark.stop()

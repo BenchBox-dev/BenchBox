@@ -1,7 +1,8 @@
 # BenchBox CLI Reference
 
-This document is the canonical command reference for the `benchbox` CLI.
-It is intended to complement `benchbox --help` with a stable, searchable
+This document is a condensed overview of the `benchbox` CLI.
+For exhaustive flags and options, use the detailed [CLI reference](reference/cli/index.md)
+and live `benchbox <command> --help`. It provides a stable, searchable
 overview of core commands, common flags, and practical invocation patterns.
 
 BenchBox supports SQL and DataFrame benchmark execution across local and
@@ -222,6 +223,26 @@ optional plan flapping detection.
 
 Pre-downloads TPC-H and TPC-DS answer files to a local cache for
 offline row-count validation.
+
+### `benchbox compare`
+
+Compares benchmark result files for regression detection. See [results](reference/cli/results.md#compare).
+
+### `benchbox convert`
+
+Converts data to Parquet, Vortex, Delta Lake, or Iceberg. See [convert](reference/cli/convert.md).
+
+### `benchbox platforms`
+
+Manages database platform adapters. See [platforms](reference/cli/platforms.md).
+
+### `benchbox shell`
+
+Launches an interactive SQL shell. See [shell](reference/cli/shell.md).
+
+### `benchbox tuning`
+
+Tuning configuration commands. See [tuning](reference/cli/tuning.md).
 
 ## Notes
 

@@ -157,6 +157,15 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
+    # _convert_to_hudi_table is a helper invoked by _convert_to_delta_table
+    # when table_format is "hudi" to emit USING HUDI DDL; it is part of the
+    # same registered DDL_OPTIMIZE transform, not a second independent rewrite.
+    ("databricks", "_convert_to_hudi_table"): ("databricks_delta_ddl_optimizer",),
+    # _hudi_table_properties is a helper invoked by _convert_to_hudi_table
+    # to compute the per-statement TBLPROPERTIES it splices into the
+    # statement; it is part of the same registered DDL_OPTIMIZE transform,
+    # not a second independent rewrite.
+    ("databricks", "_hudi_table_properties"): ("databricks_delta_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
     ("fabric_dw", "_optimize_table_definition"): ("fabric_dw_ddl_optimizer",),
     ("firebolt", "_optimize_table_definition"): ("firebolt_ddl_optimizer",),

@@ -17,9 +17,12 @@ tests/
 ├── unit/                     # Unit tests
 ├── utilities/                # Test utilities and helpers
 ├── conftest.py              # Global pytest configuration
-├── pytest.ini              # Enhanced pytest configuration
 └── README.md               # This file
 ```
+
+Pytest uses the root `pytest.ini` by default (fast local runs). CI-oriented
+targets such as `make test-ci` and `make coverage-fast` explicitly select the
+root `pytest-ci.ini` profile with `pytest -c pytest-ci.ini`.
 
 ## Test Categories
 

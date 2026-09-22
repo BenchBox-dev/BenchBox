@@ -187,11 +187,26 @@ class CloudSparkConfigMixin:
     _scale_factor: float
     _spark_config: dict[str, str]
 
+    # Adapters may set `adaptive_enabled = False` to turn AQE off; absent
+    # means on (backwards compatible with adapters that predate the toggle).
+    # Shared by all CloudSparkConfigMixin consumers (EMR Serverless, Athena
+    # Spark, Dataproc, Dataproc Serverless, Quanton): user-override precedence
+    # and stale-output protection apply uniformly, not only to the two Azure
+    # adapters that expose the toggle today. Synapse and Fabric override
+    # `configure_for_benchmark` directly and do not use this mixin.
+
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Configure adapter for specific benchmark.
 
         Uses SparkConfigOptimizer to generate optimized Spark configuration
-        for the specified benchmark type and scale factor.
+        for the specified benchmark type and scale factor. The adapter's
+        `adaptive_enabled` toggle (default True) flows into the optimizer so
+        AQE is honored, not force-enabled. Entries already present in
+        `_spark_config` before the first call win over optimizer output; only
+        hosts that pre-seed `_spark_config` from user configuration (today:
+        Dataproc Serverless) give user entries precedence — hosts starting
+        from an empty config merge optimizer output unchanged. Shared across
+        all mixin consumers by design.
 
         Args:
             connection: Connection object (unused, for interface compatibility).
@@ -200,31 +215,43 @@ class CloudSparkConfigMixin:
         self._benchmark_type = benchmark_type.lower()
         platform_name = self.cloud_platform.value.replace("_", " ").title()
         logger.info(f"Configuring {platform_name} for {benchmark_type} benchmark")
+        adaptive_enabled = getattr(self, "adaptive_enabled", True)
 
         # Get optimized Spark config from cloud-spark infrastructure
         if self._benchmark_type == "tpch":
             spark_config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=self.cloud_platform,
+                adaptive_enabled=adaptive_enabled,
             )
         elif self._benchmark_type == "tpcds":
             spark_config = SparkConfigOptimizer.for_tpcds(
                 scale_factor=self._scale_factor,
                 platform=self.cloud_platform,
+                adaptive_enabled=adaptive_enabled,
             )
         elif self._benchmark_type == "ssb":
             spark_config = SparkConfigOptimizer.for_ssb(
                 scale_factor=self._scale_factor,
                 platform=self.cloud_platform,
+                adaptive_enabled=adaptive_enabled,
             )
         else:
             # Default to TPC-H config for unknown benchmarks
             spark_config = SparkConfigOptimizer.for_tpch(
                 scale_factor=self._scale_factor,
                 platform=self.cloud_platform,
+                adaptive_enabled=adaptive_enabled,
             )
 
-        self._spark_config = spark_config.to_dict()
+        # Config precedence: entries the host pre-seeded in _spark_config
+        # before the first optimizer run (user overrides on hosts that seed
+        # them) win over optimizer output, so re-apply them on top. Stashed
+        # once so reconfiguring for another benchmark cannot resurrect stale
+        # optimizer output as user entries.
+        if "_user_spark_config" not in self.__dict__:
+            self._user_spark_config = dict(self._spark_config)
+        self._spark_config = {**spark_config.to_dict(), **self._user_spark_config}
 
         # These configs are genuinely applied (at SparkSession build), just not
         # via connection SETs, so record them as executed session statements in
