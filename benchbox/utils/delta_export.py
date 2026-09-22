@@ -98,7 +98,10 @@ def export_delta_to_parquet(
     unpartitioned tables that fit in one chunk land in ``file_name``.
     Files are staged in a sibling temp directory and moved into place only
     on full success, so a failed export never leaves partial artifacts in
-    ``output_dir`` (safe to retry or to glob from ClickHouse).
+    ``output_dir`` (safe to retry or to glob from ClickHouse). Prior
+    ``.parquet`` files in ``output_dir`` are removed before publishing, so
+    reusing the directory with a different file name cannot leave stale
+    snapshots behind for a glob to double-read.
 
     Args:
         table_path: Local path to the Delta table directory (must contain
@@ -162,6 +165,13 @@ def export_delta_to_parquet(
         staged = sorted(p for p in staging_dir.rglob("*") if p.is_file())
         row_count = dataset.count_rows()
         column_names = dataset.schema.names
+
+        # Remove prior export files before publishing: reusing output_dir
+        # with a different file_name (or layout) would otherwise leave stale
+        # .parquet files that a ClickHouse glob would read as duplicate rows.
+        for stale in sorted(out_dir.rglob("*.parquet")):
+            logger.info(f"Removing stale export file '{stale}' superseded by version {resolved_version}")
+            stale.unlink()
 
         moved: list[Path] = []
         if len(staged) == 1 and not partition_columns:

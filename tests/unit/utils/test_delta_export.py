@@ -137,6 +137,18 @@ class TestExportShapes:
         assert second.parquet_files == [out / "data.parquet"]
         assert pq.read_table(out / "data.parquet").num_rows == 2
 
+    def test_reexport_with_different_name_cleans_stale_files(self, delta_table: Path, tmp_path: Path):
+        """Reusing output_dir with another file_name must not duplicate rows."""
+        out = tmp_path / "parquet"
+        export_delta_to_parquet(delta_table, out, version=0, file_name="v0.parquet")
+        repeat = export_delta_to_parquet(delta_table, out, version=0, file_name="v0.parquet")
+        assert repeat.parquet_files == [out / "v0.parquet"]
+
+        latest = export_delta_to_parquet(delta_table, out)
+        assert latest.parquet_files == [out / "data.parquet"]
+        assert sorted(p.name for p in out.glob("*.parquet")) == ["data.parquet"]
+        assert pq.read_table(out / "data.parquet").num_rows == 3
+
     def test_partitioned_table_keeps_hive_layout(self, tmp_path: Path):
         from deltalake import write_deltalake
 
