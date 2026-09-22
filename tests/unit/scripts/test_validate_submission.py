@@ -107,13 +107,10 @@ def _minimal_bundle() -> dict:
         },
         "summary": {
             "validation": "passed",
-            "queries": {"total": 2, "passed": 2, "failed": 0},
+            "queries": {"total": 22, "passed": 22, "failed": 0},
         },
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS", "rows": 6},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS", "rows": 12},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i * 10, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -700,11 +697,10 @@ class TestValidateBundle:
 
     def test_failed_warmup_does_not_contradict_successful_measurements(self):
         data = _minimal_bundle()
-        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["summary"]["queries"] = {"total": 23, "passed": 23, "failed": 0}
         data["queries"] = [
             {"id": "Q1", "ms": 0, "status": "FAILED", "run_type": "warmup"},
-            {"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "measurement"},
-        ]
+        ] + [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "run_type": "measurement"} for i in range(1, 23)]
         vr = ValidationResult("test")
 
         _validate_bundle(data, vr)
@@ -767,7 +763,7 @@ class TestValidateBundle:
 
     def test_positive_sub_millisecond_timing_passes(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "SUCCESS"}]
+        data["queries"] = [{"id": f"Q{i}", "ms": 0.04, "status": "SUCCESS"} for i in range(1, 23)]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok
@@ -1025,7 +1021,7 @@ def _bundle_with_rows(row_values, rows_loaded=866602):
 class TestEmptyResultRows:
     def test_all_empty_against_loaded_data_warns(self):
         vr = ValidationResult("test")
-        _validate_bundle(_bundle_with_rows([0, 0]), vr)
+        _validate_bundle(_bundle_with_rows([0, 0]), vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert any("result-rows-empty" in w for w in vr.warnings)
 
@@ -1034,19 +1030,19 @@ class TestEmptyResultRows:
         for q in data["queries"]:
             q.pop("rows")
         vr = ValidationResult("test")
-        _validate_bundle(data, vr)
+        _validate_bundle(data, vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert any("result-rows-empty" in w and "unreported" in w for w in vr.warnings)
 
     def test_mixed_zero_and_nonzero_is_silent(self):
         vr = ValidationResult("test")
-        _validate_bundle(_bundle_with_rows([0, 41]), vr)
+        _validate_bundle(_bundle_with_rows([0, 41]), vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert not any("result-rows-empty" in w for w in vr.warnings)
 
     def test_zero_loaded_volume_excuses_empty_results(self):
         vr = ValidationResult("test")
-        _validate_bundle(_bundle_with_rows([0, 0], rows_loaded=0), vr)
+        _validate_bundle(_bundle_with_rows([0, 0], rows_loaded=0), vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert not any("result-rows-empty" in w for w in vr.warnings)
 
@@ -1134,7 +1130,9 @@ class TestTimingPlateau:
 
     def test_few_distinct_queries_unevaluable(self):
         vr = ValidationResult("test")
-        _validate_bundle(_timing_bundle({"Q1": 4400.0, "Q2": 4450.0}), vr)
+        # Mirror lane: a 2-query fixture cannot satisfy canonical coverage;
+        # the plateau gate under test is orthogonal to it.
+        _validate_bundle(_timing_bundle({"Q1": 4400.0, "Q2": 4450.0}), vr, allow_partial_validation=True)
         assert vr.ok, vr.errors
         assert not any("timing-plateau" in w for w in vr.warnings)
 
@@ -1379,7 +1377,9 @@ class TestFloorOutlier:
                     rows_loaded=8_661_245,
                 )
             )
-        return validate_bundles(paths)
+        # Mirror lane: these peer fixtures are deliberately short-coverage
+        # synthetic bundles; the coverage gate is orthogonal to peer logic.
+        return validate_bundles(paths, allow_partial_validation=True)
 
     def test_slow_peer_warns_informationally(self, tmp_path):
         slow, mid, fast = self._peer_set(tmp_path, [4500.0, 350.0, 300.0])
@@ -1411,6 +1411,183 @@ class TestFloorOutlier:
         assert all(vr.ok for vr in (slow, rerun))
         assert any("floor-outlier" in w for w in slow.warnings)
         assert not any("floor-outlier" in w for w in rerun.warnings)
+
+
+# compliance_class + canonical query-set coverage gates
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionDeterministicGates:
+    def test_unofficial_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial_nonstandard", "unofficial_subscale"):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("compliance_class" in e for e in vr.errors)
+
+    def test_official_compliance_passes(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "official"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_compliance_class_grandfathered(self):
+        data = _minimal_bundle()
+        assert "compliance_class" not in data["benchmark"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_unofficial_compliance_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "unofficial_subscale"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_short_query_coverage_refused_in_community_mode(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("canonical queries" in e for e in vr.errors)
+
+    def test_full_query_coverage_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_minimal_bundle(), vr)
+        assert vr.ok, vr.errors
+
+    def test_short_coverage_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_unknown_benchmark_skips_coverage(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "some_new_benchmark"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_case_variant_benchmark_id_still_gated(self):
+        for bm_id in ("TPCH", "tpch ", " Tpch"):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = bm_id
+            data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+            data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("canonical queries" in e for e in vr.errors)
+
+    def test_non_string_query_ids_do_not_count_toward_coverage(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": i, "ms": 100, "status": "SUCCESS"} for i in range(1, 23)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("non-string or blank id" in e for e in vr.errors)
+
+    def test_non_official_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial", "Official", "official ", 123, True):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok, compliance
+            assert any("compliance_class" in e for e in vr.errors)
+
+    def test_canonical_counts_match_explorer_transformer(self):
+        from _project.scripts.explorer_pipeline.transformer import (
+            _KNOWN_LOGICAL_QUERY_COUNTS,
+        )
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_COUNTS
+
+        assert CANONICAL_LOGICAL_QUERY_COUNTS == _KNOWN_LOGICAL_QUERY_COUNTS
+
+    def test_matching_cardinality_with_wrong_ids_is_refused(self):
+        # 22 distinct labels, none of them canonical: cardinality alone
+        # must not pass the gate.
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"FAKE{i}", "ms": 100, "status": "SUCCESS"} for i in range(22)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("covers 0 of 22 canonical queries" in e for e in vr.errors)
+        assert any("missing:" in e for e in vr.errors)
+
+    def test_canonical_membership_accepts_producer_id_variants(self):
+        # Q-prefix, bare, padded, and query_-prefixed spellings all name
+        # the same canonical queries once normalized.
+        variants = [f"Q{i}" for i in range(1, 8)] + [str(i) for i in range(8, 15)]
+        variants += [f"query_{i}" for i in range(15, 20)] + [f"  q{i} " for i in range(20, 23)]
+        data = _minimal_bundle()
+        data["queries"] = [{"id": v, "ms": 100, "status": "SUCCESS"} for v in variants]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_membership_allows_extra_ids(self):
+        data = _minimal_bundle()
+        data["queries"] = data["queries"] + [{"id": "EXTRA", "ms": 100, "status": "SUCCESS"}]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_id_sets_agree_with_counts(self):
+        from benchbox.validation.bundle import (
+            CANONICAL_LOGICAL_QUERY_COUNTS,
+            CANONICAL_LOGICAL_QUERY_IDS,
+        )
+
+        assert set(CANONICAL_LOGICAL_QUERY_IDS) == set(CANONICAL_LOGICAL_QUERY_COUNTS)
+        for family, ids in CANONICAL_LOGICAL_QUERY_IDS.items():
+            assert len(ids) == CANONICAL_LOGICAL_QUERY_COUNTS[family], family
+
+    def test_ssb_and_clickbench_membership(self):
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_IDS
+
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["ssb"]) == 13
+        assert "1.1" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert "4.3" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["clickbench"]) == 43
+        # SSB flight IDs in producer Q-prefixed form validate.
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "ssb"
+        data["queries"] = [
+            {"id": qid, "ms": 100, "status": "SUCCESS"}
+            for qid in (
+                "Q1.1",
+                "Q1.2",
+                "Q1.3",
+                "Q2.1",
+                "Q2.2",
+                "Q2.3",
+                "Q3.1",
+                "Q3.2",
+                "Q3.3",
+                "Q3.4",
+                "Q4.1",
+                "Q4.2",
+                "Q4.3",
+            )
+        ]
+        data["summary"]["queries"] = {"total": 13, "passed": 13, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
 
 
 # ---------------------------------------------------------------------------
@@ -1905,3 +2082,223 @@ class TestMain:
         output = capsys.readouterr().out
         assert "PLANS.JSON" in output
         assert "private absolute paths" in output
+
+
+# ---------------------------------------------------------------------------
+# warn-require-override contract (model, exit code, version, rendering)
+# ---------------------------------------------------------------------------
+
+
+class TestOverrideContract:
+    def test_require_override_dual_records_and_keeps_ok(self):
+        from benchbox.validation.bundle import RULES, RULES_VERSION
+
+        vr = ValidationResult("test")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        assert vr.ok
+        assert vr.override_required == ["timing-plateau"]
+        assert vr.warnings.count("span 4400-4500ms") == 2
+        assert RULES_VERSION == "1"
+        assert {r[0]: r[2] for r in RULES} == {
+            "timing-plateau": "warn-require-override",
+            "scale-invariant": "warn-require-override",
+            "floor-outlier": "info",
+            "small-scale-floor": "warn-require-override",
+        }
+
+    def test_plateau_and_floor_promoted_to_overrides(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0)), vr)
+        assert vr.ok, vr.errors
+        assert sorted(vr.override_required) == ["small-scale-floor", "timing-plateau"]
+
+    def test_floor_outlier_stays_informational(self, tmp_path):
+        slow, _, _ = TestFloorOutlier()._peer_set(tmp_path, [4500.0, 350.0, 300.0])
+        assert slow.ok
+        assert "floor-outlier" not in slow.override_required
+        assert any("floor-outlier" in w for w in slow.warnings)
+
+    def test_unsatisfied_mapping(self):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        vr = ValidationResult("b.json")
+        vr.require_override("timing-plateau", "flat")
+        assert unsatisfied_override_rules([vr]) == {"b.json": ["timing-plateau"]}
+        assert unsatisfied_override_rules([ValidationResult("clean.json")]) == {}
+
+    def test_pr_comment_strict_fails_header_with_overrides(self):
+        from benchbox.validation.bundle import format_pr_comment
+
+        vr = ValidationResult("flat.json")
+        vr.require_override("timing-plateau", "flat")
+        strict = format_pr_comment([vr])
+        assert "## Submission Validation: FAILED" in strict
+        assert "### Overrides required (rules v1)" in strict
+        assert "`timing-plateau`" in strict
+        mirror = format_pr_comment([vr], strict_overrides=False)
+        assert "## Submission Validation: PASSED" in mirror
+        assert "advisory only" in mirror
+
+    def test_exit_contract_community_vs_mirror(self, tmp_path):
+        bundle = tmp_path / "flat.json"
+        bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+        assert main([str(bundle)]) == 1
+        assert main([str(bundle), "--allow-partial-validation"]) == 0
+
+    def test_rules_version_flag(self, capsys):
+        assert main(["--rules-version"]) == 0
+        out = capsys.readouterr().out
+        assert "rules version: 1" in out
+        assert "timing-plateau" in out
+
+    def test_unknown_flag_fails_closed(self, tmp_path, capsys):
+        bundle = tmp_path / "b.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        assert main([str(bundle), "--bogus-flag"]) == 2
+        assert "unrecognized flag" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# committed override artifacts (<stem>.override.json)
+# ---------------------------------------------------------------------------
+
+
+def _override_doc(*rules, **kw):
+    doc = {
+        "rules": [{"rule": rule, "rule_version": "1"} for rule in rules or ("timing-plateau",)],
+        "reason": "verified against profiler trace",
+        "evidence": "https://example.com/trace",
+        "expires": "single-batch",
+        "approver": "reviewer2",
+    }
+    doc.update(kw)
+    return doc
+
+
+def _write_plateau_bundle(tmp_path, name="flat.json"):
+    bundle = tmp_path / name
+    bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+    return bundle
+
+
+class TestOverrideDocument:
+    def test_valid_document_accepts(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(), bundle_stem="flat") == []
+
+    def test_expiry_matrix(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(expires="2999-01-01"), bundle_stem="flat") == []
+        expired = validate_override_document(_override_doc(expires="2000-01-01"), bundle_stem="flat")
+        assert any("expired" in e for e in expired)
+        bad = validate_override_document(_override_doc(expires="next Friday"), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in bad)
+        nonstr = validate_override_document(_override_doc(expires=20260101), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in nonstr)
+
+    def test_unknown_rule_and_wrong_severity_refused(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        unknown = validate_override_document(_override_doc("nope"), bundle_stem="flat")
+        assert any("not a known rubric rule" in e for e in unknown)
+        info = validate_override_document(_override_doc("floor-outlier"), bundle_stem="flat")
+        assert any("only warn-require-override rules are overridable" in e for e in info)
+
+    def test_version_pin_required_and_exact(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        doc = _override_doc()
+        del doc["rules"][0]["rule_version"]
+        assert any("exactly rule and rule_version" in e for e in validate_override_document(doc, bundle_stem="flat"))
+        stale_doc = _override_doc()
+        stale_doc["rules"][0]["rule_version"] = "0"
+        stale = validate_override_document(stale_doc, bundle_stem="flat")
+        assert any("does not match registry version" in e for e in stale)
+
+    def test_shape_and_content_guards(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(["x"], bundle_stem="flat") != []
+        assert any(
+            "unknown fields" in e for e in validate_override_document(_override_doc(aprover="x"), bundle_stem="flat")
+        )
+        assert any(
+            "missing fields" in e for e in validate_override_document({"rule": "timing-plateau"}, bundle_stem="flat")
+        )
+        assert any(
+            "non-empty string" in e for e in validate_override_document(_override_doc(reason="  "), bundle_stem="flat")
+        )
+        assert any(
+            "non-empty list" in e for e in validate_override_document(_override_doc(bundles=[]), bundle_stem="flat")
+        )
+        assert any(
+            "own stem" in e for e in validate_override_document(_override_doc(bundles=["other"]), bundle_stem="flat")
+        )
+        assert validate_override_document(_override_doc(bundles=["flat", "flat2"]), bundle_stem="flat") == []
+
+
+class TestOverrideSatisfaction:
+    def test_valid_artifact_satisfies_finding(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert vr.override_required == ["timing-plateau", "small-scale-floor"]
+        assert unsatisfied_override_rules([vr]) == {}
+
+    def test_satisfaction_narrows_unsatisfied_map(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(json.dumps(_override_doc("timing-plateau")), encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert unsatisfied_override_rules([vr]) == {str(bundle): ["small-scale-floor"]}
+
+    def test_malformed_artifact_errors_in_both_lanes(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text("{not json", encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok
+        assert any("override artifact" in e for e in vr.errors)
+        (mirror,) = validate_bundles([bundle], allow_partial_validation=True)
+        assert not mirror.ok
+
+    def test_expired_artifact_satisfies_nothing(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc(expires="2000-01-01")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok  # malformed-audit artifact is an error, not silent
+        assert main([str(bundle)]) == 1
+
+    def test_main_passes_with_valid_artifact(self, tmp_path, capsys):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        assert main([str(bundle)]) == 0
+        out = capsys.readouterr().out
+        assert "override(s) required" in out
+
+    def test_override_companion_excluded_from_discovery(self, tmp_path):
+        from benchbox.validation.bundle import is_primary_bundle_file
+
+        bundle = _write_plateau_bundle(tmp_path)
+        artifact = bundle.with_name("flat.override.json")
+        artifact.write_text(json.dumps(_override_doc()), encoding="utf-8")
+        assert not is_primary_bundle_file(artifact)
+
+    def test_override_companion_privacy_scanned(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        doc = _override_doc(reason="see /Users/alice/private notes")
+        bundle.with_name("flat.override.json").write_text(json.dumps(doc), encoding="utf-8")
+        assert main([str(bundle)]) == 1

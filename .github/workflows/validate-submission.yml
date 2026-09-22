@@ -253,12 +253,13 @@ jobs:
             | grep -vi '\.applied\.json$' \
             | grep -vi 'corpus-inventory\.json$' \
             | grep -vi '\.manifest\.json$' \
+            | grep -vi '\.override\.json$' \
             | grep -vi 'submission-manifest\.json$' \
             || true)
 
           while IFS= read -r -d '' deleted_bundle; do
               stem="${deleted_bundle:0:${#deleted_bundle}-5}"
-              for suffix in ".manifest.json" ".plans.json" ".tuning.json" ".applied.json"; do
+              for suffix in ".manifest.json" ".plans.json" ".tuning.json" ".applied.json" ".override.json"; do
                 companion=$(git ls-tree -rz --name-only "$EFFECTIVE_MERGE" -- results-data/bundles \
                   | STEM="$stem" SUFFIX="$suffix" awk -v RS='\0' \
                     'length($0) == length(ENVIRON["STEM"]) + length(ENVIRON["SUFFIX"]) && \
@@ -294,7 +295,7 @@ jobs:
           done < <(git diff --no-renames --name-only -z --diff-filter=D \
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
-            | grep -vizE '\.(manifest|plans|tuning|applied)\.json$' \
+            | grep -vizE '\.(manifest|plans|tuning|applied|override)\.json$' \
             | grep -viz 'corpus-inventory\.json$' \
             | grep -viz 'submission-manifest\.json$' \
             || true)
@@ -336,7 +337,7 @@ jobs:
           CHANGED_COMPANIONS=$(git diff --no-renames --name-only --diff-filter=ACMRD \
             "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
-            | grep -iE '\.(plans|tuning)\.json$' \
+            | grep -iE '\.(plans|tuning|override)\.json$' \
             | grep -ivE '(corpus-inventory|submission-manifest)\.json$' \
             || true)
           if [ -n "$CHANGED_COMPANIONS" ]; then
@@ -345,6 +346,7 @@ jobs:
               case "$lower" in
                 *.plans.json) strip=11 ;;
                 *.tuning.json) strip=12 ;;
+                *.override.json) strip=14 ;;
                 *) continue ;;
               esac
               stem="${companion:0:$(( ${#companion} - strip ))}"
@@ -384,7 +386,7 @@ jobs:
               git show "$EFFECTIVE_MERGE:$bundle" > "/tmp/payload/$bundle" 2>/dev/null || echo "Warning: cannot extract $bundle at $EFFECTIVE_MERGE" >&2
               # Extract companions if present at MERGE_SHA
               stem="${bundle%.json}"
-              for suffix in ".manifest.json" ".applied.json" ".plans.json" ".tuning.json"; do
+              for suffix in ".manifest.json" ".applied.json" ".plans.json" ".tuning.json" ".override.json"; do
                 companion="${stem}${suffix}"
                 if git cat-file -e "$EFFECTIVE_MERGE:$companion" 2>/dev/null; then
                   git show "$EFFECTIVE_MERGE:$companion" > "/tmp/payload/$companion" 2>/dev/null || true
@@ -460,6 +462,76 @@ jobs:
             | tee /tmp/validation_output.txt
           # Also run parity validator to compare PR-head vs merge-SHA outcomes (fallback for harness)
           uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --head-sha "$_HEAD_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION
+
+      # Override approval separation: a committed override's approver must
+      # differ from the PR author, and an APPROVED review from that approver
+      # must exist — file content alone never authorizes. Mirror-lane bot
+      # PRs are exempt (allow-partial renders overrides advisory there).
+      - name: Check override approvals
+        if: steps.validate.outcome == 'success'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ env.BASE_SHA }}
+          MERGE_SHA: ${{ env.MERGE_SHA }}
+        run: |
+          set -euo pipefail
+          EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"
+          OVERRIDES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
+            ':(icase,glob)results-data/bundles/*.override.json' ':(icase,glob)results-data/bundles/**/*.override.json' \
+            || true)
+          # Reused artifacts need approval too: touching a bundle covered by
+          # an unchanged override would otherwise inherit the old artifact
+          # with no review on this PR. Enumerate the override sibling of
+          # every changed primary bundle alongside changed overrides.
+          CHANGED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
+            ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
+            | grep -viE '\.(manifest|plans|tuning|applied|override)\.json$' \
+            | grep -vi 'corpus-inventory\.json$' \
+            | grep -vi 'submission-manifest\.json$' \
+            || true)
+          ASSOCIATED=""
+          while IFS= read -r bundle; do
+            [ -n "$bundle" ] || continue
+            candidate="${bundle%.json}.override.json"
+            if git cat-file -e "$EFFECTIVE_MERGE:$candidate" 2>/dev/null; then
+              ASSOCIATED=$(printf '%s\n%s' "$ASSOCIATED" "$candidate")
+            fi
+          done <<< "$CHANGED_BUNDLES"
+          OVERRIDES=$(printf '%s\n%s' "$OVERRIDES" "$ASSOCIATED" | sed '/^[[:space:]]*$/d' | sort -u)
+          if [ -z "$OVERRIDES" ]; then
+            echo "No override artifacts changed or associated."
+            exit 0
+          fi
+          if [ "${PR_AUTHOR:-}" = "github-actions[bot]" ]; then
+            echo "Mirror-lane bot PR: overrides advisory, no approval required."
+            exit 0
+          fi
+          failed=0
+          while IFS= read -r artifact; do
+            [ -n "$artifact" ] || continue
+            approver=$(git show "$EFFECTIVE_MERGE:$artifact" 2>/dev/null \
+              | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('approver','') if isinstance(data,dict) else '')" 2>/dev/null || true)
+            if [ -z "$approver" ]; then
+              echo "::error file=${artifact}::Override artifact has no approver."
+              failed=1
+              continue
+            fi
+            if [ "$(printf '%s' "$approver" | tr 'A-Z' 'a-z')" = "$(printf '%s' "$PR_AUTHOR" | tr 'A-Z' 'a-z')" ]; then
+              echo "::error file=${artifact}::Override approver must differ from the PR author."
+              failed=1
+              continue
+            fi
+            approved=$(WANT="$approver" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
+              | WANT="$approver" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED')), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
+            if [ "$approved" != "yes" ]; then
+              echo "::error file=${artifact}::No APPROVED review from override approver '${approver}'."
+              failed=1
+              continue
+            fi
+            echo "Override ${artifact} approved by ${approver}."
+          done <<< "$OVERRIDES"
+          exit "$failed"
 
       - name: Check corpus inventory
         if: steps.validate.outcome == 'success' || steps.changed.outputs.has_bundles == 'corpus-only'

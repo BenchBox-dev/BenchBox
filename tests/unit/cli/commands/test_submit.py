@@ -47,9 +47,11 @@ def _valid_submission_bundle() -> dict:
         },
         "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
         "platform": {"name": "duckdb", "version": "1.3.0"},
-        "summary": {"validation": "passed", "queries": {"total": 1, "passed": 1, "failed": 0}},
+        "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [{"id": "Q1", "ms": 123, "status": "SUCCESS"}],
+        # Full canonical TPC-H coverage: submit runs the bundle validator
+        # on every path, and short query sets are refused.
+        "queries": [{"id": f"Q{i}", "ms": 123, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -155,7 +157,7 @@ def test_submit_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
 
 def test_submit_creates_output_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -218,7 +220,7 @@ def test_submit_contributing_md_includes_canonical_required_items(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -246,7 +248,7 @@ def test_submit_contributing_md_includes_canonical_required_items(
 
 def test_submit_prints_next_steps_with_pr_target_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -302,6 +304,29 @@ def test_submit_dry_run_validation_rejects_pr_package_errors(monkeypatch: pytest
     assert not out_dir.exists()
 
 
+def test_submit_real_run_refuses_short_coverage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Every submit path runs the bundle validator, not just --dry-run.
+
+    A clean-classified single-query result must be refused before the real
+    PR-package path writes anything, since published-results CI would
+    reject the artifact.
+    """
+    src = tmp_path / "tpch_duckdb.json"
+    bundle = _valid_submission_bundle()
+    bundle["queries"] = [{"id": "Q1", "ms": 123, "status": "SUCCESS"}]
+    bundle["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+    src.write_text(json.dumps(bundle), encoding="utf-8")
+    monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
+
+    out_dir = tmp_path / "submission"
+    result = CliRunner().invoke(sub.submit, [str(src), "--output", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "Submission validation failed" in result.output
+    assert "canonical queries" in result.output
+    assert not out_dir.exists()
+
+
 # ---------------------------------------------------------------------------
 # 4d. Dry-run validation uses the packaged library, not a cwd-loadable script.
 # ---------------------------------------------------------------------------
@@ -312,7 +337,7 @@ def test_submit_dry_run_validator_is_packaged_library() -> None:
     import re
 
     assert not hasattr(sub, "_load_submission_validator_module")
-    source = inspect.getsource(sub._validate_submission_bundle_for_dry_run)
+    source = inspect.getsource(sub._validate_submission_bundle)
     forbidden_patterns = [
         r"importlib",
         r"\bPath\.cwd\b",
@@ -333,7 +358,7 @@ def test_submit_dry_run_validator_is_packaged_library() -> None:
 
 def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
@@ -348,7 +373,7 @@ def test_submit_manifest_contains_bundle_hash(monkeypatch: pytest.MonkeyPatch, t
 
 def test_submit_manifest_provenance_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     out_dir = tmp_path / "submission"
@@ -366,7 +391,7 @@ def test_submit_manifest_provenance_fields(monkeypatch: pytest.MonkeyPatch, tmp_
 
 def test_submit_manifest_funding_defaults_to_unspecified(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     out_dir = tmp_path / "submission"
@@ -404,7 +429,7 @@ def test_submit_load_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
 
 def test_submit_copies_companion_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
 
     plans = tmp_path / "tpch_duckdb.plans.json"
     plans.write_text('{"plans": []}', encoding="utf-8")
@@ -429,7 +454,7 @@ def test_submit_canonical_manifest_hashes_primary_and_companions(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version":"2.0","z":2,"a":1}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     source_raw_hash = _sha256(src.read_bytes())
 
     plans = tmp_path / "tpch_duckdb.plans.json"
@@ -644,7 +669,7 @@ def test_submit_service_idempotency_key_passthrough(monkeypatch: pytest.MonkeyPa
 def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--service without --dry-run resolves auth and calls the hosted transport."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     auth_calls: list[str] = []
     upload_calls: list[dict] = []
@@ -683,7 +708,7 @@ def test_submit_service_real_upload_calls_transport(monkeypatch: pytest.MonkeyPa
 
 def test_submit_service_upload_uses_canonical_manifest_hashes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version":"2.0","z":2,"a":1}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     plans = tmp_path / "tpch_duckdb.plans.json"
     plans.write_text('{"z":1,"alpha":{"b":2}}', encoding="utf-8")
     tuning = tmp_path / "tpch_duckdb.tuning.json"
@@ -720,7 +745,7 @@ def test_submit_service_upload_uses_canonical_manifest_hashes(monkeypatch: pytes
 def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--service without --dry-run stops before upload when auth is missing."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     def fake_resolve(_service_url: str):
@@ -737,7 +762,7 @@ def test_submit_service_real_upload_requires_auth(monkeypatch: pytest.MonkeyPatc
 def test_submit_service_reauthenticates_once_on_401(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A 401 from the hosted service prompts refresh, then retries once."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     tokens: list[str] = []
 
@@ -769,7 +794,7 @@ def test_submit_service_reauthenticates_once_on_401(monkeypatch: pytest.MonkeyPa
 def test_submit_service_no_wait_reports_accepted_not_complete(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """--no-wait accepted submissions are not reported as completed publications."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     monkeypatch.setattr(sub, "resolve_submission_token", lambda _service_url: SimpleNamespace(token="secret-token"))
     monkeypatch.setattr(
@@ -793,7 +818,7 @@ def test_submit_service_no_wait_reports_accepted_not_complete(monkeypatch: pytes
 def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Default behavior (no --service) is unchanged: PR-package mode."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     out_dir = tmp_path / "submission"
@@ -811,7 +836,7 @@ def test_submit_default_pr_path_unchanged(monkeypatch: pytest.MonkeyPatch, tmp_p
 def test_submit_manifest_filename_inherits_bundle_stem(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Manifest is named `<bundle_stem>.manifest.json`, not the legacy literal."""
     src = tmp_path / "tpch_sf001_duckdb_20260403_093653_9c0925d1.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     out_dir = tmp_path / "submission"
@@ -826,9 +851,9 @@ def test_submit_manifest_filename_inherits_bundle_stem(monkeypatch: pytest.Monke
 def test_submit_two_consecutive_submits_do_not_collide(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Two submits to the same output dir produce two distinct manifest files."""
     src_a = tmp_path / "tpch_duckdb.json"
-    src_a.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src_a)
     src_b = tmp_path / "tpch_clickhouse.json"
-    src_b.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src_b)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
 
     out_dir = tmp_path / "submission"
@@ -850,7 +875,7 @@ def test_submit_two_consecutive_submits_do_not_collide(monkeypatch: pytest.Monke
 def test_submit_submitted_by_flag_overrides_git(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Explicit --submitted-by wins over git config user.name."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     monkeypatch.setattr(sub, "_get_git_username", lambda: "git-config-name")
 
@@ -868,7 +893,7 @@ def test_submit_submitted_by_flag_overrides_git(monkeypatch: pytest.MonkeyPatch,
 def test_submit_submitted_by_falls_back_to_git_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Without --submitted-by, git config user.name is used."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     monkeypatch.setattr(sub, "_get_git_username", lambda: "git-config-name")
 
@@ -883,7 +908,7 @@ def test_submit_submitted_by_falls_back_to_git_config(monkeypatch: pytest.Monkey
 def test_submit_submitted_by_warns_when_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """When both flag and git config are empty, warn but do not fail."""
     src = tmp_path / "tpch_duckdb.json"
-    src.write_text('{"schema_version": "2.0"}', encoding="utf-8")
+    _write_valid_submission_bundle(src)
     monkeypatch.setattr(sub, "load_result_file", lambda *_a, **_k: (_fake_result(), {}))
     monkeypatch.setattr(sub, "_get_git_username", lambda: "")
 

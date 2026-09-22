@@ -164,9 +164,10 @@ jobs:
         shell: bash
         run: |
           # Default results dir is benchmark_runs/results/ relative to repo root.
-          # Find the most recently modified schema-v2 JSON (excludes .plans.json / .tuning.json).
+          # Find the most recently modified schema-v2 JSON (excludes companions).
           RESULT=$(find benchmark_runs/results -maxdepth 1 -name "*.json" \
             ! -name "*.plans.json" ! -name "*.tuning.json" \
+            ! -name "*.override.json" \
             -printf "%T@ %p\n" 2>/dev/null \
             | sort -rn | head -1 | awk '{print $2}')
           if [ -z "$RESULT" ]; then

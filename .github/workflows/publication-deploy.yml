@@ -566,7 +566,8 @@ jobs:
           LOCKFILE_DIGEST=$(sha256sum uv.lock | cut -d ' ' -f 1)
           BUNDLE_COUNT=$(find results-data/bundles -type f -name '*.json' \
             ! -name '*.manifest.json' ! -name '*.applied.json' \
-            ! -name '*.plans.json' ! -name '*.tuning.json' | wc -l | tr -d ' ')
+            ! -name '*.plans.json' ! -name '*.tuning.json' \
+            ! -name '*.override.json' | wc -l | tr -d ' ')
           INVENTORY_COUNT=$(python3 -c "import json; print(json.load(open('results-data/corpus-inventory.json'))['summary']['total_bundles'])")
           [ "$BUNDLE_COUNT" = "$INVENTORY_COUNT" ] || {
             echo "::error::primary bundle count $BUNDLE_COUNT differs from validated inventory count $INVENTORY_COUNT"

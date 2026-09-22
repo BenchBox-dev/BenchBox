@@ -6,10 +6,23 @@ submission manifest is present) matching SHA-256 hashes. The public
 CLI wrapper is `scripts/validate_submission.py`; this module is the
 shared implementation used by both develop and the slim published-results
 branch.
+
+Mirror-allowlist obligation: new validation rules must live in this
+module (or another file already mirrored) using stdlib only. A rule in
+a new module would silently not run on published-results, where only
+``scripts/validate_submission.py``, this module,
+``benchbox/core/results/query_status.py``,
+``benchbox/core/results/schema_policy.py``,
+``scripts/generate_corpus_inventory.py``, and the workflows exist —
+add the module to the sync allowlist
+(``sync-results-data-to-published.yml``) and the self-green guard
+(``validate-submission.yml``) in the same change, and register the rule
+in RULES below.
 """
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import importlib.util
 import json
@@ -115,7 +128,8 @@ ROW_COUNT_VALIDATION_REQUIRED_FIELDS = frozenset({"status", "expected", "actual"
 # applied tuning ledger + `applied_ledger_hash`; leaving it out of this tuple
 # dropped that evidence from public bundles and surfaced it as a standalone run
 # in discovery paths.
-COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json")
+OVERRIDE_SUFFIX = ".override.json"
+COMPANION_SUFFIXES = (".plans.json", ".tuning.json", ".applied.json", OVERRIDE_SUFFIX)
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
@@ -125,7 +139,104 @@ PUBLIC_CLEAN_VALIDATION_STATUS = "passed"
 # non-clean state, including ``not_run``.
 PUBLIC_MIRROR_ALLOWED_VALIDATION_STATUSES = frozenset({"passed", "partial", "not_run"})
 PUBLIC_NON_CLEAN_TRANSLATION_STATUSES = {"fallback", "failed"}
+# The two known-unofficial classes. The community submission gate below is a
+# whitelist (only "official" passes), but admission, UAT phases, and
+# per-benchmark compliance tests still match on these values directly.
 CLI_REFUSED_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
+
+# Canonical logical query counts per benchmark family: the deterministic
+# denominator for the query-set coverage gate below. Kept in lockstep with
+# _project/scripts/explorer_pipeline/transformer.py::_KNOWN_LOGICAL_QUERY_COUNTS
+# by hand: this module must stay importable without the installable package
+# (slim published-results branch mirror), so it cannot import the transformer.
+CANONICAL_LOGICAL_QUERY_COUNTS: dict[str, int] = {
+    "tpch": 22,
+    "tpch_skew": 22,
+    "tpchavoc": 22,
+    "tpcds": 99,
+    "ssb": 13,
+    "star_schema": 13,
+    "clickbench": 43,
+}
+
+_TPCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 23))
+_TPCDS_CANONICAL_IDS = frozenset(str(i) for i in range(1, 100))
+_SSB_CANONICAL_IDS = frozenset(
+    {
+        "1.1",
+        "1.2",
+        "1.3",
+        "2.1",
+        "2.2",
+        "2.3",
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "4.1",
+        "4.2",
+        "4.3",
+    }
+)
+_CLICKBENCH_CANONICAL_IDS = frozenset(str(i) for i in range(1, 44))
+
+# Canonical logical query IDs per benchmark family: the membership set for
+# the query-set coverage gate below. Counts alone accept any 22 distinct
+# labels (e.g. FAKE0-FAKE21 for TPC-H); comparing normalized IDs against
+# this set keeps such bundles out of ranking-eligible cohorts. IDs are
+# stored in producer-normalized form (see _normalize_coverage_query_id, kept
+# in lockstep with benchbox/core/results/query_normalizer.py::
+# normalize_query_id by hand for the same slim-mirror reason as the counts
+# above). Every key/denominator pair must agree with
+# CANONICAL_LOGICAL_QUERY_COUNTS.
+CANONICAL_LOGICAL_QUERY_IDS: dict[str, frozenset[str]] = {
+    "tpch": _TPCH_CANONICAL_IDS,
+    "tpch_skew": _TPCH_CANONICAL_IDS,
+    "tpchavoc": _TPCH_CANONICAL_IDS,
+    "tpcds": _TPCDS_CANONICAL_IDS,
+    "ssb": _SSB_CANONICAL_IDS,
+    "star_schema": _SSB_CANONICAL_IDS,
+    "clickbench": _CLICKBENCH_CANONICAL_IDS,
+}
+
+
+def _normalize_coverage_query_id(raw_id: Any) -> str | None:
+    """Normalize a bundle query ID for coverage membership, or None.
+
+    Mirrors ``benchbox.core.results.query_normalizer.normalize_query_id``
+    for string inputs (``Q1``/``q1``/``query_1``/`` 1 `` all name query
+    ``1``; SSB ``Q1.1`` names ``1.1``) without importing the package, which
+    the slim published-results branch mirror cannot do. Non-string and
+    blank IDs return None: they contribute nothing to coverage (fail
+    closed) instead of passing as distinct unknowns.
+    """
+    if not isinstance(raw_id, str):
+        return None
+    text = raw_id.strip()
+    if not text:
+        return None
+    upper = text.upper()
+    if upper.startswith("QUERY_"):
+        text = text[6:]
+    elif upper.startswith("QUERY"):
+        text = text[5:]
+    elif upper.startswith("Q") and len(text) > 1 and (text[1].isdigit() or text[1].islower()):
+        text = text[1:]
+    text = text.strip()
+    if not text:
+        return None
+    if "." in text:
+        base, _, ext = text.rpartition(".")
+        if ext.isalpha():  # "sql", "q", "txt" -> strip; "1", "2" -> keep.
+            text = base.strip()
+            if not text:
+                return None
+    match = re.fullmatch(r"(\d+)([A-Za-z]+)?", text)
+    if match:
+        digits, suffix = match.groups()
+        return f"{digits}{suffix.lower() if suffix else ''}"
+    return text
+
 
 # Known benchmarks and platforms - warn (not fail) on unknown values.
 KNOWN_BENCHMARKS = {
@@ -253,12 +364,18 @@ TOP_LEVEL_DIRECT_COST_KEYS = ("cost_usd",)
 
 
 class ValidationResult:
-    """Collects errors and warnings for a single bundle."""
+    """Collects errors, warnings, and override findings for a single bundle."""
 
     def __init__(self, path: str) -> None:
         self.path = path
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        # Rule ids (see RULES) whose findings require a committed override
+        # before the bundle may publish. The finding text is dual-recorded
+        # in ``warnings`` so existing renderers and counters keep working;
+        # this list is the machine-readable subset the exit contract and
+        # the override workflow consume.
+        self.override_required: list[str] = []
         # Metadata extracted during validation, used by format_pr_comment.
         self.benchmark_id: str = "-"
         self.platform_name: str = "-"
@@ -270,9 +387,180 @@ class ValidationResult:
     def warn(self, msg: str) -> None:
         self.warnings.append(msg)
 
+    def require_override(self, rule_id: str, msg: str) -> None:
+        """Record a warn-require-override finding for ``rule_id``."""
+        self.warnings.append(msg)
+        if rule_id not in self.override_required:
+            self.override_required.append(rule_id)
+
     @property
     def ok(self) -> bool:
         return len(self.errors) == 0
+
+
+# Rubric rule registry. ``RULES_VERSION`` versions the active set for
+# ``validate_submission.py --rules-version``; bump it whenever a rule is
+# added or a severity changes. Severities: ``refuse`` (error),
+# ``warn-require-override`` (blocking warning pending a committed
+# override), ``info`` (advisory warning, never refused alone). The two
+# deterministic refuse gates (compliance-class, query-set-coverage)
+# register here when they land; keep this table in lockstep with the
+# checks below.
+RULES_VERSION = "1"
+RULES: tuple[tuple[str, str, str], ...] = (
+    # (rule id, rule version, severity)
+    ("timing-plateau", "1", "warn-require-override"),
+    ("scale-invariant", "1", "warn-require-override"),
+    ("floor-outlier", "1", "info"),
+    ("small-scale-floor", "1", "warn-require-override"),
+)
+
+
+# Committed override artifact: ``<bundle_stem>.override.json`` beside the
+# bundle it covers (one artifact per bundle, covering one or more rules).
+# Schema:
+#   rules (non-empty list of {rule, rule_version}: id in RULES with
+#     severity warn-require-override, plus the exact registry pin — a rule
+#     change forces re-review),
+#   reason + evidence (non-empty strings; evidence is a link),
+#   expires ("YYYY-MM-DD" UTC date or "single-batch"),
+#   approver (maintainer handle; separation from the submitter is enforced
+#     by the submission workflow via GitHub review, never by file content),
+#   bundles (optional list that must contain the artifact's own stem).
+# Unknown fields are refused so typos (``aprover``) fail loudly.
+OVERRIDE_REQUIRED_FIELDS = ("rules", "reason", "evidence", "expires", "approver")
+OVERRIDE_OPTIONAL_FIELDS = ("bundles",)
+OVERRIDE_RULE_ENTRY_FIELDS = ("rule", "rule_version")
+
+
+def _override_artifact_path(bundle_path: str | Path) -> Path | None:
+    """Return the sibling override path for a bundle, or None when N/A."""
+    try:
+        candidate = Path(bundle_path)
+    except (TypeError, ValueError):
+        return None
+    if not candidate.suffix == ".json":
+        return None
+    name = candidate.name
+    if name.lower().endswith(OVERRIDE_SUFFIX):
+        return None
+    return candidate.with_name(f"{candidate.stem}{OVERRIDE_SUFFIX}")
+
+
+def validate_override_document(payload: Any, *, bundle_stem: str) -> list[str]:
+    """Check an override artifact payload; return error strings (empty OK)."""
+    if not isinstance(payload, dict):
+        return ["override artifact must be a JSON object"]
+    unknown = sorted(k for k in payload if k not in OVERRIDE_REQUIRED_FIELDS + OVERRIDE_OPTIONAL_FIELDS)
+    errors = [f"override artifact has unknown fields: {unknown}"] if unknown else []
+    missing = [k for k in OVERRIDE_REQUIRED_FIELDS if k not in payload]
+    if missing:
+        errors.append(f"override artifact missing fields: {missing}")
+        return errors
+    registry = {rule_id: (version, severity) for rule_id, version, severity in RULES}
+    entries = payload["rules"]
+    if not isinstance(entries, list) or not entries:
+        errors.append("override artifact rules must be a non-empty list")
+        return errors
+    for index, entry in enumerate(entries):
+        errors.extend(_validate_override_rule_entry(entry, index, registry))
+    for key in ("reason", "evidence", "approver"):
+        if not isinstance(payload[key], str) or not payload[key].strip():
+            errors.append(f"override artifact {key} must be a non-empty string")
+    if "bundles" in payload:
+        bundles = payload["bundles"]
+        if (
+            not isinstance(bundles, list)
+            or not bundles
+            or any(not isinstance(b, str) or not b.strip() for b in bundles)
+        ):
+            errors.append("override artifact bundles must be a non-empty list of non-empty strings")
+        elif bundle_stem not in bundles:
+            errors.append(f"override artifact bundles does not contain its own stem {bundle_stem!r}")
+    expires = payload["expires"]
+    if expires == "single-batch":
+        return errors
+    if not isinstance(expires, str):
+        errors.append("override artifact expires must be a YYYY-MM-DD date or 'single-batch'")
+        return errors
+    try:
+        expiry = datetime.date.fromisoformat(expires)
+    except ValueError:
+        errors.append(f"override artifact expires {expires!r} is not a YYYY-MM-DD date or 'single-batch'")
+        return errors
+    if expiry < datetime.datetime.now(datetime.timezone.utc).date():
+        errors.append(f"override artifact expired on {expires}")
+    return errors
+
+
+def _validate_override_rule_entry(entry: Any, index: int, registry: dict[str, tuple[str, str]]) -> list[str]:
+    """Check one rules[] entry; return error strings (empty OK)."""
+    prefix = f"override artifact rules[{index}]"
+    if not isinstance(entry, dict):
+        return [f"{prefix} must be an object"]
+    errors = []
+    unknown_entry = sorted(k for k in entry if k not in OVERRIDE_RULE_ENTRY_FIELDS)
+    if unknown_entry:
+        errors.append(f"{prefix} has unknown fields: {unknown_entry}")
+    if sorted(entry) != ["rule", "rule_version"]:
+        return errors + [f"{prefix} must hold exactly rule and rule_version"]
+    rule, version = entry["rule"], entry["rule_version"]
+    if rule not in registry:
+        errors.append(f"{prefix} rule {rule!r} is not a known rubric rule")
+    elif registry[rule][1] != "warn-require-override":
+        errors.append(
+            f"{prefix} rule {rule!r} has severity {registry[rule][1]!r}, "
+            "only warn-require-override rules are overridable"
+        )
+    elif version != registry[rule][0]:
+        errors.append(
+            f"{prefix} rule_version {version!r} does not match registry version "
+            f"{registry[rule][0]!r}; re-review against the current rule"
+        )
+    return errors
+
+
+def accepted_override_rules(bundle_path: str | Path) -> tuple[set[str], list[str]]:
+    """Return (accepted rule ids, artifact errors) for a bundle's override file.
+
+    A missing artifact is not an error — it simply satisfies nothing, so
+    the rule stays unsatisfied and community validation keeps failing.
+    """
+    artifact = _override_artifact_path(bundle_path)
+    if artifact is None or not artifact.is_file():
+        return set(), []
+    try:
+        payload = json.loads(artifact.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return set(), [f"override artifact {artifact.name} is unreadable: {exc}"]
+    errors = validate_override_document(payload, bundle_stem=artifact.name[: -len(OVERRIDE_SUFFIX)])
+    if errors:
+        return set(), [f"override artifact {artifact.name}: {message}" for message in errors]
+    return {entry["rule"] for entry in payload["rules"]}, []
+
+
+def unsatisfied_override_rules(results: list[ValidationResult]) -> dict[str, list[str]]:
+    """Map bundle path to override rule ids still requiring an override.
+
+    Rules covered by a valid committed sibling artifact are satisfied;
+    everything else fails closed in community mode. Findings fail closed
+    because a missing artifact satisfies nothing.
+    """
+    pending: dict[str, list[str]] = {}
+    for vr in results:
+        if not vr.override_required:
+            continue
+        accepted, _artifact_errors = accepted_override_rules(vr.path)
+        remaining = [rule for rule in vr.override_required if rule not in accepted]
+        if remaining:
+            pending[vr.path] = remaining
+    return pending
+
+
+def override_artifact_errors(bundle_path: str | Path) -> list[str]:
+    """Return schema errors for a bundle's sibling override file, if any."""
+    _accepted, errors = accepted_override_rules(bundle_path)
+    return errors
 
 
 def _capture_metadata(data: dict, vr: ValidationResult) -> None:
@@ -542,10 +830,11 @@ def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
     ratio = peak / floor
     cv = statistics.pstdev(means) / statistics.fmean(means)
     if ratio < PLATEAU_MAX_MIN_RATIO and cv < PLATEAU_MAX_CV:
-        vr.warn(
+        vr.require_override(
+            "timing-plateau",
             f"timing-plateau: benchmark {bm_id!r} per-query means span "
             f"{floor:.0f}-{peak:.0f}ms (max/min {ratio:.2f}, CV {cv:.2f}); "
-            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement"
+            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement",
         )
 
 
@@ -564,9 +853,10 @@ def _warn_small_scale_floor(data: dict[str, Any], vr: ValidationResult) -> None:
     if rows is not None and rows >= SMALL_SCALE_MAX_ROWS_LOADED:
         return
     rows_note = f"{rows} rows loaded" if rows is not None else "rows_loaded unreported"
-    vr.warn(
+    vr.require_override(
+        "small-scale-floor",
         f"small-scale-floor: scale factor {sf:g} ({rows_note}) but fastest measurement is "
-        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume"
+        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume",
     )
 
 
@@ -638,10 +928,11 @@ def _warn_scale_invariance(
         span = hi / lo
         for data, vr in members:
             if _bundle_scale_factor(data) in (lo, hi):
-                vr.warn(
+                vr.require_override(
+                    "scale-invariant",
                     f"scale-invariant: benchmark {bm_id!r} grows {span:g}x in scale "
                     f"but timings barely move ({detail}); check for result caching or "
-                    "fixed-overhead-dominated measurement"
+                    "fixed-overhead-dominated measurement",
                 )
 
 
@@ -833,6 +1124,101 @@ def _warn_empty_result_rows(data: dict[str, Any], vr: ValidationResult) -> None:
             f"result-rows-empty: every measurement SUCCESS reports zero rows against "
             f"{loaded} loaded rows — check for silently empty execution "
             "(evidence: queries[].rows, summary.data.rows_loaded)"
+        )
+
+
+def _validate_compliance_section(
+    benchmark: Any,
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse unofficial compliance classes on the community path.
+
+    ``benchbox submit`` and ``benchbox publish`` refuse these classes from
+    loaded result objects; without this rule a hand-authored bundle could
+    bypass that gate by arriving as a PR directly. An absent
+    ``compliance_class`` passes: legacy pre-stamp bundles are grandfathered,
+    and the trusted mirror lane (``allow_partial_validation``) preserves
+    pre-gate unofficial evidence as non-ranking cohorts.
+    """
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    compliance = benchmark.get("compliance_class")
+    if compliance is None:
+        return
+    # Whitelist, not blacklist: any stamped value other than exactly
+    # "official" is refused, so "Official", "official " or an unexpected type
+    # cannot slip past on spelling. Absent stays grandfathered for legacy
+    # pre-stamp bundles; the trusted mirror lane stays exempt.
+    if compliance != "official":
+        if allow_partial_validation:
+            return
+        vr.error(
+            f"benchmark.compliance_class={compliance!r} is not accepted for public submissions; "
+            "only compliance_class=official may be submitted"
+        )
+
+
+def _validate_query_coverage(
+    data: dict[str, Any],
+    vr: ValidationResult,
+    *,
+    allow_partial_validation: bool = False,
+) -> None:
+    """Refuse bundles whose query evidence misses canonical query IDs.
+
+    A run covering 5 of TPC-H's 22 queries must not present as a complete
+    result: the explorer derives its logical denominator from observed query
+    IDs, so short coverage would rank as complete. Cardinality alone is not
+    enough either: 22 timings named FAKE0-FAKE21 name none of the canonical
+    queries, so the gate compares normalized IDs against the benchmark's
+    canonical set and refuses on any miss. The trusted mirror lane is
+    exempt (it preserves partial cohorts by design); community partials
+    stay refused by the summary-validation gate regardless.
+    """
+    if allow_partial_validation:
+        return
+    benchmark = data.get("benchmark")
+    if not isinstance(benchmark, dict):
+        return  # _validate_benchmark_section owns the shape error.
+    bm_id = benchmark.get("id")
+    # Normalize before the lookup: "TPCH" or "tpch " names the same family as
+    # "tpch", and must not slip past the gate on casing or padding.
+    normalized_id = bm_id.strip().casefold() if isinstance(bm_id, str) else None
+    canonical = CANONICAL_LOGICAL_QUERY_IDS.get(normalized_id) if normalized_id else None
+    if not canonical:
+        return  # No canonical set: nothing deterministic to enforce.
+    queries = data.get("queries")
+    if not isinstance(queries, list):
+        return  # _validate_queries_section owns the shape error.
+    # Only non-empty string ids count as query evidence. Non-string ids
+    # (legacy integers) and blanks fail closed: they contribute nothing to
+    # coverage instead of passing as distinct unknowns.
+    observed: set[str] = set()
+    uncounted = 0
+    for q in queries:
+        if not isinstance(q, dict):
+            continue  # _validate_queries_section owns the shape error.
+        normalized_qid = _normalize_coverage_query_id(q.get("id"))
+        if normalized_qid is None:
+            uncounted += 1
+        else:
+            observed.add(normalized_qid)
+    missing = sorted(
+        canonical - observed,
+        key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
+    )
+    if missing:
+        covered = len(observed & canonical)
+        shown = ", ".join(missing[:12])
+        if len(missing) > 12:
+            shown += f", … (+{len(missing) - 12} more)"
+        hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
+        vr.error(
+            f"benchmark {bm_id!r} covers {covered} of {len(canonical)} canonical queries{hint} "
+            f"(missing: {shown}); partial runs remain local artifacts "
+            "unless validated through the trusted mirror path"
         )
 
 
@@ -1481,6 +1867,11 @@ def _validate_bundle(
     _validate_version(version, vr)
     _validate_run_section(data.get("run", {}), vr)
     _validate_benchmark_section(data.get("benchmark", {}), vr)
+    _validate_compliance_section(
+        data.get("benchmark", {}),
+        vr,
+        allow_partial_validation=allow_partial_validation,
+    )
     _validate_platform_section(data.get("platform", {}), vr)
     _validate_cache_control_section(
         data.get("platform", {}),
@@ -1502,7 +1893,13 @@ def _validate_bundle(
     _warn_empty_result_rows(data, vr)
     _warn_timing_plateau(data, vr)
     _warn_small_scale_floor(data, vr)
+    _validate_query_coverage(data, vr, allow_partial_validation=allow_partial_validation)
     _validate_execution_consistency(data, vr)
+    # A malformed committed override corrupts the audit trail in every
+    # lane; a missing one simply satisfies nothing (handled by the exit
+    # contract via unsatisfied_override_rules).
+    for message in override_artifact_errors(vr.path):
+        vr.error(message)
     _validate_validation_phase_consistency(data, vr)
 
 
@@ -1804,6 +2201,13 @@ def validate_bundles(
     the trusted maintainer mirror path only: the seed corpus intentionally
     retains partial and legacy unvalidated evidence. Community submissions
     must leave the flag off so every non-clean status remains refused.
+
+    The same lane split governs the two deterministic submission gates:
+    unofficial ``compliance_class`` values and short canonical query-set
+    coverage are errors in community mode but pass under the mirror flag,
+    which preserves pre-gate unofficial and partial cohorts as non-ranking
+    evidence. An absent ``compliance_class`` passes in both modes (legacy
+    pre-stamp grandfathering).
     """
     results = []
     parsed: list[tuple[dict[str, Any], ValidationResult]] = []
@@ -1883,10 +2287,12 @@ def format_summary(results: list[ValidationResult]) -> str:
     lines: list[str] = []
     total_errors = 0
     total_warnings = 0
+    total_overrides = 0
 
     for vr in results:
         total_errors += len(vr.errors)
         total_warnings += len(vr.warnings)
+        total_overrides += len(vr.override_required)
 
         status = "PASS" if vr.ok else "FAIL"
         lines.append(f"  {status}  {vr.path}")
@@ -1894,20 +2300,30 @@ def format_summary(results: list[ValidationResult]) -> str:
             lines.append(f"        ERROR: {e}")
         for w in vr.warnings:
             lines.append(f"        WARN:  {w}")
+        for rule_id in vr.override_required:
+            lines.append(f"        OVERRIDE-REQUIRED: {rule_id}")
 
-    header = f"Validated {len(results)} bundle(s): {total_errors} error(s), {total_warnings} warning(s)"
+    header = (
+        f"Validated {len(results)} bundle(s): {total_errors} error(s), "
+        f"{total_warnings} warning(s), {total_overrides} override(s) required"
+    )
     return header + "\n" + "\n".join(lines)
 
 
-def format_pr_comment(results: list[ValidationResult]) -> str:
-    """Format validation results as a GitHub PR comment (Markdown)."""
-    lines: list[str] = []
-    all_pass = all(vr.ok for vr in results)
+def format_pr_comment(results: list[ValidationResult], *, strict_overrides: bool = True) -> str:
+    """Format validation results as a GitHub PR comment (Markdown).
+
+    With ``strict_overrides`` (community mode), bundles carrying
+    unsatisfied override findings fail the header even when error-free;
+    the mirror lane passes ``False`` so pre-gate cohorts render advisory.
+    """
+    pending = unsatisfied_override_rules(results)
+    all_pass = all(vr.ok for vr in results) and not (strict_overrides and pending)
 
     if all_pass:
-        lines.append("## Submission Validation: PASSED")
+        lines = ["## Submission Validation: PASSED"]
     else:
-        lines.append("## Submission Validation: FAILED")
+        lines = ["## Submission Validation: FAILED"]
 
     lines.append("")
     lines.append(f"Validated **{len(results)}** bundle(s).")
@@ -1940,5 +2356,23 @@ def format_pr_comment(results: list[ValidationResult]) -> str:
             for w in vr.warnings:
                 lines.append(f"- WARN: {w}")
             lines.append("")
+
+    # Overrides required (rules version RULES_VERSION): per-bundle rule ids
+    # with the key numbers already present in the WARN text above.
+    if pending:
+        lines.append("")
+        lines.append(f"### Overrides required (rules v{RULES_VERSION})")
+        lines.append("")
+        lines.append("| Bundle | Rule |")
+        lines.append("|--------|------|")
+        for path, rule_ids in sorted(pending.items()):
+            name = Path(path).name.replace("|", "\\|")
+            for rule_id in sorted(rule_ids):
+                lines.append(f"| `{name}` | `{rule_id}` |")
+        lines.append("")
+        if strict_overrides:
+            lines.append("Add a committed override artifact for each rule to proceed.")
+        else:
+            lines.append("Mirror lane: advisory only, no override required.")
 
     return "\n".join(lines)

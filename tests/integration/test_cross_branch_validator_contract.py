@@ -77,7 +77,10 @@ def _minimal_schema_v2_bundle() -> dict:
         "platform": {"name": "duckdb"},
         "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [{"id": "Q1", "ms": 100.0}],
+        # Full canonical TPC-H coverage: the query-set coverage gate
+        # refuses short query sets, so the round-trip source must carry
+        # all 22, the same way a genuine complete submission does.
+        "queries": [{"id": f"Q{i}", "ms": 100.0} for i in range(1, 23)],
     }
 
 

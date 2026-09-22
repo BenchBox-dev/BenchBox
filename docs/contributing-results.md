@@ -116,12 +116,30 @@ When your PR is opened, the **Validate Submission** workflow runs automatically.
 - **Sanity checks** - no all-zero timings, no negative durations, valid platform/benchmark names
 - **Cache evidence** - a recorded session cache-control receipt must confirm the cache is disabled; on Snowflake/Redshift a bundle declaring an enabled result cache without a disabling receipt is refused; all-SUCCESS runs with zero rows everywhere are flagged
 - **Timing plausibility (warnings only)** - `timing-plateau` (implausibly tight per-query band), `small-scale-floor` (tiny data answered slowly), `scale-invariant` (timings flat across a 10x scale span), and informational `floor-outlier` (fastest query far above the peer median). Warnings never fail validation; sub-millisecond rows are timer noise and excluded from the evidence
+- **Compliance gate** - unofficial `compliance_class` values are refused; only `official` may be submitted
+- **Query-set coverage** - the normalized query IDs must cover the benchmark's canonical query set (e.g. TPC-H Q1–Q22 in any Q-prefixed, bare, or padded spelling); the benchmark id is matched case-insensitively
+- **Cost provenance** - direct cost totals require `normalized_cost` provenance; totals alongside `cost_status: unavailable` are refused
 - **Metadata extraction** - a summary comment is posted on the PR showing what the submission adds
 
 Community submissions must include a manifest, execute at least one query, and
 report `summary.validation=passed` with no failed measurement evidence.
 Truthful partial results are accepted only from the trusted maintainer mirror
 path and remain excluded from rankings.
+
+### 5a. Plausibility overrides
+
+Timing-plausibility findings (`timing-plateau`, `scale-invariant`,
+`small-scale-floor`) block community publication until covered by a
+committed `<bundle_stem>.override.json` companion beside the bundle.
+The artifact lists the covered rules with exact registry pins, the
+reason, an evidence link, an expiry date (`YYYY-MM-DD`) or
+`single-batch`, and the approver. The approver must differ from the PR author, and an APPROVED
+review from the approver must exist — file content alone never
+authorizes. Approval is required on every PR that adds or touches a
+covered bundle, including PRs that reuse an unchanged override.
+Overrides never substitute for the `unofficial-research`
+compliance label and vice versa. Expired or malformed artifacts fail
+validation; the mirror lane renders overrides advisory.
 
 Submissions are **data-only**: every file a PR adds under
 `results-data/bundles/` must be a supported `.json` result bundle, companion,

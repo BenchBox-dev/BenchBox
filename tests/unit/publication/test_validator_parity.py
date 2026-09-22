@@ -87,12 +87,9 @@ def _minimal_bundle_dict() -> dict:
         "run": {"id": "abc123", "timestamp": "2026-04-01T12:00:00", "total_duration_ms": 5000},
         "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 0.01},
         "platform": {"name": "DuckDB", "version": "1.4.3"},
-        "summary": {"validation": "passed", "queries": {"total": 2, "passed": 2, "failed": 0}},
+        "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i * 10, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
