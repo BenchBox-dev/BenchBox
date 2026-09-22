@@ -408,7 +408,7 @@ class TestGetSupportedFormats:
         assert formats[:3] == ["iceberg", "delta", "parquet"]
 
     def test_bigquery_external_supported_formats(self):
-        """Test BigQuery external mode exposes Delta."""
+        """Test BigQuery external mode exposes Delta and Iceberg."""
         formats = get_supported_formats(
             "bigquery",
             table_mode="external",
@@ -417,10 +417,20 @@ class TestGetSupportedFormats:
                 "biglake_connection": "project.us.conn",
             },
         )
-        assert formats[:2] == ["delta", "parquet"]
+        assert formats[:3] == ["delta", "iceberg", "parquet"]
+
+    def test_bigquery_external_iceberg_requires_biglake_connection(self):
+        """Test BigQuery external mode hides Iceberg without a BigLake connection."""
+        formats = get_supported_formats(
+            "bigquery",
+            table_mode="external",
+            platform_config={"staging_root": "gs://bucket/prefix"},
+        )
+        assert "iceberg" not in formats
+        assert "delta" not in formats
 
     def test_redshift_external_supported_formats(self):
-        """Test Redshift external mode exposes Delta."""
+        """Test Redshift external mode exposes Delta and Iceberg."""
         formats = get_supported_formats(
             "redshift",
             table_mode="external",
@@ -429,7 +439,17 @@ class TestGetSupportedFormats:
                 "iam_role": "arn:aws:iam::123456789012:role/benchbox",
             },
         )
-        assert formats[:2] == ["delta", "parquet"]
+        assert formats[:3] == ["delta", "iceberg", "parquet"]
+
+    def test_redshift_external_iceberg_requires_iam_role(self):
+        """Test Redshift external mode hides Iceberg without an IAM role."""
+        formats = get_supported_formats(
+            "redshift",
+            table_mode="external",
+            platform_config={"staging_root": "s3://bucket/prefix"},
+        )
+        assert "iceberg" not in formats
+        assert "delta" not in formats
 
     def test_clickhouse_cloud_external_supported_formats(self):
         """Test ClickHouse Cloud external mode exposes Iceberg without affecting local ClickHouse."""

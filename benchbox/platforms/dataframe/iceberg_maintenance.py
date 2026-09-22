@@ -511,6 +511,15 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         3. Apply when_matched updates
         4. Insert when_not_matched rows
 
+        Contract: each inserted row is built in target-column order from
+        ``when_not_matched`` — a ``"source.<col>"`` reference pulls that
+        source column, any other value is a per-row literal, unmapped
+        columns fall back to the same-named source column (which is what
+        the ``{"insert": "*"}`` row gate relies on), and columns present
+        in neither resolve to null. Results are rebuilt against the target
+        Arrow schema so pandas round-trips (nulls inferring float,
+        decimals collapsing) cannot drift the table schema on overwrite.
+
         Args:
             table_path: Table identifier (namespace.table_name)
             source_dataframe: Source DataFrame
@@ -567,15 +576,47 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             rows_inserted = len(new_rows)
 
             if rows_inserted > 0:
-                target_df = pa.concat_tables([target_df, new_rows])
+                import pandas as pd  # noqa: PLC0415  (lazy adapter import)
 
-        # Overwrite table with merged data
-        result_arrow = pa.Table.from_pandas(target_df)
+                # Build each inserted row from when_not_matched in
+                # target-column order before concatenation.
+                insert_data: dict[str, Any] = {}
+                for column in target_arrow.schema.names:
+                    if column in when_not_matched:
+                        mapping = when_not_matched[column]
+                        if isinstance(mapping, str) and mapping.startswith("source."):
+                            source_column = mapping[len("source.") :]
+                            if source_column not in new_rows.columns:
+                                raise ValueError(
+                                    f"Merge insert mapping for {column!r} references "
+                                    f"missing source column {source_column!r}"
+                                )
+                            insert_data[column] = new_rows[source_column].reset_index(drop=True)
+                        else:
+                            insert_data[column] = mapping
+                    elif column in new_rows.columns:
+                        insert_data[column] = new_rows[column].reset_index(drop=True)
+                    else:
+                        insert_data[column] = None
+                new_rows = pd.DataFrame(insert_data)
+                # Rebuild both frames against the target schema first: a bare
+                # from_pandas round-trip would infer float64 for null-bearing
+                # int columns (or collapse decimals) and break the concat.
+                target_df = pa.concat_tables(
+                    [
+                        pa.Table.from_pandas(target_df, schema=target_arrow.schema),
+                        pa.Table.from_pandas(new_rows, schema=target_arrow.schema),
+                    ]
+                ).to_pandas()
+
+        # Overwrite table with merged data, preserving the target schema so the
+        # pandas round-trip cannot drift column types (e.g. nulls -> float64).
+        result_arrow = pa.Table.from_pandas(target_df, schema=target_arrow.schema)
         iceberg_table.overwrite(result_arrow)
 
-        total_affected = rows_updated + rows_inserted
+        total_affected = int(rows_updated) + int(rows_inserted)
         self.logger.info(
-            f"Merged into Iceberg table {table_identifier}: {rows_updated} updated, {rows_inserted} inserted"
+            f"Merged into Iceberg table {table_identifier}: {int(rows_updated)} updated, {int(rows_inserted)} inserted"
         )
         return total_affected
 
