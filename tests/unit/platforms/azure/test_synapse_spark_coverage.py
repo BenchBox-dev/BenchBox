@@ -147,7 +147,7 @@ def test_create_connection_maps_http_failures(status_code: int, message: str) ->
             adapter.create_connection()
 
 
-def test_close_clears_session_id_when_delete_raises() -> None:
+def test_close_clears_session_id_when_delete_raises(caplog) -> None:
     adapter = _adapter()
     adapter._session_id = 7
     adapter._session_created_by_us = True
@@ -155,7 +155,9 @@ def test_close_clears_session_id_when_delete_raises() -> None:
     with (
         patch.object(adapter, "_get_headers", return_value={"Authorization": "Bearer token"}),
         patch("benchbox.platforms.azure.synapse_spark_adapter.requests.delete", side_effect=RuntimeError("boom")),
+        caplog.at_level("WARNING", logger="benchbox.platforms.azure.synapse_spark_adapter"),
     ):
         adapter.close()
 
     assert adapter._session_id is None
+    assert any("Failed to close session" in r.getMessage() for r in caplog.records)
