@@ -62,6 +62,4 @@ Top-level platform files that are not direct optional adapter registration modul
 | `benchbox/platforms/datafusion_write_transformer.py` | supported helper | Write-path SQL compatibility helper for DataFusion. |
 | `benchbox/platforms/presto_trino_utils.py` | supported helper | Shared helper module used by Presto-family adapters. |
 | `benchbox/platforms/questdb_rewriter.py` | supported helper | QuestDB SQL compatibility helper. |
-| `benchbox/platforms/cudf.py` | removal candidate | Legacy top-level cuDF adapter imports `benchbox.experimental.gpu`; current registry metadata marks `cudf` as experimental DataFrame support through the DataFrame platform path. |
-
-The cuDF removal/integration decision is tracked as a follow-up TODO so this migration can avoid deleting platform files outside its scope.
+| `benchbox/platforms/dataframe/cudf_df.py` | experimental DataFrame support | cuDF coverage lives in the DataFrame platform family (`CuDFDataFrameAdapter`); the legacy top-level `benchbox/platforms/cudf.py` adapter was removed. |

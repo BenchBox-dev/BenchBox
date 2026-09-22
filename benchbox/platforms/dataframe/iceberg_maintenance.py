@@ -28,8 +28,11 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from benchbox.utils.clock import mono_time
 
 try:
     from pyiceberg.catalog import Catalog, load_catalog
@@ -65,6 +68,8 @@ from benchbox.core.dataframe.maintenance_interface import (
     ICEBERG_CAPABILITIES,
     BaseDataFrameMaintenanceOperations,
     DataFrameMaintenanceCapabilities,
+    MaintenanceOperationType,
+    MaintenanceResult,
 )
 
 if TYPE_CHECKING:
@@ -511,6 +516,15 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
         3. Apply when_matched updates
         4. Insert when_not_matched rows
 
+        Contract: each inserted row is built in target-column order from
+        ``when_not_matched`` — a ``"source.<col>"`` reference pulls that
+        source column, any other value is a per-row literal, unmapped
+        columns fall back to the same-named source column (which is what
+        the ``{"insert": "*"}`` row gate relies on), and columns present
+        in neither resolve to null. Results are rebuilt against the target
+        Arrow schema so pandas round-trips (nulls inferring float,
+        decimals collapsing) cannot drift the table schema on overwrite.
+
         Args:
             table_path: Table identifier (namespace.table_name)
             source_dataframe: Source DataFrame
@@ -567,15 +581,47 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             rows_inserted = len(new_rows)
 
             if rows_inserted > 0:
-                target_df = pa.concat_tables([target_df, new_rows])
+                import pandas as pd  # noqa: PLC0415  (lazy adapter import)
 
-        # Overwrite table with merged data
-        result_arrow = pa.Table.from_pandas(target_df)
+                # Build each inserted row from when_not_matched in
+                # target-column order before concatenation.
+                insert_data: dict[str, Any] = {}
+                for column in target_arrow.schema.names:
+                    if column in when_not_matched:
+                        mapping = when_not_matched[column]
+                        if isinstance(mapping, str) and mapping.startswith("source."):
+                            source_column = mapping[len("source.") :]
+                            if source_column not in new_rows.columns:
+                                raise ValueError(
+                                    f"Merge insert mapping for {column!r} references "
+                                    f"missing source column {source_column!r}"
+                                )
+                            insert_data[column] = new_rows[source_column].reset_index(drop=True)
+                        else:
+                            insert_data[column] = mapping
+                    elif column in new_rows.columns:
+                        insert_data[column] = new_rows[column].reset_index(drop=True)
+                    else:
+                        insert_data[column] = None
+                new_rows = pd.DataFrame(insert_data)
+                # Rebuild both frames against the target schema first: a bare
+                # from_pandas round-trip would infer float64 for null-bearing
+                # int columns (or collapse decimals) and break the concat.
+                target_df = pa.concat_tables(
+                    [
+                        pa.Table.from_pandas(target_df, schema=target_arrow.schema),
+                        pa.Table.from_pandas(new_rows, schema=target_arrow.schema),
+                    ]
+                ).to_pandas()
+
+        # Overwrite table with merged data, preserving the target schema so the
+        # pandas round-trip cannot drift column types (e.g. nulls -> float64).
+        result_arrow = pa.Table.from_pandas(target_df, schema=target_arrow.schema)
         iceberg_table.overwrite(result_arrow)
 
-        total_affected = rows_updated + rows_inserted
+        total_affected = int(rows_updated) + int(rows_inserted)
         self.logger.info(
-            f"Merged into Iceberg table {table_identifier}: {rows_updated} updated, {rows_inserted} inserted"
+            f"Merged into Iceberg table {table_identifier}: {int(rows_updated)} updated, {int(rows_inserted)} inserted"
         )
         return total_affected
 
@@ -600,6 +646,233 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
 
         # Fallback - assume it's just the column name
         return condition
+
+    def optimize_table(
+        self,
+        table_path: Path | str,
+        *,
+        strategy: str = "compact",
+        columns: list[str] | None = None,
+        partition_filter: Any | None = None,
+    ) -> MaintenanceResult:
+        """Binpack optimization is not available in pyiceberg.
+
+        Raises:
+            NotImplementedError: Always — pyiceberg 0.12 exposes no
+                rewrite_data_files action. Run Spark rewrite_data_files
+                for Iceberg file layout work.
+        """
+        _ = (table_path, strategy, columns, partition_filter)
+        raise NotImplementedError(
+            "Iceberg OPTIMIZE is not implemented: pyiceberg exposes no binpack rewrite. "
+            "Use Spark rewrite_data_files for Iceberg file layout work."
+        )
+
+    # Iceberg defaults mirroring the table-property contract: history
+    # entries older than the max snapshot age expire, keeping at least the
+    # minimum retained snapshots.
+    _DEFAULT_MAX_SNAPSHOT_AGE_MS = 5 * 24 * 3600 * 1000
+    _DEFAULT_MIN_SNAPSHOTS_TO_KEEP = 1
+
+    def _retention_window(self, table: Any, retention_hours: int | None) -> tuple[int, int]:
+        """Derive the expiration cutoff (epoch ms) and minimum snapshots to keep.
+
+        An explicit retention_hours wins; None (the backend-default contract)
+        reads history.expire.max-snapshot-age-ms and
+        history.expire.min-snapshots-to-keep from the table properties.
+        """
+        if retention_hours is not None:
+            cutoff_ms = int((datetime.now(timezone.utc) - timedelta(hours=retention_hours)).timestamp() * 1000)
+            return cutoff_ms, 1
+        properties = table.properties or {}
+        try:
+            max_age_ms = int(properties.get("history.expire.max-snapshot-age-ms", self._DEFAULT_MAX_SNAPSHOT_AGE_MS))
+        except (TypeError, ValueError):
+            max_age_ms = self._DEFAULT_MAX_SNAPSHOT_AGE_MS
+        try:
+            min_keep = int(properties.get("history.expire.min-snapshots-to-keep", self._DEFAULT_MIN_SNAPSHOTS_TO_KEEP))
+        except (TypeError, ValueError):
+            min_keep = self._DEFAULT_MIN_SNAPSHOTS_TO_KEEP
+        cutoff_ms = int(datetime.now(timezone.utc).timestamp() * 1000) - max(0, max_age_ms)
+        return cutoff_ms, max(1, min_keep)
+
+    @staticmethod
+    def _normalize_file_ref(uri: str) -> str:
+        """Normalize a graph file reference for set comparison.
+
+        Local URIs collapse to their resolved filesystem path so
+        symlinked, relative, and percent-encoded spellings compare equal
+        (macOS /tmp lives under /private/var, which naive string comparison
+        misses). Non-local URIs compare verbatim.
+        """
+        from urllib.parse import unquote, urlparse
+
+        parsed = urlparse(uri)
+        if parsed.scheme == "":
+            return f"path:{Path(uri).resolve()}"
+        if parsed.scheme == "file" and parsed.netloc in ("", "localhost"):
+            return f"path:{Path(unquote(parsed.path)).resolve()}"
+        return uri
+
+    def _snapshot_file_refs(self, table: Any, snapshot_ids: set[int]) -> set[str]:
+        """Collect data, delete, manifest, and manifest-list refs for snapshots."""
+        from pyiceberg.manifest import read_manifest_list
+
+        refs: set[str] = set()
+        wanted = set(snapshot_ids)
+        for snapshot in table.snapshots() or []:
+            if snapshot.snapshot_id not in wanted:
+                continue
+            refs.add(self._normalize_file_ref(snapshot.manifest_list))
+            for manifest in read_manifest_list(table.io.new_input(snapshot.manifest_list)):
+                refs.add(self._normalize_file_ref(manifest.manifest_path))
+                for entry in manifest.fetch_manifest_entry(table.io, discard_deleted=False):
+                    refs.add(self._normalize_file_ref(entry.data_file.file_path))
+        return refs
+
+    @staticmethod
+    def _local_table_dir(location: str) -> Path | None:
+        """Return the local directory for a file-scheme table location, if any."""
+        from urllib.parse import unquote, urlparse
+
+        parsed = urlparse(location)
+        if parsed.scheme not in ("", "file"):
+            return None
+        path = unquote(parsed.path) if parsed.scheme == "file" else location
+        directory = Path(path)
+        return directory if directory.is_dir() else None
+
+    def _reclaim_orphan_files(self, table: Any, remaining_ids: set[int]) -> dict[str, Any]:
+        """Delete files unreferenced by the remaining snapshots on local tables.
+
+        Returns file-cleanup metrics. Non-local locations skip deletion
+        (metadata-only expiration) since object-store removal needs the
+        cloud FileIO the runtime may not have.
+        """
+        table.refresh()
+        location = table.location()
+        directory = self._local_table_dir(location)
+        if directory is None:
+            self.logger.warning(f"Iceberg vacuum skips file cleanup for non-local table location: {location}")
+            return {"file_cleanup": "metadata-only", "reclaimed_files": 0, "reclaimed_bytes": 0}
+        referenced = self._snapshot_file_refs(table, remaining_ids)
+        referenced.add(self._normalize_file_ref(table.metadata_location))
+        reclaimed_files = 0
+        reclaimed_bytes = 0
+        for path in sorted(directory.rglob("*")):
+            if not path.is_file() or path.name == "version-hint.text":
+                continue
+            if self._normalize_file_ref(path.as_uri()) in referenced:
+                continue
+            reclaimed_bytes += path.stat().st_size
+            reclaimed_files += 1
+            path.unlink()
+        return {"file_cleanup": "full", "reclaimed_files": reclaimed_files, "reclaimed_bytes": reclaimed_bytes}
+
+    def _reclaimable_files(self, table: Any, remaining_ids: set[int]) -> tuple[int, int]:
+        """Count files (and bytes) a vacuum would delete, without deleting."""
+        location = table.location()
+        directory = self._local_table_dir(location)
+        if directory is None:
+            return 0, 0
+        referenced = self._snapshot_file_refs(table, remaining_ids)
+        referenced.add(self._normalize_file_ref(table.metadata_location))
+        files = 0
+        total_bytes = 0
+        for path in sorted(directory.rglob("*")):
+            if not path.is_file() or path.name == "version-hint.text":
+                continue
+            if self._normalize_file_ref(path.as_uri()) in referenced:
+                continue
+            files += 1
+            total_bytes += path.stat().st_size
+        return files, total_bytes
+
+    def vacuum_table(
+        self,
+        table_path: Path | str,
+        *,
+        retention_hours: int | None = None,
+        dry_run: bool = True,
+        enforce_retention: bool = True,
+    ) -> MaintenanceResult:
+        """Expire Iceberg snapshots and reclaim their files.
+
+        retention_hours=None honors the backend-default contract: the cutoff
+        and minimum retained snapshots come from the table's
+        history.expire.max-snapshot-age-ms and
+        history.expire.min-snapshots-to-keep properties. Snapshots referenced
+        by tags or branches are never expired. A dry run computes the
+        expirable set and reclaimable bytes without committing.
+        rows_affected counts expired snapshots; their ids are carried in
+        metrics alongside file-cleanup totals.
+        """
+        if not enforce_retention:
+            self.logger.warning(
+                "Iceberg vacuum ignores enforce_retention=False; snapshot expiration always enforces retention."
+            )
+        operation = MaintenanceOperationType.VACUUM
+        start_time = mono_time()
+        try:
+            self._check_capability(operation)
+            identifier = self._normalize_table_identifier(str(table_path))
+            try:
+                table = self.catalog.load_table(identifier)
+            except Exception as e:
+                raise RuntimeError(f"Could not open Iceberg table {identifier}: {e}") from e
+            snapshots = list(table.snapshots() or [])
+            current_id = table.current_snapshot().snapshot_id if table.current_snapshot() else None
+            protected = {ref.snapshot_id for ref in table.refs().values()}
+            cutoff_ms, min_keep = self._retention_window(table, retention_hours)
+            eligible = sorted(
+                (
+                    snapshot
+                    for snapshot in snapshots
+                    if snapshot.snapshot_id != current_id
+                    and snapshot.snapshot_id not in protected
+                    and snapshot.timestamp_ms < cutoff_ms
+                ),
+                key=lambda snapshot: snapshot.timestamp_ms,
+            )
+            # Never retain fewer than min_keep snapshots overall.
+            expirable = [snapshot.snapshot_id for snapshot in eligible[: max(0, len(snapshots) - min_keep)]]
+            metrics: dict[str, Any] = {"dry_run": dry_run, "expired_snapshot_ids": expirable}
+            remaining_ids = {snapshot.snapshot_id for snapshot in snapshots} - set(expirable)
+            if dry_run:
+                reclaimable_files, reclaimable_bytes = self._reclaimable_files(table, remaining_ids)
+                metrics["reclaimable_files"] = reclaimable_files
+                metrics["reclaimable_bytes"] = reclaimable_bytes
+            elif expirable:
+                table.maintenance.expire_snapshots().by_ids(expirable).commit()
+                # Reload: the in-memory object still points at the pre-expire
+                # metadata file, which cleanup is about to delete.
+                table = self.catalog.load_table(identifier)
+                metrics.update(self._reclaim_orphan_files(table, remaining_ids))
+            end_time = mono_time()
+            self.logger.info(f"Vacuumed Iceberg table {identifier} (dry_run={dry_run}): {len(expirable)} snapshots")
+            return MaintenanceResult(
+                operation_type=operation,
+                success=True,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=len(expirable),
+                metrics=metrics,
+            )
+        except NotImplementedError:
+            raise
+        except Exception as e:
+            self.logger.error(f"VACUUM failed: {e}")
+            end_time = mono_time()
+            return MaintenanceResult(
+                operation_type=operation,
+                success=False,
+                start_time=start_time,
+                end_time=end_time,
+                duration=end_time - start_time,
+                rows_affected=0,
+                error_message=str(e),
+            )
 
 
 def get_iceberg_maintenance_operations(

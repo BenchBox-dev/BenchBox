@@ -59,7 +59,6 @@ _NOT_FEASIBLE_ADAPTERS = [
     ("benchbox.platforms.gcp.dataproc_serverless_adapter", "DataprocServerlessAdapter"),
     ("benchbox.platforms.azure.fabric_spark_adapter", "FabricSparkAdapter"),
     ("benchbox.platforms.azure.synapse_spark_adapter", "SynapseSparkAdapter"),
-    ("benchbox.platforms.cudf", "CuDFAdapter"),
 ]
 
 _NOT_APPLICABLE_ADAPTERS = [

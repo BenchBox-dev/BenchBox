@@ -472,3 +472,42 @@ class TestEMRServerlessAdapterClose:
 
             # Verify logging was called
             mock_logger.info.assert_called()
+
+
+class TestLoadDataRequestedFormat:
+    """Registration must follow the resolved upload format, not table_format alone."""
+
+    def test_requested_delta_registers_delta(self, tmp_path):
+        ClientError = pytest.importorskip("botocore.exceptions").ClientError
+        source_dir = tmp_path / "test_data"
+        source_dir.mkdir()
+
+        with (
+            patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging_instance = MagicMock()
+            mock_staging_instance.tables_exist.return_value = False
+            mock_staging_instance.upload_tables.return_value = {}
+            mock_staging.from_uri.return_value = mock_staging_instance
+
+            from benchbox.platforms.aws import EMRServerlessAdapter
+
+            adapter = EMRServerlessAdapter(
+                application_id="00f123",
+                s3_staging_dir="s3://bucket/data",
+                execution_role_arn="arn:aws:iam::123456789012:role/EMRRole",
+            )
+            adapter.requested_table_format = "delta"
+            assert adapter.table_format == "parquet"
+
+            glue = MagicMock()
+            glue.get_table.side_effect = ClientError({"Error": {"Code": "EntityNotFoundException"}}, "GetTable")
+            mock_benchmark = SimpleNamespace(tables=["lineitem"])
+            with (
+                patch.object(adapter, "_get_glue_client", return_value=glue),
+                patch.object(adapter, "_submit_job_run", return_value="job-1") as submit,
+            ):
+                adapter.load_data(mock_benchmark, None, source_dir)
+
+        sql = submit.call_args[0][0]
+        assert "USING DELTA" in sql

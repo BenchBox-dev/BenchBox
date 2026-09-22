@@ -67,6 +67,7 @@ EXPECTED_REGISTRY_ALIASES = {
     "azure_synapse": "synapse",
     "fabric-dw": "fabric_dw",
     "fabric_lakehouse": "fabric-lakehouse",
+    "pg_duckdb": "pg-duckdb",
     "sqlite3": "sqlite",
 }
 EXPECTED_ADAPTER_REGISTRATION_ORDER = (
