@@ -100,3 +100,65 @@ class TestExportErrors:
     def test_unknown_version_raises(self, delta_table: Path, tmp_path: Path):
         with pytest.raises(DeltaExportError, match="Cannot open Delta table"):
             export_delta_to_parquet(delta_table, tmp_path / "out", version=99)
+
+    def test_traversal_file_name_raises(self, delta_table: Path, tmp_path: Path):
+        for bad_name in ("../escape.parquet", "sub/dir.parquet", "/abs.parquet", ".hidden.parquet", "data.csv"):
+            with pytest.raises(DeltaExportError, match="Invalid file_name"):
+                export_delta_to_parquet(delta_table, tmp_path / "out", file_name=bad_name)
+        assert not (tmp_path / "escape.parquet").exists()
+
+    def test_output_overlapping_table_raises(self, delta_table: Path):
+        with pytest.raises(DeltaExportError, match="must not overlap"):
+            export_delta_to_parquet(delta_table, delta_table / "nested-out")
+
+
+class TestExportShapes:
+    def test_empty_table_exports_no_files(self, tmp_path: Path):
+        from deltalake import write_deltalake
+
+        table = tmp_path / "empty"
+        write_deltalake(
+            str(table),
+            pa.table({"id": pa.array([], type=pa.int64()), "v": pa.array([], type=pa.string())}),
+            mode="overwrite",
+        )
+        result = export_delta_to_parquet(table, tmp_path / "out")
+
+        assert result.row_count == 0
+        assert result.parquet_files == []
+
+    def test_reexport_overwrites(self, delta_table: Path, tmp_path: Path):
+        out = tmp_path / "parquet"
+        first = export_delta_to_parquet(delta_table, out)
+        assert first.parquet_files == [out / "data.parquet"]
+
+        second = export_delta_to_parquet(delta_table, out, version=0)
+        assert second.row_count == 2
+        assert second.parquet_files == [out / "data.parquet"]
+        assert pq.read_table(out / "data.parquet").num_rows == 2
+
+    def test_partitioned_table_keeps_hive_layout(self, tmp_path: Path):
+        from deltalake import write_deltalake
+
+        table = tmp_path / "parted"
+        write_deltalake(
+            str(table),
+            pa.table({"id": [1, 2], "p": ["a", "b"]}),
+            mode="overwrite",
+            partition_by=["p"],
+        )
+        result = export_delta_to_parquet(table, tmp_path / "out")
+
+        assert result.row_count == 2
+        assert len(result.parquet_files) == 2
+        assert {path.parent.name for path in result.parquet_files} == {"p=a", "p=b"}
+        combined = pa.concat_tables([pq.read_table(path) for path in result.parquet_files])
+        assert sorted(combined.column("id").to_pylist()) == [1, 2]
+
+    def test_chunked_output_splits_files(self, delta_table: Path, tmp_path: Path):
+        result = export_delta_to_parquet(delta_table, tmp_path / "out", max_rows_per_file=2)
+
+        assert result.row_count == 3
+        assert len(result.parquet_files) == 2
+        combined = pa.concat_tables([pq.read_table(path) for path in result.parquet_files])
+        assert sorted(combined.column("id").to_pylist()) == [1, 2, 3]

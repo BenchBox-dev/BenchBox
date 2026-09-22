@@ -23,6 +23,9 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -63,21 +66,48 @@ def _load_delta_table(table_path: Path, version: int | None):
         raise DeltaExportError(f"Cannot open Delta table at '{table_path}': {exc}") from exc
 
 
+def _validate_export_paths(table_dir: Path, out_dir: Path, file_name: str) -> None:
+    """Reject file names and output dirs that could escape the export layout."""
+    if not file_name or file_name != Path(file_name).name or file_name.startswith("."):
+        raise DeltaExportError(
+            f"Invalid file_name {file_name!r}: must be a plain file name inside the output directory."
+        )
+    if not file_name.endswith(".parquet"):
+        raise DeltaExportError(f"Invalid file_name {file_name!r}: expected a '.parquet' file.")
+    table_resolved = table_dir.resolve()
+    out_resolved = out_dir.resolve() if out_dir.exists() else (out_dir.parent.resolve() / out_dir.name)
+    if out_resolved == table_resolved or table_resolved in out_resolved.parents:
+        raise DeltaExportError(
+            f"Refusing to export into '{out_dir}': output must not overlap the Delta table directory."
+        )
+
+
 def export_delta_to_parquet(
     table_path: Path | str,
     output_dir: Path | str,
     *,
     version: int | None = None,
     file_name: str = "data.parquet",
+    max_rows_per_file: int = 1_000_000,
 ) -> DeltaExportResult:
     """Export a Delta table directory to plain Parquet files.
+
+    The table is read as a lazy Arrow dataset and streamed to Parquet, so
+    exports stay bounded in memory regardless of table size. Partitioned
+    tables keep their Hive-style layout (one file group per partition);
+    unpartitioned tables that fit in one chunk land in ``file_name``.
+    Files are staged in a sibling temp directory and moved into place only
+    on full success, so a failed export never leaves partial artifacts in
+    ``output_dir`` (safe to retry or to glob from ClickHouse).
 
     Args:
         table_path: Local path to the Delta table directory (must contain
             a ``_delta_log`` subdirectory).
         output_dir: Directory receiving the exported ``.parquet`` file(s).
         version: Delta version to export; ``None`` exports the latest version.
-        file_name: Name of the single Parquet file written into ``output_dir``.
+        file_name: Name of the single Parquet file written into ``output_dir``
+            for unpartitioned single-chunk tables.
+        max_rows_per_file: Row cap per emitted Parquet file.
 
     Returns:
         DeltaExportResult with the exported version, row count, columns,
@@ -93,32 +123,72 @@ def export_delta_to_parquet(
             "ClickHouse Delta ingestion requires a Delta Lake source."
         )
 
+    out_dir = Path(output_dir)
+    _validate_export_paths(table_dir, out_dir, file_name)
+
     dt = _load_delta_table(table_dir, version)
     try:
-        arrow_table = dt.to_pyarrow_table()
+        dataset = dt.to_pyarrow_dataset()
         resolved_version = dt.version()
+        metadata = dt.metadata()
+        partition_columns = list(getattr(metadata, "partition_columns", None) or [])
     except Exception as exc:
         raise DeltaExportError(f"Failed to read Delta table at '{table_dir}': {exc}") from exc
 
-    out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    parquet_path = out_dir / file_name
+    staging_dir = out_dir.parent / f".{out_dir.name}.export-tmp-{uuid.uuid4().hex[:12]}"
     try:
-        import pyarrow.parquet as pq
+        import pyarrow as pa
+        import pyarrow.dataset as ds
 
-        pq.write_table(arrow_table, parquet_path)
+        partitioning = None
+        if partition_columns:
+            partitioning = ds.partitioning(
+                pa.schema(
+                    [dataset.schema.field(name) for name in partition_columns],
+                    metadata=dataset.schema.metadata,
+                ),
+                flavor="hive",
+            )
+        ds.write_dataset(
+            dataset,
+            str(staging_dir),
+            format="parquet",
+            partitioning=partitioning,
+            basename_template="part-{i}.parquet",
+            max_rows_per_file=max_rows_per_file,
+            max_rows_per_group=max_rows_per_file,
+        )
+        staged = sorted(p for p in staging_dir.rglob("*") if p.is_file())
+        row_count = dataset.count_rows()
+        column_names = dataset.schema.names
+
+        moved: list[Path] = []
+        if len(staged) == 1 and not partition_columns:
+            target = out_dir / file_name
+            os.replace(staged[0], target)
+            moved.append(target)
+        else:
+            for staged_file in staged:
+                relative = staged_file.relative_to(staging_dir)
+                target = out_dir / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(staged_file, target)
+                moved.append(target)
     except Exception as exc:
-        raise DeltaExportError(f"Failed to write Parquet to '{parquet_path}': {exc}") from exc
+        raise DeltaExportError(f"Failed to export Delta table at '{table_dir}': {exc}") from exc
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
     logger.info(
         f"Exported Delta table '{table_dir}' version {resolved_version} "
-        f"({arrow_table.num_rows:,} rows) to {parquet_path}"
+        f"({row_count:,} rows) to {len(moved)} Parquet file(s) in {out_dir}"
     )
     return DeltaExportResult(
         table_path=str(table_dir),
         output_dir=out_dir,
         version=resolved_version,
-        row_count=arrow_table.num_rows,
-        column_names=arrow_table.schema.names,
-        parquet_files=[parquet_path],
+        row_count=row_count,
+        column_names=column_names,
+        parquet_files=moved,
     )
