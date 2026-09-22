@@ -38,8 +38,9 @@ harnesses move behind an explicit experimental boundary. That boundary can be an
 installable companion package or a clearly labeled namespace with limited
 exports.
 
-Note: GPU support has one active consumer (`benchbox/platforms/cudf.py`), so its
-move requires updating that platform adapter's imports. The other four
+Note: GPU support infrastructure lives under `benchbox/experimental/gpu` with no
+production platform-adapter consumer; cuDF coverage goes through the DataFrame
+family (`benchbox/platforms/dataframe/cudf_df.py`). The other four
 subsystems have zero external consumers today.
 
 ## Why This Is Valuable

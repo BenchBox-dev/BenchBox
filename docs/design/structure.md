@@ -160,7 +160,6 @@ benchbox/platforms/
 ├── spark.py               # Generic Spark adapter
 ├── pyspark/               # PySpark SQL adapter (subpackage)
 ├── polars_platform.py     # Polars SQL adapter
-├── cudf.py                # cuDF SQL adapter
 ├── adapter_factory.py     # Unified adapter factory (get_adapter)
 │
 └── dataframe/             # DataFrame platform adapters
