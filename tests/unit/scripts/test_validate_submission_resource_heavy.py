@@ -109,7 +109,7 @@ def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_fil
     )
 
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
+    assert "Validated 1 bundle: 0 errors" in result.stdout
 
 
 def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
@@ -140,7 +140,7 @@ def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
+    assert "Validated 1 bundle: 0 errors" in result.stdout
 
 
 def test_slim_no_project_checkout_rejects_empty_public_result(tmp_path: Path) -> None:

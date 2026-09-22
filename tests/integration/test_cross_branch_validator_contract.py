@@ -32,7 +32,7 @@ from types import SimpleNamespace
 import pytest
 from click.testing import CliRunner
 
-from benchbox.validation.bundle import format_summary, validate_bundles
+from benchbox.validation.bundle import format_summary, validate_bundles, validation_failed
 
 pytestmark = [
     pytest.mark.integration,
@@ -42,7 +42,7 @@ pytestmark = [
 
 def _run_validator(paths: list[Path]) -> tuple[int, str]:
     results = validate_bundles(paths)
-    return (1 if any(not result.ok for result in results) else 0), format_summary(results)
+    return (1 if validation_failed(results) else 0), format_summary(results)
 
 
 def _fake_result() -> SimpleNamespace:
@@ -112,7 +112,7 @@ def test_writer_emits_hash_format_validator_accepts(monkeypatch: pytest.MonkeyPa
         f"This is the same class of release-blocker as the 2026-04-29 dry-run. "
         f"Output:\n{output}"
     )
-    assert "0 error(s), 0 warning(s)" in output, output
+    assert "0 error(s), 0 warning(s), 0 override(s) required" in output, output
 
 
 def test_writer_companion_hashes_validator_accepts(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

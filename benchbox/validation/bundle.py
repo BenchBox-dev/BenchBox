@@ -389,6 +389,11 @@ class ValidationResult:
 
     def require_override(self, rule_id: str, msg: str) -> None:
         """Record a warn-require-override finding for ``rule_id``."""
+        if rule_id not in {known_id for known_id, _, _ in RULES}:
+            raise ValueError(
+                f"unknown rubric rule {rule_id!r}: a typo here would create an "
+                "override finding no committed artifact could ever satisfy"
+            )
         self.warnings.append(msg)
         if rule_id not in self.override_required:
             self.override_required.append(rule_id)
@@ -563,6 +568,20 @@ def override_artifact_errors(bundle_path: str | Path) -> list[str]:
     return errors
 
 
+def validation_failed(results: list[ValidationResult], *, strict_overrides: bool = True) -> bool:
+    """Success contract shared by the validator CLI and ``benchbox submit --dry-run``.
+
+    Errors always fail. Unsatisfied warn-require-override findings fail community
+    (strict) mode; the trusted mirror lane passes ``strict_overrides=False`` so
+    pre-gate cohorts render advisory. ``ValidationResult.ok`` stays errors-only
+    on purpose so renderers and the mirror lane keep working — every exit or
+    preview decision must go through this helper instead of ``ok`` alone.
+    """
+    if any(not vr.ok for vr in results):
+        return True
+    return bool(strict_overrides and unsatisfied_override_rules(results))
+
+
 def _capture_metadata(data: dict, vr: ValidationResult) -> None:
     """Pull benchmark/platform identifiers out of the bundle for PR-comment formatting."""
     bm = data.get("benchmark")
@@ -675,6 +694,12 @@ PLATEAU_MAX_MIN_RATIO = 2.0
 PLATEAU_MAX_CV = 0.15
 # Spreads over fewer distinct queries are unevaluable noise, not evidence.
 PLATEAU_MIN_DISTINCT_QUERIES = 3
+# Absolute scale gate: a tight band is only evidence of fixed-overhead-dominated
+# measurement in the multi-second regime this rule was calibrated on (September
+# cloud TPC-H: Snowflake flat at ~4.5s per query). A tight band of genuinely
+# fast queries (e.g. the checked-in TPC-H SF0.01 DuckDB bundle at 5-8ms means)
+# is fast execution, not overhead, and must not require an override.
+PLATEAU_MIN_PEAK_MS = 1000.0
 
 # Cross-scale comparison only runs across a 10x or wider scale span; below
 # that, engine noise dominates and the rule stays silent (insufficient
@@ -827,6 +852,8 @@ def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
     means = [statistics.fmean(samples) for samples in grouped.values()]
     peak = max(means)
     floor = min(means)
+    if peak < PLATEAU_MIN_PEAK_MS:
+        return
     ratio = peak / floor
     cv = statistics.pstdev(means) / statistics.fmean(means)
     if ratio < PLATEAU_MAX_MIN_RATIO and cv < PLATEAU_MAX_CV:
@@ -834,7 +861,8 @@ def _warn_timing_plateau(data: dict[str, Any], vr: ValidationResult) -> None:
             "timing-plateau",
             f"timing-plateau: benchmark {bm_id!r} per-query means span "
             f"{floor:.0f}-{peak:.0f}ms (max/min {ratio:.2f}, CV {cv:.2f}); "
-            "heterogeneous queries should vary more — check for fixed-overhead-dominated measurement",
+            "heterogeneous queries should vary more — check for fixed-overhead-dominated "
+            "measurement (evidence: queries[].ms grouped by queries[].id)",
         )
 
 
@@ -856,7 +884,8 @@ def _warn_small_scale_floor(data: dict[str, Any], vr: ValidationResult) -> None:
     vr.require_override(
         "small-scale-floor",
         f"small-scale-floor: scale factor {sf:g} ({rows_note}) but fastest measurement is "
-        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this data volume",
+        f"{floor:.0f}ms — fixed overhead dominates; expected sub-second answers on this "
+        "data volume (evidence: queries[].ms, summary.data.rows_loaded)",
     )
 
 
