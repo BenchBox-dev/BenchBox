@@ -4049,9 +4049,7 @@
     },
     "datavault-cross-surface-gate-promotion": {
       "claim": null,
-      "needs": [
-        "cross-surface-gate-rollout-followups"
-      ],
+      "needs": [],
       "priority": "medium",
       "status": "open",
       "title": "Promote datavault cross-surface gate from staged to enforced"
