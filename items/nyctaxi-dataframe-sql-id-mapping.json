@@ -1,0 +1,4 @@
+{
+  "context": "Confirm an independent SQL<->DataFrame query-id correspondence for nyctaxi. Documentation-plus-test change; gate wiring is downstream, not part of this item. Do NOT guess id mappings. Prefer small honest candidate-unverified reclassification over speculative wiring.",
+  "description": "Confirm independent SQL<->DataFrame id mapping for nyctaxi or declare it a poor gate candidate."
+}

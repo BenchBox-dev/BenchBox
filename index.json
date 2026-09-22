@@ -10088,6 +10088,13 @@
       "status": "done",
       "title": "NYC Taxi OLAP Benchmark (Core Implementation)"
     },
+    "nyctaxi-dataframe-sql-id-mapping": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Confirm nyctaxi DataFrame-SQL id mapping"
+    },
     "off-scale-indicator-for-diverging-bar-values-clamped-at-300": {
       "claim": null,
       "needs": [],
