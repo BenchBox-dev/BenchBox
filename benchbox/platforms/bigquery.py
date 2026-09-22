@@ -1566,18 +1566,27 @@ class BigQueryAdapter(PlatformAdapter):
         """
         uris: list[str] = []
         local_dirs: list[Path] = []
+        seen_iceberg_shape = False
 
         for file_path in file_paths:
             file_path_str = str(file_path)
             if is_cloud_path(file_path_str):
                 if file_path_str.lower().endswith(".metadata.json"):
                     uris.append(file_path_str)
+                elif "/metadata/" in file_path_str:
+                    seen_iceberg_shape = True
                 continue
 
             path = Path(file_path)
             if resolve_iceberg_metadata_file(path) is None:
                 continue
             local_dirs.append(path)
+
+        if seen_iceberg_shape and not uris and not local_dirs:
+            raise ValueError(
+                f"BigQuery Iceberg external mode found Iceberg-shaped cloud input for table '{table_name.lower()}' "
+                "but no *.metadata.json file URI: pass the table's current gs://.../metadata/*.metadata.json URI."
+            )
 
         if (uris or local_dirs) and not self.biglake_connection:
             raise ValueError(

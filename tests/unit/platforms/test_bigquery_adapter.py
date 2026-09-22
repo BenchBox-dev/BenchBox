@@ -649,6 +649,20 @@ class TestBigQueryAdapter:
         assert uris == []
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_prepare_iceberg_uris_rejects_metadata_dir_without_file(self, mock_bigquery, dependencies_available):
+        """A metadata directory without a file URI must fail specifically, not fall through."""
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+            storage_prefix="benchbox-data",
+            biglake_connection="test-project.us.benchbox",
+        )
+
+        with pytest.raises(ValueError, match=r"\*\.metadata\.json file URI"):
+            adapter._prepare_external_iceberg_uris(Mock(), "lineitem", ["gs://other-bucket/table/metadata/"])
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_delta_requires_biglake_connection(self, mock_bigquery, dependencies_available):
         """Delta external mode should reject runs without BigLake connection config."""
         adapter = BigQueryAdapter(

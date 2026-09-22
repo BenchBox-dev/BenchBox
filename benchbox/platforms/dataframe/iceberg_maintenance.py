@@ -616,7 +616,7 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
 
         total_affected = int(rows_updated) + int(rows_inserted)
         self.logger.info(
-            f"Merged into Iceberg table {table_identifier}: {rows_updated} updated, {rows_inserted} inserted"
+            f"Merged into Iceberg table {table_identifier}: {int(rows_updated)} updated, {int(rows_inserted)} inserted"
         )
         return total_affected
 

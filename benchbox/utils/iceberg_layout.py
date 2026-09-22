@@ -19,10 +19,11 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Union
+
+_FIRST_NUMBER = re.compile(r"(\d+)")
 
 
-def is_iceberg_directory(path: Union[str, Path]) -> bool:
+def is_iceberg_directory(path: str | Path) -> bool:
     """Return whether a local path is an Iceberg table directory."""
     path = Path(path)
     metadata = path / "metadata"
@@ -31,18 +32,42 @@ def is_iceberg_directory(path: Union[str, Path]) -> bool:
     return (metadata / "version-hint.text").exists() or bool(list(metadata.glob("*.metadata.json")))
 
 
-def resolve_iceberg_metadata_file(path: Union[str, Path]) -> Path | None:
+def _metadata_sort_key(metadata_file: Path) -> tuple[int, str]:
+    """Order metadata files by version number, then by name.
+
+    PyIceberg writes zero-padded sequence prefixes (``00000-<uuid>``) while
+    Hadoop-catalog tables use ``v<N>.metadata.json`` without padding, so raw
+    lexicographic order picks ``v9`` over ``v10``. The first digit run is the
+    version in both layouts.
+    """
+    match = _FIRST_NUMBER.search(metadata_file.name)
+    return (int(match.group(1)), metadata_file.name) if match else (10**18, metadata_file.name)
+
+
+def resolve_iceberg_metadata_file(path: str | Path) -> Path | None:
     """Return the current Iceberg metadata file for a table directory, if any.
 
-    Prefers the newest ``metadata/*.metadata.json`` by file name. Iceberg
-    writers use zero-padded sequence prefixes (``00000-<uuid>.metadata.json``),
-    so lexicographic order matches snapshot order. Returns None when the path
-    is not an Iceberg table directory.
+    Honors ``metadata/version-hint.text`` (the authoritative current-version
+    pointer for Hadoop-catalog tables) by resolving ``v<N>.metadata.json``,
+    falling back to the highest-versioned ``*.metadata.json``. Returns None
+    when the path is not an Iceberg table directory or holds no metadata
+    files (e.g. a hint-only directory).
     """
     path = Path(path)
-    if not is_iceberg_directory(path):
+    metadata = path / "metadata"
+    if not path.is_dir() or not metadata.is_dir():
         return None
-    candidates = sorted((path / "metadata").glob("*.metadata.json"), key=lambda p: p.name)
+    hint = metadata / "version-hint.text"
+    if hint.is_file():
+        try:
+            version = int(hint.read_text(encoding="utf-8").strip())
+        except (ValueError, OSError):
+            version = None
+        if version is not None:
+            candidate = metadata / f"v{version}.metadata.json"
+            if candidate.is_file():
+                return candidate
+    candidates = sorted(metadata.glob("*.metadata.json"), key=_metadata_sort_key)
     if not candidates:
         return None
     return candidates[-1]
@@ -69,9 +94,9 @@ class RelocatedIcebergGraph:
 
 
 def relocate_iceberg_table(
-    table_dir: Union[str, Path],
+    table_dir: str | Path,
     dest_uri: str,
-    staging_dir: Union[str, Path],
+    staging_dir: str | Path,
 ) -> RelocatedIcebergGraph:
     """Rewrite a local Iceberg table's metadata graph for a new location URI.
 

@@ -1692,8 +1692,14 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     @staticmethod
     def _map_external_column_type_to_glue(spectrum_type: str) -> str:
         """Map a Spectrum column type to its Glue/Hive catalog type name."""
+        upper = spectrum_type.strip().upper()
+        # Hive has no NUMERIC or TIMESTAMP WITH TIME ZONE spellings.
+        if upper.startswith("NUMERIC"):
+            return "DECIMAL" + upper[len("NUMERIC") :]
+        if upper.startswith("TIMESTAMP"):
+            return "TIMESTAMP"
         aliases = {"INTEGER": "INT", "DOUBLE PRECISION": "DOUBLE", "REAL": "FLOAT"}
-        return aliases.get(spectrum_type.strip().upper(), spectrum_type)
+        return aliases.get(upper, spectrum_type)
 
     def _create_glue_client(self):
         """Create a Glue Data Catalog client sharing the S3 upload session config."""
@@ -1814,6 +1820,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if not isinstance(data_source, DataSource):
                 data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
             s3_client = self._create_s3_client()
+            glue_client: Any = None
 
             cursor.execute(
                 f"""
@@ -1853,7 +1860,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     # register the uploaded table instead of issuing ad-hoc DDL.
                     # A byte copy would leave file:// references throughout the
                     # metadata graph, so relocate it to S3 before uploading.
-                    glue_client = self._create_glue_client()
+                    # The client is created once, on first use, so non-Iceberg
+                    # tables never pay for it.
+                    if glue_client is None:
+                        glue_client = self._create_glue_client()
                     glue_database = f"{self.database.lower()}_external"
                     s3_bucket, s3_prefix = self._external_s3_table_uri(table_name_lower)
                     dest_uri = f"s3://{s3_bucket}/{s3_prefix}"

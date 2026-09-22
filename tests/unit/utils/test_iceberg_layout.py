@@ -52,6 +52,21 @@ def test_resolves_newest_metadata_file(tmp_path):
     assert resolved.name == "00001-bbb.metadata.json"
 
 
+def test_resolve_honors_version_hint(tmp_path):
+    table = _make_table(tmp_path / "hinted", ["v9.metadata.json", "v10.metadata.json"])
+    (table / "metadata" / "version-hint.text").write_text("9")
+    resolved = resolve_iceberg_metadata_file(table)
+    assert resolved is not None
+    assert resolved.name == "v9.metadata.json"
+
+
+def test_resolve_orders_unpadded_versions_numerically(tmp_path):
+    table = _make_table(tmp_path / "hadoop", ["v9.metadata.json", "v10.metadata.json"])
+    resolved = resolve_iceberg_metadata_file(table)
+    assert resolved is not None
+    assert resolved.name == "v10.metadata.json"
+
+
 def test_resolve_returns_none_without_metadata_files(tmp_path):
     table = tmp_path / "empty-meta"
     (table / "metadata").mkdir(parents=True)

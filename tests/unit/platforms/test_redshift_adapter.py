@@ -1182,6 +1182,9 @@ class TestRedshiftAdapter:
         assert RedshiftAdapter._map_external_column_type_to_glue("REAL") == "FLOAT"
         assert RedshiftAdapter._map_external_column_type_to_glue("BIGINT") == "BIGINT"
         assert RedshiftAdapter._map_external_column_type_to_glue("DECIMAL(15,2)") == "DECIMAL(15,2)"
+        assert RedshiftAdapter._map_external_column_type_to_glue("NUMERIC(10,2)") == "DECIMAL(10,2)"
+        assert RedshiftAdapter._map_external_column_type_to_glue("TIMESTAMP WITH TIME ZONE") == "TIMESTAMP"
+        assert RedshiftAdapter._map_external_column_type_to_glue("TIMESTAMP(6)") == "TIMESTAMP"
 
     def test_external_table_mode_requires_iam_role(self):
         """External mode should require IAM role configuration for Spectrum DDL."""
