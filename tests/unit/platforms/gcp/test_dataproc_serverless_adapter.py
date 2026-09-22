@@ -566,3 +566,35 @@ class TestDataprocServerlessUserConfigPrecedence:
 
             adapter.configure_for_benchmark(None, "tpcds")
             assert adapter._spark_config["spark.sql.shuffle.partitions"] == "42"
+
+
+class TestLoadDataRequestedFormat:
+    """Registration must follow the resolved upload format, not table_format alone."""
+
+    def test_requested_delta_registers_delta(self, tmp_path):
+        source_dir = tmp_path / "test_data"
+        source_dir.mkdir()
+
+        with (
+            patch("benchbox.platforms.gcp.dataproc_serverless_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging_instance = MagicMock()
+            mock_staging_instance.tables_exist.return_value = False
+            mock_staging_instance.upload_tables.return_value = {}
+            mock_staging.from_uri.return_value = mock_staging_instance
+
+            from benchbox.platforms.gcp import DataprocServerlessAdapter
+
+            adapter = DataprocServerlessAdapter(
+                project_id="my-project",
+                gcs_staging_dir="gs://bucket/data",
+            )
+            adapter.requested_table_format = "delta"
+            assert adapter.table_format == "parquet"
+
+            mock_benchmark = SimpleNamespace(tables=["lineitem"])
+            with patch.object(adapter, "_submit_spark_sql_batch", return_value=("b-1", "SUCCEEDED")) as submit:
+                adapter.load_data(mock_benchmark, None, source_dir)
+
+        sql = submit.call_args[0][0]
+        assert "USING DELTA" in sql

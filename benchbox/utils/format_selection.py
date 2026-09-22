@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.platforms.base.format_capabilities import get_preferred_format, is_format_supported
+from benchbox.utils.iceberg_layout import is_iceberg_directory
 
 
 class FormatSelector:
@@ -140,8 +141,7 @@ class FormatSelector:
         if delta_dir.exists() and delta_dir.is_dir():
             available.append("delta")
 
-        iceberg_dir = data_dir / table_name / "metadata"
-        if iceberg_dir.exists() and iceberg_dir.is_dir() and list(iceberg_dir.glob("*.metadata.json")):
+        if is_iceberg_directory(data_dir / table_name):
             available.append("iceberg")
 
         return available

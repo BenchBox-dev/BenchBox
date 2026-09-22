@@ -77,6 +77,22 @@ class TestEMRServerlessCoverage:
         assert 'spark.sql("USE benchbox")' in payload
         assert "SELECT 1" in payload
 
+    def test_submit_job_run_escapes_quote_bearing_query(self, adapter):
+        import json
+
+        emr_client = MagicMock()
+        emr_client.start_job_run.return_value = {"jobRunId": "job-1"}
+        s3_client = MagicMock()
+        adapter._emr_serverless_client = emr_client
+        adapter._s3_client = s3_client
+
+        query = "SELECT 'it''s' FROM t WHERE x = 'a\nb\\'"
+        adapter._submit_job_run(query)
+
+        payload = s3_client.put_object.call_args.kwargs["Body"].decode()
+        compile(payload, "<generated>", "exec")
+        assert json.dumps(query) in payload
+
     def test_wait_for_job_run_and_retrieve_results(self, adapter):
         emr_client = MagicMock()
         emr_client.get_job_run.return_value = {

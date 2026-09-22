@@ -122,6 +122,15 @@ class DatabricksDataFrameAdapter(DatabricksAdapter):
         # Initialize parent adapter (handles SQL connection, UC Volumes, etc.)
         super().__init__(**config)
 
+        # getattr: coverage tests may bypass parent __init__; a missing value
+        # means the default Delta format, which DataFrame mode supports.
+        if getattr(self, "table_format", "delta") == "hudi":
+            raise ValueError(
+                "DatabricksDataFrameAdapter does not support table_format='hudi': "
+                "the DataFrame write path has no Hudi handling. Use the SQL adapter "
+                "for Hudi DDL, or table_format='delta' for DataFrame mode."
+            )
+
         # Verify DataFrame mode dependencies
         if self.execution_mode == "dataframe" and not DATABRICKS_CONNECT_AVAILABLE:
             reason = (

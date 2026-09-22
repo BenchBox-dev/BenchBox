@@ -1559,7 +1559,12 @@ _PLATFORM_MANIFEST_JSON = """[
   },
   {
     "key": "pg-duckdb",
-    "aliases": [],
+    "aliases": [
+      {
+        "name": "pg_duckdb",
+        "scopes": ["registry"]
+      }
+    ],
     "adapter": {
       "module": "benchbox.platforms.pg_duckdb",
       "class_name": "PgDuckDBAdapter",
@@ -2920,7 +2925,7 @@ _PLATFORM_MANIFEST_JSON = """[
       }
     ],
     "requirements": [
-      "pandas>=2.0.0"
+      "pandas>=3.0.0"
     ],
     "installation_command": "uv add pandas",
     "adoption": "emerging",

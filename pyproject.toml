@@ -138,7 +138,7 @@ all = [
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
     "cloudpathlib[azure,gs,s3]>=0.15.0",
-    "pandas>=2.0.0",  # For TPC-DI benchmark
+    "pandas>=3.0.0",  # For TPC-DI benchmark
     "chdb>=0.10.0; sys_platform != 'win32'",   # For ClickHouse local mode (not available on Windows)
     "deltalake>=1.2.1",  # For Delta Lake table format
     "pyiceberg>=0.10.0",  # For Iceberg table format
@@ -223,7 +223,7 @@ starrocks = ["pymysql>=1.1.0"]
 singlestore = ["singlestoredb>=1.0.0"]
 
 # Individual benchmark extras
-tpcdi = ["pandas>=2.0.0"]
+tpcdi = ["pandas>=3.0.0"]
 clickhouse-local = ["chdb>=0.10.0; sys_platform != 'win32'"]
 table-formats = [
     "deltalake>=1.2.1",
@@ -243,12 +243,12 @@ ai-primitives = [
 # dataframe-* variants are kept as backward-compatible aliases.
 
 # Pandas family - string-based column access, eager evaluation
-pandas = ["pandas>=2.0.0"]
-dataframe-pandas = ["pandas>=2.0.0"]
-dask = ["dask[distributed]>=2024.1.0", "pandas>=2.0.0"]
+pandas = ["pandas>=3.0.0"]
+dataframe-pandas = ["pandas>=3.0.0"]
+dask = ["dask[distributed]>=2024.1.0", "pandas>=3.0.0"]
 dataframe-dask = [
     "dask[distributed]>=2024.1.0",
-    "pandas>=2.0.0",
+    "pandas>=3.0.0",
 ]
 # Note: cudf requires NVIDIA GPU with CUDA 12.x
 # cuDF is not on PyPI directly - install via RAPIDS:
@@ -278,7 +278,7 @@ dataframe-datafusion = [
 
 # DataFrame family convenience groups
 dataframe-pandas-family = [
-    "pandas>=2.0.0",
+    "pandas>=3.0.0",
     "dask[distributed]>=2024.1.0",
     # cudf not included - requires NVIDIA GPU/CUDA, install separately
 ]
@@ -288,7 +288,7 @@ dataframe-expression-family = [
     "datafusion>=54.0.0",
 ]
 dataframe-all = [
-    "pandas>=2.0.0",
+    "pandas>=3.0.0",
     "dask[distributed]>=2024.1.0",
     "polars>=1.35.2",
     "pyspark>=3.5.0",
@@ -439,7 +439,7 @@ dev = [
     "pytest-benchmark>=5.1.0",
     "pytest-xdist>=3.8.0",
     "pytest-timeout>=2.4.0",
-    "pandas>=2.0.0", # DataFrame dependencies (needed for many tests)
+    "pandas>=3.0.0", # DataFrame dependencies (needed for many tests)
     "pyiceberg[sql-sqlite,pyarrow]>=0.10.0", # Table format converters (needed for tests/unit/utils/format_converters/)
     "deltalake>=1.2.1",
     "datafusion>=54.0.0", # DataFusion (needed for tests/integration/test_datafusion_integration.py)
@@ -750,7 +750,7 @@ ignore_rules = [
     { function_names = ["from_config", "apply_constraint_configuration", "apply_unified_tuning", "supports_tuning_type", "apply_tuning_configuration"], path_contains = [
         "benchbox/platforms/athena.py", "benchbox/platforms/azure_synapse.py",
         "benchbox/platforms/bigquery.py", "benchbox/platforms/clickhouse_cloud.py",
-        "benchbox/platforms/cudf.py", "benchbox/platforms/datafusion.py",
+        "benchbox/platforms/datafusion.py",
         "benchbox/platforms/doris.py", "benchbox/platforms/duckdb.py",
         "benchbox/platforms/fabric_lakehouse.py", "benchbox/platforms/fabric_warehouse.py",
         "benchbox/platforms/firebolt.py", "benchbox/platforms/lakesail.py",

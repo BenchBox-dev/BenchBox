@@ -113,13 +113,6 @@ source_modules =
     benchbox.utils
 forbidden_modules =
     benchbox.experimental
-ignore_imports =
-    ; Known, tracked violation: benchbox/platforms/cudf.py imports
-    ; benchbox.experimental.gpu at module top level. Owned by
-    ; remove-or-integrate-legacy-cudf-platform-module.yaml (decides
-    ; removal/quarantine/integration) - do not duplicate that decision
-    ; here, just allowlist until it resolves.
-    benchbox.platforms.cudf -> benchbox.experimental.gpu
 
 ; benchbox.mcp is a one-directional consumer of core/utils (it exposes
 ; benchmark data and execution via MCP tools - see

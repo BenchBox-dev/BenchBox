@@ -95,7 +95,6 @@ def test_transaction_primitives_pk_rule_registered(dialect: str):
 _MIXIN_USER_DIALECT: dict[str, str | None] = {
     "DataFusionAdapter": "datafusion",
     "PolarsAdapter": None,  # DataFrame-only platform; no SQL-mode primitives.
-    "CuDFAdapter": None,  # DataFrame-only platform; no SQL-mode primitives.
 }
 
 
@@ -107,7 +106,6 @@ def _import_mixin_user_modules() -> None:
     """
     importlib.import_module("benchbox.platforms.datafusion")
     importlib.import_module("benchbox.platforms.polars_platform")
-    importlib.import_module("benchbox.platforms.cudf")
 
 
 def test_no_constraint_mixin_parity():
