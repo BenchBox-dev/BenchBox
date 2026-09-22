@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "ClickHouse native Delta read path exists (deltaLake table function / DeltaLake engine SQL builders)",
+    "Unit tests cover SQL generation and identifier/literal handling without a server",
+    "Docker-gated live test proves SELECT against a real ClickHouse server and real Delta table",
+    "False 'cannot read directly' statements corrected to describe native path and conversion fallback"
+  ],
+  "context": "Source TODO clickhouse-delta-support-via-conversion-or-external-tooling assumed ClickHouse lacks native Delta support. Prior verification against ClickHouse docs showed native reads exist: DeltaLake table engine and deltaLake/deltaLakeS3/deltaLakeAzure/deltaLakeLocal table functions. PR 2269 implements only Delta-to-Parquet conversion plus a Parquet ingestion contract test, with server-side ingestion explicitly out of scope. This item implements the actual native path on PR branch feat/delta-lake-live-integration.",
+  "description": "Implement actual ClickHouse native Delta Lake reads to supersede the conversion-only approach. Add SQL builders for the deltaLake table function family and DeltaLake engine, unit tests, a Docker-gated live SELECT test, and correct the inaccurate no-native-support statements."
+}
