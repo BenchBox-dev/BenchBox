@@ -1,0 +1,10 @@
+{
+  "acceptance": [
+    "Session cache-control receipt (validated/cache_disabled/settings) persisted into result bundles",
+    "Cache-gated plausibility: receipt present and checked before any geomean-flatness inference",
+    "Rows/digest plausibility rule: bundles claiming all-SUCCESS with zero/absent row evidence are flagged",
+    "Unit tests for receipt propagation and both positive/negative plausibility cases"
+  ],
+  "context": "Adversarial findings 14 and 15 accepted. The Databricks cache-suspect case is answerable deterministically from the existing validate_session_cache_control receipt instead of inferring from flat geomeans; row_count_validation is currently opt-in so all-SUCCESS zero-row bundles pass cleanly. Land before or with C2 promotion.",
+  "description": "Persist runtime cache-state evidence into bundles and add result-correctness plausibility: record the cloud session-cache receipt at run time, gate on it deterministically, and add a rows/digest rule so output plausibility is checked alongside timing. Guardrail: inference-based cache flags retire once the receipt gate exists."
+}
