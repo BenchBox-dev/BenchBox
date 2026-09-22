@@ -41,8 +41,12 @@ dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "pyyaml>=6.0.0",
     "packaging>=24.0",
-    # pyarrow: ABI-sensitive (bundled C++); wide cap to <26 to give runway while catching jumps.
-    "pyarrow>=21.0.0,<26.0.0",
+    # pyarrow: ABI-sensitive (bundled C++); capped below 25 because
+    # datafusion 54 imports call pyarrow.scalar at module scope and pyarrow
+    # 25 changed that C ABI surface (linux autodoc import fails with
+    # "isinstance() arg 2 must be a type"). datafusion 54 declares no upper
+    # pyarrow bound, so the cap lives here until datafusion ships a fix.
+    "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
     # pandas is intentionally NOT a core dependency. It is an optional
     # engine/DataFrame dep (DataFrame mode, TPC-DI, ClickHouse-local) declared
