@@ -1,0 +1,11 @@
+{
+  "acceptance": [
+    "Validator refuses bundles with unofficial compliance_class and no unofficial-research path parity with submit/publish",
+    "Validator refuses bundles missing canonical query-set coverage unless labeled partial",
+    "Unit tests: passing + failing fixtures for both rules",
+    "scripts/validate_submission.py green on current corpus (no new mass failures) or explicit grandfather list",
+    "D-cost docs corrected to describe existing refusal behavior"
+  ],
+  "context": "Revised proposal v2 after claude-opus-5 adversarial review (findings 3, 4, 13 accepted). Deterministic rules land before tuned thresholds.",
+  "description": "Add the two deterministic submission gates the reviewer showed are missing: (1) a real compliance_class check in benchbox/validation/bundle.py — CLI_REFUSED_COMPLIANCE_CLASSES is currently defined but never read there, so hand-authored PR bundles bypass the submit/publish gate; (2) a canonical query-set coverage rule using the existing canonical denominator (explorer transformer _KNOWN_LOGICAL_QUERY_COUNTS) so a 5-of-22 TPC-H submission cannot rank as complete. Correct the cost docs (D1): direct cost totals without normalized_cost provenance and unavailable+totals are already hard errors, not disclosure-only. Stdlib-only modules; no new package imports that break the published-results slim mirror."
+}

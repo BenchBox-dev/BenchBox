@@ -16113,6 +16113,13 @@
       "status": "done",
       "title": "Structural debt: extract TPC harnesses out of platforms/base/execution.py and split the cross_surface god-module"
     },
+    "submission-gates-deterministic": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Submission gates: compliance check, query-set coverage, cost docs"
+    },
     "submission-validator-drift-develop-vs-published-results": {
       "claim": null,
       "needs": [],
