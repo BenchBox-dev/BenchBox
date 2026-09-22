@@ -189,6 +189,10 @@ class CloudSparkConfigMixin:
 
     # Adapters may set `adaptive_enabled = False` to turn AQE off; absent
     # means on (backwards compatible with adapters that predate the toggle).
+    # Shared by all CloudSparkConfigMixin consumers (EMR, Athena, Dataproc,
+    # Dataproc Serverless, Quanton, Synapse, Fabric): user-override precedence
+    # and stale-output protection apply uniformly, not only to the two Azure
+    # adapters that expose the toggle today.
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Configure adapter for specific benchmark.
@@ -197,7 +201,8 @@ class CloudSparkConfigMixin:
         for the specified benchmark type and scale factor. The adapter's
         `adaptive_enabled` toggle (default True) flows into the optimizer so
         AQE is honored, not force-enabled; explicit user entries present
-        before the first call win over optimizer output.
+        before the first call win over optimizer output. Shared across all
+        mixin consumers by design.
 
         Args:
             connection: Connection object (unused, for interface compatibility).

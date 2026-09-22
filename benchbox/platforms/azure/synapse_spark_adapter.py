@@ -33,6 +33,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import argparse
 import logging
 import time
 from pathlib import Path
@@ -753,6 +754,13 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             help="Statement timeout in minutes (default: 60)",
             dest="timeout_minutes",
         )
+        parser.add_argument(
+            "--adaptive-enabled",
+            action=argparse.BooleanOptionalAction,
+            default=True,
+            help="Enable or disable Adaptive Query Execution (AQE)",
+            dest="adaptive_enabled",
+        )
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SynapseSparkAdapter:
@@ -775,6 +783,7 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
             "timeout_minutes": config.get("timeout_minutes", 60),
             "spark_config": config.get("spark_config"),
             "table_format": config.get("table_format"),
+            "adaptive_enabled": config.get("adaptive_enabled", True),
         }
 
         # Pass through tuning provenance/config

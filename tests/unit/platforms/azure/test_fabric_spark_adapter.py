@@ -672,6 +672,32 @@ class TestFabricSparkLivySessionConstants:
             )
             assert adapter.table_format == "parquet"
 
+    def test_adaptive_enabled_from_config(self):
+        """Test adaptive_enabled is forwarded through from_config."""
+        with (
+            patch("benchbox.platforms.azure.fabric_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.fabric_spark_adapter.REQUESTS_AVAILABLE", True),
+        ):
+            from benchbox.platforms.azure import FabricSparkAdapter
+
+            adapter = FabricSparkAdapter.from_config(
+                {
+                    "workspace_id": "ws-123",
+                    "lakehouse_id": "lh-456",
+                    "adaptive_enabled": False,
+                }
+            )
+            assert adapter.adaptive_enabled is False
+
+            defaulted = FabricSparkAdapter.from_config(
+                {
+                    "workspace_id": "ws-123",
+                    "lakehouse_id": "lh-456",
+                }
+            )
+            assert defaulted.adaptive_enabled is True
+
     def test_session_config_iceberg_extensions(self):
         """Test Iceberg extensions are added to session config."""
         with (

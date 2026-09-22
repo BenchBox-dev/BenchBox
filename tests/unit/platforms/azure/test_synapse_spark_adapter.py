@@ -635,6 +635,38 @@ class TestSynapseLivyStateConstants:
             )
             assert adapter.table_format == "iceberg"
 
+    def test_adaptive_enabled_from_config(self):
+        """Test adaptive_enabled is forwarded through from_config."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter.from_config(
+                {
+                    "workspace_name": "ws",
+                    "spark_pool_name": "pool",
+                    "storage_account": "sa",
+                    "storage_container": "c",
+                    "adaptive_enabled": False,
+                }
+            )
+            assert adapter.adaptive_enabled is False
+
+            defaulted = SynapseSparkAdapter.from_config(
+                {
+                    "workspace_name": "ws",
+                    "spark_pool_name": "pool",
+                    "storage_account": "sa",
+                    "storage_container": "c",
+                }
+            )
+            assert defaulted.adaptive_enabled is True
+
     def test_session_config_delta_extensions(self):
         """Test Delta Lake extensions are added to session config."""
         with (
