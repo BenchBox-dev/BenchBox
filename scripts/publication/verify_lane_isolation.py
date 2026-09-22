@@ -73,6 +73,9 @@ SHARED_BUILD_INPUTS: tuple[str, ...] = (
 NON_LANE_INPUTS: tuple[str, ...] = (
     # Test suites: exercised by code CI, never read by lane builds.
     "tests/",
+    # Test-runner configs at repo root: same status as tests/.
+    "pytest.ini",
+    "pytest-ci.ini",
     # Publication control-plane checks and receipt tooling do not contribute
     # bytes to any lane artifact. Lane-owned scripts below this prefix are
     # still classified first by ``verify_lane_isolation``.
