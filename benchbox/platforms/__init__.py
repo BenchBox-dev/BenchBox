@@ -823,6 +823,8 @@ sqlite|database_path|Path to the SQLite database file (auto-generated from --ben
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+synapse-spark|adaptive_enabled|Enable or disable Synapse Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+fabric-spark|adaptive_enabled|Enable or disable Fabric Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 spark|java_home|Path to the JDK Spark should run under|{}
 spark|driver_memory|Spark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
 pyspark|driver_memory|PySpark driver JVM heap, e.g. 4g or 8g (default 4g)|{}

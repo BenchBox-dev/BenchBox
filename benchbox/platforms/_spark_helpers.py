@@ -52,6 +52,21 @@ def spark_aqe_conf_entries(adaptive_enabled: bool) -> dict[str, str]:
     return dict.fromkeys(SPARK_AQE_KEYS, value)
 
 
+def adaptive_enabled_from_config(config: Mapping[str, Any]) -> bool:
+    """Resolve the ``adaptive_enabled`` toggle from an adapter config dict.
+
+    Platforms without a registered config builder receive parsed CLI options
+    nested under ``config["options"]`` (see ``get_platform_config``), so read
+    the top level first and fall back to the nested options. Accepts bools
+    (direct API use) and option-parser strings (config files).
+    """
+    options = config.get("options") or {}
+    value = config.get("adaptive_enabled", options.get("adaptive_enabled", True))
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "y", "on")
+    return bool(value)
+
+
 def apply_spark_olap_runtime_conf(
     connection: Any,
     benchmark_type: str,
