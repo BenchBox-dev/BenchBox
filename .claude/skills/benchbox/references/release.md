@@ -17,16 +17,24 @@ finalize step. Stop and ask only when a gate genuinely needs the user
 
 Verify, do not assume; each failure has a recovery path in the guide:
 
-1. Committed UAT release-gate evidence is fresh (≤21 days) — stale evidence
-   fails `validate-base`.
-2. The latest release-canary run is green, <48h old, and its tested
+1. The latest release-canary run is green, <48h old, and its tested
    `develop` SHA is an ancestor of the intended release head.
-3. The local `develop` branch matches `origin/develop`, and the latest required
-   checks on that revision are green.
+2. The intended release head is the fetched `origin/develop` commit. Once the
+   linked-worktree guard is deployed, cut from a clean linked worktree at that
+   exact commit. Until then, treat the missing guard as a blocker for agent
+   cuts. The required release PR checks must pass on the exact PR head before
+   finalization.
+
+The three-stage UAT campaign is advisory under the current runbook. Missing,
+stale, red, or non-ancestor UAT evidence does not fail `validate-base` or stop
+`release-cut`. A future blocking UAT policy needs an explicit runbook change
+and rollout on the trusted release base.
 
 ## Hard rules
 
 - `VERSION` is explicit on every target invocation; never guess it.
+- Use BenchBox's linked-worktree flow once deployed; do not cut from its
+  primary clone.
 - Never bypass or ask to bypass `validate-base`,
   `release-required-result`, or the `release-only` ruleset.
 - A failed or interrupted cut is **resumable**; prefer resume

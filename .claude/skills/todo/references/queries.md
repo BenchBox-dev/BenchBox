@@ -8,7 +8,7 @@ history yourself.
 
 | Goal | Tool call | Notes |
 |---|---|---|
-| Ready work | `list_items(ready_only=true)` | `open`, unclaimed, dependencies all `done`. |
+| Ready work | `list_items(ready_only=true)` | `open`, unclaimed, no future `not_before`, dependencies all `done`. |
 | List or search | `list_items(status=..., priority=..., text=...)` | Brief rows; default 5 per page. |
 | Inspect one task | `show_item(id=...)` | Needs, unmet needs, unlock count, sections. |
 | Next page | `list_items(cursor=<next_cursor>)` | Cursors bind to a state revision. |
@@ -17,10 +17,14 @@ history yourself.
 
 - `create_item(id=..., title=..., priority=..., description=..., needs=[...], acceptance=..., links=..., context=...)`
   — `priority` defaults to `medium`; IDs use `a-z0-9-`; titles are 1–200
-  characters. Creation rejects a dependency cycle.
+  characters. Creation rejects a dependency cycle. Pass `not_before` to
+  create a task that waits until a set time.
 - `update_item(id=..., ...)` — amends `title` / `priority` / `description` /
-  `needs` / sections, or moves `status` between `open` and `blocked`. Give a
-  `reason` when the change is not self-evident.
+  `needs` / sections / `not_before`, or moves `status` between `open` and
+  `blocked`. Give a `reason` when the change is not self-evident.
+- `update_item(id=..., not_before="2026-10-02T00:00:00Z")` holds an open task
+  out of the ready queue until that time; `not_before=""` clears it. Prefer
+  this to `blocked` when the wait has a known end.
 - Closing goes through `finish`. Dropping is a human decision reported to the
   user (`drop` needs the `generation` if the task is claimed).
 
