@@ -6,7 +6,7 @@
     "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
     "make pr-preflight passes on the implementation PR."
   ],
-  "context": "Reviewed 2026-09-23: old finalize could not resume after merge and tag could follow an unrelated release advance. Implementation committed as 259bd3f32 on fix/release-finalize-merged-pr-tag-recovery in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery, rebased onto origin/develop 435d07e97. Focused tests 18 passed; release infrastructure and curation tests passed after stale assertion and inventory regeneration; Ruff, ty, inventory, and commit hooks passed. make pr-preflight remains pending shared pytest lock, most recently live PID 72698 in BenchBox.wt-canary-tpcdi-etl-incremental-load. No PR opened, release merge, or tag performed. Next: make pr-preflight after lock clears, then make pr-open. Ledger /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
+  "context": "Implementation committed at 9d361bb30752eb330fbe9290e7458c0978ae5d89 on fix/release-finalize-merged-pr-tag-recovery in clean linked worktree /Users/joe/Developer/BenchBox.wt-release-finalize-recovery. Focused tests 18 passed; marker-policy and publication-lane classification tests passed; release infrastructure/curation, Ruff, ty, inventory, and hooks passed. Full make pr-preflight is now running in exec session 52043, log /tmp/benchbox-release-finalize-preflight.log, with BENCHBOX_TEST_LOCK_WAIT_SECONDS=1800. After it exits, inspect exact result; on pass run make pr-open PR_BODY_FILE=/tmp/benchbox-release-finalize-pr-body.md. No finalization PR, merge, or tag yet. Ignored ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
   "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
   "links": [
     "Makefile",
@@ -90,6 +90,14 @@
       "generation": "f9b71c16dadd4ea9af0792aaf92be414",
       "op": "take",
       "op_id": "a0a6de68b15c4916b2261766f2b5c710",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T22:31:29Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "00ec34d854f841f5ab5aa14c9ee807de",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
