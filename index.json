@@ -1682,6 +1682,13 @@
       "status": "done",
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
+    "canary-submission-validator-drift": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Realign hosted-submit, slim validator, and official TPC-DS bundles with develop's submission validator"
+    },
     "canary-tpcdi-etl-incremental-load": {
       "claim": null,
       "needs": [],

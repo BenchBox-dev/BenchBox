@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Hosted-submit validator contract and slim-checkout resource-heavy validator tests pass locally.",
+    "Official TPC-DS submission test passes locally or an independent failure is tracked separately.",
+    "make pr-preflight passes.",
+    "The fix PR targets develop and merges before this item closes."
+  ],
+  "description": "Diagnose and fix hosted-submit bundle schema drift, slim-checkout validator imports, and the official TPC-DS submission failure. Determine whether TPC-DS has the same root cause; if independent, create a separate owned item. Identify causing commits before changing code. Keep submission validation strict and do not skip tests.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T20:24:19Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "cb759f2a6a734f6b957ec3febb9b523f",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    }
+  ]
+}
