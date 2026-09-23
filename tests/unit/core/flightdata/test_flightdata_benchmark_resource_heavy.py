@@ -182,24 +182,36 @@ class TestDataGeneration:
         assert not (tmp_path / "flights").exists()
         assert not (tmp_path / ".flights-shards.tmp").exists()
 
-    def test_existing_flight_shard_with_bad_width_is_rejected(self, tmp_path):
-        """Shard reuse should validate FlightData rows before writing a fresh manifest."""
-        shard_dir = tmp_path / "flights"
-        shard_dir.mkdir()
-        _write_csv(shard_dir / "flights_0001.csv", FlightDataDownloader._flight_header(), [_flight_row(1)[:-1]])
-        _write_csv(tmp_path / "airlines.csv", ["code", "name"], [["AA", "American"]])
-        _write_csv(
-            tmp_path / "airports.csv",
-            ["code", "name", "city", "state", "latitude", "longitude"],
-            [["ATL", "Atlanta", "Atlanta", "GA", "33.64", "-84.43"]],
-        )
+    def test_existing_flight_shard_with_bad_width_is_rejected(self, tmp_path, monkeypatch):
+        """A reusable cache rejects a malformed shard without replacing its manifest."""
+
+        def fake_process_month(self, writer, year, month, start_id):
+            writer.writerow(_flight_row(start_id, year, month))
+            return 1
+
+        monkeypatch.setattr(FlightDataDownloader, "_process_month", fake_process_month)
         downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
         downloader._num_months = MONTHS_PER_SCALE_FACTOR
+        downloader._months = [(2024, 12)]
+        flights = downloader.download()["flights"]
+        assert isinstance(flights, list)
+        assert len(flights) == 1
+        shard_path = flights[0]
+        manifest_path = tmp_path / "_datagen_manifest.json"
+        manifest_before = manifest_path.read_bytes()
+        assert json.loads(manifest_before)["source_contract_id"] == downloader.source_contract_id()
+
+        _write_csv(shard_path, FlightDataDownloader._flight_header(), [_flight_row(1)[:-1]])
+        malformed_shard = shard_path.read_bytes()
+        reused_downloader = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path, seed=42, verbose=1)
+        reused_downloader._num_months = MONTHS_PER_SCALE_FACTOR
+        reused_downloader._months = [(2024, 12)]
 
         with pytest.raises(ValueError, match="row 2 has 27 columns; expected 28"):
-            downloader.download()
+            reused_downloader.download()
 
-        assert not (tmp_path / "_datagen_manifest.json").exists()
+        assert manifest_path.read_bytes() == manifest_before
+        assert shard_path.read_bytes() == malformed_shard
 
 
 def _flight_row(flight_id: int, year: int = 2024, month: int = 12) -> list[str | int | float]:
