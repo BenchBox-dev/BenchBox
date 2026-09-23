@@ -17134,10 +17134,15 @@
       "title": "Unseeded TPC-H DataFrame runs use the SF=1 Q11 fraction at every scale"
     },
     "tpch-skew-dataframe-sql-id-mapping": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T13:43:01Z",
+        "generation": "41a343dd9a7c4dfebaaef6cbcecfcd05",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Confirm tpch_skew DataFrame-SQL id mapping"
     },
     "tpch-stdout-fix-integrate-stdout-datagen": {
