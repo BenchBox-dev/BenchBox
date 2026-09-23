@@ -16466,7 +16466,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "Set numeric Throughput@Size floor from retained baseline spread"
+      "title": "Throughput UAT gate: activate numeric Throughput@Size floor from baseline"
     },
     "throughput-independent-sessions-per-stream": {
       "claim": null,
