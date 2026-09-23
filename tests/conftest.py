@@ -431,17 +431,6 @@ def _reset_global_config_provider():
     set_config_provider(None)
 
 
-def pytest_runtest_setup(item) -> None:
-    """Set up test-specific configurations based on markers."""
-    # Set timeouts based on speed markers
-    if item.get_closest_marker("fast"):
-        item.config.option.timeout = 30
-    elif item.get_closest_marker("medium"):
-        item.config.option.timeout = 120
-    elif item.get_closest_marker("slow"):
-        item.config.option.timeout = 600
-
-
 def pytest_sessionfinish(session, exitstatus) -> None:
     """Clean up test databases after the test session ends."""
     from pathlib import Path
