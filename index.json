@@ -1257,7 +1257,7 @@
         "benchbox-score-size-profile-pilot",
         "benchbox-score-concurrency-pilot"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Calibrate score membership and weights across systems"
     },
