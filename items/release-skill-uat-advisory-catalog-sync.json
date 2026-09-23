@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "The canonical skill source accurately distinguishes blocking canary/PR checks from advisory UAT, and states that the maintainer runbook wins on conflicts.",
+    "The catalog change is published through its normal reviewed workflow; BenchBox pins its exact source commit and regenerates both selected mirrors without hand edits.",
+    "make skill-sync-check and the repository skill-integrity gate pass on the BenchBox PR, and the two release action mirrors agree with the pinned source.",
+    "The revised skill describes a linked-worktree release cut once the release-cut guard exists, or explicitly avoids promising that path until it lands."
+  ],
+  "context": "The stale skill is a false operational blocker, not a failing CI gate. Its source is the external skill-sync-skills catalog at the rev pinned by BenchBox; an in-repo mirror edit would drift. Coordinate the source PR and the BenchBox pin PR as separate delivery states.",
+  "description": "The agent release skill says committed UAT evidence no older than 21 days is required and stale evidence fails validate-base, but the current release guide and scripts/release_readiness_check.py make the three-stage UAT campaign advisory. The demotion landed in PR #1927. Correct the canonical benchbox release action in skill-sync-skills, then update BenchBox's immutable catalog rev in skill-sync.conf and regenerate the tracked .claude/skills mirror and ignored .agents/skills mirror through make skill-sync. Prior art: skill-sync.conf:7-17,33 declares the catalog source/pin; AGENTS.md forbids hand-editing generated mirrors. Decision: retain the local-develop-equals-origin/develop prose as a useful operator check or replace it with a reference to the new mechanical release-cut guard once that guard lands. Keep UAT advisory under current policy; any decision to make it blocking again requires an explicit later policy change and trusted-base rollout. Do not edit mirrors directly, treat tracker done as proof of current gate behavior, or make a release wait for optional UAT.",
+  "links": [
+    "skill-sync.conf",
+    ".agents/skills/benchbox/references/release.md",
+    "docs/operations/release-guide.md",
+    "scripts/release_readiness_check.py",
+    "https://github.com/BenchBox-dev/BenchBox/pull/1927"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T20:43:04Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "7b532e1bf12146bdb5bea115316d994a",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    }
+  ]
+}
