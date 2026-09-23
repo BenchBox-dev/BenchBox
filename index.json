@@ -4100,10 +4100,15 @@
       "title": "TPC-H and TPC-DI have no compliance gate while TPC-DS refuses non-official runs"
     },
     "decide-fate-of-documented-unimplemented-surfaces": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T12:19:41Z",
+        "generation": "51b194c4c90a40508d6986d4554dd56a",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ce7766b2ec440e9d41ae1494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Three documented surfaces do not exist: benchbox admin, explorer build, and the TPC-DI parallel API"
     },
     "declare-undeclared-runtime-imports": {
