@@ -24,10 +24,15 @@ Queries Q1-Q15 have hand-written variant modules. They vary DataFrame call
 sequences around filter timing, column pruning, intermediate DataFrames, join
 order, and aggregation formulation while preserving the canonical TPC-H output.
 
-Queries Q16-Q22 are complex correlated-subquery and anti-join workloads. Their
-initial variants delegate the core canonical TPC-H implementation, then replay
-final result projection and ordering steps in different sequences. This keeps
-the registration and execution surface complete while preserving equivalence for
+Queries Q19-Q22 have hand-written structural variants: Q19 condition unions,
+Q20 semi-join ordering, Q21 anti-join alternatives, and Q22 average-balance
+materialization, each with v1 baseline delegation plus nine structural
+rewrites in both families.
+
+Queries Q16-Q18 are complex correlated-subquery workloads. Their variants
+delegate the core canonical TPC-H implementation, then replay final result
+projection and ordering steps in different sequences. This keeps the
+registration and execution surface complete while preserving equivalence for
 the highest-risk query shapes.
 
 The benchmark class exposes `get_dataframe_queries()` as a lazy import and marks
@@ -45,7 +50,6 @@ integration pattern and keeps SQL TPC-Havoc variant generation unchanged.
 
 ## Future Work
 
-The Q16-Q22 result-replay variants should be replaced with deeper structural
-variants after Q1-Q15 have established equivalence coverage across both
-families. The next useful targets are Q19 union-of-conditions, Q20 semi-join
-ordering, Q21 anti-join alternatives, and Q22 average-balance materialization.
+The Q16-Q18 result-replay variants remain the next candidates for deeper
+structural rewrites now that Q19-Q22 have established structural equivalence
+coverage across both families.
