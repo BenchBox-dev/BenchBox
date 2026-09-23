@@ -49,6 +49,7 @@ def test_classify_path_identifies_correct_lanes() -> None:
     assert classify_path("README.md") == set()
     assert classify_path("DISCLAIMER.md") == set()
     assert classify_path("pyproject.toml") == set()
+    assert classify_path(".coveragerc_core") == set()
     assert classify_path("") == set()
 
 
@@ -59,6 +60,12 @@ def test_is_ignored() -> None:
     assert is_ignored(".DS_Store") is True
     assert is_ignored("docs/index.rst") is False
     assert is_ignored("landing/style.css") is False
+
+
+def test_removed_coverage_config_is_non_lane_input() -> None:
+    for lane in ("site", "explorer", "corpus"):
+        report = verify_lane_isolation(lane, repo_root=REPO_ROOT, changed_paths=[".coveragerc_core"])
+        assert report.success is True
 
 
 def test_scan_lane_files_finds_tracked_files() -> None:

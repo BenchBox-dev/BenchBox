@@ -76,6 +76,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # Test-runner configs at repo root: same status as tests/.
     "pytest.ini",
     "pytest-ci.ini",
+    # Deleted local coverage config remains visible in a PR's changed paths.
+    ".coveragerc_core",
     # Publication control-plane checks and receipt tooling do not contribute
     # bytes to any lane artifact. Lane-owned scripts below this prefix are
     # still classified first by ``verify_lane_isolation``.
