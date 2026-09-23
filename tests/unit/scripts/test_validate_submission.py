@@ -1579,6 +1579,26 @@ class TestSubmissionDeterministicGates:
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 
+    def test_tpcds_paired_variants_cover_all_99_logical_queries(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpcds"
+        variants = {14, 23, 24, 39}
+        ids = [f"Q{i}" for i in range(1, 100) if i not in variants]
+        ids += [f"Q{i}{part}" for i in sorted(variants) for part in ("a", "b")]
+        data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+        data["summary"]["queries"] = {"total": 103, "passed": 103, "failed": 0}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+        data["queries"] = [query for query in data["queries"] if query["id"] != "Q14b"]
+        data["summary"]["queries"] = {"total": 102, "passed": 102, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("covers 98 of 99 canonical queries" in error and "missing: 14" in error for error in vr.errors)
+
     def test_canonical_id_sets_agree_with_counts(self):
         from benchbox.validation.bundle import (
             CANONICAL_LOGICAL_QUERY_COUNTS,

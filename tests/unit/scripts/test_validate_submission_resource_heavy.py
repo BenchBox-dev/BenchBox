@@ -37,12 +37,9 @@ def _minimal_bundle() -> dict:
         },
         "summary": {
             "validation": "passed",
-            "queries": {"total": 2, "passed": 2, "failed": 0},
+            "queries": {"total": 22, "passed": 22, "failed": 0},
         },
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -74,6 +71,10 @@ def _copy_slim_validator(repo_root: Path, slim_root: Path) -> None:
     shutil.copy2(
         repo_root / "benchbox" / "core" / "results" / "query_status.py",
         slim_root / "benchbox" / "core" / "results" / "query_status.py",
+    )
+    shutil.copy2(
+        repo_root / "benchbox" / "core" / "results" / "schema_policy.py",
+        slim_root / "benchbox" / "core" / "results" / "schema_policy.py",
     )
 
 
@@ -109,7 +110,7 @@ def test_cli_runs_from_develop_checkout_without_project_install(valid_bundle_fil
     )
 
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle: 0 errors" in result.stdout
+    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
 
 
 def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
@@ -140,7 +141,7 @@ def test_cli_runs_in_slim_no_project_checkout(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    assert "Validated 1 bundle: 0 errors" in result.stdout
+    assert "Validated 1 bundle(s): 0 error(s)" in result.stdout
 
 
 def test_slim_no_project_checkout_rejects_empty_public_result(tmp_path: Path) -> None:
