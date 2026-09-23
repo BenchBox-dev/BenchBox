@@ -42,9 +42,9 @@ def test_ci_profile_includes_full_instrumentation():
     section = _load_pytest_section("pytest-ci.ini")
     addopts = _tokenize_addopts(section["addopts"])
 
-    # Coverage source/branch flags live in Makefile targets (coverage-fast, coverage-all, test-ci)
-    # so each target controls its own scope. The profile still wires up the coverage config and JUnit.
-    assert "--cov-config=.coveragerc_core" in addopts
+    # Coverage source and branch rules live in pyproject.toml. Makefile targets
+    # select tests and set their blocking threshold.
+    assert "--cov-config=pyproject.toml" in addopts
     assert "--junit-xml=test-results.xml" in section["addopts"]
     assert "no:cov" not in addopts
 
