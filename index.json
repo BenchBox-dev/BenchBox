@@ -1569,10 +1569,15 @@
       "title": "The Chromium job advertises itself as blocking but gates no merge"
     },
     "build-a-comparison-ui-cohort-warning-for-cross-mechanism-tun": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T12:28:32Z",
+        "generation": "b2701b57070747c29c2ffbe3d67d0e5e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ce7766b2ec440e9d41ae1494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Build a comparison-UI cohort warning for cross-mechanism tuned results"
     },
     "build-results-explorer-subsite-on-benchbox-dev": {
