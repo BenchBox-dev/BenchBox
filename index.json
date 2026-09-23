@@ -1733,6 +1733,15 @@
       "status": "open",
       "title": "Run the impacted canary tests in the merge queue as a non-blocking shadow job"
     },
+    "canary-impact-05-shadow-watch": {
+      "claim": null,
+      "needs": [
+        "canary-impact-04-shadow-job"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Watch the canary-impact shadow job for 14 days, then decide whether to make it a required merge check"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
