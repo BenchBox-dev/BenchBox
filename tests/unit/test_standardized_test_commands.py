@@ -543,6 +543,8 @@ class TestMakefileCommands:
         makefile_content = (repo_root / "Makefile").read_text()
 
         assert "The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`" in readme_content
+        assert "only when the heavy tier is needed" in readme_content
+        assert "Ordinary\ncode-change PRs skip it" in readme_content
         assert "Product-critical tests that need a different" in readme_content
         assert "test-medium:" in makefile_content
 

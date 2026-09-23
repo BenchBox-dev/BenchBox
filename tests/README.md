@@ -167,10 +167,14 @@ The standard gates are intentionally split by the risk they are meant to catch:
   signals until their cost, credential, and flake policies are suitable for
   blocking routine PRs.
 
-The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`
-for code changes. Its marker selection excludes slow, stress, resource-heavy,
-and live integration tests. Product-critical tests that need a different
-selection belong in an explicit workflow or correctness gate.
+The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`,
+but only when the heavy tier is needed: code-routed runs where the event is
+`merge_group` or the change touches soundness paths or packaging
+(`scripts/heavy_tier_needed.py` reports `heavy-needed == 'true'`). Ordinary
+code-change PRs skip it, so do not assume medium coverage ran on a routine PR.
+Its marker selection excludes slow, stress, resource-heavy, and live
+integration tests. Product-critical tests that need a different selection
+belong in an explicit workflow or correctness gate.
 
 ### Quick Development Testing
 ```bash
