@@ -46,7 +46,7 @@ def int_or_none(value: Any) -> int | None:
 def _query_row_failed(query: Any) -> bool:
     if not isinstance(query, dict):
         return False
-    run_type = str(query.get("run_type") or "measurement").lower()
+    run_type = str(query.get("run_type") or "measurement").strip().lower()
     if run_type != "measurement":
         return False
     status = query.get("status")
