@@ -346,6 +346,49 @@ def test_git_output_decoding_is_independent_of_the_host_locale(monkeypatch: pyte
     assert result.stdout == "benchbox/cli/commands/λ.py\n"
 
 
+def test_cli_surface_guard_uses_branch_fork_when_target_advances(monkeypatch: pytest.MonkeyPatch):
+    fork = "a" * 40
+    monkeypatch.setenv("BENCHBOX_BASE_REF", "origin/develop")
+
+    def fake_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        if args == ("rev-parse", "--is-inside-work-tree"):
+            output = "true\n"
+        elif args == ("rev-parse", "--verify", "origin/develop^{commit}"):
+            output = "b" * 40 + "\n"
+        elif args == ("merge-base", "origin/develop", "HEAD"):
+            output = fork + "\n"
+        elif args == ("diff", "--name-only", fork, "--", "benchbox/cli/"):
+            output = ""
+        elif args == ("diff", "--name-only", "origin/develop", "--", "benchbox/cli/"):
+            output = "benchbox/cli/logo.py\n"
+        else:
+            raise AssertionError(f"Unexpected git call: {args}")
+        return subprocess.CompletedProcess(args, 0, output, "")
+
+    monkeypatch.setitem(globals(), "_git", fake_git)
+    monkeypatch.setitem(globals(), "ALLOWED_INTERNAL_CLI_FILES", set())
+
+    test_uat_did_not_modify_benchbox_cli_surface()
+
+
+def test_cli_surface_guard_rejects_unrelated_base_history(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("BENCHBOX_BASE_REF", "origin/develop")
+
+    def fake_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        if args == ("rev-parse", "--is-inside-work-tree"):
+            return subprocess.CompletedProcess(args, 0, "true\n", "")
+        if args == ("rev-parse", "--verify", "origin/develop^{commit}"):
+            return subprocess.CompletedProcess(args, 0, "b" * 40 + "\n", "")
+        if args == ("merge-base", "origin/develop", "HEAD"):
+            return subprocess.CompletedProcess(args, 1, "", "no common ancestor")
+        raise AssertionError(f"Unexpected git call: {args}")
+
+    monkeypatch.setitem(globals(), "_git", fake_git)
+
+    with pytest.raises(AssertionError, match="cannot find a common ancestor"):
+        _verified_base_ref()
+
+
 def _verified_base_ref() -> str:
     inside = _git("rev-parse", "--is-inside-work-tree", check=False)
     if inside.returncode != 0 or inside.stdout.strip() != "true":
@@ -355,7 +398,10 @@ def _verified_base_ref() -> str:
     verified = _git("rev-parse", "--verify", f"{base}^{{commit}}", check=False)
     if verified.returncode != 0:
         pytest.skip(f"CLI surface drift guard base ref {base!r} is not available")
-    return base
+    fork = _git("merge-base", base, "HEAD", check=False)
+    if fork.returncode != 0 or not fork.stdout.strip():
+        raise AssertionError(f"CLI surface drift guard cannot find a common ancestor for {base!r} and HEAD")
+    return fork.stdout.strip()
 
 
 def _source_at_ref(ref: str, path: str) -> str:
