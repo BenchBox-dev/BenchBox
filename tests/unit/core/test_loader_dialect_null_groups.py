@@ -148,6 +148,6 @@ class TestPopulatedTablesAuxiliaryHeal:
 
         result = _ensure_data_generated(dummy, benchmark_config)
 
-        assert result is False
+        assert result == (False, False)
         dummy.generate_data.assert_not_called()
         hook.assert_called_once_with()

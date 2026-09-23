@@ -1412,11 +1412,13 @@ def run_benchmark_lifecycle(
             validation_records=validation_records,
         )
     # Result provenance may only describe the output-dir manifest when this
-    # run established the dataset identity: fresh generation, or a manifest
-    # reuse whose files the load phase then reads. Execute-only runs against
-    # an existing database (and caller-supplied external tables) leave the
-    # fields unset rather than asserting unverified provenance.
-    dataset_identity_established = freshly_generated or (manifest_reused and bool(phases.load))
+    # run established the dataset identity through the load path: a manifest
+    # reuse whose files the load phase reads, or a fresh generation the load
+    # phase then loads. Generate-plus-execute without load measures the
+    # pre-existing database, not the fresh files, and caller-supplied tables
+    # bypass the manifest entirely; both leave the fields unset rather than
+    # asserting unverified provenance.
+    dataset_identity_established = bool(phases.load) and (freshly_generated or manifest_reused)
 
     if test_type == "data_only":
         return _build_data_only_result(
