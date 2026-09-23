@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -497,17 +498,24 @@ class TestMakefileCommands:
         pytest_ci_config = ConfigParser()
         pytest_ci_config.read(repo_root / "pytest-ci.ini")
         pytest_ci_addopts = _load_ini_section(repo_root / "pytest-ci.ini", "pytest")["addopts"]
-        coverage_run = _load_ini_section(repo_root / ".coveragerc_core", "run")
+        coverage_run = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["coverage"][
+            "run"
+        ]
 
         test_ci_body = _makefile_target_body(makefile_content, "test-ci")
         assert "-c pytest-ci.ini" in test_ci_body
         assert '-m "not (slow or stress or resource_heavy or live_integration)"' in test_ci_body
         assert "--cov=benchbox" in test_ci_body
+        assert "--cov-fail-under=0" in test_ci_body
         assert "Maintained broad local CI profile" in makefile_content
         assert pytest_ci_config.sections() == ["pytest"]
-        assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
-        assert coverage_run["parallel"] == "true"
+        assert "--cov-config=pyproject.toml" in pytest_ci_addopts
+        assert coverage_run["source"] == ["benchbox"]
+        assert coverage_run["branch"] is True
+        assert "benchbox/core/tpcdi/etl/scd_processor.py" in coverage_run["omit"]
         assert _marker_names(repo_root / "pytest.ini") == _marker_names(repo_root / "pytest-ci.ini")
+        for target in ("coverage-fast", "coverage-all", "coverage-opt-in-all", "coverage-html", "coverage-report"):
+            assert "--cov-fail-under=0" in _makefile_target_body(makefile_content, target)
 
         coverage_filter = '-m "not (stress or resource_heavy or live_integration)"'
         for target in ("coverage-all", "coverage-html", "coverage-report"):
