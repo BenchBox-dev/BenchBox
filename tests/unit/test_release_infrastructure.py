@@ -725,12 +725,14 @@ class TestReleaseInfrastructure:
             .split()
         )
         assert "release-cut" not in development_only
-        assert "Resuming interrupted cut" in recipe
-        assert "already carries its release commit" in recipe
-        assert "git checkout -b v$(VERSION) develop" in recipe
-        assert "git rev-parse --verify --quiet refs/heads/v$(VERSION)" in recipe
+        assert 'sh scripts/release_cut_start.sh "$(VERSION)"' in recipe
+        start = (REPO_ROOT / "scripts" / "release_cut_start.sh").read_text(encoding="utf-8")
+        assert "Resuming interrupted cut" in start
+        assert "already carries its release commit" in start
+        assert 'git switch -c "$branch" "$develop"' in start
+        assert 'git show-ref --verify --quiet "refs/heads/$branch"' in start
 
-        assert "--first-parent" in recipe, (
+        assert "--first-parent" in start, (
             "the resume guard must walk first-parent: the `-s ours` alignment merge puts "
             "origin/release's release ledger (full of 'Release vX.Y.Z' subjects) on the second parent, "
             "and a plain `git log -1` misses a release commit sitting beneath that merge"

@@ -1076,8 +1076,8 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 		fi; \
 	fi
 
-# Cut a release branch from develop in one shot:
-#   1. Create v$(VERSION) branch off develop (develop is not modified).
+# Cut a release branch from fetched origin/develop in one shot:
+#   1. Verify a clean linked worktree at origin/develop and create v$(VERSION).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
 #   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
@@ -1087,8 +1087,8 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 #   8. Merge origin/release with `-s ours` so the PR is mergeable and CI can run.
 #   9. Push, open PR vs release.
 #  10. Sweep stale v* branches on origin (option-c lifecycle).
-# Pre-conditions: on develop with a clean tree (new cut), or on v$(VERSION)
-# with no release commit yet (resume).
+# Pre-conditions: on a clean linked worktree branch at fetched origin/develop
+# (new cut), or on v$(VERSION) with no release commit yet (resume).
 #
 # Steps 1-5 are idempotent, so an interrupted cut is resumed by re-running the
 # same command: the branch is reused, the bump and `uv lock` re-apply to the
@@ -1098,36 +1098,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # Usage: make release-cut VERSION=X.Y.Z
 release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
-	@# Resume guard. --first-parent matters: the `-s ours` alignment merge below
-	@# puts origin/release's whole release ledger -- which contains commits literally
-	@# titled "Release vX.Y.Z" -- on the merge's second parent. Walking first-parent
-	@# only sees this branch's own commits, so the guard fires for both post-commit
-	@# states: release commit at HEAD, and release commit beneath the alignment merge.
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
-		if git log --first-parent --format=%s develop..HEAD 2>/dev/null | grep -Fxq "Release v$(VERSION)"; then \
-			echo "Error: v$(VERSION) already carries its release commit; nothing left to resume." >&2; \
-			echo "       Finish it by hand (PRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v$(VERSION) && gh pr create --base release ...)," >&2; \
-			echo "       remembering the -s ours alignment merge if it has not run yet, or start over:" >&2; \
-			echo "         make release-cut-abort VERSION=$(VERSION)" >&2; \
-			exit 1; \
-		fi; \
-		echo "==> Resuming interrupted cut on v$(VERSION)"; \
-	elif [ "$$BRANCH" = "develop" ]; then \
-		[ -z "$$(git status --porcelain)" ] || { echo "Error: working tree must be clean" >&2; exit 1; }; \
-		if git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null; then \
-			echo "Error: branch v$(VERSION) already exists but HEAD is develop." >&2; \
-			echo "       Resume it (git checkout v$(VERSION) && make release-cut VERSION=$(VERSION))" >&2; \
-			echo "       or discard it (make release-cut-abort VERSION=$(VERSION))." >&2; \
-			exit 1; \
-		fi; \
-	else \
-		echo "Error: must be on develop (new cut) or v$(VERSION) (resume), not $$BRANCH" >&2; exit 1; \
-	fi
-	git fetch origin
-	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
-		&& git checkout v$(VERSION) \
-		|| git checkout -b v$(VERSION) develop
+	sh scripts/release_cut_start.sh "$(VERSION)"
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
 	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
