@@ -537,13 +537,13 @@ class TestMakefileCommands:
             in makefile_content
         )
 
-    def test_medium_marker_policy_is_documented_as_explicit_routing(self):
+    def test_medium_marker_policy_is_documented_with_pr_routing(self):
         repo_root = Path.cwd()
         readme_content = (repo_root / "tests" / "README.md").read_text()
         makefile_content = (repo_root / "Makefile").read_text()
 
-        assert "Medium tests are an explicit local routing tier" in readme_content
-        assert "Correctness-relevant medium tests must be promoted" in readme_content
+        assert "The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`" in readme_content
+        assert "Product-critical tests that need a different" in readme_content
         assert "test-medium:" in makefile_content
 
     def test_every_speed_marker_tier_has_a_ci_consumer(self):
