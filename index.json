@@ -13019,10 +13019,15 @@
       "title": "Cut releases from an exact origin/develop head in a linked worktree"
     },
     "release-finalize-merged-pr-tag-recovery": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T23:05:38Z",
+        "generation": "c89a8b3b16244f2eb30165ecf7d25955",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Make release finalization recoverable and bind the tag to the merged PR"
     },
     "release-finalize-pretag-ci-wait": {
