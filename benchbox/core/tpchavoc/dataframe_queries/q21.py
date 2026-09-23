@@ -441,14 +441,23 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 9:
-            # Swapped assembly: multi-supplier orders from the deduplicated
-            # pair set, exclusion via the shared finish path.
+            # Late-join-order swap: the late-supplier counts are joined
+            # before the total supplier counts, mirroring the expression
+            # variant's join order.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
-            pairs = scoped[["l_orderkey", "l_suppkey"]].drop_duplicates()
-            multi = pairs.groupby("l_orderkey").size()
-            kept = candidates[candidates["l_orderkey"].isin(list(multi[multi > 1].index))]
+            late_counts = (
+                scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]]
+                .groupby("l_orderkey")
+                .agg(num_late_suppliers=("l_suppkey", "nunique"))
+                .reset_index()
+            )
+            multi = scoped.groupby("l_orderkey").agg(num_suppliers=("l_suppkey", "nunique")).reset_index()
+            kept = candidates.merge(late_counts, on="l_orderkey").merge(multi, on="l_orderkey")
+            kept = kept[(kept["num_late_suppliers"] == 1) & (kept["num_suppliers"] > 1)].drop(
+                columns=["num_late_suppliers", "num_suppliers"]
+            )
             all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][["l_orderkey", "l_suppkey"]]
             keys = kept[["l_orderkey", "s_suppkey"]].drop_duplicates()
             merged = keys.merge(all_late, on="l_orderkey")
