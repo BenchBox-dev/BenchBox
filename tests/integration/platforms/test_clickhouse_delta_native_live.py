@@ -39,7 +39,6 @@ from benchbox.platforms.clickhouse.delta_lake import (
     delta_function_probe_sql,
     delta_lake_count_sql,
     delta_lake_engine_ddl,
-    delta_lake_table_function,
     has_native_delta_registration,
 )
 
@@ -125,7 +124,12 @@ class TestPublicS3DeltaEndToEnd:
     def test_table_function_read(self, clickhouse_adapter) -> None:
         connection = clickhouse_adapter.create_connection()
         try:
-            source = delta_lake_table_function(PUBLIC_DELTA_URL)
+            # Resolve through the adapter selection, not the builder directly:
+            # the HTTPS S3 URL must classify as S3 and select the native reader.
+            reader = clickhouse_adapter.delta_reader_for(connection, PUBLIC_DELTA_URL)
+            assert reader.kind == "native"
+            assert reader.location_kind == "s3"
+            source = reader.source_sql
             rows = connection.execute(f"SELECT URL, UserAgent FROM {source} WHERE URL IS NOT NULL LIMIT 2")
             assert len(rows) == 2
             assert all(row[0] for row in rows)

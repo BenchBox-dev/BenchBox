@@ -20,6 +20,114 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
+    """Select the ClickHouse load handler for one table path.
+
+    Module-level (rather than a ``load_data`` closure) so the dispatch is
+    unit-testable. Delta Lake table directories resolve to
+    :class:`ClickHouseDeltaHandler`; everything else keeps the established
+    extension-based dispatch.
+    """
+    from benchbox.platforms.base.data_loading import (
+        ClickHouseNativeHandler,
+        DataSource,
+        FileFormatRegistry,
+        is_delta_table_dir,
+        resolve_csv_dialect,
+    )
+
+    # Delta Lake table directories load as one unit through the
+    # read-path selection (native INSERT ... SELECT or snapshot
+    # export), never as raw part-file shards.
+    if is_delta_table_dir(file_path):
+        return ClickHouseDeltaHandler(adapter, benchmark_instance)
+
+    # Determine the true base extension (handles names like *.tbl.1.zst)
+    base_ext = FileFormatRegistry.get_base_data_extension(file_path)
+
+    # Create ClickHouse native handler for supported formats
+    if base_ext in (".tbl", ".dat", ".csv"):
+        dialect_source = data_source or DataSource(source_type="clickhouse_handler", tables={})
+        dialect = resolve_csv_dialect(dialect_source, table_name or file_path.stem, file_path, benchmark_instance)
+        return ClickHouseNativeHandler(
+            dialect.delimiter,
+            adapter,
+            benchmark_instance,
+            has_header=dialect.has_header,
+        )
+    elif base_ext == ".parquet":
+        # Delimiter is unused for Parquet - file() reads the format natively.
+        # We route through ClickHouseNativeHandler so load_table() uses
+        # INSERT INTO ... SELECT * FROM file(path, 'Parquet') instead of
+        # falling back to the generic row-by-row ParquetHandler.
+        return ClickHouseNativeHandler(",", adapter, benchmark_instance)
+    return None  # Fall back to generic handler
+
+
+class ClickHouseDeltaHandler:
+    """Load a Delta Lake table directory into ClickHouse via the read-path selection.
+
+    The handler drives :meth:`ClickHouseWorkloadMixin.delta_reader_for` inside
+    an adapter run (this is the load/format-dispatch connection): a native
+    reader loads with ``INSERT INTO ... SELECT`` straight from the table
+    function, while a snapshot reader first exports the table directory with
+    :func:`benchbox.utils.delta_export.export_delta_to_parquet` and loads the
+    exported files through the native Parquet path. Only local table
+    directories reach this handler; remote locations without native reads
+    raise from the selection instead of producing an unexecutable snapshot.
+    """
+
+    def __init__(self, adapter: Any, benchmark: Any):
+        """Initialize handler.
+
+        Args:
+            adapter: Platform adapter (exposes ``delta_reader_for``).
+            benchmark: Benchmark instance (forwarded to the Parquet path).
+        """
+        self.adapter = adapter
+        self.benchmark = benchmark
+
+    def get_delimiter(self) -> str:
+        """Get delimiter for this file format (not applicable to Delta Lake)."""
+        return ""
+
+    def load_table(self, table_name: str, file_path: Path, connection: Any, benchmark: Any, logger: Any) -> int:
+        """Load a Delta Lake table directory into a ClickHouse table.
+
+        Args:
+            table_name: Name of table to load into.
+            file_path: Path to the Delta Lake table directory.
+            connection: ClickHouse connection.
+            benchmark: Benchmark instance.
+            logger: Logger instance.
+
+        Returns:
+            Number of rows loaded.
+        """
+        from benchbox.platforms.base.data_loading import ClickHouseNativeHandler, validate_sql_identifier
+
+        validated_table = validate_sql_identifier(table_name, "table name")
+        reader = self.adapter.delta_reader_for(connection, str(file_path))
+        if reader.kind == "native":
+            load_query = f"INSERT INTO {validated_table} SELECT * FROM {reader.source_sql}"
+            before_result = connection.execute(f"SELECT COUNT(*) FROM {validated_table}")
+            before = before_result[0][0] if before_result and before_result[0] else 0
+            connection.execute(load_query)
+            after_result = connection.execute(f"SELECT COUNT(*) FROM {validated_table}")
+            after = after_result[0][0] if after_result and after_result[0] else 0
+            return after - before
+        import tempfile
+
+        from benchbox.utils.delta_export import export_delta_to_parquet
+
+        with tempfile.TemporaryDirectory(prefix="benchbox_delta_snapshot_") as tmp_dir:
+            result = export_delta_to_parquet(file_path, tmp_dir)
+            parquet_handler = ClickHouseNativeHandler(",", self.adapter, benchmark or self.benchmark)
+            return parquet_handler.load_table_bulk(
+                table_name, [Path(p) for p in result.parquet_files], connection, benchmark, logger
+            )
+
+
 class ClickHouseWorkloadMixin:
     """Provide schema management and workload execution utilities."""
 
@@ -596,35 +704,7 @@ class ClickHouseWorkloadMixin:
 
         # Create ClickHouse-specific handler factory
         def clickhouse_handler_factory(file_path, adapter, benchmark_instance, table_name=None, data_source=None):
-            from benchbox.platforms.base.data_loading import (
-                ClickHouseNativeHandler,
-                DataSource,
-                FileFormatRegistry,
-                resolve_csv_dialect,
-            )
-
-            # Determine the true base extension (handles names like *.tbl.1.zst)
-            base_ext = FileFormatRegistry.get_base_data_extension(file_path)
-
-            # Create ClickHouse native handler for supported formats
-            if base_ext in (".tbl", ".dat", ".csv"):
-                dialect_source = data_source or DataSource(source_type="clickhouse_handler", tables={})
-                dialect = resolve_csv_dialect(
-                    dialect_source, table_name or file_path.stem, file_path, benchmark_instance
-                )
-                return ClickHouseNativeHandler(
-                    dialect.delimiter,
-                    adapter,
-                    benchmark_instance,
-                    has_header=dialect.has_header,
-                )
-            elif base_ext == ".parquet":
-                # Delimiter is unused for Parquet - file() reads the format natively.
-                # We route through ClickHouseNativeHandler so load_table() uses
-                # INSERT INTO ... SELECT * FROM file(path, 'Parquet') instead of
-                # falling back to the generic row-by-row ParquetHandler.
-                return ClickHouseNativeHandler(",", adapter, benchmark_instance)
-            return None  # Fall back to generic handler
+            return _clickhouse_handler_for(file_path, adapter, benchmark_instance, table_name, data_source)
 
         loader = DataLoader(
             adapter=self,
@@ -723,7 +803,10 @@ class ClickHouseWorkloadMixin:
         """Select the native or snapshot read path for a Delta location.
 
         Probes the server once, then resolves via
-        :func:`benchbox.platforms.clickhouse.delta_lake.resolve_delta_reader`.
+        :func:`benchbox.platforms.clickhouse.delta_lake.resolve_delta_reader`
+        with both the base-integration verdict and the per-function
+        ``deltaLakeLocal`` verdict (a server can register the base
+        integration without the local alias).
 
         Args:
             connection: ClickHouse connection exposing ``execute()``.
@@ -733,11 +816,26 @@ class ClickHouseWorkloadMixin:
             The chosen :class:`DeltaReader`.
 
         Raises:
-            ValueError: If the location is empty, blank, or unrecognized.
+            ValueError: If the location is empty, blank, unrecognized, or has
+                no executable read path (remote without native reads).
         """
-        from .delta_lake import resolve_delta_reader
+        from .delta_lake import (
+            delta_engine_probe_sql,
+            delta_function_probe_sql,
+            has_local_delta_registration,
+            has_native_delta_registration,
+            resolve_delta_reader,
+        )
 
-        return resolve_delta_reader(location, native_available=self.delta_native_registration(connection))
+        function_rows = connection.execute(delta_function_probe_sql()) or []
+        engine_rows = connection.execute(delta_engine_probe_sql()) or []
+        functions = [str(row[0]) for row in function_rows]
+        engines = [str(row[0]) for row in engine_rows]
+        return resolve_delta_reader(
+            location,
+            native_available=has_native_delta_registration(functions, engines),
+            local_native_available=has_local_delta_registration(functions),
+        )
 
     def _get_constraint_configuration(self) -> tuple[bool, bool]:
         """Extract constraint configuration settings from tuning config.
