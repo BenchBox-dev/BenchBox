@@ -20,7 +20,6 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from _project.scripts.cross_surface_applicability_sweep import (  # noqa: E402
-    ABANDONED,
     ARTIFACT,
     BLOCKED,
     CANDIDATE_UNVERIFIED,
@@ -66,25 +65,19 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # would require guessing an id mapping, which the campaign TODO forbids. (amplab,
 # clickbench, joinorder_synthetic were previously here; all are now enforced
 # cross-surface gates, so they no longer appear among the unguarded candidates.
-# tpcds_obt was previously here; its id correspondence was then explicitly
-# abandoned, so it is `abandoned` instead.)
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "tpch_skew", "tsbs_devops"}
+# tpcds_obt was previously here; it now rejects the bounded SF=0.01 cell, so it
+# is `not-cheaply-gateable` instead. datavault was previously here too; it is
+# now an enforced cross-surface gate.)
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpch_skew", "tsbs_devops"}
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
 # bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
 # perform downloader-backed network fetches at the bounded scale.
 # joinorder accepts only SF=1.0 (IMDb 2013 manifest; joinorder_synthetic is the
-# already-enforced scaled stand-in); nyctaxi downloads the pinned TLC Parquet
-# months before sampling even at SF=0.01 (flightdata stays out: its downloader
-# always synthesizes below SF=0.1). tpcds_obt requires SF>=1.0 too, but its
-# id correspondence was explicitly abandoned, so it is `abandoned` instead.
-_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "nyctaxi"}
-
-# Benchmarks whose SQL<->DataFrame id correspondence was investigated and
-# explicitly abandoned: the verdict is recorded in the sweep classifier, so a
-# later bounded-scale fix cannot re-invite investigation as
-# `candidate-unverified`.
-_ABANDONED_BENCHMARKS = {"tpcds_obt"}
+# already-enforced scaled stand-in); tpcds_obt requires SF>=1.0; nyctaxi
+# downloads the pinned TLC Parquet months before sampling even at SF=0.01
+# (flightdata stays out: its downloader always synthesizes below SF=0.1).
+_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "tpcds_obt", "nyctaxi"}
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
@@ -102,10 +95,9 @@ def test_registry_bearing_benchmarks_are_gateable(rows):
     assert by_id.get("joinorder") == NOT_CHEAPLY_GATEABLE
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert gateable == set(), f"unexpected gateable candidates: {sorted(gateable)}"
-    # datavault ships a registry but its ids do not overlap the SQL ids verbatim
-    # (friendly/Q-prefixed names), so there is no verified correspondence: it is
-    # candidate-unverified, NOT counted as gateable coverage.
-    assert by_id.get("datavault") == CANDIDATE_UNVERIFIED
+    # datavault graduated to enforced GATES, so it no longer appears among the
+    # candidates the sweep drills into.
+    assert "datavault" not in by_id
 
 
 def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
@@ -124,11 +116,10 @@ def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
 def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
     """A benchmark that cannot run as one cheap bounded cell is never gateable.
 
-    joinorder accepts only SF=1.0 (canonical IMDb 2013 manifest fetch), so it
-    cannot land as a routine-PR gate no matter its id overlap.
-    joinorder_synthetic (already CI-enforced) is joinorder's scaled stand-in.
-    tpcds_obt also rejects the bounded scale, but its id correspondence was
-    explicitly abandoned, so it is `abandoned` instead (see below).
+    joinorder accepts only SF=1.0 (canonical IMDb 2013 manifest fetch) and
+    tpcds_obt requires SF>=1.0, so neither can land as a routine-PR gate no
+    matter its id overlap. joinorder_synthetic (already CI-enforced) is
+    joinorder's scaled stand-in.
     """
     by_id = {r["benchmark"]: r for r in rows}
     not_cheaply = {r["benchmark"] for r in rows if r["status"] == NOT_CHEAPLY_GATEABLE}
@@ -137,31 +128,13 @@ def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
     assert "SF=0.01" in by_id["joinorder"].get("reason", "")
     assert "data_manifest.toml" in by_id["joinorder"].get("reason", "")
     assert "joinorder_synthetic" in by_id["joinorder"].get("reason", "")
+    assert by_id["tpcds_obt"]["status"] == NOT_CHEAPLY_GATEABLE
+    assert "SF=0.01" in by_id["tpcds_obt"].get("reason", "")
     assert by_id["nyctaxi"]["status"] == NOT_CHEAPLY_GATEABLE
     assert by_id["nyctaxi"].get("data_source") == "network-fetch"
     assert "network fetch" in by_id["nyctaxi"].get("reason", "")
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert _NOT_CHEAPLY_GATEABLE_BENCHMARKS.isdisjoint(gateable)
-
-
-def test_abandoned_correspondences_stay_abandoned(rows):
-    """An explicitly abandoned id correspondence is never re-invited.
-
-    tpcds_obt's DataFrame Q1..Q17 denote OBT-native analytics while its SQL
-    ids denote TPC-DS queries; the abandon verdict is recorded in the sweep
-    classifier with its reason, so even a future bounded-scale fix must not
-    flip it to `candidate-unverified`.
-    """
-    by_id = {r["benchmark"]: r for r in rows}
-    abandoned = {r["benchmark"] for r in rows if r["status"] == ABANDONED}
-    assert abandoned == _ABANDONED_BENCHMARKS, f"abandoned set changed: {sorted(abandoned)}"
-    assert by_id["tpcds_obt"]["status"] == ABANDONED
-    assert "renumbering" in by_id["tpcds_obt"].get("reason", "")
-    assert "id_mapping_decision" in by_id["tpcds_obt"].get("reason", "")
-    gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
-    assert _ABANDONED_BENCHMARKS.isdisjoint(gateable)
-    unverified = {r["benchmark"] for r in rows if r["status"] == CANDIDATE_UNVERIFIED}
-    assert _ABANDONED_BENCHMARKS.isdisjoint(unverified), "an abandoned verdict was re-opened as candidate-unverified"
 
 
 def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
@@ -178,10 +151,11 @@ def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
 def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
-    # flightdata graduated to enforced GATES, so it is no longer a candidate;
-    # datavault remains the staged example.
+    # flightdata and datavault both graduated to enforced GATES, so neither is
+    # a candidate anymore and no staged candidates remain.
     assert "flightdata" not in by_id
-    assert by_id["datavault"].get("staged") is True
+    assert "datavault" not in by_id
+    assert not [r["benchmark"] for r in rows if r.get("staged")], "unexpected staged candidates remain"
     assert by_id["joinorder"].get("staged") is False
 
 
@@ -195,7 +169,6 @@ def test_no_candidate_is_silently_dropped(rows):
             NOT_CHEAPLY_GATEABLE,
             NO_DF_QUERY_SURFACE,
             BLOCKED,
-            ABANDONED,
         }, r
 
 

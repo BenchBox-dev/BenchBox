@@ -111,6 +111,10 @@ _TARGETS: dict[str, str] = {
     # the strict comparator path sees a discriminating order key (no BS3
     # tie-at-1 artifact, no LIMIT boundary-swap acceptance).
     "flightdata": "ontime-by-carrier",
+    # datavault targets Q16 (296 rows x 4 cols at SF=0.01): GROUP BY brand +
+    # ORDER BY supplier_cnt DESC with NO trailing LIMIT, so the strict
+    # comparator path sees a discriminating order key.
+    "datavault": "Q16",
 }
 
 

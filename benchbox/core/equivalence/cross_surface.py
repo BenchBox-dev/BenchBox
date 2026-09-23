@@ -57,9 +57,11 @@ clickbench (the one classified exception is the order-less ``Q18``),
 joinorder_synthetic and h2odb (single ``trips`` table; SQL and DataFrame ids
 correspond 1:1 as ``Q1`` .. ``Q10``; the one classified exception is ``Q9``'s
 PERCENTILE_CONT, where DuckDB returns the percentile at the source column's
-DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives, and
+DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
 flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
-``scale_factor=0.01``, which stays offline). Additional dual-surface
+``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
+.. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
+``"Q1"`` .. ``"Q22"``). Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
@@ -1523,22 +1525,13 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_FLIGHTDATA_SCALE,
     ),
-}
-
-# Staged gates: a load-faithful builder is wired and runnable in report mode,
-# but the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
-# counts a staged gate as a registered oracle under an explicit staged (NOT
-# CI-enforced) label, so staged status is visible there without implying CI
-# enforcement.
-# The next gateable benchmarks (nyctaxi,
-# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    # Data Vault stages here while its cross-surface query-execution burn-down
-    # is open: the builder forces regeneration on every build (probes can never
-    # pass on a stale manifest) and logs the probe manifest the cell came from.
-    # Promoting it to GATES also refreshes the oracle coverage map, the
-    # applicability sweep artifact, and the related registry tests.
+    # Data Vault: 22 SQL queries ("1" .. "22") and 22 DataFrame queries
+    # ("Q1" .. "Q22") correspond by the mechanical ``Q`` prefix (the same
+    # convention as enforced amplab) -- an independently authored numbering on
+    # each surface, not a guessed mapping. Promoted from STAGED_GATES with an
+    # empty baseline: all 44 query-backend cells compare equal, and the
+    # query-execution burn-down is done. The builder keeps forcing regeneration
+    # on every build so probes can never pass on a stale manifest.
     "datavault": CrossSurfaceGate(
         name="datavault",
         build=build_datavault_duckdb,
@@ -1550,6 +1543,16 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
         scale_factor=_DATAVAULT_SCALE,
     ),
 }
+
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# The next gateable benchmarks (nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
