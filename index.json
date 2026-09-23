@@ -1285,7 +1285,7 @@
         "benchbox-score-power-runner",
         "benchbox-score-qualification-policy"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Qualify score size profiles and reference feasibility"
     },
