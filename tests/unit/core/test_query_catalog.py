@@ -220,6 +220,22 @@ class TestSupportsDialectTranslation:
         assert supports_dialect_translation("vector_search", "datafusion") is False
         assert supports_dialect_translation("tpch", "duckdb") is True
 
+    def test_nyctaxi_advertises_only_rendered_dialects(self):
+        # NYCTaxiBenchmark mixes TranslatableQueryMixin in, but get_queries()
+        # only renders the native source, DuckDB-raw, translated cloud, and
+        # registry-variant dialects. Anything else gets untranslated Postgres
+        # SQL and must fall back to the default render, never mislabeled.
+        assert supports_dialect_translation("nyctaxi", "snowflake") is True
+        assert supports_dialect_translation("nyctaxi", "bigquery") is True
+        assert supports_dialect_translation("nyctaxi", "duckdb") is True
+        assert supports_dialect_translation("nyctaxi", "postgres") is True
+        assert supports_dialect_translation("nyctaxi", "clickhouse") is True
+        assert supports_dialect_translation("nyctaxi", "mysql") is False
+        assert supports_dialect_translation("nyctaxi", "datafusion") is False
+        query_id = list_query_ids("nyctaxi")[0]
+        assert get_sql_render("nyctaxi", query_id, dialect="mysql").dialect == "default"
+        assert get_sql_render("nyctaxi", query_id, dialect="snowflake").dialect == "snowflake"
+
 
 class TestQuerySourcePath:
     def test_tpch_points_at_template_file(self):

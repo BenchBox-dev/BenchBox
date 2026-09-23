@@ -961,6 +961,39 @@ benchbox-fixture-key-material
         assert "NULL_IF" not in create_sql
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_header_with_none_null_marker_skips(self, mock_snowflake):
+        """A headered CSV declaring csv_null_marker=None must not raise on .replace().
+
+        TSBS DevOps declares csv_has_header=True with csv_null_marker=None: the
+        format still needs SKIP_HEADER but keeps default NULL handling.
+        """
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("devops.csv.gz")
+        ds = resolver_data_source(
+            "devops",
+            file_path,
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": None},
+        )
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "devops", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "SKIP_HEADER = 1" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = TRUE" in create_sql
+        assert "NULL_IF" not in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):
         """COPY INTO parsing should warn on failed files and malformed row counts."""
         adapter = SnowflakeAdapter(

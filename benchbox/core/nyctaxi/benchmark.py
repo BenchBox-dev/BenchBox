@@ -56,6 +56,21 @@ _NYCTAXI_SF_EPOCH_RE = re.compile(
 # established raw/variant behavior.
 _NYCTAXI_TRANSLATED_DIALECTS = ("bigquery", "snowflake", "databricks", "spark")
 
+# Every dialect get_queries() can actually render: the native Postgres source,
+# DuckDB (executes the raw source; covered by test_nyctaxi_duckdb.py), the
+# SQLGlot-translated cloud dialects, and the registry-backed variants.
+# Anything else (e.g. mysql, datafusion) receives untranslated Postgres SQL,
+# so it must NOT be advertised as supported -- query_catalog falls back to the
+# default render instead of mislabeling the source SQL as that dialect.
+_NYCTAXI_SUPPORTED_DIALECTS = (
+    "postgres",
+    "postgresql",
+    "duckdb",
+    *_NYCTAXI_TRANSLATED_DIALECTS,
+    "clickhouse",
+    "starrocks",
+)
+
 
 class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenchmark):
     """NYC Taxi OLAP benchmark implementation.
@@ -339,6 +354,10 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
             )
 
         manifest.write()
+
+    def supported_dialects(self) -> list[str]:
+        """Return dialects whose query rendering get_queries() actually provides."""
+        return list(_NYCTAXI_SUPPORTED_DIALECTS)
 
     def translate_query_text(self, query_text: str, target_dialect: str) -> str:
         """Translate a query to a cloud dialect, rendering date-part idioms.

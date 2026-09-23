@@ -1024,17 +1024,21 @@ class SnowflakeAdapter(PlatformAdapter):
         Header-aware inputs need their own SKIP_HEADER setting. A truthy
         null-marker sentinel also needs a format where only that literal loads
         as NULL while empty fields stay empty strings (required by NOT NULL
-        schemas such as ClickBench). Returns None when the static CSV/TBL
+        schemas such as ClickBench). A headered CSV with no null marker
+        (null_marker None, e.g. TSBS DevOps) still needs SKIP_HEADER but keeps
+        default NULL handling. Returns None when the static CSV/TBL
         formats already match the resolved dialect.
         """
         dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
         if not dialect.null_marker and not dialect.has_header:
             return None
-        key = f"{dialect.delimiter}\x1f{dialect.null_marker}\x1f{int(dialect.has_header)}\x1f{self.compression}"
+        # Normalize an absent null marker to "" before escaping: header-only
+        # dialects declare csv_null_marker=None and must not reach .replace().
+        marker = (dialect.null_marker or "").replace("'", "''")
+        key = f"{dialect.delimiter}\x1f{marker}\x1f{int(dialect.has_header)}\x1f{self.compression}"
         digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12].upper()
         format_name = f"{self.schema}.BENCHBOX_DYN_{digest}"
         delimiter = dialect.delimiter.replace("'", "''")
-        marker = dialect.null_marker.replace("'", "''")
         skip_header = 1 if dialect.has_header else 0
         empty_field_as_null = "FALSE" if marker else "TRUE"
         null_if = f"NULL_IF = ('{marker}')" if marker else ""
