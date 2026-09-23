@@ -1841,7 +1841,7 @@
       "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "blocked",
       "title": "Make the hourly post-merge sweep exit when the develop tip is already tested"
     },
     "ci-dedupe-03-docs-cancel-superseded-pr-runs": {
