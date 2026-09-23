@@ -349,8 +349,8 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark:
         if callable(getter):
             try:
                 allowed.add(_slug(getter()))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("ignoring data-source alias lookup failure: %s", exc)
     allowed.discard(None)
     if manifest_benchmark and allowed and manifest_benchmark not in allowed:
         return False
@@ -365,17 +365,22 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark:
     return True
 
 
-def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> BenchmarkResults:
+def _attach_datagen_version(
+    result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
+) -> BenchmarkResults:
     """Stamp the result with the verified data-generation version behind it.
 
     The version is read back from the benchmark's datagen manifest and
     recorded only when that manifest's stamp is current and the manifest
     plausibly describes this result's dataset (matching benchmark/scale).
-    Paths that bypass manifest validation (caller-supplied external tables,
-    missing output dir) leave the field unset rather than asserting
-    unverified provenance.
+    Callers pass ``dataset_identity_established=False`` when this run did not
+    establish that link (execute-only runs against an existing database,
+    caller-supplied external tables); those paths leave the fields unset
+    rather than asserting unverified provenance.
     """
     try:
+        if not dataset_identity_established:
+            return result
         if getattr(result, "data_generation_version", None) is not None:
             return result
         from benchbox.utils.datagen_version import manifest_datagen_is_current
@@ -396,8 +401,8 @@ def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> 
             return result
         result.data_generation_version = manifest.get("data_generation_version")
         result.data_generation_hash = manifest.get("base_constants_hash")
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("leaving data-generation provenance unset: %s", exc)
     return result
 
 
@@ -421,8 +426,8 @@ def _attach_variant_comparability_metadata(result: BenchmarkResults, benchmark: 
         if not isinstance(result.execution_metadata, dict):
             result.execution_metadata = {}
         result.execution_metadata["variant_comparability"] = summary
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("leaving variant comparability metadata unset: %s", exc)
     return result
 
 
@@ -948,8 +953,13 @@ def _run_data_generation_phase(
     output_dir_handler: Any,
     monitor: Any,
     validation_records: list[tuple[str, ValidationResult]],
-) -> float:
-    """Run preflight+datagen+manifest-validation+format-conversion, return elapsed seconds."""
+) -> tuple[float, bool, bool]:
+    """Run preflight+datagen+manifest-validation+format-conversion.
+
+    Returns ``(elapsed_seconds, freshly_generated, manifest_reused)`` so the
+    lifecycle can tell whether this run established the dataset identity
+    behind the output-dir manifest.
+    """
     datagen_start = time.monotonic()
 
     if phases.generate and validation_opts.enable_preflight_validation:
@@ -959,13 +969,15 @@ def _run_data_generation_phase(
             error_msg = ", ".join(preflight_result.errors) or "Unknown preflight validation error"
             raise RuntimeError(f"Preflight validation failed: {error_msg}")
 
+    freshly_generated = False
+    manifest_reused = False
     if monitor is not None:
         with monitor.time_operation("data_generation"):
-            data_was_generated = _ensure_data_generated(benchmark, benchmark_config)
-            if data_was_generated:
+            freshly_generated, manifest_reused = _ensure_data_generated(benchmark, benchmark_config)
+            if freshly_generated:
                 monitor.increment_counter("tables_generated", len(getattr(benchmark, "tables", []) or []))
     else:
-        _ensure_data_generated(benchmark, benchmark_config)
+        freshly_generated, manifest_reused = _ensure_data_generated(benchmark, benchmark_config)
 
     if validation_opts.enable_postgen_manifest_validation:
         manifest_result = _run_manifest_validation(benchmark, benchmark_config)
@@ -974,7 +986,7 @@ def _run_data_generation_phase(
     if phases.generate:
         _run_format_conversion(benchmark, benchmark_config)
 
-    return time.monotonic() - datagen_start
+    return time.monotonic() - datagen_start, freshly_generated, manifest_reused
 
 
 def _build_data_only_result(
@@ -1387,8 +1399,10 @@ def run_benchmark_lifecycle(
     needs_data = test_type != "data_only"
 
     datagen_duration = 0.0
+    freshly_generated = False
+    manifest_reused = False
     if needs_data or phases.generate:
-        datagen_duration = _run_data_generation_phase(
+        datagen_duration, freshly_generated, manifest_reused = _run_data_generation_phase(
             benchmark=benchmark,
             benchmark_config=benchmark_config,
             phases=phases,
@@ -1397,6 +1411,12 @@ def run_benchmark_lifecycle(
             monitor=monitor,
             validation_records=validation_records,
         )
+    # Result provenance may only describe the output-dir manifest when this
+    # run established the dataset identity: fresh generation, or a manifest
+    # reuse whose files the load phase then reads. Execute-only runs against
+    # an existing database (and caller-supplied external tables) leave the
+    # fields unset rather than asserting unverified provenance.
+    dataset_identity_established = freshly_generated or (manifest_reused and bool(phases.load))
 
     if test_type == "data_only":
         return _build_data_only_result(
@@ -1466,7 +1486,7 @@ def run_benchmark_lifecycle(
             result_obj.execution_context = execution_context.model_dump()
         result_obj = _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
         result_obj = _attach_variant_comparability_metadata(result_obj, benchmark)
-        return _attach_datagen_version(result_obj, benchmark)
+        return _attach_datagen_version(result_obj, benchmark, dataset_identity_established=dataset_identity_established)
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1538,7 +1558,7 @@ def run_benchmark_lifecycle(
     )
     finalized = _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
     finalized = _attach_variant_comparability_metadata(finalized, benchmark)
-    return _attach_datagen_version(finalized, benchmark)
+    return _attach_datagen_version(finalized, benchmark, dataset_identity_established=dataset_identity_established)
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1659,7 +1679,7 @@ def _run_ensure_auxiliary_hook(benchmark: Any) -> None:
         )
 
 
-def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
+def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
     """Ensure data is generated, respecting manifest and generator validator.
 
     Implements the idempotent behavior: reuse valid existing data when possible,
@@ -1667,7 +1687,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     and data is missing/invalid.
 
     Returns:
-        True if data was freshly generated, False if reused from existing manifest
+        ``(freshly_generated, manifest_reused)``: whether this call generated
+        data, and whether it reused a manifest validated on this run. Both
+        False means caller-supplied tables bypassed manifest reuse entirely.
     """
     options = getattr(config, "options", {}) or {}
     force_regenerate_flag = bool(options.get("force_regenerate"))
@@ -1681,7 +1703,7 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
             # Caller-supplied tables bypass manifest reuse, but stale manifests
             # still need healing (e.g. FlightData dialect backfill).
             _run_ensure_auxiliary_hook(benchmark)
-            return False
+            return False, False
         populated_tables_invalid = True
         if no_regenerate_flag:
             raise RuntimeError("no_regenerate is set but populated benchmark tables are missing or stale")
@@ -1705,7 +1727,7 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
             # This is needed for benchmarks that generate additional test files beyond the main data
             _run_ensure_auxiliary_hook(benchmark)
 
-            return False
+            return False, True
 
     if no_regenerate_flag and not force_regenerate_flag:
         reason = "manifest is invalid or stale" if manifest_found else "manifest is missing"
@@ -1720,7 +1742,7 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     _gen_start = time.monotonic()
     benchmark.generate_data()
     emit(f"✅ Data generation completed in {time.monotonic() - _gen_start:.2f}s")
-    return True
+    return True, False
 
 
 def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:

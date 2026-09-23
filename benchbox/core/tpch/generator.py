@@ -933,8 +933,10 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             if existing_manifest is None or not manifest_paths:
                 # No usable manifest exists, so create one from the discovered
                 # files. This is a first-write/recovery path, not a recurring
-                # reuse scan for a measured manifest.
-                self._write_manifest(target_dir, existing_paths)
+                # reuse scan for a measured manifest. The files' vintage is
+                # unknown, so the rebuilt manifest stays unstamped and the
+                # next run honestly regenerates to establish provenance.
+                self._write_manifest(target_dir, existing_paths, stamp=False)
             return existing_paths
 
         removed_stale = self._prune_stale_table_artifacts(target_dir)
@@ -1455,7 +1457,9 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             more = "..." if len(empties) > 5 else ""
             raise RuntimeError(f"File format consistency violation: Found empty compressed files: {names}{more}")
 
-    def _write_manifest(self, output_dir: Path, table_paths: dict[str, Path | list[Path]]) -> None:
+    def _write_manifest(
+        self, output_dir: Path, table_paths: dict[str, Path | list[Path]], *, stamp: bool = True
+    ) -> None:
         if not table_paths:
             return
 
@@ -1467,6 +1471,9 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
             parallel=self.parallel,
             seed=getattr(self, "seed", None),
             extra_metadata={"row_counts_source": _MEASURED_ROW_COUNTS_SOURCE},
+            # Recovery rewrites for files of unknown vintage must not stamp:
+            # only a real generation establishes provenance.
+            stamp=stamp,
         )
 
         # Collect ALL chunk files for each table

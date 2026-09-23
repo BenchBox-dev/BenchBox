@@ -1001,12 +1001,14 @@ class ResultExporter:
     def _check_generation_compatibility(baseline_data: dict[str, Any], current_data: dict[str, Any]) -> dict[str, Any]:
         """Flag comparisons across incompatible data generations.
 
-        Returns a block with the stamped ``(version, hash)`` provenance of each side, whether the
-        comparison is generation-compatible, and a human-readable warning when both sides are stamped
-        but disagree. Results predating the stamp carry no provenance and are reported as unknown
-        rather than incompatible, so legacy comparisons keep working.
+        Returns a block with the stamped ``(version, hash)`` provenance of each side, a ``status``
+        of ``compatible``/``unknown``/``incompatible``, a legacy ``compatible`` boolean (None when
+        unknown, so API consumers cannot read "provenance unknown" as "safe to compare"), and a
+        human-readable warning. Results predating the stamp carry no provenance and are reported as
+        unknown rather than incompatible, so legacy comparisons keep working. Compatibility is only
+        asserted when both versions match and both hashes are present and equal.
         """
-        outcome: dict[str, Any] = {"compatible": True, "warning": None}
+        outcome: dict[str, Any] = {"status": "compatible", "compatible": True, "warning": None}
 
         def _provenance(data: dict[str, Any]) -> dict[str, Any]:
             benchmark = data.get("benchmark") if isinstance(data, dict) else None
@@ -1023,22 +1025,43 @@ class ResultExporter:
         outcome["current"] = current_prov
         baseline_version = baseline_prov["data_generation_version"]
         current_version = current_prov["data_generation_version"]
+        baseline_hash = baseline_prov["data_generation_hash"]
+        current_hash = current_prov["data_generation_hash"]
         if baseline_version is None or current_version is None:
+            outcome["status"] = "unknown"
+            outcome["compatible"] = None
             outcome["warning"] = (
                 "One or both results predate data-generation stamping; "
                 "generation compatibility is unknown. Timing deltas may reflect dataset differences."
             )
             return outcome
-        baseline_hash = baseline_prov["data_generation_hash"]
-        current_hash = current_prov["data_generation_hash"]
-        if baseline_version != current_version or (
-            baseline_hash is not None and current_hash is not None and baseline_hash != current_hash
-        ):
+        if baseline_version != current_version:
+            outcome["status"] = "incompatible"
             outcome["compatible"] = False
             outcome["warning"] = (
-                f"Results were generated from different data generations "
+                "Results were generated from different data generations "
                 f"(baseline version={baseline_version}, current version={current_version}); "
                 "timing deltas may reflect dataset differences rather than performance changes."
+            )
+            return outcome
+        if baseline_hash is None or current_hash is None:
+            outcome["status"] = "unknown"
+            outcome["compatible"] = None
+            outcome["warning"] = (
+                f"Both results carry data-generation version {baseline_version}, but at least one "
+                "is missing its base-constants fingerprint; generation compatibility is unknown. "
+                "Timing deltas may reflect dataset differences."
+            )
+            return outcome
+        if baseline_hash != current_hash:
+            outcome["status"] = "incompatible"
+            outcome["compatible"] = False
+            outcome["warning"] = (
+                f"Both results carry data-generation version {baseline_version}, but their "
+                f"base-constants fingerprints differ ({str(baseline_hash)[:12]}… vs "
+                f"{str(current_hash)[:12]}…): the generator specs likely changed without a "
+                "version bump. Timing deltas may reflect dataset differences rather than "
+                "performance changes."
             )
         return outcome
 
@@ -1050,7 +1073,9 @@ class ResultExporter:
             current_path: Path to current result file.
 
         Returns:
-            Comparison dictionary with performance changes and query comparisons.
+            Comparison dictionary with performance changes, query comparisons,
+            and a ``generation_compatibility`` block (``status``,
+            ``compatible``, ``warning``, plus each side's stamped provenance).
         """
         baseline_result = self.load_result_from_file(baseline_path)
         current_result = self.load_result_from_file(current_path)
@@ -1207,6 +1232,15 @@ class ResultExporter:
         summary = comparison.get("summary", {})
         performance_changes = comparison.get("performance_changes", {})
         query_comparisons = comparison.get("query_comparisons", [])
+        generation = comparison.get("generation_compatibility") or {}
+        generation_warning = str(generation.get("warning") or "")
+        generation_warning_html = (
+            '<div class="metric regressed" style="margin-bottom: 20px;">'
+            "<h3>Data generation warning</h3>"
+            f"<p>{html_escape(generation_warning, quote=True)}</p></div>"
+            if generation_warning
+            else ""
+        )
         total_queries_compared = html_escape(str(summary.get("total_queries_compared", 0)), quote=True)
         improved_queries = html_escape(str(summary.get("improved_queries", 0)), quote=True)
         regressed_queries = html_escape(str(summary.get("regressed_queries", 0)), quote=True)
@@ -1238,6 +1272,7 @@ class ResultExporter:
             <h1>Performance Comparison Report</h1>
             <p>Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
         </div>
+        {generation_warning_html}
         <div class="summary">
             <div class="metric neutral">
                 <h3>Queries Compared</h3>

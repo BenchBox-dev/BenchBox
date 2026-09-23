@@ -10,6 +10,13 @@ operator-chosen first-class platform for every bundle that still carries it:
 - a bare ``_clickhouse_`` filename slug -> ``_<target>_`` (underscored form)
 - the ``.manifest.json`` sidecar ``bundle_file`` entry plus a recomputed
   ``bundle_hash`` over the rewritten result file
+- companion files (``benchbox.validation.bundle.COMPANION_SUFFIXES``) renamed
+  alongside their bundle so plans/tuning ledgers stay associated
+
+All writes go through temp files plus ``os.replace`` (same directory), so a
+crash leaves either the old or the new file in place, never a partial one.
+Companions are skipped during discovery exactly like bundle discovery skips
+them: they are carried, never treated as bundles themselves.
 
 Dry-run by default; pass ``--apply`` to write. After applying, regenerate
 ``results-data/corpus-inventory.json`` (see ``results-data/REGENERATION.md``)
@@ -21,9 +28,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+
+from benchbox.validation.bundle import COMPANION_SUFFIXES
 
 TARGETS = {
     "clickhouse-local": "ClickHouse Local",
@@ -49,7 +59,18 @@ def _load_json(path: Path) -> dict:
 
 
 def _write_json(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _atomic_write_bytes(path, (json.dumps(data, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+
+
+def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    """Write bytes atomically: temp file in the same directory, then replace.
+
+    A crash leaves either the complete old file or the complete new file;
+    readers never observe a partial write.
+    """
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    tmp.write_bytes(payload)
+    os.replace(tmp, path)
 
 
 def _sha256(path: Path) -> str:
@@ -70,11 +91,15 @@ def platform_label_of(payload: dict) -> str | None:
     return None
 
 
+def _is_companion(name: str) -> bool:
+    return name.endswith(COMPANION_SUFFIXES)
+
+
 def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
     hits: list[BundleHit] = []
     anomalies: list[str] = []
     for result in sorted(bundle_dir.rglob("*.json")):
-        if result.name.endswith(".manifest.json"):
+        if result.name.endswith(".manifest.json") or _is_companion(result.name):
             continue
         try:
             payload = _load_json(result)
@@ -103,31 +128,54 @@ def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
     return hits, anomalies
 
 
-def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
-    """Rewrite one bundle (and sidecar) to the target platform. Returns new paths.
+def _existing_companions(result: Path) -> list[tuple[str, Path]]:
+    """Return ``(suffix, path)`` for companion files present beside a bundle."""
+    found = []
+    for suffix in COMPANION_SUFFIXES:
+        candidate = result.with_name(f"{result.stem}{suffix}")
+        if candidate.is_file():
+            found.append((suffix, candidate))
+    return found
 
-    Raises:
-        FileExistsError: If the rewritten result or sidecar path already
-            exists. `--apply` never overwrites a published artifact; resolve
-            the collision by hand and re-run.
-        ValueError: If the manifest sidecar is malformed. Nothing is written.
-    """
-    display = TARGETS[target]
+
+def _planned_names(hit: BundleHit, target: str) -> tuple[Path, Path | None, list[tuple[Path, Path]]]:
+    """Compute rename targets without writing: result, sidecar, companions."""
     slug = target.replace("-", "_")
-
     new_result = hit.result
     if _BARE_SLUG.search(hit.result.name):
         new_result = hit.result.with_name(_BARE_SLUG.sub(f"_{slug}_", hit.result.name, count=1))
-    if new_result != hit.result and new_result.exists():
-        raise FileExistsError(f"refusing to overwrite existing bundle {new_result}")
-    new_manifest_guess = (
-        hit.manifest.with_name(f"{new_result.stem}.manifest.json") if hit.manifest is not None else None
-    )
-    if new_manifest_guess is not None and new_manifest_guess != hit.manifest and new_manifest_guess.exists():
-        raise FileExistsError(f"refusing to overwrite existing sidecar {new_manifest_guess}")
+    new_manifest = hit.manifest.with_name(f"{new_result.stem}.manifest.json") if hit.manifest is not None else None
+    companions = [
+        (old, old.with_name(f"{new_result.stem}{suffix}")) for suffix, old in _existing_companions(hit.result)
+    ]
+    return new_result, new_manifest, companions
+
+
+def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
+    """Rewrite one bundle (plus sidecar and companions) to the target platform.
+
+    Returns new result and sidecar paths. Every write is atomic (temp file
+    plus replace), all new files land before any old path is removed, and an
+    existing target aborts the hit before anything is written.
+
+    Raises:
+        FileExistsError: If a rewritten path already exists. `--apply` never
+            overwrites a published artifact; resolve the collision by hand
+            and re-run.
+        ValueError: If the manifest sidecar is malformed. Nothing is written.
+    """
+    display = TARGETS[target]
+    new_result, new_manifest_guess, companions = _planned_names(hit, target)
+    guarded: list[tuple[Path | None, Path | None]] = [(hit.result, new_result)]
+    if hit.manifest is not None:
+        guarded.append((hit.manifest, new_manifest_guess))
+    guarded.extend(companions)
+    for old, new in guarded:
+        if old is not None and new is not None and new != old and new.exists():
+            raise FileExistsError(f"refusing to overwrite existing file {new}")
 
     # Preflight everything before writing: a malformed sidecar aborts the
-    # hit with both originals untouched.
+    # hit with all originals untouched.
     payload = _load_json(hit.result)
     sidecar: dict | None = None
     if hit.manifest is not None:
@@ -142,22 +190,26 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
     elif isinstance(platform, str) and _BARE_LABEL.match(platform):
         payload["platform"] = display
 
-    # Write the new pair before removing the old one, so a crash leaves both
+    # Write every new file before removing any old one, so a crash leaves the
     # originals recoverable; re-running then reports a collision, never a
-    # half-migrated bundle.
+    # half-migrated bundle. Each write is atomic, so even the in-place
+    # (label-only) case cannot leave a partial file behind.
     _write_json(new_result, payload)
     new_manifest: Path | None = None
-    if hit.manifest is not None and sidecar is not None:
+    if hit.manifest is not None and sidecar is not None and new_manifest_guess is not None:
         sidecar["bundle_file"] = new_result.name
         sidecar["bundle_hash"] = _sha256(new_result)
-        new_manifest = hit.manifest
-        if new_result != hit.result:
-            new_manifest = hit.manifest.with_name(f"{new_result.stem}.manifest.json")
+        new_manifest = new_manifest_guess
         _write_json(new_manifest, sidecar)
-    if new_result != hit.result:
-        hit.result.unlink()
-    if new_manifest is not None and new_manifest != hit.manifest and hit.manifest is not None:
-        hit.manifest.unlink()
+    for old, new in companions:
+        _atomic_write_bytes(new, old.read_bytes())
+    renames = [(hit.result, new_result)]
+    if hit.manifest is not None and new_manifest is not None:
+        renames.append((hit.manifest, new_manifest))
+    renames.extend(companions)
+    for old, new in renames:
+        if new != old:
+            old.unlink()
     return new_result, new_manifest
 
 
@@ -175,7 +227,13 @@ def main(argv: list[str] | None = None) -> int:
 
     hits, anomalies = discover_hits(args.bundle_dir)
     for hit in hits:
-        print(f"{hit.result.name}: platform label {hit.old_label!r}")
+        if args.target:
+            new_result, _, companions = _planned_names(hit, args.target)
+            renames = [f"{hit.result.name} -> {new_result.name}"]
+            renames.extend(f"{old.name} -> {new.name}" for old, new in companions if new != old)
+            print(f"{hit.result.name}: platform label {hit.old_label!r} would become {'; '.join(renames)}")
+        else:
+            print(f"{hit.result.name}: platform label {hit.old_label!r}")
     for anomaly in anomalies:
         print(f"anomaly: {anomaly}")
     print(f"{len(hits)} bundle(s) carry the legacy bare `clickhouse` label")

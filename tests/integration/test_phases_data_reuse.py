@@ -100,7 +100,7 @@ class TestPhasesDataReuse:
         was_generated = _ensure_data_generated(benchmark, config)
 
         # Verify data was reused, not regenerated
-        assert was_generated is False, "Data should be reused, not regenerated"
+        assert was_generated == (False, True), "Data should be reused, not regenerated"
         benchmark.generate_data.assert_not_called()
 
     def test_power_phase_generates_if_no_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
@@ -124,7 +124,7 @@ class TestPhasesDataReuse:
         was_generated = _ensure_data_generated(benchmark, config)
 
         # Verify data was generated
-        assert was_generated is True, "Data should be generated when no manifest exists"
+        assert was_generated == (True, False), "Data should be generated when no manifest exists"
         benchmark.generate_data.assert_called_once()
 
     def test_force_regenerate_ignores_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
@@ -175,7 +175,7 @@ class TestPhasesDataReuse:
         was_generated = _ensure_data_generated(benchmark, config)
 
         # Verify data was regenerated
-        assert was_generated is True, "Data should be regenerated with force_regenerate"
+        assert was_generated == (True, False), "Data should be regenerated with force_regenerate"
         benchmark.generate_data.assert_called_once()
 
     def test_no_regenerate_fails_without_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
