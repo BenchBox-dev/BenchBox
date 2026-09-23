@@ -19038,7 +19038,7 @@
         "flightdata-dataframe-date-params-miss-the-generated-data"
       ],
       "priority": "medium",
-      "status": "blocked",
+      "status": "open",
       "title": "Wire the FlightData cross-surface gate (staged) once its DataFrame date window is fixed"
     },
     "workflow-lint-guard-for-invalid-context-references": {
