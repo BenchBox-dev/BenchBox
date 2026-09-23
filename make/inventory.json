@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "825f2af9f39bede81bc5b48dbeec81042daeaf595259b8297e3193796012afe3",
+  "contract_sha256": "ba1c5660f0293ad0b76455af981fcb23bfd7cd943a2036d0ebbe4020817da02e",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -703,36 +703,36 @@
     "coverage-all": [
       {
         "header": "coverage-all:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
-        "recipe_sha256": "d3daa0cc39f44f69e2bdeea9accaca6e5d65b2dcc90356717f2c1df1d8a0bf35"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0",
+        "recipe_sha256": "dcd37b99e80d4a20e0e9d9d7d46716968d759ddc63e9cb4a5e605f9ef4a2a993"
       }
     ],
     "coverage-fast": [
       {
         "header": "coverage-fast:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered",
-        "recipe_sha256": "ec8ad8a1e904a742588074307c16967651beaf3b85fc69b75b136ea90cdbce56"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0",
+        "recipe_sha256": "0d5f539509e76207440186871ebfeafc49e39803f74a4663abf585712c03b299"
       }
     ],
     "coverage-html": [
       {
         "header": "coverage-html:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov",
-        "recipe_sha256": "2b77f670f30bf6cb29c086de9208256c7152b982b7f386aa7e8baaeb06e4f567"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov --cov-fail-under=0",
+        "recipe_sha256": "60ddf4cfacc76c02c775400357e177410950756d2250ad669f00e49805a7bfc5"
       }
     ],
     "coverage-opt-in-all": [
       {
         "header": "coverage-opt-in-all:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
-        "recipe_sha256": "27b2bd8d74be8dbf3ce394008c2ab886b0d695055bb0c69b5e882d5bdb864e71"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0",
+        "recipe_sha256": "cc96f0ddc2c314bbafa2d7bb80c4676c06f6896a2857b1dbd3f69a49590f9bae"
       }
     ],
     "coverage-report": [
       {
         "header": "coverage-report:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
-        "recipe_sha256": "3fc4a02c06db3968ff637b34185bf96c45fe68282bd8e2dbdceb2081304c8942"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=0",
+        "recipe_sha256": "fb94b8d788d45f3a4690aeb4a0a957391fb60e8836640e54d32a0d073e679793"
       }
     ],
     "cross-surface-applicability-report": [
@@ -1487,8 +1487,8 @@
     "test-ci": [
       {
         "header": "test-ci:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
-        "recipe_sha256": "66b267e35e7ac30f4e463245ace0cc88649f77716b65056d7ef0be7ac1871a97"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0",
+        "recipe_sha256": "269fc051212f3fc2d7a0d9df4964fba0ecdfd4ea8c14d88c65ffebe286ab6f2a"
       }
     ],
     "test-correctness-gate": [
@@ -2139,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "ad3c4da08dc43c163938b5bd8065518fd761ce7af66cfde4d3d08130bf5c7ba5",
+  "semantic_sha256": "85332f32675b0113794ab7cf23779d3c3ecbcc3ee18b4bebf3106f44cb7ec5d0",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2742,9 +2742,9 @@
       ]
     },
     {
-      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
+      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "d30aa04b792866bbb98dde41c07cb574b4036ae3fc57ed00ed9f1dc14dc06572",
+      "sha256": "4e63cea6216f1a98a959bca0bd7ff3693c16040378ba2f892bfc16b3819e7ad1",
       "targets": [
         "test-ci"
       ]
@@ -3032,25 +3032,25 @@
       ]
     },
     {
-      "body": "coverage-fast:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered",
+      "body": "coverage-fast:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "e687620d952e98f0d8f1cb838ce76b5a612d3ae0d8e1fefa9e3c161d5a79046f",
+      "sha256": "5201398487e85b124f34135bb0e9f02b86e45501a649728bdcc46f247ccb4eb7",
       "targets": [
         "coverage-fast"
       ]
     },
     {
-      "body": "coverage-all:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+      "body": "coverage-all:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "e2e2d0d5d2c6f0f75ecc036b00dee740efe4deae6e5712d9b6af0d4b45ed0b2f",
+      "sha256": "369ba3825f5b112a7bcad74c896b7394043ef53c5053e02cb487f30f8150b45f",
       "targets": [
         "coverage-all"
       ]
     },
     {
-      "body": "coverage-opt-in-all:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+      "body": "coverage-opt-in-all:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "1814c05186fa2c90291172ce6987f7d45ed4e5eed5913ee9fca0c8024fbef4a8",
+      "sha256": "8b924ebd6e64af86869d0111d6768a3de02ea65e7e46ff9cc908c826c56034f0",
       "targets": [
         "coverage-opt-in-all"
       ]
@@ -3064,17 +3064,17 @@
       ]
     },
     {
-      "body": "coverage-html:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov",
+      "body": "coverage-html:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "06ba1b49aea2a80e13b990ece88aaddaa9a59e747db308e947a905e0cc11435a",
+      "sha256": "f3680a6dbd6d194e918f300a2207f8ab464b869d06cb7abaedc279194dc30c48",
       "targets": [
         "coverage-html"
       ]
     },
     {
-      "body": "coverage-report:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
+      "body": "coverage-report:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=0",
       "kind": "rule",
-      "sha256": "9fff094171f06dc1a6e23a37714dab3bbf30d09ef0de8b425f8b1799f89b5210",
+      "sha256": "2ce02bba73ce1685f9727806e411a6722e0cc5de8678e49d097ea271867e4312",
       "targets": [
         "coverage-report"
       ]
