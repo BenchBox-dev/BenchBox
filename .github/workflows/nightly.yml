@@ -845,8 +845,12 @@ jobs:
     # throughput-stream-count-wiring-defect) would have shipped green. This
     # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
     # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
+    # The Docker Postgres cell below is the deferred w4: same stream-count
+    # contract on a client/server engine via INDEPENDENT_CONNECTION, with the
+    # cell managing its own compose stack
+    # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -890,6 +894,18 @@ jobs:
         # gating on this step's own exit code.
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
+
+      - name: Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        # w4: the same stream-count contract on a client/server engine. Unlike
+        # DuckDB's SHARED_CURSOR fast path, PostgreSQL opts into
+        # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
+        # proves N concurrent independent sessions end to end via the
+        # production CLI. The cell manages its own compose stack
+        # (cleanup.docker_manage_platforms); no service container is needed.
+        # Gated on the sweep's own exit code like the DuckDB cell above: no
+        # `continue-on-error` here either.
+        run: |
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
         # Independent, defense-in-depth gate. `if: !cancelled()` is load-bearing:
@@ -945,6 +961,48 @@ jobs:
               print(f'::error::{reason}')
               sys.exit(1)
           print(f'OK: stream count and per-stream success both verified ({result_path})')
+          "
+
+      - name: Assert the Postgres cell stream count and per-stream success
+        # w4 defense-in-depth, mirroring the DuckDB assert above: runs under
+        # `if: !cancelled()` so a failed sweep still gates instead of skipping.
+        # Globs the postgresql result (not duckdb) within the same run window.
+        if: ${{ !cancelled() }}
+        run: |
+          uv run -- python -c "
+          import datetime, os, sys
+          from datetime import timezone
+          from pathlib import Path
+          from tests.uat.throughput import (
+              validate_stream_count,
+              validate_stream_success,
+          )
+
+          started_after = datetime.datetime.strptime(
+              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
+          ).replace(tzinfo=timezone.utc)
+          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
+          candidates = [
+              p for p in results_dir.glob('tpch_sf1_postgres*.json')
+              if not p.name.endswith('.applied.json')
+              and not p.name.endswith('.plans.json')
+              and p.stat().st_mtime >= (started_after.timestamp() - 5)
+          ]
+          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
+          if result_path is None:
+              print('::error::No throughput UAT result JSON found for postgresql/tpch')
+              sys.exit(1)
+          import json
+          result_json = json.loads(result_path.read_text(encoding='utf-8'))
+          ok, reason = validate_stream_count(result_json, requested_streams=3)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          ok, reason = validate_stream_success(result_json)
+          if not ok:
+              print(f'::error::{reason}')
+              sys.exit(1)
+          print(f'OK: postgres stream count and per-stream success both verified ({result_path})')
           "
 
   pyspark-tests:
