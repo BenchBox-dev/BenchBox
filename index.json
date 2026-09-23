@@ -3477,7 +3477,13 @@
     },
     "cross-surface-gate-rollout-followups": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "datavault-cross-surface-gate-promotion",
+        "tpch-skew-dataframe-sql-id-mapping",
+        "nyctaxi-dataframe-sql-id-mapping",
+        "tsbs-devops-dataframe-sql-id-mapping",
+        "tpcds-obt-dataframe-sql-id-mapping-decision"
+      ],
       "priority": "medium-high",
       "status": "blocked",
       "title": "Cross-surface gate breadth rollout: wire the remaining gateable benchmarks + fallback oracle"
