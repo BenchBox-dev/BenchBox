@@ -5,6 +5,7 @@ import pytest
 
 from benchbox.utils.data_validation import BenchmarkDataValidator
 from benchbox.utils.datagen_manifest import compute_entry_size
+from benchbox.utils.datagen_version import current_datagen_stamp
 
 pytestmark = [
     pytest.mark.unit,
@@ -31,9 +32,13 @@ def test_validator_builds_manifest_from_scan(tmp_path: Path):
     assert manifest.get("benchmark") == "ssb"
     assert "tables" in manifest and len(manifest["tables"]) >= 1
 
-    # Validate again; should still be valid and not raise
+    # Validate again: a scan-rebuilt manifest carries no datagen stamp (a scan
+    # proves file presence, not provenance), so revalidation honestly reports
+    # staleness instead of laundering unknown-vintage data into current
+    # provenance. The next run regenerates to establish provenance.
     res2 = v.validate_data_directory(data_dir)
-    assert res2.valid is True
+    assert res2.valid is False
+    assert any("stale" in issue for issue in res2.issues)
 
 
 class TestComputeEntrySize:
@@ -87,6 +92,10 @@ class TestDataValidationDirectoryEntries:
             "version": 2,
             "benchmark": "ssb",
             "scale_factor": 0.01,
+            # A current datagen stamp: this fixture represents a properly
+            # generated dataset, so validation reaches the entry checks
+            # instead of failing on staleness.
+            **current_datagen_stamp("ssb"),
             "format_preference": ["delta"],
             "tables": {
                 table_name: {

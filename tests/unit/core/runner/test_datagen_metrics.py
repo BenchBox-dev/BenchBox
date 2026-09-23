@@ -83,9 +83,9 @@ def _run_data_only(
         )
 
 
-def _sleeping_ensure_data_generated(*_args, **_kwargs) -> bool:
+def _sleeping_ensure_data_generated(*_args, **_kwargs) -> tuple[bool, bool]:
     time.sleep(0.02)
-    return True
+    return True, False
 
 
 def _write_manifest_v1(output_dir: Path, benchmark_id: str) -> None:
@@ -147,7 +147,7 @@ def test_datagen_phase_has_duration_ms(tmp_path: Path):
 @pytest.mark.parametrize("benchmark_id", ["tpch", "tpcds", "ssb"])
 def test_datagen_phase_has_table_stats_when_manifest_present(tmp_path: Path, benchmark_id: str):
     _write_manifest_v1(tmp_path, benchmark_id)
-    result = _run_data_only(benchmark_id, tmp_path, lambda *_args, **_kwargs: False)
+    result = _run_data_only(benchmark_id, tmp_path, lambda *_args, **_kwargs: (False, False))
     phase = result.execution_metadata["phase_status"]["data_generation"]
     payload = build_result_payload(result)
     payload_phase = payload["phases"]["data_generation"]
@@ -180,7 +180,7 @@ def test_datagen_phase_gracefully_degrades_without_manifest(tmp_path: Path):
 
 def test_datagen_phase_has_table_stats_from_v2_manifest(tmp_path: Path):
     _write_manifest_v2(tmp_path, "tpch")
-    result = _run_data_only("tpch", tmp_path, lambda *_args, **_kwargs: False)
+    result = _run_data_only("tpch", tmp_path, lambda *_args, **_kwargs: (False, False))
     phase = result.execution_metadata["phase_status"]["data_generation"]
     payload = build_result_payload(result)
     payload_phase = payload["phases"]["data_generation"]
