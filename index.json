@@ -1707,6 +1707,13 @@
       "status": "open",
       "title": "Publish per-test durations from every release-canary shard"
     },
+    "canary-impact-02-selector": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Build a fail-safe selector that maps changed paths to the release-canary tests they can affect"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
