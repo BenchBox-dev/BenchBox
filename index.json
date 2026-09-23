@@ -1224,7 +1224,7 @@
       "needs": [
         "benchbox-score-methodology-freeze"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Publish qualified BenchBox score surfaces"
     },
