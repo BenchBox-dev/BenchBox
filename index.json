@@ -4765,7 +4765,7 @@
         "todo-db-cutover-g5"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Retire work units from the item schema"
     },
     "dry-run-feature-completed": {
