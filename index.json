@@ -12936,6 +12936,13 @@
       "status": "done",
       "title": "Release canonical todo-db holder-only runtime"
     },
+    "release-cut-origin-head-linked-worktree": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Cut releases from an exact origin/develop head in a linked worktree"
+    },
     "release-finalize-pretag-ci-wait": {
       "claim": null,
       "needs": [
