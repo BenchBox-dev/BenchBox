@@ -6124,10 +6124,15 @@
       "title": "Root-cause the WebKit benchmark-index data-binding failure on /results/tpch/"
     },
     "expose-query-comparability-metadata-in-cli-output-and-persis": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T12:22:28Z",
+        "generation": "059a021c66b14c098185a46e0f02319e",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ce7766b2ec440e9d41ae1494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Expose query comparability metadata in CLI output and persisted result artifacts"
     },
     "expose-update-verb-in-project-wrapper": {
