@@ -580,11 +580,12 @@ skill-sync:
 # `.agents/skills` mirror and `.claude/skills/blog/`) are per-machine local
 # state regenerated via `make skill-sync` — fresh worktrees lack them entirely
 # and every catalog bump re-dirties them until a local sync runs, so gating on
-# them fails checkouts for reasons unrelated to the committed tree. Rows for
-# git-ignored paths are therefore skipped; any pending add/modify/delete for a
-# tracked path still fails. Ignored-mirror self-consistency stays covered by
-# `skill-sync verify` inside `skill-integrity-check`. A missing wrapper is
-# a hard failure, never a skip-and-succeed.
+# them fails checkouts for reasons unrelated to the committed tree. Rows under
+# those two roots are therefore skipped; any pending add/modify/delete
+# elsewhere still fails, including a tracked path that merely matches some
+# unrelated repository-wide ignore pattern. Ignored-mirror self-consistency
+# stays covered by `skill-sync verify` inside `skill-integrity-check`.
+# A missing wrapper is a hard failure, never a skip-and-succeed.
 skill-sync-check:
 	@if [ ! -x "$(SKILL_SYNC)" ]; then \
 		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
@@ -596,7 +597,8 @@ skill-sync-check:
 	while IFS= read -r row; do \
 		case "$$row" in "A "*|"M "*|"D "*|"R "*) ;; *) continue ;; esac; \
 		path="$${row#? }"; \
-		if git check-ignore -q -- "$$path"; then continue; fi; \
+		case "$$path" in ./*) path="$${path#./}";; esac; \
+		case "$$path" in .agents/skills/*|.claude/skills/blog/*) continue;; esac; \
 		drift="$$drift$$row\n"; \
 	done <"$$tmp"; \
 	rm -f "$$tmp"; \

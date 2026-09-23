@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "009761ce480b1a6f9611282b4f218879f19982ea031dc89a23d6f43a24c7fce8",
+  "contract_sha256": "49d6a5eaf46ba7c9e03e59a9ca34fc4de7ded6bb6750afce6d7cdda0f3cf652c",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1413,8 +1413,8 @@
     "skill-sync-check": [
       {
         "header": "skill-sync-check:",
-        "recipe": "\t@if [ ! -x \"$(SKILL_SYNC)\" ]; then \\\n\t\techo \"skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@tmp=$$(mktemp); \\\n\t\"$(SKILL_SYNC)\" preview >\"$$tmp\" || { rc=$$?; rm -f \"$$tmp\"; exit $$rc; }; \\\n\tdrift=\"\"; \\\n\twhile IFS= read -r row; do \\\n\t\tcase \"$$row\" in \"A \"*|\"M \"*|\"D \"*|\"R \"*) ;; *) continue ;; esac; \\\n\t\tpath=\"$${row#? }\"; \\\n\t\tif git check-ignore -q -- \"$$path\"; then continue; fi; \\\n\t\tdrift=\"$$drift$$row\\n\"; \\\n\tdone <\"$$tmp\"; \\\n\trm -f \"$$tmp\"; \\\n\tif [ -n \"$$drift\" ]; then \\\n\t\techo \"skill-sync-check: tracked mirror drifts from skill-sync.conf:\" >&2; \\\n\t\tprintf '%b' \"$$drift\" >&2; \\\n\t\texit 3; \\\n\tfi; \\\n\techo \"skill-sync-check: tracked mirror up to date.\"",
-        "recipe_sha256": "5717b4dab2329a44875f6f889cce67fce2a1e4dc51b197e52bd7c3811eafa3b3"
+        "recipe": "\t@if [ ! -x \"$(SKILL_SYNC)\" ]; then \\\n\t\techo \"skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@tmp=$$(mktemp); \\\n\t\"$(SKILL_SYNC)\" preview >\"$$tmp\" || { rc=$$?; rm -f \"$$tmp\"; exit $$rc; }; \\\n\tdrift=\"\"; \\\n\twhile IFS= read -r row; do \\\n\t\tcase \"$$row\" in \"A \"*|\"M \"*|\"D \"*|\"R \"*) ;; *) continue ;; esac; \\\n\t\tpath=\"$${row#? }\"; \\\n\t\tcase \"$$path\" in ./*) path=\"$${path#./}\";; esac; \\\n\t\tcase \"$$path\" in .agents/skills/*|.claude/skills/blog/*) continue;; esac; \\\n\t\tdrift=\"$$drift$$row\\n\"; \\\n\tdone <\"$$tmp\"; \\\n\trm -f \"$$tmp\"; \\\n\tif [ -n \"$$drift\" ]; then \\\n\t\techo \"skill-sync-check: tracked mirror drifts from skill-sync.conf:\" >&2; \\\n\t\tprintf '%b' \"$$drift\" >&2; \\\n\t\texit 3; \\\n\tfi; \\\n\techo \"skill-sync-check: tracked mirror up to date.\"",
+        "recipe_sha256": "75171511d596199622a4f0b10c7c36217b31aed9e5a857252b06a316c3f212db"
       }
     ],
     "soundness-drain-report": [
@@ -2131,7 +2131,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "5d06ce042fdbffa655d402e87688d99c46d46aefc6849439de3ef5717af6efb2",
+  "semantic_sha256": "e13615e579f078dc95c100fe7e60f48bf9b8372da0945ce7efbd75a385750921",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3298,9 +3298,9 @@
       ]
     },
     {
-      "body": "skill-sync-check:\n\t@if [ ! -x \"$(SKILL_SYNC)\" ]; then \\\n\t\techo \"skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@tmp=$$(mktemp); \\\n\t\"$(SKILL_SYNC)\" preview >\"$$tmp\" || { rc=$$?; rm -f \"$$tmp\"; exit $$rc; }; \\\n\tdrift=\"\"; \\\n\twhile IFS= read -r row; do \\\n\t\tcase \"$$row\" in \"A \"*|\"M \"*|\"D \"*|\"R \"*) ;; *) continue ;; esac; \\\n\t\tpath=\"$${row#? }\"; \\\n\t\tif git check-ignore -q -- \"$$path\"; then continue; fi; \\\n\t\tdrift=\"$$drift$$row\\n\"; \\\n\tdone <\"$$tmp\"; \\\n\trm -f \"$$tmp\"; \\\n\tif [ -n \"$$drift\" ]; then \\\n\t\techo \"skill-sync-check: tracked mirror drifts from skill-sync.conf:\" >&2; \\\n\t\tprintf '%b' \"$$drift\" >&2; \\\n\t\texit 3; \\\n\tfi; \\\n\techo \"skill-sync-check: tracked mirror up to date.\"",
+      "body": "skill-sync-check:\n\t@if [ ! -x \"$(SKILL_SYNC)\" ]; then \\\n\t\techo \"skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@tmp=$$(mktemp); \\\n\t\"$(SKILL_SYNC)\" preview >\"$$tmp\" || { rc=$$?; rm -f \"$$tmp\"; exit $$rc; }; \\\n\tdrift=\"\"; \\\n\twhile IFS= read -r row; do \\\n\t\tcase \"$$row\" in \"A \"*|\"M \"*|\"D \"*|\"R \"*) ;; *) continue ;; esac; \\\n\t\tpath=\"$${row#? }\"; \\\n\t\tcase \"$$path\" in ./*) path=\"$${path#./}\";; esac; \\\n\t\tcase \"$$path\" in .agents/skills/*|.claude/skills/blog/*) continue;; esac; \\\n\t\tdrift=\"$$drift$$row\\n\"; \\\n\tdone <\"$$tmp\"; \\\n\trm -f \"$$tmp\"; \\\n\tif [ -n \"$$drift\" ]; then \\\n\t\techo \"skill-sync-check: tracked mirror drifts from skill-sync.conf:\" >&2; \\\n\t\tprintf '%b' \"$$drift\" >&2; \\\n\t\texit 3; \\\n\tfi; \\\n\techo \"skill-sync-check: tracked mirror up to date.\"",
       "kind": "rule",
-      "sha256": "7e4beb7e655386a0a62b358e4f39b4822c2deeee5ea8a16bb2998dc15fc57992",
+      "sha256": "e1ab2eaf07644495e79ea1cd0a1121458747fe7e642b270a61a9525992ac4acc",
       "targets": [
         "skill-sync-check"
       ]
