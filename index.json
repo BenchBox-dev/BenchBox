@@ -12979,10 +12979,15 @@
       "title": "Add comprehensive unit tests for release automation (fingerprinting, timestamps, content validation, size checks, scripts)"
     },
     "release-canary-incident-alert": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T22:45:08Z",
+        "generation": "508096319b204d7e8c12ee5bf31a00aa",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:aed9b6f728777e9a1155090f"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Open an owned incident issue when the release canary goes red, and close it on the next green run"
     },
     "release-canary-ruleset-drift-baseline-refresh": {
