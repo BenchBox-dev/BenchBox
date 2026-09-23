@@ -194,6 +194,12 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # guard diffs against the base ref, so once this lands on develop the
     # baseline already carries the new signature and the entry can go.
     "benchbox/cli/platform.py",
+    # qpc-history-version-awareness: `plan-history` gains --platform plus a
+    # platform keyword on the history read path, intentionally changing the
+    # command's surface so multi-platform lineages are never compared as one
+    # sequence. Temporary, like the run.py entry above: once this lands on
+    # develop the baseline carries the new signature and the entry can go.
+    "benchbox/cli/commands/plan_history.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}

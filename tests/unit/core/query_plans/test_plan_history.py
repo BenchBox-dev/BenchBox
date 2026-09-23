@@ -715,3 +715,67 @@ class TestFingerprintVersionLegacy:
             assert history.detect_plan_flapping("q1") is True
             versions = history.get_plan_version_history("q1")
             assert [v for _, v in versions] == [1, 1, 2, 3, 4, 5]
+
+
+class TestPlatformPartitionAndVersionAwareMetrics:
+    """Version history partitions by platform, and CLI metrics count plan
+    versions rather than raw fingerprint strings."""
+
+    def _add(self, history: PlanHistory, exec_id: str, platform: str, fp: str) -> None:
+        plan = _create_plan_with_fingerprint("q1", fp)
+        history.add_run(
+            make_benchmark_results(
+                execution_id=exec_id,
+                timestamp=datetime(2024, 1, int(exec_id[-1]) + 1, tzinfo=timezone.utc),
+                platform=platform,
+                query_results=[_qr("q1", 100.0, plan)],
+            )
+        )
+
+    def test_version_history_platform_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history = PlanHistory(Path(tmpdir))
+            self._add(history, "run0", "duckdb", "a" * 64)
+            self._add(history, "run1", "postgres", "b" * 64)
+            self._add(history, "run2", "duckdb", "a" * 64)
+
+            assert [v for _, v in history.get_plan_version_history("q1")] == [1, 2, 3]
+            duck = history.get_plan_version_history("q1", platform="duckdb")
+            assert duck == [("a" * 64, 1), ("a" * 64, 1)]
+            pg = history.get_plan_version_history("q1", platform="postgres")
+            assert pg == [("b" * 64, 1)]
+
+    def test_cli_version_aware_summary_ignores_encoding_bump(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history_dir = Path(tmpdir)
+            history = PlanHistory(history_dir)
+            plan_v1 = _create_plan_with_fingerprint("1", "a" * 64)
+            plan_v1.fingerprint_version = LEGACY_FINGERPRINT_VERSION
+            plan_v2 = _create_plan_with_fingerprint("1", "a2" * 32)
+            plan_v2.fingerprint_version = FINGERPRINT_VERSION
+            for i, plan in enumerate((plan_v1, plan_v2, plan_v2)):
+                history.add_run(
+                    make_benchmark_results(
+                        execution_id=f"run{i}",
+                        timestamp=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+                        platform="duckdb",
+                        query_results=[_qr("1", 100.0, plan)],
+                    )
+                )
+            result = CliRunner().invoke(plan_history, ["--query-id", "1", "--history-dir", str(history_dir)])
+            assert result.exit_code == 0, result.output
+            assert "Unique plans: 1" in result.output
+            assert "Plan changes: 0" in result.output
+
+    def test_flap_back_counts_two_unique_plans(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history_dir = Path(tmpdir)
+            history = PlanHistory(history_dir)
+            for i, fp in enumerate(("a" * 64, "b" * 64, "a" * 64)):
+                self._add(history, f"run{i}", "duckdb", fp)
+            assert [v for _, v in history.get_plan_version_history("q1")] == [1, 2, 3]
+            assert history.count_unique_plans("q1") == 2
+            result = CliRunner().invoke(plan_history, ["--query-id", "q1", "--history-dir", str(history_dir)])
+            assert result.exit_code == 0, result.output
+            assert "Unique plans: 2" in result.output
+            assert "Plan changes: 1" in result.output
