@@ -18284,17 +18284,12 @@
       "title": "test_orchestrator's docker fake is only accidentally correct under the readiness compose ps"
     },
     "uat-throughput-regression-threshold-policy": {
-      "claim": {
-        "expires_at": "2026-09-24T14:25:45Z",
-        "generation": "65aaf2f9ec8146a69dda7a5ef125e133",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:c34f7fdc20585bf7d833c1a2"
-      },
+      "claim": null,
       "needs": [
         "nightly-throughput-gate-restoration"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Define throughput performance-regression thresholds (Throughput@Size floor per platform/scale)"
     },
     "uat-throughput-result-path-manifest": {
