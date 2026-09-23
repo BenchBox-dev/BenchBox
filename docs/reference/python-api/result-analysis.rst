@@ -792,13 +792,10 @@ Export results with full anonymization:
         AnonymizationManager
     )
 
-    # Configure strict anonymization
+    # Configure strict anonymization (path, hostname, and username handling
+    # always applies - see the note above - so only the surviving knobs are set)
     anon_config = AnonymizationConfig(
-        include_machine_id=True,
-        anonymize_paths=True,
-        anonymize_hostnames=True,
-        anonymize_usernames=True,
-        allowed_path_prefixes=["/tmp"],
+        machine_id_salt="your-org-salt",
         custom_sanitizers={
             r"company_name": "[COMPANY]",
             r"project_\w+": "[PROJECT]"
@@ -815,25 +812,23 @@ Export results with full anonymization:
     # Export with anonymization
     files = exporter.export_result(results, formats=["json", "html"])
 
-    # Verify anonymization
-    manager = AnonymizationManager(anon_config)
+    # Verify anonymization: confirm the exported payload carries no public-path leaks
     import json
+
+    from benchbox.core.results.anonymization import find_public_path_leaks
 
     with open(files["json"]) as f:
         anonymized_data = json.load(f)
 
-    validation = manager.validate_anonymization(
-        original_data=results.__dict__,
-        anonymized_data=anonymized_data
-    )
+    leaks = find_public_path_leaks(anonymized_data)
 
-    if validation["is_valid"]:
-        print("✅ Results safely anonymized for public sharing")
-        print(f"Checks performed: {len(validation['checks_performed'])}")
+    if not leaks:
+        print("✅ No public-path leaks found - safe to share paths publicly")
+        print("   (path check only - confirm PII sanitizers above separately)")
     else:
         print("⚠️ Anonymization warnings:")
-        for warning in validation["warnings"]:
-            print(f"  - {warning}")
+        for path in leaks:
+            print(f"  - {path}")
 
 Regression Detection
 ~~~~~~~~~~~~~~~~~~~~
@@ -1016,6 +1011,12 @@ Anonymization Validation Failures
 .. code-block:: python
 
     # Add custom sanitizers
+    from benchbox.core.results.anonymization import (
+        AnonymizationConfig,
+        AnonymizationManager,
+        find_public_path_leaks,
+    )
+
     config = AnonymizationConfig(
         custom_sanitizers={
             r"your_pattern": "[REDACTED]"
@@ -1023,10 +1024,10 @@ Anonymization Validation Failures
     )
 
     manager = AnonymizationManager(config)
-    validation = manager.validate_anonymization(original, anonymized)
+    anonymized = manager.anonymize_result_payload(anonymized)
 
-    for warning in validation["warnings"]:
-        print(f"Address: {warning}")
+    for path in find_public_path_leaks(anonymized):
+        print(f"Address: {path}")
 
 See Also
 --------

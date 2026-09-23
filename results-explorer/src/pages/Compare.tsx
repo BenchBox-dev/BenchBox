@@ -901,7 +901,7 @@ export function Compare({ url }: CompareProps) {
       </div>
 
       <p class="mb-6 text-xs text-[var(--bb-data-fg-subtle)]">
-        <strong>Geomean query time</strong> - geometric mean of per-query execution times ({isDefaultBasis(basis) ? "measurement runs only" : `${formatBasisLabel(basis)} only`}). More
+        <strong>Geomean query time</strong> - geometric mean of per-query median execution times ({isDefaultBasis(basis) ? "measurement runs only" : `${formatBasisLabel(basis)} only`}). More
         comparable than wall-clock total when query counts differ. Lower is faster.
       </p>
 

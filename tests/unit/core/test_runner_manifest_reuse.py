@@ -11,6 +11,7 @@ import pytest
 from benchbox.core.runner.runner import _ensure_data_generated
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.utils.cloud_storage import CloudStagingPath
+from benchbox.utils.datagen_version import current_datagen_stamp
 
 pytestmark = [
     pytest.mark.unit,
@@ -54,6 +55,7 @@ def _write_manifest(tmp_path: Path, *, table_names: list[str]) -> dict:
     manifest = {
         "benchmark": "tpcds",
         "scale_factor": 0.01,
+        **current_datagen_stamp("tpcds"),
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
         "created_at": "2025-01-01T00:00:00Z",
@@ -111,6 +113,7 @@ def test_manifest_reuse_preserves_directory_format_preference(tmp_path: Path, be
     manifest = {
         "version": 2,
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -363,6 +366,7 @@ def _write_directory_manifest(tmp_path: Path, *, table_name: str = "lineitem") -
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -506,6 +510,7 @@ def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -555,6 +560,7 @@ def test_multi_format_tracked_directory_not_flagged_as_collision(
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -607,6 +613,7 @@ def test_shards_inside_table_named_directory_not_flagged_as_collision(
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": False, "type": None, "level": None},
         "parallel": 1,

@@ -420,9 +420,12 @@ class TestDeltaLakeFormatSmoke:
 
         # Build a manifest like the conversion orchestrator would
         delta_dir = tmp_path / "customer"
+        from benchbox.utils.datagen_version import current_datagen_stamp
+
         manifest = {
             "version": 2,
             "benchmark": "tpch",
+            **current_datagen_stamp("tpch"),
             "scale_factor": 0.01,
             "format_preference": ["delta"],
             "tables": {

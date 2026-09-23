@@ -95,3 +95,58 @@ def test_no_validation_records_do_not_leave_default_passed_status() -> None:
 )
 def test_strict_translation_mode_resolves_from_supported_option_scopes(options: dict) -> None:
     assert _resolve_strict_translation_mode(options) is True
+
+
+def test_variant_comparability_metadata_exports_to_payload() -> None:
+    """Variant comparability rides the execution block into saved artifacts."""
+    from benchbox.core.runner.runner import _attach_variant_comparability_metadata
+
+    result = make_benchmark_results(
+        validation_status="PASSED",
+        validation_details={},
+        execution_metadata={},
+    )
+
+    class _Benchmark:
+        def get_benchmark_info(self):
+            return {"variant_comparability": {"comparable": True, "issue_count": 0, "total_queries": 3}}
+
+    enriched = _attach_variant_comparability_metadata(result, _Benchmark())
+    payload = build_result_payload(enriched)
+
+    assert payload["execution"]["variant_comparability"]["comparable"] is True
+    assert payload["execution"]["variant_comparability"]["issue_count"] == 0
+
+
+def test_variant_comparability_attach_leaves_other_benchmarks_untouched() -> None:
+    """Benchmarks without the summary keep their execution metadata as-is."""
+    from benchbox.core.runner.runner import _attach_variant_comparability_metadata
+
+    result = make_benchmark_results(
+        validation_status="PASSED",
+        validation_details={},
+        execution_metadata={},
+    )
+
+    class _Benchmark:
+        pass
+
+    enriched = _attach_variant_comparability_metadata(result, _Benchmark())
+    assert "variant_comparability" not in (enriched.execution_metadata or {})
+
+
+def test_variant_comparability_survives_reconstruction() -> None:
+    """Load-then-export must not strip the comparability disclosure."""
+    from benchbox.core.results.loader import reconstruct_benchmark_results
+
+    result = make_benchmark_results(
+        validation_status="PASSED",
+        validation_details={},
+        execution_metadata={"variant_comparability": {"comparable": True, "issue_count": 0}},
+    )
+    payload = build_result_payload(result)
+    rebuilt = reconstruct_benchmark_results(payload)
+
+    assert rebuilt.execution_metadata is not None
+    assert rebuilt.execution_metadata["variant_comparability"]["comparable"] is True
+    assert build_result_payload(rebuilt)["execution"]["variant_comparability"]["issue_count"] == 0

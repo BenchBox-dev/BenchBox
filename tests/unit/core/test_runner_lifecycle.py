@@ -17,6 +17,7 @@ from benchbox.core.runner import LifecyclePhases, ValidationOptions, run_benchma
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, SystemProfile
 from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 from benchbox.core.validation import ValidationResult
+from benchbox.utils.datagen_version import current_datagen_stamp
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
@@ -956,6 +957,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
     manifest = {
         "benchmark": "tpch",
+        **current_datagen_stamp("tpch"),
         "scale_factor": 0.1,
         "tables": {
             "customer": {
@@ -1025,6 +1027,7 @@ def test_no_regenerate_respects_alias_manifest(tmp_path):
     orders_path.write_text("1|order\n")
     manifest = {
         "benchmark": "tpch",
+        **current_datagen_stamp("tpch"),
         "scale_factor": 0.1,
         "tables": {
             "orders": {

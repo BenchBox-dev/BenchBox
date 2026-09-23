@@ -617,6 +617,12 @@ class BenchmarkDataValidator:
             "generator_version": "scan-v1",
             "tables": {},
         }
+        try:
+            from benchbox.utils.datagen_version import current_datagen_stamp
+
+            manifest.update(current_datagen_stamp(self.benchmark_name))
+        except Exception:
+            pass
         for table, paths in tables.items():
             # Sort for determinism
             paths = sorted(paths)

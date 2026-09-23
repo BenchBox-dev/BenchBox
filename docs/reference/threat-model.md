@@ -4,6 +4,11 @@
 **Phase scope:** Phase 3 hosted API extensions at `api.benchbox.dev`
 **Input:** `benchbox-results-platform-strategy.md`, `operate-results-platform-security-observability-and-abuse-controls.yaml`
 
+> **Not implemented yet.** The Phase 3 surfaces in this document - the hosted
+> API at `api.benchbox.dev` and `benchbox admin ...` - are planned designs,
+> not shipped software. No `admin` command is registered on the CLI; see
+> `docs/operations/results-phase-3-runbook.md` for the same notice.
+
 The accepted
 [`independent-publication-threat-model.md`](../development/independent-publication-threat-model.md)
 governs the live Phase 1 static Explorer, Phase 2 PR contributions, publication

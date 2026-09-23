@@ -319,6 +319,12 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             "generator_version": "v1",
             "tables": {},
         }
+        try:
+            from benchbox.utils.datagen_version import current_datagen_stamp
+
+            manifest.update(current_datagen_stamp("ssb"))
+        except Exception:
+            pass
         for table, path in table_paths.items():
             p = Path(path)
             size = p.stat().st_size if p.exists() else 0
