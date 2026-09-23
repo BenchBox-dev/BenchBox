@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "make pr-preflight passes on the branch and the PR targets develop.",
+    "The first scheduled canary run after merge opens (or updates) exactly one incident:release-canary-red issue listing the current failing test IDs and a compare link from the last green run.",
+    "The first green canary run after that comments on and closes the issue.",
+    "Unit tests cover log parsing, maxfail truncation, green/red rendering, missing artifacts, and bad job-result input; the workflow contract test asserts continue-on-error and job-scoped issues: write."
+  ],
+  "context": "Guardrails:\n1. The job must keep continue-on-error: true. Readiness reads the run conclusion, so an alerting failure (for example a GitHub API error) must never turn a green canary red. A test in tests/unit/test_release_infrastructure.py asserts this; do not remove it.\n2. issues: write stays job-scoped. The workflow-level permissions stay actions: read and contents: read.\n3. Do not change the canary's marker expression, shard count, --maxfail, or the release-canary-result aggregation in this item.\n4. release-canary.yml is a soundness path (_project/scripts/auto_merge_soundness_paths.py): maintainer review is required and auto-merge is excluded.\n5. Find the open incident by label, not by search: the search index lags.",
+  "description": "Release readiness (scripts/release_readiness_check.py) blocks every release PR unless the latest release-canary.yml run concluded success, but a red canary notifies nobody. The canary went red on 2026-09-14 and stayed red for ten days while new regressions landed on top (TPC-DI via #2250, flightdata via #2247, the submission validator via #2199/#2206), and was found only when v0.4.1 was considered.\n\nImplementation already exists on branch fix/release-canary-incident (worktree ../BenchBox.wt-release-canary-incident, commits 32ad1c50a and the lane-isolation follow-up). It adds a release-canary-incident job and scripts/release_canary_incident.py: a red run opens one issue labelled incident:release-canary-red, or comments on the open one, with failed jobs, failing test IDs parsed from the shard logs, and a compare link from the last green run; the next green run comments and closes it. Remaining work: pass make pr-preflight (earlier attempts were blocked only by the machine-wide test lock), open the PR, get maintainer review, merge.",
+  "links": [
+    ".github/workflows/release-canary.yml",
+    "scripts/release_canary_incident.py",
+    "tests/unit/test_release_canary_incident.py",
+    "scripts/release_readiness_check.py"
+  ]
+}
