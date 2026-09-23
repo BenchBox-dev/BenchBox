@@ -10099,7 +10099,7 @@
         "todo-db-cutover-g5"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Degraded read mode: serve ready/show/list from the committed snapshot when hosted DB is unreachable"
     },
     "on-demand-tpc-answer-download": {
