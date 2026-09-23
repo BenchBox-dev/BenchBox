@@ -29,16 +29,10 @@ def test_power_test_returns_labeled_keys():
         "Position_2_Query_2": "SELECT 2",
     }
     cfg = Mock()
+    cfg.name = "tpcds"
     cfg.scale_factor = 0.01
 
-    out = executor._execute_tpcds_test_class(
-        benchmark,
-        cfg,
-        "power",
-        cfg.scale_factor,
-        connection=Mock(),
-        platform_adapter=Mock(),
-    )
+    out = executor._extract_queries_via_real_test_execution(benchmark, cfg, "power")
 
     assert set(out.keys()) == {"Position_1_Query_1", "Position_2_Query_2"}
     assert "SELECT 1" in out["Position_1_Query_1"]
@@ -53,16 +47,10 @@ def test_throughput_test_returns_labeled_keys():
         "Stream_1_Position_3_Query_21": "SELECT 21",
     }
     cfg = Mock()
+    cfg.name = "tpcds"
     cfg.scale_factor = 0.01
 
-    out = executor._execute_tpcds_test_class(
-        benchmark,
-        cfg,
-        "throughput",
-        cfg.scale_factor,
-        connection=Mock(),
-        platform_adapter=Mock(),
-    )
+    out = executor._extract_queries_via_real_test_execution(benchmark, cfg, "throughput")
 
     assert any(k.startswith("Stream_") for k in out)
     assert "Stream_0_Position_1_Query_7" in out
@@ -78,16 +66,10 @@ def test_maintenance_test_returns_labeled_keys():
         "Op_3_STORE_RETURNS_DELETE": "DELETE FROM store_returns WHERE 1=0",
     }
     cfg = Mock()
+    cfg.name = "tpcds"
     cfg.scale_factor = 0.01
 
-    out = executor._execute_tpcds_test_class(
-        benchmark,
-        cfg,
-        "maintenance",
-        cfg.scale_factor,
-        connection=Mock(),
-        platform_adapter=Mock(),
-    )
+    out = executor._extract_queries_via_real_test_execution(benchmark, cfg, "maintenance")
 
     assert set(out.keys()) == {
         "Op_1_CUSTOMER_INSERT",
