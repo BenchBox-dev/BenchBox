@@ -10,9 +10,9 @@ inputs so cached datagen directories can be recognized as stale:
 - ``compute_base_constants_hash`` fingerprints the base-constant inputs for a
   benchmark, so editing a specs file is detected even without a version bump.
   Only benchmarks with registered specs files (currently ``tpch``,
-  ``tsbs_devops``/``tsbs``) get a content fingerprint; every other benchmark
-  falls back to the version marker alone, so its hash cannot detect specs
-  edits. Register a benchmark here when it gains a specs file.
+  ``tpch_skew``, ``tsbs_devops``/``tsbs``) get a content fingerprint; every
+  other benchmark falls back to the version marker alone, so its hash cannot
+  detect specs edits. Register a benchmark here when it gains a specs file.
 
 Datagen manifests stamp both values; the runner treats a manifest whose stamp
 differs from current as invalid and regenerates (the automatic equivalent of
@@ -31,11 +31,15 @@ from typing import Any, Mapping
 DATA_GENERATION_VERSION = 1
 
 # Benchmark slug (as stored lowercased in datagen manifests) to the
-# base-constant files that determine its generated data. tpch_skew is
-# deliberately absent: its data is produced by TPCHDataGenerator under a
-# "tpch" manifest, so the tpch fingerprint already covers its base inputs.
+# base-constant files that determine its generated data. tpch_skew carries
+# both specs because skewed output depends on the base TPC-H inputs and on
+# the skew column indices applied on top of them.
 _BENCHMARK_SPECS_FILES: dict[str, tuple[str, ...]] = {
     "tpch": ("benchbox/core/tpch/generator_specs.yaml",),
+    "tpch_skew": (
+        "benchbox/core/tpch/generator_specs.yaml",
+        "benchbox/core/tpch_skew/generator_specs.yaml",
+    ),
     "tsbs_devops": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
     "tsbs": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
 }

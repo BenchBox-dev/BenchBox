@@ -651,3 +651,29 @@ def test_shards_inside_table_named_directory_not_flagged_as_collision(
     assert dummy.tables == {"lineitem": shard}
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
+
+
+def test_populated_tables_matching_current_manifest_reuse_manifest(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Caller tables identical to the validated manifest keep its provenance."""
+    _write_manifest(tmp_path, table_names=["customer", "orders"])
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    populated = DummyBenchmark()
+    assert _ensure_data_generated(populated, benchmark_config) == (False, True)
+
+    class CallerBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = dict(populated.tables)
+            self.generate_data = Mock()
+
+    caller = CallerBenchmark()
+    result = _ensure_data_generated(caller, benchmark_config)
+
+    assert result == (False, True)
+    caller.generate_data.assert_not_called()

@@ -68,12 +68,51 @@ def test_check_existing_and_collect_table_files(tmp_path: Path):
     gen = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
     assert gen._check_existing_data() is False
 
-    for name in ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"]:
+    tables = ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"]
+    for name in tables:
         (tmp_path / f"{name}.tbl").write_text("1|x|\n", encoding="utf-8")
 
+    # Files alone are not enough: reuse requires a current manifest stamp.
+    assert gen._check_existing_data() is False
+    gen._write_manifest({name: tmp_path / f"{name}.tbl" for name in tables})
     assert gen._check_existing_data() is True
     found = gen._collect_table_files()
     assert set(found) == {"customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"}
+
+
+def test_check_existing_rejects_stale_manifest(tmp_path: Path):
+    import json
+
+    from benchbox.utils.datagen_version import DATA_GENERATION_VERSION
+
+    gen = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
+    for name in ["customer", "lineitem"]:
+        (tmp_path / f"{name}.tbl").write_text("1|x|\n", encoding="utf-8")
+    (tmp_path / "_datagen_manifest.json").write_text(
+        json.dumps(
+            {
+                "benchmark": "tpch_skew",
+                "scale_factor": 0.01,
+                "data_generation_version": DATA_GENERATION_VERSION - 1,
+                "base_constants_hash": "0" * 64,
+                "tables": {},
+            }
+        )
+    )
+    assert gen._check_existing_data() is False
+
+
+def test_written_manifest_carries_current_skew_stamp(tmp_path: Path):
+    import json
+
+    from benchbox.utils.datagen_version import manifest_datagen_is_current
+
+    gen = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
+    (tmp_path / "customer.tbl").write_text("1|x|\n", encoding="utf-8")
+    gen._write_manifest({"customer": tmp_path / "customer.tbl"})
+    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["benchmark"] == "tpch_skew"
+    assert manifest_datagen_is_current(manifest, benchmark="tpch_skew") is True
 
 
 def test_read_and_write_tbl_file_roundtrip(tmp_path: Path):

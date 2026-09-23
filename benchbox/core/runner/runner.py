@@ -365,6 +365,18 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark:
     return True
 
 
+def _adapter_reused_database(adapter: Any) -> bool:
+    """Whether the adapter skipped loading by reusing an existing database.
+
+    Adapters record this on ``database_was_reused`` when a compatible
+    persistent database lets them skip schema creation and data loading even
+    though load was requested; results measured then describe the older
+    reused database, not the output-dir manifest. Adapters without the
+    attribute behave as before.
+    """
+    return bool(getattr(adapter, "database_was_reused", False))
+
+
 def _attach_datagen_version(
     result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
 ) -> BenchmarkResults:
@@ -1416,8 +1428,9 @@ def run_benchmark_lifecycle(
     # reuse whose files the load phase reads, or a fresh generation the load
     # phase then loads. Generate-plus-execute without load measures the
     # pre-existing database, not the fresh files, and caller-supplied tables
-    # bypass the manifest entirely; both leave the fields unset rather than
-    # asserting unverified provenance.
+    # bypass the manifest entirely. (Adapter-level database reuse is folded
+    # in at the attach sites via _adapter_reused_database: the reuse flag is
+    # only final after the load decision, which happens later.)
     dataset_identity_established = bool(phases.load) and (freshly_generated or manifest_reused)
 
     if test_type == "data_only":
@@ -1488,7 +1501,11 @@ def run_benchmark_lifecycle(
             result_obj.execution_context = execution_context.model_dump()
         result_obj = _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
         result_obj = _attach_variant_comparability_metadata(result_obj, benchmark)
-        return _attach_datagen_version(result_obj, benchmark, dataset_identity_established=dataset_identity_established)
+        return _attach_datagen_version(
+            result_obj,
+            benchmark,
+            dataset_identity_established=dataset_identity_established and not _adapter_reused_database(adapter),
+        )
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1560,7 +1577,11 @@ def run_benchmark_lifecycle(
     )
     finalized = _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
     finalized = _attach_variant_comparability_metadata(finalized, benchmark)
-    return _attach_datagen_version(finalized, benchmark, dataset_identity_established=dataset_identity_established)
+    return _attach_datagen_version(
+        finalized,
+        benchmark,
+        dataset_identity_established=dataset_identity_established and not _adapter_reused_database(adapter),
+    )
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1701,11 +1722,16 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[boo
     # Validate populated tables too. Callers may provide stale or incomplete
     # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
-        if _populated_tables_are_valid(benchmark, config):
+        tables_usable, tables_reuse_manifest = _populated_tables_are_valid(benchmark, config)
+        if tables_usable:
             # Caller-supplied tables bypass manifest reuse, but stale manifests
-            # still need healing (e.g. FlightData dialect backfill).
+            # still need healing (e.g. FlightData dialect backfill). When the
+            # mapping exactly matches the current output-dir manifest, the
+            # manifest still describes this dataset, so reuse is reported and
+            # a later load establishes provenance; anything else stays
+            # unprovenanced.
             _run_ensure_auxiliary_hook(benchmark)
-            return False, False
+            return False, tables_reuse_manifest
         populated_tables_invalid = True
         if no_regenerate_flag:
             raise RuntimeError("no_regenerate is set but populated benchmark tables are missing or stale")
@@ -1747,34 +1773,40 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[boo
     return True, False
 
 
-def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:
-    """Return whether caller-provided table mappings are safe to reuse."""
+def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
+    """Check whether caller-provided table mappings are safe to reuse.
+
+    Returns ``(usable, reuse_manifest)``: usability, plus whether the mapping
+    exactly matches the current output-dir manifest (native mode only), in
+    which case the manifest still describes this dataset for provenance.
+    """
     tables = getattr(benchmark, "tables", None)
     table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
     if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
-        return False
+        return False, False
 
     if table_mode == "external":
         # External table mappings are supplied by the caller and may not have a
         # local datagen manifest. Their paths are validated at the adapter
         # boundary, so local manifest comparison would incorrectly regenerate
         # otherwise usable external data.
-        return True
+        return True, False
 
     output_dir = getattr(benchmark, "output_dir", None)
     if not output_dir:
         # External table mappings have no local manifest to compare against;
         # existence is the strongest validation available at this boundary.
-        return True
+        return True, False
 
     manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config, quiet=True)
     if not manifest_valid or manifest_data is None:
-        return False
+        return False, False
 
     manifest_benchmark = copy(benchmark)
     manifest_benchmark.tables = None
     _populate_tables_from_manifest(manifest_benchmark, manifest_data)
-    return _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+    reuse = _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+    return reuse, reuse
 
 
 def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:

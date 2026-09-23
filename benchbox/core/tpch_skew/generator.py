@@ -15,6 +15,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import csv
+import json
 import logging
 import shutil
 import tempfile
@@ -177,12 +178,21 @@ class TPCHSkewDataGenerator(VerbosityMixin):
             # Step 2: Apply skew transformations
             self.log_verbose("Step 2/2: Applying skew transformations...")
             skewed_tables = self._apply_skew_to_tables(base_tables)
+            self._write_manifest(skewed_tables)
 
         self.log_verbose("✅ Skewed TPC-H data generation complete")
         return skewed_tables
 
     def _check_existing_data(self) -> bool:
-        """Check if valid skewed data already exists."""
+        """Check if valid skewed data already exists.
+
+        Reuse requires the expected files plus a current ``tpch_skew``
+        datagen manifest. File presence alone cannot prove the files came
+        from the current generator inputs, so a missing or stale stamp
+        regenerates instead of silently reusing unknown-vintage data.
+        """
+        from benchbox.utils.datagen_version import manifest_datagen_is_current
+
         expected_files = [
             "customer.tbl",
             "lineitem.tbl",
@@ -196,7 +206,33 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         for filename in expected_files:
             if not (self.output_dir / filename).exists():
                 return False
-        return True
+        manifest_path = self.output_dir / "_datagen_manifest.json"
+        if not manifest_path.is_file():
+            return False
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            logging.getLogger(__name__).debug("ignoring unreadable skew manifest: %s", exc)
+            return False
+        return bool(manifest_datagen_is_current(manifest, benchmark="tpch_skew"))
+
+    def _write_manifest(self, table_paths: dict[str, Path]) -> None:
+        """Stamp the skewed output with the current ``tpch_skew`` generation.
+
+        Skew transforms preserve row counts, so entries use the spec base
+        counts scaled to this run's scale factor; file sizes are measured.
+        """
+        from benchbox.utils.datagen_manifest import DataGenerationManifest
+
+        manifest = DataGenerationManifest(
+            output_dir=self.output_dir,
+            benchmark="tpch_skew",
+            scale_factor=self.scale_factor,
+        )
+        for table_name, file_path in table_paths.items():
+            base_rows = _TPCH_BASE_ROW_COUNTS.get(table_name, 0)
+            manifest.add_entry(table_name, file_path, row_count=int(base_rows * self.scale_factor))
+        manifest.write()
 
     def _collect_table_files(self) -> dict[str, Path]:
         """Collect existing table file paths."""

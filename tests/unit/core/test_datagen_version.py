@@ -260,6 +260,30 @@ def test_stale_stamp_fails_directory_validation(tmp_path: Path) -> None:
     assert any("stale" in issue for issue in result.issues)
 
 
+def test_skew_fingerprint_covers_both_specs() -> None:
+    """The skew hash must differ from the base tpch hash (both specs feed it)."""
+    assert compute_base_constants_hash("tpch_skew") != compute_base_constants_hash("tpch")
+    stamp = current_datagen_stamp("tpch_skew")
+    assert (
+        manifest_datagen_is_current(
+            {"data_generation_version": DATA_GENERATION_VERSION, "base_constants_hash": stamp["base_constants_hash"]},
+            benchmark="tpch_skew",
+        )
+        is True
+    )
+
+
+def test_adapter_reused_database_flag() -> None:
+    from types import SimpleNamespace
+
+    from benchbox.core.runner.runner import _adapter_reused_database
+
+    assert _adapter_reused_database(None) is False
+    assert _adapter_reused_database(SimpleNamespace()) is False
+    assert _adapter_reused_database(SimpleNamespace(database_was_reused=False)) is False
+    assert _adapter_reused_database(SimpleNamespace(database_was_reused=True)) is True
+
+
 def test_attach_leaves_provenance_unset_without_dataset_identity(tmp_path: Path) -> None:
     """Execute-only runs must not inherit the local manifest's stamp."""
     import json
