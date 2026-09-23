@@ -1831,10 +1831,15 @@
       "title": "Measure complete PR lifecycles and repair missing-head CI accounting"
     },
     "ci-dedupe-01-post-merge-skip-queue-certified-shas": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T13:44:20Z",
+        "generation": "54e3d7f19d104a179963135c0fd346a8",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:a8bba4e0821515df53089710"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Skip post-merge fast and medium tests on develop commits the merge queue already passed"
     },
     "ci-dedupe-02-hourly-sweep-skip-tested-tip": {
