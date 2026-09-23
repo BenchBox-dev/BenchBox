@@ -19033,12 +19033,17 @@
       "title": "Wire plan capture for DataFrame execution path in benchbox/core/dataframe/profiling.py"
     },
     "wire-the-flightdata-cross-surface-gate": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T00:22:02Z",
+        "generation": "bc1fc752f9244811a8470dfa1cfae4b0",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
+      },
       "needs": [
         "flightdata-dataframe-date-params-miss-the-generated-data"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Wire the FlightData cross-surface gate (staged) once its DataFrame date window is fixed"
     },
     "workflow-lint-guard-for-invalid-context-references": {
