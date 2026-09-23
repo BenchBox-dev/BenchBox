@@ -810,7 +810,9 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Nine enforced gates plus setup must fit: the FlightData promotion added
+    # the ninth gate step to this job.
+    timeout-minutes: 25
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
