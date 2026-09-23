@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Bad-width shard resource-heavy test passes locally.",
+    "make pr-preflight passes.",
+    "The fix PR targets develop and merges before this item closes."
+  ],
+  "description": "Restore FlightData shard width validation required by the release canary. Identify the causing commit before changing code. Fix product behavior without skipping or changing test markers.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T20:24:54Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "18331ecabd474a9e9827409754f0382d",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    }
+  ]
+}

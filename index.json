@@ -1682,6 +1682,13 @@
       "status": "done",
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
+    "canary-flightdata-bad-width-shard": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Reject FlightData shards with a bad width again"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
