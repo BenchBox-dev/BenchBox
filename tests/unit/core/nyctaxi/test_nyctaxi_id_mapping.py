@@ -73,6 +73,21 @@ def test_dataframe_titles_slugify_to_sql_ids() -> None:
         assert _slug(query.query_name) in sql_ids, f"{query.query_id} ({query.query_name!r}) matches no SQL query"
 
 
+def test_each_dataframe_id_maps_to_its_own_title_slug() -> None:
+    """Each DataFrame id maps to its own title's slug, not just any SQL id.
+
+    Comparing mapping keys and values as independent sets would still pass
+    if two rows were swapped, so pin the per-query correspondence directly.
+    """
+    from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
+
+    for query in NYCTAXI_DATAFRAME_QUERIES.get_all_queries():
+        assert EXPECTED_MAPPING[query.query_id] == _slug(query.query_name), (
+            f"{query.query_id} maps to {EXPECTED_MAPPING[query.query_id]!r} "
+            f"but its title slugifies to {_slug(query.query_name)!r}"
+        )
+
+
 def test_mapping_table_is_exact_and_total() -> None:
     """The locked table covers every query on both surfaces exactly once."""
     from benchbox.core.benchmark_loader import get_core_benchmark_class
