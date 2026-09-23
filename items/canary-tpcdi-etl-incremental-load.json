@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Affected TPC-DI full benchmark tests pass locally with slow/resource_heavy markers.",
+    "make pr-preflight passes.",
+    "The fix PR targets develop and merges before this item closes."
+  ],
+  "description": "Repair the TPC-DI full benchmark ETL failures seen in the scheduled release canary, including incremental loader LastModified lookups and data quality monitor null arithmetic. Identify the causing commit before changing code. Preserve valid incremental load and data-quality behavior; do not skip tests or change markers.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T20:23:43Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "d3c0e4746fe44ad89410af3c7901b3be",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    }
+  ]
+}

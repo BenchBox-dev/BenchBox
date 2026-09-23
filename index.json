@@ -1682,6 +1682,13 @@
       "status": "done",
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
+    "canary-tpcdi-etl-incremental-load": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Fix the TPC-DI ETL pipeline failing in the release canary"
+    },
     "canonical-benchmark-id-resolution": {
       "claim": null,
       "needs": [],
