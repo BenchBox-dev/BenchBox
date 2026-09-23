@@ -1215,7 +1215,7 @@
         "benchbox-score-size-profile-pilot",
         "benchbox-score-qualification-policy"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Qualify the score concurrency ladder"
     },
