@@ -242,14 +242,14 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate (pr.yml);
+# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
-# cell. In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate
+# cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
 # (pr.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
@@ -272,6 +272,14 @@ h2odb-cross-surface-equivalence-report:
 # on any unclassified divergence.
 read-primitives-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
+
+# Enforced gate: FlightData DataFrame surface vs its own SQL surface on a bounded
+# one-synthetic-month DuckDB cell (SF=0.01 stays offline; SF>=0.1 attempts a BTS
+# download). 20 SQL and 20 DataFrame ids overlap verbatim;
+# every compared cell matches with an empty baseline. Exits non-zero on any
+# unclassified divergence.
+flightdata-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata
 
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -

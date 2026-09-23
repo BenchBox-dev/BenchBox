@@ -885,6 +885,24 @@ def test_clickbench_and_joinorder_are_enforced_gates():
     assert "ssb" in GATES
 
 
+def test_flightdata_is_promoted_to_enforced_gates():
+    """FlightData graduates from STAGED_GATES to enforced GATES with an empty baseline.
+
+    The staged cell is green (20 SQL and 20 DataFrame ids overlap verbatim; all
+    40 query-backend cells compare equal at SF=0.01, which stays offline), so
+    there is no burn-down to stage behind and no staged test to keep: the
+    enforced gate itself is the test. The bounded scale must stay below 0.1 or
+    a routine PR fetches a real BTS dataset over the network.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
+
+    assert "flightdata" in GATES
+    assert "flightdata" not in STAGED_GATES
+    assert get_gate("flightdata").name == "flightdata"
+    assert GATES["flightdata"].known_divergences == {}
+    assert GATES["flightdata"].scale_factor == 0.01
+
+
 def test_read_primitives_gate_opts_into_documented_nan_null_decode_tolerance():
     """Read Primitives keeps strict defaults global while opting in for pandas NULL decode."""
     from benchbox.core.equivalence.cross_surface import GATES

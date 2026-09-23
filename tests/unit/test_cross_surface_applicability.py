@@ -68,13 +68,17 @@ _CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "nyctaxi", "tpcds_obt", "tpch_s
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """flightdata (verified verbatim overlap) is gateable; a zero-overlap registry is not.
+    """A verified verbatim overlap is gateable; a zero-overlap registry is not.
 
-    (h2odb was the prior example here; it is now an enforced cross-surface gate, so
-    it no longer appears among the unguarded candidates the sweep drills into.)
+    flightdata was the prior example here; it is now an enforced cross-surface
+    gate, so it no longer appears among the candidates the sweep drills into
+    (like h2odb before it). joinorder carries the verbatim-overlap example for
+    now; whether it can land as a cheap bounded gate is owned separately by the
+    sweep-honesty item, not by this promotion.
     """
     by_id = {r["benchmark"]: r["status"] for r in rows}
-    assert by_id.get("flightdata") == GATEABLE
+    assert "flightdata" not in by_id, "flightdata graduated to enforced GATES and must leave the candidates"
+    assert by_id.get("joinorder") == GATEABLE
     # datavault ships a registry but its ids do not overlap the SQL ids verbatim
     # (friendly/Q-prefixed names), so there is no verified correspondence: it is
     # candidate-unverified, NOT counted as gateable coverage.

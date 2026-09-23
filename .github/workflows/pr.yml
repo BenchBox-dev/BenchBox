@@ -861,6 +861,9 @@ jobs:
       - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
         run: make read-primitives-cross-surface-equivalence-report
 
+      - name: Run FlightData cross-surface SQL<->DataFrame equivalence gate
+        run: make flightdata-cross-surface-equivalence-report
+
   plan-capture-gate:
     name: plan-capture-gate
     needs: ci-paths

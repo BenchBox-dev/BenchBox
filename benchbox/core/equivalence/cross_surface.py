@@ -57,7 +57,9 @@ clickbench (the one classified exception is the order-less ``Q18``),
 joinorder_synthetic and h2odb (single ``trips`` table; SQL and DataFrame ids
 correspond 1:1 as ``Q1`` .. ``Q10``; the one classified exception is ``Q9``'s
 PERCENTILE_CONT, where DuckDB returns the percentile at the source column's
-DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``). Additional dual-surface
+DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives, and
+flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
+``scale_factor=0.01``, which stays offline). Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
@@ -1503,23 +1505,13 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_READ_PRIMITIVES_SCALE,
     ),
-}
-
-# Staged gates: a load-faithful builder is wired and runnable in report mode,
-# but the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
-# counts a staged gate as a registered oracle under an explicit staged (NOT
-# CI-enforced) label, so staged status is visible there without implying CI
-# enforcement.
-# FlightData stages here with no known-divergence baseline after its
-# output-contract fixes; promoting it to GATES also refreshes the oracle
-# coverage map, the applicability sweep artifact, and the related registry tests.
-# The next gateable benchmarks (nyctaxi,
-# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
-# The FlightData bounded cell is one synthetic month (SF=0.01), which stays offline
-# (larger scales attempt a BTS download with a synthetic fallback) while keeping
-# every query discriminating.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # FlightData: 20 SQL queries and 20 DataFrame queries overlap verbatim, and
+    # the bounded cell is one synthetic month (SF=0.01), which stays offline
+    # (larger scales attempt a BTS download with a synthetic fallback) while
+    # keeping every query discriminating. Promoted from STAGED_GATES with an
+    # empty baseline: all 40 query-backend cells compare equal, so there is no
+    # burn-down to stage behind. Stability from here is observed in CI, where
+    # this gate blocks.
     "flightdata": CrossSurfaceGate(
         name="flightdata",
         build=build_flightdata_duckdb,
@@ -1531,6 +1523,17 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_FLIGHTDATA_SCALE,
     ),
+}
+
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# The next gateable benchmarks (nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
     # Data Vault stages here while its cross-surface query-execution burn-down
     # is open: the builder forces regeneration on every build (probes can never
     # pass on a stale manifest) and logs the probe manifest the cell came from.
