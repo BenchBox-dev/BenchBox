@@ -778,7 +778,7 @@
         "todo-db-cutover-g5"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Archive terminal items out of the hot DB into the git export"
     },
     "ascii-chart-cdf": {
