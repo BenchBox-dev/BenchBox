@@ -592,6 +592,30 @@ non-zero if fewer than `N` (platform, benchmark) pairs passed AND
 validator-cleaned every rung. Default null (off) — convention is the
 primary enforcement, tooling teeth are opt-in.
 
+## Throughput performance floor (relative model)
+
+The nightly `throughput-uat` job gates breakage (stream-count wiring via
+`validate_stream_count`, per-stream success via `validate_stream_success`),
+not gradual slowdown. The Throughput@Size floor closes that gap: a green
+run must also clear a per-platform/scale floor derived from observed
+spread. It is additive -- a floor failure never masks or replaces a
+stream-count failure, which keeps gating independently.
+
+Model: fail when observed Throughput@Size drops more than X% below the
+rolling median of the last N green runs for that cell
+(`THROUGHPUT_FLOOR_MEDIAN`, `THROUGHPUT_FLOOR_MAX_DROP_FRACTION`,
+default X = 20%). A relative floor tracks hardware/runner drift; a
+hardcoded absolute number would flake on the next runner.
+
+Status: observe-only. The DuckDB TPC-H SF1 cell is green on recent
+nightlies, but runners are ephemeral and no run retains its
+`summary.tpc_metrics.throughput_at_size`, so no defensible spread
+exists yet -- setting X/N now would manufacture false failures. Until
+`THROUGHPUT_FLOOR_MEDIAN` is configured, the nightly assert reports
+each observed value (`::notice::`) for baseline accumulation and never
+fails on the floor. Wiring the median (retained observations, N, and
+the sign-off on X) is the remaining step before the floor gates.
+
 ## Compatibility Pruning
 
 UAT compatibility pruning is explicit policy, not an implicit skip. Rules live
