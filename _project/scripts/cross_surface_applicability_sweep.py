@@ -77,6 +77,20 @@ CANDIDATE_UNVERIFIED = "candidate-unverified"
 NOT_CHEAPLY_GATEABLE = "not-cheaply-gateable"
 NO_DF_QUERY_SURFACE = "no-df-query-surface"
 BLOCKED = "blocked"
+ABANDONED = "abandoned"
+
+# Benchmarks whose SQL<->DataFrame id correspondence was investigated and
+# explicitly abandoned (not merely unverified): even if the scale/provenance
+# bars below are later cleared, the mapping itself was judged not achievable
+# without renumbering one side, so the sweep must keep reporting the recorded
+# verdict instead of inviting re-investigation as ``candidate-unverified``.
+_ABANDONED_CORRESPONDENCE: dict[str, str] = {
+    "tpcds_obt": (
+        "DataFrame Q1..Q17 denote OBT-native analytics while SQL ids denote "
+        "TPC-DS queries; no clean correspondence without renumbering one side "
+        "(see tests/unit/core/tpcds_obt/test_tpcds_obt_id_mapping_decision.py)"
+    ),
+}
 
 # Statuses that mean "a cross-surface gate is genuinely applicable today". Only a
 # VERIFIED id overlap counts: a zero-overlap registry (``candidate-unverified``)
@@ -197,6 +211,11 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         "raw_id_overlap": raw_overlap,
         "scale": used_scale,
     }
+    # Recorded abandon verdicts outrank the scale/provenance bars below: the
+    # mapping itself was judged unachievable, so clearing the bounded scale
+    # must not re-invite investigation as ``candidate-unverified``.
+    if benchmark_id in _ABANDONED_CORRESPONDENCE:
+        return ABANDONED, {**detail, "reason": _ABANDONED_CORRESPONDENCE[benchmark_id]}
     # Bounded-scale honesty (M1): a gate must be one cheap bounded cell. A
     # benchmark that rejects SF=0.01, fetches a canonical dataset via
     # data_manifest.toml, or performs downloader-backed network fetches at the
@@ -251,6 +270,7 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     not_cheaply = [r for r in rows if r["status"] == NOT_CHEAPLY_GATEABLE]
     no_surface = [r for r in rows if r["status"] == NO_DF_QUERY_SURFACE]
     blocked = [r for r in rows if r["status"] == BLOCKED]
+    abandoned = [r for r in rows if r["status"] == ABANDONED]
 
     lines: list[str] = []
     lines.append("# Cross-surface applicability sweep")
@@ -275,8 +295,10 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         "`candidate-unverified`, NOT gateable: wiring a gate would require *guessing* "
         "which DataFrame query answers which SQL query, and the campaign's own TODO "
         'warns "do NOT guess". These need an independent, per-benchmark id mapping '
-        "confirmed first (and some, like `tpcds_obt` at 3 DataFrame vs ~89 SQL "
-        "queries, may never be a clean correspondence)."
+        "confirmed first. Correspondences investigated and ruled out are "
+        "`abandoned` instead (e.g. `tpcds_obt`: OBT-native Q1..Q17 vs TPC-DS "
+        "numbered SQL ids), so a later bounded-scale fix cannot re-invite "
+        "investigation."
     )
     lines.append("")
     lines.append(
@@ -296,6 +318,7 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         f"verified id overlap — needs a confirmed id mapping first), "
         f"{len(not_cheaply)} not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), "
         f"{len(no_surface)} have no DataFrame query surface (need a w2 fallback oracle), "
+        f"{len(abandoned)} abandoned (correspondence investigated and ruled out), "
         f"{len(blocked)} blocked."
     )
     lines.append("")
@@ -315,6 +338,13 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
             continue
         if r["status"] == NOT_CHEAPLY_GATEABLE:
             note = f"→ NOT a routine-PR gate: {r.get('reason', 'needs a canonical fetch or non-bounded scale')}"
+            lines.append(
+                f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
+                f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note}{staged_suffix} |"
+            )
+            continue
+        if r["status"] == ABANDONED:
+            note = f"→ correspondence abandoned: {r.get('reason', 'see the per-benchmark id-mapping decision test')}"
             lines.append(
                 f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
                 f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note}{staged_suffix} |"
@@ -350,6 +380,13 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         + " — rejects the bounded SF=0.01 cell, needs a canonical manifest fetch, "
         "or performs downloader-backed network fetches at the bounded scale; "
         "do not wire as a routine-PR gate."
+    )
+    lines.append(
+        "- **Abandoned (do NOT re-investigate):** "
+        + (", ".join(r["benchmark"] for r in abandoned) or "none")
+        + " — the SQL↔DataFrame id correspondence was investigated and ruled "
+        "out; the row reason records the verdict. Do not re-open as "
+        "candidate-unverified without renumbering one side first."
     )
     lines.append(
         "- **w2 fallback oracle** — no DataFrame query registry, so the cross-surface "
