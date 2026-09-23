@@ -53,6 +53,7 @@ def test_datavault_dataframe_surface_equivalent_to_sql(tmp_path):
     gate = GATES["datavault"]
     data = gate.build(gate.scale_factor, tmp_path)
     connection = data.connection
+    reference_row_counts: dict = {}
     try:
         contexts = build_production_contexts(
             data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
@@ -65,15 +66,25 @@ def test_datavault_dataframe_surface_equivalent_to_sql(tmp_path):
             contexts=contexts,
             validator=ResultValidator(tolerance=gate.tolerance),
             backends=gate.backends,
+            reference_row_counts=reference_row_counts,
         )
         coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
     finally:
         connection.close()
 
-    # Both gated backends must actually compare something - a fully-unimplemented
-    # backend would make the gate silently green by comparing nothing.
-    missing = sorted(backend for backend, count in coverage.items() if count == 0)
-    assert not missing, f"gated Data Vault backend(s) implement no queries: {missing}"
+    # Every query must run on BOTH backends: the gate skips a (query, backend)
+    # cell with no DataFrame implementation, so a partially-unimplemented
+    # backend would shrink coverage while the gate stays green. Pin the full
+    # 22-per-backend count, not just nonzero.
+    expected_coverage = {backend: len(data.query_ids) for backend in gate.backends}
+    assert coverage == expected_coverage, f"Data Vault backend coverage shrank: {coverage}"
+
+    # The production gate fails an unclassified vacuous (empty-reference) query;
+    # without the row counts this test could pass on empty-vs-empty cells the
+    # gate rejects. Data Vault configures no legitimately-empty queries, so
+    # every reference must return rows.
+    vacuous = sorted(qid for qid, count in reference_row_counts.items() if count == 0)
+    assert not vacuous, f"Data Vault reference queries returned zero rows: {vacuous}"
 
     # The baseline is empty: every divergence is an unclassified regression.
     assert not divergences, "Data Vault DataFrame surface diverges from SQL: " + ", ".join(
