@@ -1597,7 +1597,30 @@ class TestSubmissionDeterministicGates:
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert not vr.ok
-        assert any("covers 98 of 99 canonical queries" in error and "missing: 14" in error for error in vr.errors)
+
+    def test_tpcds_bare_ids_cannot_replace_required_variant_pairs(self):
+        variants = {14, 23, 24, 39}
+        for missing_variant, expected_coverage, expected_missing in (
+            (None, 95, "14, 23, 24, 39"),
+            ("Q14b", 98, "14"),
+        ):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = "tpcds"
+            ids = [f"Q{i}" for i in range(1, 100)]
+            if missing_variant is not None:
+                ids += [f"Q{i}a" for i in sorted(variants)]
+                ids += [f"Q{i}b" for i in sorted(variants) if f"Q{i}b" != missing_variant]
+            data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+            data["summary"]["queries"] = {"total": len(ids), "passed": len(ids), "failed": 0}
+
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any(
+                f"covers {expected_coverage} of 99 canonical queries" in error
+                and f"missing: {expected_missing}" in error
+                for error in vr.errors
+            )
 
     def test_canonical_id_sets_agree_with_counts(self):
         from benchbox.validation.bundle import (

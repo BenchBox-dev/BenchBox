@@ -1239,6 +1239,7 @@ def _validate_query_coverage(
         # instead of a single unsuffixed query. Require the full pair before
         # counting its logical query ID toward the 99-query denominator.
         for base_id in ("14", "23", "24", "39"):
+            observed.discard(base_id)
             if {f"{base_id}a", f"{base_id}b"} <= observed:
                 observed.add(base_id)
     missing = sorted(
