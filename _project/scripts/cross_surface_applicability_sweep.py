@@ -33,10 +33,12 @@ Classification per candidate:
     counted as gateable coverage: it needs an independent, per-benchmark id mapping
     to be confirmed first (some, like tpcds_obt at 3 DF vs ~89 SQL queries, may
     never be a clean correspondence). The honest status the M2 review demanded.
-  - ``not-cheaply-gateable``: would need a full canonical dataset fetch or a
-    non-bounded scale (rejects SF=0.01 or ships ``data_manifest.toml``, e.g.
-    joinorder accepts only SF=1.0 via its IMDb 2013 manifest) -> NOT wired as a
-    routine-PR gate, no matter the id overlap. The reason names the scale /
+  - ``not-cheaply-gateable``: would need a full canonical dataset fetch, a
+    downloader-backed network fetch, or a non-bounded scale (rejects SF=0.01,
+    ships ``data_manifest.toml``, or ships a network-backed ``downloader.py``;
+    e.g. joinorder accepts only SF=1.0 via its IMDb 2013 manifest, nyctaxi
+    downloads the pinned TLC Parquet months before sampling) -> NOT wired as
+    a routine-PR gate, no matter the id overlap. The reason names the scale /
     provenance evidence; joinorder_synthetic (already CI-enforced) is the
     scaled stand-in for joinorder.
   - ``no-df-query-surface``: no DataFrame query registry -> NOT cross-surface
@@ -111,20 +113,33 @@ def _dataframe_query_registry(benchmark_id: str) -> Any | None:
     return None
 
 
+# Benchmarks whose downloader synthesizes fully offline at the bounded
+# SF=0.01 cell (no network fetch in routine PRs). FlightData's downloader
+# always synthesizes below SF=0.1 (see FlightDataDownloader._process_month),
+# so it stays ``generated`` for gate-cost purposes despite shipping a
+# downloader. Any other downloader-backed benchmark fetches remote data even
+# at the bounded scale and is ``network-fetch``.
+_BOUNDED_OFFLINE_DOWNLOADERS = frozenset({"flightdata"})
+
+
 def _data_provenance(benchmark_id: str) -> str:
-    """Classify how a benchmark acquires data: manifest fetch vs bounded generation.
+    """Classify how a benchmark acquires data: manifest fetch vs network fetch vs generation.
 
     A benchmark that ships ``benchbox/core/<id>/data_manifest.toml`` fetches a
     canonical dataset (e.g. joinorder's IMDb 2013 archive) instead of generating
     a cheap bounded cell, so wiring it as a routine-PR gate would drag a full
-    dataset fetch into CI. Everything else (synthetic generators, offline
-    downloaders that synthesize below SF=0.1 like flightdata) counts as
-    ``generated`` for gate-cost purposes.
+    dataset fetch into CI. A benchmark that ships a per-benchmark
+    ``downloader.py`` likewise performs remote fetches at the bounded scale
+    (e.g. nyctaxi downloads the pinned TLC Parquet months before sampling),
+    unless it is an explicit bounded-offline exception. Everything else
+    (synthetic generators) counts as ``generated`` for gate-cost purposes.
     """
-    manifest = _REPO_ROOT / "benchbox" / "core" / benchmark_id / "data_manifest.toml"
+    benchmark_dir = _REPO_ROOT / "benchbox" / "core" / benchmark_id
     try:
-        if manifest.exists():
+        if (benchmark_dir / "data_manifest.toml").exists():
             return "manifest-fetch"
+        if benchmark_id not in _BOUNDED_OFFLINE_DOWNLOADERS and (benchmark_dir / "downloader.py").exists():
+            return "network-fetch"
     except OSError:
         pass
     return "generated"
@@ -183,18 +198,21 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         "scale": used_scale,
     }
     # Bounded-scale honesty (M1): a gate must be one cheap bounded cell. A
-    # benchmark that rejects SF=0.01 or fetches a canonical dataset via
-    # data_manifest.toml cannot land as a routine-PR gate, no matter how clean
-    # its id overlap is -- report it as not-cheaply-gateable with the reason.
+    # benchmark that rejects SF=0.01, fetches a canonical dataset via
+    # data_manifest.toml, or performs downloader-backed network fetches at the
+    # bounded scale cannot land as a routine-PR gate, no matter how clean its
+    # id overlap is -- report it as not-cheaply-gateable with the reason.
     provenance = _data_provenance(benchmark_id)
     bounded_ok = used_scale is not None and abs(float(used_scale) - _INSTANTIATE_SCALES[0]) < 1e-9
-    if not bounded_ok or provenance == "manifest-fetch":
+    if not bounded_ok or provenance in ("manifest-fetch", "network-fetch"):
         reasons: list[str] = []
         if not bounded_ok:
             why = bounded_scale_error or error
             reasons.append(f"rejects bounded scale SF=0.01 ({why}); requires SF={used_scale}")
         if provenance == "manifest-fetch":
             reasons.append("canonical manifest fetch (data_manifest.toml)")
+        if provenance == "network-fetch":
+            reasons.append("downloader-backed network fetch at the bounded scale (downloader.py)")
         if benchmark_id == "joinorder":
             reasons.append("use joinorder_synthetic (already CI-enforced) for scaled smoke-test data")
         return NOT_CHEAPLY_GATEABLE, {**detail, "data_source": provenance, "reason": "; ".join(reasons)}
@@ -263,8 +281,9 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("")
     lines.append(
         "**Gateable also means CHEAP, not merely overlapping.** A benchmark that "
-        "rejects the bounded SF=0.01 cell or fetches a canonical dataset via "
-        "`data_manifest.toml` is `not-cheaply-gateable`, NOT gateable, no matter "
+        "rejects the bounded SF=0.01 cell, fetches a canonical dataset via "
+        "`data_manifest.toml`, or performs downloader-backed network fetches at "
+        "the bounded scale is `not-cheaply-gateable`, NOT gateable, no matter "
         "its id overlap: wiring it would drag a full dataset fetch into routine "
         "PRs. The table reason names the scale/provenance evidence."
     )
@@ -328,7 +347,8 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append(
         "- **Not-cheaply-gateable (NOT a routine-PR gate):** "
         + (", ".join(not_cheap_names) or "none")
-        + " — rejects the bounded SF=0.01 cell or needs a canonical manifest fetch; "
+        + " — rejects the bounded SF=0.01 cell, needs a canonical manifest fetch, "
+        "or performs downloader-backed network fetches at the bounded scale; "
         "do not wire as a routine-PR gate."
     )
     lines.append(

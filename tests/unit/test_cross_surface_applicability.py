@@ -67,13 +67,16 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # cross-surface gates, so they no longer appear among the unguarded candidates.
 # tpcds_obt was previously here; it now rejects the bounded SF=0.01 cell, so it
 # is `not-cheaply-gateable` instead.)
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "nyctaxi", "tpch_skew", "tsbs_devops"}
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "tpch_skew", "tsbs_devops"}
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
-# bounded SF=0.01 cell or fetch a canonical dataset via data_manifest.toml.
+# bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
+# perform downloader-backed network fetches at the bounded scale.
 # joinorder accepts only SF=1.0 (IMDb 2013 manifest; joinorder_synthetic is the
-# already-enforced scaled stand-in); tpcds_obt requires SF>=1.0.
-_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "tpcds_obt"}
+# already-enforced scaled stand-in); tpcds_obt requires SF>=1.0; nyctaxi
+# downloads the pinned TLC Parquet months before sampling even at SF=0.01
+# (flightdata stays out: its downloader always synthesizes below SF=0.1).
+_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "tpcds_obt", "nyctaxi"}
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
@@ -120,8 +123,22 @@ def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
     assert "joinorder_synthetic" in by_id["joinorder"].get("reason", "")
     assert by_id["tpcds_obt"]["status"] == NOT_CHEAPLY_GATEABLE
     assert "SF=0.01" in by_id["tpcds_obt"].get("reason", "")
+    assert by_id["nyctaxi"]["status"] == NOT_CHEAPLY_GATEABLE
+    assert by_id["nyctaxi"].get("data_source") == "network-fetch"
+    assert "network fetch" in by_id["nyctaxi"].get("reason", "")
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert _NOT_CHEAPLY_GATEABLE_BENCHMARKS.isdisjoint(gateable)
+
+
+def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
+    """Downloader-backed benchmarks are network-fetch; bounded-offline ones are not."""
+    from _project.scripts.cross_surface_applicability_sweep import _data_provenance
+
+    assert _data_provenance("nyctaxi") == "network-fetch"
+    assert _data_provenance("joinorder") == "manifest-fetch"
+    # flightdata ships a downloader but always synthesizes below SF=0.1.
+    assert _data_provenance("flightdata") == "generated"
+    assert _data_provenance("tpch") == "generated"
 
 
 def test_staged_gates_are_marked_not_unguarded(rows):
