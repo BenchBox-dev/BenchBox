@@ -16454,6 +16454,13 @@
       "status": "done",
       "title": "Let the throughput executor return without blocking on a hung/leaked stream at shutdown"
     },
+    "throughput-floor-numeric-threshold-from-baseline": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Set numeric Throughput@Size floor from retained baseline spread"
+    },
     "throughput-independent-sessions-per-stream": {
       "claim": null,
       "needs": [

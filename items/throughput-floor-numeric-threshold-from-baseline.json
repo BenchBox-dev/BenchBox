@@ -1,0 +1,4 @@
+{
+  "context": "Blocked until retained Throughput@Size observations exist: nightly runners are ephemeral and no run retains summary.tpc_metrics.throughput_at_size, so no defensible spread exists yet (the item's own data-first rule forbids premature numbers). The nightly assert now reports each observed value via ::notice:: for accumulation. Unblocks when N green DuckDB TPC-H SF1 observations are retained and X/N are signed off.",
+  "description": "Set the numeric Throughput@Size floor: configure THROUGHPUT_FLOOR_MEDIAN and sign off THROUGHPUT_FLOOR_MAX_DROP_FRACTION (default 20%) from the retained rolling-median spread of green DuckDB TPC-H SF1 runs. Wiring, observe-only default, and policy docs merged in #2302 (plus hardening in #2309)."
+}
