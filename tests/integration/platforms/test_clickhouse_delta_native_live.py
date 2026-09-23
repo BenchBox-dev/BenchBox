@@ -37,6 +37,9 @@ from benchbox.platforms.clickhouse.delta_lake import (
     DELTA_TABLE_FUNCTION_NAMES,
     delta_engine_probe_sql,
     delta_function_probe_sql,
+    delta_lake_count_sql,
+    delta_lake_engine_ddl,
+    delta_lake_table_function,
     has_native_delta_registration,
 )
 
@@ -97,4 +100,46 @@ class TestNativeDeltaCapability:
                 f"Server {version} lacks native Delta registration: functions={functions} engines={engines}"
             )
         finally:
+            clickhouse_adapter.close_connection(connection)
+
+    def test_adapter_selects_native_for_s3(self, clickhouse_adapter) -> None:
+        connection = clickhouse_adapter.create_connection()
+        try:
+            reader = clickhouse_adapter.delta_reader_for(connection, "s3://bucket/orders")
+            assert reader.kind == "native"
+            assert reader.source_sql == "deltaLake('s3://bucket/orders')"
+        finally:
+            clickhouse_adapter.close_connection(connection)
+
+
+PUBLIC_DELTA_URL = "https://clickhouse-public-datasets.s3.amazonaws.com/delta_lake/hits/"
+
+
+class TestPublicS3DeltaEndToEnd:
+    """Data-level reads against the public Delta example from the ClickHouse docs.
+
+    Requires container egress to S3. A failure here names the dataset URL so a
+    moved dataset reads as an external change, not a BenchBox regression.
+    """
+
+    def test_table_function_read(self, clickhouse_adapter) -> None:
+        connection = clickhouse_adapter.create_connection()
+        try:
+            source = delta_lake_table_function(PUBLIC_DELTA_URL)
+            rows = connection.execute(f"SELECT URL, UserAgent FROM {source} WHERE URL IS NOT NULL LIMIT 2")
+            assert len(rows) == 2
+            assert all(row[0] for row in rows)
+            count = connection.execute(delta_lake_count_sql(source))
+            assert count[0][0] > 0
+        finally:
+            clickhouse_adapter.close_connection(connection)
+
+    def test_engine_attach_read(self, clickhouse_adapter) -> None:
+        connection = clickhouse_adapter.create_connection()
+        try:
+            connection.execute(delta_lake_engine_ddl("hits_delta_e2e", PUBLIC_DELTA_URL))
+            rows = connection.execute("SELECT URL FROM hits_delta_e2e WHERE URL IS NOT NULL LIMIT 2")
+            assert len(rows) == 2
+        finally:
+            connection.execute("DROP TABLE IF EXISTS hits_delta_e2e")
             clickhouse_adapter.close_connection(connection)

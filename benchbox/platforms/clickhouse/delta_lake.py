@@ -53,8 +53,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Literal
+
 #: S3-backed Delta Lake table functions sharing one argument shape.
 _S3_TABLE_FUNCTIONS = frozenset({"deltaLake", "deltaLakeS3"})
+
+#: Where a Delta table lives, deciding which native builder (if any) applies.
+DeltaLocationKind = Literal["s3", "azure", "gcs", "local", "unknown"]
 
 #: Base Delta Lake table function; required for native reads.
 DELTA_BASE_FUNCTION = "deltaLake"
@@ -69,6 +75,9 @@ __all__ = [
     "DELTA_BASE_FUNCTION",
     "DELTA_ENGINE_NAME",
     "DELTA_TABLE_FUNCTION_NAMES",
+    "DeltaLocationKind",
+    "DeltaReader",
+    "classify_delta_location",
     "delta_engine_probe_sql",
     "delta_function_probe_sql",
     "delta_lake_azure_table_function",
@@ -80,6 +89,7 @@ __all__ = [
     "has_native_delta_registration",
     "quote_identifier",
     "quote_literal",
+    "resolve_delta_reader",
 ]
 
 
@@ -368,3 +378,96 @@ def has_native_delta_registration(function_names: list[str], engine_names: list[
         both registered; the S3/local/Azure aliases alone are not sufficient.
     """
     return DELTA_BASE_FUNCTION in function_names and DELTA_ENGINE_NAME in engine_names
+
+
+def classify_delta_location(location: str) -> DeltaLocationKind:
+    """Classify where a Delta table lives from its location string.
+
+    Args:
+        location: Bucket URL, connection string, or filesystem path.
+
+    Returns:
+        ``"s3"`` for ``s3://`` URLs, ``"azure"`` for Azure Blob location forms
+        (``abfs(s)://``, ``wasb(s)://``, account-host URLs, connection
+        strings), ``"gcs"`` for GCS forms, ``"local"`` for filesystem paths,
+        ``"unknown"`` otherwise.
+
+    Raises:
+        ValueError: If the location is empty or blank.
+    """
+    if not location or not location.strip():
+        raise ValueError("Cannot classify an empty Delta location.")
+    lowered = location.lower()
+    if lowered.startswith("s3://"):
+        return "s3"
+    if lowered.startswith("gs://") or lowered.startswith("https://storage.googleapis.com/"):
+        return "gcs"
+    if (
+        lowered.startswith(("abfs://", "abfss://", "wasb://", "wasbs://"))
+        or ".blob.core.windows.net" in lowered
+        or ".dfs.core.windows.net" in lowered
+        or "accountname=" in lowered
+        or "defaultendpointsprotocol=" in lowered
+    ):
+        return "azure"
+    if lowered.startswith(("/", "./", "../", "file://")) or (
+        len(location) > 3 and location[0].isalpha() and location[1] == ":" and location[2] in "\\/"
+    ):
+        return "local"
+    return "unknown"
+
+
+@dataclass(frozen=True)
+class DeltaReader:
+    """How a Delta table should be read by ClickHouse.
+
+    Attributes:
+        kind: ``"native"`` (issue ``source_sql`` straight at the server) or
+            ``"parquet-snapshot"`` (export with
+            ``benchbox.utils.delta_export.export_delta_to_parquet`` first).
+        location_kind: The :func:`classify_delta_location` result.
+        source_sql: Native table-function expression, or ``""`` for snapshots.
+        reason: Why this path was chosen.
+    """
+
+    kind: str
+    location_kind: str
+    source_sql: str
+    reason: str
+
+
+def resolve_delta_reader(location: str, *, native_available: bool) -> DeltaReader:
+    """Choose the native or snapshot read path for a Delta location.
+
+    S3 and local locations read natively when the server registers the
+    integration; Azure and GCS locations always resolve to the snapshot path
+    (no committed native selection for those location forms yet), as does any
+    location when native reads are unavailable.
+
+    Args:
+        location: Bucket URL or filesystem path of the Delta table.
+        native_available: The :func:`has_native_delta_registration` verdict.
+
+    Returns:
+        The chosen :class:`DeltaReader`.
+
+    Raises:
+        ValueError: If the location is empty, blank, or unrecognized.
+    """
+    kind = classify_delta_location(location)
+    if kind == "unknown":
+        raise ValueError(f"Unrecognized Delta location {location!r}: expected an S3/Azure/GCS URL or a local path.")
+    if native_available and kind in ("s3", "local"):
+        if kind == "s3":
+            return DeltaReader("native", kind, delta_lake_table_function(location), "server registers deltaLake")
+        return DeltaReader("native", kind, delta_lake_local_table_function(location), "server registers deltaLakeLocal")
+    if kind in ("azure", "gcs"):
+        return DeltaReader(
+            "parquet-snapshot",
+            kind,
+            "",
+            f"no committed native selection for {kind} locations; export to Parquet first",
+        )
+    return DeltaReader(
+        "parquet-snapshot", kind, "", "server does not register native Delta reads; export to Parquet first"
+    )

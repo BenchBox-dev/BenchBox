@@ -18,6 +18,7 @@ from benchbox.platforms.clickhouse.delta_lake import (
     DELTA_BASE_FUNCTION,
     DELTA_ENGINE_NAME,
     DELTA_TABLE_FUNCTION_NAMES,
+    classify_delta_location,
     delta_engine_probe_sql,
     delta_function_probe_sql,
     delta_lake_azure_table_function,
@@ -29,6 +30,7 @@ from benchbox.platforms.clickhouse.delta_lake import (
     has_native_delta_registration,
     quote_identifier,
     quote_literal,
+    resolve_delta_reader,
 )
 
 pytestmark = [
@@ -256,3 +258,62 @@ class TestSupportProbe:
         )
         assert has_native_delta_registration(["deltaLake"], ["MergeTree"]) is False
         assert has_native_delta_registration([], []) is False
+
+
+class TestClassifyDeltaLocation:
+    def test_s3(self) -> None:
+        assert classify_delta_location("s3://bucket/table") == "s3"
+        assert classify_delta_location("S3://bucket/table") == "s3"
+
+    def test_azure_forms(self) -> None:
+        assert classify_delta_location("abfss://container@acct.dfs.core.windows.net/table") == "azure"
+        assert classify_delta_location("wasb://container@acct.blob.core.windows.net/table") == "azure"
+        assert classify_delta_location("https://acct.blob.core.windows.net/container/table") == "azure"
+        assert classify_delta_location("DefaultEndpointsProtocol=https;AccountName=acct;") == "azure"
+
+    def test_gcs_forms(self) -> None:
+        assert classify_delta_location("gs://bucket/table") == "gcs"
+        assert classify_delta_location("https://storage.googleapis.com/bucket/table") == "gcs"
+
+    def test_local_forms(self) -> None:
+        assert classify_delta_location("/data/orders") == "local"
+        assert classify_delta_location("./relative/orders") == "local"
+        assert classify_delta_location("file:///data/orders") == "local"
+        assert classify_delta_location("C:\\data\\orders") == "local"
+
+    def test_unknown_and_empty(self) -> None:
+        assert classify_delta_location("hdfs://namenode/table") == "unknown"
+        assert classify_delta_location("a:b") == "unknown"
+        with pytest.raises(ValueError, match="empty"):
+            classify_delta_location("   ")
+
+
+class TestResolveDeltaReader:
+    def test_native_s3_and_local_when_available(self) -> None:
+        s3 = resolve_delta_reader("s3://bucket/orders", native_available=True)
+        assert (s3.kind, s3.location_kind) == ("native", "s3")
+        assert s3.source_sql == "deltaLake('s3://bucket/orders')"
+
+        local = resolve_delta_reader("/data/orders", native_available=True)
+        assert (local.kind, local.location_kind) == ("native", "local")
+        assert local.source_sql == "deltaLakeLocal('/data/orders')"
+
+    def test_snapshot_when_native_unavailable(self) -> None:
+        reader = resolve_delta_reader("s3://bucket/orders", native_available=False)
+        assert reader.kind == "parquet-snapshot"
+        assert reader.source_sql == ""
+        assert "does not register" in reader.reason
+
+        local = resolve_delta_reader("/data/orders", native_available=False)
+        assert local.kind == "parquet-snapshot"
+
+    def test_azure_and_gcs_always_snapshot(self) -> None:
+        for location in ("abfss://c@a.dfs.core.windows.net/t", "gs://bucket/table"):
+            reader = resolve_delta_reader(location, native_available=True)
+            assert reader.kind == "parquet-snapshot"
+            assert reader.source_sql == ""
+            assert "no committed native selection" in reader.reason
+
+    def test_unknown_location_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unrecognized Delta location"):
+            resolve_delta_reader("hdfs://namenode/table", native_available=True)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from benchbox.core.tuning.introspection import has_order_by_clause
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -13,6 +13,9 @@ from benchbox.utils.printing import emit
 from benchbox.utils.sql_parsing import find_matching_parenthesis
 
 from .query_transformer import ClickHouseQueryTransformer
+
+if TYPE_CHECKING:
+    from .delta_lake import DeltaReader
 
 logger = logging.getLogger(__name__)
 
@@ -690,6 +693,51 @@ class ClickHouseWorkloadMixin:
         except Exception as e:
             self.logger.debug(f"Failed to get row count for {table}: {e}")
             return 0
+
+    def delta_native_registration(self, connection: Any) -> bool:
+        """Probe whether the server registers native Delta Lake reads.
+
+        Runs the ``system.table_functions`` / ``system.table_engines`` probes
+        from :mod:`benchbox.platforms.clickhouse.delta_lake` and applies
+        :func:`has_native_delta_registration`. No caching: the probe is two
+        light system queries, and callers that decide per statement should see
+        current server state.
+
+        Args:
+            connection: ClickHouse connection exposing ``execute()``.
+
+        Returns:
+            True when the server registers the ``deltaLake`` function and the
+            ``DeltaLake`` engine.
+        """
+        from .delta_lake import delta_engine_probe_sql, delta_function_probe_sql, has_native_delta_registration
+
+        function_rows = connection.execute(delta_function_probe_sql()) or []
+        engine_rows = connection.execute(delta_engine_probe_sql()) or []
+        return has_native_delta_registration(
+            [str(row[0]) for row in function_rows],
+            [str(row[0]) for row in engine_rows],
+        )
+
+    def delta_reader_for(self, connection: Any, location: str) -> DeltaReader:
+        """Select the native or snapshot read path for a Delta location.
+
+        Probes the server once, then resolves via
+        :func:`benchbox.platforms.clickhouse.delta_lake.resolve_delta_reader`.
+
+        Args:
+            connection: ClickHouse connection exposing ``execute()``.
+            location: Bucket URL or filesystem path of the Delta table.
+
+        Returns:
+            The chosen :class:`DeltaReader`.
+
+        Raises:
+            ValueError: If the location is empty, blank, or unrecognized.
+        """
+        from .delta_lake import resolve_delta_reader
+
+        return resolve_delta_reader(location, native_available=self.delta_native_registration(connection))
 
     def _get_constraint_configuration(self) -> tuple[bool, bool]:
         """Extract constraint configuration settings from tuning config.
