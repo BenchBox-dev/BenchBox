@@ -525,6 +525,89 @@ class TestLoadSingleTable:
         assert "FILEFORMAT = PARQUET" in copy_sql
         assert "CAST(`id` AS int)" in copy_sql
 
+    def _copy_sql_for_csv(self, tmp_stem, metadata):
+        """Run _load_single_table for a CSV and return the COPY INTO SQL."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench"
+        adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        adapter.enable_delta_optimization = False
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (10,)
+        cursor.fetchall.return_value = [("id", "int", "")]
+        file_path = Path(f"{tmp_stem}.csv")
+        ds = resolver_data_source(tmp_stem, file_path, metadata)
+        adapter._load_single_table(
+            cursor=cursor,
+            connection=MagicMock(),
+            benchmark=None,
+            table_name=tmp_stem,
+            file_path=file_path,
+            stage_root="dbfs:/Volumes/main/bench",
+            existing_tables={tmp_stem},
+            data_source=ds,
+        )
+        executed_sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+        copy_sql = next((s for s in executed_sqls if "COPY INTO" in s), None)
+        assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
+        return copy_sql
+
+    def test_copy_into_honors_manifest_header(self):
+        """Manifest csv_has_header=true must set header=true in FORMAT_OPTIONS."""
+        copy_sql = self._copy_sql_for_csv(
+            "trips",
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""},
+        )
+        assert "'header'='true'" in copy_sql
+
+    def test_copy_into_header_csv_uses_cast_select(self):
+        """Header CSVs load through a DESCRIBE-driven cast SELECT."""
+        from unittest.mock import call, patch
+
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench"
+        adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        adapter.enable_delta_optimization = False
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (10,)
+        cursor.fetchall.return_value = [("id", "int", ""), ("amount", "decimal(8,2)", "")]
+        file_path = Path("orders.csv")
+        ds = resolver_data_source(
+            "orders", file_path, {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""}
+        )
+        with (
+            patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0),
+            patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.1),
+        ):
+            adapter._load_single_table(
+                cursor=cursor,
+                connection=MagicMock(),
+                benchmark=None,
+                table_name="orders",
+                file_path=file_path,
+                stage_root="dbfs:/Volumes/main/bench",
+                existing_tables={"orders"},
+                data_source=ds,
+            )
+        executed_sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+        copy_sql = next((s for s in executed_sqls if "COPY INTO" in s), None)
+        assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
+        assert "FILEFORMAT = CSV" in copy_sql
+        assert "CAST(`id` AS int)" in copy_sql
+        assert "CAST(`amount` AS decimal(8,2))" in copy_sql
+
+    def test_copy_into_defaults_to_no_header(self):
+        """CSVs without manifest metadata keep header=false."""
+        copy_sql = self._copy_sql_for_csv("orders", {})
+        assert "'header'='false'" in copy_sql
+
 
 # ---------------------------------------------------------------------------
 # create_external_tables - happy path
@@ -1971,16 +2054,46 @@ class TestResolveFileUriAndDelimiter:
 
     def test_dbfs_multi_file_list_uses_shared_directory(self):
         adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
+            "dbfs:/Volumes/cat/sch/vol/orders/region=EUROPE/part-00000.parquet",
+        ]
         file_uri, filename, delimiter = adapter._resolve_file_uri_and_delimiter(
-            [
-                "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
-                "dbfs:/Volumes/cat/sch/vol/orders/region=EUROPE/part-00000.parquet",
-            ],
+            files,
             "dbfs:/Volumes/cat/sch/vol",
         )
         assert file_uri == "dbfs:/Volumes/cat/sch/vol/orders"
         assert filename == "orders"
         assert delimiter == ","
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == [file_uri]
+
+    def test_flat_multi_file_list_expands_to_exact_uris(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/flights_0001_2024_12.csv.gz",
+            "dbfs:/Volumes/cat/sch/vol/flights_0002_2024_11.csv.gz",
+        ]
+        file_uri, _filename, _delimiter = adapter._resolve_file_uri_and_delimiter(
+            files,
+            "dbfs:/Volumes/cat/sch/vol",
+        )
+
+        assert file_uri == "dbfs:/Volumes/cat/sch/vol"
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == files
+
+    def test_files_within_one_partition_keep_partition_directory_source(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00001.parquet",
+        ]
+        file_uri, _filename, _delimiter = adapter._resolve_file_uri_and_delimiter(
+            files,
+            "dbfs:/Volumes/cat/sch/vol",
+        )
+
+        assert file_uri == "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA"
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == [file_uri]
 
     def test_wildcard_shard_set_expands_to_exact_per_file_uris(self):
         adapter = _make_adapter()

@@ -1856,7 +1856,8 @@ class BigQueryAdapter(PlatformAdapter):
         ]
         if match:
             rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
-            if pk_cols:
+            has_table_pk = re.search(r"PRIMARY\s+KEY\s*\(", rest, flags=re.IGNORECASE) is not None
+            if pk_cols and not has_table_pk:
                 depth = 0
                 for i, ch in enumerate(rest):
                     if ch == "(":
@@ -1869,6 +1870,16 @@ class BigQueryAdapter(PlatformAdapter):
             statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
         else:
             statement = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", statement, flags=re.IGNORECASE)
+
+        # BigQuery rejects enforced PRIMARY KEY table constraints too (e.g.
+        # nyctaxi's `PRIMARY KEY (cols)`). Mark surviving table-level keys
+        # NOT ENFORCED; already-marked constraints are left untouched.
+        statement = re.sub(
+            r"PRIMARY\s+KEY\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+            r"PRIMARY KEY (\1) NOT ENFORCED",
+            statement,
+            flags=re.IGNORECASE,
+        )
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in statement.upper() and self.partitioning_field:

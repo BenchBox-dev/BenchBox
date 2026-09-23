@@ -249,3 +249,41 @@ class TestQuerySQLValidity:
         for query_id in geographic_queries:
             query = manager.get_query(query_id)
             assert "JOIN" in query.upper() or "taxi_zones" in query.lower()
+
+
+class TestCloudTranslation:
+    """Cloud dialects render Postgres date-part idioms natively."""
+
+    @pytest.fixture
+    def queries_by_dialect(self):
+        import tempfile
+
+        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
+
+        with tempfile.TemporaryDirectory() as tmp:
+            bm = NYCTaxiBenchmark(scale_factor=0.1, output_dir=tmp)
+            return {d: bm.get_queries(dialect=d) for d in ("bigquery", "snowflake", "databricks")}
+
+    def test_no_dow_or_epoch_residuals(self, queries_by_dialect):
+        for dialect, queries in queries_by_dialect.items():
+            for qid, sql in queries.items():
+                assert "DOW" not in sql, (dialect, qid)
+                assert "EPOCH" not in sql, (dialect, qid)
+
+    def test_bigquery_dayofweek_preserves_sunday_zero(self, queries_by_dialect):
+        sql = queries_by_dialect["bigquery"]["trips-by-day-of-week"]
+        assert "EXTRACT(DAYOFWEEK" in sql
+        assert "- 1" in sql
+
+    def test_bigquery_epoch_uses_unix_seconds(self, queries_by_dialect):
+        sql = queries_by_dialect["bigquery"]["trip-duration-analysis"]
+        assert "UNIX_SECONDS(TIMESTAMP(" in sql
+
+    def test_snowflake_epoch_uses_datediff(self, queries_by_dialect):
+        sql = queries_by_dialect["snowflake"]["trip-duration-analysis"]
+        assert "DATEDIFF(second," in sql
+
+    def test_databricks_dow_uses_dayofweek(self, queries_by_dialect):
+        sql = queries_by_dialect["databricks"]["trips-by-day-of-week"]
+        assert "DAYOFWEEK(" in sql
+        assert "- 1" in sql

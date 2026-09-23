@@ -2100,6 +2100,20 @@ class TestConvertToBigqueryTable:
         result = adapter._convert_to_bigquery_table("CREATE TABLE `my_ds.orders` (id INT64)")
         assert result == "CREATE OR REPLACE TABLE `my_ds.ORDERS` (id INT64)"
 
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_table_level_primary_key_not_enforced(self, mock_bigquery):
+        """Table-level PRIMARY KEY constraints become NOT ENFORCED."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE trips (\n    id INT64,\n    PRIMARY KEY (id)\n)")
+        assert "PRIMARY KEY (id) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_not_enforced_not_duplicated(self, mock_bigquery):
+        """An already NOT ENFORCED key is left untouched."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64,\n    PRIMARY KEY (id) NOT ENFORCED)")
+        assert result.count("NOT ENFORCED") == 1
+
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestQualifyTableNames:
@@ -2222,6 +2236,14 @@ class TestApplyTpcdiBigqueryRewrites:
 
         assert "DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)" in result
         sqlglot.parse_one(result, read="bigquery")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_relative_now_uses_interval(self, mock_bigquery):
+        """DATE('now', '-N days') needs BigQuery's INTERVAL expression."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM t WHERE d.DateValue >= DATE('now', '-90 days')")
+        assert "DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)" in result
+        assert "DATE('now'" not in result
 
 
 @pytest.mark.usefixtures("dependencies_available")

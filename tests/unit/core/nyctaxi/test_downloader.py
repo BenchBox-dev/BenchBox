@@ -315,3 +315,36 @@ class TestSourceContractIdentity:
         with tempfile.TemporaryDirectory() as tmpdir:
             downloader = NYCTaxiDataDownloader(output_dir=tmpdir)
             assert downloader._read_persisted_contract_id(Path(tmpdir) / "trips.csv.gz") is None
+
+
+class TestCleanCsvValue:
+    """Parquet-derived values must be strict-loader-safe CSV scalars."""
+
+    def test_integral_float_becomes_int(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(1.0, 0) == 1
+        assert isinstance(NYCTaxiDataDownloader._clean_csv_value(1.0, 0), int)
+
+    def test_fractional_float_kept(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(1.2, 0) == 1.2
+
+    def test_nan_falls_back_to_default(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(float("nan"), 0) == 0
+        assert NYCTaxiDataDownloader._clean_csv_value(None, 1) == 1
+
+    def test_map_row_normalizes_parquet_floats(self):
+        import tempfile
+
+        row = {
+            "VendorID": 1.0,
+            "passenger_count": 2.0,
+            "congestion_surcharge": float("nan"),
+            "fare_amount": 6.5,
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            downloader = NYCTaxiDataDownloader(output_dir=tmpdir)
+            mapped = downloader._map_row_to_schema(row, 0)
+        by_col = dict(zip(["trip_id", *NYCTaxiDataDownloader._COLUMN_PROVIDER()], mapped))
+        assert by_col["vendor_id"] == 1
+        assert by_col["passenger_count"] == 2
+        assert by_col["congestion_surcharge"] == 0
+        assert by_col["fare_amount"] == 6.5

@@ -302,12 +302,54 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
                 return row[name]
         return default
 
+    @staticmethod
+    def _clean_csv_value(value: Any, default: Any) -> Any:
+        """Normalize a parquet-derived value for CSV output.
+
+        Pandas represents missing numerics as NaN and integer columns with
+        gaps as float (``1.0``); both break strict loaders (BigQuery rejects
+        ``nan`` and ``1.0`` for INT64). Missing values fall back to the
+        column default, integral floats become ints, and datetimes render
+        as ``YYYY-MM-DD HH:MM:SS``.
+        """
+        if value is None:
+            return default
+        if isinstance(value, float):
+            if value != value:  # NaN (covers numpy float64 too)
+                return default
+            if value.is_integer():
+                return int(value)
+            return value
+        value_type = type(value).__name__
+        if value_type == "NaTType":
+            return default
+        if value_type == "Timestamp" or isinstance(value, datetime):
+            try:
+                return value.strftime("%Y-%m-%d %H:%M:%S")
+            except (ValueError, AttributeError):
+                return default
+        if isinstance(value, (np.integer,)):
+            return int(value)
+        if isinstance(value, (np.floating,)):
+            rounded = float(value)
+            if rounded != rounded:
+                return default
+            return int(rounded) if rounded.is_integer() else rounded
+        if isinstance(value, (np.bool_,)):
+            return int(value)
+        return value
+
     def _map_row_to_schema(self, row, trip_id: int) -> list:
         columns = type(self)._COLUMN_PROVIDER()
         return [
             trip_id,
             *[
-                self._get_col(row, self._COLUMN_ALIASES.get(column, (column,)), self._COLUMN_DEFAULTS.get(column, 0))
+                self._clean_csv_value(
+                    self._get_col(
+                        row, self._COLUMN_ALIASES.get(column, (column,)), self._COLUMN_DEFAULTS.get(column, 0)
+                    ),
+                    self._COLUMN_DEFAULTS.get(column, 0),
+                )
                 for column in columns
             ],
         ]

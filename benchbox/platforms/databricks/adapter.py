@@ -2076,9 +2076,29 @@ class DatabricksAdapter(PlatformAdapter):
         exact URI per shard (COPY INTO appends, so one statement per file
         loads the full table). Non-wildcard sources pass through unchanged.
         """
+        entries = self._normalize_table_file_inputs(file_path)
+        if len(entries) > 1 and "*" not in file_uri:
+            sources = []
+            for entry in entries:
+                entry_str = str(entry)
+                if entry_str.startswith("dbfs:/") or self._is_cloud_uri(entry_str):
+                    sources.append(entry_str)
+                else:
+                    sources.append(f"{stage_root}/{self._path_name(entry)}")
+
+            # A flat list of files must stay exact. Collapsing it to the shared
+            # staging directory makes COPY INTO scan unrelated benchmark data
+            # that happens to live beside the requested files. Keep a common
+            # ancestor only for partitioned datasets whose files live in
+            # different subdirectories, where the directory carries partition
+            # discovery semantics.
+            source_parents = {source.rsplit("/", 1)[0] for source in sources}
+            is_partition_directory = any("=" in segment for segment in file_uri.rstrip("/").split("/"))
+            if source_parents == {file_uri.rstrip("/")} and not is_partition_directory:
+                return sources
+
         if "*" not in file_uri:
             return [file_uri]
-        entries = self._normalize_table_file_inputs(file_path)
         sources = []
         for entry in entries:
             entry_str = str(entry)
@@ -2148,13 +2168,15 @@ class DatabricksAdapter(PlatformAdapter):
             self.log_very_verbose(f"Could not get column list for {table_name}: {e}")
         return ""
 
-    def _parquet_cast_select(self, cursor: Any, table_name_upper: str) -> str:
-        """Build a SELECT list casting Parquet fields to the Delta column types.
+    def _target_cast_select(self, cursor: Any, table_name_upper: str) -> str:
+        """Build a SELECT list casting source fields to the Delta column types.
 
-        Reads the target types from DESCRIBE TABLE so Parquet/Delta type
-        mismatches (e.g. int64 fields into INT columns) load without a
+        Reads the target types from DESCRIBE TABLE so source/Delta type
+        mismatches (e.g. int64 Parquet fields into INT columns, or all-string
+        CSV fields with a header row into typed columns) load without a
         DELTA_FAILED_TO_MERGE_FIELDS error. Partition-metadata rows emitted
-        by DESCRIBE are skipped.
+        by DESCRIBE are skipped. Requires named source fields: Parquet field
+        names or CSV header names.
         """
         cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
         items = []
@@ -2165,8 +2187,12 @@ class DatabricksAdapter(PlatformAdapter):
                 continue
             items.append(f"CAST(`{col}` AS {dtype}) AS `{col}`")
         if not items:
-            raise RuntimeError(f"DESCRIBE TABLE {table_name_upper} returned no columns for Parquet cast SELECT")
+            raise RuntimeError(f"DESCRIBE TABLE {table_name_upper} returned no columns for cast SELECT")
         return ", ".join(items)
+
+    def _parquet_cast_select(self, cursor: Any, table_name_upper: str) -> str:
+        """Build a SELECT list casting Parquet fields to the Delta column types."""
+        return self._target_cast_select(cursor, table_name_upper)
 
     def _load_single_table(
         self,
@@ -2207,7 +2233,11 @@ class DatabricksAdapter(PlatformAdapter):
         null_marker = self._resolve_csv_null_marker(
             data_source, table_name or null_dialect_path.stem, null_dialect_path, benchmark
         )
-        format_options = f"'delimiter'='{delimiter}', 'header'='false'"
+        copy_dialect = self._resolve_copy_dialect(
+            data_source, table_name or null_dialect_path.stem, null_dialect_path, benchmark
+        )
+        header_opt = "true" if copy_dialect.has_header else "false"
+        format_options = f"'delimiter'='{delimiter}', 'header'='{header_opt}'"
         if null_marker:
             # A truthy marker means only that literal is NULL, so empty fields
             # stay empty strings. Falsy markers keep COPY INTO defaults.
@@ -2222,20 +2252,27 @@ class DatabricksAdapter(PlatformAdapter):
         # COPY path. Parquet field types need not match the Delta DDL (IMDb
         # integers are int64 while the schema says INTEGER/INT), so load
         # through a SELECT that casts every field to the target column type
-        # read from DESCRIBE TABLE. Column lists and CSV format options apply
-        # to delimited text only.
+        # read from DESCRIBE TABLE. The same SELECT-cast form loads CSVs with
+        # a header row: named header fields merge by name as all-STRING, so
+        # they need casts just like Parquet fields. Headerless CSVs keep the
+        # positional path with its explicit column list.
         is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
-        parquet_select = ""
-        if is_parquet:
-            self.log_very_verbose(f"Using PARQUET file format for {table_name_upper}")
-            parquet_select = self._parquet_cast_select(cursor, table_name_upper)
+        use_cast_select = is_parquet or copy_dialect.has_header
+        cast_select = ""
+        if use_cast_select:
+            self.log_very_verbose(f"Using cast SELECT load for {table_name_upper}")
+            cast_select = self._target_cast_select(cursor, table_name_upper)
 
         copy_time = 0.0
         for source_uri in copy_sources:
             if is_parquet:
                 copy_sql = (
-                    f"COPY INTO {table_name_upper} FROM (SELECT {parquet_select} FROM '{source_uri}') "
-                    f"FILEFORMAT = PARQUET"
+                    f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') FILEFORMAT = PARQUET"
+                )
+            elif copy_dialect.has_header:
+                copy_sql = (
+                    f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') "
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
                 )
             else:
                 copy_sql = (
