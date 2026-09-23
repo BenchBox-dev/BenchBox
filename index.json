@@ -1890,7 +1890,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Find why 22% of Documentation workflow PR runs fail and fix or re-scope the cause"
     },
     "ci-failure-baseline-dev-loop-metrics": {
