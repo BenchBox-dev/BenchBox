@@ -1,0 +1,14 @@
+{
+  "acceptance": [
+    "ci-required-result requires the impacted canary shards for non-empty selections and fails on selector failure or missing or inconsistent output, with workflow tests for each case.",
+    "The PR includes the pre-written revert and states the rollback trigger.",
+    "A 7-day report after landing gives blocked merges (with causes), merge-queue p50 time to merge against the prior 7 days, and any canary failures the gate missed.",
+    "The D3 decision on pull_request gating is recorded, even if the answer is merge_group only."
+  ],
+  "context": "Guardrails:\n1. Maintainer approval of this PR is required (pr.yml and ci-required-result are soundness paths); no auto-merge.\n2. The PR must include a pre-written revert: removing the jobs from the umbrella and restoring continue-on-error.\n3. Rollback trigger, fixed now and not tuned later: revert the same day if, in any rolling 7 days after landing, (a) the required job blocks 3 or more merges whose failures are later shown to be flakes or infrastructure, or (b) merge-queue p50 time to merge rises by more than 15 minutes against the 7 days before landing. Revert first, then investigate; do not add exceptions to keep the gate.\n4. A canary failure the gate did not catch after landing is a selector bug: open an item for it the same day and link it here.\n5. Workflow tests cover: non-empty selection required and failing blocks; zero selection passes; selector failure blocks; missing output blocks; whole-suite fallback required.\n6. The daily release canary stays as the full backstop; do not reduce it.",
+  "description": "Start only after D2 in canary-impact-05-shadow-watch is recorded as promote.\n\nWire the canary-impact selector and test jobs into ci-required-result so a canary regression cannot merge:\n- the umbrella requires the test shards whenever the selector reports a non-empty selection;\n- the umbrella fails if the selector job fails, or its output is missing, malformed, or inconsistent with the shard results;\n- a recorded zero selection is a pass;\n- remove the jobs' continue-on-error.\n\nNo ruleset change is needed: ci-required-result is already the required check.\n\nDECISION POINT D3 (maintainer, optional): whether to also run the selector on pull_request for earlier feedback. Default is merge_group only, matching the heavy tier; only extend it with an explicit recorded decision.",
+  "links": [
+    ".github/workflows/pr.yml",
+    "scripts/canary_impact.py"
+  ]
+}

@@ -1742,6 +1742,15 @@
       "status": "open",
       "title": "Watch the canary-impact shadow job for 14 days, then decide whether to make it a required merge check"
     },
+    "canary-impact-06-required-gate": {
+      "claim": null,
+      "needs": [
+        "canary-impact-05-shadow-watch"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the impacted canary tests a required merge-queue check, with a rollback trigger"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
