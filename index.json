@@ -11971,12 +11971,17 @@
       "title": "compare-plans drops an explicitly-requested query at --threshold 0.0"
     },
     "qpc-history-version-awareness-hardening": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T13:56:49Z",
+        "generation": "d341ae701a7d4cceb3afb35935acf06f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c34f7fdc20585bf7d833c1a2"
+      },
       "needs": [
         "qpc-14-history-fingerprint-version-guard"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Harden plan-history version awareness: platform partition and CLI metrics"
     },
     "quality-add-cross-platform-result-validation": {
