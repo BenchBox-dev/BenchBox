@@ -3476,12 +3476,7 @@
       "title": "Cross-surface comparator: close the >=2 final-tie-group gap for a complete (non-truncated) final tie"
     },
     "cross-surface-gate-rollout-followups": {
-      "claim": {
-        "expires_at": "2026-09-24T14:15:13Z",
-        "generation": "7f8831a13823445098da1ef1dfd18036",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
-      },
+      "claim": null,
       "needs": [
         "datavault-cross-surface-gate-promotion",
         "tpch-skew-dataframe-sql-id-mapping",
@@ -3490,7 +3485,7 @@
         "tpcds-obt-dataframe-sql-id-mapping-decision"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Cross-surface gate breadth rollout: wire the remaining gateable benchmarks + fallback oracle"
     },
     "cross-surface-gate-target-ci-ratchet": {
