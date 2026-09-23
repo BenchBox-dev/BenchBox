@@ -1883,7 +1883,7 @@
         "ci-dedupe-06-heavy-tier-queue-only"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "blocked",
       "title": "Watch the queue-only heavy tier for 14 days and roll back on the recorded trigger"
     },
     "ci-dedupe-08-docs-pr-failure-triage": {
