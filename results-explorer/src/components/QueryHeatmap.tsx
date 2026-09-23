@@ -24,6 +24,7 @@ import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
+import { parseOverrideRules } from "@/lib/displayLabels";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
 import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
@@ -670,7 +671,11 @@ export function QueryHeatmap({
                   <>
                     <TrustBadge trustLabel={row.trust_label} compact />
                     <FundingChip funding={row.funding} compact />
-                    <ValidationBadge validationStatus={row.validation_status} showMissing />
+                    <ValidationBadge
+                      validationStatus={row.validation_status}
+                      overrideRules={parseOverrideRules(row.override_rules)}
+                      showMissing
+                    />
                   </>
                 )}
                 {showGeomeanCol && (
@@ -885,7 +890,11 @@ export function QueryHeatmap({
                       <div class="flex flex-nowrap items-center gap-1">
                         <TrustBadge trustLabel={row.trust_label} compact />
                         <FundingChip funding={row.funding} compact />
-                        <ValidationBadge validationStatus={row.validation_status} showMissing />
+                        <ValidationBadge
+                          validationStatus={row.validation_status}
+                          overrideRules={parseOverrideRules(row.override_rules)}
+                          showMissing
+                        />
                       </div>
                     </td>
                   )}

@@ -111,6 +111,15 @@ CREATE TABLE IF NOT EXISTS results (
     -- rendered read-only by the RunReceipt drill-down. NULL when the run
     -- published no receipt (introspection did not run, or a legacy bundle).
     applied_receipt      VARCHAR,
+    -- Accepted plausibility overrides ({stem}.override.json companion),
+    -- stored verbatim as display-only badge data: override_rules holds the
+    -- covered rule ids as a canonical JSON array string; the audit fields
+    -- are plain text. NULL / empty when no override was accepted. Never
+    -- parsed, joined on, or re-derived downstream.
+    override_rules       VARCHAR,
+    override_evidence    VARCHAR,
+    override_approver    VARCHAR,
+    override_expires     VARCHAR,
     -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
     -- never a join/dedup key). NULL for legacy bundles, treated downstream as
     -- the "pre-seam" generation.
@@ -223,6 +232,10 @@ SELECT
     r.applied_ledger_hash,
     r.tuning_validation_status,
     r.applied_receipt,
+    r.override_rules,
+    r.override_evidence,
+    r.override_approver,
+    r.override_expires,
     r.tuning_policy_generation,
     r.test_type,
     r.validation_status,

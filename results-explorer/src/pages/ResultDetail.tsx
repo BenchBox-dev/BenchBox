@@ -20,7 +20,7 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { formatEnumLabel, formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatEnumLabel, formatTrustLabel, formatValidationStatus, parseOverrideRules } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { RunDateChip } from "@/components/RunAge";
@@ -186,6 +186,9 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
+  // An accepted override is never a clean pass, even when the recorded
+  // validation status alone would hide this badge.
+  const detailOverrideRules = parseOverrideRules(detail.override_rules);
 
   function toggleSort(key: MedianSortKey) {
     setSort((prev) =>
@@ -316,8 +319,12 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
             </span>
             <TrustBadge trustLabel={detail.trust_label} />
             <FundingChip funding={detail.funding} />
-            {!isPassingValidationStatus(detail.validation_status) && (
-              <ValidationBadge validationStatus={detail.validation_status} showMissing />
+            {(!isPassingValidationStatus(detail.validation_status) || detailOverrideRules.length > 0) && (
+              <ValidationBadge
+                validationStatus={detail.validation_status}
+                overrideRules={detailOverrideRules}
+                showMissing
+              />
             )}
             {detail.tuning_mode && (
               <TuningBadge

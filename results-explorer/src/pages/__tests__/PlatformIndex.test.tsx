@@ -1325,3 +1325,29 @@ it("suspends comparison during pass loading and clears selections after a failed
   fireEvent.click(screen.getByTestId("platform-compare-checkbox-second"));
   expect(screen.getByTestId("compare-tray-compare-link")).toBeTruthy();
 });
+
+describe("PlatformIndex - accepted-override validation badges", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.history.replaceState(null, "", "/results/p/duckdb/");
+  });
+
+  it("badges an accepted override in both cells even when validation passed", async () => {
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      makeRow({ result_id: "r-over", validation_status: "passed", override_rules: '["timing-plateau"]' }),
+      makeRow({ result_id: "r-clean", validation_status: "passed" }),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+
+    // The overridden pass keeps its version-cell flag (a clean status alone
+    // would hide it) while the clean pass stays unflagged.
+    expect(screen.getByTestId("platform-validation-flag-r-over")).toBeTruthy();
+    expect(screen.queryByTestId("platform-validation-flag-r-clean")).toBeNull();
+
+    // Both the version-cell flag and the source-column badge warn.
+    const row = screen.getByTestId("r-over");
+    expect(within(row).getAllByText("Overridden: timing-plateau")).toHaveLength(2);
+  });
+});

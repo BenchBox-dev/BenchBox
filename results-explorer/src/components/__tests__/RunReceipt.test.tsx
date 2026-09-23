@@ -604,4 +604,40 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
       within(receipt).getByText(/us-east-1 \/ aws \(overhead: 0\.85 ms min, 1\.42 ms median\) \[measured\]/),
     ).toBeTruthy();
   });
+
+  it("badges an accepted override and never renders the validation row clean", () => {
+    render(
+      <RunReceipt
+        detail={makeDetail({
+          validation_status: "passed",
+          override_rules: '["timing-plateau"]',
+          override_evidence: "https://example.test/pr/1",
+          override_approver: "reviewer",
+          override_expires: "2099-01-01",
+        })}
+      />,
+    );
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    // Both the Validation cell and the Override row badge overridden
+    // (warning), never the clean pass.
+    const badges = within(receipt).getAllByText("Overridden: timing-plateau");
+    expect(badges).toHaveLength(2);
+    for (const badge of badges) {
+      expect(badge.getAttribute("data-tone")).toBe("warning");
+    }
+    // A dedicated Override row names the rules plus the audit fields.
+    expect(within(receipt).getByText("Override")).toBeTruthy();
+    expect(within(receipt).getByText("by reviewer")).toBeTruthy();
+    expect(within(receipt).getByText("https://example.test/pr/1")).toBeTruthy();
+    expect(within(receipt).getByText("expires 2099-01-01")).toBeTruthy();
+  });
+
+  it("omits the Override row when no override was accepted", () => {
+    render(<RunReceipt detail={makeDetail({ validation_status: "passed" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).queryByText("Override")).toBeNull();
+    expect(within(receipt).getByText("passed")).toBeTruthy();
+  });
 });

@@ -148,6 +148,11 @@ export interface ResultRow extends CostDeploymentFields {
   execution_mode: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string,
+  // see DetailResult in types.ts). List-only: the audit fields
+  // (evidence/approver/expires) stay detail-only. Optional so fixtures and
+  // SQL paths predating this column default to undefined. Display-only.
+  override_rules?: string | null;
   // ADR-1 bundle-emitted tuning identities (see DetailResult in types.ts):
   // canonical requested-config hash and physical applied-ledger hash. Optional
   // (like physical_rendering_id below) so fixtures/SQL paths predating these
@@ -216,6 +221,15 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   // Detail-only - the list projection never selects it. Optional so fixtures
   // and SQL paths predating this column default to undefined.
   applied_receipt?: string | null;
+  // Accepted plausibility-override badge data (see DetailResult): the covered
+  // rule ids as a canonical JSON array string plus the audit fields, carried
+  // verbatim from the pipeline. Detail-only - the list projection carries
+  // only override_rules. Optional so fixtures predating these columns default
+  // to undefined. Display-only; never a join/dedup key.
+  override_rules?: string | null;
+  override_evidence?: string | null;
+  override_approver?: string | null;
+  override_expires?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -281,6 +295,9 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   funding: string;
   platform_version?: string | null;
   validation_status?: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string).
+  // Optional so fixtures predating this column default to undefined.
+  override_rules?: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
   execution_mode: string | null;
@@ -341,6 +358,9 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   validation_status?: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string).
+  // Optional so fixtures predating this column default to undefined.
+  override_rules?: string | null;
   tuning_mode: string | null;
   tuning_validation_status?: string | null;
   execution_mode: string | null;
@@ -445,6 +465,8 @@ const RESULT_COLUMNS = [
   "tuning_policy_generation",
   "test_type",
   "validation_status",
+  // Accepted-override rule ids (list-safe: small JSON array, unlike applied_receipt).
+  "override_rules",
   "cost_usd",
   "normalized_cost_usd",
   "cost_model_version",
@@ -508,6 +530,12 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   // ADR-1 per-statement introspection receipt, detail-only (the list
   // projection above deliberately omits this potentially large JSON blob).
   "applied_receipt",
+  // Accepted plausibility-override badge data, detail-only (the list
+  // projection carries only override_rules; the audit fields stay here).
+  "override_rules",
+  "override_evidence",
+  "override_approver",
+  "override_expires",
   "tuning_policy_generation",
   "test_type",
   "validation_status",
@@ -952,6 +980,10 @@ function detailResultFromWideRow(
     applied_ledger_hash: wide.applied_ledger_hash ?? null,
     tuning_validation_status: wide.tuning_validation_status ?? null,
     applied_receipt: wide.applied_receipt ?? null,
+    override_rules: wide.override_rules ?? null,
+    override_evidence: wide.override_evidence ?? null,
+    override_approver: wide.override_approver ?? null,
+    override_expires: wide.override_expires ?? null,
     tuning_policy_generation: wide.tuning_policy_generation ?? null,
     test_type: wide.test_type,
     validation_status: wide.validation_status,
@@ -1032,7 +1064,7 @@ export async function getBenchmarkRanking(
 ): Promise<BenchmarkRankingRow[]> {
   benchmark = canonicalBenchmarkSlug(benchmark);
   return queryRows<BenchmarkRankingRow>(
-    `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status,` +
+    `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status, r.override_rules,` +
       " r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
       " r.cost_scope, r.cost_status, r.billing_unit, r.pricing_region," +
       " r.deployment_class, r.cloud_provider, r.cloud_region, r.instance_or_warehouse," +
@@ -1152,6 +1184,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       trust_label: row.trust_label,
       funding: row.funding,
       validation_status: row.validation_status ?? null,
+      override_rules: row.override_rules ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
       has_display_timing: row.has_display_timing,
@@ -1243,6 +1276,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.trust_label," +
     " r.funding," +
     " r.validation_status," +
+    " r.override_rules," +
     " r.tuning_mode," +
     " r.tuning_validation_status," +
     " r.execution_mode," +

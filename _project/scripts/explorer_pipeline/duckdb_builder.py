@@ -460,6 +460,16 @@ class DuckDBSnapshotBuilder:
                 -- published. Opaque read-only payload: never parsed, joined
                 -- on, or re-derived anywhere downstream.
                 applied_receipt      VARCHAR,
+                -- Accepted plausibility overrides ({stem}.override.json
+                -- companion), stored verbatim as display-only badge data:
+                -- override_rules holds the covered rule ids as a canonical
+                -- JSON array string; the audit fields are plain text. NULL /
+                -- empty when no override was accepted. Never parsed, joined
+                -- on, or re-derived downstream.
+                override_rules       VARCHAR,
+                override_evidence    VARCHAR,
+                override_approver    VARCHAR,
+                override_expires     VARCHAR,
                 -- ADR-3 seam: explicit tuning-policy generation marker
                 -- (display-only, never a join/dedup key). NULL for legacy
                 -- bundles, treated downstream as the "pre-seam" generation.
@@ -532,6 +542,10 @@ class DuckDBSnapshotBuilder:
                 r.applied_ledger_hash,
                 r.tuning_validation_status,
                 r.applied_receipt,
+                r.override_rules,
+                r.override_evidence,
+                r.override_approver,
+                r.override_expires,
                 r.tuning_policy_generation,
                 r.test_type,
                 r.validation_status,
@@ -909,6 +923,10 @@ class DuckDBSnapshotBuilder:
                     entry.applied_ledger_hash,
                     entry.tuning_validation_status,
                     entry.applied_receipt,
+                    json.dumps(entry.override_rules) if entry.override_rules else None,
+                    entry.override_evidence,
+                    entry.override_approver,
+                    entry.override_expires,
                     entry.tuning_policy_generation,
                     entry.test_type,
                     entry.validation_status,
