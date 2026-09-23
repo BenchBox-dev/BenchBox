@@ -15203,15 +15203,10 @@
       "title": "Bring shared primitives loader's validation_query parsing up to write_primitives parity"
     },
     "ship-discoverable-templates-with-the-installed-package-packa": {
-      "claim": {
-        "expires_at": "2026-09-24T12:39:14Z",
-        "generation": "73ac987b86b149e89ea2df7a9ba4a667",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ce7766b2ec440e9d41ae1494"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Ship discoverable templates with the installed package (package resources) so --tuning tuned works outside a repo checkout"
     },
     "shipping-the-normalize-plan-literals-cli-flag-and-surfacing": {
