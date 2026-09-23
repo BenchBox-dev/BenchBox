@@ -320,11 +320,17 @@ def classify_path(rel_path: str) -> set[str]:
     return matched
 
 
-def scan_lane_files(  # noqa: C901
+# Base scan cache: the walk below re-reads tens of thousands of files per
+# call, and one verification performs dozens of scans of an unchanged tree.
+# Keyed on (lane, absolute repo root); synthetic probes are in-memory
+# overlays applied after the lookup, so the cache never masks a mutation.
+_scan_cache: dict[tuple[str, str], tuple[dict[str, bytes], list[str]]] = {}
+
+
+def _walk_lane_files(  # noqa: C901
     lane: str,
     repo_root: Path,
-    extra_files: dict[str, bytes] | None = None,
-) -> dict[str, bytes]:
+) -> tuple[dict[str, bytes], list[str]]:
     files: dict[str, bytes] = {}
     prefixes = LANE_PREFIXES.get(lane, ())
     unreadable: list[str] = []
@@ -377,11 +383,24 @@ def scan_lane_files(  # noqa: C901
     if unreadable:
         # Surface unreadable files as warnings; caller surfaces as errors.
         # Keep files dict without those entries but record the failure.
-        # Store on the dict for caller to inspect via side-channel attribute.
-        # Use an attribute on the dict object via a global.
-        scan_lane_files._last_unreadable = unreadable  # type: ignore[attr-defined]
-    else:
-        scan_lane_files._last_unreadable = []  # type: ignore[attr-defined]
+        return files, unreadable
+    return files, []
+
+
+def scan_lane_files(
+    lane: str,
+    repo_root: Path,
+    extra_files: dict[str, bytes] | None = None,
+) -> dict[str, bytes]:
+    key = (lane, os.path.abspath(repo_root))
+    cached = _scan_cache.get(key)
+    if cached is None:
+        cached = _walk_lane_files(lane, repo_root)
+        _scan_cache[key] = cached
+    base_files, unreadable = cached
+    # Preserve the side-channel contract; copy so overlays never pollute the cache.
+    scan_lane_files._last_unreadable = list(unreadable)  # type: ignore[attr-defined]
+    files = dict(base_files)
 
     if extra_files:
         for rel_path, content in extra_files.items():
