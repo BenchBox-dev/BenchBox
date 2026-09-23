@@ -1,4 +1,5 @@
 {
+  "context": "Merged via PR 2272 (squash 7cefd0b26, full CI green). Final state: Parquet registered for pg_duckdb via inherited pyarrow-to-COPY path; Delta/Iceberg deliberately unregistered (no adapter read path; registry gates dispatch). Reviewed by two external reviewers; findings adjudicated and addressed. No further action.",
   "description": "Promoted from deferral #218 of open-table-format-gap-analysis.\nDeferred: Investigate pg_duckdb table format registration\nReason deferred: pg_duckdb supports delta/iceberg via DuckDB extensions but not registered",
   "legacy": {
     "item_meta": {
