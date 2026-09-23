@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
+from rich.panel import Panel
 
 from benchbox.cli.commands.run import run
 from benchbox.cli.tuning_runtime import build_baseline_unified_config
@@ -99,7 +100,9 @@ def test_interactive_header_shown_for_prompted_tty_run():
     ):
         _run_module._derive_exec_type_and_banner(state)
 
-    mock_console.print.assert_called_once()
+    printed = [call.args[0] for call in mock_console.print.call_args_list]
+    assert isinstance(printed[-1], Panel)
+    assert sum(isinstance(item, Panel) for item in printed) == 1
 
 
 def test_interactive_cloud_setup_leaves_server_credentials_to_adapter():

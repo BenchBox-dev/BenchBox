@@ -28,6 +28,10 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # relocate-cli-hook-registries: these two are now thin back-compat
     # re-export shims; the real registries live in benchbox/core/hooks/
     # (outside the CLI surface this guard protects).
+    # cli-logo: holds the README block-character logo and the encoding check
+    # that decides whether to print it above help, version, run, and welcome
+    # output. No click decorators; no command, option, or argument changed.
+    "benchbox/cli/logo.py",
     "benchbox/cli/benchmark_hooks.py",
     "benchbox/cli/platform_hooks.py",
     "benchbox/cli/benchmarks.py",

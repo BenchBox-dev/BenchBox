@@ -15,6 +15,8 @@ from typing import Any, cast
 import click
 import yaml
 
+from benchbox.cli.logo import styled_logo
+
 
 # Static help catalogs live in package data so the CLI keeps import-time public
 # constants without embedding hundreds of command example lines in code.
@@ -325,6 +327,14 @@ class BenchBoxGroup(click.Group):
         """Override to use BenchBoxCommand by default."""
         kwargs.setdefault("cls", BenchBoxCommand)
         return super().command(*args, **kwargs)
+
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Show the logo above the root group's help; subgroups are unchanged."""
+        if ctx.parent is None:
+            logo = styled_logo()
+            if logo:
+                formatter.write(logo + "\n\n")
+        super().format_help(ctx, formatter)
 
     def format_help_text(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Format help text with colors for examples and headers."""
