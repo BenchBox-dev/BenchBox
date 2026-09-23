@@ -1304,7 +1304,7 @@
         "benchbox-score-capability-matrix",
         "benchbox-score-advanced-oracles"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Prove TPC-Havoc panel equivalence"
     },
