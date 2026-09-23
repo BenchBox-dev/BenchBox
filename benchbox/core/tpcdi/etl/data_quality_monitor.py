@@ -257,7 +257,7 @@ class DataQualityRuleEngine:
         row = cursor.fetchone()
 
         result.records_checked = row[0]
-        valid_records = row[1]
+        valid_records = row[1] or 0
         accuracy_pct = (valid_records / max(result.records_checked, 1)) * 100.0
 
         result.actual_value = accuracy_pct
@@ -310,7 +310,7 @@ class DataQualityRuleEngine:
             row = cursor.fetchone()
 
             result.records_checked = row[0]
-            valid_records = row[1]
+            valid_records = row[1] or 0
             validity_pct = (valid_records / max(result.records_checked, 1)) * 100.0
 
             result.actual_value = validity_pct

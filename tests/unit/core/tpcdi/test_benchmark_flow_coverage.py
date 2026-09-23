@@ -10,6 +10,12 @@ import pytest
 
 import benchbox.core.tpcdi.benchmark as benchmark_module
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.etl.finwire_processor import (
+    CompanyFundamentalRecord,
+    DailyMarketRecord,
+    FinWireParser,
+    SecurityMasterRecord,
+)
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult, ETLResult
 from benchbox.core.tpcdi.metrics import BenchmarkMetrics, BenchmarkReport
 from benchbox.core.tpcdi.validation import DataQualityResult, ValidationResult
@@ -280,3 +286,22 @@ def test_generate_source_data_all_formats_and_invalid_format(tmp_path: Path):
 
     with pytest.raises(ValueError, match="Unsupported format"):
         benchmark.generate_source_data(formats=["bad"], batch_types=["historical"])
+
+
+def test_generated_finwire_records_match_the_parser_layout(tmp_path: Path):
+    benchmark = _make_benchmark(tmp_path)
+    path = benchmark._generate_finwire_data_files()[0]
+    parser = FinWireParser()
+
+    records = list(parser.parse_file(path))
+
+    assert not parser.errors
+    assert sum(isinstance(record, CompanyFundamentalRecord) for record in records) == 1
+    assert sum(isinstance(record, SecurityMasterRecord) for record in records) == 5
+    assert sum(isinstance(record, DailyMarketRecord) for record in records) == 2
+    assert records[0].company_id == "0000000001"
+    assert records[0].company_name == "Company_0001"
+    assert records[0].ceo == "CEO_1"
+    security = next(record for record in records if isinstance(record, SecurityMasterRecord))
+    assert security.symbol == "SEC0001"
+    assert security.shares_outstanding == 1000000
