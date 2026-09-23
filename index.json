@@ -1692,7 +1692,7 @@
       "needs": [],
       "priority": "high",
       "status": "active",
-      "title": "Reject FlightData shards with a bad width again"
+      "title": "Verify malformed reusable FlightData shards are rejected"
     },
     "canary-green-for-v0-4-1": {
       "claim": null,
