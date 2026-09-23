@@ -1024,7 +1024,10 @@ Anonymization Validation Failures
     )
 
     manager = AnonymizationManager(config)
-    anonymized = manager.anonymize_result_payload(anonymized)
+
+    # Re-anonymize the payload under test with the stricter config.
+    payload_under_test = {"working_dir": "/home/alice/project", "rows": 100}
+    anonymized = manager.anonymize_result_payload(payload_under_test)
 
     for path in find_public_path_leaks(anonymized):
         print(f"Address: {path}")
