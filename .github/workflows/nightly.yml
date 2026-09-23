@@ -851,6 +851,13 @@ jobs:
     # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      # Throughput@Size floor activation: repository configuration variables
+      # flow into the DuckDB assert step below. Unset vars evaluate to empty,
+      # which the assert step treats as unconfigured, so the floor stays in
+      # observe-only mode until the variables are actually set.
+      THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
+      THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -961,6 +968,34 @@ jobs:
               print(f'::error::{reason}')
               sys.exit(1)
           print(f'OK: stream count and per-stream success both verified ({result_path})')
+          # Throughput@Size floor (relative model -- see
+          # docs/operations/uat-framework.md 'Throughput performance floor').
+          # Additive to the stream-count hard gate above: a floor failure
+          # never masks or replaces a stream-count failure. With no baseline
+          # configured this only reports the observed value for future
+          # baseline accumulation and never fails: a threshold set before a
+          # stable baseline exists manufactures false failures.
+          tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
+          observed = tpc_metrics.get('throughput_at_size')
+          print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
+          floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
+          floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION', '0.2')
+          if floor_median:
+              try:
+                  median = float(floor_median)
+                  max_drop = float(floor_drop)
+                  assert median > 0 and 0 < max_drop < 1
+                  assert isinstance(observed, (int, float)) and observed > 0
+              except (ValueError, AssertionError):
+                  print('::error::Throughput@Size floor misconfigured or unobserved; refusing to gate')
+                  sys.exit(1)
+              floor = median * (1 - max_drop)
+              if observed < floor:
+                  print(f'::error::Throughput@Size regression: observed {observed:.2f} below floor {floor:.2f} (median {median:.2f}, max drop {max_drop:.0%})')
+                  sys.exit(1)
+              print(f'OK: Throughput@Size {observed:.2f} clears floor {floor:.2f}')
+          else:
+              print('::notice::No THROUGHPUT_FLOOR_MEDIAN configured; floor check in observe-only mode')
           "
 
       - name: Assert the Postgres cell stream count and per-stream success
