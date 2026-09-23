@@ -592,6 +592,24 @@ non-zero if fewer than `N` (platform, benchmark) pairs passed AND
 validator-cleaned every rung. Default null (off) — convention is the
 primary enforcement, tooling teeth are opt-in.
 
+## Throughput UAT cells
+
+Two nightly cells prove the throughput driver honors a requested stream
+count end to end via the production CLI (`run-official --streams 3`):
+
+- DuckDB TPC-H SF1 (`uat-throughput-duckdb-nightly.yaml`) on the
+  SHARED_CURSOR fast path.
+- Docker Postgres TPC-H SF1 (`uat-throughput-postgresql-nightly.yaml`,
+  the deferred w4) on INDEPENDENT_CONNECTION: one fresh session per
+  stream. The cell manages its own compose stack
+  (`cleanup.docker_manage_platforms`), so the nightly job needs no
+  service container for it.
+
+Both cells gate on the sweep exit code plus an independent assert step
+(`validate_stream_count` and `validate_stream_success` over that run's
+result JSON). PR fast-lane coverage stays with the focused
+session-isolation integration tests.
+
 ## Compatibility Pruning
 
 UAT compatibility pruning is explicit policy, not an implicit skip. Rules live
