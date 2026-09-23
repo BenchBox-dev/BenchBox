@@ -1244,7 +1244,7 @@
       "needs": [
         "benchbox-score-multisystem-pilot"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Freeze and qualify score methodology version 1"
     },
