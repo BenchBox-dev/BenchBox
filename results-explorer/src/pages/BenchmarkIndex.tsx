@@ -50,6 +50,7 @@ import {
   formatMemoryGb,
   formatTrustLabel,
   formatValidationStatus,
+  parseOverrideRules,
 } from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
@@ -500,6 +501,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             ...platform,
             platform_version: platform.platform_version ?? metadata?.platform_version ?? null,
             validation_status: platform.validation_status ?? metadata?.validation_status ?? null,
+            override_rules: platform.override_rules ?? metadata?.override_rules ?? null,
             arch: metadata?.arch ?? null,
             cpu_family: metadata?.cpu_family ?? null,
             memory_gb: metadata?.memory_gb ?? null,
@@ -1448,7 +1450,11 @@ function BenchmarkRow({
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
           <FundingChip funding={entry.funding} compact />
-          <ValidationBadge validationStatus={entry.validation_status} showMissing />
+          <ValidationBadge
+            validationStatus={entry.validation_status}
+            overrideRules={parseOverrideRules(entry.override_rules)}
+            showMissing
+          />
           {entry.tuning_mode && (
             <TuningBadge
               tuningMode={entry.tuning_mode}

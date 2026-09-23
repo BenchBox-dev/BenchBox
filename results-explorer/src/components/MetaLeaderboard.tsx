@@ -15,6 +15,7 @@ import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
+import { parseOverrideRules } from "@/lib/displayLabels";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { formatRunAge } from "@/lib/runAge";
@@ -32,6 +33,8 @@ interface MetaResultMetadata {
   trust_label: string;
   funding?: string | null;
   validation_status?: string | null;
+  /** Accepted-override rule ids (canonical JSON array string). Optional for callers predating v11. */
+  override_rules?: string | null;
   run_date?: string | null;
 }
 
@@ -467,9 +470,22 @@ export function MetaLeaderboard({
                                 <FundingChip funding={metadata.funding} compact />
                               </>
                             )}
-                            {metadata.validation_status?.trim().toLowerCase() !== "passed" && (
-                              <ValidationBadge validationStatus={metadata.validation_status} showMissing />
-                            )}
+                            {(() => {
+                              // An accepted override always badges — even when
+                              // the recorded status is a clean "passed", which
+                              // otherwise hides the badge on this surface.
+                              const overrideRules = parseOverrideRules(metadata.override_rules);
+                              const isCleanPass =
+                                metadata.validation_status?.trim().toLowerCase() === "passed";
+                              if (isCleanPass && overrideRules.length === 0) return null;
+                              return (
+                                <ValidationBadge
+                                  validationStatus={metadata.validation_status}
+                                  overrideRules={overrideRules}
+                                  showMissing
+                                />
+                              );
+                            })()}
                           </div>
                         )}
                       </td>

@@ -124,6 +124,17 @@ export interface DetailResult extends CostDeploymentFields {
   // recomputes a verdict or a corroboration decision from it. Null/undefined
   // when no receipt was published (introspection did not run, legacy bundle).
   applied_receipt?: string | null;
+  // Accepted plausibility-override badge data, ingested verbatim from the
+  // {stem}.override.json companion (see explorer_pipeline/transformer.py::
+  // _override_display): the covered rule ids as a canonical JSON array string
+  // plus the audit fields (evidence link, approver, expiry). The explorer
+  // parses the rule list only to display the badge and NEVER recomputes an
+  // acceptance decision. Null/undefined when no override was accepted (no
+  // companion, invalid, or expired). Display-only; never a join/dedup key.
+  override_rules?: string | null;
+  override_evidence?: string | null;
+  override_approver?: string | null;
+  override_expires?: string | null;
   // ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
   // from platform.tuning (see explorer_pipeline/transformer.py); never derived
   // from benchbox_version. Null/undefined for legacy bundles predating the
@@ -182,6 +193,13 @@ export interface PlatformRow extends CostDeploymentFields {
   /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   validation_status?: string | null;
+  /**
+   * Accepted plausibility-override rule ids (canonical JSON array string).
+   * Attached client-side from the results-table join, like validation_status
+   * above — never part of the summary artifact. Optional so pre-v11 snapshots
+   * default to undefined (no badge). Display-only.
+   */
+  override_rules?: string | null;
   run_date: string;
   is_ranking_eligible: boolean;
   has_display_timing: boolean;

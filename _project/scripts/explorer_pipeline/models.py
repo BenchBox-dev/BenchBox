@@ -201,6 +201,15 @@ class ManifestEntry(BaseModel):
     # broken companion never fails the build. Never recomputed or re-derived:
     # the explorer renders the verdicts as recorded. Display-only.
     applied_receipt: str | None = None
+    # Accepted plausibility overrides, read verbatim from the
+    # {stem}.override.json companion (never recomputed): covered rule
+    # ids plus the audit fields. Empty/absent when the companion is
+    # missing, invalid, or expired -- a broken companion never fails the
+    # build. Display-only; NEVER a join/dedup/grouping key.
+    override_rules: list[str] = Field(default_factory=list)
+    override_evidence: str | None = None
+    override_approver: str | None = None
+    override_expires: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
@@ -444,6 +453,15 @@ class DetailResult(BaseModel):
     # broken companion never fails the build. Never recomputed or re-derived:
     # the explorer renders the verdicts as recorded. Display-only.
     applied_receipt: str | None = None
+    # Accepted plausibility overrides, read verbatim from the
+    # {stem}.override.json companion (never recomputed): covered rule
+    # ids plus the audit fields. Empty/absent when the companion is
+    # missing, invalid, or expired -- a broken companion never fails the
+    # build. Display-only; NEVER a join/dedup/grouping key.
+    override_rules: list[str] = Field(default_factory=list)
+    override_evidence: str | None = None
+    override_approver: str | None = None
+    override_expires: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").

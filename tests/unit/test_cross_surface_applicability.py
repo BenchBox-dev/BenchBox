@@ -25,6 +25,7 @@ from _project.scripts.cross_surface_applicability_sweep import (  # noqa: E402
     CANDIDATE_UNVERIFIED,
     GATEABLE,
     NO_DF_QUERY_SURFACE,
+    NOT_CHEAPLY_GATEABLE,
     build_applicability_sweep,
     render_markdown,
 )
@@ -63,8 +64,19 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # `candidate-unverified` (honest M2 classification), NOT gateable. Wiring a gate
 # would require guessing an id mapping, which the campaign TODO forbids. (amplab,
 # clickbench, joinorder_synthetic were previously here; all are now enforced
-# cross-surface gates, so they no longer appear among the unguarded candidates.)
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "nyctaxi", "tpcds_obt", "tpch_skew", "tsbs_devops"}
+# cross-surface gates, so they no longer appear among the unguarded candidates.
+# tpcds_obt was previously here; it now rejects the bounded SF=0.01 cell, so it
+# is `not-cheaply-gateable` instead.)
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "tpch_skew", "tsbs_devops"}
+
+# Benchmarks that cannot land as a routine-PR gate because they reject the
+# bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
+# perform downloader-backed network fetches at the bounded scale.
+# joinorder accepts only SF=1.0 (IMDb 2013 manifest; joinorder_synthetic is the
+# already-enforced scaled stand-in); tpcds_obt requires SF>=1.0; nyctaxi
+# downloads the pinned TLC Parquet months before sampling even at SF=0.01
+# (flightdata stays out: its downloader always synthesizes below SF=0.1).
+_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "tpcds_obt", "nyctaxi"}
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
@@ -72,13 +84,16 @@ def test_registry_bearing_benchmarks_are_gateable(rows):
 
     flightdata was the prior example here; it is now an enforced cross-surface
     gate, so it no longer appears among the candidates the sweep drills into
-    (like h2odb before it). joinorder carries the verbatim-overlap example for
-    now; whether it can land as a cheap bounded gate is owned separately by the
-    sweep-honesty item, not by this promotion.
+    (like h2odb before it). joinorder also carried a verbatim overlap, but it
+    rejects the bounded SF=0.01 cell, so it is `not-cheaply-gateable`, not
+    gateable. No remaining candidate has a verified overlap at a bounded
+    scale, so the gateable set is currently empty.
     """
     by_id = {r["benchmark"]: r["status"] for r in rows}
     assert "flightdata" not in by_id, "flightdata graduated to enforced GATES and must leave the candidates"
-    assert by_id.get("joinorder") == GATEABLE
+    assert by_id.get("joinorder") == NOT_CHEAPLY_GATEABLE
+    gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
+    assert gateable == set(), f"unexpected gateable candidates: {sorted(gateable)}"
     # datavault ships a registry but its ids do not overlap the SQL ids verbatim
     # (friendly/Q-prefixed names), so there is no verified correspondence: it is
     # candidate-unverified, NOT counted as gateable coverage.
@@ -98,11 +113,62 @@ def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
     assert _CANDIDATE_UNVERIFIED_BENCHMARKS.isdisjoint(gateable), "a zero-overlap benchmark was counted as gateable"
 
 
+def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
+    """A benchmark that cannot run as one cheap bounded cell is never gateable.
+
+    joinorder accepts only SF=1.0 (canonical IMDb 2013 manifest fetch) and
+    tpcds_obt requires SF>=1.0, so neither can land as a routine-PR gate no
+    matter its id overlap. joinorder_synthetic (already CI-enforced) is
+    joinorder's scaled stand-in.
+    """
+    by_id = {r["benchmark"]: r for r in rows}
+    not_cheaply = {r["benchmark"] for r in rows if r["status"] == NOT_CHEAPLY_GATEABLE}
+    assert not_cheaply == _NOT_CHEAPLY_GATEABLE_BENCHMARKS, f"not-cheaply-gateable set changed: {sorted(not_cheaply)}"
+    assert by_id["joinorder"]["status"] == NOT_CHEAPLY_GATEABLE
+    assert "SF=0.01" in by_id["joinorder"].get("reason", "")
+    assert "data_manifest.toml" in by_id["joinorder"].get("reason", "")
+    assert "joinorder_synthetic" in by_id["joinorder"].get("reason", "")
+    assert by_id["tpcds_obt"]["status"] == NOT_CHEAPLY_GATEABLE
+    assert "SF=0.01" in by_id["tpcds_obt"].get("reason", "")
+    assert by_id["nyctaxi"]["status"] == NOT_CHEAPLY_GATEABLE
+    assert by_id["nyctaxi"].get("data_source") == "network-fetch"
+    assert "network fetch" in by_id["nyctaxi"].get("reason", "")
+    gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
+    assert _NOT_CHEAPLY_GATEABLE_BENCHMARKS.isdisjoint(gateable)
+
+
+def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
+    """Downloader-backed benchmarks are network-fetch; bounded-offline ones are not."""
+    from _project.scripts.cross_surface_applicability_sweep import _data_provenance
+
+    assert _data_provenance("nyctaxi") == "network-fetch"
+    assert _data_provenance("joinorder") == "manifest-fetch"
+    # flightdata ships a downloader but always synthesizes below SF=0.1.
+    assert _data_provenance("flightdata") == "generated"
+    assert _data_provenance("tpch") == "generated"
+
+
+def test_staged_gates_are_marked_not_unguarded(rows):
+    """Staged (registered but not CI-enforced) candidates are marked as staged."""
+    by_id = {r["benchmark"]: r for r in rows}
+    # flightdata graduated to enforced GATES, so it is no longer a candidate;
+    # datavault remains the staged example.
+    assert "flightdata" not in by_id
+    assert by_id["datavault"].get("staged") is True
+    assert by_id["joinorder"].get("staged") is False
+
+
 def test_no_candidate_is_silently_dropped(rows):
     """Every candidate is classified into a known status."""
     assert rows, "applicability sweep produced no candidates"
     for r in rows:
-        assert r["status"] in {GATEABLE, CANDIDATE_UNVERIFIED, NO_DF_QUERY_SURFACE, BLOCKED}, r
+        assert r["status"] in {
+            GATEABLE,
+            CANDIDATE_UNVERIFIED,
+            NOT_CHEAPLY_GATEABLE,
+            NO_DF_QUERY_SURFACE,
+            BLOCKED,
+        }, r
 
 
 def test_committed_artifact_is_current(rows):

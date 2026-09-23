@@ -433,4 +433,35 @@ describe("ResultDetail - median-first contract", () => {
 
     expect(screen.getByRole("button", { name: /What do these labels mean\?/i })).toBeTruthy();
   });
+
+  // -------------------------------------------------------------------------
+  // Accepted-override header badge: an overridden run is never a clean pass,
+  // even when the recorded validation status alone would hide this badge.
+  // -------------------------------------------------------------------------
+
+  it("badges an accepted override in the header even when validation passed", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({ validation_status: "passed", override_rules: '["timing-plateau"]' }),
+    );
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const headerMeta = within(screen.getByTestId("page-header-meta"));
+    const badge = headerMeta.getByText("Overridden: timing-plateau");
+    expect(badge.getAttribute("data-tone")).toBe("warning");
+  });
+
+  it("hides the header validation badge for a clean pass with no override", async () => {
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({ validation_status: "passed", override_rules: null }),
+    );
+
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const headerMeta = within(screen.getByTestId("page-header-meta"));
+    expect(headerMeta.queryByText(/Overridden:/)).toBeNull();
+    expect(headerMeta.queryByText("passed")).toBeNull();
+  });
 });

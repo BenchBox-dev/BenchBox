@@ -12,7 +12,7 @@
 
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { OverrideBadge, TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
 describe("TrustBadge", () => {
   // -----------------------------------------------------------------------
@@ -233,5 +233,60 @@ describe("ValidationBadge", () => {
     const badge = container.querySelector(".badge");
     expect(badge?.textContent).toBe("passed");
     expect(badge?.getAttribute("data-tone")).toBe("info");
+  });
+});
+
+describe("ValidationBadge with overrideRules", () => {
+  it("never renders clean for an overridden run, even with a passing status", () => {
+    const { container } = render(<ValidationBadge validationStatus="passed" overrideRules={["timing-plateau"]} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("Overridden: timing-plateau");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.getAttribute("title")).toContain("timing-plateau");
+    expect(badge?.getAttribute("title")).toContain("Recorded status: passed.");
+  });
+
+  it("badges an override even when no status was recorded", () => {
+    const { container } = render(<ValidationBadge validationStatus={null} overrideRules={["scale-invariant"]} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("Overridden: scale-invariant");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+  });
+
+  it("stays silent without a status or an override", () => {
+    const { container } = render(<ValidationBadge validationStatus={null} />);
+    expect(container.textContent).toBe("");
+  });
+});
+
+describe("OverrideBadge", () => {
+  it("renders nothing when no override was accepted", () => {
+    const { container } = render(<OverrideBadge rules={[]} />);
+    expect(container.textContent).toBe("");
+    const { container: empty } = render(<OverrideBadge rules={null} />);
+    expect(empty.textContent).toBe("");
+  });
+
+  it("names the covered rules and the audit fields", () => {
+    render(
+      <OverrideBadge
+        rules={["timing-plateau"]}
+        approver="reviewer"
+        evidence="https://example.test/pr/1"
+        expires="2099-01-01"
+      />,
+    );
+    const badge = screen.getByText("Overridden: timing-plateau");
+    expect(badge.getAttribute("data-tone")).toBe("warning");
+    expect(badge.getAttribute("data-role")).toBe("override");
+    expect(screen.getByText("by reviewer")).toBeTruthy();
+    expect(screen.getByText("https://example.test/pr/1")).toBeTruthy();
+    expect(screen.getByText("expires 2099-01-01")).toBeTruthy();
+  });
+
+  it("compacts to a bare badge", () => {
+    render(<OverrideBadge rules={["timing-plateau"]} approver="reviewer" compact />);
+    expect(screen.getByText("Overridden")).toBeTruthy();
+    expect(screen.queryByText("by reviewer")).toBeNull();
   });
 });

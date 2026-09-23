@@ -11,6 +11,7 @@ import {
   formatMemoryGb,
   formatTuningMode,
   formatValidationStatus,
+  parseOverrideRules,
 } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
@@ -98,7 +99,12 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
     compareValues("Execution mode", results, (result) => result.execution_mode ? formatExecutionMode(result.execution_mode) : "Not recorded"),
     buildTuningField(results),
-    compareValues("Validation", results, (result) => formatValidationStatusReceiptValue(result.validation_status)),
+    compareValues(
+      "Validation",
+      results,
+      (result) =>
+        formatValidationStatusReceiptValue(result.validation_status, parseOverrideRules(result.override_rules)),
+    ),
     compareHardwareValues("Architecture", results, (result) => result.environment?.arch ? formatArchitecture(result.environment.arch) : "Not recorded"),
     compareHardwareValues("CPU family", results, (result) => result.environment?.cpu_family ? formatCpuFamily(result.environment.cpu_family) : "Not recorded"),
     compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
@@ -122,6 +128,9 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
 
   const tuningPolicyGenerationField = buildTuningPolicyGenerationField(results);
   if (tuningPolicyGenerationField) fields.push(tuningPolicyGenerationField);
+
+  const overrideField = buildOverrideField(results);
+  if (overrideField) fields.push(overrideField);
 
   return fields;
 }
@@ -582,10 +591,50 @@ function formatPerPlatform(entries: { platform: string; value: string }[]) {
  * field" surface the shared vocabulary is meant to keep precision available
  * on, per describeValidationStatus's contract.
  */
-function formatValidationStatusReceiptValue(status: string | null | undefined) {
-  if (!status) return "Not recorded";
+function formatValidationStatusReceiptValue(status: string | null | undefined, overrideRules?: string[]) {
+  // An accepted override is never a clean pass: name the covered rules
+  // alongside the recorded status so an overridden run cannot read clean here.
+  const suffix = overrideRules && overrideRules.length > 0 ? ` — overridden (${overrideRules.join(", ")})` : "";
+  if (!status) return overrideRules && overrideRules.length > 0 ? `Not recorded${suffix}` : "Not recorded";
   const label = formatValidationStatus(status);
-  return label === status ? label : `${label} (${status})`;
+  const base = label === status ? label : `${label} (${status})`;
+  return `${base}${suffix}`;
+}
+
+/**
+ * Accepted plausibility overrides across the compared runs. Null when no
+ * compared result carries override data (pre-v11 snapshots leave the fields
+ * undefined — unknown, not "no override") or when every result is known to
+ * have none, keeping the receipt quiet in the normal case. Otherwise a
+ * warning naming the covered rules per platform; an override is a
+ * comparability caveat, never a match/dedup key.
+ */
+function buildOverrideField(results: DetailResult[]): ComparabilityField | null {
+  if (results.some((result) => result.override_rules === undefined)) return null;
+  const withRules = results.filter((result) => parseOverrideRules(result.override_rules).length > 0);
+  if (withRules.length === 0) return null;
+  return {
+    label: "Override",
+    status: "diff",
+    summary: "One or more compared runs were accepted under a plausibility override",
+    detail: formatPerPlatform(
+      results.map((result) => {
+        const rules = parseOverrideRules(result.override_rules);
+        const value = rules.length > 0 ? `overridden (${rules.join(", ")})` : "no override";
+        const audit =
+          rules.length > 0
+            ? [
+                result.override_approver ? `approved by ${result.override_approver}` : null,
+                result.override_expires ? `expires ${result.override_expires}` : null,
+                result.override_evidence ? `evidence: ${result.override_evidence}` : null,
+              ]
+                .filter((part): part is string => part !== null)
+                .join("; ")
+            : null;
+        return { platform: result.platform, value: audit ? `${value} — ${audit}` : value };
+      }),
+    ),
+  };
 }
 
 function valueOrMissing(value: string | number | null | undefined) {

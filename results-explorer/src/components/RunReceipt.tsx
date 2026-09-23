@@ -12,11 +12,12 @@ import {
   formatMemoryGb,
   formatTuningMode,
   formatTrustLabel,
-  formatValidationStatus,
   formatVisibility,
+  parseOverrideRules,
 } from "@/lib/displayLabels";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { StatusBadge } from "@/components/StatusBadge";
+import { OverrideBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 import { RunDateChip } from "@/components/RunAge";
@@ -60,6 +61,36 @@ function rowFromString(
 function rowFromSummary(label: string, value: string): ReceiptRow {
   if (value === MISSING_PLACEHOLDER) return missingRow(label);
   return recordedRow(label, value);
+}
+
+/**
+ * Integrity rows for the validation / override pair. The Validation cell
+ * always renders (as a badge, so an overridden run can never read as a clean
+ * pass), while the Override audit row appears only when the pipeline recorded
+ * an accepted override.
+ */
+function overrideRows(detail: DetailResult): ReceiptRow[] {
+  const rules = parseOverrideRules(detail.override_rules);
+  const status = detail.validation_status;
+  if (rules.length === 0) {
+    // No override: keep the long-standing missing-row contract (a null
+    // status hides behind the disclosure) and badge recorded statuses.
+    if (status === null || status === undefined || status === "") return [missingRow("Validation")];
+    return [recordedRow("Validation", <ValidationBadge validationStatus={status} showMissing />)];
+  }
+  const validation = <ValidationBadge validationStatus={status} overrideRules={rules} showMissing />;
+  return [
+    recordedRow("Validation", validation),
+    recordedRow(
+      "Override",
+      <OverrideBadge
+        rules={rules}
+        approver={detail.override_approver}
+        evidence={detail.override_evidence}
+        expires={detail.override_expires}
+      />,
+    ),
+  ];
 }
 
 function formattedRow(label: string, raw: string | null | undefined, format: (raw: string) => string): ReceiptRow {
@@ -166,7 +197,12 @@ export function RunReceipt({
         // should record that no disclosure was made rather than omit the row.
         rowFromString("Funding", detail.funding, formatFunding),
         rowFromString("Visibility", detail.visibility, formatVisibility),
-        rowFromString("Validation", detail.validation_status, formatValidationStatus),
+        // An accepted plausibility override is never a clean pass: the
+        // validation cell badges overridden (warning tone) whenever the
+        // pipeline recorded covered rule ids, and a dedicated Override row
+        // names the rules plus the audit fields. No override means no row —
+        // absence is the normal case, not missing data.
+        ...overrideRows(detail),
         rowFromString("Compliance", detail.compliance_class),
         rankingEligibilityRow(isRankingEligible),
       ],

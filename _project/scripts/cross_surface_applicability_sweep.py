@@ -33,6 +33,14 @@ Classification per candidate:
     counted as gateable coverage: it needs an independent, per-benchmark id mapping
     to be confirmed first (some, like tpcds_obt at 3 DF vs ~89 SQL queries, may
     never be a clean correspondence). The honest status the M2 review demanded.
+  - ``not-cheaply-gateable``: would need a full canonical dataset fetch, a
+    downloader-backed network fetch, or a non-bounded scale (rejects SF=0.01,
+    ships ``data_manifest.toml``, or ships a network-backed ``downloader.py``;
+    e.g. joinorder accepts only SF=1.0 via its IMDb 2013 manifest, nyctaxi
+    downloads the pinned TLC Parquet months before sampling) -> NOT wired as
+    a routine-PR gate, no matter the id overlap. The reason names the scale /
+    provenance evidence; joinorder_synthetic (already CI-enforced) is the
+    scaled stand-in for joinorder.
   - ``no-df-query-surface``: no DataFrame query registry -> NOT cross-surface
     gateable; needs a w2 fallback oracle (differential second-engine or a curated
     expected-results subset).
@@ -66,6 +74,7 @@ _INSTANTIATE_SCALES = (0.01, 1.0)
 
 GATEABLE = "gateable"
 CANDIDATE_UNVERIFIED = "candidate-unverified"
+NOT_CHEAPLY_GATEABLE = "not-cheaply-gateable"
 NO_DF_QUERY_SURFACE = "no-df-query-surface"
 BLOCKED = "blocked"
 
@@ -104,23 +113,62 @@ def _dataframe_query_registry(benchmark_id: str) -> Any | None:
     return None
 
 
-def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str]:
+# Benchmarks whose downloader synthesizes fully offline at the bounded
+# SF=0.01 cell (no network fetch in routine PRs). FlightData's downloader
+# always synthesizes below SF=0.1 (see FlightDataDownloader._process_month),
+# so it stays ``generated`` for gate-cost purposes despite shipping a
+# downloader. Any other downloader-backed benchmark fetches remote data even
+# at the bounded scale and is ``network-fetch``.
+_BOUNDED_OFFLINE_DOWNLOADERS = frozenset({"flightdata"})
+
+
+def _data_provenance(benchmark_id: str) -> str:
+    """Classify how a benchmark acquires data: manifest fetch vs network fetch vs generation.
+
+    A benchmark that ships ``benchbox/core/<id>/data_manifest.toml`` fetches a
+    canonical dataset (e.g. joinorder's IMDb 2013 archive) instead of generating
+    a cheap bounded cell, so wiring it as a routine-PR gate would drag a full
+    dataset fetch into CI. A benchmark that ships a per-benchmark
+    ``downloader.py`` likewise performs remote fetches at the bounded scale
+    (e.g. nyctaxi downloads the pinned TLC Parquet months before sampling),
+    unless it is an explicit bounded-offline exception. Everything else
+    (synthetic generators) counts as ``generated`` for gate-cost purposes.
+    """
+    benchmark_dir = _REPO_ROOT / "benchbox" / "core" / benchmark_id
+    try:
+        if (benchmark_dir / "data_manifest.toml").exists():
+            return "manifest-fetch"
+        if benchmark_id not in _BOUNDED_OFFLINE_DOWNLOADERS and (benchmark_dir / "downloader.py").exists():
+            return "network-fetch"
+    except OSError:
+        pass
+    return "generated"
+
+
+def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str, str]:
     # Resolve through the SAME core loader production runs use
     # (benchbox/core/benchmark_loader.py), not the public-wrapper registry. Several
     # wrappers do not forward ``get_dataframe_queries`` even though their core
     # classes do (e.g. tpcds_obt, joinorder, read_primitives), so resolving via the
     # public wrapper would see 0 DataFrame queries and misclassify a gateable
     # benchmark as a fallback-oracle candidate.
+    #
+    # Returns ``(instance, used_scale, error, bounded_scale_error)``: the fourth
+    # element records why SF=0.01 failed ("" when it succeeded), so callers can
+    # report the bounded-scale reason instead of just the fallback scale.
     from benchbox.core.benchmark_loader import get_core_benchmark_class
 
     cls = get_core_benchmark_class(benchmark_id)
+    bounded_scale_error = ""
     last_error = ""
     for scale in _INSTANTIATE_SCALES:
         try:
-            return cls(scale_factor=scale), scale, ""
+            return cls(scale_factor=scale), scale, "", bounded_scale_error
         except Exception as exc:  # noqa: BLE001 - record why instantiation failed, do not crash the sweep
             last_error = f"{type(exc).__name__}: {exc}"
-    return None, None, last_error
+            if abs(float(scale) - _INSTANTIATE_SCALES[0]) < 1e-9:
+                bounded_scale_error = last_error
+    return None, None, last_error, bounded_scale_error
 
 
 def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
@@ -137,7 +185,7 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
     except Exception as exc:  # noqa: BLE001 - a registry read error is a finding, not a crash
         return BLOCKED, {"error": f"registry {type(exc).__name__}: {exc}"}
 
-    instance, used_scale, error = _instantiate(benchmark_id)
+    instance, used_scale, error, bounded_scale_error = _instantiate(benchmark_id)
     if instance is None:
         return BLOCKED, {"error": error, "df_queries": len(df_ids)}
 
@@ -149,37 +197,58 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
         "raw_id_overlap": raw_overlap,
         "scale": used_scale,
     }
+    # Bounded-scale honesty (M1): a gate must be one cheap bounded cell. A
+    # benchmark that rejects SF=0.01, fetches a canonical dataset via
+    # data_manifest.toml, or performs downloader-backed network fetches at the
+    # bounded scale cannot land as a routine-PR gate, no matter how clean its
+    # id overlap is -- report it as not-cheaply-gateable with the reason.
+    provenance = _data_provenance(benchmark_id)
+    bounded_ok = used_scale is not None and abs(float(used_scale) - _INSTANTIATE_SCALES[0]) < 1e-9
+    if not bounded_ok or provenance in ("manifest-fetch", "network-fetch"):
+        reasons: list[str] = []
+        if not bounded_ok:
+            why = bounded_scale_error or error
+            reasons.append(f"rejects bounded scale SF=0.01 ({why}); requires SF={used_scale}")
+        if provenance == "manifest-fetch":
+            reasons.append("canonical manifest fetch (data_manifest.toml)")
+        if provenance == "network-fetch":
+            reasons.append("downloader-backed network fetch at the bounded scale (downloader.py)")
+        if benchmark_id == "joinorder":
+            reasons.append("use joinorder_synthetic (already CI-enforced) for scaled smoke-test data")
+        return NOT_CHEAPLY_GATEABLE, {**detail, "data_source": provenance, "reason": "; ".join(reasons)}
     # Honesty (M2): only a VERIFIED (non-zero) verbatim id overlap is gateable. A
     # zero-overlap registry has no confirmed SQL<->DataFrame query correspondence,
     # so it is a ``candidate-unverified`` until an independent id mapping is
     # confirmed per benchmark -- never silently counted as gateable coverage.
     status = GATEABLE if raw_overlap > 0 else CANDIDATE_UNVERIFIED
-    return status, detail
+    return status, {**detail, "data_source": provenance}
 
 
 def build_applicability_sweep() -> list[dict[str, Any]]:
-    """Drill into every dual-surface UNGUARDED benchmark from the coverage map."""
+    """Drill into every dual-surface unguarded-or-staged benchmark from the coverage map."""
     from _project.scripts.generate_oracle_coverage_map import build_coverage_map
 
     # A STAGED cross-surface gate is registered but NOT CI-enforced
     # (``cross_surface_enforced is False``), so the benchmark still needs its
     # verified-overlap candidacy drilled here. Enforced gates stay out: their
     # correspondence already blocks CI.
-    candidates = [
-        row["benchmark"]
+    coverage = {
+        row["benchmark"]: row
         for row in build_coverage_map()
         if row["dual_surface"] and (not row["guarded"] or row.get("cross_surface_enforced") is False)
-    ]
+    }
     rows: list[dict[str, Any]] = []
-    for benchmark_id in candidates:
+    for benchmark_id, cov in coverage.items():
         status, detail = classify_applicability(benchmark_id)
-        rows.append({"benchmark": benchmark_id, "status": status, **detail})
+        staged = cov.get("cross_surface_enforced") is False
+        rows.append({"benchmark": benchmark_id, "status": status, "staged": staged, **detail})
     return rows
 
 
 def render_markdown(rows: list[dict[str, Any]]) -> str:
     gateable = [r for r in rows if r["status"] in _GATEABLE_STATUSES]
     candidate_unverified = [r for r in rows if r["status"] == CANDIDATE_UNVERIFIED]
+    not_cheaply = [r for r in rows if r["status"] == NOT_CHEAPLY_GATEABLE]
     no_surface = [r for r in rows if r["status"] == NO_DF_QUERY_SURFACE]
     blocked = [r for r in rows if r["status"] == BLOCKED]
 
@@ -188,8 +257,9 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("")
     lines.append(
         "**Generated** by `_project/scripts/cross_surface_applicability_sweep.py`. "
-        "Drills into the dual-surface UNGUARDED benchmarks from the oracle coverage "
-        "map and detects which ship a DataFrame query `QueryRegistry` (the registry "
+        "Drills into the dual-surface unguarded-or-staged benchmarks from the oracle "
+        "coverage map (staged gates are registered but NOT CI-enforced) and detects "
+        "which ship a DataFrame query `QueryRegistry` (the registry "
         "the cross-surface gate builders consume). `supports_dataframe` (the coverage "
         "map's signal) is a DataFrame *loading* flag and over-counts candidates; the "
         "production query *resolver* under-counts (it misses per-benchmark "
@@ -210,10 +280,21 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     )
     lines.append("")
     lines.append(
-        f"**Summary:** {len(rows)} dual-surface unguarded candidates — "
-        f"{len(gateable)} cross-surface gateable (verified verbatim id overlap), "
+        "**Gateable also means CHEAP, not merely overlapping.** A benchmark that "
+        "rejects the bounded SF=0.01 cell, fetches a canonical dataset via "
+        "`data_manifest.toml`, or performs downloader-backed network fetches at "
+        "the bounded scale is `not-cheaply-gateable`, NOT gateable, no matter "
+        "its id overlap: wiring it would drag a full dataset fetch into routine "
+        "PRs. The table reason names the scale/provenance evidence."
+    )
+    lines.append("")
+    lines.append(
+        f"**Summary:** {len(rows)} dual-surface candidates (unguarded + staged, "
+        f"registered but not CI-enforced) — "
+        f"{len(gateable)} cross-surface gateable (verified verbatim id overlap at a bounded scale), "
         f"{len(candidate_unverified)} candidate-unverified (registry exists but ZERO "
         f"verified id overlap — needs a confirmed id mapping first), "
+        f"{len(not_cheaply)} not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), "
         f"{len(no_surface)} have no DataFrame query surface (need a w2 fallback oracle), "
         f"{len(blocked)} blocked."
     )
@@ -221,14 +302,23 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
     lines.append("| Benchmark | Status | SQL queries | DataFrame queries | Raw id overlap | Note |")
     lines.append("| --- | --- | --- | --- | --- | --- |")
     for r in rows:
+        staged_suffix = " [staged, not CI-enforced]" if r.get("staged") else ""
         if r["status"] == BLOCKED:
             lines.append(
-                f"| {r['benchmark']} | {BLOCKED} | — | {r.get('df_queries', '—')} | — | {r.get('error', '')} |"
+                f"| {r['benchmark']} | {BLOCKED} | — | {r.get('df_queries', '—')} | — | "
+                f"{r.get('error', '')}{staged_suffix} |"
             )
             continue
         if r["status"] == NO_DF_QUERY_SURFACE:
             note = "→ w2 fallback oracle (no DataFrame query registry)"
-            lines.append(f"| {r['benchmark']} | {r['status']} | — | 0 | — | {note} |")
+            lines.append(f"| {r['benchmark']} | {r['status']} | — | 0 | — | {note}{staged_suffix} |")
+            continue
+        if r["status"] == NOT_CHEAPLY_GATEABLE:
+            note = f"→ NOT a routine-PR gate: {r.get('reason', 'needs a canonical fetch or non-bounded scale')}"
+            lines.append(
+                f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
+                f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note}{staged_suffix} |"
+            )
             continue
         note = (
             "→ cross-surface gate (w3)"
@@ -237,13 +327,14 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         )
         lines.append(
             f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
-            f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note} |"
+            f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note}{staged_suffix} |"
         )
     lines.append("")
     lines.append("## Campaign dispatch")
     lines.append("")
     direct = [r["benchmark"] for r in rows if r["status"] == GATEABLE]
     unverified = [r["benchmark"] for r in candidate_unverified]
+    not_cheap_names = [r["benchmark"] for r in not_cheaply]
     lines.append("- **Cross-surface gate, ids overlap as-is (w3):** " + (", ".join(direct) or "none") + ".")
     lines.append(
         "- **Candidate-unverified (NOT gateable yet):** "
@@ -252,6 +343,13 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
         "verbatim, so there is no verified query correspondence. Each needs an "
         "independent, per-benchmark id mapping confirmed (the campaign TODO says "
         '"do NOT guess") before a gate can be wired; do not count these as coverage.'
+    )
+    lines.append(
+        "- **Not-cheaply-gateable (NOT a routine-PR gate):** "
+        + (", ".join(not_cheap_names) or "none")
+        + " — rejects the bounded SF=0.01 cell, needs a canonical manifest fetch, "
+        "or performs downloader-backed network fetches at the bounded scale; "
+        "do not wire as a routine-PR gate."
     )
     lines.append(
         "- **w2 fallback oracle** — no DataFrame query registry, so the cross-surface "

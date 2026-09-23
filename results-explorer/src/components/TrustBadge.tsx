@@ -21,7 +21,7 @@
 // own color rather than a "cautionary" yellow.
 // ---------------------------------------------------------------------------
 
-import { describeValidationStatus } from "@/lib/displayLabels";
+import { describeOverride, describeValidationStatus } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 
 const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: string }> = {
@@ -93,6 +93,21 @@ interface TrustBadgeProps {
 interface ValidationBadgeProps {
   validationStatus?: string | null;
   showMissing?: boolean;
+  /**
+   * Accepted-override rule ids (parsed `override_rules`). When non-empty the
+   * badge never renders clean: tone is forced to "warning" and the title
+   * names the covering override, regardless of the recorded status.
+   */
+  overrideRules?: string[] | null;
+}
+
+export interface OverrideBadgeProps {
+  /** Accepted-override rule ids (parsed `override_rules`). Renders nothing when empty. */
+  rules?: string[] | null;
+  approver?: string | null;
+  evidence?: string | null;
+  expires?: string | null;
+  compact?: boolean;
 }
 
 export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
@@ -123,9 +138,17 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
 // visible text is the reader-facing label, never the raw enum value (e.g.
 // "no validation", not "not_run") - the raw status is still available via the
 // title tooltip for anyone who wants precision.
-export function ValidationBadge({ validationStatus, showMissing = false }: ValidationBadgeProps) {
-  if (!validationStatus && !showMissing) return null;
+export function ValidationBadge({ validationStatus, showMissing = false, overrideRules }: ValidationBadgeProps) {
+  const override = describeOverride(overrideRules ?? []);
+  if (!validationStatus && !showMissing && !override) return null;
   if (!validationStatus) {
+    if (override) {
+      return (
+        <StatusBadge role="validation" tone="warning" title={override.title}>
+          {override.label}
+        </StatusBadge>
+      );
+    }
     return (
       <StatusBadge role="validation" tone="neutral" title="No validation status was recorded for this result.">
         Not recorded
@@ -133,10 +156,54 @@ export function ValidationBadge({ validationStatus, showMissing = false }: Valid
     );
   }
   const info = describeValidationStatus(validationStatus);
+  if (override) {
+    // An accepted override is never a clean pass, even when the recorded
+    // status alone would badge as one.
+    return (
+      <StatusBadge
+        role="validation"
+        tone="warning"
+        title={`${info.description} Recorded status: ${info.status}. ${override.title}`}
+      >
+        {override.label}
+      </StatusBadge>
+    );
+  }
   return (
     <StatusBadge role="validation" tone={info.tone} title={`${info.description} Recorded status: ${info.status}.`}>
       {info.label}
     </StatusBadge>
+  );
+}
+
+// Renders an accepted plausibility override as its own badge. Null (renders
+// nothing) when no override was accepted. The evidence link, when present,
+// is a plain text URL — never fetched, only shown as the audit trail.
+export function OverrideBadge({ rules, approver, evidence, expires, compact = false }: OverrideBadgeProps) {
+  const override = describeOverride(rules ?? [], { approver, expires });
+  if (!override) return null;
+  const text = compact ? "Overridden" : override.label;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <StatusBadge role="override" tone="warning" title={override.title}>
+        {text}
+      </StatusBadge>
+      {!compact && approver ? (
+        <span className="text-xs text-[var(--bb-data-fg-muted)]" title={`Override approved by ${approver}`}>
+          by {approver}
+        </span>
+      ) : null}
+      {!compact && evidence ? (
+        <span className="font-mono text-xs text-[var(--bb-data-fg-muted)]" title={`Override evidence: ${evidence}`}>
+          {evidence}
+        </span>
+      ) : null}
+      {!compact && expires ? (
+        <span className="text-xs text-[var(--bb-data-fg-muted)]" title={`Override expires ${expires}`}>
+          expires {expires}
+        </span>
+      ) : null}
+    </span>
   );
 }
 

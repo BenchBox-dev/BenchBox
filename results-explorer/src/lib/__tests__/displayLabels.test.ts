@@ -3,7 +3,9 @@ import {
   formatBenchmarkLabel,
   canonicalBenchmarkSlug,
   canonicalPhase,
+  describeOverride,
   describeValidationStatus,
+  parseOverrideRules,
   formatCostStatus,
   formatEnumLabel,
   formatFunding,
@@ -173,5 +175,48 @@ describe("formatBenchmarkLabel", () => {
   it("falls through to humanizeBenchmark for other slugs", () => {
     expect(formatBenchmarkLabel("tpch")).toBe("TPC-H");
     expect(formatBenchmarkLabel("clickbench")).toBe("ClickBench");
+  });
+});
+
+describe("parseOverrideRules", () => {
+  it("parses the canonical JSON array string", () => {
+    expect(parseOverrideRules('["timing-plateau", "scale-invariant"]')).toEqual([
+      "timing-plateau",
+      "scale-invariant",
+    ]);
+  });
+
+  it("returns [] for absent values", () => {
+    expect(parseOverrideRules(null)).toEqual([]);
+    expect(parseOverrideRules(undefined)).toEqual([]);
+    expect(parseOverrideRules("")).toEqual([]);
+  });
+
+  it("never invents an override from unreadable values", () => {
+    expect(parseOverrideRules("not json")).toEqual([]);
+    expect(parseOverrideRules('{"rule": "timing-plateau"}')).toEqual([]);
+    expect(parseOverrideRules("[1, 2]")).toEqual([]);
+    expect(parseOverrideRules("timing-plateau")).toEqual([]);
+  });
+});
+
+describe("describeOverride", () => {
+  it("returns null when no override was accepted", () => {
+    expect(describeOverride([])).toBeNull();
+    expect(describeOverride(null)).toBeNull();
+    expect(describeOverride(undefined)).toBeNull();
+  });
+
+  it("names the covered rules and the audit trail", () => {
+    const info = describeOverride(["timing-plateau"], {
+      approver: "reviewer",
+      expires: "2099-01-01",
+    });
+    expect(info).not.toBeNull();
+    expect(info!.label).toBe("Overridden: timing-plateau");
+    expect(info!.title).toContain("timing-plateau");
+    expect(info!.title).toContain("Approved by reviewer.");
+    expect(info!.title).toContain("Override expires 2099-01-01.");
+    expect(info!.title).toContain("not a clean pass");
   });
 });

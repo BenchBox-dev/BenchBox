@@ -25,6 +25,7 @@ import {
   formatTrustLabel,
   formatValidationStatus,
   isValidationNotClean,
+  parseOverrideRules,
 } from "@/lib/displayLabels";
 import {
   compareCohortLockReason,
@@ -1485,6 +1486,9 @@ interface PlatformRowProps {
 
 function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
+  // An accepted override is never a clean pass, even when the recorded
+  // validation status alone would hide or clean-read these badges.
+  const entryOverrideRules = parseOverrideRules(entry.override_rules);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
     <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
@@ -1522,9 +1526,13 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
         >
           {versionLabel}
         </a>
-        {isValidationNotClean(entry.validation_status) && (
+        {(isValidationNotClean(entry.validation_status) || entryOverrideRules.length > 0) && (
           <div class="mt-0.5" data-testid={`platform-validation-flag-${entry.result_id}`}>
-            <ValidationBadge validationStatus={entry.validation_status} showMissing />
+            <ValidationBadge
+              validationStatus={entry.validation_status}
+              overrideRules={entryOverrideRules}
+              showMissing
+            />
           </div>
         )}
         <PlatformCompareReasonStatus id={reasonId} copy={disabledCopy} />
@@ -1549,7 +1557,11 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
           <FundingChip funding={entry.funding} compact />
-          <ValidationBadge validationStatus={entry.validation_status} showMissing />
+          <ValidationBadge
+            validationStatus={entry.validation_status}
+            overrideRules={entryOverrideRules}
+            showMissing
+          />
           {entry.tuning_mode && (
             <TuningBadge
               tuningMode={entry.tuning_mode}

@@ -3,11 +3,11 @@
 
 This CLI tool verifies that the Results Explorer SPA and its artifacts
 maintain compatibility with the current corpus DuckDB read-model schema
-(v10). It also validates hermetic, content-addressed Explorer application
+(v11). It also validates hermetic, content-addressed Explorer application
 artifact bundles.
 
 Usage:
-    # Run schema compatibility checks only (v10 only):
+    # Run schema compatibility checks only (v11 only):
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only
 
     # Validate an Explorer build artifact directory or archive:
@@ -22,7 +22,7 @@ Usage:
     # Validate a specific DuckDB database snapshot file:
     uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
 
-    # Check specific schema versions (only 10 is supported):
+    # Check specific schema versions (only 11 is supported):
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 10
 
     # Output machine-readable JSON:
@@ -60,8 +60,8 @@ try:
     CURRENT_SCHEMA_VERSION: int = _READ_MODEL_VERSION
     CONTRACT_VERSION: str = _CONTRACT_VERSION
 except ImportError:
-    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (10,)
-    CURRENT_SCHEMA_VERSION: int = 10
+    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (11,)
+    CURRENT_SCHEMA_VERSION: int = 11
     CONTRACT_VERSION: str = "6"
 
 # Canonical DuckDB type normalisation for schema validation comparisons
@@ -305,9 +305,21 @@ TABLE_COLUMNS_V10: dict[str, dict[str, str]] = {
     },
 }
 
+TABLE_COLUMNS_V11: dict[str, dict[str, str]] = {
+    **TABLE_COLUMNS_V10,
+    "results": {
+        **TABLE_COLUMNS_V10["results"],
+        "override_rules": "VARCHAR",
+        "override_evidence": "VARCHAR",
+        "override_approver": "VARCHAR",
+        "override_expires": "VARCHAR",
+    },
+}
+
 SCHEMA_REGISTRY: dict[int, dict[str, dict[str, str]]] = {
     9: TABLE_COLUMNS_V9,
     10: TABLE_COLUMNS_V10,
+    11: TABLE_COLUMNS_V11,
 }
 
 REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
@@ -327,6 +339,21 @@ REQUIRED_VIEWS_V9: list[str] = [
 
 REQUIRED_VIEWS_V10: list[str] = list(REQUIRED_VIEWS_V9)
 
+REQUIRED_VIEWS_V11: list[str] = list(REQUIRED_VIEWS_V10)
+
+# Columns the frontend selects by name from views (not just the underlying
+# tables). A snapshot whose `results` table carries these columns but whose
+# view omits them would pass the table and view-existence checks yet fail
+# with a binder error on every load of that surface.
+REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
+    "result_detail_metrics": [
+        "override_rules",
+        "override_evidence",
+        "override_approver",
+        "override_expires",
+    ],
+}
+
 
 def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
     """Return the expected table column map for a given read-model version."""
@@ -339,6 +366,8 @@ def get_views_for_version(version: int) -> list[str]:
     """Return required view names for a schema version."""
     if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
+    if version >= 11:
+        return list(REQUIRED_VIEWS_V11)
     return list(REQUIRED_VIEWS_V10)
 
 
@@ -454,7 +483,8 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
     ),
     (
         "Result detail metrics view",
-        "SELECT * FROM result_detail_metrics LIMIT 10",
+        "SELECT result_id, benchmark, scale_factor, platform, validation_status, override_rules, "
+        "override_evidence, override_approver, override_expires FROM result_detail_metrics LIMIT 10",
     ),
     (
         "Benchmark matrix cells scan",
@@ -568,6 +598,21 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     missing_views = sorted(set(expected_views) - existing_views)
     if missing_views:
         errors.append(f"missing required views for v{version_to_check}: {', '.join(missing_views)}")
+
+    # Views that exist must also expose the columns the frontend selects by
+    # name; a view that drops one fails at read time despite passing the
+    # table and view-existence checks above.
+    if version_to_check >= 11:
+        for view, required_cols in REQUIRED_VIEW_COLUMNS_V11.items():
+            if view not in existing_views:
+                continue
+            view_col_rows = con.execute(
+                f"SELECT column_name FROM information_schema.columns WHERE table_name = '{view}'"
+            ).fetchall()
+            actual_view_cols = {row[0] for row in view_col_rows}
+            missing_view_cols = sorted(set(required_cols) - actual_view_cols)
+            if missing_view_cols:
+                errors.append(f"view '{view}' missing required columns: {', '.join(missing_view_cols)}")
 
     return errors
 
