@@ -847,6 +847,13 @@ jobs:
     # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Throughput@Size floor activation: repository configuration variables
+      # flow into the assert step below. Unset vars evaluate to empty, which
+      # the assert step treats as unconfigured, so the floor stays in
+      # observe-only mode until the variables are actually set.
+      THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
+      THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
