@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "49d6a5eaf46ba7c9e03e59a9ca34fc4de7ded6bb6750afce6d7cdda0f3cf652c",
+  "contract_sha256": "825f2af9f39bede81bc5b48dbeec81042daeaf595259b8297e3193796012afe3",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -179,7 +179,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 208,
+  "public_target_count": 209,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -220,6 +220,7 @@
     "cross-surface-applicability-report",
     "cross-surface-baseline-autodetect",
     "cross-surface-update-baseline",
+    "datavault-cross-surface-equivalence-report",
     "dependency-check",
     "dev-loop-metrics",
     "develop",
@@ -761,8 +762,15 @@
     "cross-surface-update-baseline": [
       {
         "header": "cross-surface-update-baseline:",
-        "recipe": "\t@test -n \"$(BENCHMARK)\" || { echo \"Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>\"; exit 1; }\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline",
-        "recipe_sha256": "244eaccd8d4845dc9657608079586d7c42b26a834efa8b1f1a6e44c76583db72"
+        "recipe": "\t@test -n \"$(BENCHMARK)\" || { echo \"Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>\"; exit 1; }\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline",
+        "recipe_sha256": "48b57be31378b92d1e9cb2b12d1d956273ad45813f36528afb3d622924df4185"
+      }
+    ],
+    "datavault-cross-surface-equivalence-report": [
+      {
+        "header": "datavault-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault",
+        "recipe_sha256": "965a023d6f01acbdf38ea6cb91040767cf32645d81357c8ba5e99f5483073121"
       }
     ],
     "dependency-check": [
@@ -2131,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "e13615e579f078dc95c100fe7e60f48bf9b8372da0945ce7efbd75a385750921",
+  "semantic_sha256": "ad3c4da08dc43c163938b5bd8065518fd761ce7af66cfde4d3d08130bf5c7ba5",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2606,9 +2614,17 @@
       ]
     },
     {
-      "body": "cross-surface-update-baseline:\n\t@test -n \"$(BENCHMARK)\" || { echo \"Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>\"; exit 1; }\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline",
+      "body": "datavault-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault",
       "kind": "rule",
-      "sha256": "ea4e31ebacc5cae9378113413d096ed1339d573a6be28466f1b17503f5488f86",
+      "sha256": "4222552c9343569c0989b2c78955e5448c10cce7d4a8074efb4ad51df16d9aa1",
+      "targets": [
+        "datavault-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "cross-surface-update-baseline:\n\t@test -n \"$(BENCHMARK)\" || { echo \"Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>\"; exit 1; }\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline",
+      "kind": "rule",
+      "sha256": "73d61228a59596dfe0540a1c17bc28f39a8795873f6feac62a75334927ab27b9",
       "targets": [
         "cross-surface-update-baseline"
       ]
@@ -4350,7 +4366,7 @@
       ]
     }
   ],
-  "target_count": 214,
+  "target_count": 215,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4394,6 +4410,7 @@
     "cross-surface-applicability-report",
     "cross-surface-baseline-autodetect",
     "cross-surface-update-baseline",
+    "datavault-cross-surface-equivalence-report",
     "dependency-check",
     "dev-loop-metrics",
     "develop",
