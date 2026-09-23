@@ -6,7 +6,7 @@
     "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
     "make pr-preflight passes on the implementation PR."
   ],
-  "context": "Implementation committed at 9d361bb30752eb330fbe9290e7458c0978ae5d89 in clean linked worktree /Users/joe/Developer/BenchBox.wt-release-finalize-recovery. Full make pr-preflight passed (medium 2090 passed, 21 skipped; artifact hygiene). make pr-open pushed branch and opened https://github.com/BenchBox-dev/BenchBox/pull/2321 against develop, exact head 9d361bb3, OPEN, auto-merge withheld, hosted checks pending in first snapshot. The new helper tags only the confirmed PR merge commit after fetching origin/release, without checkout of local release. Review thread on cut PR #2318 P1 is accepted and addressed by this PR; respond there with evidence after current head is visible. pr-conflict-scan warns textual conflicts with cut PR #2318 (inventory/lane classification) and PR #2308 (inventory); coordinate after parent merges. Do not finish tracker item until PR verified merged. No release merge or tag performed. Ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
+  "context": "Implementation committed at 9d361bb30752eb330fbe9290e7458c0978ae5d89 in linked worktree /Users/joe/Developer/BenchBox.wt-release-finalize-recovery; full make pr-preflight passed previously (medium 2090 passed, 21 skipped; focused/inventory/hooks passed). Current exact snapshot: PR #2321 OPEN at head 9d361bb30752eb330fbe9290e7458c0978ae5d89 on base 435d07e97c2e0f30a002d721fbc42aca508d6a52, mergeable; displayed checks complete/success and reviewDecision is blank. This does not authorize marking ready or merging. The worktree currently has an uncommitted .github/RELEASE_PR_TEMPLATE.md diff (6 insertions, 3 deletions) whose ownership is unknown; preserve it and keep it out of commits. The helper tags only a confirmed PR merge commit after fetching origin/release, without checking out local release. Review thread on cut PR #2318 P1 is addressed by this PR; respond with evidence only after its exact fix is hosted and reconcile all threads. Earlier conflict scan noted overlap with PRs #2318 and #2308; refresh before changing branches. No release merge or tag has been performed. Ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
   "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
   "links": [
     "Makefile",
@@ -149,6 +149,14 @@
       "generation": "c89a8b3b16244f2eb30165ecf7d25955",
       "op": "release",
       "op_id": "24796f1fca1f4e0493fe4363fe9e5204",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T23:59:40Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "4a2f61fe069b4108ba9d490cc39ad77c",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
