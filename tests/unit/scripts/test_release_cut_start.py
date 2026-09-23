@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "release_cut_start.sh"
 
 
