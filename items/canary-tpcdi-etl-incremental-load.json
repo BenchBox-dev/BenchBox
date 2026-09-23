@@ -4,7 +4,11 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
+  "context": "Commit 306e126224a5d46cd7e70038b8801aae963e7824 on fix/canary-tpcdi-etl-incremental-load; PR https://github.com/BenchBox-dev/BenchBox/pull/2316 targets develop and is open, held. Root cause: enhanced ETL used nonexistent warehouse LastModified and malformed generated FinWire records; empty quality aggregates failed. Focused TPC-DI suite 49 passed; committed-head make pr-preflight passed (31496 fast and 2091 medium tests). Await hosted CI, review, and merge before closing.",
   "description": "Repair the TPC-DI full benchmark ETL failures seen in the scheduled release canary, including incremental loader LastModified lookups and data quality monitor null arithmetic. Identify the causing commit before changing code. Preserve valid incremental load and data-quality behavior; do not skip tests or change markers.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2316"
+  ],
   "sessions": [
     {
       "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
@@ -21,6 +25,14 @@
       "generation": "90477eb78c2c449b83b719f42ecdff7a",
       "op": "take",
       "op_id": "d871dfdf0e1d4afa83689c6d27f9fcb7",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T21:53:47Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "9e0ad748d66444778039809c659f9c1d",
       "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
