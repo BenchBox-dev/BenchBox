@@ -7149,7 +7149,7 @@
         "auto-merge-review-gate-admin-enforcement"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Re-evaluate can_approve_pull_request_reviews once review enforcement is live"
     },
     "gpu-acceleration-benchmarking-rapids-cudf-integration": {
