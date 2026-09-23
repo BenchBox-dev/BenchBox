@@ -1311,7 +1311,7 @@
     "benchbox-score-workload-contracts": {
       "claim": null,
       "needs": [],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Reconcile composite-score workload contracts"
     },
