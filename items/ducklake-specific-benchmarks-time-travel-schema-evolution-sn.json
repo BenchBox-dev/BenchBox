@@ -1,4 +1,5 @@
 {
+  "context": "Merged via PR 2272. Documented current coverage (TPC-H/TPC-DS parity plus run-phase maintenance ops) and the gap (no dedicated time-travel/schema-evolution/snapshot workload; needs versioned-query fixtures and lifecycle harnesses). That workload remains a separate research item.",
   "description": "Promoted from deferral #97 of ducklake-platform-adapter.\nDeferred: DuckLake-specific benchmarks (time travel, schema evolution, snapshot/maintenance workloads)\nReason deferred: Adapter parity first; lakehouse-feature benchmarks are a separate research item",
   "legacy": {
     "item_meta": {
