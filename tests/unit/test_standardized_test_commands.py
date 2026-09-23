@@ -279,6 +279,7 @@ class TestMakefileCommands:
             "test-slow": "--timeout=1200",
             "test-stress": "--timeout=1800",
             "test-ci": "--timeout=300",
+            "ci-test": "--timeout=120",
             "pr-preflight-fast-tests": "--timeout=120",
         }
         for target, timeout in expected.items():

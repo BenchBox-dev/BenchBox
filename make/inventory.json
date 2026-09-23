@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "8f4d6a4f1297c7c420de8cf3934ea9e2ed4b31a003518da8998fac81cfde365e",
+  "contract_sha256": "10dfe995971e1fa1cb3a21df846be76c783f630547c8ae5ae834e41d69f2b851",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -611,8 +611,8 @@
     "ci-test": [
       {
         "header": "ci-test:",
-        "recipe": "\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
-        "recipe_sha256": "f91848e652e649165d0584fd56ee410839f380b6b40d5d0087836d3072b3d182"
+        "recipe": "\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
+        "recipe_sha256": "52e26351f1db97053a91ad1dc9509b1097a479aa1e3ce4e66280006ff7d8301e"
       }
     ],
     "clean": [
@@ -2139,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "9e2c567c616cb3ab989c0897a3199906efc6e227737a66353db7cc0c85fe4ca1",
+  "semantic_sha256": "2050c6dce832669bdf15c3cd33fa78d1ce5c35e0fb20b2aacc333bd6bcda27b9",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3402,9 +3402,9 @@
       ]
     },
     {
-      "body": "ci-test:\n\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
+      "body": "ci-test:\n\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
       "kind": "rule",
-      "sha256": "695ed46a2e6bfaa3c7fe27e594919e5a1dc9029a36c5210d0f0aeb03ec5ede64",
+      "sha256": "52b4fbc1f924a7fc6066fa20ebcbb3b2f84c66e13f2ae9307fd333a442837717",
       "targets": [
         "ci-test"
       ]

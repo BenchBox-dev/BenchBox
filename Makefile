@@ -852,7 +852,7 @@ ci-lint:
 # non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
-	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
+	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
 # CI docs build - exact match for docs.yml workflow
