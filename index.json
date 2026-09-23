@@ -18710,10 +18710,15 @@
       "title": "Visualization hardening: centralize chart suggestions and render orchestration across CLI and MCP"
     },
     "w4-docker-postgres-throughput-uat-cell-see-work-w4-notes": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T14:30:30Z",
+        "generation": "7d98042b4083471483096e5051e643af",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c34f7fdc20585bf7d833c1a2"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.\n"
     },
     "webkit-smoke-fix-or-demote": {
