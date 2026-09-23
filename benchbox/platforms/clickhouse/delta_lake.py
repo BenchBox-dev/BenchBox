@@ -13,18 +13,23 @@ Support is deployment dependent: the engine takes object-storage bucket URLs
 URI``), while local reads go through the ``deltaLakeLocal`` table function
 (count and row reads verified on ``clickhouse/clickhouse-server:25.8``, server
 ``25.8.33.6``). Minimal or embedded builds may not register the Delta
-integration at all. When native reads are unavailable, fall back to the Parquet
-snapshot export in :mod:`benchbox.utils.delta_export`;
-:func:`has_native_delta_registration` answers the availability question from
-the server's system tables, while choosing between the paths inside an adapter
-run is follow-up work.
+integration at all — and the local alias is individually deployment-dependent,
+so :func:`has_local_delta_registration` must affirm it before a local path
+resolves natively. A local table without local native reads falls back to the
+Parquet snapshot export in :mod:`benchbox.utils.delta_export` (the only
+snapshot the exporter can execute: it requires a local ``_delta_log``).
+Remote locations without native reads have no executable path — remote
+snapshot export is not provided — so :func:`resolve_delta_reader` raises
+instead of returning a snapshot that cannot run.
 
 Evidence: the ``DeltaLake`` table engine and ``deltaLake`` table-function family
 in the ClickHouse documentation, corroborated in-repo by the Docker-gated
 registration probe in ``tests/integration/platforms/`` (which names the server
-version on failure). The format registry stays untouched until loading code
-exists. GCS locations use the same engine/table-function URL form; there is no
-separate GCS builder.
+version on failure). GCS locations use the same engine/table-function URL form;
+there is no separate GCS builder. The ClickHouse load path reaches this
+selection through ``ClickHouseWorkloadMixin.delta_reader_for``: Delta table
+directories (``_delta_log``) load natively via ``INSERT INTO ... SELECT`` when
+the reader is native, else via a snapshot export loaded as Parquet.
 
 Trust contract: ``url``, ``path``, table/database names, and credential values
 are quoted; ``source`` expressions and string-form ``columns`` are trusted
@@ -53,11 +58,25 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
+from typing import Literal
+from urllib.parse import urlsplit
+
 #: S3-backed Delta Lake table functions sharing one argument shape.
 _S3_TABLE_FUNCTIONS = frozenset({"deltaLake", "deltaLakeS3"})
 
+#: Where a Delta table lives, deciding which native builder (if any) applies.
+DeltaLocationKind = Literal["s3", "azure", "gcs", "local", "unknown"]
+
 #: Base Delta Lake table function; required for native reads.
 DELTA_BASE_FUNCTION = "deltaLake"
+
+#: Local-filesystem Delta Lake table function; required for local native reads.
+DELTA_LOCAL_FUNCTION = "deltaLakeLocal"
+
+#: Virtual-hosted-style S3 HTTPS host (``<bucket>.s3[.-]<region>.amazonaws.com``).
+_S3_VIRTUAL_HOSTED_RE = re.compile(r"\.s3[.-][a-z0-9-]+\.amazonaws\.com$")
 
 #: Native Delta Lake table functions emitted by this module.
 DELTA_TABLE_FUNCTION_NAMES = (DELTA_BASE_FUNCTION, "deltaLakeS3", "deltaLakeLocal", "deltaLakeAzure")
@@ -68,7 +87,11 @@ DELTA_ENGINE_NAME = "DeltaLake"
 __all__ = [
     "DELTA_BASE_FUNCTION",
     "DELTA_ENGINE_NAME",
+    "DELTA_LOCAL_FUNCTION",
     "DELTA_TABLE_FUNCTION_NAMES",
+    "DeltaLocationKind",
+    "DeltaReader",
+    "classify_delta_location",
     "delta_engine_probe_sql",
     "delta_function_probe_sql",
     "delta_lake_azure_table_function",
@@ -77,9 +100,11 @@ __all__ = [
     "delta_lake_local_table_function",
     "delta_lake_select_sql",
     "delta_lake_table_function",
+    "has_local_delta_registration",
     "has_native_delta_registration",
     "quote_identifier",
     "quote_literal",
+    "resolve_delta_reader",
 ]
 
 
@@ -368,3 +393,144 @@ def has_native_delta_registration(function_names: list[str], engine_names: list[
         both registered; the S3/local/Azure aliases alone are not sufficient.
     """
     return DELTA_BASE_FUNCTION in function_names and DELTA_ENGINE_NAME in engine_names
+
+
+def has_local_delta_registration(function_names: list[str]) -> bool:
+    """Decide local native Delta availability from probed system-table names.
+
+    The base ``deltaLake`` registration says nothing about the local alias:
+    a server can register ``deltaLake``/``DeltaLake`` without
+    ``deltaLakeLocal`` (observed as deployment-dependent), and resolving a
+    local path to ``deltaLakeLocal(...)`` there fails at execution. Require
+    the alias itself before selecting the local native path.
+
+    Args:
+        function_names: Function names reported by :func:`delta_function_probe_sql`.
+
+    Returns:
+        True when the ``deltaLakeLocal`` function is registered.
+    """
+    return DELTA_LOCAL_FUNCTION in function_names
+
+
+def _is_https_s3_location(lowered: str) -> bool:
+    """True for S3 HTTPS URL forms (virtual-hosted and path style).
+
+    Matches ``https://<bucket>.s3[.-]<region>.amazonaws.com/...`` and
+    ``https://s3[.-]<region>.amazonaws.com/<bucket>/...`` (either scheme).
+    Azure and GCS HTTPS hosts never match: they carry no ``amazonaws.com``
+    S3 host segment.
+    """
+    if not lowered.startswith(("https://", "http://")):
+        return False
+    try:
+        host = urlsplit(lowered).hostname or ""
+    except ValueError:
+        return False
+    if host == "s3.amazonaws.com" or (host.startswith("s3.") and host.endswith(".amazonaws.com")):
+        return True
+    if ".s3.amazonaws.com" in host or _S3_VIRTUAL_HOSTED_RE.search(host):
+        return True
+    return False
+
+
+def classify_delta_location(location: str) -> DeltaLocationKind:
+    """Classify where a Delta table lives from its location string.
+
+    Args:
+        location: Bucket URL, connection string, or filesystem path.
+
+    Returns:
+        ``"s3"`` for ``s3://`` URLs and S3 HTTPS URL forms (virtual-hosted
+        ``<bucket>.s3[.-]<region>.amazonaws.com`` and path-style
+        ``s3[.-]<region>.amazonaws.com/<bucket>``), ``"azure"`` for Azure Blob
+        location forms (``abfs(s)://``, ``wasb(s)://``, account-host URLs,
+        connection strings), ``"gcs"`` for GCS forms, ``"local"`` for
+        filesystem paths, ``"unknown"`` otherwise.
+
+    Raises:
+        ValueError: If the location is empty or blank.
+    """
+    if not location or not location.strip():
+        raise ValueError("Cannot classify an empty Delta location.")
+    lowered = location.lower()
+    if lowered.startswith("s3://") or _is_https_s3_location(lowered):
+        return "s3"
+    if lowered.startswith("gs://") or lowered.startswith("https://storage.googleapis.com/"):
+        return "gcs"
+    if (
+        lowered.startswith(("abfs://", "abfss://", "wasb://", "wasbs://"))
+        or ".blob.core.windows.net" in lowered
+        or ".dfs.core.windows.net" in lowered
+        or "accountname=" in lowered
+        or "defaultendpointsprotocol=" in lowered
+    ):
+        return "azure"
+    if lowered.startswith(("/", "./", "../", "file://")) or (
+        len(location) > 3 and location[0].isalpha() and location[1] == ":" and location[2] in "\\/"
+    ):
+        return "local"
+    return "unknown"
+
+
+@dataclass(frozen=True)
+class DeltaReader:
+    """How a Delta table should be read by ClickHouse.
+
+    Attributes:
+        kind: ``"native"`` (issue ``source_sql`` straight at the server) or
+            ``"parquet-snapshot"`` (export with
+            ``benchbox.utils.delta_export.export_delta_to_parquet`` first).
+        location_kind: The :func:`classify_delta_location` result.
+        source_sql: Native table-function expression, or ``""`` for snapshots.
+        reason: Why this path was chosen.
+    """
+
+    kind: str
+    location_kind: str
+    source_sql: str
+    reason: str
+
+
+def resolve_delta_reader(location: str, *, native_available: bool, local_native_available: bool = False) -> DeltaReader:
+    """Choose the native or snapshot read path for a Delta location.
+
+    S3 locations read natively when the server registers the base
+    integration; local locations read natively only when the server
+    additionally registers the ``deltaLakeLocal`` alias (probed per function:
+    base registration alone does not imply it). A local location without
+    local native reads resolves to the snapshot path, which
+    :func:`benchbox.utils.delta_export.export_delta_to_parquet` can execute
+    directly on the table directory. Every other combination has no
+    executable path — remote snapshot export is not provided — and raises
+    instead of returning a snapshot that cannot run.
+
+    Args:
+        location: Bucket URL or filesystem path of the Delta table.
+        native_available: The :func:`has_native_delta_registration` verdict.
+        local_native_available: The :func:`has_local_delta_registration`
+            verdict. Defaults to False (fail closed: callers must
+            affirmatively report the alias).
+
+    Returns:
+        The chosen :class:`DeltaReader`.
+
+    Raises:
+        ValueError: If the location is empty, blank, unrecognized, or has no
+            executable read path (a remote location without native reads).
+    """
+    kind = classify_delta_location(location)
+    if kind == "unknown":
+        raise ValueError(f"Unrecognized Delta location {location!r}: expected an S3/Azure/GCS URL or a local path.")
+    if native_available and kind == "s3":
+        return DeltaReader("native", kind, delta_lake_table_function(location), "server registers deltaLake")
+    if native_available and local_native_available and kind == "local":
+        return DeltaReader("native", kind, delta_lake_local_table_function(location), "server registers deltaLakeLocal")
+    if kind == "local":
+        return DeltaReader(
+            "parquet-snapshot", kind, "", "server does not register deltaLakeLocal; export to Parquet first"
+        )
+    raise ValueError(
+        f"No executable Delta read path for {kind} location {location!r}: the server does not register native "
+        "Delta reads and remote Parquet snapshot export is not provided."
+    )
