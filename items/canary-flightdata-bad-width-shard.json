@@ -5,8 +5,11 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "Root cause identified before editing: commit 5e9284a2cf changed download() to regenerate caches without a persisted source-contract ID. The old test created malformed shards but no manifest, so it never entered the shard-reuse validation path. The production width check in _count_flight_csv_rows remains present.",
+  "context": "Root cause commit 5e9284a2cf intentionally regenerates caches without a source-contract manifest; the old bad-width test never entered reuse. Commit b40ec340b on fix/canary-flightdata-shard-reuse; PR https://github.com/BenchBox-dev/BenchBox/pull/2322 is open and held. The test creates a real manifested shard cache, corrupts a row, and asserts width rejection with unchanged manifest and shard bytes. Focused suite: 14 passed; committed-head make pr-preflight passed (31495 fast and 2090 medium tests). Await hosted CI, review, and merge before closing.",
   "description": "The release canary's bad-width shard test became stale when source-contract pinning made manifest-free caches regenerate. Build a genuine reusable shard cache with a matching manifest, corrupt one row, and verify download rejects that shard without replacing the manifest or cache. Preserve the product's fail-closed reuse validation and the no-manifest regeneration policy; do not skip tests or change markers.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2322"
+  ],
   "sessions": [
     {
       "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
@@ -31,6 +34,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "62b09e5ccb784769812d1f6c19447e0c",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T23:22:06Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "041546f391bb4f2fbbec9f67983d1441",
       "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
