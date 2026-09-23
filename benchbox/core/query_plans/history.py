@@ -167,12 +167,16 @@ class PlanHistory:
         # Update cache
         self._cache[execution_id] = history_entry
 
-    def query_plan_history(self, query_id: str) -> list[PlanHistoryEntry]:
+    def query_plan_history(self, query_id: str, platform: str | None = None) -> list[PlanHistoryEntry]:
         """
         Get plan history for a specific query.
 
         Args:
             query_id: Query identifier
+            platform: Optional platform filter. When set, only entries from
+                that platform are returned. Multi-platform histories must not
+                be compared as one interleaved sequence -- each engine has its
+                own plan lineage.
 
         Returns:
             List of PlanHistoryEntry sorted by timestamp (oldest first)
@@ -189,6 +193,9 @@ class PlanHistory:
                         entry = json.load(f)
                     self._cache[run_id] = entry
 
+                run_platform = entry.get("platform", "unknown")
+                if platform is not None and run_platform != platform:
+                    continue
                 if query_id in entry.get("plan_fingerprints", {}):
                     plan_data = entry["plan_fingerprints"][query_id]
                     history.append(
@@ -198,7 +205,7 @@ class PlanHistory:
                             fingerprint=plan_data["fingerprint"],
                             estimated_cost=plan_data.get("estimated_cost"),
                             execution_time_ms=plan_data.get("execution_time_ms", 0.0),
-                            platform=entry.get("platform", "unknown"),
+                            platform=run_platform,
                             fingerprint_version=plan_data.get("fingerprint_version", LEGACY_FINGERPRINT_VERSION),
                         )
                     )
@@ -219,6 +226,7 @@ class PlanHistory:
         query_id: str,
         window_size: int = 10,
         transition_threshold: float = 0.3,
+        platform: str | None = None,
     ) -> bool:
         """
         Detect if a query plan changes back and forth frequently.
@@ -238,11 +246,13 @@ class PlanHistory:
             query_id: Query identifier
             window_size: Number of recent runs to analyze (per platform)
             transition_threshold: Fraction of transitions that indicates flapping
+            platform: Optional platform filter. When set, only that platform's
+                lineage is checked; otherwise flapping in any platform reports True.
 
         Returns:
             True if plan flapping is detected for any platform
         """
-        history = self.query_plan_history(query_id)
+        history = self.query_plan_history(query_id, platform=platform)
         if not history:
             return False
 
@@ -287,18 +297,21 @@ class PlanHistory:
 
         return transition_rate > transition_threshold
 
-    def get_plan_version_history(self, query_id: str) -> list[tuple[str, int]]:
+    def get_plan_version_history(self, query_id: str, platform: str | None = None) -> list[tuple[str, int]]:
         """
         Get version history showing when plan changed.
 
         Args:
             query_id: Query identifier
+            platform: Optional platform filter. When set, only entries from
+                that platform form the version lineage, so fingerprints are
+                never compared across engines.
 
         Returns:
             List of (fingerprint, version) tuples where version increments
             each time fingerprint changes
         """
-        history = self.query_plan_history(query_id)
+        history = self.query_plan_history(query_id, platform=platform)
         versions: list[tuple[str, int]] = []
 
         current_version = 0
