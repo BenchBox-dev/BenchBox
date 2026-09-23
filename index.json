@@ -17079,10 +17079,15 @@
       "title": "Add TPC-DS-OBT (One Big Table) Benchmark Implementation"
     },
     "tpcds-obt-dataframe-sql-id-mapping-decision": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T14:07:20Z",
+        "generation": "91e8ea1f00194ea1a535df2a571817a9",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c34f7fdc20585bf7d833c1a2"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Decide tpcds_obt DataFrame-SQL correspondence achievability"
     },
     "tpcds-obt-query-expansion": {
