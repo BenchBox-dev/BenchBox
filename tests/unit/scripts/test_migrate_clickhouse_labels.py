@@ -101,3 +101,28 @@ def test_migrate_refuses_to_overwrite_existing_bundle(tmp_path: Path) -> None:
 
     assert old.exists()
     assert json.loads(old.read_text(encoding="utf-8"))["platform"]["name"] == "clickhouse"
+
+
+def test_conflicting_slug_and_first_class_label_is_skipped(tmp_path: Path) -> None:
+    result = tmp_path / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.json"
+    result.write_text(json.dumps({"platform": {"name": "ClickHouse Cloud"}}))
+
+    hits, anomalies = migrate_clickhouse_labels.discover_hits(tmp_path)
+
+    assert hits == []
+    assert any("conflicting bundle" in anomaly for anomaly in anomalies)
+
+
+def test_malformed_sidecar_aborts_without_writing(tmp_path: Path) -> None:
+    import pytest
+
+    old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
+    (tmp_path / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.manifest.json").write_text("not json{")
+
+    (hits, _) = migrate_clickhouse_labels.discover_hits(tmp_path)
+
+    with pytest.raises(ValueError):
+        migrate_clickhouse_labels.migrate_hit(hits[0], "clickhouse-local")
+
+    assert old.exists()
+    assert json.loads(old.read_text(encoding="utf-8"))["platform"]["name"] == "clickhouse"

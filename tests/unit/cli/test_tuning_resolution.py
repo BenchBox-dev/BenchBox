@@ -28,7 +28,11 @@ from benchbox.cli.tuning_resolver import (
     resolve_tuning,
     warn_sql_auto_mode,
 )
-from benchbox.core.tuning.packaged_templates import TEMPLATES_ROOT, packaged_template_path
+from benchbox.core.tuning.packaged_templates import (
+    TEMPLATES_ROOT,
+    list_packaged_templates,
+    packaged_template_path,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -1077,3 +1081,33 @@ class TestOutsideCheckoutResolution:
 
         assert "duckdb" in templates
         assert any(f.name == "tpch_tuned.yaml" for f in templates["duckdb"])
+
+
+_REPO_ROOT_PACKAGING = Path(__file__).resolve().parents[3]
+
+
+class TestPackagedTemplateShippingInputs:
+    """The wheel must contain the templates; guard the inclusion mechanism.
+
+    A full wheel build per test run is too heavy, so this pins the two
+    inputs that put `benchbox/**/*.yaml` (including
+    `core/tuning/templates/`) into wheels: the MANIFEST.in recursive
+    include and setuptools `include-package-data`.
+    """
+
+    def test_manifest_in_covers_benchbox_yaml(self):
+        manifest = (_REPO_ROOT_PACKAGING / "MANIFEST.in").read_text()
+        assert "recursive-include benchbox" in manifest
+        line = next(line for line in manifest.splitlines() if line.startswith("recursive-include benchbox"))
+        assert "*.yaml" in line.split()
+
+    def test_pyproject_enables_include_package_data(self):
+        pyproject = (_REPO_ROOT_PACKAGING / "pyproject.toml").read_text()
+        assert "include-package-data = true" in pyproject
+
+    def test_every_packaged_template_is_yaml_covered(self):
+        by_platform = list_packaged_templates()
+        assert by_platform, "no packaged templates discovered"
+        for templates in by_platform.values():
+            for template in templates:
+                assert template.suffix == ".yaml"

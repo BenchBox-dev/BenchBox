@@ -105,7 +105,9 @@ def test_result_carries_verified_data_generation_version(tmp_path) -> None:
     from benchbox.core.runner.runner import _attach_datagen_version
     from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
-    (tmp_path / "_datagen_manifest.json").write_text(json.dumps({"benchmark": "tpch", **current_datagen_stamp("tpch")}))
+    (tmp_path / "_datagen_manifest.json").write_text(
+        json.dumps({"benchmark": "Test Benchmark", **current_datagen_stamp("Test Benchmark")})
+    )
 
     class _Benchmark:
         output_dir = tmp_path
@@ -126,3 +128,21 @@ def test_result_leaves_version_unset_without_verified_manifest(tmp_path) -> None
 
     assert _attach_datagen_version(make_benchmark_results(), _Benchmark()).data_generation_version is None
     assert _attach_datagen_version(make_benchmark_results()).data_generation_version is None
+
+
+def test_result_rejects_manifest_for_another_benchmark(tmp_path) -> None:
+    """A current stamp from an unrelated dataset must not verify the result."""
+    import json
+
+    from benchbox.core.runner.runner import _attach_datagen_version
+    from tests.fixtures.result_dict_fixtures import make_benchmark_results
+
+    (tmp_path / "_datagen_manifest.json").write_text(
+        json.dumps({"benchmark": "tpch", "scale_factor": 1.0, **current_datagen_stamp("tpch")})
+    )
+
+    class _Benchmark:
+        output_dir = tmp_path
+
+    result = _attach_datagen_version(make_benchmark_results(), _Benchmark())
+    assert result.data_generation_version is None

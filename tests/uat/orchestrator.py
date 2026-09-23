@@ -227,7 +227,7 @@ def _datagen_cache_complete(path: Path | None) -> bool:
 
             manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            return True
+            return False
         return bool(manifest_datagen_is_current(manifest))
     except OSError:
         return False

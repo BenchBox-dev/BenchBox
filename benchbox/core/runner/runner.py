@@ -321,13 +321,48 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
     return False
 
 
+def _manifest_matches_result(manifest: Any, result: BenchmarkResults) -> bool:
+    """Check a manifest plausibly describes the dataset behind a result.
+
+    Compares benchmark identity (punctuation-insensitive) and scale factor,
+    but only on fields both sides provide; absent fields do not disqualify.
+    This is a tripwire against output dirs pointing at another benchmark's
+    data, not a proof that these exact files were read.
+    """
+    import re as _re
+
+    if not isinstance(manifest, dict):
+        return False
+
+    def _slug(value: Any) -> str | None:
+        if value is None:
+            return None
+        return _re.sub(r"[^a-z0-9]", "", str(value).lower()) or None
+
+    manifest_benchmark = _slug(manifest.get("benchmark"))
+    result_benchmark = _slug(getattr(result, "benchmark_name", None))
+    if manifest_benchmark and result_benchmark and manifest_benchmark != result_benchmark:
+        return False
+    try:
+        manifest_scale = manifest.get("scale_factor")
+        result_scale = getattr(result, "scale_factor", None)
+        if manifest_scale is not None and result_scale is not None:
+            if float(manifest_scale) != float(result_scale):
+                return False
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
 def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> BenchmarkResults:
     """Stamp the result with the verified data-generation version behind it.
 
     The version is read back from the benchmark's datagen manifest and
-    recorded only when that manifest's stamp is current. Paths that bypass
-    manifest validation (caller-supplied external tables, missing output
-    dir) leave the field unset rather than asserting unverified provenance.
+    recorded only when that manifest's stamp is current and the manifest
+    plausibly describes this result's dataset (matching benchmark/scale).
+    Paths that bypass manifest validation (caller-supplied external tables,
+    missing output dir) leave the field unset rather than asserting
+    unverified provenance.
     """
     try:
         if getattr(result, "data_generation_version", None) is not None:
@@ -345,6 +380,8 @@ def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> 
         with manifest_path.open("r", encoding="utf-8") as handle:
             manifest = _json.load(handle)
         if not manifest_datagen_is_current(manifest):
+            return result
+        if not _manifest_matches_result(manifest, result):
             return result
         result.data_generation_version = manifest.get("data_generation_version")
     except Exception:
@@ -959,7 +996,7 @@ def _build_data_only_result(
     result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=None, database_config=database_config)
     if execution_context is not None:
         result_obj.execution_context = execution_context.model_dump()
-    return result_obj
+    return _attach_datagen_version(result_obj, benchmark)
 
 
 def _clickhouse_load_failure_details(

@@ -823,7 +823,8 @@ Export results with full anonymization:
     leaks = find_public_path_leaks(anonymized_data)
 
     if not leaks:
-        print("✅ Results safely anonymized for public sharing")
+        print("✅ No public-path leaks found - safe to share paths publicly")
+        print("   (path check only - confirm PII sanitizers above separately)")
     else:
         print("⚠️ Anonymization warnings:")
         for path in leaks:

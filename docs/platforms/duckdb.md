@@ -277,8 +277,10 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
 # Check thread count
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=$(nproc)
+```
 
-# Enable progress for visibility (Python API: the progress bar is not a --platform-option)
+The progress bar is not a `--platform-option`; enable it through the Python API:
+
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 

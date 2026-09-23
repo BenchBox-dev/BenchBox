@@ -83,6 +83,12 @@ def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
             continue
         label = platform_label_of(payload)
         old_slug = bool(_BARE_SLUG.search(result.name))
+        if label is not None and not _BARE_LABEL.match(label) and old_slug:
+            anomalies.append(
+                f"conflicting bundle {result.name}: filename slug is bare "
+                f"`clickhouse` but the payload already says {label!r}; fix by hand"
+            )
+            continue
         if (label is not None and _BARE_LABEL.match(label)) or old_slug:
             manifest = result.with_name(f"{result.stem}.manifest.json")
             hits.append(
@@ -104,6 +110,7 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
         FileExistsError: If the rewritten result or sidecar path already
             exists. `--apply` never overwrites a published artifact; resolve
             the collision by hand and re-run.
+        ValueError: If the manifest sidecar is malformed. Nothing is written.
     """
     display = TARGETS[target]
     slug = target.replace("-", "_")
@@ -119,7 +126,15 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
     if new_manifest_guess is not None and new_manifest_guess != hit.manifest and new_manifest_guess.exists():
         raise FileExistsError(f"refusing to overwrite existing sidecar {new_manifest_guess}")
 
+    # Preflight everything before writing: a malformed sidecar aborts the
+    # hit with both originals untouched.
     payload = _load_json(hit.result)
+    sidecar: dict | None = None
+    if hit.manifest is not None:
+        sidecar = _load_json(hit.manifest)
+        if not isinstance(sidecar, dict):
+            raise ValueError(f"malformed manifest sidecar {hit.manifest}")
+
     platform = payload.get("platform")
     if isinstance(platform, dict):
         if platform.get("name") is not None and _BARE_LABEL.match(str(platform["name"])):
@@ -127,20 +142,22 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
     elif isinstance(platform, str) and _BARE_LABEL.match(platform):
         payload["platform"] = display
 
+    # Write the new pair before removing the old one, so a crash leaves both
+    # originals recoverable; re-running then reports a collision, never a
+    # half-migrated bundle.
     _write_json(new_result, payload)
-    if new_result != hit.result:
-        hit.result.unlink()
-
     new_manifest: Path | None = None
-    if hit.manifest is not None:
-        sidecar = _load_json(hit.manifest)
+    if hit.manifest is not None and sidecar is not None:
         sidecar["bundle_file"] = new_result.name
         sidecar["bundle_hash"] = _sha256(new_result)
         new_manifest = hit.manifest
         if new_result != hit.result:
             new_manifest = hit.manifest.with_name(f"{new_result.stem}.manifest.json")
-            hit.manifest.unlink()
         _write_json(new_manifest, sidecar)
+    if new_result != hit.result:
+        hit.result.unlink()
+    if new_manifest is not None and new_manifest != hit.manifest and hit.manifest is not None:
+        hit.manifest.unlink()
     return new_result, new_manifest
 
 
@@ -172,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
     for hit in hits:
         try:
             new_result, _ = migrate_hit(hit, args.target)
-        except FileExistsError as exc:
+        except (FileExistsError, ValueError, OSError) as exc:
             blocked += 1
             print(f"blocked: {exc}")
             continue
