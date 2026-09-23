@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "A release-canary.yml run on a develop SHA containing all required fixes succeeds for every shard and release-canary-result.",
+    "Record the run ID and SHA before finishing."
+  ],
+  "description": "After the three canary fixes merge into develop, verify a scheduled release-canary.yml run on a develop SHA containing all three merges. If new failures appear, create an owned item for each cause, add it to this item's dependencies, and keep this item open. Version bump, release cut, changelog, and UAT evidence are outside this item.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-23T20:25:24Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "a575a9ac710e42efbee8a1a9fb59d00c",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    }
+  ]
+}

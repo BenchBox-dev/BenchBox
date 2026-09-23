@@ -1689,6 +1689,17 @@
       "status": "open",
       "title": "Reject FlightData shards with a bad width again"
     },
+    "canary-green-for-v0-4-1": {
+      "claim": null,
+      "needs": [
+        "canary-tpcdi-etl-incremental-load",
+        "canary-submission-validator-drift",
+        "canary-flightdata-bad-width-shard"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Get one green release canary run on develop before v0.4.1"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
