@@ -494,17 +494,20 @@ class TestMakefileCommands:
     def test_test_ci_is_maintained_broad_local_profile(self):
         repo_root = Path.cwd()
         makefile_content = (repo_root / "Makefile").read_text()
-        pytest_ci_content = (repo_root / "pytest-ci.ini").read_text()
+        pytest_ci_config = ConfigParser()
+        pytest_ci_config.read(repo_root / "pytest-ci.ini")
         pytest_ci_addopts = _load_ini_section(repo_root / "pytest-ci.ini", "pytest")["addopts"]
+        coverage_run = _load_ini_section(repo_root / ".coveragerc_core", "run")
 
         test_ci_body = _makefile_target_body(makefile_content, "test-ci")
         assert "-c pytest-ci.ini" in test_ci_body
         assert '-m "not (slow or stress or resource_heavy or live_integration)"' in test_ci_body
         assert "--cov=benchbox" in test_ci_body
         assert "Maintained broad local CI profile" in makefile_content
-        assert "source = benchbox" in pytest_ci_content
+        assert pytest_ci_config.sections() == ["pytest"]
         assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
-        assert _marker_names(repo_root / "pytest.ini") <= _marker_names(repo_root / "pytest-ci.ini")
+        assert coverage_run["parallel"] == "true"
+        assert _marker_names(repo_root / "pytest.ini") == _marker_names(repo_root / "pytest-ci.ini")
 
         coverage_filter = '-m "not (stress or resource_heavy or live_integration)"'
         for target in ("coverage-all", "coverage-html", "coverage-report"):
