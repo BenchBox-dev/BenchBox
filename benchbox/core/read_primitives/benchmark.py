@@ -292,11 +292,19 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
         elif queries is None:
             queries = list(self.query_manager.get_all_queries().keys())
 
-        results = {
+        try:
+            from benchbox.core.read_primitives.variant_contracts import summarize_variant_comparability
+
+            comparability = summarize_variant_comparability()
+        except Exception:
+            comparability = {"comparable": None, "issue_count": None}
+
+        results: dict[str, Any] = {
             "benchmark": "Read Primitives",
             "scale_factor": self.scale_factor,
             "iterations": iterations,
             "categories": categories,
+            "variant_comparability": comparability,
             "queries": {},
         }
 
@@ -307,9 +315,14 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
             except ValueError:
                 category = "unknown"
 
+            query_comparability = (comparability.get("per_query") or {}).get(str(query_id), {})
             query_results = {
                 "query_id": query_id,
                 "category": category,
+                "comparability": {
+                    "variant_dialects": query_comparability.get("variant_dialects", []),
+                    "issue_count": query_comparability.get("issue_count", 0),
+                },
                 "iterations": [],
                 "avg_time": 0,
                 "min_time": float("inf"),
@@ -380,7 +393,7 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
         Returns:
             Dictionary containing benchmark metadata
         """
-        return {
+        info: dict[str, Any] = {
             "name": self._name,
             "version": self._version,
             "description": self._description,
@@ -390,6 +403,13 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
             "tables": list(TABLES.keys()),
             "schema": "TPC-H",
         }
+        try:
+            from benchbox.core.read_primitives.variant_contracts import summarize_variant_comparability
+
+            info["variant_comparability"] = summarize_variant_comparability()
+        except Exception:
+            info["variant_comparability"] = {"comparable": None, "issue_count": None}
+        return info
 
     def _check_compatible_tpch_database(self, connection: DatabaseConnection) -> bool:
         """Check if an existing TPC-H database is compatible with Read Primitives requirements.

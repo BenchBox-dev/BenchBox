@@ -1279,3 +1279,28 @@ class TestSimulatedInstalledEnvironmentDiscovery:
         display_tuning_list(mock_console, platform="duckdb")
 
         assert mock_console.print.called
+
+
+class TestOutsideCheckoutResolution:
+    """`--tuning tuned` must resolve outside a repo checkout via the packaged tier."""
+
+    def test_tuned_template_resolves_from_bare_directory(self, tmp_path, monkeypatch):
+        """No examples/tunings, no env var: the packaged copy still resolves."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("BENCHBOX_TUNING_PATH", raising=False)
+
+        paths = get_tuning_template_paths("duckdb", "tpch")
+        existing = [p for p in paths if p.exists()]
+
+        assert existing
+        assert existing[0] == packaged_template_path("duckdb", "tpch")
+        assert existing[0].is_absolute()
+
+    def test_tuning_list_falls_back_to_packaged_templates(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("BENCHBOX_TUNING_PATH", raising=False)
+
+        templates = list_available_tuning_templates(platform="duckdb", benchmark="tpch")
+
+        assert "duckdb" in templates
+        assert any(f.name == "tpch_tuned.yaml" for f in templates["duckdb"])

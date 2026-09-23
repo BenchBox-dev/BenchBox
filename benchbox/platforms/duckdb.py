@@ -610,6 +610,8 @@ class DuckDBAdapter(PlatformAdapter):
         # ever sees this rebuilt config, never the original.
         for key in [
             "thread_limit",
+            "max_temp_directory_size",
+            "progress_bar",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

@@ -324,9 +324,17 @@ class DataGenerationManifest:
                 }
             }
 
+        try:
+            from benchbox.core.datagen_version import current_datagen_stamp
+
+            datagen_stamp = current_datagen_stamp(self._benchmark)
+        except Exception:
+            datagen_stamp = {}
+
         manifest: dict[str, Any] = {
             "version": 2,
             "benchmark": self._benchmark.lower(),
+            **datagen_stamp,
             "scale_factor": float(self._scale_factor),
             "formats": list(self._formats),  # List of available formats
             "format_preference": list(self._formats),  # Default preference order

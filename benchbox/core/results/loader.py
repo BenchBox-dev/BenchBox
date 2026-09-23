@@ -333,6 +333,7 @@ def reconstruct_benchmark_results(
         _benchmark_id_override=benchmark_section.get("id"),
         compliance_class=benchmark_section.get("compliance_class"),
         dataset_version=benchmark_section.get("dataset_version"),
+        data_generation_version=benchmark_section.get("data_generation_version"),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),

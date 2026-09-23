@@ -324,6 +324,44 @@ class TestInteractionStaysInTheCli:
         cli_source = (REPO_ROOT / "benchbox/cli/orchestrator.py").read_text(encoding="utf-8")
         assert "_offer_and_run_credential_setup" in cli_source
 
+    def test_the_cli_warns_on_variant_comparability_issues(self, tmp_path):
+        from benchbox.cli.orchestrator import BenchmarkOrchestrator
+
+        printed = []
+
+        class _Console:
+            def print(self, message):
+                printed.append(str(message))
+
+        class _Benchmark:
+            def get_benchmark_info(self):
+                return {"variant_comparability": {"comparable": False, "issue_count": 2}}
+
+        orchestrator = BenchmarkOrchestrator(base_dir=str(tmp_path))
+        orchestrator.console = _Console()
+        orchestrator._warn_on_variant_comparability_issues(_Benchmark())
+
+        assert any("comparability" in message for message in printed)
+
+    def test_the_cli_stays_silent_when_variants_are_comparable(self, tmp_path):
+        from benchbox.cli.orchestrator import BenchmarkOrchestrator
+
+        printed = []
+
+        class _Console:
+            def print(self, message):
+                printed.append(str(message))
+
+        class _Benchmark:
+            def get_benchmark_info(self):
+                return {"variant_comparability": {"comparable": True, "issue_count": 0}}
+
+        orchestrator = BenchmarkOrchestrator(base_dir=str(tmp_path))
+        orchestrator.console = _Console()
+        orchestrator._warn_on_variant_comparability_issues(_Benchmark())
+
+        assert printed == []
+
     def test_the_cli_still_owns_the_load_phase_warning(self):
         source = (REPO_ROOT / "benchbox/cli/orchestrator.py").read_text(encoding="utf-8")
 

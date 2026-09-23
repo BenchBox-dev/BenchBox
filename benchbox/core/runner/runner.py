@@ -321,6 +321,43 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
     return False
 
 
+def _attach_datagen_version(result: BenchmarkResults) -> BenchmarkResults:
+    """Stamp the result with the data-generation version that produced it."""
+    try:
+        from benchbox.core.datagen_version import DATA_GENERATION_VERSION
+
+        if getattr(result, "data_generation_version", None) is None:
+            result.data_generation_version = DATA_GENERATION_VERSION
+    except Exception:
+        pass
+    return result
+
+
+def _attach_variant_comparability_metadata(result: BenchmarkResults, benchmark: Any) -> BenchmarkResults:
+    """Attach read_primitives variant comparability to execution metadata.
+
+    Reads the ``variant_comparability`` summary the benchmark exposes via
+    ``get_benchmark_info()`` (see
+    ``benchbox.core.read_primitives.variant_contracts``) and persists it on
+    ``execution_metadata["variant_comparability"]`` so CLI output and saved
+    result artifacts report which query variants were compared. Benchmarks
+    without the summary are untouched. Best-effort: never fails the run.
+    """
+    try:
+        info_getter = getattr(benchmark, "get_benchmark_info", None)
+        if info_getter is None:
+            return result
+        summary = (info_getter() or {}).get("variant_comparability")
+        if not isinstance(summary, dict) or not summary:
+            return result
+        if not isinstance(result.execution_metadata, dict):
+            result.execution_metadata = {}
+        result.execution_metadata["variant_comparability"] = summary
+    except Exception:
+        pass
+    return result
+
+
 def _attach_translation_metadata(
     result: BenchmarkResults,
     outcomes: list[SqlTranslationOutcome],
@@ -1359,7 +1396,9 @@ def run_benchmark_lifecycle(
         )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
-        return _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
+        result_obj = _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
+        result_obj = _attach_variant_comparability_metadata(result_obj, benchmark)
+        return _attach_datagen_version(result_obj)
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1429,7 +1468,9 @@ def run_benchmark_lifecycle(
         resource_monitor=resource_monitor,
         execution_context=execution_context,
     )
-    return _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
+    finalized = _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
+    finalized = _attach_variant_comparability_metadata(finalized, benchmark)
+    return _attach_datagen_version(finalized)
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1846,6 +1887,14 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
             return False, None, True
 
         if float(manifest.get("scale_factor", -1)) != float(config.scale_factor):
+            return False, None, True
+
+        from benchbox.core.datagen_version import describe_datagen_staleness, manifest_datagen_is_current
+
+        if not manifest_datagen_is_current(manifest, benchmark=manifest_benchmark):
+            reason = describe_datagen_staleness(manifest, benchmark=manifest_benchmark)
+            logger.warning("Datagen manifest is stale (%s); regenerating benchmark data", reason)
+            emit(f"\u26a0\ufe0f Cached data is stale ({reason}); regenerating (as if --force datagen)")
             return False, None, True
 
         from benchbox.utils.datagen_manifest import get_table_files

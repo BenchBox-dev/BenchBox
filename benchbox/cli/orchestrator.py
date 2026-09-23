@@ -245,6 +245,7 @@ class BenchmarkOrchestrator:
             self.console.print(
                 f"[green]✅[/green] Loaded benchmark: [cyan]{getattr(benchmark, '_name', config.name)}[/cyan]"
             )
+            self._warn_on_variant_comparability_issues(benchmark)
 
             # Compute platform config (dict) if a database is provided
             # Include benchmark context for config-aware adapters (Databricks, Snowflake, etc.)
@@ -309,6 +310,24 @@ class BenchmarkOrchestrator:
             # Fall through to existing error handling
             self.console.print(f"[red]❌ Benchmark execution failed: {e}[/red]")
             return _build_failure_result(config, e)
+
+    def _warn_on_variant_comparability_issues(self, benchmark) -> None:
+        """Warn when variant contracts report comparability issues. Console-only, CLI-scoped."""
+        info_getter = getattr(benchmark, "get_benchmark_info", None)
+        if info_getter is None:
+            return
+        try:
+            summary = (info_getter() or {}).get("variant_comparability") or {}
+        except Exception:
+            return
+        issue_count = summary.get("issue_count")
+        if not issue_count:
+            return
+        self.console.print(
+            "[yellow]⚠️  Read-primitives variant contracts report "
+            f"{issue_count} comparability issue(s); cross-dialect comparisons "
+            "for the affected queries may not be like-for-like.[/yellow]"
+        )
 
     def _warn_on_execute_without_load(self, config, database_config, phases_to_run) -> None:
         """Warn when a cloud run queries without loading. Console-only, CLI-scoped."""

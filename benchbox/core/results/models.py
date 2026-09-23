@@ -455,6 +455,11 @@ class BenchmarkResults:
     total_rows_loaded: int = 0
     data_size_mb: float = 0.0
     table_statistics: dict[str, int] = field(default_factory=dict)
+    # Data-generation version (benchbox.core.datagen_version.DATA_GENERATION_VERSION)
+    # that produced the data this result ran against. Results stamped with
+    # different versions must not be silently compared. None for results
+    # predating the stamp.
+    data_generation_version: str | int | None = None
     # Optional detailed per-query timing info (for CSV export and analysis)
     per_query_timings: list[dict[str, Any]] | None = field(default_factory=list)
     # Optional detailed structures

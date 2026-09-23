@@ -157,7 +157,7 @@ export function Home(_: RoutableProps) {
                   {showRecentPower && <th class="table-th">Power score</th>}
                   <th
                     class="table-th"
-                    title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
+                    title="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
                   >
                     Geomean
                   </th>

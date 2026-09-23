@@ -1001,7 +1001,7 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
                   scope="col"
                   aria-sort={ariaSort("geomean_ms")}
                   aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}
-                  title="Geometric mean of per-query execution times (measurement runs only). Lower is faster."
+                  title="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
                 >
                   <button
                     type="button"

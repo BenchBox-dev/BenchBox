@@ -479,6 +479,8 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
     compliance_class = getattr(result, "compliance_class", None)
     if compliance_class is not None:
         section["compliance_class"] = compliance_class
+    if getattr(result, "data_generation_version", None) is not None:
+        section["data_generation_version"] = result.data_generation_version
     section.update(_dataset_identity_fields(result))
     return section
 
@@ -735,6 +737,7 @@ def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dic
             exec_block[key] = ctx[key]
 
     _inject_translation_metadata(exec_block, result)
+    _inject_variant_comparability_metadata(exec_block, result)
     return exec_block
 
 
@@ -750,6 +753,7 @@ def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[st
         exec_block["mode"] = mode_value
     _inject_driver_metadata(exec_block, driver_metadata)
     _inject_translation_metadata(exec_block, result)
+    _inject_variant_comparability_metadata(exec_block, result)
     return exec_block
 
 
@@ -858,6 +862,15 @@ def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkRe
     translation = result.execution_metadata.get("translation")
     if isinstance(translation, Mapping):
         exec_block["translation"] = dict(translation)
+
+
+def _inject_variant_comparability_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
+    """Inject read_primitives variant comparability into the execution block."""
+    if not isinstance(result.execution_metadata, Mapping):
+        return
+    comparability = result.execution_metadata.get("variant_comparability")
+    if isinstance(comparability, Mapping):
+        exec_block["variant_comparability"] = dict(comparability)
 
 
 def _shorten_benchmark_name(name: str) -> str:
