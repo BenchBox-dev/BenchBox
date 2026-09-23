@@ -9,6 +9,8 @@ import pytest
 
 from scripts import release_finalize
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 HEAD = "a" * 40
 MERGE = "b" * 40
 
