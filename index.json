@@ -1195,7 +1195,7 @@
       "needs": [
         "benchbox-score-manifest-schema"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Implement the replayable score calculator"
     },
