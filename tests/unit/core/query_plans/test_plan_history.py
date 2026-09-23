@@ -718,8 +718,8 @@ class TestFingerprintVersionLegacy:
 
 
 class TestPlatformPartitionAndVersionAwareMetrics:
-    """FINDING-03/04: version history must partition by platform and the CLI
-    must count versions, not raw fingerprints."""
+    """Version history partitions by platform, and CLI metrics count plan
+    versions rather than raw fingerprint strings."""
 
     def _add(self, history: PlanHistory, exec_id: str, platform: str, fp: str) -> None:
         plan = _create_plan_with_fingerprint("q1", fp)
@@ -766,3 +766,16 @@ class TestPlatformPartitionAndVersionAwareMetrics:
             assert result.exit_code == 0, result.output
             assert "Unique plans: 1" in result.output
             assert "Plan changes: 0" in result.output
+
+    def test_flap_back_counts_two_unique_plans(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history_dir = Path(tmpdir)
+            history = PlanHistory(history_dir)
+            for i, fp in enumerate(("a" * 64, "b" * 64, "a" * 64)):
+                self._add(history, f"run{i}", "duckdb", fp)
+            assert [v for _, v in history.get_plan_version_history("q1")] == [1, 2, 3]
+            assert history.count_unique_plans("q1") == 2
+            result = CliRunner().invoke(plan_history, ["--query-id", "q1", "--history-dir", str(history_dir)])
+            assert result.exit_code == 0, result.output
+            assert "Unique plans: 2" in result.output
+            assert "Plan changes: 1" in result.output

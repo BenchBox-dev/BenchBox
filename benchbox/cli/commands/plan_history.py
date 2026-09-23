@@ -128,9 +128,10 @@ def plan_history(
 
         console.print(table)
 
-        # Summary statistics (version-aware: distinct plan versions, not raw
-        # fingerprint strings).
-        unique_plans = len({v for _, v in versions}) if versions else 0
+        # Summary statistics (identity-aware: distinct logical plans — version
+        # numbers identify change episodes, so an A -> B -> A flap must not
+        # count three).
+        unique_plans = history.count_unique_plans(query_id, platform=platform)
         console.print()
         console.print("[bold]Summary:[/bold]")
         console.print(f"  Unique plans: {unique_plans}")

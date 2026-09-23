@@ -309,7 +309,10 @@ class PlanHistory:
 
         Returns:
             List of (fingerprint, version) tuples where version increments
-            each time fingerprint changes
+            each time fingerprint changes. Without ``platform``, runs from
+            every engine form one interleaved lineage, so adjacent entries
+            may compare fingerprints across engines; pass ``platform`` for
+            a per-engine lineage.
         """
         history = self.query_plan_history(query_id, platform=platform)
         versions: list[tuple[str, int]] = []
@@ -333,6 +336,43 @@ class PlanHistory:
             versions.append((entry.fingerprint, current_version))
 
         return versions
+
+    def count_unique_plans(self, query_id: str, platform: str | None = None) -> int:
+        """Count distinct logical plans in a query's history.
+
+        Version numbers identify change episodes, not plans: an ``A -> B ->
+        A`` flap mints versions ``1, 2, 3`` for only two plans. Identity is
+        therefore tracked separately from versioning. Two entries are the
+        same plan when their ``(fingerprint, fingerprint_version)`` pair
+        matches an earlier entry; a fingerprint_version boundary crossing
+        joins the previous entry's plan (a re-encoding of the same plan
+        hashes differently, so the boundary alone is never a new plan).
+
+        Args:
+            query_id: Query identifier
+            platform: Optional platform filter, same semantics as
+                :meth:`query_plan_history`.
+
+        Returns:
+            Number of distinct logical plans (0 when there is no history)
+        """
+        history = self.query_plan_history(query_id, platform=platform)
+        plan_of: list[int] = []
+        seen: dict[tuple[str, int], int] = {}
+        next_plan = 0
+        for i, entry in enumerate(history):
+            key = (entry.fingerprint, entry.fingerprint_version)
+            if key in seen:
+                plan_of.append(seen[key])
+                continue
+            if i > 0 and entry.fingerprint_version != history[i - 1].fingerprint_version:
+                plan_id = plan_of[i - 1]
+            else:
+                plan_id = next_plan
+                next_plan += 1
+            seen[key] = plan_id
+            plan_of.append(plan_id)
+        return len(set(plan_of))
 
     def get_all_query_ids(self) -> set[str]:
         """Get all query IDs in the history."""
