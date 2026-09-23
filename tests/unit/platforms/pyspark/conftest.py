@@ -31,7 +31,9 @@ _java_version, _java_home = ensure_compatible_java()
 _IS_WINDOWS = sys.platform == "win32"
 PYSPARK_SQL_TESTS_SKIPPED = _IS_WINDOWS or not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
 PYSPARK_SQL_SKIP_REASON = (
-    "PySpark tests skipped on Windows - Hadoop requires winutils.exe setup" if _IS_WINDOWS else get_java_skip_reason()
+    "PySpark tests skipped on Windows - Hadoop requires winutils.exe setup"
+    if _IS_WINDOWS
+    else get_java_skip_reason() or "PySpark or a compatible Java runtime is unavailable"
 )
 
 
