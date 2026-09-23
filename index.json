@@ -13018,10 +13018,15 @@
       "title": "Create a mandatory release-required test contract for main PRs"
     },
     "release-skill-uat-advisory-catalog-sync": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T21:06:27Z",
+        "generation": "503401b40d23494fb14c4464b979146f",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Correct the release skill's UAT precondition at its catalog source"
     },
     "release-tag-publish-hardening": {
