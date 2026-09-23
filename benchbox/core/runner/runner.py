@@ -365,6 +365,18 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark:
     return True
 
 
+def _dataset_identity_established(*, freshly_generated: bool, manifest_reused: bool, phases: LifecyclePhases) -> bool:
+    """Decide whether this run established the measured dataset's identity.
+
+    Result provenance may only describe the output-dir manifest when the load
+    phase read this run's files into the measured database. Generate-plus-power
+    without load measures the pre-existing database, so a fresh manifest would
+    misattribute the dataset; likewise a manifest reuse counts only when load
+    reads its files.
+    """
+    return bool(phases.load) and (freshly_generated or manifest_reused)
+
+
 def _attach_datagen_version(
     result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
 ) -> BenchmarkResults:
@@ -1412,11 +1424,18 @@ def run_benchmark_lifecycle(
             validation_records=validation_records,
         )
     # Result provenance may only describe the output-dir manifest when this
-    # run established the dataset identity: fresh generation, or a manifest
-    # reuse whose files the load phase then reads. Execute-only runs against
-    # an existing database (and caller-supplied external tables) leave the
-    # fields unset rather than asserting unverified provenance.
-    dataset_identity_established = freshly_generated or (manifest_reused and bool(phases.load))
+    # run established the dataset identity: generation this run produced AND
+    # the load phase read into the measured database. Generate-plus-power
+    # without load measures the pre-existing database, so stamping the fresh
+    # manifest would misattribute the dataset; likewise a manifest reuse
+    # counts only when load reads its files. Execute-only runs against an
+    # existing database (and caller-supplied external tables) leave the
+    # fields unset rather than asserting unverified provenance. (Data-only
+    # results attach unconditionally in _build_data_only_result: that result
+    # is about the generated data itself, not a measured database.)
+    dataset_identity_established = _dataset_identity_established(
+        freshly_generated=freshly_generated, manifest_reused=manifest_reused, phases=phases
+    )
 
     if test_type == "data_only":
         return _build_data_only_result(

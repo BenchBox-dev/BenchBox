@@ -143,6 +143,25 @@ def test_data_only_mode_propagates_duration_seconds():
 
 
 @pytest.mark.unit
+def test_dataset_identity_requires_load():
+    """Provenance needs load plus generation-or-reuse.
+
+    Generate-plus-power without load measures the pre-existing database, so
+    even freshly generated files must not stamp the result.
+    """
+    from benchbox.core.runner.runner import _dataset_identity_established
+
+    loaded = LifecyclePhases(generate=True, load=True, execute=True)
+    assert _dataset_identity_established(freshly_generated=True, manifest_reused=False, phases=loaded) is True
+    assert _dataset_identity_established(freshly_generated=False, manifest_reused=True, phases=loaded) is True
+    assert _dataset_identity_established(freshly_generated=False, manifest_reused=False, phases=loaded) is False
+
+    no_load = LifecyclePhases(generate=True, load=False, execute=True)
+    assert _dataset_identity_established(freshly_generated=True, manifest_reused=False, phases=no_load) is False
+    assert _dataset_identity_established(freshly_generated=False, manifest_reused=True, phases=no_load) is False
+
+
+@pytest.mark.unit
 def test_load_only_mode_invokes_adapter_load(tmp_path):
     cfg = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="load_only")
     db = DatabaseConfig(type="duckdb", name="test")
