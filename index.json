@@ -18723,6 +18723,13 @@
       "status": "done",
       "title": "w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.\n"
     },
+    "w4-postgres-cell-first-live-nightly": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Verify w4 Postgres cell on first live nightly run"
+    },
     "webkit-smoke-fix-or-demote": {
       "claim": null,
       "needs": [],

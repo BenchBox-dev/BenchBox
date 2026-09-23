@@ -1,0 +1,4 @@
+{
+  "context": "The w4 cell (Docker Postgres TPC-H SF1, run-official --streams 3, self-managed compose) was wired into the throughput-uat job in #2303 after the last nightly run, so no nightly has executed it yet. Wiring verified by config load, sweep DRY_RUN, and YAML parse only.",
+  "description": "Confirm the first scheduled nightly run executes the new Postgres throughput cell green: pg sweep completes and the postgresql stream-count/success assert passes. If it fails, fix wiring or cell (timeout, compose, result glob) rather than the contract."
+}
