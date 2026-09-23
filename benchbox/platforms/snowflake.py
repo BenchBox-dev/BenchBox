@@ -312,14 +312,18 @@ class SnowflakeAdapter(PlatformAdapter):
                 platform_info["engine_version"] = platform_info["platform_version"]
                 platform_info["engine_version_source"] = "sql_query"
 
-                # Get current region and cloud provider
+                # Get current region. CURRENT_REGION() embeds the cloud prefix
+                # (e.g. AWS_US_EAST_2); there is no CURRENT_CLOUD() function.
                 try:
-                    result = cursor.execute("SELECT current_region(), current_cloud()").fetchone()
-                    if result:
-                        platform_info["cloud_region"] = result[0]
-                        platform_info["cloud_provider"] = result[1]
+                    result = cursor.execute("SELECT CURRENT_REGION()").fetchone()
+                    if result and result[0]:
+                        region = str(result[0])
+                        platform_info["cloud_region"] = region
+                        provider = region.split("_", 1)[0].upper()
+                        if provider in ("AWS", "AZURE", "GCP"):
+                            platform_info["cloud_provider"] = provider
                 except Exception as e:
-                    self.logger.debug(f"Could not query Snowflake region/cloud: {e}")
+                    self.logger.debug(f"Could not query Snowflake region: {e}")
 
                 # Try to get warehouse metadata (requires appropriate permissions)
                 if self.warehouse:

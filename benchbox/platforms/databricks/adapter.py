@@ -868,6 +868,17 @@ class DatabricksAdapter(PlatformAdapter):
             )
             platform_info["compute_configuration"] = self._unavailable_warehouse_metadata(warehouse_id, e)
 
+        # Detect the workspace region when it was not configured. The
+        # detected value flows into configuration["region"], which the
+        # normalized cloud metadata reads.
+        if not self.region:
+            detected_region = self._detect_databricks_region()
+            if detected_region:
+                self.region = detected_region
+                configuration = platform_info.get("configuration")
+                if isinstance(configuration, dict):
+                    configuration["region"] = detected_region
+
         return platform_info
 
     def get_normalized_result_metadata(
@@ -893,6 +904,27 @@ class DatabricksAdapter(PlatformAdapter):
         if not http_path or "/warehouses/" not in http_path:
             return None
         return http_path.split("/warehouses/")[-1].strip("/") or None
+
+    def _detect_databricks_region(self) -> str | None:
+        """Detect the workspace region via the Unity Catalog metastore summary.
+
+        The workspace hostname does not embed the region, so the region is
+        read from the metastore summary when it was not configured. Best
+        effort: returns None when the SDK is unavailable, credentials are
+        missing, or the API call fails. Never raises.
+        """
+        try:
+            from databricks.sdk import WorkspaceClient
+
+            if not self.server_hostname or not self.access_token:
+                return None
+            workspace = WorkspaceClient(host=f"https://{self.server_hostname}", token=self.access_token)
+            summary = workspace.metastores.summary()
+            region = getattr(summary, "region", None)
+            return region.strip() if isinstance(region, str) and region.strip() else None
+        except Exception as e:
+            self.logger.debug(f"Could not detect Databricks workspace region: {e}")
+            return None
 
     @staticmethod
     def _is_serverless_warehouse(compute: Mapping[str, Any]) -> bool:

@@ -194,6 +194,91 @@ class TestGetPlatformInfoSdkPath:
 
 
 # ---------------------------------------------------------------------------
+# workspace region detection via metastore summary
+# ---------------------------------------------------------------------------
+
+
+class TestDetectDatabricksRegion:
+    """Test workspace region detection when the region was not configured."""
+
+    def _mock_sdk_with_region(self, region):
+        mock_summary = MagicMock()
+        mock_summary.region = region
+        mock_workspace = MagicMock()
+        mock_workspace.metastores.summary.return_value = mock_summary
+        # Fail warehouse lookup: an unconstrained warehouses.get() mock would
+        # store MagicMocks throughout compute_configuration, which the
+        # normalization path cannot sanitize promptly.
+        mock_workspace.warehouses.get.side_effect = RuntimeError("warehouse lookup disabled")
+        mock_sdk = MagicMock()
+        mock_sdk.WorkspaceClient.return_value = mock_workspace
+        return mock_sdk, mock_workspace
+
+    def test_detected_region_fills_unconfigured_region(self):
+        adapter = _make_adapter()
+        assert adapter.region is None
+
+        mock_sdk, _ = self._mock_sdk_with_region("us-east-2")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region == "us-east-2"
+        assert info["configuration"]["region"] == "us-east-2"
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+        assert metadata["platform_cloud"]["region"] == "us-east-2"
+        assert metadata["platform_cloud"]["region_collection_status"] == "available"
+
+    def test_configured_region_takes_precedence_over_detection(self):
+        adapter = _make_adapter(region="us-west-2")
+
+        mock_sdk, mock_workspace = self._mock_sdk_with_region("us-east-2")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region == "us-west-2"
+        assert info["configuration"]["region"] == "us-west-2"
+        mock_workspace.metastores.summary.assert_not_called()
+
+    def test_detection_failure_leaves_region_unset(self):
+        adapter = _make_adapter()
+
+        mock_sdk = MagicMock()
+        mock_sdk.WorkspaceClient.side_effect = RuntimeError("SDK error")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region is None
+        assert info["configuration"]["region"] is None
+
+    def test_detection_rejects_blank_region(self):
+        adapter = _make_adapter()
+
+        mock_sdk, _ = self._mock_sdk_with_region("   ")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region is None
+        assert info["configuration"]["region"] is None
+
+
+# ---------------------------------------------------------------------------
 # normalized result metadata
 # ---------------------------------------------------------------------------
 

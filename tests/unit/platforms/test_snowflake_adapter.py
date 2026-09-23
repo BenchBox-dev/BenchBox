@@ -2010,20 +2010,24 @@ class TestSnowflakeGetPlatformInfo:
         mock_connection.cursor.return_value = mock_cursor
 
         # First call: SELECT current_version()
-        # Second call: SELECT current_region(), current_cloud()
+        # Second call: SELECT CURRENT_REGION() (single column; the cloud
+        # prefix is embedded, e.g. AWS_US_EAST_1). There is no
+        # CURRENT_CLOUD() function, so no query may reference it.
         # Third call: SHOW WAREHOUSES (raise to skip)
         # Fourth call: SELECT current_account_name() (raise to skip)
         mock_cursor.execute.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
             ("8.12.3",),  # current_version()
-            ("AWS_US_EAST_1", "AWS"),  # current_region(), current_cloud()
+            ("AWS_US_EAST_1",),  # CURRENT_REGION()
             Exception("skip"),  # will be caught
         ]
 
         call_count = [0]
+        executed_statements = []
 
         def side_effect_execute(sql):
             call_count[0] += 1
+            executed_statements.append(sql)
             if "SHOW WAREHOUSES" in sql:
                 raise Exception("skip warehouses")
             if "current_account_name" in sql:
@@ -2039,6 +2043,8 @@ class TestSnowflakeGetPlatformInfo:
         assert result["engine_version_source"] == "sql_query"
         assert result["cloud_region"] == "AWS_US_EAST_1"
         assert result["cloud_provider"] == "AWS"
+        assert executed_statements, "expected the adapter to issue SQL queries"
+        assert all("current_cloud" not in sql.lower() for sql in executed_statements)
 
 
 class TestSnowflakeConfigValidation:
