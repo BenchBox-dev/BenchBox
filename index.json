@@ -13236,10 +13236,15 @@
       "title": "✅ Replace Merge Benchmark with Write Primitives"
     },
     "replace-q16-q22-result-replay-variants-with-deeper-hand-writ": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-24T14:10:46Z",
+        "generation": "82f757a2be4044dbae836c82889a6c25",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:c34f7fdc20585bf7d833c1a2"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
     },
     "reproduce-postgres-integration-needs-a-live-postgres-inside": {
