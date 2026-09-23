@@ -1204,7 +1204,7 @@
       "needs": [
         "benchbox-score-workload-contracts"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Define score capability and lineage matrices"
     },
