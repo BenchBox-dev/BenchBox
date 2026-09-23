@@ -187,8 +187,6 @@ class TestStandardizedTestCommands:
         assert "fast:" in pytest_ini_content
         assert "unit:" in pytest_ini_content
         assert "integration:" in pytest_ini_content
-        assert "flaky:" in pytest_ini_content
-        assert "local_only:" in pytest_ini_content
         assert "markers =" in pytest_ini_content
         assert "not slow and not stress and not live_integration and not resource_heavy" in pytest_ini_content
 
@@ -501,14 +499,19 @@ class TestMakefileCommands:
 
         test_ci_body = _makefile_target_body(makefile_content, "test-ci")
         assert "-c pytest-ci.ini" in test_ci_body
-        assert '-m "not (slow or flaky or local_only)"' in test_ci_body
+        assert '-m "not (slow or stress or resource_heavy or live_integration)"' in test_ci_body
         assert "--cov=benchbox" in test_ci_body
         assert "Maintained broad local CI profile" in makefile_content
-        assert "flaky:" in pytest_ci_content
-        assert "local_only:" in pytest_ci_content
         assert "source = benchbox" in pytest_ci_content
         assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
         assert _marker_names(repo_root / "pytest.ini") <= _marker_names(repo_root / "pytest-ci.ini")
+
+        coverage_filter = '-m "not (stress or resource_heavy or live_integration)"'
+        for target in ("coverage-all", "coverage-html", "coverage-report"):
+            assert coverage_filter in _makefile_target_body(makefile_content, target)
+        assert '-m "not (stress or resource_heavy or live_integration)"' not in _makefile_target_body(
+            makefile_content, "coverage-opt-in-all"
+        )
 
     def test_coverage_threshold_policy_distinguishes_blocking_and_advisory_thresholds(self):
         repo_root = Path.cwd()

@@ -71,8 +71,10 @@ uv run -- python -m pytest -m "integration and not live_integration"
 
 # With coverage (fast tests only - quick feedback)
 make coverage-fast
-# or full suite
+# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
+# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
+make coverage-opt-in-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```
