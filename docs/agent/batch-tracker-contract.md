@@ -44,9 +44,11 @@ activation permit.
 ## Catalog delivery boundary
 
 The corresponding canonical `todo` skill documentation is merged in
-skill-sync-skills PR #80 at `c8473708b5c7809700e8449ecde0dabcdc8e9892`, and
-BenchBox pins that revision in `skill-sync.conf`. The tracked `.claude/skills`
-mirror and the ignored `.agents/skills` materialization were regenerated from
+skill-sync-skills PR #80 at `c8473708b5c7809700e8449ecde0dabcdc8e9892`.
+BenchBox's `skill-sync.conf` pins a later catalog revision that contains it:
+`67ab679ded13f2ab47151a3bd7d1e41855357202` (PR #82), which also documents the
+`not_before` readiness hold in todo-db 0.8.0. The tracked `.claude/skills`
+mirror and the ignored `.agents/skills` materialization are regenerated from
 that pin. Generated mirrors are never hand-edited; `make skill-sync-check`
 verifies their parity when the ignored local materialization is present.
 

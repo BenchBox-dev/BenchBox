@@ -98,7 +98,7 @@ first page, never skip ahead.
 
 | Code | Meaning | Do |
 |---|---|---|
-| `E_NOTHING_READY` | Nothing claimable. | Report it. Do not invent work. |
+| `E_NOTHING_READY` | Nothing claimable, or `take`/`finish` hit a `not_before` hold. | Report it. Do not invent work or clear someone else's hold to get around it. |
 | `E_MULTIPLE_CLAIMS` | You already hold a claim. | Finish or `release` it first. |
 | `E_CLAIM_STALE` | Wrong generation or another holder. | `show_item`, then `take` again if it is free. |
 | `E_CONFLICT` | Someone changed the task first. | Re-read, re-evaluate; never overwrite blindly. |
@@ -119,18 +119,28 @@ Conflicts, lost claims, and offline handling in full: `references/recovery.md`.
 `register_batch` takes the immutable repository and integration contract before
 member enrollment. `create_item` takes `id`, `title`, and optionally `priority` (default
 `medium`), `description`, `needs` (IDs this task waits on), `acceptance`,
-`links`, `context`, and explicit batch metadata. Batch metadata names a
+`links`, `context`, `not_before`, and explicit batch metadata. Batch metadata names a
 `batch_id`, `member_id`, and `implementation_dependencies`; it is never
 inferred from `needs`. IDs use `a-z0-9-` (start/end alphanumeric). Titles are
 1–200 characters. There is no work breakdown, scope gate, or verification
 ladder: an ordinary task closes with `take` + `finish`.
 
-`update_item` amends title/priority/description/needs/sections, or moves status
-between `open` and `blocked`. Closing goes through `finish`; dropping a task is
-a human decision reported to the user.
+`update_item` amends title/priority/description/needs/sections/`not_before`,
+or moves status between `open` and `blocked`. Closing goes through `finish`;
+dropping a task is a human decision reported to the user.
+
+Use `not_before` rather than `blocked` when a task is waiting for a known time,
+such as the end of a measurement window. It takes a future RFC 3339 time with
+`Z` or an offset. The task stays `open`, leaves the ready queue until then, and
+returns on its own; rows and `show_item` show `waiting_until` meanwhile, and
+`take` and `finish` refuse it with `E_NOTHING_READY` — a hold set while you
+hold the claim still blocks `finish`, so `release` instead. The hold also
+applies while the task is `blocked`. `not_before=""` clears the hold. Use
+`blocked` for work stalled on something with no known end. Clients older than
+todo-db 0.8.0 keep the field but do not enforce the hold.
 
 `list_items(ready_only=true)` returns only claimable tasks: `open`, unclaimed,
-dependencies all `done`, except that an explicitly registered same-batch
+not held by a future `not_before`, dependencies all `done`, except that an explicitly registered same-batch
 implementation edge may consume a valid prepared receipt whose accepted head is
 present at the registered integration head and whose base, scope, owner
 generation, repository, and member identity all match. Readiness and unlock

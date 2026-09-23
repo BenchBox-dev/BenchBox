@@ -16,7 +16,8 @@ class StateContractError(ValueError):
 
 EXPECTED_REMOTE = "https://github.com/BenchBox-dev/BenchBox.git"
 EXPECTED_BRANCH = "todo-state"
-EXPECTED_WHEEL = "todo_db-0.7.3-py3-none-any.whl"
+EXPECTED_VERSION = "0.8.0"
+EXPECTED_WHEEL = f"todo_db-{EXPECTED_VERSION}-py3-none-any.whl"
 
 
 def validate_contract(*, repo_root: Path) -> None:
@@ -59,8 +60,8 @@ def validate_contract(*, repo_root: Path) -> None:
                 raise StateContractError(f"cannot read package metadata from {wheels[0]}") from exc
     except (OSError, zipfile.BadZipFile) as exc:
         raise StateContractError(f"cannot inspect {wheels[0]}: {exc}") from exc
-    if "Name: todo-db\n" not in metadata or "Version: 0.7.3\n" not in metadata:
-        raise StateContractError(f"{wheels[0]} does not identify the reviewed todo-db 0.7.3 runtime")
+    if "Name: todo-db\n" not in metadata or f"Version: {EXPECTED_VERSION}\n" not in metadata:
+        raise StateContractError(f"{wheels[0]} does not identify the reviewed todo-db {EXPECTED_VERSION} runtime")
 
 
 def main(argv: list[str] | None = None) -> int:
