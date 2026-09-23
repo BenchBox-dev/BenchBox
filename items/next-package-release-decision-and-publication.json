@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Before the cut, record the chosen unused version, intended origin/develop base SHA, live v0.4.1 branch/PR disposition, current release-only and v-tag rulesets, and latest completed green canary run whose checked develop SHA is applicable and under 48 hours old.",
+    "Create the release branch from the exact intended origin/develop head in a clean linked worktree; review the curated tree and CHANGELOG on the release PR's exact head; confirm validate-base and release-required-result are required and green on that head.",
+    "Confirm the release PR is MERGED with mergedAt and merge commit; verify vX.Y.Z points to that commit on release, and record the matching release.yml run and protected PyPI approval.",
+    "Verify the built-wheel installation matrix, PyPI version/files and clean installation, and GitHub Release assets/notes from live endpoints before reporting publication complete.",
+    "After publication, prepare and land the separate develop version-sync PR and run the release-accounting check; report package publication, site publication, advisory UAT, and tracker completion as distinct states."
+  ],
+  "context": "Live review on 2026-09-23: latest published version was 0.4.0; no open PR targeted release; v0.4.1 existed on origin with closed unmerged PR #2045; latest canary run 35866016150 failed at checked SHA 3e1e9922 while live develop was 523e3bbe. All state must be refreshed immediately before execution. Existing canary prerequisite is titled for v0.4.1, but its green develop evidence is relevant to whichever version the maintainer chooses, subject to the 48-hour and ancestry gate.",
+  "description": "Carry the next Python package release only after the blocking canary and release-tooling repairs are delivered. Decision 1: the maintainer selects an unused X.Y.Z after checking PyPI, GitHub tags/releases, and the closed unmerged v0.4.1 PR/remote branch; record whether v0.4.1 is reused or deliberately superseded before any branch sweep. Decision 2: confirm the release scope and hand-curated CHANGELOG/release tree on the exact PR head; UAT, stress, and live-cloud campaigns remain advisory under the current runbook unless a later policy decision changes that. Decision 3: the named human approves the protected pypi environment when release.yml reaches publish. This tracker item does not itself authorize a cut, merge, tag, PyPI approval, or site publication; execute those actions only in a later release request with the chosen version. The package release is separate from independent benchbox.dev publication. Prior art: docs/operations/release-guide.md, Makefile release-cut/release-finalize, release-canary.yml, and release.yml. Use the fixed linked-worktree flow and preserve the dirty primary clone, unrelated worktrees, and v* branches until their ownership and disposition are known. Never use an emergency canary override for routine failures, bypass required contexts, force-push or replace a public tag, or infer completion from a pushed tag or green PR.",
+  "links": [
+    "docs/operations/release-guide.md",
+    "docs/operations/repo-admin-settings.md",
+    ".github/workflows/release-canary.yml",
+    ".github/workflows/release.yml",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2045",
+    "https://pypi.org/project/benchbox/"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T20:43:44Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "f8c6ce0b8b7f4a2a9747a5580616b543",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    }
+  ]
+}

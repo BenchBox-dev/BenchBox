@@ -9958,6 +9958,18 @@
       "status": "blocked",
       "title": "Negative --wait test (a healthcheck that never passes)"
     },
+    "next-package-release-decision-and-publication": {
+      "claim": null,
+      "needs": [
+        "canary-green-for-v0-4-1",
+        "release-cut-origin-head-linked-worktree",
+        "release-finalize-merged-pr-tag-recovery",
+        "release-skill-uat-advisory-catalog-sync"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Decide the next version and complete a verified BenchBox package release"
+    },
     "nightly-macos-dataframe-insufficient-memory-flake": {
       "claim": null,
       "needs": [],
