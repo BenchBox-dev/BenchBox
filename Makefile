@@ -576,18 +576,38 @@ skill-sync:
 	@# only skill directories plus receipt/manifest, so the recipe mirrors the
 	@# same file into the untracked agents workspace for local parity.
 
-# Fresh worktrees lack the gitignored agents mirror, so check reports pending
-# additions there until `make skill-sync` runs in THIS worktree. Judge those
-# rows only after that; a clean primary-clone check does not certify a
-# worktree that changed skill-sync.conf or tracked Claude mirrors. The
-# tracked `.claude/skills` rows are the durable signal. A missing wrapper is
-# a hard failure, never a skip-and-succeed.
+# Check covers the tracked mirror only: the gitignored selections (the whole
+# `.agents/skills` mirror and `.claude/skills/blog/`) are per-machine local
+# state regenerated via `make skill-sync` — fresh worktrees lack them entirely
+# and every catalog bump re-dirties them until a local sync runs, so gating on
+# them fails checkouts for reasons unrelated to the committed tree. Rows under
+# those two roots are therefore skipped; any pending add/modify/delete
+# elsewhere still fails, including a tracked path that merely matches some
+# unrelated repository-wide ignore pattern. Ignored-mirror self-consistency
+# stays covered by `skill-sync verify` inside `skill-integrity-check`.
+# A missing wrapper is a hard failure, never a skip-and-succeed.
 skill-sync-check:
 	@if [ ! -x "$(SKILL_SYNC)" ]; then \
 		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
 		exit 1; \
 	fi
-	@"$(SKILL_SYNC)" check
+	@tmp=$$(mktemp); \
+	"$(SKILL_SYNC)" preview >"$$tmp" || { rc=$$?; rm -f "$$tmp"; exit $$rc; }; \
+	drift=""; \
+	while IFS= read -r row; do \
+		case "$$row" in "A "*|"M "*|"D "*|"R "*) ;; *) continue ;; esac; \
+		path="$${row#? }"; \
+		case "$$path" in ./*) path="$${path#./}";; esac; \
+		case "$$path" in .agents/skills/*|.claude/skills/blog/*) continue;; esac; \
+		drift="$$drift$$row\n"; \
+	done <"$$tmp"; \
+	rm -f "$$tmp"; \
+	if [ -n "$$drift" ]; then \
+		echo "skill-sync-check: tracked mirror drifts from skill-sync.conf:" >&2; \
+		printf '%b' "$$drift" >&2; \
+		exit 3; \
+	fi; \
+	echo "skill-sync-check: tracked mirror up to date."
 
 # Fail-closed local counterpart of pr.yml's required skill-integrity job. The
 # tool pin comes from the same policy module as CI; the vendored wrapper
