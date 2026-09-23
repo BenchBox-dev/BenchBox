@@ -174,8 +174,10 @@ uv run -- python -m pytest tests/unit/benchmarks/test_tpch_core.py
 
 # Run with coverage (fast tests only - quick feedback)
 make coverage-fast
-# or full suite
+# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
+# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
+make coverage-opt-in-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
