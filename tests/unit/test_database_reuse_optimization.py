@@ -204,13 +204,13 @@ class TestTPCHavocDatabaseReuse:
 
     def test_load_data_with_compatible_database(self, tpchavoc_benchmark, mock_connection):
         """Test that _load_data reuses compatible database."""
-        # Mock compatible database check to return True
-        with patch.object(tpchavoc_benchmark, "_check_compatible_tpch_database", return_value=True):
+        with (
+            patch.object(tpchavoc_benchmark, "_check_compatible_tpch_database", return_value=True),
+            patch("benchbox.core.tpch.benchmark.TPCHBenchmark._load_data") as mock_parent_load,
+        ):
             tpchavoc_benchmark._load_data(mock_connection)
 
-        # Should not call parent's _load_data method
-        # We can verify this by checking that no database operations were performed
-        # The test passes if no exception is raised
+        mock_parent_load.assert_not_called()
 
     def test_load_data_without_compatible_database(self, tpchavoc_benchmark, mock_connection):
         """Test that _load_data falls back to parent implementation when no compatible database."""
