@@ -619,53 +619,43 @@ class TestReleaseInfrastructure:
         """release-finalize must hard-stop unless required release contexts are required and green."""
         makefile_content = _makefile_text()
         recipe = _make_target_recipe("release-finalize")
+        finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
 
         assert "RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result" in makefile_content
-        assert 'gh pr checks "$$PR" --required --json name,bucket,state' in recipe
-        assert 'select(.name == \\"$$context\\")' in recipe
-        assert "for context in $(RELEASE_REQUIRED_CONTEXTS)" in recipe
-        assert "--watch" not in recipe
-        assert 'CHECK_RC" = "8"' in recipe
-        assert 'CHECK_RC" != "0"' in recipe
-        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
-
-        assert recipe.index("no open PR found for v$(VERSION)") < recipe.index("gh pr checks")
-        assert recipe.index("gh pr checks") < recipe.index("gh pr merge --squash")
-        assert recipe.index("gh pr merge --squash") < recipe.index("git fetch origin --tags")
-        explicit_tag_refspec = "git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)"
-        assert explicit_tag_refspec in recipe
-        assert "git push origin v$(VERSION)" not in recipe
-        assert recipe.index("git tag v$(VERSION)") < recipe.index(explicit_tag_refspec)
+        assert '--required-contexts "$(RELEASE_REQUIRED_CONTEXTS)"' in recipe
+        assert "scripts/release_finalize.py" in recipe
+        assert '"--required"' in finalize
+        assert '"name,bucket,state"' in finalize
+        assert "pending_ok=True" in finalize
+        assert 'f"sha={head}"' in finalize
+        assert '"merge_method=squash"' in finalize
+        assert 'command("git", "fetch", "origin", "--tags")' in finalize
+        assert 'f"refs/tags/{tag}:refs/tags/{tag}"' in finalize
+        assert '"git", "checkout", "release"' not in finalize
 
     def test_release_finalize_blocks_pending_required_check_exit_code(self):
         """gh pr checks exit 8 means at least one required check is still pending."""
-        recipe = _make_target_recipe("release-finalize")
+        finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
 
-        assert 'if [ "$$CHECK_RC" = "8" ]; then' in recipe
-        assert "required PR checks are pending. Wait for GitHub Actions, then rerun" in recipe
-        assert 'CHECK_RC" != "0" ] && [ "$$CHECK_RC" != "8"' not in recipe
-        assert recipe.index('if [ "$$CHECK_RC" = "8" ]') < recipe.index('case "$$CHECK_BUCKET"')
+        assert "result.returncode == 8" in finalize
+        assert "Required PR checks are pending. Wait for GitHub Actions, then rerun" in finalize
 
     def test_release_finalize_failure_modes_are_explicit(self):
         """The one-shot release-finalize precondition must fail closed for drift and non-green states."""
-        recipe = _make_target_recipe("release-finalize")
+        finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
 
         for expected in [
-            "missing)",
-            "pending)",
-            "fail|cancel|skipping)",
-            "duplicate)",
-            "unexpected $$context status",
+            "Required release context",
+            "missing or duplicated",
+            "Required PR checks are pending",
+            "Release PR state or head changed",
+            "Local tag",
+            "not reachable from fetched origin/release",
         ]:
-            assert expected in recipe
+            assert expected in finalize
 
-        assert "no open PR found for v$(VERSION)" in recipe
-        assert "required release context '$$context' is missing" in recipe
-        assert "Wait for GitHub Actions, then rerun" in recipe
-        assert "Fix the release PR before finalizing" in recipe
-        assert "Fix workflow/ruleset drift" in recipe
-        assert "gh pr merge --squash" in recipe
-        assert "|| true" not in recipe
+        assert 'in ("OPEN", "MERGED")' in finalize
+        assert "merge_method=squash" in finalize
 
     def test_release_finalize_docs_separate_premerge_and_postmerge_signals(self):
         """Release docs must not imply post-merge push checks are pre-publish blockers."""
@@ -877,18 +867,19 @@ class TestReleaseInfrastructure:
 
     def test_release_pushes_allow_the_intentionally_missing_precommit_config(self):
         """Every post-curation push must allow the release tree's intentionally absent hook config."""
-        for target in ("release-cut", "release-finalize"):
-            recipe = _make_target_recipe(target)
-            push_lines = [
-                line.strip()
-                for line in recipe.splitlines()
-                if "git push" in line and not line.lstrip().startswith("@#") and not line.strip().startswith("echo ")
-            ]
-            assert push_lines, f"expected at least one git push in {target}"
-            for line in push_lines:
-                assert "PRE_COMMIT_ALLOW_NO_CONFIG=1 git push" in line, (
-                    f"{target} push must allow the intentionally missing .pre-commit-config.yaml: {line}"
-                )
+        recipe = _make_target_recipe("release-cut")
+        push_lines = [
+            line.strip()
+            for line in recipe.splitlines()
+            if "git push" in line and not line.lstrip().startswith("@#") and not line.strip().startswith("echo ")
+        ]
+        assert push_lines
+        for line in push_lines:
+            assert "PRE_COMMIT_ALLOW_NO_CONFIG=1 git push" in line
+
+        finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
+        assert 'push_env["PRE_COMMIT_ALLOW_NO_CONFIG"] = "1"' in finalize
+        assert 'command("git", "push", "origin", f"refs/tags/{tag}:refs/tags/{tag}", env=push_env)' in finalize
 
     def test_release_cut_aligns_release_histories_before_pushing(self):
         """release-cut must merge `origin/release` with `-s ours` before it pushes.

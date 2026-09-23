@@ -186,15 +186,19 @@ raw commit subjects, which step 3 requires you to curate anyway.
 
 ### What `release-finalize` does
 
-1. Finds the open release PR for `vX.Y.Z`.
-2. Checks the required PR status list once and refuses to continue unless
+1. Finds the unique open or merged release PR for `vX.Y.Z`.
+2. For an open PR, checks the required PR status list once and refuses to continue unless
    both `validate-base` and `release-required-result` are present and green.
    Missing means the ruleset/workflow contract is broken; pending means wait
    in GitHub Actions and rerun the command. `release-finalize` does not poll.
-3. Squash-merges the PR. (Ruleset `release-only` also blocks the merge
-   unless `validate-base` and `release-required-result` are green.)
-4. Fast-forwards `release` and tags `vX.Y.Z`.
-5. Pushes the tag — which fires `.github/workflows/release.yml`:
+3. Rechecks the PR head and squash-merges with that expected SHA. A concurrent
+   head change fails before merge. The `release-only` ruleset also requires the
+   two green contexts.
+4. Confirms the PR is `MERGED` with `mergedAt` and a merge commit, fetches
+   `origin/release` and tags, then checks that the merge commit is on `release`.
+   It creates or verifies `vX.Y.Z` at that exact commit without checking out a
+   local `release` branch. A mismatched local or remote tag stops finalization.
+5. Pushes an absent remote tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
@@ -204,6 +208,17 @@ raw commit subjects, which step 3 requires you to curate anyway.
 6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
+
+**Resuming finalization.** Run `make release-finalize VERSION=X.Y.Z` again after
+an interrupted merge, tag creation, or tag push. If the PR is still open, its
+current exact head must pass the required checks before merge. If it is merged,
+the command resumes from the recorded merge commit and does not merge again. A
+matching local tag is pushed; a matching remote tag is accepted as already
+pushed. A mismatched tag, closed unmerged PR, missing merge commit, or merge
+commit not on fetched `release` requires investigation and is never retagged
+or force-pushed. If the tag is already pushed and `release.yml` is pending or
+failed, inspect that workflow and the PyPI/GitHub artifacts separately; a
+successful finalize command alone does not prove package publication.
 
 **Syncing `develop`'s version.** `release-cut`/`release-finalize` never modify
 `develop` (step 6), so its declared version does not track releases on its own —
