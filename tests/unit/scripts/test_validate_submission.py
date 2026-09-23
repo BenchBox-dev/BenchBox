@@ -1056,6 +1056,15 @@ class TestEmptyResultRows:
         _validate_bundle(data, vr)
         assert not any("result-rows-empty" in w for w in vr.warnings)
 
+    def test_padded_run_type_still_counts_as_measurement(self):
+        data = _bundle_with_rows([0, 0])
+        for q in data["queries"]:
+            q["run_type"] = "measurement "
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w for w in vr.warnings)
+
 
 # timing plausibility warnings (C1-C4; warnings only, never refuse)
 # ---------------------------------------------------------------------------

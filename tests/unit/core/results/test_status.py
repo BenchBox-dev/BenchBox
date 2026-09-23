@@ -37,6 +37,18 @@ def test_bundle_skipped_queries_are_not_failures() -> None:
     assert bundle_is_clean_pass(data) is True
 
 
+def test_bundle_padded_run_type_does_not_hide_failed_measurement() -> None:
+    data = {
+        "queries": [
+            {"id": "Q1", "status": "FAILED", "run_type": "measurement "},
+            {"id": "Q2", "status": "SUCCESS", "run_type": "measurement"},
+        ],
+    }
+
+    assert bundle_failed_query_count(data) == 1
+    assert bundle_is_clean_pass(data) is False
+
+
 def test_bundle_explicit_failed_count_takes_precedence_over_rows() -> None:
     data = {
         "summary": {"queries": {"total": 3, "passed": 2, "failed": 1}},

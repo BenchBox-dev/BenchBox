@@ -472,8 +472,10 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BASE_SHA: ${{ env.BASE_SHA }}
           MERGE_SHA: ${{ env.MERGE_SHA }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"
@@ -522,8 +524,11 @@ jobs:
               failed=1
               continue
             fi
-            approved=$(WANT="$approver" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
-              | WANT="$approver" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED')), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
+            # The approval must review the current head commit: an APPROVED left
+            # on an earlier push must not satisfy an artifact the approver
+            # never saw.
+            approved=$(WANT="$approver" WANT_SHA="$HEAD_SHA" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
+              | WANT="$approver" WANT_SHA="$HEAD_SHA" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); want_sha=os.environ.get('WANT_SHA',''); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED') and (not want_sha or r.get('commit_id')==want_sha)), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
             if [ "$approved" != "yes" ]; then
               echo "::error file=${artifact}::No APPROVED review from override approver '${approver}'."
               failed=1
