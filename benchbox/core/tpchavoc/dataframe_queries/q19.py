@@ -191,8 +191,6 @@ def _q19_pandas_sum(filtered: Any, *, commuted: bool = False) -> Any:
 
 def _make_q19_pandas_impl(variant: int) -> VariantImpl:
     def impl(ctx: DataFrameContext) -> Any:
-        import pandas as pd
-
         if variant == 1:
             return _q19_pandas_base(ctx)
 
@@ -204,7 +202,7 @@ def _make_q19_pandas_impl(variant: int) -> VariantImpl:
             joined = lineitem.merge(part, left_on="l_partkey", right_on="p_partkey")
             common, _, conds = _q19_pandas_masks(joined, params)
             parts = [joined[common & cond] for cond in conds]
-            return _q19_pandas_sum(pd.concat(parts, ignore_index=True))
+            return _q19_pandas_sum(ctx.concat(parts))
 
         if variant == 3:
             lineitem = lineitem[
@@ -224,7 +222,7 @@ def _make_q19_pandas_impl(variant: int) -> VariantImpl:
                     & (part["p_size"] <= size_hi)
                 ]
                 frames.append(lineitem.merge(part_branch, left_on="l_partkey", right_on="p_partkey"))
-            joined = pd.concat(frames, ignore_index=True)
+            joined = ctx.concat(frames)
             common, combined, _ = _q19_pandas_masks(joined, params)
             return _q19_pandas_sum(joined[common & combined])
 
@@ -237,7 +235,7 @@ def _make_q19_pandas_impl(variant: int) -> VariantImpl:
             joined = lineitem.merge(part, left_on="l_partkey", right_on="p_partkey")
             common, _, conds = _q19_pandas_masks(joined, params)
             piped = [joined[common & cond] for cond in conds]
-            return _q19_pandas_sum(pd.concat(piped, ignore_index=True))
+            return _q19_pandas_sum(ctx.concat(piped))
 
         if variant == 7:
             joined = ctx.get_table("lineitem").merge(ctx.get_table("part"), left_on="l_partkey", right_on="p_partkey")

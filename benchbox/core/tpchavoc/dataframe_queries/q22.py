@@ -57,6 +57,11 @@ def _q22_expr_avg_sum_count(coded: Any, ctx: DataFrameContext, col: Any, lit: An
     )
     total = ctx.scalar(stats.select("total"))
     count = ctx.scalar(stats.select("n"))
+    if count is None or count == 0:
+        # No positive-balance customers for these country codes: the
+        # canonical mean is null, so the threshold must be null too (an
+        # empty result), not a ZeroDivisionError.
+        return None
     return total / count
 
 
@@ -234,7 +239,11 @@ def _make_q22_pandas_impl(variant: int) -> VariantImpl:
             count = eligible["c_acctbal"].count()
             total = total.compute() if hasattr(total, "compute") else total
             count = count.compute() if hasattr(count, "compute") else count
-            return _q22_pandas_main(coded, orders, total / count, country_codes)
+            # No positive-balance customers: pandas mean() is NaN on empty,
+            # so mirror NaN (comparisons are False -> empty result), not a
+            # ZeroDivisionError.
+            avg_balance = total / count if count else float("nan")
+            return _q22_pandas_main(coded, orders, avg_balance, country_codes)
 
         if variant == 3:
             coded = _q22_pandas_coded(customer)
