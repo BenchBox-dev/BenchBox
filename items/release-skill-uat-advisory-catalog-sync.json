@@ -5,7 +5,7 @@
     "make skill-sync-check and the repository skill-integrity gate pass on the BenchBox PR, and the two release action mirrors agree with the pinned source.",
     "The revised skill describes a linked-worktree release cut once the release-cut guard exists, or explicitly avoids promising that path until it lands."
   ],
-  "context": "Current exact PR snapshot in this invocation: PR #2320 OPEN, mergeable, hosted at 70165f57dd9aef7c8e6782cad94fa626d9a557e4 with required-result success; these checks do not cover local edits. Local follow-up remains uncommitted in /Users/joe/Developer/BenchBox.wt-release-skill-pin: isolate benchbox at catalog ac07 and all other shared skills at c847 to avoid publishing TODO not_before guidance unsupported by live MCP schema. make skill-sync, make skill-sync-check, make skill-integrity-check, Ruff, and git diff --check pass. Focused tests/full preflight still pending; live lsof snapshot showed shared test.lock held by pytest PIDs 50950, 52651, 57875, and 67172. Preserve them. The unrelated release-cut preflight session 55979 is terminal (exit 2): timing_policy_check strict failed because fast lane count is 31,554 against 31,550, caused by the new real-Git release cut/abort test module classified as fast. That module is being moved to medium under its own TODO. Re-adopt this item later, run its policy test and full preflight after the lock clears, inspect identity, commit authorized files, and update PR #2320. No ready/merge action authorized.",
+  "context": "Upstream PR #84 is live MERGED at 2026-09-23T22:45:14Z; merge commit ac07efb9ae7affc0a6740cf7c7cf1be1e572e0ac is on origin/main. BenchBox PR #2320 is still OPEN, mergeable, hosted at old head 70165f57dd9aef7c8e6782cad94fa626d9a557e4 on base 435d07e97c2e0f30a002d721fbc42aca508d6a52; its completed hosted checks do not cover local edits. Local follow-up in /Users/joe/Developer/BenchBox.wt-release-skill-pin pins only benchbox to ac07 while retaining the other shared skills at c847 because ac07 also includes TODO not_before guidance unsupported by this live MCP tool schema. `make skill-sync-check`, `make skill-integrity-check`, instruction audit, artifact hygiene, Ruff, and `git diff --check` pass. Focused policy pytest and full make pr-preflight remain pending: current shared test.lock owners include PIDs 2815, 42687, 42769, 92574, 93511, and 93675; preserve those processes and recheck before tests. Once clear, run focused tests and required preflight, inspect effective identity, commit only the authorized generated/config/policy/test paths, and update PR #2320. No PR-ready or merge action is authorized.",
   "description": "The agent release skill says committed UAT evidence no older than 21 days is required and stale evidence fails validate-base, but the current release guide and scripts/release_readiness_check.py make the three-stage UAT campaign advisory. The demotion landed in PR #1927. Correct the canonical benchbox release action in skill-sync-skills, then update BenchBox's immutable catalog rev in skill-sync.conf and regenerate the tracked .claude/skills mirror and ignored .agents/skills mirror through make skill-sync. Prior art: skill-sync.conf:7-17,33 declares the catalog source/pin; AGENTS.md forbids hand-editing generated mirrors. Decision: retain the local-develop-equals-origin/develop prose as a useful operator check or replace it with a reference to the new mechanical release-cut guard once that guard lands. Keep UAT advisory under current policy; any decision to make it blocking again requires an explicit later policy change and trusted-base rollout. Do not edit mirrors directly, treat tracker done as proof of current gate behavior, or make a release wait for optional UAT.",
   "links": [
     "skill-sync.conf",
@@ -124,6 +124,14 @@
       "generation": "59d54beda84c4d65b44c5baf4088f2a0",
       "op": "take",
       "op_id": "045bbc66577e4c0f8e9714878715b4e3",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T23:56:00Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "e8618e79eef246aa8b61a6aa72c642cf",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
