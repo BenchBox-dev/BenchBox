@@ -41,6 +41,7 @@ from benchbox.cli.exceptions import (
     create_error_handler,
 )
 from benchbox.cli.help import BenchBoxCommand, advanced_option
+from benchbox.cli.logo import rich_logo
 from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.platform import get_platform_alias_mode, get_platform_manager, normalize_platform_name
@@ -999,6 +1000,8 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
     # to a log) misrepresents the run as interactive.
     is_interactive = sys.stdin.isatty() and not (s.platform and s.benchmark)
     if not s.quiet and is_interactive:
+        if (logo := rich_logo()) is not None:
+            console.print(logo, end="\n\n")
         console.print(
             Panel.fit(
                 Text("BenchBox Interactive Benchmark Runner", style="bold blue"),
