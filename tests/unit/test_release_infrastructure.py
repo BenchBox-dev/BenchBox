@@ -464,6 +464,7 @@ class TestReleaseInfrastructure:
             "ruleset-drift",
             "pypi-latest-installability",
             "release-canary-result",
+            "release-canary-incident",
         }
         collection_job = jobs["collect-credential-free-non-fast"]
         assert collection_job["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
@@ -525,6 +526,21 @@ class TestReleaseInfrastructure:
         assert '"collection_result": "${COLLECTION_RESULT}"' in result_text
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
+
+        # A red canary must reach an owner: the incident job runs after every
+        # non-cancelled run, is the only job allowed to write issues, and
+        # closes the incident on green.
+        assert "issues" not in workflow["permissions"]
+        incident_job = jobs["release-canary-incident"]
+        assert incident_job["if"] == "${{ always() && !cancelled() }}"
+        assert incident_job["permissions"]["issues"] == "write"
+        # Readiness reads the run conclusion; the alert must not be able to block a release.
+        assert incident_job["continue-on-error"] is True
+        assert {"collect-credential-free-non-fast", "credential-free-non-fast"} <= set(incident_job["needs"])
+        incident_text = _workflow_job_run_text("release-canary.yml", "release-canary-incident")
+        assert "scripts/release_canary_incident.py" in incident_text
+        assert "incident:release-canary-red" in incident_text
+        assert "gh issue close" in incident_text
 
     def test_canary_collect_count_regex_matches_pytest_deselect_format(self):
         """The canary collect-step grep regex must match the actual pytest --collect-only output format."""
