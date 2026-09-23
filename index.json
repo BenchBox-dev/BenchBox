@@ -1186,7 +1186,7 @@
       "needs": [
         "benchbox-score-capability-matrix"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Implement score oracle contracts and evaluators"
     },
