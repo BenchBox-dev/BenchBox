@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from benchbox.base import BaseBenchmark
+from benchbox.core.datagen_version import current_datagen_stamp
 from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.results.models import BenchmarkResults
@@ -956,6 +957,7 @@ def test_manifest_reuse_accepts_data_source_alias(tmp_path):
 
     manifest = {
         "benchmark": "tpch",
+        **current_datagen_stamp("tpch"),
         "scale_factor": 0.1,
         "tables": {
             "customer": {
@@ -1025,6 +1027,7 @@ def test_no_regenerate_respects_alias_manifest(tmp_path):
     orders_path.write_text("1|order\n")
     manifest = {
         "benchmark": "tpch",
+        **current_datagen_stamp("tpch"),
         "scale_factor": 0.1,
         "tables": {
             "orders": {

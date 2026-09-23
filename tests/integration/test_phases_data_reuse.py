@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.core.benchmark_loader import get_benchmark_instance
+from benchbox.core.datagen_version import current_datagen_stamp
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 
 pytestmark = [
@@ -73,6 +74,7 @@ class TestPhasesDataReuse:
         manifest = {
             "version": 2,
             "benchmark": "tpch",
+            **current_datagen_stamp("tpch"),
             "scale_factor": 0.01,
             "created_at": "2025-01-01T00:00:00",
             "tables": {
@@ -148,6 +150,7 @@ class TestPhasesDataReuse:
         manifest = {
             "version": 2,
             "benchmark": "tpch",
+            **current_datagen_stamp("tpch"),
             "scale_factor": 0.01,
             "created_at": "2025-01-01T00:00:00",
             "tables": {
@@ -223,6 +226,7 @@ class TestPhasesDataReuse:
         manifest = {
             "version": 2,
             "benchmark": "tpch",
+            **current_datagen_stamp("tpch"),
             "scale_factor": 0.01,
             "created_at": "2025-01-01T00:00:00",
             "tables": {
