@@ -669,15 +669,10 @@
       "title": "Apache Spark Platform Adapter"
     },
     "applicability-sweep-ignores-data-acquisition-cost": {
-      "claim": {
-        "expires_at": "2026-09-23T23:42:10Z",
-        "generation": "fdafbd74fc544fbeaaf1f829f22e6fd3",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Cross-surface applicability sweep reports joinorder as gateable though it forbids a bounded scale"
     },
     "applied-receipt-anonymization-error-reason-leak-20260801": {
