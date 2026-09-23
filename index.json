@@ -16643,7 +16643,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Add a pre-commit hook for validate_todo.py to catch invalid TODO YAML at commit time"
     },
     "todo-auto-remint-when-config-url-but-no-token-20260806": {
