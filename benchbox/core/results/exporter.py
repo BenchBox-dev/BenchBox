@@ -997,6 +997,51 @@ class ResultExporter:
             logger.error("Failed to load result from %s: %s", filepath, exc)
             return None
 
+    @staticmethod
+    def _check_generation_compatibility(baseline_data: dict[str, Any], current_data: dict[str, Any]) -> dict[str, Any]:
+        """Flag comparisons across incompatible data generations.
+
+        Returns a block with the stamped ``(version, hash)`` provenance of each side, whether the
+        comparison is generation-compatible, and a human-readable warning when both sides are stamped
+        but disagree. Results predating the stamp carry no provenance and are reported as unknown
+        rather than incompatible, so legacy comparisons keep working.
+        """
+        outcome: dict[str, Any] = {"compatible": True, "warning": None}
+
+        def _provenance(data: dict[str, Any]) -> dict[str, Any]:
+            benchmark = data.get("benchmark") if isinstance(data, dict) else None
+            if not isinstance(benchmark, dict):
+                return {"data_generation_version": None, "data_generation_hash": None}
+            return {
+                "data_generation_version": benchmark.get("data_generation_version"),
+                "data_generation_hash": benchmark.get("data_generation_hash"),
+            }
+
+        baseline_prov = _provenance(baseline_data)
+        current_prov = _provenance(current_data)
+        outcome["baseline"] = baseline_prov
+        outcome["current"] = current_prov
+        baseline_version = baseline_prov["data_generation_version"]
+        current_version = current_prov["data_generation_version"]
+        if baseline_version is None or current_version is None:
+            outcome["warning"] = (
+                "One or both results predate data-generation stamping; "
+                "generation compatibility is unknown. Timing deltas may reflect dataset differences."
+            )
+            return outcome
+        baseline_hash = baseline_prov["data_generation_hash"]
+        current_hash = current_prov["data_generation_hash"]
+        if baseline_version != current_version or (
+            baseline_hash is not None and current_hash is not None and baseline_hash != current_hash
+        ):
+            outcome["compatible"] = False
+            outcome["warning"] = (
+                f"Results were generated from different data generations "
+                f"(baseline version={baseline_version}, current version={current_version}); "
+                "timing deltas may reflect dataset differences rather than performance changes."
+            )
+        return outcome
+
     def compare_results(self, baseline_path: Path, current_path: Path) -> dict[str, Any]:
         """Compare two result files and return performance analysis.
 
@@ -1031,6 +1076,7 @@ class ResultExporter:
             "current_file": current_path.name if self.anonymize else str(current_path),
             "baseline_version": baseline_version,
             "current_version": current_version,
+            "generation_compatibility": self._check_generation_compatibility(baseline_data, current_data),
             "performance_changes": {},
             "query_comparisons": [],
         }

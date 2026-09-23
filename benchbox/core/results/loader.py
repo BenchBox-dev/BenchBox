@@ -334,6 +334,7 @@ def reconstruct_benchmark_results(
         compliance_class=benchmark_section.get("compliance_class"),
         dataset_version=benchmark_section.get("dataset_version"),
         data_generation_version=_coerce_datagen_version(benchmark_section.get("data_generation_version")),
+        data_generation_hash=_coerce_datagen_hash(benchmark_section.get("data_generation_hash")),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
@@ -354,6 +355,15 @@ def _coerce_datagen_version(value: object) -> int | None:
             return int(value.strip())
         except ValueError:
             return None
+    return None
+
+
+def _coerce_datagen_hash(value: object) -> str | None:
+    """Coerce a persisted datagen hash to str; unknown shapes stay unset."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value.strip()
     return None
 
 

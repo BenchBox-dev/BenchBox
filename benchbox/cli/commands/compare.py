@@ -1207,7 +1207,9 @@ def _run_file_comparison(
 
     baseline, current = _load_comparison_files(baseline_path, current_path)
 
-    comparison = _perform_comparison(baseline, current, baseline_path, current_path, include_plans, plan_threshold)
+    comparison = _perform_comparison(
+        baseline, current, baseline_path, current_path, include_plans, plan_threshold, output_format
+    )
 
     _output_file_comparison(comparison, baseline, current, output_format, output_file, show_all_queries)
 
@@ -1256,6 +1258,7 @@ def _perform_comparison(
     current_path: Path,
     include_plans: bool,
     plan_threshold: float,
+    output_format: str = "text",
 ) -> dict[str, Any]:
     """Run the core comparison and optional plan comparison."""
     exporter = ResultExporter()
@@ -1264,6 +1267,16 @@ def _perform_comparison(
     if "error" in comparison:
         console.print(f"[red]Comparison failed: {comparison['error']}[/red]")
         sys.exit(1)
+
+    # JSON output must stay machine-readable (the generation_compatibility block
+    # travels inside the payload); warn on stdout only for human-readable formats.
+    if output_format != "json":
+        generation = comparison.get("generation_compatibility") or {}
+        if generation.get("warning"):
+            if generation.get("compatible") is False:
+                console.print(f"[yellow]Warning: {generation['warning']}[/yellow]")
+            else:
+                console.print(f"[dim]Note: {generation['warning']}[/dim]")
 
     if include_plans:
         plan_comparison = _compare_plans(baseline, current, plan_threshold)
@@ -1300,6 +1313,10 @@ def _output_file_comparison(
     if output_file:
         Path(output_file).write_text(content, encoding="utf-8")
         console.print(f"[green]Comparison saved to {output_file}[/green]")
+    elif output_format == "json":
+        # Machine-readable output must bypass rich line-wrapping, which would
+        # splice literal newlines into long JSON string values.
+        click.echo(content)
     else:
         console.print(content)
 

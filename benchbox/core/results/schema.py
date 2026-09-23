@@ -481,6 +481,8 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
         section["compliance_class"] = compliance_class
     if getattr(result, "data_generation_version", None) is not None:
         section["data_generation_version"] = result.data_generation_version
+    if getattr(result, "data_generation_hash", None) is not None:
+        section["data_generation_hash"] = result.data_generation_hash
     section.update(_dataset_identity_fields(result))
     return section
 

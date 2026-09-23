@@ -321,13 +321,16 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
     return False
 
 
-def _manifest_matches_result(manifest: Any, result: BenchmarkResults) -> bool:
+def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark: Any = None) -> bool:
     """Check a manifest plausibly describes the dataset behind a result.
 
     Compares benchmark identity (punctuation-insensitive) and scale factor,
     but only on fields both sides provide; absent fields do not disqualify.
-    This is a tripwire against output dirs pointing at another benchmark's
-    data, not a proof that these exact files were read.
+    Benchmarks that intentionally reuse another benchmark's dataset (via
+    ``get_data_source_benchmark``) accept the shared manifest identity, mirroring
+    ``_resolve_manifest_allowed_names``. This is a tripwire against output dirs
+    pointing at another benchmark's data, not a proof that these exact files
+    were read.
     """
     import re as _re
 
@@ -340,8 +343,16 @@ def _manifest_matches_result(manifest: Any, result: BenchmarkResults) -> bool:
         return _re.sub(r"[^a-z0-9]", "", str(value).lower()) or None
 
     manifest_benchmark = _slug(manifest.get("benchmark"))
-    result_benchmark = _slug(getattr(result, "benchmark_name", None))
-    if manifest_benchmark and result_benchmark and manifest_benchmark != result_benchmark:
+    allowed = {_slug(getattr(result, "benchmark_name", None))}
+    if benchmark is not None:
+        getter = getattr(benchmark, "get_data_source_benchmark", None)
+        if callable(getter):
+            try:
+                allowed.add(_slug(getter()))
+            except Exception:
+                pass
+    allowed.discard(None)
+    if manifest_benchmark and allowed and manifest_benchmark not in allowed:
         return False
     try:
         manifest_scale = manifest.get("scale_factor")
@@ -381,9 +392,10 @@ def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> 
             manifest = _json.load(handle)
         if not manifest_datagen_is_current(manifest):
             return result
-        if not _manifest_matches_result(manifest, result):
+        if not _manifest_matches_result(manifest, result, benchmark):
             return result
         result.data_generation_version = manifest.get("data_generation_version")
+        result.data_generation_hash = manifest.get("base_constants_hash")
     except Exception:
         pass
     return result
