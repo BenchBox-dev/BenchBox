@@ -1714,6 +1714,16 @@
       "status": "open",
       "title": "Build a fail-safe selector that maps changed paths to the release-canary tests they can affect"
     },
+    "canary-impact-03-replay-and-go-decision": {
+      "claim": null,
+      "needs": [
+        "canary-impact-01-junit-durations",
+        "canary-impact-02-selector"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Replay the canary selector over recent merges at their parent trees, then decide whether to start a shadow run"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
