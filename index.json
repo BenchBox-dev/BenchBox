@@ -1235,7 +1235,7 @@
         "benchbox-score-advanced-fixtures",
         "benchbox-score-tpchavoc-equivalence"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Define score manifests and cohort identity"
     },
