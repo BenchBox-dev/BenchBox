@@ -12943,6 +12943,13 @@
       "status": "open",
       "title": "Cut releases from an exact origin/develop head in a linked worktree"
     },
+    "release-finalize-merged-pr-tag-recovery": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Make release finalization recoverable and bind the tag to the merged PR"
+    },
     "release-finalize-pretag-ci-wait": {
       "claim": null,
       "needs": [

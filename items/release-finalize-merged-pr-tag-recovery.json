@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "After merge, finalization confirms the named PR is MERGED with mergedAt and a non-null merge commit, and verifies that exact commit is reachable from freshly fetched origin/release before creating or pushing the tag.",
+    "An interruption after merge, local tag creation, or tag push can be resumed safely; matching tags are idempotent and mismatched local or remote tags fail closed without mutation.",
+    "A concurrent advance of release cannot cause vX.Y.Z to point to a different PR's commit; finalization works from a linked worktree without checking out the local release branch.",
+    "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
+    "make pr-preflight passes on the implementation PR."
+  ],
+  "context": "The 2026-09-23 adversarial review confirmed the existing release.yml ancestry/version guards reduce wrong-publication risk but do not prove the tag names the PR just merged. Current make release-finalize requires an open PR, so it cannot resume after a successful merge if a later local or network step fails.",
+  "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
+  "links": [
+    "Makefile",
+    "docs/operations/release-guide.md",
+    ".github/workflows/release.yml",
+    "https://github.com/BenchBox-dev/BenchBox/actions/runs/33135870694"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T20:42:38Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "9f98d7ee21d64f16a7d8ae78e66d1ecc",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    }
+  ]
+}
