@@ -10,7 +10,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from benchbox.base import BaseBenchmark
-from benchbox.core.datagen_version import current_datagen_stamp
 from benchbox.core.errors import ScaleFactorNotSupportedError
 from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 from benchbox.core.results.models import BenchmarkResults
@@ -18,6 +17,7 @@ from benchbox.core.runner import LifecyclePhases, ValidationOptions, run_benchma
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, SystemProfile
 from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 from benchbox.core.validation import ValidationResult
+from benchbox.utils.datagen_version import current_datagen_stamp
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 from tests.fixtures.result_dict_fixtures import make_benchmark_results
 

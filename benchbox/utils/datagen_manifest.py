@@ -325,7 +325,7 @@ class DataGenerationManifest:
             }
 
         try:
-            from benchbox.core.datagen_version import current_datagen_stamp
+            from benchbox.utils.datagen_version import current_datagen_stamp
 
             datagen_stamp = current_datagen_stamp(self._benchmark)
         except Exception:

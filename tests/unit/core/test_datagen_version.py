@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from benchbox.core.datagen_version import (
+from benchbox.utils.datagen_version import (
     DATA_GENERATION_VERSION,
     compute_base_constants_hash,
     current_datagen_stamp,

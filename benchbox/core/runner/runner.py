@@ -324,7 +324,7 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
 def _attach_datagen_version(result: BenchmarkResults) -> BenchmarkResults:
     """Stamp the result with the data-generation version that produced it."""
     try:
-        from benchbox.core.datagen_version import DATA_GENERATION_VERSION
+        from benchbox.utils.datagen_version import DATA_GENERATION_VERSION
 
         if getattr(result, "data_generation_version", None) is None:
             result.data_generation_version = DATA_GENERATION_VERSION
@@ -1889,7 +1889,7 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
         if float(manifest.get("scale_factor", -1)) != float(config.scale_factor):
             return False, None, True
 
-        from benchbox.core.datagen_version import describe_datagen_staleness, manifest_datagen_is_current
+        from benchbox.utils.datagen_version import describe_datagen_staleness, manifest_datagen_is_current
 
         if not manifest_datagen_is_current(manifest, benchmark=manifest_benchmark):
             reason = describe_datagen_staleness(manifest, benchmark=manifest_benchmark)

@@ -8,10 +8,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from benchbox.core.datagen_version import current_datagen_stamp
 from benchbox.core.runner.runner import _ensure_data_generated
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.utils.cloud_storage import CloudStagingPath
+from benchbox.utils.datagen_version import current_datagen_stamp
 
 pytestmark = [
     pytest.mark.unit,
