@@ -1,4 +1,5 @@
 {
+  "context": "Merged via PR 2272. Delivered as docs plus Parquet capability; MotherDuck remains the supported cloud variant. Next step (separate effort, needs approval): live S3 Parquet verification with cloud credentials, plus adapter-side extension/secret setup before any Delta/Iceberg path can be claimed.",
   "description": "Promoted from deferral #583 of pg-duckdb-platform-adapter.\nDeferred: Data lake query support (S3 Parquet/Iceberg reads via pg_duckdb)\nReason deferred: Requires cloud storage credentials and Parquet file management - separate feature",
   "legacy": {
     "item_meta": {
