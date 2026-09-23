@@ -18735,7 +18735,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "Verify w4 Postgres cell on first live nightly run"
+      "title": "Throughput UAT: verify Docker Postgres cell on first live nightly run"
     },
     "webkit-smoke-fix-or-demote": {
       "claim": null,
