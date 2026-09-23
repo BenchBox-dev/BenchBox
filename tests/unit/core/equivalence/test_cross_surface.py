@@ -903,6 +903,45 @@ def test_flightdata_is_promoted_to_enforced_gates():
     assert GATES["flightdata"].scale_factor == 0.01
 
 
+def test_datavault_is_promoted_to_enforced_gates():
+    """Data Vault graduates from STAGED_GATES to enforced GATES with an empty baseline.
+
+    The query-execution burn-down is done: all 44 query-backend cells compare
+    equal at SF=0.01. The builder keeps forcing regeneration on every build, so
+    probes can never pass on a stale manifest.
+    """
+    from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES, get_gate
+
+    assert "datavault" in GATES
+    assert "datavault" not in STAGED_GATES
+    assert get_gate("datavault").name == "datavault"
+    assert GATES["datavault"].known_divergences == {}
+    assert GATES["datavault"].scale_factor == 0.01
+
+
+def test_datavault_sql_dataframe_id_mapping_is_mechanical_not_guessed():
+    """The Data Vault SQL<->DataFrame correspondence is a mechanical Q prefix.
+
+    The SQL surface numbers its queries "1".."22" and the DataFrame registry
+    numbers them "Q1".."Q22" -- the same convention as enforced amplab -- with
+    matching titles and parameters on each side (e.g. Q1 is the Pricing Summary
+    Report with a 90-day window on both). The builder only strips the prefix;
+    it never pairs queries by judgment. This locks the independence verdict the
+    promotion depends on, given the sweep's zero verbatim id overlap.
+    """
+    from benchbox.core.datavault.benchmark import DataVaultBenchmark
+    from benchbox.core.datavault.dataframe_queries import DATAVAULT_DATAFRAME_QUERIES
+
+    benchmark = DataVaultBenchmark(scale_factor=0.01)
+    sql_ids = sorted((str(q) for q in benchmark.get_queries().keys()), key=int)
+    df_ids = sorted(
+        (str(q) for q in DATAVAULT_DATAFRAME_QUERIES.get_query_ids()),
+        key=lambda q: int(q.lstrip("Q")),
+    )
+    assert sql_ids == [str(n) for n in range(1, 23)]
+    assert df_ids == [f"Q{n}" for n in range(1, 23)]
+
+
 def test_read_primitives_gate_opts_into_documented_nan_null_decode_tolerance():
     """Read Primitives keeps strict defaults global while opting in for pandas NULL decode."""
     from benchbox.core.equivalence.cross_surface import GATES

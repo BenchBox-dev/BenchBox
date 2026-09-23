@@ -67,8 +67,9 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # clickbench, joinorder_synthetic were previously here; all are now enforced
 # cross-surface gates, so they no longer appear among the unguarded candidates.
 # tpcds_obt was previously here; its id correspondence was then explicitly
-# abandoned, so it is `abandoned` instead.)
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"datavault", "tpch_skew", "tsbs_devops"}
+# abandoned, so it is `abandoned` instead. datavault was previously here too;
+# it is now an enforced cross-surface gate.)
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpch_skew", "tsbs_devops"}
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
 # bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
@@ -102,10 +103,9 @@ def test_registry_bearing_benchmarks_are_gateable(rows):
     assert by_id.get("joinorder") == NOT_CHEAPLY_GATEABLE
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert gateable == set(), f"unexpected gateable candidates: {sorted(gateable)}"
-    # datavault ships a registry but its ids do not overlap the SQL ids verbatim
-    # (friendly/Q-prefixed names), so there is no verified correspondence: it is
-    # candidate-unverified, NOT counted as gateable coverage.
-    assert by_id.get("datavault") == CANDIDATE_UNVERIFIED
+    # datavault graduated to enforced GATES, so it no longer appears among the
+    # candidates the sweep drills into.
+    assert "datavault" not in by_id
 
 
 def test_zero_overlap_registries_are_candidate_unverified_not_gateable(rows):
@@ -178,10 +178,11 @@ def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
 def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
-    # flightdata graduated to enforced GATES, so it is no longer a candidate;
-    # datavault remains the staged example.
+    # flightdata and datavault both graduated to enforced GATES, so neither is
+    # a candidate anymore and no staged candidates remain.
     assert "flightdata" not in by_id
-    assert by_id["datavault"].get("staged") is True
+    assert "datavault" not in by_id
+    assert not [r["benchmark"] for r in rows if r.get("staged")], "unexpected staged candidates remain"
     assert by_id["joinorder"].get("staged") is False
 
 

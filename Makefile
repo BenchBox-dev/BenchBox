@@ -281,13 +281,21 @@ read-primitives-cross-surface-equivalence-report:
 flightdata-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata
 
+# Enforced gate: Data Vault DataFrame surface vs its own SQL surface on a bounded
+# DuckDB cell (SF=0.01). 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by a
+# mechanical Q prefix ("Q1".."Q22"); every compared cell matches with an empty
+# baseline. The builder forces regeneration on every build, so probes can never
+# pass on a stale manifest. Exits non-zero on any unclassified divergence.
+datavault-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully
 # clean, and is idempotent on a second run. Usage:
 #   make cross-surface-update-baseline BENCHMARK=h2odb
 cross-surface-update-baseline:
-	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>"; exit 1; }
+	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>"; exit 1; }
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
 
 # Scheduled-maintenance glue (cross-surface-baseline-stale-entry-autodetect):
