@@ -71,7 +71,6 @@ ignore_imports =
     benchbox.core.dryrun -> benchbox.platforms
     benchbox.core.dryrun -> benchbox.platforms.adapter_factory
     benchbox.core.dryrun -> benchbox.platforms.dataframe.platform_checker
-    benchbox.core.dryrun -> benchbox.platforms.duckdb
     benchbox.core.equivalence.builders.base -> benchbox.platforms.duckdb
     benchbox.core.equivalence.dataframe_surface -> benchbox.platforms.dataframe.pandas_df
     benchbox.core.equivalence.dataframe_surface -> benchbox.platforms.dataframe.polars_df
