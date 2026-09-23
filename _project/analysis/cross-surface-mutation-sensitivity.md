@@ -124,6 +124,13 @@ SF=0.1: its `COUNT(*)` order key is constant (every one of its 10 rows ties at
 single-row perturbation as an equally-valid boundary swap (a BS3-adjacent
 artifact). Q8 avoids both, so its `drop_join` value mutation is genuinely caught.
 
+## Note on flightdata target choice
+
+The flightdata target is **ontime-by-carrier** (10 rows × 6 cols at the
+SF=0.01 bounded cell): `GROUP BY` carrier + `ORDER BY ontime_pct DESC` with
+**no** trailing `LIMIT`, so the strict comparator sees a discriminating order
+key and all four mutations are caught with no blind-spot entry.
+
 ## Tracking
 
 - **Closed (w2 / BS2):** the order-aware comparison mode (compare returned order,

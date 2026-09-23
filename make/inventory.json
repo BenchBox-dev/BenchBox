@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "cb52ed814bcdf8cb3f841a3f3a9bd14d895294772ca1adce4763181f1a951e42",
+  "contract_sha256": "55c8fbe48db31226754e84ef69a45494aab9d604c7971cd7281778cb7031d60c",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -178,7 +178,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 206,
+  "public_target_count": 207,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -235,6 +235,7 @@
     "duplicate-check-json",
     "duplicate-check-verbose",
     "explorer-snapshot-check",
+    "flightdata-cross-surface-equivalence-report",
     "format",
     "guards-fix",
     "h2odb-cross-surface-equivalence-report",
@@ -882,6 +883,13 @@
         "header": "explorer-snapshot-check:",
         "recipe": "\tuv run -- python _project/scripts/results_explorer_snapshot_invariants.py \"$(SNAPSHOT)\"",
         "recipe_sha256": "736f31629196498104d62fc37000c055257f7515f139ed5fb71bbb25229e5d11"
+      }
+    ],
+    "flightdata-cross-surface-equivalence-report": [
+      {
+        "header": "flightdata-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata",
+        "recipe_sha256": "f2d0547a76d66717eae712486af0a5a0deb8965134e40e4340c5fc827db09df7"
       }
     ],
     "format": [
@@ -2114,7 +2122,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "a30141a7b0d7967b7bae1deee195a6cbf0f54194bf699b07c798a6f7c4a0daad",
+  "semantic_sha256": "d145aa82bb94d4615d98624c5b98deb5e828338c102cac8decdc29c2b32cebb3",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2578,6 +2586,14 @@
       "sha256": "588ff4fd7766829fc303b3937eaaab9e6847a2a13597ac1d02fe9079a220bce8",
       "targets": [
         "read-primitives-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "flightdata-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata",
+      "kind": "rule",
+      "sha256": "0452dcee953f250f8eb878f5afc76d996dea289c57e878fa544b3a14db1ec9b8",
+      "targets": [
+        "flightdata-cross-surface-equivalence-report"
       ]
     },
     {
@@ -4317,7 +4333,7 @@
       ]
     }
   ],
-  "target_count": 212,
+  "target_count": 213,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4377,6 +4393,7 @@
     "duplicate-check-json",
     "duplicate-check-verbose",
     "explorer-snapshot-check",
+    "flightdata-cross-surface-equivalence-report",
     "format",
     "guards-fix",
     "h2odb-cross-surface-equivalence-report",

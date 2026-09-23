@@ -80,13 +80,20 @@ _NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "tpcds_obt", "nyctaxi"}
 
 
 def test_registry_bearing_benchmarks_are_gateable(rows):
-    """flightdata (verified verbatim overlap) is gateable; a zero-overlap registry is not.
+    """A verified verbatim overlap is gateable; a zero-overlap registry is not.
 
-    (h2odb was the prior example here; it is now an enforced cross-surface gate, so
-    it no longer appears among the unguarded candidates the sweep drills into.)
+    flightdata was the prior example here; it is now an enforced cross-surface
+    gate, so it no longer appears among the candidates the sweep drills into
+    (like h2odb before it). joinorder also carried a verbatim overlap, but it
+    rejects the bounded SF=0.01 cell, so it is `not-cheaply-gateable`, not
+    gateable. No remaining candidate has a verified overlap at a bounded
+    scale, so the gateable set is currently empty.
     """
     by_id = {r["benchmark"]: r["status"] for r in rows}
-    assert by_id.get("flightdata") == GATEABLE
+    assert "flightdata" not in by_id, "flightdata graduated to enforced GATES and must leave the candidates"
+    assert by_id.get("joinorder") == NOT_CHEAPLY_GATEABLE
+    gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
+    assert gateable == set(), f"unexpected gateable candidates: {sorted(gateable)}"
     # datavault ships a registry but its ids do not overlap the SQL ids verbatim
     # (friendly/Q-prefixed names), so there is no verified correspondence: it is
     # candidate-unverified, NOT counted as gateable coverage.
@@ -144,7 +151,9 @@ def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
 def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
-    assert by_id["flightdata"].get("staged") is True
+    # flightdata graduated to enforced GATES, so it is no longer a candidate;
+    # datavault remains the staged example.
+    assert "flightdata" not in by_id
     assert by_id["datavault"].get("staged") is True
     assert by_id["joinorder"].get("staged") is False
 

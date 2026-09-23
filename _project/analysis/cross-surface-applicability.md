@@ -6,12 +6,11 @@
 
 **Gateable also means CHEAP, not merely overlapping.** A benchmark that rejects the bounded SF=0.01 cell, fetches a canonical dataset via `data_manifest.toml`, or performs downloader-backed network fetches at the bounded scale is `not-cheaply-gateable`, NOT gateable, no matter its id overlap: wiring it would drag a full dataset fetch into routine PRs. The table reason names the scale/provenance evidence.
 
-**Summary:** 11 dual-surface candidates (unguarded + staged, registered but not CI-enforced) — 1 cross-surface gateable (verified verbatim id overlap at a bounded scale), 3 candidate-unverified (registry exists but ZERO verified id overlap — needs a confirmed id mapping first), 3 not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), 4 have no DataFrame query surface (need a w2 fallback oracle), 0 blocked.
+**Summary:** 10 dual-surface candidates (unguarded + staged, registered but not CI-enforced) — 0 cross-surface gateable (verified verbatim id overlap at a bounded scale), 3 candidate-unverified (registry exists but ZERO verified id overlap — needs a confirmed id mapping first), 3 not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), 4 have no DataFrame query surface (need a w2 fallback oracle), 0 blocked.
 
 | Benchmark | Status | SQL queries | DataFrame queries | Raw id overlap | Note |
 | --- | --- | --- | --- | --- | --- |
 | datavault | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) [staged, not CI-enforced] |
-| flightdata | gateable | 20 | 20 | 20 | → cross-surface gate (w3) [staged, not CI-enforced] |
 | joinorder | not-cheaply-gateable | 113 | 113 | 113 | → NOT a routine-PR gate: rejects bounded scale SF=0.01 (ValueError: joinorder now uses canonical IMDb 2013 data and accepts only scale_factor=1.0; use joinorder_synthetic for scaled synthetic smoke-test data.); requires SF=1.0; canonical manifest fetch (data_manifest.toml); use joinorder_synthetic (already CI-enforced) for scaled smoke-test data |
 | metadata_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | nyctaxi | not-cheaply-gateable | 25 | 25 | 0 | → NOT a routine-PR gate: downloader-backed network fetch at the bounded scale (downloader.py) |
@@ -24,7 +23,7 @@
 
 ## Campaign dispatch
 
-- **Cross-surface gate, ids overlap as-is (w3):** flightdata.
+- **Cross-surface gate, ids overlap as-is (w3):** none.
 - **Candidate-unverified (NOT gateable yet):** datavault, tpch_skew, tsbs_devops — a DataFrame query registry exists but ZERO ids overlap the SQL ids verbatim, so there is no verified query correspondence. Each needs an independent, per-benchmark id mapping confirmed (the campaign TODO says "do NOT guess") before a gate can be wired; do not count these as coverage.
 - **Not-cheaply-gateable (NOT a routine-PR gate):** joinorder, nyctaxi, tpcds_obt — rejects the bounded SF=0.01 cell, needs a canonical manifest fetch, or performs downloader-backed network fetches at the bounded scale; do not wire as a routine-PR gate.
 - **w2 fallback oracle** — no DataFrame query registry, so the cross-surface gate cannot reach them; they need a differential second-engine check or a curated expected-results subset: metadata_primitives, tpcdi, transaction_primitives, write_primitives.
