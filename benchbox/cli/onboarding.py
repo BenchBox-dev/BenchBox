@@ -17,6 +17,7 @@ from rich.prompt import Confirm
 from rich.table import Table
 from rich.text import Text
 
+from benchbox.cli.logo import rich_logo
 from benchbox.utils.printing import quiet_console
 
 console = quiet_console
@@ -97,6 +98,8 @@ def _show_welcome_message() -> None:
     welcome_text.append("Documentation: ", style="dim")
     welcome_text.append("https://benchbox.dev/docs/", style="cyan underline")
 
+    if (logo := rich_logo()) is not None:
+        console.print(logo, end="\n\n")
     console.print(Panel(welcome_text, title="🎯 Getting Started", border_style="cyan", padding=(1, 2)))
 
 
