@@ -1266,7 +1266,7 @@
       "needs": [
         "benchbox-score-manifest-schema"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Implement the cross-benchmark Power runner"
     },
