@@ -73,3 +73,31 @@ def test_checked_in_corpus_carries_no_bare_labels() -> None:
     hits, _ = migrate_clickhouse_labels.discover_hits(bundle_dir)
 
     assert hits == []
+
+
+def test_discovers_nested_bundles(tmp_path: Path) -> None:
+    nested = tmp_path / "tpch" / "duckdb"
+    nested.mkdir(parents=True)
+    result = nested / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.json"
+    result.write_text(json.dumps({"platform": {"name": "clickhouse"}}))
+
+    hits, _ = migrate_clickhouse_labels.discover_hits(tmp_path)
+
+    assert [hit.result for hit in hits] == [result]
+
+
+def test_migrate_refuses_to_overwrite_existing_bundle(tmp_path: Path) -> None:
+    import pytest
+
+    old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
+    clash = tmp_path / "tpch_sf1_clickhouse_local_sql_20200101_000000_abc123.json"
+    clash.write_text(json.dumps({"platform": {"name": "ClickHouse Local"}}))
+
+    (hits, _) = migrate_clickhouse_labels.discover_hits(tmp_path)
+    (hit,) = [hit for hit in hits if hit.result == old]
+
+    with pytest.raises(FileExistsError):
+        migrate_clickhouse_labels.migrate_hit(hit, "clickhouse-local")
+
+    assert old.exists()
+    assert json.loads(old.read_text(encoding="utf-8"))["platform"]["name"] == "clickhouse"

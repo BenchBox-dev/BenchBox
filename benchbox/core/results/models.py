@@ -459,7 +459,7 @@ class BenchmarkResults:
     # that produced the data this result ran against. Results stamped with
     # different versions must not be silently compared. None for results
     # predating the stamp.
-    data_generation_version: str | int | None = None
+    data_generation_version: int | None = None
     # Optional detailed per-query timing info (for CSV export and analysis)
     per_query_timings: list[dict[str, Any]] | None = field(default_factory=list)
     # Optional detailed structures

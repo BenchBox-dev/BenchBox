@@ -321,13 +321,32 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
     return False
 
 
-def _attach_datagen_version(result: BenchmarkResults) -> BenchmarkResults:
-    """Stamp the result with the data-generation version that produced it."""
-    try:
-        from benchbox.utils.datagen_version import DATA_GENERATION_VERSION
+def _attach_datagen_version(result: BenchmarkResults, benchmark: Any = None) -> BenchmarkResults:
+    """Stamp the result with the verified data-generation version behind it.
 
-        if getattr(result, "data_generation_version", None) is None:
-            result.data_generation_version = DATA_GENERATION_VERSION
+    The version is read back from the benchmark's datagen manifest and
+    recorded only when that manifest's stamp is current. Paths that bypass
+    manifest validation (caller-supplied external tables, missing output
+    dir) leave the field unset rather than asserting unverified provenance.
+    """
+    try:
+        if getattr(result, "data_generation_version", None) is not None:
+            return result
+        from benchbox.utils.datagen_version import manifest_datagen_is_current
+
+        output_dir = getattr(benchmark, "output_dir", None) if benchmark is not None else None
+        if output_dir is None:
+            return result
+        manifest_path = output_dir.joinpath("_datagen_manifest.json")
+        if not hasattr(manifest_path, "exists") or not manifest_path.exists():
+            return result
+        import json as _json
+
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = _json.load(handle)
+        if not manifest_datagen_is_current(manifest):
+            return result
+        result.data_generation_version = manifest.get("data_generation_version")
     except Exception:
         pass
     return result
@@ -1398,7 +1417,7 @@ def run_benchmark_lifecycle(
             result_obj.execution_context = execution_context.model_dump()
         result_obj = _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
         result_obj = _attach_variant_comparability_metadata(result_obj, benchmark)
-        return _attach_datagen_version(result_obj)
+        return _attach_datagen_version(result_obj, benchmark)
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1470,7 +1489,7 @@ def run_benchmark_lifecycle(
     )
     finalized = _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
     finalized = _attach_variant_comparability_metadata(finalized, benchmark)
-    return _attach_datagen_version(finalized)
+    return _attach_datagen_version(finalized, benchmark)
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1625,7 +1644,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     manifest_data: dict | None = None
 
     if output_dir and not force_regenerate_flag and not populated_tables_invalid:
-        manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(benchmark, config)
+        manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(
+            benchmark, config, quiet=no_regenerate_flag
+        )
         if manifest_valid:
             summary = _populate_tables_from_manifest(benchmark, manifest_data)
             if summary:
@@ -1673,7 +1694,7 @@ def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool
         # existence is the strongest validation available at this boundary.
         return True
 
-    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config)
+    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config, quiet=True)
     if not manifest_valid or manifest_data is None:
         return False
 
@@ -1865,7 +1886,9 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
     return False
 
 
-def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, dict | None, bool]:
+def _validate_manifest_if_present(
+    benchmark: Any, config: BenchmarkConfig, *, quiet: bool = False
+) -> tuple[bool, dict | None, bool]:
     """Validate manifest structure and referenced files.
 
     Returns (valid, manifest_dict or None). Non-fatal; failures are signaled by return value.
@@ -1894,7 +1917,8 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
         if not manifest_datagen_is_current(manifest, benchmark=manifest_benchmark):
             reason = describe_datagen_staleness(manifest, benchmark=manifest_benchmark)
             logger.warning("Datagen manifest is stale (%s); regenerating benchmark data", reason)
-            emit(f"\u26a0\ufe0f Cached data is stale ({reason}); regenerating (as if --force datagen)")
+            if not quiet:
+                emit(f"\u26a0\ufe0f Cached data is stale ({reason}); regenerating (as if --force datagen)")
             return False, None, True
 
         from benchbox.utils.datagen_manifest import get_table_files

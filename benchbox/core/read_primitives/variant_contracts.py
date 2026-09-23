@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import sqlglot
@@ -216,12 +217,29 @@ def summarize_variant_comparability(catalog=None) -> dict:
     names per-query variant dialects and the static contract issues from
     :func:`collect_variant_contract_issues`, so CLI output and persisted
     result artifacts can report what was compared without re-running the
-    lint. Best-effort: callers treat an empty issue list as comparable.
+    lint.
+
+    ``comparable`` reports static contract status only (no contract issues
+    found in the catalog lint) — it is not runtime evidence that two
+    executions were like-for-like. Best-effort: callers treat an empty
+    issue list as comparable.
     """
     if catalog is None:
-        from benchbox.core.read_primitives.catalog.loader import load_primitives_catalog
+        import copy as _copy
 
-        catalog = load_primitives_catalog()
+        return _copy.deepcopy(_default_comparability_summary())
+    return _summarize_catalog(catalog)
+
+
+@lru_cache(maxsize=1)
+def _default_comparability_summary() -> dict:
+    """Cached summary for the default catalog (stable per process)."""
+    from benchbox.core.read_primitives.catalog.loader import load_primitives_catalog
+
+    return _summarize_catalog(load_primitives_catalog())
+
+
+def _summarize_catalog(catalog) -> dict:
     issues = collect_variant_contract_issues(catalog)
     queries = getattr(catalog, "queries", {}) or {}
     per_query: dict[str, dict] = {}

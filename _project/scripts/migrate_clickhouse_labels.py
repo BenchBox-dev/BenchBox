@@ -73,7 +73,7 @@ def platform_label_of(payload: dict) -> str | None:
 def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
     hits: list[BundleHit] = []
     anomalies: list[str] = []
-    for result in sorted(bundle_dir.glob("*.json")):
+    for result in sorted(bundle_dir.rglob("*.json")):
         if result.name.endswith(".manifest.json"):
             continue
         try:
@@ -98,9 +98,26 @@ def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
 
 
 def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
-    """Rewrite one bundle (and sidecar) to the target platform. Returns new paths."""
+    """Rewrite one bundle (and sidecar) to the target platform. Returns new paths.
+
+    Raises:
+        FileExistsError: If the rewritten result or sidecar path already
+            exists. `--apply` never overwrites a published artifact; resolve
+            the collision by hand and re-run.
+    """
     display = TARGETS[target]
     slug = target.replace("-", "_")
+
+    new_result = hit.result
+    if _BARE_SLUG.search(hit.result.name):
+        new_result = hit.result.with_name(_BARE_SLUG.sub(f"_{slug}_", hit.result.name, count=1))
+    if new_result != hit.result and new_result.exists():
+        raise FileExistsError(f"refusing to overwrite existing bundle {new_result}")
+    new_manifest_guess = (
+        hit.manifest.with_name(f"{new_result.stem}.manifest.json") if hit.manifest is not None else None
+    )
+    if new_manifest_guess is not None and new_manifest_guess != hit.manifest and new_manifest_guess.exists():
+        raise FileExistsError(f"refusing to overwrite existing sidecar {new_manifest_guess}")
 
     payload = _load_json(hit.result)
     platform = payload.get("platform")
@@ -110,9 +127,6 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
     elif isinstance(platform, str) and _BARE_LABEL.match(platform):
         payload["platform"] = display
 
-    new_result = hit.result
-    if _BARE_SLUG.search(hit.result.name):
-        new_result = hit.result.with_name(_BARE_SLUG.sub(f"_{slug}_", hit.result.name, count=1))
     _write_json(new_result, payload)
     if new_result != hit.result:
         hit.result.unlink()
@@ -154,9 +168,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     assert args.target is not None
+    blocked = 0
     for hit in hits:
-        new_result, _ = migrate_hit(hit, args.target)
+        try:
+            new_result, _ = migrate_hit(hit, args.target)
+        except FileExistsError as exc:
+            blocked += 1
+            print(f"blocked: {exc}")
+            continue
         print(f"rewrote {hit.result.name} -> {new_result.name} ({TARGETS[args.target]})")
+    if blocked:
+        print(f"{blocked} hit(s) blocked by existing files; resolve by hand and re-run")
+        return 1
     print("done: regenerate corpus-inventory.json and re-run validate_corpus.py")
     return 0
 

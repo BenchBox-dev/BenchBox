@@ -72,9 +72,10 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
 | `threads` | (auto) | Number of threads |
 | `memory_limit` | (auto) | Maximum memory usage |
 | `temp_directory` | (auto) | Temp file location |
-| `enable_progress_bar` | true | Show query progress |
 | `driver_version` | (latest) | Pin the DuckDB Python package version (e.g. `1.2.0`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |
+
+`max_temp_directory_size` and `progress_bar` are Python/config-file settings, not `--platform-option` names: pass them to `DuckDBAdapter` (or `from_config`) directly, e.g. `DuckDBAdapter(database_path=":memory:", progress_bar=True)`.
 
 ### Testing a Specific DuckDB Version
 
@@ -277,9 +278,11 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=$(nproc)
 
-# Enable progress for visibility
-benchbox run --platform duckdb --benchmark tpch \
-  --platform-option enable_progress_bar=true
+# Enable progress for visibility (Python API: the progress bar is not a --platform-option)
+```python
+from benchbox.platforms.duckdb import DuckDBAdapter
+
+adapter = DuckDBAdapter(database_path=":memory:", progress_bar=True)
 ```
 
 ### Database Locked

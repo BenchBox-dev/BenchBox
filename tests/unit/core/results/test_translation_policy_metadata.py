@@ -133,3 +133,20 @@ def test_variant_comparability_attach_leaves_other_benchmarks_untouched() -> Non
 
     enriched = _attach_variant_comparability_metadata(result, _Benchmark())
     assert "variant_comparability" not in (enriched.execution_metadata or {})
+
+
+def test_variant_comparability_survives_reconstruction() -> None:
+    """Load-then-export must not strip the comparability disclosure."""
+    from benchbox.core.results.loader import reconstruct_benchmark_results
+
+    result = make_benchmark_results(
+        validation_status="PASSED",
+        validation_details={},
+        execution_metadata={"variant_comparability": {"comparable": True, "issue_count": 0}},
+    )
+    payload = build_result_payload(result)
+    rebuilt = reconstruct_benchmark_results(payload)
+
+    assert rebuilt.execution_metadata is not None
+    assert rebuilt.execution_metadata["variant_comparability"]["comparable"] is True
+    assert build_result_payload(rebuilt)["execution"]["variant_comparability"]["issue_count"] == 0

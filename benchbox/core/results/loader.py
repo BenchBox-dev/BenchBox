@@ -333,12 +333,28 @@ def reconstruct_benchmark_results(
         _benchmark_id_override=benchmark_section.get("id"),
         compliance_class=benchmark_section.get("compliance_class"),
         dataset_version=benchmark_section.get("dataset_version"),
-        data_generation_version=benchmark_section.get("data_generation_version"),
+        data_generation_version=_coerce_datagen_version(benchmark_section.get("data_generation_version")),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
         result_source=provenance_section.get("source"),
     )
+
+
+def _coerce_datagen_version(value: object) -> int | None:
+    """Coerce a persisted datagen version to int; unknown shapes stay unset."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
 
 
 def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
@@ -347,6 +363,9 @@ def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, 
     translation = execution_section.get("translation")
     if isinstance(translation, dict):
         metadata["translation"] = translation
+    comparability = execution_section.get("variant_comparability")
+    if isinstance(comparability, dict):
+        metadata["variant_comparability"] = comparability
     return metadata or None
 
 

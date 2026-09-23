@@ -202,18 +202,33 @@ def _cell_datagen_dir(benchmark_runs_dir: Path | str | None, benchmark: str, sca
 
 
 def _datagen_cache_complete(path: Path | None) -> bool:
-    """Report whether `path` holds a *finished* dataset.
+    """Report whether `path` holds a *finished, reusable* dataset.
 
     Generators populate their output directory before writing
     ``_datagen_manifest.json`` last, so a non-empty directory can be a
     generation that died partway. Only the manifest proves the dataset is
     complete enough for a later cell to reuse; anything short of it keeps the
     full datagen reserve, which is the safe direction for a disk guard.
+
+    A present manifest whose datagen stamp is stale is likewise not reusable:
+    the cell regenerates (the automatic equivalent of ``--force`` datagen),
+    so the reserve stays intact.
     """
     if path is None:
         return False
     try:
-        return (path / "_datagen_manifest.json").is_file()
+        manifest_path = path / "_datagen_manifest.json"
+        if not manifest_path.is_file():
+            return False
+        try:
+            import json as _json
+
+            from benchbox.utils.datagen_version import manifest_datagen_is_current
+
+            manifest = _json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return True
+        return bool(manifest_datagen_is_current(manifest))
     except OSError:
         return False
 

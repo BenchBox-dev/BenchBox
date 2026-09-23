@@ -676,11 +676,17 @@ def _passed_cell(platform: str, benchmark: str, scale: float, tmp_path: Path) ->
 
 def _complete_datagen(runs_dir: Path, benchmark: str, scale: float) -> Path:
     """Materialize a finished datagen cache the way a generator leaves one."""
+    import json
+
+    from benchbox.utils.datagen_version import current_datagen_stamp
+
     path = orchestrator._cell_datagen_dir(runs_dir, benchmark, scale)
     assert path is not None
     path.mkdir(parents=True, exist_ok=True)
     (path / "lineitem.tbl").write_text("data")
-    (path / "_datagen_manifest.json").write_text("{}")
+    (path / "_datagen_manifest.json").write_text(
+        json.dumps({"benchmark": benchmark, **current_datagen_stamp(benchmark)})
+    )
     return path
 
 
@@ -710,7 +716,21 @@ def test_partial_datagen_cache_does_not_drop_the_reserve(tmp_path: Path):
     assert orchestrator._datagen_cache_complete(partial) is False
 
     (partial / "_datagen_manifest.json").write_text("{}")
-    assert orchestrator._datagen_cache_complete(partial) is True
+    assert orchestrator._datagen_cache_complete(partial) is False
+
+
+def test_stamped_datagen_cache_marks_dataset_reusable(tmp_path: Path):
+    """A current-stamped manifest proves the dataset is finished and reusable."""
+    import json
+
+    from benchbox.utils.datagen_version import current_datagen_stamp
+
+    complete = orchestrator._cell_datagen_dir(tmp_path, "tpch", 0.01)
+    assert complete is not None
+    complete.mkdir(parents=True)
+    (complete / "_datagen_manifest.json").write_text(json.dumps({"benchmark": "tpch", **current_datagen_stamp("tpch")}))
+
+    assert orchestrator._datagen_cache_complete(complete) is True
 
 
 def test_failed_cell_does_not_mark_its_datagen_available(tmp_path: Path):

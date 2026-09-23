@@ -31,7 +31,7 @@ def test_missing_stamp_is_stale() -> None:
     manifest = {"benchmark": "tpch", "scale_factor": 1.0}
     assert manifest_datagen_is_current(manifest, benchmark="tpch") is False
     reason = describe_datagen_staleness(manifest, benchmark="tpch")
-    assert reason is not None and "version" in reason
+    assert reason is not None and "predates version stamping" in reason
 
 
 def test_changed_base_constants_hash_is_stale() -> None:
@@ -44,6 +44,22 @@ def test_changed_base_constants_hash_is_stale() -> None:
 
 def test_base_constants_hash_is_stable() -> None:
     assert compute_base_constants_hash("tpch") == compute_base_constants_hash("tpch")
+
+
+def test_base_constants_hash_fingerprints_spec_files() -> None:
+    """Distinct spec inputs must hash distinctly, or staleness is undetectable."""
+    assert compute_base_constants_hash("tpch") != compute_base_constants_hash("tsbs_devops")
+
+
+def test_base_constants_hash_changes_with_spec_contents(tmp_path, monkeypatch) -> None:
+    import benchbox.utils.datagen_version as datagen_version
+
+    specs = tmp_path / "generator_specs.yaml"
+    specs.write_text("base_row_counts:\n  lineitem: 1\n")
+    monkeypatch.setitem(datagen_version._BENCHMARK_SPECS_FILES, "probe", (str(specs),))
+    before = compute_base_constants_hash("probe")
+    specs.write_text("base_row_counts:\n  lineitem: 2\n")
+    assert compute_base_constants_hash("probe") != before
 
 
 def test_manifest_writer_stamps_version(tmp_path: Path) -> None:
@@ -81,14 +97,32 @@ def test_stale_manifest_fails_reuse_validation(tmp_path: Path) -> None:
     assert valid is False
 
 
-def test_result_carries_data_generation_version() -> None:
+def test_result_carries_verified_data_generation_version(tmp_path) -> None:
+    import json
+
     from benchbox.core.results.loader import reconstruct_benchmark_results
     from benchbox.core.results.schema import build_result_payload
     from benchbox.core.runner.runner import _attach_datagen_version
     from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
-    result = _attach_datagen_version(make_benchmark_results())
+    (tmp_path / "_datagen_manifest.json").write_text(json.dumps({"benchmark": "tpch", **current_datagen_stamp("tpch")}))
+
+    class _Benchmark:
+        output_dir = tmp_path
+
+    result = _attach_datagen_version(make_benchmark_results(), _Benchmark())
     assert result.data_generation_version == DATA_GENERATION_VERSION
     payload = build_result_payload(result)
     assert payload["benchmark"]["data_generation_version"] == DATA_GENERATION_VERSION
     assert reconstruct_benchmark_results(payload).data_generation_version == DATA_GENERATION_VERSION
+
+
+def test_result_leaves_version_unset_without_verified_manifest(tmp_path) -> None:
+    from benchbox.core.runner.runner import _attach_datagen_version
+    from tests.fixtures.result_dict_fixtures import make_benchmark_results
+
+    class _Benchmark:
+        output_dir = tmp_path
+
+    assert _attach_datagen_version(make_benchmark_results(), _Benchmark()).data_generation_version is None
+    assert _attach_datagen_version(make_benchmark_results()).data_generation_version is None

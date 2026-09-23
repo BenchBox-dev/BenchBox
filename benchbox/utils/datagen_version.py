@@ -35,7 +35,7 @@ _BENCHMARK_SPECS_FILES: dict[str, tuple[str, ...]] = {
     "tsbs": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
 }
 
-_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+_PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _spec_files_for(benchmark: str | None) -> list[Path]:
@@ -86,6 +86,11 @@ def describe_datagen_staleness(manifest: Mapping[str, Any] | None, benchmark: st
     if not isinstance(manifest, Mapping):
         return "datagen manifest is missing or unreadable"
     if manifest.get("data_generation_version") != DATA_GENERATION_VERSION:
+        if "data_generation_version" not in manifest:
+            return (
+                "this dataset predates version stamping and is treated as stale; "
+                "it regenerates once to establish provenance"
+            )
         return (
             f"datagen version {manifest.get('data_generation_version')!r} "
             f"does not match current version {DATA_GENERATION_VERSION}"
