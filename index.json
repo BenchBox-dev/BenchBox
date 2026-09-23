@@ -10080,15 +10080,10 @@
       "title": "NYC Taxi OLAP Benchmark (Core Implementation)"
     },
     "nyctaxi-dataframe-sql-id-mapping": {
-      "claim": {
-        "expires_at": "2026-09-24T13:56:54Z",
-        "generation": "d9ea68fd1fa9475a8cbbc74a16e3957f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Confirm nyctaxi DataFrame-SQL id mapping"
     },
     "off-scale-indicator-for-diverging-bar-values-clamped-at-300": {
