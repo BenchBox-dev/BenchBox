@@ -4044,15 +4044,10 @@
       "title": "Staged Data Vault cross-surface gate plus static frame-API check"
     },
     "datavault-cross-surface-gate-promotion": {
-      "claim": {
-        "expires_at": "2026-09-24T01:34:49Z",
-        "generation": "306ee3acff3640f3b9bd6e89d7899527",
-        "renewals": 1,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Promote datavault cross-surface gate from staged to enforced"
     },
     "datavault-cross-surface-query-execution-burn-down": {
