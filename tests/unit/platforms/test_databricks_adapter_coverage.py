@@ -206,6 +206,10 @@ class TestDetectDatabricksRegion:
         mock_summary.region = region
         mock_workspace = MagicMock()
         mock_workspace.metastores.summary.return_value = mock_summary
+        # Fail warehouse lookup: an unconstrained warehouses.get() mock would
+        # store MagicMocks throughout compute_configuration, which the
+        # normalization path cannot sanitize promptly.
+        mock_workspace.warehouses.get.side_effect = RuntimeError("warehouse lookup disabled")
         mock_sdk = MagicMock()
         mock_sdk.WorkspaceClient.return_value = mock_workspace
         return mock_sdk, mock_workspace
