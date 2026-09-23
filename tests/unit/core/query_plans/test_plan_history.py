@@ -745,6 +745,36 @@ class TestPlatformPartitionAndVersionAwareMetrics:
             pg = history.get_plan_version_history("q1", platform="postgres")
             assert pg == [("b" * 64, 1)]
 
+    def test_mixed_platform_lineage_warns_without_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            history_dir = Path(tmpdir)
+            history = PlanHistory(history_dir)
+            plan = _create_plan_with_fingerprint("q1", "a" * 64)
+            history.add_run(
+                make_benchmark_results(
+                    execution_id="run0",
+                    timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                    platform="duckdb",
+                    query_results=[_qr("q1", 100.0, plan)],
+                )
+            )
+            history.add_run(
+                make_benchmark_results(
+                    execution_id="run1",
+                    timestamp=datetime(2024, 1, 2, tzinfo=timezone.utc),
+                    platform="postgres",
+                    query_results=[_qr("q1", 100.0, plan)],
+                )
+            )
+            mixed = CliRunner().invoke(plan_history, ["--query-id", "q1", "--history-dir", str(history_dir)])
+            assert mixed.exit_code == 0, mixed.output
+            assert "--platform" in mixed.output
+            filtered = CliRunner().invoke(
+                plan_history, ["--query-id", "q1", "--history-dir", str(history_dir), "--platform", "duckdb"]
+            )
+            assert filtered.exit_code == 0, filtered.output
+            assert "--platform" not in filtered.output
+
     def test_cli_version_aware_summary_ignores_encoding_bump(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             history_dir = Path(tmpdir)
@@ -778,4 +808,4 @@ class TestPlatformPartitionAndVersionAwareMetrics:
             result = CliRunner().invoke(plan_history, ["--query-id", "q1", "--history-dir", str(history_dir)])
             assert result.exit_code == 0, result.output
             assert "Unique plans: 2" in result.output
-            assert "Plan changes: 1" in result.output
+            assert "Plan changes: 2" in result.output

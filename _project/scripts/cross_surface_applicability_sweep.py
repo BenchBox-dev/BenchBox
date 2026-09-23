@@ -345,6 +345,9 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
             continue
         if r["status"] == ABANDONED:
             note = f"→ correspondence abandoned: {r.get('reason', 'see the per-benchmark id-mapping decision test')}"
+            scale = r.get("scale")
+            if scale is not None and abs(float(scale) - _INSTANTIATE_SCALES[0]) >= 1e-9:
+                note += f" Also rejects bounded scale SF={_INSTANTIATE_SCALES[0]:g} (requires SF={scale:g})."
             lines.append(
                 f"| {r['benchmark']} | {r['status']} | {r.get('sql_queries', '—')} | "
                 f"{r.get('df_queries', '—')} | {r.get('raw_id_overlap', '—')} | {note}{staged_suffix} |"
