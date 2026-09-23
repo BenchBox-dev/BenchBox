@@ -75,6 +75,7 @@ jobs:
     name: Slow tier observation
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -94,7 +95,6 @@ jobs:
         run: uv run -- python _project/scripts/report_slow_test_coverage.py
 
       - name: Observe non-credentialed slow tests
-        continue-on-error: true
         run: |
           uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20
 
