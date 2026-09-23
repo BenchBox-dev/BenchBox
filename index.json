@@ -204,15 +204,10 @@
       "title": "Add first-class, policy-safe MCP platform option arguments"
     },
     "add-force-datagen-auto-detection-when-base-constants-change": {
-      "claim": {
-        "expires_at": "2026-09-24T12:37:44Z",
-        "generation": "b9ab178ab5934aec973bb0a6d8a5f058",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ce7766b2ec440e9d41ae1494"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Add --force datagen auto-detection when base constants change"
     },
     "add-global-quiet-mode-quiet-q-to-suppress-all-output": {
