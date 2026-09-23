@@ -42,6 +42,12 @@ pytestmark = [
 ]
 
 
+# Runs to completion but exceeds the medium lane's 60s cap: the full 22-query
+# two-backend comparison needs about 115s end to end. The marker overrides
+# the CLI --timeout=60 (pytest-timeout marker precedence, same as the
+# coffeeshop cross-surface companion) so the test keeps running in the
+# medium lane instead of being killed mid-work.
+@pytest.mark.timeout(600)
 def test_datavault_dataframe_surface_equivalent_to_sql(tmp_path):
     """Every Data Vault DataFrame query (both backends) must match its own SQL surface."""
     gate = GATES["datavault"]
