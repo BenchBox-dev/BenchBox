@@ -1,0 +1,15 @@
+{
+  "acceptance": [
+    "pr.yml runs the selector and impacted-test shards on merge_group only, with job-level continue-on-error and outside ci-required-result.",
+    "release_canary_sharding.py supports --allow-empty with unit tests; the default still rejects empty input.",
+    "Workflow tests cover empty, non-empty, whole-suite fallback, and selector-failure results, and assert the jobs are not required.",
+    "The first live merge_group run shows the selector summary and, if tests were selected, their shard results; its date is recorded in this item."
+  ],
+  "context": "Guardrails:\n1. Shadow means not required: do not add these jobs to ci-required-result, and give them job-level continue-on-error: true so they cannot fail the merge-group run. A workflow test asserts both.\n2. merge_group only. Gating pull_request is a separate decision (see canary-impact-06-required-gate) and is out of scope here.\n3. Selector failure or missing output falls back to running the whole canary suite in the shadow job, and records why. Never silently skip.\n4. Keep the release canary unchanged; it remains the full daily backstop.\n5. pr.yml is a soundness path: maintainer review required, no auto-merge.\n6. Workflow tests cover: empty selection, non-empty selection, whole-suite fallback, and selector failure, on merge_group; and that the jobs do not run on pull_request.\n7. Record the date of the first merge_group run that executes the shadow job in this item when it happens; canary-impact-05-shadow-watch measures its 14 days from that date.",
+  "description": "Start only after D1 in canary-impact-03-replay-and-go-decision is recorded as go.\n\nAdd to pr.yml, on merge_group only:\n- a canary-impact selector job that runs scripts/canary_impact.py against the merge-group diff and publishes its JSON result as an artifact and in the step summary;\n- a canary-impacted test job, sharded with scripts/release_canary_sharding.py (new --allow-empty mode), sized from the selector's shard count, running the selected node IDs with the canary marker expression.\n\nZero-selection contract: when nothing is selected, the selector job succeeds, records \"0 selected\" and the reason in the step summary, and the test shards are skipped. The sharder with --allow-empty writes an empty shard instead of raising.\n\nIn this item the job is a shadow: it runs and reports on every merge-group run but cannot block a merge.",
+  "links": [
+    ".github/workflows/pr.yml",
+    "scripts/release_canary_sharding.py",
+    "scripts/canary_impact.py"
+  ]
+}

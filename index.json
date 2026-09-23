@@ -1724,6 +1724,15 @@
       "status": "open",
       "title": "Replay the canary selector over recent merges at their parent trees, then decide whether to start a shadow run"
     },
+    "canary-impact-04-shadow-job": {
+      "claim": null,
+      "needs": [
+        "canary-impact-03-replay-and-go-decision"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Run the impacted canary tests in the merge queue as a non-blocking shadow job"
+    },
     "canary-submission-validator-drift": {
       "claim": null,
       "needs": [],
