@@ -738,20 +738,19 @@ class TestDryRunBenchmarkIdentityContract:
         maint.assert_called_once()
         assert "1" in result and "RF1" in result
 
-    def test_extract_queries_via_real_test_execution_uses_benchmark_config_name(self):
-        """_extract_queries_via_real_test_execution routes using BenchmarkConfig.name."""
+    def test_extract_queries_via_real_test_execution_uses_benchmark_queries(self):
+        """Test-mode extraction uses the same benchmark query definitions."""
         executor = DryRunExecutor()
         benchmark = MagicMock()
-        benchmark._name = "anything"
+        benchmark.get_queries.return_value = {"Q1": "SELECT 1"}
 
         benchmark_config = MagicMock()
         benchmark_config.name = "tpch"
         benchmark_config.scale_factor = 0.01
 
-        with patch.object(executor, "_execute_tpch_test_class", return_value={"Q1": "SELECT 1"}) as patched:
-            result = executor._extract_queries_via_real_test_execution(benchmark, benchmark_config, "power")
+        result = executor._extract_queries_via_real_test_execution(benchmark, benchmark_config, "power")
 
-        patched.assert_called_once()
+        benchmark.get_queries.assert_called_once()
         assert result == {"Q1": "SELECT 1"}
 
 

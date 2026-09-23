@@ -476,51 +476,8 @@ class DryRunExecutor:
         test_execution_type: str,
         platform_adapter=None,
     ) -> dict[str, str]:
-        try:
-            if platform_adapter is None:
-                from benchbox.platforms.duckdb import DuckDBAdapter
-
-                platform_adapter = DuckDBAdapter()
-
-            platform_adapter.enable_dry_run()
-
-            # Set benchmark_instance and scale_factor on adapter before create_connection()
-            # These are required for database validation during handle_existing_database()
-            platform_adapter.benchmark_instance = benchmark
-            platform_adapter.scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
-
-            connection = platform_adapter.create_connection()
-
-            # Use BenchmarkConfig.name as the authoritative slug, same as _extract_queries.
-            benchmark_id = normalize_benchmark_id(benchmark_config.name)
-            scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
-
-            if benchmark_id == "tpcds":
-                return self._execute_tpcds_test_class(
-                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
-                )
-            if benchmark_id == "tpch":
-                return self._execute_tpch_test_class(
-                    benchmark, benchmark_config, test_execution_type, scale_factor, connection, platform_adapter
-                )
-            return self._extract_standard_queries(benchmark)
-
-        except Exception:
-            return self._extract_standard_queries(benchmark)
-
-    def _execute_tpcds_test_class(
-        self,
-        benchmark,
-        benchmark_config,
-        test_execution_type: str,
-        scale_factor: float,
-        connection,
-        platform_adapter,
-    ) -> dict[str, str]:
-        """Extract query text from the TPC-DS benchmark object."""
+        """Return the benchmark's queries for test modes without opening a platform connection."""
         return self._extract_standard_queries(benchmark)
-
-    _execute_tpch_test_class = _execute_tpcds_test_class
 
     def _extract_standard_queries(self, benchmark) -> dict[str, str]:
         if hasattr(benchmark, "get_queries"):

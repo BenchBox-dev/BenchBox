@@ -94,6 +94,19 @@ class TestAdapterDryRunFlag:
             adapter.handle_existing_database(database="test")
             mock_check.assert_not_called()
 
+    def test_capture_mode_skips_existing_database_validation(self):
+        adapter = self._make_adapter(dry_run=False)
+        adapter.enable_dry_run()
+
+        with patch.object(adapter, "check_database_exists") as mock_check:
+            adapter.handle_existing_database(database="test")
+            mock_check.assert_not_called()
+
+        adapter.disable_dry_run()
+        with patch.object(adapter, "check_database_exists", return_value=False) as mock_check:
+            adapter.handle_existing_database(database="test")
+            mock_check.assert_called_once()
+
     def test_handle_existing_database_runs_when_not_dry_run(self):
         adapter = self._make_adapter(dry_run=False)
         # Should proceed and call check_database_exists
