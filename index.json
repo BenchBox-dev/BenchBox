@@ -4498,7 +4498,7 @@
         "dev-loop-step-5-measurement-window"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "dropped",
       "title": "Dev-loop simplification — Step 6: queue implementation gate (re-homed to hosted tracker; gated on Step 5 + WS9 baseline)"
     },
     "develop-post-merge-lint-red-since-1494": {
