@@ -1177,7 +1177,7 @@
       "needs": [
         "benchbox-score-capability-matrix"
       ],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Build non-vacuous advanced SQL fixtures"
     },
