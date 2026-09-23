@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "55c8fbe48db31226754e84ef69a45494aab9d604c7971cd7281778cb7031d60c",
+  "contract_sha256": "46a43496fe699d26f9719d772e9945e02c26aa9f46e391305869139b4bf593ec",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -51,6 +51,7 @@
     "coverage-check",
     "coverage-fast",
     "coverage-html",
+    "coverage-opt-in-all",
     "coverage-report",
     "cross-surface-applicability-report",
     "cross-surface-baseline-autodetect",
@@ -178,7 +179,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 207,
+  "public_target_count": 208,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -214,6 +215,7 @@
     "coverage-all",
     "coverage-fast",
     "coverage-html",
+    "coverage-opt-in-all",
     "coverage-report",
     "cross-surface-applicability-report",
     "cross-surface-baseline-autodetect",
@@ -700,8 +702,8 @@
     "coverage-all": [
       {
         "header": "coverage-all:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
-        "recipe_sha256": "27b2bd8d74be8dbf3ce394008c2ab886b0d695055bb0c69b5e882d5bdb864e71"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+        "recipe_sha256": "d3daa0cc39f44f69e2bdeea9accaca6e5d65b2dcc90356717f2c1df1d8a0bf35"
       }
     ],
     "coverage-fast": [
@@ -714,15 +716,22 @@
     "coverage-html": [
       {
         "header": "coverage-html:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=html:htmlcov",
-        "recipe_sha256": "6ce49f7c4b2b51fb98e955e428d4d7e7c1c4bfcaff4240f3847b488d87724816"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov",
+        "recipe_sha256": "2b77f670f30bf6cb29c086de9208256c7152b982b7f386aa7e8baaeb06e4f567"
+      }
+    ],
+    "coverage-opt-in-all": [
+      {
+        "header": "coverage-opt-in-all:",
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+        "recipe_sha256": "27b2bd8d74be8dbf3ce394008c2ab886b0d695055bb0c69b5e882d5bdb864e71"
       }
     ],
     "coverage-report": [
       {
         "header": "coverage-report:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
-        "recipe_sha256": "9fef3501e7071e8fdac09ecde4dfeea5f114d238215a1b0be5cd8afa7826fd96"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
+        "recipe_sha256": "3fc4a02c06db3968ff637b34185bf96c45fe68282bd8e2dbdceb2081304c8942"
       }
     ],
     "cross-surface-applicability-report": [
@@ -1470,8 +1479,8 @@
     "test-ci": [
       {
         "header": "test-ci:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or flaky or local_only)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
-        "recipe_sha256": "a5e0e6e663f78ccb8f5e7d8fde60401117a183751e5eacbe9ac814bbdf386a48"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
+        "recipe_sha256": "66b267e35e7ac30f4e463245ace0cc88649f77716b65056d7ef0be7ac1871a97"
       }
     ],
     "test-correctness-gate": [
@@ -2122,7 +2131,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "d145aa82bb94d4615d98624c5b98deb5e828338c102cac8decdc29c2b32cebb3",
+  "semantic_sha256": "9e4200237a1bd63bfe8bd49e6b3c1126810d63372d837d697826fc38392d2f3c",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2257,9 +2266,9 @@
       "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
+      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
       "kind": "rule",
-      "sha256": "41d0a306960535105483f02dabc0468926c2e7fa66c8d4708390cd94b7725ec3",
+      "sha256": "41a0cfc2649d542ffd0302134773065a8e1e8ba6c723d21dfb9fb4c9e7b3bd66",
       "targets": [
         ".PHONY"
       ]
@@ -2717,9 +2726,9 @@
       ]
     },
     {
-      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or flaky or local_only)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
+      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml",
       "kind": "rule",
-      "sha256": "9fa9aaad24c08029ef43c0c2023d38e2958c256c29963570f6dcb47f14b4a874",
+      "sha256": "d30aa04b792866bbb98dde41c07cb574b4036ae3fc57ed00ed9f1dc14dc06572",
       "targets": [
         "test-ci"
       ]
@@ -3015,11 +3024,19 @@
       ]
     },
     {
-      "body": "coverage-all:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+      "body": "coverage-all:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
       "kind": "rule",
-      "sha256": "d9e7f66adde8f012bffd8eb1926d5ce72fddc2253234562086bb1541069379e4",
+      "sha256": "e2e2d0d5d2c6f0f75ecc036b00dee740efe4deae6e5712d9b6af0d4b45ed0b2f",
       "targets": [
         "coverage-all"
+      ]
+    },
+    {
+      "body": "coverage-opt-in-all:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml",
+      "kind": "rule",
+      "sha256": "1814c05186fa2c90291172ce6987f7d45ed4e5eed5913ee9fca0c8024fbef4a8",
+      "targets": [
+        "coverage-opt-in-all"
       ]
     },
     {
@@ -3031,17 +3048,17 @@
       ]
     },
     {
-      "body": "coverage-html:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=html:htmlcov",
+      "body": "coverage-html:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov",
       "kind": "rule",
-      "sha256": "4d7567a5fc337276543322ab2e778a1689af722a060f54d5d5e8110c6511095f",
+      "sha256": "06ba1b49aea2a80e13b990ece88aaddaa9a59e747db308e947a905e0cc11435a",
       "targets": [
         "coverage-html"
       ]
     },
     {
-      "body": "coverage-report:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
+      "body": "coverage-report:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing",
       "kind": "rule",
-      "sha256": "3a2ec647ce4904a2c8a296272c413decb783d2b1f3492fcd34a4f4e65f8a2aef",
+      "sha256": "9fff094171f06dc1a6e23a37714dab3bbf30d09ef0de8b425f8b1799f89b5210",
       "targets": [
         "coverage-report"
       ]
@@ -4333,7 +4350,7 @@
       ]
     }
   ],
-  "target_count": 213,
+  "target_count": 214,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4372,6 +4389,7 @@
     "coverage-all",
     "coverage-fast",
     "coverage-html",
+    "coverage-opt-in-all",
     "coverage-report",
     "cross-surface-applicability-report",
     "cross-surface-baseline-autodetect",

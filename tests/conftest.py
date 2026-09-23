@@ -441,13 +441,6 @@ def pytest_runtest_setup(item) -> None:
     elif item.get_closest_marker("slow"):
         item.config.option.timeout = 600
 
-    # Skip tests based on environment
-    if item.get_closest_marker("skip_ci") and os.environ.get("CI"):
-        pytest.skip("Skipped in CI environment")
-
-    if item.get_closest_marker("local_only") and os.environ.get("CI"):
-        pytest.skip("Local-only test skipped in CI")
-
 
 def pytest_sessionfinish(session, exitstatus) -> None:
     """Clean up test databases after the test session ends."""
