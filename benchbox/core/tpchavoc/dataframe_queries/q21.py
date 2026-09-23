@@ -350,11 +350,144 @@ def _make_q21_pandas_impl(variant: int) -> VariantImpl:
                 .head(100)
             )
 
-        if variant in (2, 4, 7, 8, 9, 10):
+        if variant == 2:
+            # Exists-via-inner: multi-supplier orders from an inner-joined,
+            # deduplicated pair set instead of a semi-join plus nunique.
             candidates = _candidates(lineitem)
             cand_orders = list(candidates["l_orderkey"].unique())
             scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
-            return _finish(candidates, scoped)
+            pairs = scoped[["l_orderkey", "l_suppkey"]].drop_duplicates()
+            multi = pairs.groupby("l_orderkey").size()
+            kept = candidates[candidates["l_orderkey"].isin(list(multi[multi > 1].index))]
+            all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][["l_orderkey", "l_suppkey"]]
+            keys = kept[["l_orderkey", "s_suppkey"]].drop_duplicates()
+            merged = keys.merge(all_late, on="l_orderkey")
+            bad = merged[merged["s_suppkey"] != merged["l_suppkey"]][["l_orderkey", "s_suppkey"]].drop_duplicates()
+            bad = bad.copy()
+            bad["_exclude"] = True
+            kept = kept.merge(bad, on=["l_orderkey", "s_suppkey"], how="left")
+            kept = kept[kept["_exclude"].isna()].drop(columns=["_exclude"])
+            return (
+                kept.groupby("s_name", as_index=False)
+                .agg(numwait=("l_orderkey", "count"))
+                .sort_values(["numwait", "s_name"], ascending=[False, True])
+                .head(100)
+            )
+
+        if variant == 4:
+            # Counts-first-late: the late-supplier counts are aggregated
+            # before the total supplier counts instead of after them.
+            candidates = _candidates(lineitem)
+            cand_orders = list(candidates["l_orderkey"].unique())
+            scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
+            late_counts = (
+                scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]]
+                .groupby("l_orderkey")
+                .agg(num_late_suppliers=("l_suppkey", "nunique"))
+            )
+            multi = scoped.groupby("l_orderkey").agg(num_suppliers=("l_suppkey", "nunique"))
+            kept = candidates[candidates["l_orderkey"].isin(list(multi[multi["num_suppliers"] > 1].index))]
+            all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][["l_orderkey", "l_suppkey"]]
+            keys = kept[["l_orderkey", "s_suppkey"]].drop_duplicates()
+            merged = keys.merge(all_late, on="l_orderkey")
+            bad = merged[merged["s_suppkey"] != merged["l_suppkey"]][["l_orderkey", "s_suppkey"]].drop_duplicates()
+            bad = bad.copy()
+            bad["_exclude"] = True
+            kept = kept.merge(bad, on=["l_orderkey", "s_suppkey"], how="left")
+            kept = kept[kept["_exclude"].isna()].drop(columns=["_exclude"])
+            kept = kept.merge(late_counts, left_on="l_orderkey", right_index=True, how="left")
+            kept = kept[kept["num_late_suppliers"] == 1].drop(columns=["num_late_suppliers"])
+            return (
+                kept.groupby("s_name", as_index=False)
+                .agg(numwait=("l_orderkey", "count"))
+                .sort_values(["numwait", "s_name"], ascending=[False, True])
+                .head(100)
+            )
+
+        if variant == 7:
+            # Chained style: one continuous method chain, no named intermediates.
+            chained = lineitem[lineitem["l_receiptdate"] > lineitem["l_commitdate"]].merge(
+                targets, left_on="l_suppkey", right_on="s_suppkey"
+            )
+            kept = chained[chained["l_orderkey"].isin(valid_keys)][["l_orderkey", "s_suppkey", "s_name"]]
+            cand_orders = list(kept["l_orderkey"].unique())
+            scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
+            return _finish(kept, scoped)
+
+        if variant == 8:
+            # Combined predicates: the EXISTS (multi-supplier) and NOT EXISTS
+            # (no other late supplier) checks apply in a single compound
+            # filter instead of two staged filters.
+            candidates = _candidates(lineitem)
+            cand_orders = list(candidates["l_orderkey"].unique())
+            scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
+            multi = scoped.groupby("l_orderkey").agg(num_suppliers=("l_suppkey", "nunique"))
+            multi_orders = list(multi[multi["num_suppliers"] > 1].index)
+            all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][["l_orderkey", "l_suppkey"]]
+            keys = candidates[["l_orderkey", "s_suppkey"]].drop_duplicates()
+            merged = keys.merge(all_late, on="l_orderkey")
+            bad = merged[merged["s_suppkey"] != merged["l_suppkey"]][["l_orderkey", "s_suppkey"]].drop_duplicates()
+            bad = bad.copy()
+            bad["_exclude"] = True
+            marked = candidates.merge(bad, on=["l_orderkey", "s_suppkey"], how="left")
+            kept = marked[(marked["l_orderkey"].isin(multi_orders)) & (marked["_exclude"].isna())].drop(
+                columns=["_exclude"]
+            )
+            return (
+                kept.groupby("s_name", as_index=False)
+                .agg(numwait=("l_orderkey", "count"))
+                .sort_values(["numwait", "s_name"], ascending=[False, True])
+                .head(100)
+            )
+
+        if variant == 9:
+            # Late-join-order swap: the late-supplier counts are joined
+            # before the total supplier counts, mirroring the expression
+            # variant's join order.
+            candidates = _candidates(lineitem)
+            cand_orders = list(candidates["l_orderkey"].unique())
+            scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
+            late_counts = (
+                scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]]
+                .groupby("l_orderkey")
+                .agg(num_late_suppliers=("l_suppkey", "nunique"))
+                .reset_index()
+            )
+            multi = scoped.groupby("l_orderkey").agg(num_suppliers=("l_suppkey", "nunique")).reset_index()
+            kept = candidates.merge(late_counts, on="l_orderkey").merge(multi, on="l_orderkey")
+            kept = kept[(kept["num_late_suppliers"] == 1) & (kept["num_suppliers"] > 1)].drop(
+                columns=["num_late_suppliers", "num_suppliers"]
+            )
+            all_late = scoped[scoped["l_receiptdate"] > scoped["l_commitdate"]][["l_orderkey", "l_suppkey"]]
+            keys = kept[["l_orderkey", "s_suppkey"]].drop_duplicates()
+            merged = keys.merge(all_late, on="l_orderkey")
+            bad = merged[merged["s_suppkey"] != merged["l_suppkey"]][["l_orderkey", "s_suppkey"]].drop_duplicates()
+            bad = bad.copy()
+            bad["_exclude"] = True
+            kept = kept.merge(bad, on=["l_orderkey", "s_suppkey"], how="left")
+            kept = kept[kept["_exclude"].isna()].drop(columns=["_exclude"])
+            return (
+                kept.groupby("s_name", as_index=False)
+                .agg(numwait=("l_orderkey", "count"))
+                .sort_values(["numwait", "s_name"], ascending=[False, True])
+                .head(100)
+            )
+
+        if variant == 10:
+            # Candidate-narrowing: restrict candidate orders to late
+            # target-supplier touches before scoping the aggregation frame.
+            late_targets = lineitem[
+                (lineitem["l_receiptdate"] > lineitem["l_commitdate"])
+                & (lineitem["l_suppkey"].isin(list(targets["s_suppkey"])))
+            ]
+            candidates = _candidates(lineitem)
+            cand_orders = list(
+                late_targets[late_targets["l_orderkey"].isin(list(candidates["l_orderkey"].unique()))][
+                    "l_orderkey"
+                ].unique()
+            )
+            scoped = lineitem[lineitem["l_orderkey"].isin(cand_orders)]
+            return _finish(candidates[candidates["l_orderkey"].isin(cand_orders)], scoped)
 
         if variant == 3:
             candidates = _candidates(lineitem)

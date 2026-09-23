@@ -87,6 +87,13 @@ def plan_history(
         title_scope = f" (platform: {platform})" if platform else ""
         console.print(f"[bold]Plan History for {query_id}{title_scope}[/bold]")
         console.print(f"Total runs: {len(entries)}, showing last {len(display_entries)}")
+        if platform is None:
+            mixed = sorted({e.platform for e in entries})
+            if len(mixed) > 1:
+                console.print(
+                    f"[yellow]Note: {len(mixed)} platforms in this lineage "
+                    f"({', '.join(mixed)}); pass --platform to compare within one engine[/yellow]"
+                )
         console.print()
 
         table = Table(show_header=True)
@@ -130,12 +137,14 @@ def plan_history(
 
         # Summary statistics (identity-aware: distinct logical plans — version
         # numbers identify change episodes, so an A -> B -> A flap must not
-        # count three).
+        # count three; changes count version transitions in the lineage).
         unique_plans = history.count_unique_plans(query_id, platform=platform)
+        ordered_versions = [versions[i][1] for i in range(len(entries))]
+        plan_changes = sum(1 for a, b in zip(ordered_versions, ordered_versions[1:]) if a != b)
         console.print()
         console.print("[bold]Summary:[/bold]")
         console.print(f"  Unique plans: {unique_plans}")
-        console.print(f"  Plan changes: {max(unique_plans - 1, 0)}")
+        console.print(f"  Plan changes: {plan_changes}")
 
         # Flapping detection
         if check_flapping:

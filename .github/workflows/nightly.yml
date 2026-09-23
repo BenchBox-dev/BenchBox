@@ -978,14 +978,18 @@ jobs:
           tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
           observed = tpc_metrics.get('throughput_at_size')
           print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
+          import math
           floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
-          floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION', '0.2')
+          # `or` (not a get-default): a defined-but-empty variable must fall
+          # back too, otherwise float('') fails the gate on valid input.
+          floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION') or '0.2'
           if floor_median:
               try:
                   median = float(floor_median)
                   max_drop = float(floor_drop)
-                  assert median > 0 and 0 < max_drop < 1
-                  assert isinstance(observed, (int, float)) and observed > 0
+                  assert math.isfinite(median) and median > 0
+                  assert math.isfinite(max_drop) and 0 < max_drop < 1
+                  assert isinstance(observed, (int, float)) and math.isfinite(observed) and observed > 0
               except (ValueError, AssertionError):
                   print('::error::Throughput@Size floor misconfigured or unobserved; refusing to gate')
                   sys.exit(1)

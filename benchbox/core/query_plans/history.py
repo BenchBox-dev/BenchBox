@@ -348,6 +348,14 @@ class PlanHistory:
         joins the previous entry's plan (a re-encoding of the same plan
         hashes differently, so the boundary alone is never a new plan).
 
+        Known limitation: identity across an encoding boundary is a
+        heuristic, not proof — ``A(v1), B(v1), A(v2), B(v2)`` cannot
+        distinguish two re-encoded plans from new ones from fingerprints
+        alone, so the boundary entry joins its predecessor and the count
+        may overstate. Cross-encoding identity is unknowable without a
+        comparable plan representation; only same-encoding comparisons
+        are exact.
+
         Args:
             query_id: Query identifier
             platform: Optional platform filter, same semantics as

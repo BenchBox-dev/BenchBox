@@ -24,6 +24,7 @@ class _Entry:
     timestamp: str
     fingerprint: str
     execution_time_ms: float
+    platform: str = "duckdb"
 
 
 class _HistoryNoRuns:

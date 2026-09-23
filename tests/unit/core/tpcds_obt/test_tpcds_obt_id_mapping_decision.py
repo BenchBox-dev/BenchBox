@@ -56,6 +56,13 @@ def test_no_clean_correspondence() -> None:
     every overlapping label the DataFrame query's SQL differs from the SQL
     surface's same-numbered TPC-DS query, so no Qn<->n correspondence can
     be wired without revisiting this verdict.
+
+    This is a convergence tripwire, not a semantic proof: text inequality
+    forces a revisit if either side is rewritten toward the other, while
+    the domain mismatch (tests 1-2: obt_-named single-table analytics vs
+    numbered TPC-DS benchmark queries) is what rules the correspondence
+    out. A semantically convergent rewrite with different text is out of
+    scope for an automated guard.
     """
     from benchbox.core.tpcds_obt.dataframe_queries import get_dataframe_queries
     from benchbox.core.tpcds_obt.queries import CONVERTIBLE_QUERY_IDS, TPCDSOBTQueryManager
