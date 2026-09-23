@@ -13230,6 +13230,13 @@
       "status": "done",
       "title": "✅ Replace Merge Benchmark with Write Primitives"
     },
+    "replace-q16-q18-result-replay-with-structural": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Replace Q16-Q18 result-replay variants with structural rewrites"
+    },
     "replace-q16-q22-result-replay-variants-with-deeper-hand-writ": {
       "claim": null,
       "needs": [],

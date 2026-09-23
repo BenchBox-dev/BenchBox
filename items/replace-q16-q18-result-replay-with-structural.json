@@ -1,0 +1,4 @@
+{
+  "context": "The replay-replacement item scoped its detailed targets to Q19 condition unions, Q20 semi-join ordering, Q21 anti-join alternatives, and Q22 average-balance materialization (shipped in #2301, 80/80 equivalence cells). Q16-Q18 remain on canonical-delegation-plus-replay; DATAFRAME_VARIANTS.md records them as the next candidates. Follow the Q19-Q22 pattern: v1 baseline plus nine hand-written structural rewrites in both families, verified by the DuckDB equivalence gate, registry stays at 220 entries.",
+  "description": "Replace the Q16-Q18 result-replay variants with deeper hand-written structural rewrites, mirroring the shipped Q19-Q22 work. Registry entry count and the build_variants seam stay unchanged."
+}
