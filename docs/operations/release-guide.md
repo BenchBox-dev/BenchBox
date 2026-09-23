@@ -178,13 +178,14 @@ untouched — so a section you curated between runs survives. To throw the cut
 away instead:
 
 ```bash
-make release-cut-abort VERSION=X.Y.Z   # reset, return to develop, delete the branch
+make release-cut-abort VERSION=X.Y.Z   # discard tracked edits and restore the creating worktree branch
 ```
 
-`release-cut-abort` refuses once `vX.Y.Z` exists on origin, and refuses to run
-from any branch other than `vX.Y.Z` or `develop`. It is a legacy cleanup path
-that assumes a local `develop` branch is available. In a linked worktree,
-inspect the unpushed branch and its edits before any manual abort. `release-cut`
+`release-cut-abort` works in the creating linked worktree, even if the primary
+clone holds `develop`. It returns to the branch recorded when the worktree was
+created and deletes only an uncommitted local release branch. It refuses a
+pushed branch or tag, any local tag, a moved or committed branch, and untracked
+files. Inspect the edits before deliberately discarding them. `release-cut`
 refuses to resume a branch that already carries its `Release vX.Y.Z` commit or
 exists on origin.
 

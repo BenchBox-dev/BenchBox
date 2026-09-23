@@ -117,6 +117,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/check_release_curation.py",
     "scripts/release_finalize.py",
     "scripts/release_cut_start.sh",
+    "scripts/release_cut_abort.sh",
     "scripts/check_untracked_skill_mirrors.sh",
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",

@@ -201,6 +201,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "scripts/check_release_curation.py",
         "scripts/release_finalize.py",
         "scripts/release_cut_start.sh",
+        "scripts/release_cut_abort.sh",
         "scripts/check_untracked_skill_mirrors.sh",
         "scripts/path_filter_decision.py",
         "scripts/pr_refresh_certification.py",

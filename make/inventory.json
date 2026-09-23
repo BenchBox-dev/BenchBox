@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "0f08c7e8bb98aa602d52664ba8014393ba5608f836fe7e8cb16b35eed70904fc",
+  "contract_sha256": "e6ce3f714f16bd09e8cc5f0c9443261ad9d42e334d1a8090a0ed57160b8e375b",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1357,8 +1357,8 @@
     "release-cut-abort": [
       {
         "header": "release-cut-abort:",
-        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut-abort VERSION=X.Y.Z\" && exit 1)\n\t@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \\\n\t\t|| (echo \"Nothing to abort: no local v$(VERSION) branch\" >&2 && exit 1)\n\t@if git ls-remote --exit-code --heads origin \"v$(VERSION)\" >/dev/null 2>&1; then \\\n\t\techo \"Error: v$(VERSION) exists on origin; aborting would discard a pushed branch.\" >&2; \\\n\t\techo \"       Close its release PR and delete the remote branch first.\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \\\n\tif [ \"$$BRANCH\" = \"v$(VERSION)\" ]; then \\\n\t\techo \"==> Discarding uncommitted cut state on v$(VERSION)\"; \\\n\t\tgit reset --hard HEAD; \\\n\t\tgit checkout develop; \\\n\telif [ \"$$BRANCH\" != \"develop\" ]; then \\\n\t\techo \"Error: expected to be on v$(VERSION) or develop, not $$BRANCH\" >&2; exit 1; \\\n\tfi; \\\n\tgit branch -D v$(VERSION)\n\t@echo \"==> Aborted: v$(VERSION) deleted; develop untouched.\"",
-        "recipe_sha256": "205e43aac850937bbe9965aa98bd3752660498d78502b20017e4ff7de4597967"
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut-abort VERSION=X.Y.Z\" && exit 1)\n\tsh scripts/release_cut_abort.sh \"$(VERSION)\"",
+        "recipe_sha256": "dba6e8e0a420c57f2095ba0987004f2a2b89a3fd4c04253a60d57dca77838501"
       }
     ],
     "release-finalize": [
@@ -2139,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "bbc1045857c0926eda92fd7aa7e2742fae76fbd41df5f64129fb1d147480cea0",
+  "semantic_sha256": "b4b8612df0edd4af1f07b6b6110ea1721c560ed13e8c512ab14ca2d2319f9b63",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3760,9 +3760,9 @@
       ]
     },
     {
-      "body": "release-cut-abort:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut-abort VERSION=X.Y.Z\" && exit 1)\n\t@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \\\n\t\t|| (echo \"Nothing to abort: no local v$(VERSION) branch\" >&2 && exit 1)\n\t@if git ls-remote --exit-code --heads origin \"v$(VERSION)\" >/dev/null 2>&1; then \\\n\t\techo \"Error: v$(VERSION) exists on origin; aborting would discard a pushed branch.\" >&2; \\\n\t\techo \"       Close its release PR and delete the remote branch first.\" >&2; \\\n\t\texit 1; \\\n\tfi\n\t@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \\\n\tif [ \"$$BRANCH\" = \"v$(VERSION)\" ]; then \\\n\t\techo \"==> Discarding uncommitted cut state on v$(VERSION)\"; \\\n\t\tgit reset --hard HEAD; \\\n\t\tgit checkout develop; \\\n\telif [ \"$$BRANCH\" != \"develop\" ]; then \\\n\t\techo \"Error: expected to be on v$(VERSION) or develop, not $$BRANCH\" >&2; exit 1; \\\n\tfi; \\\n\tgit branch -D v$(VERSION)\n\t@echo \"==> Aborted: v$(VERSION) deleted; develop untouched.\"",
+      "body": "release-cut-abort:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut-abort VERSION=X.Y.Z\" && exit 1)\n\tsh scripts/release_cut_abort.sh \"$(VERSION)\"",
       "kind": "rule",
-      "sha256": "c1b3bad3147947939f4d8817c9bad09a8de24658d4065d6c7caab364eba9b27f",
+      "sha256": "57dbaaf88717687c583142cdfda557affe4a090b0142bc8ea7749b9ef749aa0b",
       "targets": [
         "release-cut-abort"
       ]

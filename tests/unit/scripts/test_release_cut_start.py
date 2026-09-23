@@ -10,6 +10,7 @@ import pytest
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "release_cut_start.sh"
+ABORT_SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "release_cut_abort.sh"
 
 
 def git(cwd: Path, *args: str) -> str:
@@ -18,6 +19,10 @@ def git(cwd: Path, *args: str) -> str:
 
 def start(cwd: Path, version: str = "9.9.9") -> subprocess.CompletedProcess[str]:
     return subprocess.run(["sh", str(SCRIPT), version], cwd=cwd, text=True, capture_output=True, check=False)
+
+
+def abort(cwd: Path, version: str = "9.9.9") -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["sh", str(ABORT_SCRIPT), version], cwd=cwd, text=True, capture_output=True, check=False)
 
 
 @pytest.fixture
@@ -35,6 +40,8 @@ def cut_repo(tmp_path: Path) -> tuple[Path, Path, Path]:
     git(primary, "commit", "-m", "Initial source")
     git(primary, "push", "-u", "origin", "develop")
     git(primary, "worktree", "add", "-b", "fix/release-cut", str(linked), "origin/develop")
+    git(primary, "config", "extensions.worktreeConfig", "true")
+    git(linked, "config", "--worktree", "benchbox.worktree.branch", "fix/release-cut")
     return remote, primary, linked
 
 
@@ -108,3 +115,77 @@ def test_rejects_invalid_version_before_branch_change(cut_repo: tuple[Path, Path
     assert result.returncode != 0
     assert "VERSION must be X.Y.Z" in result.stderr
     assert git(linked, "branch", "--show-current") == "fix/release-cut"
+
+
+def test_abort_restores_creating_branch_while_primary_holds_develop(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    (linked / "source.txt").write_text("cut edits\n", encoding="utf-8")
+    git(linked, "add", "source.txt")
+
+    result = abort(linked)
+    assert result.returncode == 0, result.stderr
+    assert git(linked, "branch", "--show-current") == "fix/release-cut"
+    assert (linked / "source.txt").read_text(encoding="utf-8") == "initial\n"
+    assert git(linked, "status", "--porcelain") == ""
+    assert git(linked, "branch", "--list", "v9.9.9") == ""
+    assert git(primary, "branch", "--show-current") == "develop"
+
+
+@pytest.mark.parametrize("state", ["committed", "remote-branch", "remote-tag", "local-tag", "untracked"])
+def test_abort_rejects_release_state_without_discarding_edits(cut_repo: tuple[Path, Path, Path], state: str) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    (linked / "source.txt").write_text("cut edits\n", encoding="utf-8")
+    if state == "committed":
+        git(linked, "add", "source.txt")
+        git(linked, "commit", "-m", "Release v9.9.9")
+    elif state == "remote-branch":
+        git(primary, "push", "origin", "v9.9.9:refs/heads/v9.9.9")
+    elif state == "remote-tag":
+        git(primary, "tag", "v9.9.9")
+        git(primary, "push", "origin", "refs/tags/v9.9.9")
+    elif state == "local-tag":
+        git(primary, "tag", "v9.9.9")
+    else:
+        (linked / "untracked.txt").write_text("keep me\n", encoding="utf-8")
+
+    before = git(linked, "rev-parse", "HEAD")
+    result = abort(linked)
+    assert result.returncode != 0
+    assert git(linked, "branch", "--show-current") == "v9.9.9"
+    assert git(linked, "rev-parse", "HEAD") == before
+    assert (linked / "source.txt").read_text(encoding="utf-8") == "cut edits\n"
+    assert git(linked, "branch", "--list", "v9.9.9") != ""
+
+
+def test_abort_resumes_after_switch_before_branch_deletion(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, _, linked = cut_repo
+    assert start(linked).returncode == 0
+    git(linked, "switch", "fix/release-cut")
+
+    result = abort(linked)
+    assert result.returncode == 0, result.stderr
+    assert git(linked, "branch", "--show-current") == "fix/release-cut"
+    assert git(linked, "branch", "--list", "v9.9.9") == ""
+
+
+def test_abort_refuses_occupied_creating_branch_without_discarding_edits(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    (linked / "source.txt").write_text("keep cut edits\n", encoding="utf-8")
+    git(primary, "worktree", "add", str(primary.parent / "other"), "fix/release-cut")
+
+    result = abort(linked)
+    assert result.returncode != 0
+    assert git(linked, "branch", "--show-current") == "v9.9.9"
+    assert (linked / "source.txt").read_text(encoding="utf-8") == "keep cut edits\n"
+
+
+def test_abort_rejects_primary_clone(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    result = abort(primary)
+    assert result.returncode != 0
+    assert "requires a linked worktree" in result.stderr
+    assert git(linked, "branch", "--show-current") == "v9.9.9"

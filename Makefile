@@ -1215,32 +1215,16 @@ release-cut: .release-cut-tree-required
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# Discard a local, unpushed release cut: reset the working tree, return to
-# develop, delete the v$(VERSION) branch. Use when a cut died partway through
+# Discard a local, unpushed release cut: return to the creating worktree branch
+# and delete v$(VERSION). Use when a cut died partway through
 # (bumped versions, rewritten uv.lock, curated-away paths, no commit) and you
 # want to start over rather than resume with `make release-cut VERSION=X.Y.Z`.
-# Refuses once the branch exists on origin — deleting a pushed release branch
-# is release-finalize's or the option-c sweep's job, not this target's.
+# Refuses after a commit, a pushed branch or tag, or untracked work. Published
+# release refs need explicit disposition; this target never moves them.
 # Usage: make release-cut-abort VERSION=X.Y.Z
 release-cut-abort:
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
-	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
-		|| (echo "Nothing to abort: no local v$(VERSION) branch" >&2 && exit 1)
-	@if git ls-remote --exit-code --heads origin "v$(VERSION)" >/dev/null 2>&1; then \
-		echo "Error: v$(VERSION) exists on origin; aborting would discard a pushed branch." >&2; \
-		echo "       Close its release PR and delete the remote branch first." >&2; \
-		exit 1; \
-	fi
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
-		echo "==> Discarding uncommitted cut state on v$(VERSION)"; \
-		git reset --hard HEAD; \
-		git checkout develop; \
-	elif [ "$$BRANCH" != "develop" ]; then \
-		echo "Error: expected to be on v$(VERSION) or develop, not $$BRANCH" >&2; exit 1; \
-	fi; \
-	git branch -D v$(VERSION)
-	@echo "==> Aborted: v$(VERSION) deleted; develop untouched."
+	sh scripts/release_cut_abort.sh "$(VERSION)"
 
 # After release-cut's PR has the required contexts green: merge its exact
 # checked head, tag the confirmed merge commit, and push the tag. A rerun after
