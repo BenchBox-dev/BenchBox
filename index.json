@@ -4045,9 +4045,9 @@
     },
     "datavault-cross-surface-gate-promotion": {
       "claim": {
-        "expires_at": "2026-09-24T01:10:39Z",
+        "expires_at": "2026-09-24T01:34:49Z",
         "generation": "306ee3acff3640f3b9bd6e89d7899527",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:b3e099a261bca2afa3a43339"
       },
       "needs": [],
