@@ -5,7 +5,7 @@
     "Resume of an uncommitted vX.Y.Z cut remains possible without discarding its curated CHANGELOG; a committed or pushed cut is not silently recreated.",
     "Focused tests cover exact-head acceptance, ahead/behind rejection, dirty checkout, and resume; make pr-preflight passes on the implementation PR."
   ],
-  "context": "Reviewed 2026-09-23: local primary develop was dirty and 19 commits behind live origin/develop. This is a process defect even when a later canary might catch some behind cases: an ahead local branch can pass canary ancestry while carrying unreviewed commits. No release cut was authorized in the review session.\nImplementation in progress 2026-09-23: linked worktree /Users/joe/Developer/BenchBox.wt-release-process, branch fix/release-cut-origin-head-linked-worktree at base 523e3bbe. Edited Makefile, scripts/release_cut_start.sh, docs/operations/release-guide.md, and focused tests. agent-write-preflight, Ruff, shellcheck, sh -n, and diff --check passed. Pytest blocked by verified live shared-lock holder PID 67692 in BenchBox.wt-arm-test-tier-timeouts. Resume with focused pytest when lock releases, then self-review, make pr-preflight, commit, make pr-open. Ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
+  "context": "Reviewed 2026-09-23: local primary develop was dirty and 19 commits behind live origin/develop. This is a process defect even when a later canary might catch some behind cases: an ahead local branch can pass canary ancestry while carrying unreviewed commits. No release cut was authorized in the review session.\nImplementation in progress 2026-09-23: linked worktree /Users/joe/Developer/BenchBox.wt-release-process, branch fix/release-cut-origin-head-linked-worktree at base 523e3bbe. Edited Makefile, scripts/release_cut_start.sh, docs/operations/release-guide.md, focused tests, and generated make/inventory.json. agent-write-preflight, Ruff, shellcheck, sh -n, diff --check, Makefile inventory pass. Focused exact-head tests 10 passed; broader release infrastructure/curation tests had 99 pass, 2 mechanical inventory failures, and both passed after inventory regeneration. make pr-preflight attempted, stopped at fast tests due live shared lock holder PID 55617 in BenchBox.wt-release-canary-incident; no validation receipt stored. Resume after lock clears: self-review, rerun make pr-preflight, commit, make pr-open. Ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
   "description": "Make the existing release-cut target usable under BenchBox's linked-worktree policy and reject unreviewed or omitted source commits. Prior art: make worktree-create fetches origin/develop, creates an allowed named branch, pins identity, and records its base (scripts/worktree_lifecycle.sh:136-185); release-cut currently accepts only local develop or vX.Y.Z, fetches origin, then branches from local develop (Makefile:1074-1098). Extend the existing target rather than adding a parallel release command. For a new cut, fetch origin before deciding eligibility, require a clean linked checkout whose HEAD equals the fetched origin/develop commit, and create vX.Y.Z from that exact commit. Preserve the current guarded resume behavior for an uncommitted vX.Y.Z cut. Decision: whether to allow only a worktree-create branch or any clean linked-worktree branch at that exact SHA; choose the smallest rule compatible with the existing worktree metadata and preflight. Keep release version explicit. Do not write in the primary clone, loosen agent-write-preflight, bypass required release checks, reset unrelated work, or force-push protected refs. The next release operator must choose a version only after checking the existing v0.4.1 branch and PyPI/tag state.",
   "links": [
     "docs/operations/release-guide.md",
@@ -56,6 +56,14 @@
       "generation": "5661bbb45f244f3bb51f9a6466abf921",
       "op": "take",
       "op_id": "6642bf667a71489db486d5de13aed785",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-23T21:14:12Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "b66fae3f22f94a65ac615b0fba1f5392",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
