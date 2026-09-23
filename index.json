@@ -3485,7 +3485,7 @@
         "tpcds-obt-dataframe-sql-id-mapping-decision"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Cross-surface gate breadth rollout: wire the remaining gateable benchmarks + fallback oracle"
     },
     "cross-surface-gate-target-ci-ratchet": {
