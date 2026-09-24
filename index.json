@@ -2020,6 +2020,13 @@
       "status": "active",
       "title": "Decision gate: choose the public-site visual comparison lane policy"
     },
+    "ci-dedupe-11-required-public-site-visual-check": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Require public-site visual acceptance before merging into develop"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],

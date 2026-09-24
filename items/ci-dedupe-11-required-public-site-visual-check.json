@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Every develop PR and merge group reports the visual required context; site-changing trees cannot pass when comparison failed, was absent, or lacked a valid exact-base-SHA baseline.",
+    "The visual job retains its existing input coverage; any excluded input names the rendered-site dependency it no longer feeds and the accepted coverage loss.",
+    "A protected exact-SHA baseline can be produced or recovered after a dropped develop push, without accepting a stale baseline or a PR diagnostic artifact.",
+    "The approval path works for intentional visual changes on the exact PR head and does not become an unreviewed merge-group bypass.",
+    "The develop-squash-only hosted ruleset requires the new context, and its runbook and drift guard agree with live state; verify a real PR and merge-group result before closeout."
+  ],
+  "description": "Implement the option 3 decision recorded in _project/decisions/public-site-visual-required-check-2026-09-24.md. Preserve the current visual comparison coverage and fail-closed exact-base-SHA semantics. Make an always-reporting required context on every develop pull request and merge group, with an explicit non-applicable success only when the current visual input set is unaffected. Do not directly require the conditional docs.yml visual job. Update the live develop-squash-only ruleset, runbook, and drift guard together. Treat missing exact-SHA baselines as a distinct producer-availability defect within this implementation: add bounded automatic production or recovery of the protected baseline without promoting PR diagnostics, and retain a manual recovery path. Account for exact-head visual approvals and merge-group identity so intentional changes can merge after review.",
+  "links": [
+    "_project/decisions/public-site-visual-required-check-2026-09-24.md",
+    ".github/workflows/docs.yml",
+    "docs/operations/repo-admin-settings.md",
+    "ci-dedupe-10-docs-visual-lane-decision"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ecc7115a6c4982502bfd2e92",
+      "at": "2026-09-24T16:13:11Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "9d0c5d405ac14a67830d270a3a30f002",
+      "session_id": "58595f50fecb4424b73e70103336ea29"
+    }
+  ]
+}
