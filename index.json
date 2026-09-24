@@ -10133,7 +10133,12 @@
       "title": "Negative --wait test (a healthcheck that never passes)"
     },
     "next-package-release-decision-and-publication": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T20:29:07Z",
+        "generation": "e97bba62b5c14427938af185e4977583",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:f9db948de729637aa7c660de"
+      },
       "needs": [
         "canary-green-for-v0-4-1",
         "release-cut-origin-head-linked-worktree",
@@ -10141,7 +10146,7 @@
         "release-skill-uat-advisory-catalog-sync"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Decide the next version and complete a verified BenchBox package release"
     },
     "nightly-macos-dataframe-insufficient-memory-flake": {
