@@ -3,7 +3,7 @@
     "A release-canary.yml run on a develop SHA containing all required fixes succeeds for every shard and release-canary-result.",
     "Record the run ID and SHA before finishing."
   ],
-  "context": "Run 35993930883 on develop SHA 1ba01a835b13d006057282892e526c0d0eeb4c4a completed shards with failures in tests/integration/test_tpcdi_end_to_end.py due to DuckDB cursor transactions not being committed by SQLETLBackend.load_customer_scd2_batch. Added canary-tpcdi-duckdb-cursor-transaction to dependencies.",
+  "context": "Run 35993930883 on develop 1ba01a835 (dispatched 2026-09-24T11:35:43Z) is red: shards 2-6 failed, all failures in tests/integration/test_tpcdi_end_to_end.py (DuckDB customer rows never committed, a regression from #2316). Tracked as canary-tpcdi-duckdb-scd2-commit. Re-dispatch the canary after that fix merges.",
   "description": "After the three canary fixes merge into develop, verify a scheduled release-canary.yml run on a develop SHA containing all three merges. If new failures appear, create an owned item for each cause, add it to this item's dependencies, and keep this item open. Version bump, release cut, changelog, and UAT evidence are outside this item.",
   "sessions": [
     {

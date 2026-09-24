@@ -1695,7 +1695,7 @@
         "canary-tpcdi-etl-incremental-load",
         "canary-submission-validator-drift",
         "canary-flightdata-bad-width-shard",
-        "canary-tpcdi-duckdb-cursor-transaction"
+        "canary-tpcdi-duckdb-scd2-commit"
       ],
       "priority": "critical",
       "status": "open",
