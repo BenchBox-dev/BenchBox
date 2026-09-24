@@ -14,6 +14,11 @@ import pytest
 
 from scripts.canary_impact import (
     FileDeps,
+    _build_shared_deps,
+    _conftest_chain,
+    _parent_inits,
+    _rel,
+    analyze_python_file,
     build_dependency_map,
     compute_selection,
     files_from_node_ids,
@@ -31,14 +36,42 @@ class TestLiveTree:
 
         node_ids = collect_canary_node_ids(REPO_ROOT)
         assert node_ids, "expected a non-empty canary collection"
-        dep_map, fallback = build_dependency_map(REPO_ROOT, files_from_node_ids(node_ids))
+        dep_map, fallback, _sites = build_dependency_map(REPO_ROOT, files_from_node_ids(node_ids))
         assert fallback is None, fallback
         return node_ids, dep_map
 
-    def test_every_collected_file_has_an_edge(self, live_canary: tuple[list[str], dict[str, FileDeps]]) -> None:
+    def test_every_collected_file_has_a_per_file_edge(self, live_canary: tuple[list[str], dict[str, FileDeps]]) -> None:
+        """Each non-dynamic file has a dep beyond the shared conftest/plugin set.
+
+        The shared set is added to every entry unconditionally, so asserting
+        non-empty deps would pass vacuously; only a per-file edge proves the
+        analyzer resolved something file-specific. A file whose own analysis
+        yields no repo edge at all is fixture-only: everything it observes
+        flows through the shared fixtures, so it needs no per-file edge.
+        Dynamic files are skipped: they are always selected by the per-test
+        dynamic rule.
+        """
         _, dep_map = live_canary
-        edgeless = sorted(test_file for test_file, deps in dep_map.items() if not deps.deps)
-        assert edgeless == []
+        root = REPO_ROOT.resolve()
+        shared, shared_fallback, _ = _build_shared_deps(root, {})
+        assert shared_fallback is None, shared_fallback
+        thin = sorted(
+            test_file
+            for test_file, file_deps in dep_map.items()
+            if not file_deps.dynamic
+            and not (
+                set(file_deps.deps)
+                - shared
+                - set(_conftest_chain(test_file, root))
+                - {
+                    rel
+                    for rel in (_rel(init, root) for init in _parent_inits(root / test_file, root))
+                    if rel is not None
+                }
+            )
+            and not analyze_python_file(root / test_file, root).deps <= shared
+        )
+        assert thin == []
 
     @pytest.mark.parametrize(
         "commit,test_file",

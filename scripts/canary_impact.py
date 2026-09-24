@@ -9,13 +9,20 @@ dependencies include a changed path.
 Dependency rules (each closes a known gap in naive import scanning):
 
 - static imports, including every parent package ``__init__.py`` (Python
-  executes them on import);
+  executes them on import), expanded transitively: an imported module's
+  own imports are edges too, so re-exported names (``from pkg import X``
+  where ``X`` lives in another module) and helper modules are covered;
 - ``importlib.import_module("<literal>")`` and ``__import__("<literal>")``;
 - repo paths built from constants: ``REPO_ROOT / "a" / "b"``,
   ``Path(__file__).with_name("x")``, and path string literals in path
   positions. A directory path depends on every file under it;
+- imports inside a string constant that parses as Python (tests that run
+  repo code via ``sys.executable -c <script>``);
 - ``tests/conftest.py`` and every module in its ``pytest_plugins`` list,
-  with their dependencies, for every test;
+  with their transitive dependencies, for every test;
+- the per-directory conftest chain pytest loads for each test file
+  (``tests/a/conftest.py`` for ``tests/a/b/test_x.py``), with their
+  ``pytest_plugins`` modules;
 - a changed non-Python file under ``benchbox/`` selects every canary test
   that imports a module in the same directory;
 - changed or added canary test files always select themselves.
@@ -24,7 +31,9 @@ Fail-safe rules (when unsure, select -- the selector may over-select but
 must never under-select silently):
 
 - per test: a canary test containing a dynamic edge the selector cannot
-  resolve (an import name or path built at runtime) is always selected;
+  resolve (an import name or path built at runtime), in its own code, its
+  conftest chain, or anywhere in its transitive closure, is always
+  selected;
 - whole suite: ``pyproject.toml``, ``uv.lock``, pytest configuration,
   ``tests/conftest.py``, ``release-canary.yml``, or the selector itself
   changed;
@@ -38,14 +47,26 @@ are imported from ``scripts/release_canary_sharding.py``, not copied.
 
 Output is JSON with the selected node IDs, the reason each was selected
 (which changed path, through which edge), whether a whole-suite fallback
-fired and why, and the canary collection it was computed against.
+fired and why, the dynamic edges observed in library code that do not
+force selection (``dynamic_library_sites``, for the shadow watch), and
+the canary collection it was computed against.
+
+Known limitation: registry-style dynamic loading inside library code
+(``import_module(name)`` with a runtime name) is unbounded, so it is
+reported rather than propagated: propagating it would always-select
+every test importing the registry. A changed file no test references
+still runs the whole suite through the unmapped-path backstop; the
+residual shape (a mapped file affecting a test only through dynamic
+loading) is pinned by known-regression replay tests.
 """
 
 from __future__ import annotations
 
 import argparse
 import ast
+import functools
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -157,6 +178,68 @@ PATH_CONSTRUCTOR_FUNCS = frozenset(
         "mkdir",
     }
 )
+
+
+_PRUNE_DIRS = frozenset(
+    {
+        ".git",
+        ".venv",
+        "venv",
+        "__pycache__",
+        "node_modules",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "build",
+        "dist",
+    }
+)
+
+
+@functools.lru_cache(maxsize=32)
+def _repo_module_index(root_str: str) -> tuple[frozenset[str], frozenset[str]]:
+    """Return (module stems, package names) for every ``.py`` under root.
+
+    Used to tell an unresolvable import that names a repo file (a real
+    edge the selector cannot pin: fail toward selection) from one that
+    names an uninstalled third-party module (no repo file can match a
+    changed path: safely ignored). Tool and dependency directories are
+    pruned; the cache assumes the tree is stable for the process lifetime
+    (one map build per CLI run; unique fixture roots per test).
+    """
+    stems: set[str] = set()
+    packages: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(root_str):
+        dirnames[:] = [d for d in dirnames if d not in _PRUNE_DIRS and not d.startswith(".")]
+        for filename in filenames:
+            if filename.endswith(".py"):
+                stems.add(filename[:-3])
+                if filename == "__init__.py":
+                    packages.add(os.path.basename(dirpath))
+    return frozenset(stems), frozenset(packages)
+
+
+def _could_be_repo(dotted: str, root: Path) -> bool:
+    """Return whether an unresolvable import name could name a repo file.
+
+    An unresolvable import with no same-named module file anywhere under
+    the root can never equal a changed repo path, so it carries no edge.
+    Anything else stays fail-safe (dynamic): sys.path manipulations at
+    runtime can rebind a bare name to a repo file the static search roots
+    do not cover.
+    """
+    parts = [part for part in dotted.split(".") if part]
+    if not parts or not all(part.isidentifier() for part in parts):
+        return True
+    try:
+        if root.joinpath(*parts).is_dir():
+            return True
+    except (OSError, ValueError):
+        return True
+    stems, packages = _repo_module_index(str(root))
+    leaf = parts[-1]
+    return leaf in stems or leaf in packages
 
 
 class FileDeps(NamedTuple):
@@ -438,6 +521,10 @@ class _FileAnalyzer(ast.NodeVisitor):
             return _PathResolution(_UNKNOWN)
         if isinstance(node, ast.Constant):
             value = node.value
+            if isinstance(value, str) and len(value) > 4096:
+                # Longer than any OS path limit: never a path, and stat
+                # calls on it raise ENAMETOOLONG instead of returning False.
+                return _PathResolution(_UNKNOWN)
             if isinstance(value, str) and _is_dir(self.root / value):
                 # Bare directory name rooted at the repo (Path("docs")).
                 # (_looks_like_path misses slash-less names; the existence
@@ -456,7 +543,7 @@ class _FileAnalyzer(ast.NodeVisitor):
                     for char in "*?[":
                         static_prefix = static_prefix.split(char, 1)[0]
                     parent = (self.root / static_prefix).parent
-                    if parent.is_dir() and parent != self.root:
+                    if _is_dir(parent) and parent != self.root:
                         return _PathResolution(_RESOLVED, parent)
                     return _PathResolution(_UNKNOWN)
                 candidate = self.root / value
@@ -743,11 +830,52 @@ class _FileAnalyzer(ast.NodeVisitor):
 
     # -- imports --------------------------------------------------------------
 
+    def visit_Constant(self, node: ast.Constant) -> None:
+        if isinstance(node.value, str) and "import" in node.value:
+            self._scan_string_snippet(node.value)
+
+    def _scan_string_snippet(self, snippet: str) -> None:
+        """Resolve imports inside a string that parses as Python code.
+
+        Tests that shell out to ``sys.executable -c <script>`` execute
+        repo code the static import scan cannot see. A string constant
+        that parses as Python carries the same edges as module-level
+        code, so its import statements are resolved identically. Only
+        one level is scanned: strings nested inside the snippet are
+        data, not code.
+        """
+        try:
+            tree = ast.parse(snippet)
+        except (SyntaxError, ValueError):
+            return
+        for child in ast.walk(tree):
+            if isinstance(child, ast.Import):
+                self.visit_Import(child)
+            elif isinstance(child, ast.ImportFrom):
+                if child.level or child.module is None:
+                    # A relative import in an executed string cannot name
+                    # a repo file: ``python -c`` has no containing package
+                    # (it would fail loudly at runtime), and the live uses
+                    # are stub packages generated into tmp_path whose
+                    # relative imports resolve inside the stub, never the
+                    # repo. (Corner: a string exec'd in a module namespace
+                    # could rebind to the repo package; no live instance.)
+                    continue
+                else:
+                    self.visit_ImportFrom(child)
+            elif isinstance(child, ast.Call) and _call_name(child.func) in {
+                "import_module",
+                "import_",
+                "__import__",
+                "importorskip",
+            }:
+                self._handle_dynamic_import(child)
+
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             deps, unknown = _resolve_import(alias.name, self.path, self.root)
             self.deps.update(deps)
-            if unknown:
+            if unknown and _could_be_repo(alias.name, self.root):
                 self._note_dynamic(f"unresolvable_import:{alias.name}")
         self.generic_visit(node)
 
@@ -774,7 +902,8 @@ class _FileAnalyzer(ast.NodeVisitor):
         for candidate in candidates:
             candidate_deps, candidate_unknown = _resolve_import(candidate, self.path, self.root)
             deps.update(candidate_deps)
-            unknown = unknown or candidate_unknown
+            if candidate_unknown and _could_be_repo(candidate, self.root):
+                unknown = True
         # ``from package import submodule``: probe each name as a submodule.
         if node.module and not node.level:
             module_file = _module_file(node.module, self.root)
@@ -826,7 +955,7 @@ class _FileAnalyzer(ast.NodeVisitor):
             else:
                 deps, unknown = _resolve_import(name, self.path, self.root)
             self.deps.update(deps)
-            if unknown:
+            if unknown and _could_be_repo(name, self.root):
                 self._note_dynamic(f"unresolvable_import:{name}")
         else:
             self._note_dynamic("dynamic_import")
@@ -856,7 +985,8 @@ class _FileAnalyzer(ast.NodeVisitor):
                         return
                 if _looks_external(parts[0], self.root):
                     return
-            self._note_dynamic(f"unresolvable_import:{target}")
+            if _could_be_repo(target, self.root):
+                self._note_dynamic(f"unresolvable_import:{target}")
 
     # Calls whose arguments are never path evidence (markers, assertions on
     # messages, warning filters). Everything else is evaluated when an
@@ -1147,8 +1277,65 @@ def analyze_python_file(path: Path, root: Path) -> FileDeps:
     )
 
 
+def _conftest_chain(test_file: str, root: Path) -> list[str]:
+    """Return repo-relative conftest.py files pytest loads for a test file.
+
+    pytest loads every conftest.py from the root down to the test's own
+    directory, so a change to any of them can alter the test's fixtures.
+    Innermost first; the root ``tests/conftest.py`` is excluded because
+    it is already shared by every entry.
+    """
+    chain: list[str] = []
+    directory = (root / test_file).parent.resolve()
+    while True:
+        if directory != root and root not in directory.parents:
+            break
+        candidate = directory / "conftest.py"
+        if candidate.is_file():
+            rel = _rel(candidate, root)
+            if rel is not None and rel != CONFTEST_REPO_PATH:
+                chain.append(rel)
+        if directory == root:
+            break
+        directory = directory.parent
+    return chain
+
+
+def _expand_closure(
+    seeds: set[str], root: Path, cache: dict[str, FileDeps]
+) -> tuple[set[str], dict[str, tuple[str, ...]]]:
+    """Expand repo ``.py`` seeds through their static dependencies.
+
+    Returns all reachable repo paths plus, per reached file, its dynamic
+    kinds. Each file is analyzed once per map build. Files that vanish
+    or fail to parse analyze as dynamic, so expansion can only
+    over-select, never silently drop an edge.
+    """
+    all_deps = set(seeds)
+    dynamic_files: dict[str, list[str]] = {}
+    stack = sorted(seed for seed in seeds if seed.endswith(".py"))
+    visited: set[str] = set()
+    while stack:
+        rel = stack.pop()
+        if rel in visited:
+            continue
+        visited.add(rel)
+        file_deps = cache.get(rel)
+        if file_deps is None:
+            file_deps = analyze_python_file(root / rel, root)
+            cache[rel] = file_deps
+        if file_deps.dynamic:
+            dynamic_files[rel] = list(file_deps.dynamic_kinds)
+        for dep in file_deps.deps:
+            if dep not in all_deps:
+                all_deps.add(dep)
+                if dep.endswith(".py"):
+                    stack.append(dep)
+    return all_deps, {rel: tuple(kinds) for rel, kinds in dynamic_files.items()}
+
+
 def _read_pytest_plugins(conftest: Path) -> tuple[list[str], str | None]:
-    """Return plugin module names from tests/conftest.py, or an error reason."""
+    """Return plugin module names from a conftest.py file, or an error reason."""
     try:
         tree = ast.parse(conftest.read_text(encoding="utf-8"), filename=str(conftest))
     except (OSError, SyntaxError, ValueError):
@@ -1170,49 +1357,110 @@ def _read_pytest_plugins(conftest: Path) -> tuple[list[str], str | None]:
     return plugins, None
 
 
-def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, FileDeps], str | None]:
+def _resolve_plugin_file(plugin: str, conftest: Path, root: Path) -> str | None:
+    """Return the repo-relative file of a plugin module, or None."""
+    deps, unknown = _resolve_import(plugin, conftest, root)
+    if unknown:
+        return None
+    return next((dep for dep in deps if dep.endswith(".py")), None)
+
+
+def _build_shared_deps(root: Path, cache: dict[str, FileDeps]) -> tuple[set[str], str | None, list[str]]:
+    """Build the fixture set shared by every canary test entry.
+
+    Returns ``(shared_deps, fallback, library_sites)``. ``fallback`` is
+    set when the root conftest, its plugins, or their direct analysis
+    cannot be resolved. Dynamic edges deeper in the shared transitive
+    closure are reported as library sites instead: registry-style dynamic
+    loading inside library code is unbounded (any test importing the
+    registry would otherwise be always-selected), and a changed file no
+    test references still runs the whole suite through the unmapped-path
+    backstop, so the residual risk is a file that is mapped elsewhere
+    while affecting a test only through dynamic loading. Those shapes
+    are pinned by known-regression replay tests.
+    """
+    conftest = root / CONFTEST_REPO_PATH
+    if not conftest.is_file():
+        return set(), "conftest_missing", []
+    plugins, plugins_error = _read_pytest_plugins(conftest)
+    if plugins_error is not None:
+        return set(), plugins_error, []
+    shared_seeds = {CONFTEST_REPO_PATH}
+    for plugin in plugins:
+        plugin_file = _resolve_plugin_file(plugin, conftest, root)
+        if plugin_file is None:
+            return set(), f"plugin_unresolvable:{plugin}", []
+        shared_seeds.add(plugin_file)
+    shared_deps, dynamic_files = _expand_closure(shared_seeds, root, cache)
+    direct_dynamic = sorted(
+        f"{kind}:{rel}" for rel, kinds in dynamic_files.items() for kind in kinds if rel in shared_seeds
+    )
+    if direct_dynamic:
+        return set(), f"shared_dynamic:{','.join(direct_dynamic)}", []
+    library_sites = sorted(f"{rel}:{kind}" for rel, kinds in dynamic_files.items() for kind in kinds)
+    return shared_deps, None, library_sites
+
+
+def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, FileDeps], str | None, list[str]]:
     """Map each canary test file to its dependencies.
 
     Every entry includes ``tests/conftest.py`` and each ``pytest_plugins``
-    module with their transitive dependencies. Returns ``(map, fallback)``
-    where ``fallback`` is the whole-suite reason when the shared fixtures
-    cannot be resolved (None on success).
+    module with their transitive dependencies, plus the per-directory
+    conftest chain pytest loads for that file (with their plugins) and
+    the transitive closure of the test's own edges. A dynamic edge in
+    the test file or its conftest chain selects that test always; a
+    dynamic edge in the shared fixtures falls back to the whole suite.
+    Dynamic edges deeper in library code are reported as library sites
+    (see ``_build_shared_deps``) rather than forcing selection.
+    Returns ``(map, fallback, library_sites)`` where ``fallback`` is the
+    whole-suite reason when the shared fixtures cannot be resolved (None
+    on success).
     """
     root = root.resolve()
-    conftest = root / CONFTEST_REPO_PATH
-    if not conftest.is_file():
-        return {}, "conftest_missing"
-    plugins, plugins_error = _read_pytest_plugins(conftest)
-    if plugins_error is not None:
-        return {}, plugins_error
-    shared = analyze_python_file(conftest, root)
-    if shared.dynamic:
-        return {}, f"conftest_dynamic:{','.join(shared.dynamic_kinds)}"
-    shared_deps = set(shared.deps) | {CONFTEST_REPO_PATH}
-    for plugin in plugins:
-        deps, unknown = _resolve_import(plugin, conftest, root)
-        if unknown or not deps:
-            return {}, f"plugin_unresolvable:{plugin}"
-        plugin_file = next((dep for dep in deps if dep.endswith(".py")), None)
-        if plugin_file is None:
-            return {}, f"plugin_unresolvable:{plugin}"
-        analyzed = analyze_python_file(root / plugin_file, root)
-        if analyzed.dynamic:
-            return {}, f"plugin_dynamic:{plugin}:{','.join(analyzed.dynamic_kinds)}"
-        shared_deps.update(analyzed.deps)
-        shared_deps.add(plugin_file)
+    cache: dict[str, FileDeps] = {}
+    shared_deps, fallback, library_sites = _build_shared_deps(root, cache)
+    if fallback is not None:
+        return {}, fallback, []
     dep_map: dict[str, FileDeps] = {}
     for test_file in test_files:
-        analyzed = analyze_python_file(root / test_file, root)
-        deps = set(analyzed.deps) | shared_deps
-        test_path = root / test_file
-        deps.update(dep for dep in (_rel(init, root) for init in _parent_inits(test_path, root)) if dep is not None)
-        dep_map[test_file] = FileDeps(
-            deps=frozenset(deps),
-            dynamic=analyzed.dynamic,
-            dynamic_kinds=analyzed.dynamic_kinds,
+        direct = cache.get(test_file)
+        if direct is None:
+            direct = analyze_python_file(root / test_file, root)
+            cache[test_file] = direct
+        chain_files = _conftest_chain(test_file, root)
+        seeds = set(direct.deps)
+        dynamic_kinds = list(direct.dynamic_kinds)
+        for chain_rel in chain_files:
+            chain_deps = cache.get(chain_rel)
+            if chain_deps is None:
+                chain_deps = analyze_python_file(root / chain_rel, root)
+                cache[chain_rel] = chain_deps
+            seeds.add(chain_rel)
+            seeds.update(chain_deps.deps)
+            dynamic_kinds.extend(f"transitive:{kind}:{chain_rel}" for kind in chain_deps.dynamic_kinds)
+            chain_plugins, chain_error = _read_pytest_plugins(root / chain_rel)
+            if chain_error is not None:
+                dynamic_kinds.append(f"chain_conftest_plugins:{chain_rel}:{chain_error}")
+                continue
+            for plugin in chain_plugins:
+                plugin_file = _resolve_plugin_file(plugin, root / chain_rel, root)
+                if plugin_file is None:
+                    dynamic_kinds.append(f"chain_plugin_unresolvable:{chain_rel}:{plugin}")
+                else:
+                    seeds.add(plugin_file)
+        expanded, closure_dynamic = _expand_closure(seeds, root, cache)
+        handled = set(chain_files) | {test_file}
+        library_sites.extend(
+            f"{rel}:{kind}" for rel, kinds in closure_dynamic.items() for kind in kinds if rel not in handled
         )
-    return dep_map, None
+        test_path = root / test_file
+        expanded.update(dep for dep in (_rel(init, root) for init in _parent_inits(test_path, root)) if dep is not None)
+        dep_map[test_file] = FileDeps(
+            deps=frozenset(expanded | shared_deps),
+            dynamic=len(dynamic_kinds) > 0,
+            dynamic_kinds=tuple(dynamic_kinds),
+        )
+    return dep_map, None, sorted(set(library_sites))
 
 
 def collect_canary_node_ids(root: Path, timeout_seconds: int = 600) -> list[str]:
@@ -1418,8 +1666,9 @@ def main(argv: list[str] | None = None) -> int:
                 "node_count": len(node_ids),
             }
         dep_map: dict[str, FileDeps] = {}
+        library_sites: list[str] = []
         if fallback_reason is None:
-            dep_map, map_fallback = build_dependency_map(root, files_from_node_ids(node_ids))
+            dep_map, map_fallback, library_sites = build_dependency_map(root, files_from_node_ids(node_ids))
             if map_fallback is not None:
                 fallback_reason = f"dependency_map_failed:{map_fallback}"
         selection = compute_selection(
@@ -1429,6 +1678,7 @@ def main(argv: list[str] | None = None) -> int:
             collection_info=collection_info,
             fallback_reason=fallback_reason,
         )
+        selection["dynamic_library_sites"] = sorted(set(library_sites))
         rendered = json.dumps(selection, indent=2) + "\n"
         if args.output is not None:
             args.output.parent.mkdir(parents=True, exist_ok=True)

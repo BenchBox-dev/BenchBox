@@ -43,7 +43,7 @@ def _fixture_root(tmp_path: Path, files: dict[str, str]) -> Path:
 
 
 def _select(root: Path, test_files: list[str], node_ids: list[str], changed: list[str]) -> dict:
-    dep_map, fallback = build_dependency_map(root, test_files)
+    dep_map, fallback, _sites = build_dependency_map(root, test_files)
     assert fallback is None, fallback
     return compute_selection(changed, dep_map, node_ids)
 
@@ -66,7 +66,7 @@ class TestDependencyRules:
                 "tests/test_x.py": "import mypkg.sub\n\ndef test_a(): ...\n",
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         deps = dep_map["tests/test_x.py"].deps
         assert "mypkg/sub.py" in deps
@@ -86,7 +86,7 @@ class TestDependencyRules:
                 "tests/test_x.py": 'import importlib\nmod = importlib.import_module("mypkg.sub")\n',
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         assert "mypkg/sub.py" in dep_map["tests/test_x.py"].deps
 
@@ -102,7 +102,7 @@ class TestDependencyRules:
                 ),
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         assert "data/spec.yaml" in dep_map["tests/test_x.py"].deps
 
@@ -119,7 +119,7 @@ class TestDependencyRules:
                 "tests/test_x.py": ('from pathlib import Path\nHELPER = Path(__file__).with_name("helper.py")\n'),
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         assert "tests/helper.py" in dep_map["tests/test_x.py"].deps
 
@@ -156,7 +156,7 @@ class TestDependencyRules:
                 "tests/test_x.py": "def test_a(): ...\n",
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         deps = dep_map["tests/test_x.py"].deps
         assert "myplug.py" in deps
@@ -187,6 +187,84 @@ class TestDependencyRules:
             {"changed_path": "benchbox/widget/spec.yaml", "edge": "same_directory"}
         ]
         assert "tests/test_other.py::test_b" not in selected
+
+    def test_transitive_imports_are_dependencies(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "mypkg/__init__.py": "",
+                "mypkg/leaf.py": "VALUE = 1\n",
+                "mypkg/mid.py": "import mypkg.leaf\n",
+                "tests/test_x.py": "import mypkg.mid\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert "mypkg/leaf.py" in dep_map["tests/test_x.py"].deps
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/leaf.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
+
+    def test_reexported_name_is_a_dependency(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "mypkg/__init__.py": "from mypkg.impl import Thing\n",
+                "mypkg/impl.py": "class Thing: ...\n",
+                "tests/test_x.py": "from mypkg import Thing\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert not dep_map["tests/test_x.py"].dynamic
+        assert "mypkg/impl.py" in dep_map["tests/test_x.py"].deps
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/impl.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
+
+    def test_string_script_import_is_a_dependency(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "mypkg/__init__.py": "",
+                "mypkg/sub.py": "VALUE = 1\n",
+                "tests/test_x.py": (
+                    "import subprocess\nimport sys\n"
+                    "SCRIPT = '''\nimport mypkg.sub\nprint(mypkg.sub.VALUE)\n'''\n"
+                    "def test_a():\n"
+                    "    subprocess.run([sys.executable, '-c', SCRIPT], check=True)\n"
+                ),
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert not dep_map["tests/test_x.py"].dynamic
+        assert "mypkg/sub.py" in dep_map["tests/test_x.py"].deps
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/sub.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
+
+    def test_conftest_chain_applies_per_directory(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "tests/unit/conftest.py": "import mypkg.unit_helper\n",
+                "mypkg/__init__.py": "",
+                "mypkg/unit_helper.py": "VALUE = 1\n",
+                "tests/unit/test_x.py": "def test_a(): ...\n",
+                "tests/other/test_y.py": "def test_b(): ...\n",
+            },
+        )
+        test_files = ["tests/unit/test_x.py", "tests/other/test_y.py"]
+        node_ids = _nodes("tests/unit/test_x.py", ["test_a"]) + _nodes("tests/other/test_y.py", ["test_b"])
+        dep_map, fallback, _sites = build_dependency_map(root, test_files)
+        assert fallback is None
+        assert "tests/unit/conftest.py" in dep_map["tests/unit/test_x.py"].deps
+        assert "mypkg/unit_helper.py" in dep_map["tests/unit/test_x.py"].deps
+        assert "tests/unit/conftest.py" not in dep_map["tests/other/test_y.py"].deps
+        selection = _select(root, test_files, node_ids, ["mypkg/unit_helper.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/unit/test_x.py::test_a"]
 
     def test_changed_canary_test_selects_itself(self, tmp_path: Path) -> None:
         root = _fixture_root(
@@ -224,7 +302,7 @@ class TestFailSafeRules:
                 "tests/test_x.py": "import importlib\nimport mypkg.base\nmod = importlib.import_module(name)\n",
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         assert dep_map["tests/test_x.py"].dynamic
         selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/base.py"])
@@ -245,7 +323,97 @@ class TestFailSafeRules:
                 ),
             },
         )
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert dep_map["tests/test_x.py"].dynamic
+
+    def test_transitive_dynamic_edge_is_reported_not_propagated(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "mypkg/__init__.py": "",
+                "mypkg/helper.py": "import importlib\nmod = importlib.import_module(name)\n",
+                "tests/test_x.py": "import mypkg.helper\n",
+            },
+        )
+        dep_map, fallback, sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        # Library dynamics are reported for the shadow watch, not
+        # propagated: propagating them would always-select every test
+        # importing the registry.
+        assert not dep_map["tests/test_x.py"].dynamic
+        assert any(site.startswith("mypkg/helper.py:") for site in sites)
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/__init__.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
+
+    def test_dynamic_chain_conftest_selects_test(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "tests/unit/conftest.py": "import importlib\nmod = importlib.import_module(name)\n",
+                "tests/unit/test_x.py": "def test_a(): ...\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/unit/test_x.py"])
+        assert fallback is None
+        assert dep_map["tests/unit/test_x.py"].dynamic
+
+    def test_chain_conftest_plugins_apply(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "tests/unit/conftest.py": 'pytest_plugins = ["unitplug"]\n',
+                "unitplug.py": "VALUE = 1\n",
+                "tests/unit/test_x.py": "def test_a(): ...\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/unit/test_x.py"])
+        assert fallback is None
+        assert not dep_map["tests/unit/test_x.py"].dynamic
+        assert "unitplug.py" in dep_map["tests/unit/test_x.py"].deps
+
+    def test_unresolvable_chain_plugin_selects_test(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "tests/unit/conftest.py": 'pytest_plugins = ["missing_plug"]\n',
+                "tests/unit/test_x.py": "def test_a(): ...\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/unit/test_x.py"])
+        assert fallback is None
+        assert dep_map["tests/unit/test_x.py"].dynamic
+
+    def test_unresolvable_external_import_is_ignored(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "tests/test_x.py": (
+                    "try:\n"
+                    "    import cupy_xyz_not_a_module\n"
+                    "    HAS_CUPY = True\n"
+                    "except ImportError:\n"
+                    "    HAS_CUPY = False\n"
+                ),
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert not dep_map["tests/test_x.py"].dynamic
+
+    def test_unresolvable_repo_named_import_selects(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                # Resolvable only through a sys.path manipulation the
+                # static search roots do not cover: the same-named repo
+                # file keeps it fail-safe.
+                "tests/helper_repo_named.py": "VALUE = 1\n",
+                "tests/test_x.py": "import helper_repo_named\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         assert dep_map["tests/test_x.py"].dynamic
 
@@ -253,7 +421,7 @@ class TestFailSafeRules:
     def test_whole_suite_triggers(self, tmp_path: Path, trigger: str) -> None:
         root = _fixture_root(tmp_path, {"tests/test_x.py": "def test_a(): ...\n"})
         node_ids = _nodes("tests/test_x.py", ["test_a", "test_b"])
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         selection = compute_selection([trigger], dep_map, node_ids)
         assert selection["whole_suite"] is True
@@ -265,7 +433,7 @@ class TestFailSafeRules:
     def test_unmapped_path_runs_whole_suite(self, tmp_path: Path) -> None:
         root = _fixture_root(tmp_path, {"tests/test_x.py": "def test_a(): ...\n"})
         node_ids = _nodes("tests/test_x.py", ["test_a"])
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
         selection = compute_selection(["some/random/file.txt"], dep_map, node_ids)
         assert selection["whole_suite"] is True
@@ -276,9 +444,10 @@ class TestFailSafeRules:
         assert CANT_AFFECT_CANARY, "the reviewed safe list must not be empty"
         root = _fixture_root(tmp_path, {"tests/test_x.py": "def test_a(): ...\n"})
         node_ids = _nodes("tests/test_x.py", ["test_a"])
-        dep_map, fallback = build_dependency_map(root, ["tests/test_x.py"])
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
-        selection = compute_selection(sorted(CANT_AFFECT_CANARY - {"_project/audits/"}), dep_map, node_ids)
+        changed = sorted((CANT_AFFECT_CANARY - {"_project/audits/"}) | {"_project/audits/2026-01-01-review.md"})
+        selection = compute_selection(changed, dep_map, node_ids)
         assert selection["whole_suite"] is False
         assert selection["selected"] == []
 
@@ -310,6 +479,7 @@ class TestFailSafeRules:
         selection = json.loads(output.read_text(encoding="utf-8"))
         assert selection["marker_expression"] == canary_impact.MARKER_EXPRESSION
         assert selection["whole_suite"] is False
+        assert selection["dynamic_library_sites"] == []
         assert selection["selected_count"] == 2
         assert selection["total_count"] == 2
         assert selection["collection"]["node_count"] == 2
