@@ -5,7 +5,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "Root cause commit 5e9284a2cf intentionally regenerates caches without a source-contract manifest; the old bad-width test never entered reuse. Commit b40ec340b on fix/canary-flightdata-shard-reuse; PR https://github.com/BenchBox-dev/BenchBox/pull/2322 is open and held. The test creates a real manifested shard cache, corrupts a row, and asserts width rejection with unchanged manifest and shard bytes. Focused suite: 14 passed; committed-head make pr-preflight passed (31495 fast and 2090 medium tests). Await hosted CI, review, and merge before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2322 at b40ec340bbd505123f3d4609e2fcd4f0445097d7. Existing manifest-free cache regeneration was intentional; the bad-width test had no manifest and never exercised reuse. The regression now creates a valid manifested cache, corrupts a shard, constructs a second downloader, and asserts the 27-versus-28-width error plus unchanged manifest/shard bytes. Fourteen focused tests and committed-head make pr-preflight passed (31495 fast, 2090 medium); hosted CI is green with no review threads. Maintainer approval and merge into develop remain before closing.",
   "description": "The release canary's bad-width shard test became stale when source-contract pinning made manifest-free caches regenerate. Build a genuine reusable shard cache with a matching manifest, corrupt one row, and verify download rejects that shard without replacing the manifest or cache. Preserve the product's fail-closed reuse validation and the no-manifest regeneration policy; do not skip tests or change markers.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2322"
@@ -51,6 +51,14 @@
       "generation": "ddbfb26fab554cdda841558903a011ce",
       "op": "release",
       "op_id": "f50bc1d646684e7096ed12e48964b42b",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-24T01:25:25Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "fcac19b784e84ee28f779710d493f534",
       "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
