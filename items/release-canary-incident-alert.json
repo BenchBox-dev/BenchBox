@@ -11,6 +11,7 @@
     ".github/workflows/release-canary.yml",
     "scripts/release_canary_incident.py",
     "tests/unit/test_release_canary_incident.py",
-    "scripts/release_readiness_check.py"
+    "scripts/release_readiness_check.py",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2323"
   ]
 }
