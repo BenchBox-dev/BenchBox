@@ -118,6 +118,39 @@ def test_fetch_helpers_support_execute_only_connections():
     assert connection.executed == ["SELECT ...", "SELECT ..."]
 
 
+class _QueryJobConn:
+    """BigQuery Client shape: neither cursor() nor execute(), only query() jobs."""
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.queried: list[str] = []
+
+    def query(self, sql):
+        self.queried.append(sql)
+        rows = self.rows
+
+        class _Job:
+            def result(self):
+                return rows
+
+        return _Job()
+
+
+def test_fetch_helpers_support_query_job_connections():
+    """BigQuery Client exposes query() jobs but no cursor() or execute()."""
+    manager = TuningMetadataManager(_Adapter(platform_name="bigquery"))
+    connection = _QueryJobConn([("orders", "sorting")])
+
+    assert manager._fetch_all(connection, "SELECT ...") == [("orders", "sorting")]
+    assert manager._fetch_one(connection, "SELECT ...") == ("orders", "sorting")
+    assert connection.queried == ["SELECT ...", "SELECT ..."]
+
+
+def test_fetch_one_query_job_connection_empty():
+    manager = TuningMetadataManager(_Adapter(platform_name="bigquery"))
+    assert manager._fetch_one(_QueryJobConn([]), "SELECT ...") is None
+
+
 @pytest.mark.parametrize(
     ("platform", "needle"),
     [

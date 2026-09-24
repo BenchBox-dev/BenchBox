@@ -371,10 +371,13 @@ class TestDatabricksAdapter:
         assert connection == mock_connection
         mock_databricks_sql.connect.assert_called_once()
 
-        # Check catalog was set (schema is set in create_schema(), not here)
+        # Check catalog and schema context were set on the connection itself
+        # (pooled connections never pass through create_schema())
         expected_calls = [
             call("USE CATALOG test_catalog"),
             call("SELECT 1"),  # Connection test
+            call("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema"),
+            call("USE SCHEMA test_schema"),
         ]
         for expected_call in expected_calls:
             mock_cursor.execute.assert_any_call(expected_call.args[0])
@@ -643,6 +646,38 @@ class TestDatabricksAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_execute_query_splits_multi_statement_batch(self, mock_databricks_sql):
+        """The SQL execution API takes one statement per execute.
+
+        Operation batches (DELETE+INSERT pairs, the 3-statement SCD2 stage
+        batch) run statement-by-statement; the last statement's rows win.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.side_effect = [[], [(60,)]]
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+        )
+
+        result = adapter.execute_query(
+            mock_connection,
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10; INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+            "q_multi",
+        )
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert executed == [
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10",
+            "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+        ]
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):

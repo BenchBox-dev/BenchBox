@@ -20,9 +20,10 @@ from typing import Any, Optional, Union
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
-    quote_identifier,
+    failed_platform_error,
+    fetch_count_probe,
+    quote_identifier_for_dialect,
     summarize_validation_failures,
-    table_exists,
 )
 from benchbox.core.transaction_primitives.generator import TransactionPrimitivesDataGenerator
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
@@ -272,7 +273,10 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         """Quote SQL identifier to prevent SQL injection.
 
         Uses double quotes (SQL standard) which work in DuckDB, PostgreSQL, SQLite.
-        For compatibility, validates identifier first.
+        Uses backticks for BigQuery, where double quotes denote string literals.
+        For compatibility, validates identifier first. Uppercases for dialects
+        whose catalogs are uppercase (Snowflake, BigQuery) so setup probes
+        resolve the adapter-created tables.
 
         Args:
             identifier: Table, column, or schema name
@@ -288,31 +292,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             - Quotes with double quotes (SQL standard for identifiers)
             - Escapes any existing double quotes by doubling them
         """
-        return quote_identifier(identifier)
-
-    def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
-        """Check if a table exists in the database.
-
-        Uses a platform-agnostic approach that attempts to query the table
-        with LIMIT 0, which should work across most SQL databases without
-        requiring INFORMATION_SCHEMA access.
-
-        Args:
-            connection: Database connection
-            table_name: Name of table to check (will be quoted for safety)
-
-        Returns:
-            True if table exists, False otherwise
-
-        Note:
-            This method catches exceptions to distinguish between:
-            - Table doesn't exist (expected, returns False)
-            - Other errors (logged, returns False for safety)
-
-        Security:
-            Table name is quoted using _quote_identifier() to prevent SQL injection.
-        """
-        return table_exists(connection, table_name, self.log_verbose)
+        return quote_identifier_for_dialect(identifier, self._setup_dialect)
 
     def _populate_staging_table(self, connection: DatabaseConnection, staging_table: str, source_table: str) -> None:
         """Populate staging table from TPC-H source table.
@@ -353,6 +333,10 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             RuntimeError: If required tables don't exist or setup fails
         """
         self.log_verbose("Setting up Transaction Primitives benchmark...")
+
+        # Set dialect first so any downstream call to _quote_identifier()
+        # matches the catalog's identifier case.
+        self._setup_dialect = dialect
 
         # Validate TPC-H base tables exist
         required_tables = ["orders", "lineitem", "customer"]
@@ -429,8 +413,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     # Check if table needs population
                     try:
                         quoted_table = self._quote_identifier(table_name)
-                        result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                        current_count = result[0] if result else 0
+                        current_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
                     except Exception:
                         current_count = 0
 
@@ -438,8 +421,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                         # Validate source table has data before copying
                         try:
                             quoted_source = self._quote_identifier(source_table)
-                            source_result = connection.execute(f"SELECT COUNT(*) FROM {quoted_source}").fetchone()
-                            source_count = source_result[0] if source_result else 0
+                            source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
                         except Exception as e:
                             raise RuntimeError(
                                 f"Cannot validate source table '{source_table}' before populating '{table_name}': {e}"
@@ -455,8 +437,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                         # Table is empty - populate it (lock prevents concurrent population)
                         self.log_verbose(f"Populating {table_name} from {source_table} ({source_count} rows)...")
                         self._populate_staging_table(connection, table_name, source_table)
-                        result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                        status[table_name] = result[0] if result else 0
+                        status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
                         self.log_verbose(f"✅ Populated {table_name} with {status[table_name]} rows")
 
                         # Verify row count matches (detect copy failures)
@@ -593,9 +574,11 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             matches this run's provenance.
         """
         try:
-            # Check that key staging tables exist and have data
+            # Check that key staging tables exist and have data. Quoted for
+            # the dialect so uppercase catalogs (Snowflake, BigQuery) resolve.
             for table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
-                result = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                quoted = self._quote_identifier(table_name)
+                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
                 if not result or result[0] == 0:
                     return False
             return self._staging_manifest_matches(connection, ["orders", "lineitem", "customer"])
@@ -761,6 +744,12 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
             write_duration_ms = (time.perf_counter() - write_start) * 1000
+            # Adapters that report failures as a FAILED result payload do
+            # not raise here: surface the failure instead of letting a
+            # no-op write flow into validation (see the write_primitives
+            # guard for the live Snowflake case that motivated this).
+            if (write_error := failed_platform_error(write_result)) is not None:
+                raise RuntimeError(f"Transaction SQL failed on platform: {write_error}")
 
             # Get rows affected (platform-specific)
             rows_affected = getattr(write_result, "rowcount", None)
@@ -779,7 +768,25 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
             for val_query in operation.validation_queries:
                 val_sql = self._replace_placeholders(val_query.sql)
-                val_result = connection.execute(val_sql).fetchall()
+                val_cursor = connection.execute(val_sql)
+                # A failed validation SELECT surfaces as an empty row set,
+                # which vacuous COUNT(*) checks would accept. Fail with the
+                # adapter-reported error instead.
+                if (val_error := failed_platform_error(val_cursor)) is not None:
+                    validation_passed = False
+                    validation_results.append(
+                        {
+                            "query_id": val_query.id,
+                            "sql": val_query.sql,
+                            "expected_rows": val_query.expected_rows,
+                            "actual_rows": 0,
+                            "passed": False,
+                            "error": val_error,
+                            "sample": [],
+                        }
+                    )
+                    continue
+                val_result = val_cursor.fetchall()
                 actual_rows = len(val_result)
                 expected_rows = val_query.expected_rows
 

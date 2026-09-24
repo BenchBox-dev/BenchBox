@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 from benchbox.core.errors import PlanCaptureError
 from benchbox.platforms.base.config_utils import make_registered_platform_config_builder
+from benchbox.platforms.base.mysql_wire import split_sql_statements
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
@@ -659,6 +660,61 @@ class BigQueryAdapter(PlatformAdapter):
         """Return the target SQL dialect for BigQuery."""
         return "bigquery"
 
+    def preprocess_operation_sql(self, query_id: str, operation: Any) -> str | None:
+        """Rewrite operation write SQL for BigQuery-only dialect gaps.
+
+        Respects catalog ``bigquery`` overrides (including skip ``None``):
+        rewrites the override when present, otherwise the default write SQL.
+        Two rewrites, both linear and single-level by construction of the
+        catalog SQL they target (verified live: the unmodified forms fail
+        server-side with ``Type not found: VARCHAR`` and ``INT64`` interval
+        complaints while COUNT(*) validations kept passing):
+
+        - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)``
+        - ``INTERVAL 'N' UNIT`` -> ``INTERVAL N UNIT``
+        - a missing ``WHERE`` on an UPDATE/DELETE statement gains
+          ``WHERE true`` (BigQuery rejects filter-less DML; constant-true
+          preserves the full-table intent)
+        - a trailing bare ``WHEN NOT MATCHED ... THEN INSERT`` gains
+          ``ROW`` (Snowflake shorthand for inserting the source row;
+          BigQuery requires ``INSERT ROW``)
+        """
+        import re
+
+        overrides = getattr(operation, "platform_overrides", None) or {}
+        if "bigquery" in overrides:
+            base = overrides["bigquery"]
+            if base is None:
+                return None
+        else:
+            base = operation.write_sql
+        rewritten = re.sub(
+            r"\bCAST\(([^()]+?)\s+AS\s+VARCHAR\s*\)",
+            r"CAST(\1 AS STRING)",
+            base,
+            flags=re.IGNORECASE,
+        )
+        rewritten = re.sub(r"\bINTERVAL\s+'(\d+)'\s+([A-Za-z]+)", r"INTERVAL \1 \2", rewritten)
+        statements = split_sql_statements(rewritten)
+        parts = []
+        changed = False
+        for statement in statements:
+            if re.match(r"(?i)^\s*(UPDATE|DELETE)\b", statement) and not re.search(r"(?i)\bWHERE\b", statement):
+                statement = statement.rstrip() + "\nWHERE true"
+                changed = True
+            parts.append(statement)
+        if changed:
+            rewritten = ";\n".join(parts)
+            if base.endswith("\n"):
+                rewritten += "\n"
+        # A trailing bare ``WHEN NOT MATCHED ... THEN INSERT`` (Snowflake
+        # shorthand for "insert the source row", verified live on Snowflake)
+        # is a BigQuery syntax error: spell it ``INSERT ROW``.
+        bare_insert = re.search(r"(?i)(WHEN\s+NOT\s+MATCHED\b[^\n;]*?THEN\s+)INSERT(\s*)$", rewritten)
+        if bare_insert:
+            rewritten = rewritten[: bare_insert.start()] + bare_insert.group(1) + "INSERT ROW" + bare_insert.group(2)
+        return rewritten
+
     def _get_connection_params(self, **connection_config) -> dict[str, Any]:
         """Get standardized connection parameters."""
         return {
@@ -1046,8 +1102,17 @@ class BigQueryAdapter(PlatformAdapter):
             # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+            # Split schema into individual statements and execute. Chunks that
+            # hold only decorative "--" comments (a ";" inside a comment
+            # splits one off) carry no DDL: skip them instead of submitting
+            # a comment-only query job.
+            from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+            statements = [
+                stmt.strip()
+                for stmt in schema_sql.split(";")
+                if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
+            ]
 
             for statement in statements:
                 # Convert to BigQuery table definition (normalizing table name to uppercase
@@ -1686,18 +1751,28 @@ class BigQueryAdapter(PlatformAdapter):
         start_time = mono_time()
 
         try:
-            # Replace table references with fully qualified names
+            # Route DDL through the standard converter first: benchmark
+            # setup() CREATEs arrive here (not via create_schema), and
+            # without conversion they land lowercase while every probe and
+            # query resolves the UPPERCASE adapter convention (BigQuery
+            # identifiers are case-sensitive). Non-CREATE statements pass
+            # through unchanged.
+            translated_query = self._convert_to_bigquery_table(query)
+            # Replace table references with fully qualified names. The
+            # query-time connection carries no default dataset, so
+            # unqualified names fail with "must be qualified with a dataset".
             # Note: Query dialect translation is now handled automatically by the base adapter
-            # Skip qualification if query has backtick-quoted identifiers (from sqlglot)
-            # because default_dataset handles unqualified names and regex breaks backticks
-            if "`" in query:
+            if "`" in translated_query:
                 # Query processed by sqlglot with identify=True
                 # Normalize lowercase table names to UPPERCASE to match TPC-DS schema
                 # (BigQuery backtick-quoted identifiers are case-sensitive)
-                translated_query = self._normalize_table_names_case(query)
+                translated_query = self._normalize_table_names_case(translated_query)
+                # Translated backtick queries skip the static fallback: when
+                # the parser cannot see into the statement, rewriting TPC-H
+                # names blindly could corrupt it.
+                translated_query = self._qualify_table_names(translated_query, allow_fallback=("`" not in query))
             else:
-                # Non-translated queries (e.g., raw TPC-H) need explicit qualification
-                translated_query = self._qualify_table_names(query)
+                translated_query = self._qualify_table_names(translated_query)
 
             # TPC-DI uses SQL Server/SQLite idioms (BIT flag literals,
             # JULIANDAY, DATE('now')) that BigQuery rejects. Config names
@@ -1815,6 +1890,52 @@ class BigQueryAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
 
+    @staticmethod
+    def _inline_pk_columns(search_text: str) -> list[str]:
+        """Column names carrying an inline PRIMARY KEY.
+
+        The column scan backtracks catastrophically on statements with no
+        PRIMARY KEY at all (verified hang on a 47-char CTAS that never
+        reaches BigQuery), so it only runs when the keywords are present.
+        The presence test is linear; on a hit the scan behaves exactly as
+        the historical inline findall.
+        """
+        import re
+
+        if not re.search(r"PRIMARY\s+KEY", search_text, flags=re.IGNORECASE):
+            return []
+        _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
+        return [
+            name
+            for name in re.findall(
+                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
+                r"PRIMARY\s+KEY(?!\s*\()",
+                search_text,
+                flags=re.IGNORECASE | re.MULTILINE,
+            )
+            if name.upper() not in _pk_keywords
+        ]
+
+    def _qualify_ctas_target(self, work: str) -> str:
+        """Dataset-qualify a bare CTAS target.
+
+        CTAS has no parenthesized column list, so the main CREATE branch
+        never fires for it: qualify here instead, since the later
+        table-name pass only rewrites FROM/JOIN/DML positions and BigQuery
+        rejects unqualified targets.
+        """
+        import re
+
+        ctas = re.match(
+            r"^(\s*CREATE\s+OR\s+REPLACE\s+TABLE\s+)(`?[A-Za-z0-9_]+`?)(\s+AS\b)",
+            work,
+            flags=re.IGNORECASE,
+        )
+        if ctas and "." not in ctas.group(2):
+            qualified_target = f"`{self.project_id}.{self.dataset_id}.{ctas.group(2).strip('`').upper()}`"
+            return ctas.group(1) + qualified_target + ctas.group(3) + work[ctas.end() :]
+        return work
+
     def _convert_to_bigquery_table(self, statement: str) -> str:
         """Convert CREATE TABLE statement to BigQuery format.
 
@@ -1825,14 +1946,52 @@ class BigQueryAdapter(PlatformAdapter):
         """
         import re
 
-        if not statement.strip().upper().startswith("CREATE"):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        # Schema chunks can carry decorative "--" header lines before the real
+        # CREATE (naive ";" splitting preserves them). Gate and match on the
+        # remainder so those chunks still get dataset-qualified; the prefix is
+        # re-attached unchanged at the end.
+        prefix, work = split_leading_sql_comments(statement)
+
+        if not work.strip().upper().startswith("CREATE"):
             return statement
+
+        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
+        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
+        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
+        # NUMERIC and inherits its limits. BigQuery also has no VARCHAR
+        # type: benchmark staging DDL spells text columns VARCHAR(n)
+        # (valid on Snowflake/Postgres/DuckDB); map to STRING.
+        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
+            precision, scale = int(match.group(2)), int(match.group(3))
+            if scale > 9 or precision > 38:
+                return f"BIGNUMERIC({precision},{scale})"
+            return match.group(0)
+
+        def _normalize_bq_column_types(text: str) -> str:
+            # Applied to the column-definition remainder (`rest`), not the
+            # rebuilt query: the match path below rebuilds `work` from
+            # `rest`, which would otherwise silently discard these rewrites.
+            text = re.sub(
+                r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+                _decimal_to_bignumeric,
+                text,
+                flags=re.IGNORECASE,
+            )
+            text = re.sub(
+                r"\bVARCHAR\s*(\(\s*\d+\s*\))?",
+                "STRING",
+                text,
+                flags=re.IGNORECASE,
+            )
+            return text
 
         pattern = re.compile(
             r"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_.]+)`?\s*(\(.*)",
             re.IGNORECASE | re.DOTALL,
         )
-        match = pattern.match(statement)
+        match = pattern.match(work)
         if match:
             # Uppercase only the table segment; a qualified name keeps its
             # project/dataset case (BigQuery table identifiers are
@@ -1843,7 +2002,7 @@ class BigQueryAdapter(PlatformAdapter):
                 table_name = ".".join([*qualifier, bare.upper()])
             else:
                 table_name = table_name.upper()
-            rest = match.group(2)
+            rest = _normalize_bq_column_types(match.group(2))
             # BigQuery table identifiers are case-sensitive: normalize the
             # table segment to UPPERCASE to match the adapter-wide convention
             # used by loads, validation, row counts, and query qualification.
@@ -1855,42 +2014,17 @@ class BigQueryAdapter(PlatformAdapter):
                 qualified_table = "`" + ".".join([*qualifier, bare.upper()]) + "`"
             else:
                 qualified_table = table_name
-            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+            work = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
         else:
-            if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
-
-        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
-        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
-        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
-        # NUMERIC and inherits its limits.
-        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
-            precision, scale = int(match.group(2)), int(match.group(3))
-            if scale > 9 or precision > 38:
-                return f"BIGNUMERIC({precision},{scale})"
-            return match.group(0)
-
-        statement = re.sub(
-            r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
-            _decimal_to_bignumeric,
-            statement,
-            flags=re.IGNORECASE,
-        )
+            if "CREATE TABLE" in work and "OR REPLACE" not in work.upper():
+                work = work.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            work = self._qualify_ctas_target(work)
+            work = _normalize_bq_column_types(work)
 
         # BigQuery rejects enforced PRIMARY KEY; it only supports informational
         # NOT ENFORCED table constraints. Convert inline column PRIMARY KEYs
         # (e.g. JoinOrder's `id INTEGER PRIMARY KEY`) to a table constraint.
-        _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
-        pk_cols = [
-            name
-            for name in re.findall(
-                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
-                r"PRIMARY\s+KEY(?!\s*\()",
-                rest if match else statement,
-                flags=re.IGNORECASE | re.MULTILINE,
-            )
-            if name.upper() not in _pk_keywords
-        ]
+        pk_cols = self._inline_pk_columns(rest if match else work)
         if match:
             rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
             has_table_pk = re.search(r"PRIMARY\s+KEY\s*\(", rest, flags=re.IGNORECASE) is not None
@@ -1904,29 +2038,29 @@ class BigQueryAdapter(PlatformAdapter):
                         if depth == 0:
                             rest = rest[:i] + f", PRIMARY KEY ({', '.join(pk_cols)}) NOT ENFORCED" + rest[i:]
                             break
-            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+            work = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
         else:
-            statement = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", statement, flags=re.IGNORECASE)
+            work = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", work, flags=re.IGNORECASE)
 
         # BigQuery rejects enforced PRIMARY KEY table constraints too (e.g.
         # nyctaxi's `PRIMARY KEY (cols)`). Mark surviving table-level keys
         # NOT ENFORCED; already-marked constraints are left untouched.
-        statement = re.sub(
+        work = re.sub(
             r"PRIMARY\s+KEY\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
             r"PRIMARY KEY (\1) NOT ENFORCED",
-            statement,
+            work,
             flags=re.IGNORECASE,
         )
 
         # Include partitioning and clustering if configured
-        if "PARTITION BY" not in statement.upper() and self.partitioning_field:
-            statement += f" PARTITION BY DATE({self.partitioning_field})"
+        if "PARTITION BY" not in work.upper() and self.partitioning_field:
+            work += f" PARTITION BY DATE({self.partitioning_field})"
 
-        if "CLUSTER BY" not in statement.upper() and self.clustering_fields:
+        if "CLUSTER BY" not in work.upper() and self.clustering_fields:
             clustering = ", ".join(self.clustering_fields)
-            statement += f" CLUSTER BY {clustering}"
+            work += f" CLUSTER BY {clustering}"
 
-        return statement
+        return prefix + work
 
     # Fallback table list when query parsing is unavailable. Covers TPC-H;
     # parser-extracted names handle every other benchmark.
@@ -1939,6 +2073,45 @@ class BigQueryAdapter(PlatformAdapter):
         "PARTSUPP",
         "ORDERS",
         "LINEITEM",
+    )
+
+    # Clause keywords that can follow a table occurrence: their presence
+    # means the occurrence carries no alias (see _qualify_has_alias).
+    _QUALIFY_CLAUSE_KEYWORDS = frozenset(
+        {
+            "AS",
+            "AND",
+            "OR",
+            "ON",
+            "USING",
+            "WHERE",
+            "GROUP",
+            "ORDER",
+            "HAVING",
+            "QUALIFY",
+            "WINDOW",
+            "LIMIT",
+            "OFFSET",
+            "JOIN",
+            "INNER",
+            "LEFT",
+            "RIGHT",
+            "FULL",
+            "CROSS",
+            "NATURAL",
+            "SET",
+            "WHEN",
+            "THEN",
+            "ELSE",
+            "END",
+            "UNION",
+            "INTERSECT",
+            "EXCEPT",
+            "SELECT",
+            "FROM",
+            "VALUES",
+            "TABLE",
+        }
     )
 
     def _extract_unqualified_tables(self, query: str) -> list[str] | None:
@@ -1954,7 +2127,10 @@ class BigQueryAdapter(PlatformAdapter):
         except ImportError:
             return None
         try:
-            tree = sqlglot.parse_one(query)
+            # Parse as BigQuery: the default dialect rejects backtick-quoted
+            # identifiers, which sqlglot translations and benchmark setup
+            # probes use throughout.
+            tree = sqlglot.parse_one(query, read="bigquery")
         except Exception:
             return None
         if tree is None:
@@ -1970,28 +2146,29 @@ class BigQueryAdapter(PlatformAdapter):
             tables.append(name)
         return tables
 
-    def _qualify_table_names(self, query: str) -> str:
+    def _qualify_table_names(self, query: str, allow_fallback: bool = True) -> str:
         """Add full qualification to table names in query.
-
-        Note: Only used for non-translated queries (e.g., raw TPC-H queries without sqlglot).
-        Queries processed by sqlglot with identify=True should skip this method to avoid
-        conflicts with backtick-quoted identifiers. When default_dataset is configured,
-        BigQuery automatically resolves unqualified table names.
 
         Table names are extracted with a SQL parser so benchmarks beyond TPC-H
         resolve; BigQuery table identifiers are case-sensitive, so every name
         is normalized to UPPERCASE to match created tables. Falls back to the
-        static TPC-H list when parsing is unavailable.
+        static TPC-H list when parsing is unavailable (unless allow_fallback
+        is False, in which case an unparseable query is returned unchanged -
+        used for already-translated backtick queries where a static rewrite
+        could corrupt a statement the parser cannot see into).
 
-        Only occurrences in table position (after FROM / JOIN or a
-        comma-separated FROM item) are rewritten: string literals and comments
-        are masked first, so same-named columns, aliases, and literal text are
-        left alone.
+        Only occurrences in table position are rewritten: after FROM / JOIN,
+        a comma-separated FROM item, or a DML/DDL target keyword (INSERT INTO,
+        UPDATE, DELETE FROM via FROM, TRUNCATE TABLE, DROP TABLE, ALTER TABLE,
+        CREATE TABLE). String literals and comments are masked first, so
+        same-named columns, aliases, and literal text are left alone.
         """
         import re
 
         table_names = self._extract_unqualified_tables(query)
         if table_names is None:
+            if not allow_fallback:
+                return query
             table_names = list(self._FALLBACK_QUALIFY_TABLES)
 
         # Blank string literals and comments length-preservingly so matches
@@ -2004,22 +2181,64 @@ class BigQueryAdapter(PlatformAdapter):
         masked = _mask(query)
 
         for table_name in table_names:
-            # Replace unqualified table names
+            # Replace unqualified table names. The name alternative also
+            # matches a backtick-quoted occurrence (`ORDERS`): benchmark
+            # setup code quotes identifiers with backticks, and BigQuery
+            # resolves the query-time connection without a default dataset,
+            # so bare backtick names must be qualified here too. Only
+            # table-position names reach this loop (sqlglot exp.Table), so
+            # backticked column references are never rewritten. Qualified
+            # references (db.table) are excluded by the extractor, and the
+            # keyword prefix guard keeps them excluded here as well.
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
+            # A qualified path creates no implicit range variable on
+            # BigQuery, so `name.column` references elsewhere in the query
+            # would stop resolving once the table is qualified. When such
+            # references exist and the occurrence carries no alias, append
+            # one spelling the original name (proven live: every bare-prefix
+            # UPDATE/DELETE failed server-side with Unrecognized name).
+            has_refs = re.search(rf"\b{table_name}\s*\.", masked, flags=re.IGNORECASE) is not None
 
-            pattern = rf"(\bFROM\s+|\bJOIN\s+|,\s*)({re.escape(table_name)})\b"
+            pattern = (
+                rf"(\bFROM\s+|\bJOIN\s+|\bINSERT\s+INTO\s+|\bUPDATE\s+"
+                rf"|\bMERGE\s+INTO\s+|\bUSING\s+"
+                rf"|\bTRUNCATE\s+(?:TABLE\s+)?|\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"
+                rf"|\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?|\bCREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|,\s*)"
+                rf"(`{re.escape(table_name)}`|{re.escape(table_name)}\b)"
+            )
             segments: list[str] = []
             last = 0
             for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
                 name_start, name_end = match.span(2)
                 segments.append(query[last:name_start])
-                segments.append(qualified_name)
+                replacement = qualified_name
+                if has_refs and not self._qualify_has_alias(masked[name_end : name_end + 40]):
+                    replacement += f" AS {table_name.lower()}"
+                segments.append(replacement)
                 last = name_end
             segments.append(query[last:])
             query = "".join(segments)
             masked = _mask(query)
 
         return query
+
+    @staticmethod
+    def _qualify_has_alias(after: str) -> bool:
+        """Whether a rewritten table occurrence already carries an alias.
+
+        Only explicit ``AS alias`` and bare-identifier aliases count; a
+        following clause keyword, punctuation, or end of input means the
+        occurrence is unaliased. Checked against the literal-masked query.
+        """
+        import re
+
+        as_match = re.match(r"\s+AS\s+([A-Za-z_]\w*)", after, flags=re.IGNORECASE)
+        if as_match:
+            return as_match.group(1).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+        bare_match = re.match(r"\s+([A-Za-z_]\w*)", after)
+        if bare_match:
+            return bare_match.group(1).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+        return False
 
     def _normalize_table_names_case(self, query: str) -> str:
         """Normalize backtick-quoted table names to UPPERCASE for case-sensitive matching.

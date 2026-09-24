@@ -1941,6 +1941,119 @@ class TestQualifyTableNames:
         assert "my_ds" in result
         assert "LINEITEM" in result
 
+    def test_merge_using_source_qualified_alias_preserved(self):
+        """The USING source is a real table (qualify it); its alias is kept."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        query = "MERGE INTO target AS t USING source_updates AS s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x"
+        result = adapter._qualify_table_names(query)
+
+        assert "USING `my-proj.my_ds.SOURCE_UPDATES` AS s" in result
+        assert "`my-proj.my_ds.TARGET` AS t" in result
+
+    def test_update_alias_not_qualified(self):
+        """An UPDATE target alias must not be rewritten as a table."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        query = "UPDATE lineitem AS l SET l_tax = l_tax * 2"
+        result = adapter._qualify_table_names(query)
+
+        assert "UPDATE `my-proj.my_ds.LINEITEM` AS l" in result
+        assert "AS `my-proj" not in result
+
+    def test_delete_from_still_qualified(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        result = adapter._qualify_table_names("DELETE FROM lineitem WHERE l_tax > 0")
+
+        assert "DELETE FROM `my-proj.my_ds.LINEITEM`" in result
+
+
+# ---------------------------------------------------------------------------
+# preprocess_operation_sql: WHERE-true backfill for filter-less DML
+# ---------------------------------------------------------------------------
+
+
+def _make_operation(write_sql: str):
+    from benchbox.core.write_primitives.catalog import WriteOperation
+
+    return WriteOperation(
+        id="test_op",
+        category="test",
+        description="test operation",
+        write_sql=write_sql,
+    )
+
+
+class TestPreprocessOperationSqlWhereTrue:
+    """Filter-less UPDATE/DELETE gain WHERE true for BigQuery DML."""
+
+    def test_update_without_where_gains_where_true(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("UPDATE lineitem SET l_tax = 1"))
+
+        assert result is not None
+        assert "WHERE true" in result
+
+    def test_update_with_where_unchanged(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("UPDATE lineitem SET l_tax = 1 WHERE l_tax > 0")
+        )
+
+        assert result is not None
+        assert "WHERE true" not in result
+
+    def test_select_unchanged(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("SELECT * FROM lineitem"))
+
+        assert result is not None
+        assert "WHERE true" not in result
+
+    def test_delete_without_where_gains_where_true(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("DELETE FROM lineitem"))
+
+        assert result is not None
+        assert "WHERE true" in result
+
+    def test_bare_insert_gains_row(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op",
+            _make_operation("MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN INSERT\n"),
+        )
+
+        assert result is not None
+        assert result.rstrip().endswith("INSERT ROW")
+
+    def test_insert_values_untouched(self):
+        adapter = _make_adapter()
+        sql = "MERGE INTO t USING s ON t.id = s.id WHEN NOT MATCHED THEN INSERT VALUES (s.id)\n"
+
+        result = adapter.preprocess_operation_sql("op", _make_operation(sql))
+
+        assert result is not None
+        assert "INSERT ROW" not in result
+        assert "INSERT VALUES (s.id)" in result
+
+
+class TestQualifyAlterTable:
+    """ALTER TABLE targets qualify like other DDL/DML targets."""
+
+    def test_alter_table_qualified(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        result = adapter._qualify_table_names("ALTER TABLE test_alter ADD COLUMN created DATE")
+
+        assert "ALTER TABLE `my-proj.my_ds.TEST_ALTER` ADD COLUMN created DATE" in result
+
 
 # ---------------------------------------------------------------------------
 # _build_load_job_config

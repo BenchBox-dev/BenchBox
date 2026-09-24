@@ -1068,6 +1068,32 @@ class DatabricksAdapter(PlatformAdapter):
         """Return the target SQL dialect for Databricks."""
         return "databricks"
 
+    def preprocess_operation_sql(self, query_id: str, operation: Any) -> str | None:
+        """Rewrite operation write SQL for Databricks-only dialect gaps.
+
+        Respects catalog ``databricks`` overrides (including skip ``None``):
+        rewrites the override when present, otherwise the default write SQL.
+
+        - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
+          VARCHAR requires a length parameter; verified live with
+          DATATYPE_MISSING_SIZE on batch inserts)
+        """
+        import re
+
+        overrides = getattr(operation, "platform_overrides", None) or {}
+        if "databricks" in overrides:
+            base = overrides["databricks"]
+            if base is None:
+                return None
+        else:
+            base = operation.write_sql
+        return re.sub(
+            r"\bCAST\(([^()]+?)\s+AS\s+VARCHAR\s*\)",
+            r"CAST(\1 AS STRING)",
+            base,
+            flags=re.IGNORECASE,
+        )
+
     def _get_connection_params(self, **connection_config) -> dict[str, Any]:
         """Get standardized connection parameters."""
         return {
@@ -1151,15 +1177,17 @@ class DatabricksAdapter(PlatformAdapter):
             cursor.fetchall()
             self.log_very_verbose("Databricks connection test successful")
 
-            # Set catalog and schema context
-            # If database is being reused, schema already exists - set it now
-            # If database is new, schema will be created in create_schema() which will also set it
+            # Set catalog and schema context on every connection. Pooled
+            # connections never pass through create_schema(), so deferring
+            # USE SCHEMA there leaves them on the default schema and every
+            # unqualified probe fails (verified live: staging COUNT(*) probes
+            # failed while DDL landed in the default schema). CREATE SCHEMA
+            # is idempotent, so ensuring here is safe on fresh and reused
+            # databases alike; create_schema() keeps owning table creation.
             cursor.execute(f"USE CATALOG {self.catalog}")
-            if self.database_was_reused:
-                cursor.execute(f"USE SCHEMA {self.schema}")
-                self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema} (database reused)")
-            else:
-                self.log_very_verbose(f"Set catalog to {self.catalog}, schema will be set during schema creation")
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
+            cursor.execute(f"USE SCHEMA {self.schema}")
+            self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
 
             self.log_operation_complete(
                 "Databricks connection",
@@ -1225,7 +1253,15 @@ class DatabricksAdapter(PlatformAdapter):
                 self.log_verbose(f"SQL length changed after Databricks syntax fix: {original_len} -> {len(schema_sql)}")
 
             # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+            from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+            # Skip chunks holding only decorative "--" comments (a ";" inside
+            # a comment splits one off): they carry no DDL.
+            statements = [
+                stmt.strip()
+                for stmt in schema_sql.split(";")
+                if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
+            ]
 
             # Debug: Log statement count
             self.log_verbose(f"Parsed {len(statements)} CREATE TABLE statements from schema SQL")
@@ -2509,8 +2545,18 @@ class DatabricksAdapter(PlatformAdapter):
             if re.sub(r"[^a-z0-9]", "", (benchmark_type or "").lower()).startswith("tpcdi"):
                 query = self._apply_tpcdi_databricks_rewrites(query)
             query = self._normalize_databricks_query(query)
-            cursor.execute(query)
-            result = cursor.fetchall()
+            # The SQL execution API accepts one statement per execute: run
+            # operation batches (DELETE+INSERT pairs, the 3-statement SCD2
+            # stage batch, DDL sequences) statement-by-statement in session
+            # order and report the last statement's rows. A single statement
+            # keeps the identical single-execute path as before.
+            from benchbox.platforms.base.mysql_wire import split_sql_statements
+
+            statements = split_sql_statements(query)
+            result = []
+            for statement in statements or [query]:
+                cursor.execute(statement)
+                result = cursor.fetchall()
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
@@ -2787,25 +2833,34 @@ class DatabricksAdapter(PlatformAdapter):
         before, while table_format="hudi" renders USING HUDI with record-key
         TBLPROPERTIES instead.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        # Schema chunks can carry decorative "--" header lines before the real
+        # CREATE (naive ";" splitting preserves them). Gate and rewrite on the
+        # remainder so those chunks still get the idempotent OR REPLACE form.
+        prefix, body = split_leading_sql_comments(statement)
+        if not body.upper().startswith("CREATE TABLE"):
             return statement
 
         # Ensure idempotency with OR REPLACE, unless the statement already has
         # IF NOT EXISTS (CREATE OR REPLACE ... IF NOT EXISTS is a syntax error).
-        if "CREATE TABLE" in statement.upper() and "OR REPLACE" not in statement.upper():
-            if "IF NOT EXISTS" not in statement.upper():
-                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        # Rewrite the body only, so a comment mentioning CREATE TABLE is safe.
+        if "CREATE TABLE" in body.upper() and "OR REPLACE" not in body.upper():
+            if "IF NOT EXISTS" not in body.upper():
+                body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        statement = prefix + body
 
         if self.table_format == "hudi":
-            return self._convert_to_hudi_table(statement)
+            return self._convert_to_hudi_table(prefix + body)
 
-        # Default to DELTA format when unspecified
-        if "USING" not in statement.upper():
+        # Default to DELTA format when unspecified. Scan the body only: parens
+        # in the comment prefix must not displace the USING DELTA insertion.
+        if "USING" not in body.upper():
             # Find the closing parenthesis of column definitions
             paren_count = 0
-            using_pos = len(statement)
+            using_pos = len(body)
 
-            for i, char in enumerate(statement):
+            for i, char in enumerate(body):
                 if char == "(":
                     paren_count += 1
                 elif char == ")":
@@ -2815,20 +2870,20 @@ class DatabricksAdapter(PlatformAdapter):
                         break
 
             # Insert USING DELTA clause
-            statement = statement[:using_pos] + " USING DELTA" + statement[using_pos:]
+            body = body[:using_pos] + " USING DELTA" + body[using_pos:]
 
         # Include Delta Lake optimization properties
-        if "TBLPROPERTIES" not in statement.upper():
-            statement += " TBLPROPERTIES ("
+        if "TBLPROPERTIES" not in body.upper():
+            body += " TBLPROPERTIES ("
             properties = []
 
             if self.delta_auto_optimize:
                 properties.append("'delta.autoOptimize.optimizeWrite' = 'true'")
                 properties.append("'delta.autoOptimize.autoCompact' = 'true'")
 
-            statement += ", ".join(properties) + ")"
+            body += ", ".join(properties) + ")"
 
-        return statement
+        return prefix + body
 
     def _convert_to_hudi_table(self, statement: str) -> str:
         """Convert CREATE TABLE statement to Apache Hudi format.

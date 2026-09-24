@@ -779,8 +779,16 @@ class SnowflakeAdapter(PlatformAdapter):
             self.log_very_verbose("Retrieving schema SQL from benchmark")
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+            # Split schema into individual statements and execute. Chunks that
+            # hold only decorative "--" comments (a ";" inside a comment
+            # splits one off) carry no DDL: skip the no-op round trip.
+            from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+            statements = [
+                stmt.strip()
+                for stmt in schema_sql.split(";")
+                if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
+            ]
 
             self.log_verbose(f"Executing {len(statements)} schema statements")
 
@@ -1360,8 +1368,20 @@ class SnowflakeAdapter(PlatformAdapter):
             # Zero-divisor guard is a no-op unless the query divides.
             query = self._safeguard_snowflake_division(query)
             self.log_verbose(f"Executing query {query_id} on Snowflake")
-            cursor.execute(query)
-            result = cursor.fetchall()
+            # Snowflake's driver rejects multi-statement strings ("Actual
+            # statement count N did not match the desired statement count
+            # 1"), which operation benchmarks emit routinely (DELETE+INSERT
+            # pairs, the 3-statement SCD2 stage batch, DDL sequences).
+            # Run each statement in session order and report the last
+            # statement's rows; a single statement takes the identical
+            # single-execute path as before.
+            from benchbox.platforms.base.mysql_wire import split_sql_statements
+
+            statements = split_sql_statements(query)
+            result = []
+            for statement in statements or [query]:
+                cursor.execute(statement)
+                result = cursor.fetchall()
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
@@ -1490,15 +1510,24 @@ class SnowflakeAdapter(PlatformAdapter):
         Uppercasing quoted identifiers keeps both spellings resolving to the
         same table. Single-quoted string literals are left untouched.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        # Schema chunks can carry decorative "--" header lines before the real
+        # CREATE (naive ";" splitting preserves them). Gate and rewrite on the
+        # remainder so those chunks still get the idempotent OR REPLACE form;
+        # the prefix is re-attached unchanged at the end.
+        prefix, body = split_leading_sql_comments(statement)
+        if not body.upper().startswith("CREATE TABLE"):
             return statement
 
         # Ensure idempotency with OR REPLACE (defense-in-depth), unless the
         # statement already has IF NOT EXISTS (OR REPLACE + IF NOT EXISTS
-        # is a Snowflake syntax error).
-        if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            if "IF NOT EXISTS" not in statement.upper():
-                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        # is a Snowflake syntax error). Rewrite the body only, so a comment
+        # that happens to mention CREATE TABLE is never corrupted.
+        if "CREATE TABLE" in body and "OR REPLACE" not in body.upper():
+            if "IF NOT EXISTS" not in body.upper():
+                body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        statement = prefix + body
 
         import re
 

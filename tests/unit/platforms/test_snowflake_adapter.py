@@ -1265,6 +1265,71 @@ benchbox-fixture-key-material
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_execute_query_splits_multi_statement_batch(self, mock_snowflake):
+        """Multi-statement operation SQL runs statement-by-statement.
+
+        The driver rejects multi-statement strings, so operation batches
+        (DELETE+INSERT pairs, the 3-statement SCD2 stage batch) must be
+        split; the last statement's rows are reported.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.side_effect = [[], [], [(25,)]]
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        batch = (
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10; "
+            "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10; "
+            "SELECT COUNT(*) FROM t WHERE k BETWEEN 1 AND 10"
+        )
+        with patch.object(adapter, "_get_query_statistics") as mock_stats:
+            mock_stats.return_value = {}
+            result = adapter.execute_query(mock_connection, batch, "q_multi")
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert executed[0] == "ALTER SESSION SET QUERY_TAG = 'BenchBox_q_multi'"
+        assert executed[1:] == [
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10",
+            "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+            "SELECT COUNT(*) FROM t WHERE k BETWEEN 1 AND 10",
+        ]
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_execute_query_single_statement_executes_once(self, mock_snowflake):
+        """A single statement keeps the exact single-execute path."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        with patch.object(adapter, "_get_query_statistics") as mock_stats:
+            mock_stats.return_value = {}
+            result = adapter.execute_query(mock_connection, "SELECT 1", "q_single")
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        statements = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert statements == ["ALTER SESSION SET QUERY_TAG = 'BenchBox_q_single'", "SELECT 1"]
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_query_statistics(self, mock_snowflake):
         """Test query statistics retrieval."""
         mock_connection = Mock()
@@ -1305,6 +1370,41 @@ benchbox-fixture-key-material
         assert "credits_used" not in stats
 
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_query_statistics_sql_uses_valid_history_columns(self, mock_snowflake):
+        """The stats lookup must only select INFORMATION_SCHEMA columns.
+
+        BYTES_WRITTEN, BYTES_SPILLED_*, and ROWS_EXAMINED exist only in
+        ACCOUNT_USAGE.QUERY_HISTORY; selecting them from the
+        INFORMATION_SCHEMA table function fails every lookup (verified live),
+        burning all retries plus backoff on every statement.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = None
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+        # max_retries=0 with an empty history: single attempt, no sleeps.
+        adapter._get_query_statistics(mock_connection, "q1", max_retries=0)
+        (sql,), _ = mock_cursor.execute.call_args
+        # Selected items are bare columns or NULL placeholders; the invalid
+        # names may only survive as NULL-alias labels, never as selections.
+        selected = [line.strip().rstrip(",") for line in sql.splitlines()]
+        for invalid in (
+            "BYTES_WRITTEN",
+            "BYTES_SPILLED_TO_LOCAL_STORAGE",
+            "BYTES_SPILLED_TO_REMOTE_STORAGE",
+            "ROWS_EXAMINED",
+        ):
+            assert invalid not in selected
+        assert "BYTES_WRITTEN_TO_RESULT" in selected
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_edition_flows_to_platform_info_for_cost_model(self, mock_snowflake):
@@ -1666,6 +1766,15 @@ class TestSnowflakeOptimizeTableDefinition:
         stmt = "ALTER TABLE orders ADD COLUMN name VARCHAR(100)"
         result = adapter._optimize_table_definition(stmt)
         assert result == stmt
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_comment_prefixed_create_still_gets_or_replace(self, mock_snowflake):
+        """Schema chunks with "--" headers must still get OR REPLACE."""
+        adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
+        chunk = "-- Generated staging load tables\nCREATE TABLE orders_stage (id INT)"
+        result = adapter._optimize_table_definition(chunk)
+        assert result.startswith("-- Generated staging load tables\n")
+        assert "CREATE OR REPLACE TABLE orders_stage (id INT)" in result
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_lowercase_create_table_is_not_modified(self, mock_snowflake):

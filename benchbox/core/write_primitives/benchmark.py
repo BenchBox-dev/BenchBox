@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
-    quote_identifier,
+    failed_platform_error,
+    fetch_count_probe,
+    quote_identifier_for_dialect,
     summarize_validation_failures,
     table_exists,
 )
@@ -359,7 +361,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """Quote SQL identifier to prevent SQL injection.
 
         Uses double quotes (SQL standard) for most dialects. Uses backticks for
-        StarRocks, which runs in MySQL mode where double-quotes are string literals.
+        StarRocks, which runs in MySQL mode where double-quotes are string literals,
+        and for BigQuery, where double quotes also denote string literals.
+        Uppercases for dialects whose catalogs are uppercase (Snowflake folds
+        unquoted names to upper; BigQuery is case-sensitive with uppercase
+        tables), so setup probes resolve the adapter-created tables.
 
         Args:
             identifier: Table, column, or schema name
@@ -373,7 +379,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if self._setup_dialect == "starrocks":
             escaped = identifier.replace("`", "``")
             return f"`{escaped}`"
-        return quote_identifier(identifier)
+        return quote_identifier_for_dialect(identifier, self._setup_dialect)
 
     def _get_effective_write_sql(
         self,
@@ -552,31 +558,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         return ", ".join(missing)
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
-        """Check if a table exists in the database.
+        """Check if a table exists in the database."""
+        return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
-        Uses a platform-agnostic approach that attempts to query the table
-        with LIMIT 0, which should work across most SQL databases without
-        requiring INFORMATION_SCHEMA access.
-
-        Args:
-            connection: Database connection
-            table_name: Name of table to check (will be quoted for safety)
-
-        Returns:
-            True if table exists, False otherwise
-
-        Note:
-            This method catches exceptions to distinguish between:
-            - Table doesn't exist (expected, returns False)
-            - Other errors (logged, returns False for safety)
-
-        Security:
-            Table name is quoted using _quote_identifier() to prevent SQL injection.
-        """
-        return table_exists(connection, table_name, self.log_verbose)
-
-    @staticmethod
-    def _scd2_row_hash_expr(acctbal_expr: str) -> str:
+    def _scd2_row_hash_expr(self, acctbal_expr: str) -> str:
         """Build the portable SCD2 change-detection fingerprint expression.
 
         Concatenates the tracked dimension attributes into a single string so
@@ -594,6 +579,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         Returns:
             A portable SQL string expression yielding the row fingerprint.
 
+        The numeric-to-text CAST spells the target type per setup dialect
+        (BigQuery has no VARCHAR type); like _date_literal, this spelling
+        must be applied here because staging population runs directly on
+        the connection, before the normal operation SQL translation path.
+
         Safety assumptions (verified for TPC-H; revisit if reused elsewhere):
             - Same-engine comparison only. The dimension and staging ``row_hash``
               are both computed by this expression during setup on the SAME
@@ -608,7 +598,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
               changed row look unchanged (or vice versa); use a collision-
               resistant separator or length-prefixed encoding in that case.
         """
-        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
+        text_type = "STRING" if getattr(self, "_setup_dialect", "standard").lower() == "bigquery" else "VARCHAR"
+        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS {text_type}) || '|' || c_mktsegment"
 
     def _date_literal(self, value: str) -> str:
         """Return a date literal accepted by the active setup dialect.
@@ -745,8 +736,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             # Check if table needs population
             try:
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                current_count = result[0] if result else 0
+                current_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
             except Exception:
                 current_count = 0
 
@@ -754,8 +744,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 # Validate source table exists and has data before copying
                 try:
                     quoted_source = self._quote_identifier(source_table)
-                    source_result = connection.execute(f"SELECT COUNT(*) FROM {quoted_source}").fetchone()
-                    source_count = source_result[0] if source_result else 0
+                    source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
                 except Exception as e:
                     # Source table doesn't exist - skip population for optional tables
                     # (see _OPTIONAL_WHEN_SOURCE_MISSING). Minimal test fixtures load
@@ -791,8 +780,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 populate_sql = self._get_population_sql(table_name, source_table)
                 self._execute_population_sql(connection, populate_sql)
 
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                status[table_name] = result[0] if result else 0
+                status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
                 self.log_verbose(f"Populated {table_name} with {status[table_name]} rows")
             else:
                 # Table already has data
@@ -1299,6 +1287,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
             write_duration_ms = (time.perf_counter() - write_start) * 1000
+            # Adapters that report failures as a FAILED result payload do not
+            # raise here: without this check a failed write reads as executed
+            # and only content-checking validations can catch it (verified
+            # live on Snowflake, where multi-statement writes no-op'd while
+            # COUNT(*) validations kept passing).
+            if (write_error := failed_platform_error(write_result)) is not None:
+                raise RuntimeError(f"Write SQL failed on platform: {write_error}")
 
             rows_affected = self._extract_rows_affected(write_result, operation_id)
 
@@ -1403,7 +1398,26 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 continue
 
             val_sql = self._replace_placeholders(effective_sql)
-            val_result = connection.execute(val_sql).fetchall()
+            val_cursor = connection.execute(val_sql)
+            # A failed validation SELECT surfaces here as an empty row set
+            # (adapters materialize placeholder rows for FAILED payloads),
+            # which vacuous COUNT(*) checks would accept. Fail the validation
+            # with the adapter-reported error instead.
+            if (val_error := failed_platform_error(val_cursor)) is not None:
+                validation_passed = False
+                validation_results.append(
+                    {
+                        "query_id": val_query.id,
+                        "sql": effective_sql,
+                        "expected_rows": val_query.expected_rows,
+                        "actual_rows": 0,
+                        "passed": False,
+                        "error": val_error,
+                        "sample": [],
+                    }
+                )
+                continue
+            val_result = val_cursor.fetchall()
             actual_rows = len(val_result)
             passed = _check_validation_query(val_query, actual_rows, val_result)
             validation_passed = validation_passed and passed

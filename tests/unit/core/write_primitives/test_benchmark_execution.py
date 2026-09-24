@@ -122,6 +122,14 @@ class TestQuoteIdentifier:
         assert wp_benchmark._quote_identifier("Orders") == '"Orders"'
         assert wp_benchmark._quote_identifier("_private") == '"_private"'
 
+    def test_databricks_uses_backticks(self, wp_benchmark):
+        """Databricks warehouses without ANSI mode reject double-quoted
+        identifiers with PARSE_SYNTAX_ERROR (verified live)."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        assert quote_identifier_for_dialect("orders", "databricks") == "`orders`"
+        assert quote_identifier_for_dialect("orders", "standard") == '"orders"'
+
     def test_identifier_with_numbers(self, wp_benchmark):
         """Test quoting identifiers with numbers."""
         assert wp_benchmark._quote_identifier("table123") == '"table123"'
@@ -148,6 +156,455 @@ class TestQuoteIdentifier:
             wp_benchmark._quote_identifier("table-name")
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("table.name")
+
+    def test_uppercase_dialects_quote_uppercase(self, wp_benchmark, tmp_path):
+        """Snowflake/BigQuery catalogs are uppercase; probes must match."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        assert quote_identifier_for_dialect("orders", "snowflake") == '"ORDERS"'
+        # BigQuery uses backticks: double quotes are string literals there.
+        assert quote_identifier_for_dialect("orders", "bigquery") == "`ORDERS`"
+        assert quote_identifier_for_dialect("orders", "BigQuery") == "`ORDERS`"
+        assert quote_identifier_for_dialect("orders", "Snowflake") == '"ORDERS"'
+        assert quote_identifier_for_dialect("orders", "duckdb") == '"orders"'
+        assert quote_identifier_for_dialect("orders", None) == '"orders"'
+
+        wp_benchmark._setup_dialect = "snowflake"
+        assert wp_benchmark._quote_identifier("orders") == '"ORDERS"'
+        wp_benchmark._setup_dialect = "bigquery"
+        assert wp_benchmark._quote_identifier("orders") == "`ORDERS`"
+        wp_benchmark._setup_dialect = "standard"
+        assert wp_benchmark._quote_identifier("orders") == '"orders"'
+
+    def test_scd2_hash_cast_per_setup_dialect(self, wp_benchmark, tmp_path):
+        """SCD2 fingerprint CAST spells the setup dialect's text type."""
+        wp_benchmark._setup_dialect = "standard"
+        assert "AS VARCHAR" in wp_benchmark._scd2_row_hash_expr("c_acctbal")
+        wp_benchmark._setup_dialect = "bigquery"
+        expr = wp_benchmark._scd2_row_hash_expr("c_acctbal")
+        assert "AS STRING" in expr
+        assert "VARCHAR" not in expr
+
+    def test_bigquery_quote_rejects_unsafe_identifier(self, wp_benchmark, tmp_path):
+        """BigQuery backtick quoting keeps the injection guard."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        with pytest.raises(ValueError, match="Invalid SQL identifier"):
+            quote_identifier_for_dialect("table-name", "bigquery")
+
+    def test_fetch_count_probe_raises_on_failed_platform_result(self, wp_benchmark, tmp_path):
+        """A FAILED adapter payload must raise, not read as 0 rows."""
+        from benchbox.core.primitives_benchmark_utils import fetch_count_probe
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error_type": "BadRequest", "error": "Syntax error"}
+
+            def fetchone(self):
+                return None
+
+        class OkCursor:
+            def fetchone(self):
+                return (15000,)
+
+        class RawCursor:
+            """Plain DB-API cursor without a platform_result payload."""
+
+            def fetchone(self):
+                return (42,)
+
+        connection = Mock()
+        connection.execute.return_value = OkCursor()
+        assert fetch_count_probe(connection, "SELECT COUNT(*) FROM `ORDERS`") == 15000
+
+        connection.execute.return_value = FailedCursor()
+        with pytest.raises(RuntimeError, match="Count probe failed.*Syntax error"):
+            fetch_count_probe(connection, "SELECT COUNT(*) FROM `ORDERS`")
+
+        connection.execute.return_value = RawCursor()
+        assert fetch_count_probe(connection, "SELECT COUNT(*) FROM orders") == 42
+
+
+class TestFailedPlatformError:
+    """Tests for the shared fail-loud adapter-payload helper."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    def test_failed_result_returns_error(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Syntax error"}
+
+        assert failed_platform_error(FailedCursor()) == "Syntax error"
+
+    def test_success_result_returns_none(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class OkCursor:
+            platform_result = {"status": "SUCCESS", "rows_returned": 1}
+
+            def fetchall(self):
+                return [(1,)]
+
+        assert failed_platform_error(OkCursor()) is None
+
+    def test_plain_cursor_returns_none(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class RawCursor:
+            def fetchall(self):
+                return [(1,)]
+
+        assert failed_platform_error(RawCursor()) is None
+
+
+class TestSnowflakeCatalogCoverage:
+    """Snowflake-dialect catalog expectations proven against the live engine."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "insert_returning_clause",
+            "update_returning",
+            "delete_returning",
+            "merge_returning_clause",
+        ],
+    )
+    def test_returning_ops_skip_snowflake(self, wp_benchmark, op_id):
+        """Snowflake has no RETURNING support (live syntax error)."""
+        operation = wp_benchmark.get_operation(op_id)
+        assert operation.platform_overrides.get("snowflake") is None
+        assert "snowflake" in operation.platform_overrides
+
+    def test_info_schema_checks_compare_uppercase(self, wp_benchmark):
+        """Existence validations must match Snowflake's uppercase catalog."""
+        operation = wp_benchmark.get_operation("ddl_create_table_simple")
+        table_exists_sql = next(v.sql for v in operation.validation_queries if v.id == "table_exists")
+        assert "UPPER(table_name) = UPPER('test_simple')" in table_exists_sql
+
+    def test_batch_ops_use_generator_on_snowflake(self, wp_benchmark):
+        """Snowflake has no generate_series/unnest set function."""
+        for op_id, base, rows in (
+            ("insert_batch_values_100", "9000100", 100),
+            ("insert_batch_values_1000", "9001000", 1000),
+        ):
+            operation = wp_benchmark.get_operation(op_id)
+            override = operation.platform_overrides.get("snowflake")
+            assert override is not None
+            assert f"GENERATOR(ROWCOUNT => {rows})" in override
+            assert "SEQ4()" in override
+            assert "generate_series" not in override
+            assert base in override
+
+    def test_conflict_op_uses_merge_on_snowflake(self, wp_benchmark):
+        """Snowflake has no ON CONFLICT; MERGE is the equivalent."""
+        operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
+        override = operation.platform_overrides.get("snowflake")
+        assert override is not None
+        assert override.startswith("MERGE INTO insert_ops_orders")
+        assert "WHEN NOT MATCHED THEN INSERT" in override
+        assert "ON CONFLICT" not in override
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "bulk_load_csv_small_gzip",
+            "bulk_load_parquet_medium_snappy",
+            "bulk_load_date_format_custom",
+        ],
+    )
+    def test_bulk_ops_skip_snowflake(self, wp_benchmark, op_id):
+        """Snowflake bulk loads need PUT-to-stage preprocessing the adapter
+        does not implement yet; they skip rather than fail."""
+        operation = wp_benchmark.get_operation(op_id)
+        assert "snowflake" in operation.platform_overrides
+        assert operation.platform_overrides.get("snowflake") is None
+
+
+class TestPortableCorrelation:
+    """DML self-references must use explicit aliases, not bare table names.
+
+    BigQuery creates no implicit range variable for a qualified target, so
+    ``UPDATE t ... WHERE t.col`` fails with ``Unrecognized name`` once the
+    adapter qualifies the target (proven live: every bare-prefix op errored
+    server-side while COUNT(*) validations kept passing). Explicit aliases
+    resolve on every engine including SQLite.
+    """
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    def test_no_bare_self_prefix_in_write_or_cleanup(self, wp_benchmark):
+        import re
+
+        bare_prefix = re.compile(r"(update_ops_orders|delete_ops_orders|scd2_ops_dim_customer)\s*\.")
+        offenders = []
+        for op_id, operation in wp_benchmark.get_all_operations().items():
+            for field in ("write_sql", "cleanup_sql"):
+                if bare_prefix.search(getattr(operation, field, None) or ""):
+                    offenders.append(f"{op_id}.{field}")
+        assert offenders == []
+
+    def test_scd2_update_targets_carry_alias(self, wp_benchmark):
+        for op_id in ("merge_scd_type2_basic", "merge_scd_type2_no_change"):
+            operation = wp_benchmark.get_operation(op_id)
+            assert "UPDATE scd2_ops_dim_customer AS tgt" in operation.write_sql
+            assert "tgt.c_custkey" in operation.write_sql
+
+
+class TestSnowflakeMergeAndIndexCoverage:
+    """Snowflake MERGE needs explicit VALUES; secondary indexes are unsupported."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "merge_simple_upsert_small",
+            "merge_overlap_10pct",
+            "merge_overlap_50pct",
+            "merge_overlap_90pct",
+            "merge_no_overlap_all_insert",
+            "merge_conditional_update",
+        ],
+    )
+    def test_merge_ops_use_explicit_values_on_snowflake(self, wp_benchmark, op_id):
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("snowflake")
+        assert override is not None
+        assert "WHEN NOT MATCHED THEN INSERT VALUES (source.o_orderkey" in override
+        assert "WHEN NOT MATCHED THEN INSERT\n" not in override
+
+    def test_cte_merge_inlines_using_on_snowflake(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("merge_with_cte_source")
+        override = operation.platform_overrides.get("snowflake")
+        assert override is not None
+        assert override.startswith("MERGE INTO merge_ops_summary_target")
+        assert "WITH" not in override.split("MERGE")[0]
+        assert "JOIN customer c ON" in override
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "merge_upsert_with_delete",
+            "merge_error_handling",
+            "ddl_create_index_on_existing",
+            "ddl_drop_index",
+        ],
+    )
+    def test_unsupported_ops_skip_snowflake(self, wp_benchmark, op_id):
+        operation = wp_benchmark.get_operation(op_id)
+        assert "snowflake" in operation.platform_overrides
+        assert operation.platform_overrides.get("snowflake") is None
+
+    def test_table_with_index_measures_table_creation_on_snowflake(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("ddl_create_table_with_index")
+        override = operation.platform_overrides.get("snowflake")
+        assert override is not None
+        # OR REPLACE: a failed earlier attempt must not block the next run.
+        assert override.startswith("CREATE OR REPLACE TABLE test_indexed")
+        assert "CREATE INDEX" not in override
+
+
+class TestDatabricksIndexAndBulkCoverage:
+    """Delta Lake has no secondary indexes and needs column mapping for
+    DROP/RENAME COLUMN; file COPY is measured through the loader path."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "ddl_create_index_on_existing",
+            "ddl_drop_index",
+            "ddl_alter_table_drop_column",
+            "ddl_alter_table_rename_column",
+        ],
+    )
+    def test_unsupported_ddl_skips_databricks(self, wp_benchmark, op_id):
+        operation = wp_benchmark.get_operation(op_id)
+        assert "databricks" in operation.platform_overrides
+        assert operation.platform_overrides.get("databricks") is None
+
+    def test_table_with_index_measures_table_creation_on_databricks(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("ddl_create_table_with_index")
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert override.startswith("CREATE OR REPLACE TABLE test_indexed")
+        assert "CREATE INDEX" not in override
+
+    def test_bulk_load_ops_skip_databricks(self, wp_benchmark):
+        operations = wp_benchmark.get_all_operations()
+        skips = [
+            op_id
+            for op_id, op in operations.items()
+            if op_id.startswith("bulk_load_")
+            and "databricks" in op.platform_overrides
+            and op.platform_overrides.get("databricks") is None
+        ]
+        total = sum(1 for op_id in operations if op_id.startswith("bulk_load_"))
+        assert total > 0
+        assert len(skips) == total
+
+    @pytest.mark.parametrize(
+        "op_id,hi",
+        [
+            ("insert_batch_values_100", 99),
+            ("insert_batch_values_1000", 999),
+        ],
+    )
+    def test_batch_ops_use_explode_sequence_on_databricks(self, wp_benchmark, op_id, hi):
+        """Databricks has no generate_series/unnest routines."""
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert f"EXPLODE(SEQUENCE(0, {hi}))" in override
+        assert "generate_series" not in override
+
+    def test_conflict_op_uses_insert_star_merge_on_databricks(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert override.startswith("MERGE INTO insert_ops_orders")
+        assert "WHEN NOT MATCHED THEN INSERT *" in override
+
+    def test_update_join_uses_exists_on_databricks(self, wp_benchmark):
+        """Databricks UPDATE has no FROM clause; the join becomes EXISTS."""
+        operation = wp_benchmark.get_operation("update_with_join")
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert "UPDATE update_ops_orders" in override
+        assert "SET o_comment = 'joined_update'\nFROM" not in override
+        assert "WHERE EXISTS" in override
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "merge_simple_upsert_small",
+            "merge_overlap_10pct",
+            "merge_overlap_50pct",
+            "merge_overlap_90pct",
+            "merge_no_overlap_all_insert",
+            "merge_conditional_update",
+        ],
+    )
+    def test_select_star_merges_use_insert_star_on_databricks(self, wp_benchmark, op_id):
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert "WHEN NOT MATCHED" in override
+        assert "INSERT *" in override
+        assert "INSERT VALUES" not in override
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "merge_conditional_insert",
+            "merge_from_subquery_aggregated",
+            "merge_with_join_condition",
+            "merge_computed_values",
+            "merge_etl_aggregation_pattern",
+            "merge_deduplication_window_function",
+            "merge_with_cte_source",
+        ],
+    )
+    def test_partial_source_merges_list_columns_on_databricks(self, wp_benchmark, op_id):
+        """Bare INSERT VALUES without a column list is a Databricks syntax error."""
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("databricks")
+        assert override is not None
+        assert "INSERT (" in override
+        assert "VALUES" in override
+
+
+class TestBigQueryBatchAndMergeCoverage:
+    """BigQuery needs GENERATE_ARRAY batches and explicit MERGE VALUES."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    @pytest.mark.parametrize(
+        "op_id,base,hi",
+        [
+            ("insert_batch_values_100", "9000100", 99),
+            ("insert_batch_values_1000", "9001000", 999),
+        ],
+    )
+    def test_batch_ops_use_generate_array_on_bigquery(self, wp_benchmark, op_id, base, hi):
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("bigquery")
+        assert override is not None
+        assert f"GENERATE_ARRAY(0, {hi})" in override
+        assert "generate_series" not in override
+        assert base in override
+
+    def test_conflict_op_uses_merge_on_bigquery(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("insert_on_conflict_ignore")
+        override = operation.platform_overrides.get("bigquery")
+        assert override is not None
+        assert override.startswith("MERGE INTO insert_ops_orders")
+        # BigQuery MERGE spells a full source-row insert as INSERT ROW.
+        assert "WHEN NOT MATCHED THEN INSERT ROW" in override
+
+    @pytest.mark.parametrize(
+        "op_id",
+        [
+            "merge_simple_upsert_small",
+            "merge_overlap_10pct",
+            "merge_overlap_50pct",
+            "merge_overlap_90pct",
+            "merge_no_overlap_all_insert",
+            "merge_conditional_update",
+            "merge_with_cte_source",
+        ],
+    )
+    def test_merge_ops_have_bigquery_override(self, wp_benchmark, op_id):
+        operation = wp_benchmark.get_operation(op_id)
+        override = operation.platform_overrides.get("bigquery")
+        assert override is not None
+        assert "INSERT VALUES (source.o_orderkey" in override
+
+    def test_merge_date_arithmetic_uses_date_add_on_bigquery(self, wp_benchmark):
+        operation = wp_benchmark.get_operation("merge_date_arithmetic")
+        override = operation.platform_overrides.get("bigquery")
+        assert override is not None
+        assert "DATE_ADD(o_orderdate, INTERVAL 30 DAY)" in override
+        assert "INTERVAL '30'" not in override
+
+    @pytest.mark.parametrize(
+        "op_id,val_id",
+        [
+            ("merge_scd_type2_basic", "basic_inserts_expected_new_version_count"),
+            ("merge_scd_type2_basic", "basic_closes_expected_changed_count"),
+            ("merge_scd_type2_new_keys_only", "new_keys_only_inserts_expected_count"),
+        ],
+    )
+    def test_scd2_validations_avoid_bare_select_where_on_bigquery(self, wp_benchmark, op_id, val_id):
+        """BigQuery rejects SELECT <expr> WHERE without FROM."""
+        operation = wp_benchmark.get_operation(op_id)
+        val = next(v for v in operation.validation_queries if v.id == val_id)
+        override = val.platform_overrides.get("bigquery")
+        assert override is not None
+        assert "SELECT 1 WHERE" not in override
+        assert "FROM (SELECT 1 AS _one) AS _t WHERE" in override
 
 
 class TestSnowflakeCatalogCoverage:
@@ -603,6 +1060,21 @@ class TestTableExists:
         result = wp_benchmark._table_exists(mock_conn, "orders")
         assert result is False
 
+    def test_table_exists_uses_setup_dialect_quoting(self, wp_benchmark):
+        """Existence probes quote per setup dialect (BigQuery: backtick upper)."""
+        mock_conn = Mock()
+        mock_conn.execute.return_value = None
+
+        wp_benchmark._setup_dialect = "bigquery"
+        assert wp_benchmark._table_exists(mock_conn, "orders") is True
+        sent_sql = mock_conn.execute.call_args[0][0]
+        assert sent_sql == "SELECT 1 FROM `ORDERS` LIMIT 0"
+
+        wp_benchmark._setup_dialect = "snowflake"
+        assert wp_benchmark._table_exists(mock_conn, "orders") is True
+        sent_sql = mock_conn.execute.call_args[0][0]
+        assert sent_sql == 'SELECT 1 FROM "ORDERS" LIMIT 0'
+
 
 class TestOperationManagement:
     """Tests for operation management methods."""
@@ -895,6 +1367,47 @@ class TestExecuteOperation:
         assert result.status == "SUCCESS"
         assert "FROM (SELECT generate_series(0, 99) AS n) t" in sql_calls[0]
         assert "unnest(generate_series" not in sql_calls[0]
+
+    def test_execute_operation_fails_loud_on_failed_platform_write(self, wp_benchmark, monkeypatch):
+        """A FAILED adapter payload must fail the op, never read as executed."""
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Actual statement count 2 did not match"}
+
+        mock_conn = Mock()
+        mock_conn.execute.return_value = FailedCursor()
+        mock_conn.rollback = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_select_simple", mock_conn)
+
+        assert result.status == "FAILED"
+        assert result.success is False
+        assert "Actual statement count 2" in (result.error or "")
+
+    def test_execute_operation_fails_validation_on_failed_platform_select(self, wp_benchmark, monkeypatch):
+        """A FAILED validation SELECT must fail validation, not pass vacuously."""
+
+        class OkCursor:
+            rowcount = 1
+
+            def fetchall(self):
+                return [(1,)]
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Object does not exist"}
+
+            def fetchall(self):
+                return []
+
+        mock_conn = Mock()
+        mock_conn.execute.side_effect = [OkCursor(), FailedCursor(), OkCursor()]
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_single_row", mock_conn)
+
+        assert result.status == "VALIDATION_FAILED"
+        assert result.validation_passed is False
 
 
 class TestRunBenchmark:

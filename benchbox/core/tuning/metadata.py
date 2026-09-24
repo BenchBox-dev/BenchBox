@@ -1100,6 +1100,14 @@ class TuningMetadataManager:
         if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
             return list(connection.execute(sql))
 
+        # Job-style clients such as BigQuery expose neither cursor() nor
+        # execute(): statements run as jobs via query(). Consume the job
+        # result the same way so tuning metadata reads work there too.
+        if not hasattr(connection, "cursor"):
+            query_fn = getattr(connection, "query", None)
+            if callable(query_fn):
+                return list(query_fn(sql).result())
+
         cursor = connection.cursor()
         cursor.execute(sql)
         return cursor.fetchall()
@@ -1117,6 +1125,14 @@ class TuningMetadataManager:
         if not hasattr(connection, "cursor") and hasattr(connection, "execute"):
             rows = list(connection.execute(sql))
             return rows[0] if rows else None
+
+        # Job-style clients such as BigQuery expose neither cursor() nor
+        # execute(): statements run as jobs via query() (see _fetch_all).
+        if not hasattr(connection, "cursor"):
+            query_fn = getattr(connection, "query", None)
+            if callable(query_fn):
+                rows = list(query_fn(sql).result())
+                return rows[0] if rows else None
 
         cursor = connection.cursor()
         cursor.execute(sql)

@@ -1345,6 +1345,14 @@ class TestConvertToDeltaTable:
         result = adapter._convert_to_delta_table(sql)
         assert result == sql
 
+    def test_comment_prefixed_create_still_converted(self):
+        """Schema chunks with "--" headers must still get OR REPLACE + USING DELTA."""
+        adapter = _make_adapter()
+        sql = "-- Generated staging load tables\nCREATE TABLE orders (id INT)"
+        result = adapter._convert_to_delta_table(sql)
+        assert result.startswith("-- Generated staging load tables\n")
+        assert "CREATE OR REPLACE TABLE orders (id INT) USING DELTA" in result
+
     def test_pre_pass_applies_to_every_statement(self):
         """Pre-pass list comprehension transforms each statement independently."""
         adapter = _make_adapter()
@@ -2467,6 +2475,28 @@ class TestCreateConnection:
         executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
         assert any("USE SCHEMA" in s and "bench_tpch" in s for s in executed)
 
+    def test_sets_schema_on_new_database(self):
+        """Fresh databases also get schema context: pooled connections never
+        reach create_schema(), so deferring USE SCHEMA there strands them on
+        the default schema."""
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench_tpch"
+
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
+            with patch.object(adapter, "handle_existing_database"):
+                with patch.object(adapter, "database_was_reused", False, create=True):
+                    adapter.create_connection()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert any("CREATE SCHEMA IF NOT EXISTS" in s and "bench_tpch" in s for s in executed)
+        assert any("USE SCHEMA" in s and "bench_tpch" in s for s in executed)
+
     def test_raises_on_connection_failure(self):
         adapter = _make_adapter()
 
@@ -3582,3 +3612,47 @@ class TestGetPlatformMetadataCurrentVersion:
         assert metadata["platform_version"] == "4.2.0"
         assert metadata["engine_version_source"] == "sql_query"
         assert metadata["spark_version"] == "4.2.0"
+
+
+# ---------------------------------------------------------------------------
+# preprocess_operation_sql
+# ---------------------------------------------------------------------------
+
+
+def _make_operation(write_sql: str, overrides: dict | None = None):
+    from benchbox.core.write_primitives.catalog import WriteOperation
+
+    return WriteOperation(
+        id="test_op",
+        category="test",
+        description="test operation",
+        write_sql=write_sql,
+        platform_overrides=overrides or {},
+    )
+
+
+class TestPreprocessOperationSql:
+    """Databricks VARCHAR requires a length; rewrite to STRING."""
+
+    def test_cast_varchar_rewritten(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("SELECT CAST(n AS VARCHAR)"))
+
+        assert result == "SELECT CAST(n AS STRING)"
+
+    def test_skip_override_returns_none(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql("op", _make_operation("SELECT 1", {"databricks": None}))
+
+        assert result is None
+
+    def test_other_platform_override_ignored(self):
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("SELECT CAST(n AS VARCHAR)", {"bigquery": "SELECT 1"})
+        )
+
+        assert result == "SELECT CAST(n AS STRING)"

@@ -19,7 +19,7 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.primitives_benchmark_utils import quote_identifier
+from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect, table_exists
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
 
 ResultT = TypeVar("ResultT")
@@ -61,6 +61,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     operations_manager: OperationsRegistryBase[Any]
     data_generator: Any
     tables: dict[str, Path]
+    _setup_dialect: str = "standard"
 
     # ------------------------------------------------------------------
     # Abstract hooks implemented spec-locally
@@ -371,7 +372,31 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
-        return quote_identifier(identifier)
+        return quote_identifier_for_dialect(identifier, getattr(self, "_setup_dialect", "standard"))
+
+    def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
+        """Check if a table exists in the database.
+
+        Uses a platform-agnostic approach that attempts to query the table
+        with LIMIT 0, which should work across most SQL databases without
+        requiring INFORMATION_SCHEMA access.
+
+        Args:
+            connection: Database connection
+            table_name: Name of table to check (will be quoted for safety)
+
+        Returns:
+            True if table exists, False otherwise
+
+        Note:
+            This method catches exceptions to distinguish between:
+            - Table doesn't exist (expected, returns False)
+            - Other errors (logged, returns False for safety)
+
+        Security:
+            Table name is quoted using _quote_identifier() to prevent SQL injection.
+        """
+        return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
     def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
         """Remove superseded manifest generations during a rebuild.

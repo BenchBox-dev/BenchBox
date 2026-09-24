@@ -499,3 +499,40 @@ class TestPlatformFallbackKey:
         bench.execute_operation("op1", conn, platform_key="ducklake")
 
         conn.execute.assert_called_once_with("generic SQL")
+
+
+class TestFailedPlatformPayload:
+    """A FAILED adapter payload must fail the op, never read as executed."""
+
+    def test_failed_write_reports_failed(self, tmp_path: Path):
+        from types import SimpleNamespace
+
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation()
+        conn = _make_connection()
+        conn.execute.return_value = SimpleNamespace(
+            rowcount=0,
+            platform_result={"status": "FAILED", "error": "Actual statement count 2 did not match"},
+        )
+
+        result = bench.execute_operation("op1", conn)
+
+        assert result.success is False
+        assert "Actual statement count 2" in (result.error or "")
+
+    def test_failed_validation_select_fails_validation(self, tmp_path: Path):
+        from types import SimpleNamespace
+
+        validation_query = SimpleNamespace(id="cnt", sql="SELECT COUNT(*) FROM t", expected_rows=1)
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(validation_queries=[validation_query])
+        conn = _make_connection()
+        failed = SimpleNamespace(
+            rowcount=0,
+            platform_result={"status": "FAILED", "error": "Object does not exist"},
+        )
+        conn.execute.side_effect = [_make_connection().execute.return_value, failed]
+
+        result = bench.execute_operation("op1", conn)
+
+        assert result.validation_passed is False
