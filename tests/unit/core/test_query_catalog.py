@@ -72,8 +72,8 @@ class TestGetSqlRender:
         assert render.dialect == "default"
 
     def test_benchmark_without_translation_is_labelled_default(self):
-        # datavault.get_queries() rejects a dialect kwarg and get_query absorbs
-        # it into **kwargs without translating -- the label must not claim it.
+        # datavault translates only to DuckDB and the cloud dialects; the
+        # reference dialect is not among them, so the label must not claim it.
         render = get_sql_render("datavault", "1")
         assert render is not None
         assert render.dialect == "default"
@@ -212,8 +212,13 @@ class TestSupportsDialectTranslation:
     def test_translating_and_non_translating_benchmarks(self):
         assert supports_dialect_translation("tpch") is True
         assert supports_dialect_translation("clickbench") is True
-        assert supports_dialect_translation("datavault") is False
-        assert supports_dialect_translation("tsbs_devops") is False
+        assert supports_dialect_translation("flightdata") is False
+
+    def test_duckdb_source_benchmarks_advertise_cloud_dialects(self):
+        for benchmark_id in ("datavault", "tsbs_devops"):
+            for dialect in ("duckdb", "snowflake", "bigquery", "databricks"):
+                assert supports_dialect_translation(benchmark_id, dialect) is True
+            assert supports_dialect_translation(benchmark_id, "datafusion") is False
 
     def test_dialect_specific_support(self):
         assert supports_dialect_translation("vector_search", "postgresql") is True
