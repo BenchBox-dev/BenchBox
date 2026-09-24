@@ -13008,9 +13008,9 @@
     },
     "release-cut-origin-head-linked-worktree": {
       "claim": {
-        "expires_at": "2026-09-25T00:06:20Z",
-        "generation": "f1f22bfcaadb4ba28b366cd1f95cf3a8",
-        "renewals": 0,
+        "expires_at": "2026-09-25T01:44:36Z",
+        "generation": "f578fcbff72748599ac92c7baef87df7",
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa"
       },
       "needs": [],
