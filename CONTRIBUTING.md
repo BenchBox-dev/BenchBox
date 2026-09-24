@@ -264,13 +264,16 @@ External contributions land via PR against `develop` (squash-merge). Releases
 are cut by maintainers via the version-branch flow documented in
 [`docs/operations/release-guide.md`](docs/operations/release-guide.md):
 
-1. `make release-cut VERSION=X.Y.Z` on an up-to-date `develop`. It cuts `vX.Y.Z`
-   with a release-curated tree and opens a PR against `release`.
+1. `make release-cut VERSION=X.Y.Z` from a clean linked worktree whose HEAD is
+   the freshly fetched `origin/develop` commit. It cuts `vX.Y.Z` with a
+   release-curated tree and opens a PR against `release`. The target refuses
+   the primary clone and any checkout that is dirty, ahead, or behind.
 2. Review the PR and wait for `validate-base` and `release-required-result`.
 3. `make release-finalize VERSION=X.Y.Z` merges and tags the release; `release.yml`
    publishes to PyPI.
 
-Use `make release-cut-abort VERSION=X.Y.Z` to back out an in-flight cut.
+Use `make release-cut-abort VERSION=X.Y.Z` to back out an uncommitted cut from
+the worktree that created it.
 
 We follow semantic versioning.
 

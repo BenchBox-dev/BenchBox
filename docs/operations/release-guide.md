@@ -85,6 +85,13 @@ must use `RULESET_DRIFT_TOKEN`, a repository secret with enough ruleset
 visibility to expose bypass actors; the default `GITHUB_TOKEN` is insufficient
 for that part of the contract.
 
+`validate-base` checks out the release PR's base commit and runs
+`scripts/release_readiness_check.py` from that trusted tree, so the readiness
+gate that evaluates a release is the copy already on `release`, not the copy on
+the release head. A change to the readiness gate therefore first takes effect
+on the release *after* the one that ships it. Plan gate hardening accordingly:
+it does not protect its own release.
+
 Stress tests, live cloud integrations, and long-running UAT remain advisory
 until their credential, cost, and flake policies are stable enough to make them
 release-blocking.
