@@ -29,6 +29,14 @@
       "op": "update",
       "op_id": "5dcfaa0d59164ef3bdb2a700dd276563",
       "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829",
+      "at": "2026-09-24T14:13:51Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "aebec1e5904e49cb8f1087b0266808b2",
+      "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
     }
   ]
 }
