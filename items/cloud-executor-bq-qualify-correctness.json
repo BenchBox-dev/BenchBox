@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Table-name collection and qualification run per statement, not once for the whole batch; multi-statement test with a later-statement-only source table passes",
+    "Synthesized AS aliases emitted only at grammar-permitted positions; INSERT/CREATE/DROP/ALTER targets with same-named references covered by tests",
+    "preprocess_operation_sql docstring rewrite count corrected as a drive-by",
+    "Touched BigQuery adapter suites green; make pr-preflight passes"
+  ],
+  "context": "Adversarial findings Required-2/3 + nit (accepted): _extract_unqualified_tables parses one statement while _qualify_table_names rewrites the whole batch (cited bigquery.py ~2104-2121 vs ~2142-2199; re-verify after rebase), so later-statement tables go unqualified; the alias synthesis loop (~2174-2193) can emit AS alias on INSERT targets, which BigQuery INSERT grammar forbids. Fix both in benchbox/platforms/bigquery.py. Staging worktree: wt-cloud-executor-loader.",
+  "description": "Fix BigQuery table qualification: parse and qualify each statement separately, and restrict synthesized AS aliases to positions whose grammar permits them. Add a multi-statement catalog-batch test and INSERT/CREATE/DROP/ALTER target tests with same-named column references elsewhere in the query.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:38:46Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "eb97afe60c6642efa966b4cc0b84671e",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}
