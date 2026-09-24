@@ -354,9 +354,10 @@ override.
 - Lock path defaults to `~/.benchbox/test.lock`; `BENCHBOX_TEST_LOCK_DIR`
   changes only the directory, not the filename.
 - Uses `fcntl.flock(LOCK_EX | LOCK_NB)` on POSIX, `msvcrt.locking` on Windows.
-- On contention, the second run **fails fast** with a message identifying the
-  holder (pid, start time, command) and three recovery options. See
-  `tests/conftest.py:138-159`.
+- On contention, the second local run waits up to 3600 seconds with holder
+  information and periodic progress messages. Set
+  `BENCHBOX_TEST_LOCK_WAIT_SECONDS=0` to fail immediately; CI does this.
+  Ctrl-C cancels the wait without disturbing the holder.
 - The fd is held open for the whole session and released in `pytest_unconfigure`.
 
 **When to bypass**: only for intentional concurrent debug runs. Set

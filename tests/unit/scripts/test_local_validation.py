@@ -1123,3 +1123,52 @@ def test_wait_on_fd_windows_uses_msvcrt(tmp_path: Path, monkeypatch: pytest.Monk
     finally:
         os.close(fd)
     assert calls == [(1, 1)]
+
+
+def test_read_holder_replaces_invalid_utf8(tmp_path: Path) -> None:
+    lock = tmp_path / "invalid.lock"
+    lock.write_bytes(b"pid:\xff\n")
+    assert lv.read_holder(lock) == "pid:\ufffd"
+
+
+def test_wait_on_fd_posix_propagates_non_contention_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import fcntl
+
+    lock = tmp_path / "posix.lock"
+    fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
+
+    def denied(_fd: int, _flags: int) -> None:
+        raise PermissionError("lock denied")
+
+    monkeypatch.setattr(fcntl, "flock", denied)
+    try:
+        with pytest.raises(PermissionError, match="lock denied"):
+            lv.wait_on_fd(fd, lock, 5.0)
+    finally:
+        os.close(fd)
+
+
+def test_wait_on_fd_windows_retries_contention(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import types
+
+    lock = tmp_path / "win-contended.lock"
+    fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
+    fake = types.ModuleType("msvcrt")
+    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
+    calls = 0
+
+    def locking(_fd: int, _mode: int, _nbytes: int) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("lock held")
+
+    fake.locking = locking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setattr(lv.sys, "platform", "win32")
+    monkeypatch.setattr(lv.time, "sleep", lambda _seconds: None)
+    try:
+        lv.wait_on_fd(fd, lock, 5.0)
+    finally:
+        os.close(fd)
+    assert calls == 2

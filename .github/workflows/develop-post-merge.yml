@@ -1,5 +1,8 @@
 name: Develop post-merge
 
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
 # Safety net for strict-checks-off and stale-PR flows alike: once a PR lands,
 # run the same lightweight local gates against the actual develop tip. This is
 # intentionally narrower than test.yml's full PR matrix so it does not turn

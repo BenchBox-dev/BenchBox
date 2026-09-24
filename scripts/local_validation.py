@@ -123,7 +123,7 @@ class IdentityUnknown(Exception):
 def read_holder(lock_path: Path) -> str:
     """Best-effort holder description for wait/timeout messages."""
     try:
-        return lock_path.read_text(encoding="utf-8").strip() or "(empty lock file)"
+        return lock_path.read_text(encoding="utf-8", errors="replace").strip() or "(empty lock file)"
     except OSError:
         return "(could not read lock file)"
 
@@ -224,7 +224,7 @@ def wait_on_fd(fd: int, lock_path: Path, timeout_seconds: float) -> None:
                 elapsed = time.monotonic() - wait_started
                 print(f"[local-validation] acquired lock after waiting {elapsed:.1f}s: {lock_path}", file=sys.stderr)
             return
-        except (BlockingIOError, OSError):
+        except BlockingIOError:
             holder = read_holder(lock_path)
             now = time.monotonic()
             if not reported_wait or now - last_report >= WAIT_PROGRESS_SECONDS:

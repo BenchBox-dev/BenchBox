@@ -1,5 +1,8 @@
 name: Nightly Validation
 
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
 on:
   workflow_dispatch:
   schedule:

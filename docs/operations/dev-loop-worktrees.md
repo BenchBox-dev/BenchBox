@@ -178,10 +178,10 @@ preserving dirty, locked, divergent, or ambiguous worktrees.
 ## Local validation singleflight
 
 Parallel pytest runs serialize on the shared flock in `tests/conftest.py`.
-The default is immediate fail-fast with holder info; set
-`BENCHBOX_TEST_LOCK_WAIT_SECONDS` to a positive bound to wait with
-owner/progress visibility instead (Ctrl-C cancels; the wait never steals,
-deletes, or bypasses — a held flock always means a live holder).
+The default local wait is 3600 seconds with holder and progress information;
+set `BENCHBOX_TEST_LOCK_WAIT_SECONDS=0` to fail immediately. CI sets it to 0.
+Ctrl-C cancels the wait; it never steals, deletes, or bypasses a lock. A held
+flock always means a live holder.
 `make test-unlock` clears only inactive diagnostic text and refuses an active
 kernel lock; it never removes the lock pathname.
 

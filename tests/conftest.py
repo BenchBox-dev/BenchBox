@@ -102,9 +102,9 @@ def _load_lock_waiter() -> Any:
 
 def _lock_wait_seconds() -> float:
     try:
-        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "0") or 0))
+        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "3600") or "3600"))
     except ValueError:
-        return 0.0
+        return 3600.0
 
 
 def _get_test_lock_path() -> Path:
@@ -183,14 +183,13 @@ def pytest_configure(config) -> None:
 
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
-    # BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 (default) keeps the historical
-    # immediate fail-fast; a positive value waits that long with owner
-    # visibility before failing the same way. Ctrl-C cancels the wait.
+    # Local parallel runs wait up to an hour with owner visibility.
+    # CI sets BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 to fail immediately.
     if _should_acquire_test_lock(config):
         test_lock_path = _get_test_lock_path()
         test_lock_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
-        waiter = None if sys.platform == "win32" else _load_lock_waiter()
+        waiter = _load_lock_waiter()
         wait_seconds = 0.0 if waiter is None else _lock_wait_seconds()
         lock_error: Exception | None = None
         if waiter is not None and wait_seconds > 0:
@@ -214,11 +213,8 @@ def pytest_configure(config) -> None:
             except (BlockingIOError, OSError) as exc:
                 lock_error = exc
         if lock_error is not None:
-            # Another parallel run holds the lock - fail fast with a clear message.
-            try:
-                holder_info = test_lock_path.read_text(encoding="utf-8").strip()
-            except OSError:
-                holder_info = "(could not read lock file)"
+            # Another parallel run holds the lock - report the holder and timeout.
+            holder_info = waiter.read_holder(test_lock_path) if waiter is not None else "(could not read lock file)"
             os.close(fd)
             # Use os._exit() rather than sys.exit(): pytest_configure is called
             # before the session loop so SystemExit bubbles up as INTERNALERROR.
@@ -227,7 +223,7 @@ def pytest_configure(config) -> None:
                 f"  Waited    : {wait_seconds:g}s (BENCHBOX_TEST_LOCK_WAIT_SECONDS)\n" if wait_seconds > 0 else ""
             )
             sys.stderr.write(
-                f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
+                f"\n\033[91m[benchbox] BLOCKED: A parallel test run is still active.\033[0m\n"
                 f"  Lock file : {test_lock_path}\n"
                 f"  Holder    : {holder_info}\n"
                 f"{waited_note}\n"
