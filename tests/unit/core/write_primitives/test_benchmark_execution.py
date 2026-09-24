@@ -471,12 +471,21 @@ class TestBigQueryBatchAndMergeCoverage:
         assert override is not None
         assert "INSERT VALUES (source.o_orderkey" in override
 
-    def test_merge_date_arithmetic_uses_date_add_on_bigquery(self, wp_benchmark):
-        operation = wp_benchmark.get_operation("merge_date_arithmetic")
-        override = operation.platform_overrides.get("bigquery")
-        assert override is not None
-        assert "DATE_ADD(o_orderdate, INTERVAL 30 DAY)" in override
-        assert "INTERVAL '30'" not in override
+    @pytest.mark.parametrize("op_id", ["update_date_arithmetic", "merge_date_arithmetic"])
+    def test_date_arithmetic_ops_are_skipped_on_bigquery(self, wp_benchmark, op_id):
+        """Cleanup SQL cannot be adapted per platform, so date arithmetic stays off BigQuery.
+
+        The base cleanup uses a quoted interval literal (`INTERVAL '7' DAY`), which
+        BigQuery rejects because a single-part interval literal requires an INT64
+        expression. Cleanup SQL has no platform-override resolution, so a BigQuery
+        write override would succeed while cleanup silently fails, leaving rows
+        date-shifted and marked for later operations to measure. Skipping keeps the
+        write and cleanup halves consistent.
+        """
+        operation = wp_benchmark.get_operation(op_id)
+        assert "bigquery" in operation.platform_overrides
+        assert operation.platform_overrides["bigquery"] is None
+        assert "INTERVAL '" in (operation.cleanup_sql or "")
 
     @pytest.mark.parametrize(
         "op_id,val_id",

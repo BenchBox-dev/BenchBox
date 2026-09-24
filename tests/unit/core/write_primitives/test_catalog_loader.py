@@ -149,6 +149,38 @@ def test_datafusion_batch_values_overrides_use_unique_projection_names() -> None
             assert " AS " in item.upper()
 
 
+def test_batch_values_casts_use_explicit_decimal_scale() -> None:
+    """Fractional batch values must carry an explicit scale.
+
+    An unparameterized `CAST(x AS NUMERIC)` resolves to scale 0 on Snowflake
+    (`NUMBER`) and Databricks (`DECIMAL` -> `DECIMAL(10,0)`), silently truncating
+    the `0.05` discount and `0.02` tax constants to zero before they reach the
+    `DECIMAL(15,2)` target columns. Count-only validation still passes, so the
+    operation would report success on semantically wrong rows. BigQuery keeps the
+    bare form: its `NUMERIC` already has scale 9 and it rejects parameterized
+    types in `CAST` (they are only valid for columns and script variables).
+    """
+    catalog = load_write_primitives_catalog()
+
+    for operation_id in ("insert_batch_values_100", "insert_batch_values_1000"):
+        operation = catalog.operations[operation_id]
+        for source_name, sql in (
+            ("base", operation.write_sql),
+            ("snowflake", operation.platform_overrides["snowflake"]),
+            ("databricks", operation.platform_overrides["databricks"]),
+        ):
+            assert sql is not None
+            for literal in ("0.05", "0.02"):
+                assert f"CAST({literal} AS DECIMAL(15,2))" in sql, (operation_id, source_name)
+            assert "AS NUMERIC)" not in sql, (operation_id, source_name)
+
+        # BigQuery NUMERIC is scale 9 and cannot take a parameterized CAST.
+        bigquery_sql = operation.platform_overrides["bigquery"]
+        assert bigquery_sql is not None
+        assert "DECIMAL(15,2)" not in bigquery_sql
+        assert "CAST(0.05 AS NUMERIC)" in bigquery_sql
+
+
 def test_datafusion_skips_slash_date_format_bulk_load() -> None:
     """DataFusion cannot cast slash-formatted dates, so the custom-date bulk load stays skipped."""
     catalog = load_write_primitives_catalog()
