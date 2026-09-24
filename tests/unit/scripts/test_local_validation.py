@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import importlib.util
 import json
@@ -1162,7 +1163,7 @@ def test_wait_on_fd_windows_retries_contention(tmp_path: Path, monkeypatch: pyte
         nonlocal calls
         calls += 1
         if calls == 1:
-            raise OSError("lock held")
+            raise OSError(errno.EACCES, "lock held")
 
     fake.locking = locking  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
@@ -1173,3 +1174,32 @@ def test_wait_on_fd_windows_retries_contention(tmp_path: Path, monkeypatch: pyte
     finally:
         os.close(fd)
     assert calls == 2
+
+
+@pytest.mark.parametrize("failure_errno", [errno.EBADF, errno.EINVAL])
+def test_wait_on_fd_windows_propagates_non_contention_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure_errno: int
+) -> None:
+    import types
+
+    lock = tmp_path / "win-invalid.lock"
+    fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
+    fake = types.ModuleType("msvcrt")
+    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
+    calls = 0
+
+    def locking(_fd: int, _mode: int, _nbytes: int) -> None:
+        nonlocal calls
+        calls += 1
+        raise OSError(failure_errno, "lock failed")
+
+    fake.locking = locking  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "msvcrt", fake)
+    monkeypatch.setattr(lv.sys, "platform", "win32")
+    try:
+        with pytest.raises(OSError) as error:
+            lv.wait_on_fd(fd, lock, 5.0)
+    finally:
+        os.close(fd)
+    assert error.value.errno == failure_errno
+    assert calls == 1
