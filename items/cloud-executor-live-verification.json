@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Targeted live runs on BigQuery, Databricks, and Snowflake covering: staging reuse, SCD2 close-then-insert, multi-statement operations, Databricks VARCHAR/connection-context paths",
+    "Live result evidence (run IDs or bundles) recorded in the item context per platform",
+    "The narrower Databricks no-ANSI-mode comment claim confirmed live or softened",
+    "make pr-preflight passes on the final tree"
+  ],
+  "context": "Adversarial review (codex gpt-6-sol) refuted unit-tests-plus-PR as sufficient: cloud behavior, atomicity, and the Databricks ANSI-mode comment claim need warehouse evidence. APPROVAL GATE: live cloud tests require explicit user approval per repository policy; do not run them until the user approves in the implementing session, stating command, maximum runtime, log path, and stop condition. UAT/stress output goes to BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs, never committed. Needs the five fix items first so live runs test the final code.",
+  "description": "Verify the landed cloud-executor fixes against live BigQuery, Databricks, and Snowflake warehouses after user approval, and record per-platform evidence. Covers staging reuse without data loss, SCD2 atomicity, multi-statement qualification, and the Databricks dialect paths.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:39:39Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "6520ef27f5eb4cb498757fba4f53f669",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}

@@ -2550,6 +2550,19 @@
       "status": "open",
       "title": "Apply FAILED-payload checks at all primitives execution boundaries"
     },
+    "cloud-executor-live-verification": {
+      "claim": null,
+      "needs": [
+        "cloud-executor-bq-create-semantics",
+        "cloud-executor-failed-payload-coverage",
+        "cloud-executor-bq-qualify-correctness",
+        "cloud-executor-snowflake-atomicity",
+        "cloud-executor-catalog-versioning"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Live-warehouse verification of cloud-executor fixes"
+    },
     "cloud-executor-rebase-reverify": {
       "claim": null,
       "needs": [],
