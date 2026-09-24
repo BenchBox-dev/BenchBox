@@ -2604,17 +2604,12 @@
       "title": "Rebase cloud-executor work onto current develop and re-verify baseline"
     },
     "cloud-executor-snowflake-atomicity": {
-      "claim": {
-        "expires_at": "2026-09-25T19:09:47Z",
-        "generation": "4c6b4e69cd1d42a79510f5406d3304df",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:1b61f46fc27c4f9766e3b059"
-      },
+      "claim": null,
       "needs": [
         "cloud-executor-rebase-reverify"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Restore atomicity for multi-statement Snowflake operations"
     },
     "cloud-integration-test-gaps": {
