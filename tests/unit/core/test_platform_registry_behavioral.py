@@ -649,8 +649,9 @@ raise SystemExit('optional SDKs loaded: ' + ', '.join(loaded) if loaded else 0)
 
     @requires_dev_manifest_generator
     def test_dataframe_availability_typo_is_detected_and_restoration_passes(self, monkeypatch):
-        import benchbox.platforms as platform_package
         from _project.scripts.platform_manifest import validate_platform_surfaces
+
+        import benchbox.platforms as platform_package
 
         adapter_name, availability_name, guidance = platform_package._DATAFRAME_PLATFORM_INFO["polars-df"]
         assert availability_name == "POLARS_AVAILABLE"
