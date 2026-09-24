@@ -13,11 +13,12 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG_REV = "c8473708b5c7809700e8449ecde0dabcdc8e9892"
-SOURCE_REV = "74631c83f74b7f184abbd49001f032943b720774"
+CATALOG_REV = "67ab679ded13f2ab47151a3bd7d1e41855357202"
+SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
+TODO_DB_VERSION = "0.8.0"
 SCRIPTS_PROJECT = ROOT / "_project/scripts"
-WHEEL = SCRIPTS_PROJECT / "vendor/todo_db-0.7.3-py3-none-any.whl"
-WHEEL_SHA256 = "d5d411703d571559df60b88445da194c59423c6d6d91f12f2d3177e41ab05ce4"
+WHEEL = SCRIPTS_PROJECT / f"vendor/todo_db-{TODO_DB_VERSION}-py3-none-any.whl"
+WHEEL_SHA256 = "dbff075e1f48614b2409adda116b96de9a0dec06bf0496a8d272c1db3e2563da"
 REQUIRED_BATCH_TOOLS = {"register_batch", "prepare", "bind_batch_pr", "abort_batch"}
 
 
@@ -91,10 +92,10 @@ def test_project_local_wheel_and_lock_are_exact_and_sibling_free() -> None:
     assert _sha256(WHEEL) == WHEEL_SHA256
     pyproject = (SCRIPTS_PROJECT / "pyproject.toml").read_text(encoding="utf-8")
     lock = (SCRIPTS_PROJECT / "uv.lock").read_text(encoding="utf-8")
-    expected_path = "vendor/todo_db-0.7.3-py3-none-any.whl"
+    expected_path = f"vendor/todo_db-{TODO_DB_VERSION}-py3-none-any.whl"
     assert f'path = "{expected_path}"' in pyproject
     assert f'path = "{expected_path}"' in lock
-    assert 'name = "todo-db"\nversion = "0.7.3"' in lock
+    assert f'name = "todo-db"\nversion = "{TODO_DB_VERSION}"' in lock
     assert "/Users/joe/Developer/todo-db" not in pyproject
     assert "/Users/joe/Developer/todo-db" not in lock
     with zipfile.ZipFile(WHEEL) as archive:
@@ -102,7 +103,7 @@ def test_project_local_wheel_and_lock_are_exact_and_sibling_free() -> None:
         metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
         metadata = archive.read(metadata_name).decode("utf-8")
     assert "Name: todo-db\n" in metadata
-    assert "Version: 0.7.3\n" in metadata
+    assert f"Version: {TODO_DB_VERSION}\n" in metadata
     assert "todo_db/mcp/server.py" in names
     assert "todo_db/mcp/tools.py" in names
     assert "todo_db/database.py" not in names
@@ -147,7 +148,7 @@ def test_installed_runtime_handshake_exposes_registered_batch_tools(tmp_path: Pa
                 "clientInfo": {"name": "batch-runtime-test", "version": "1"},
             },
         )
-        assert initialized["result"]["serverInfo"] == {"name": "todo-db", "version": "0.7.3"}
+        assert initialized["result"]["serverInfo"] == {"name": "todo-db", "version": TODO_DB_VERSION}
         assert proc.stdin is not None
         proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
         proc.stdin.flush()
@@ -164,7 +165,7 @@ def test_installed_runtime_handshake_exposes_registered_batch_tools(tmp_path: Pa
 def test_rollout_evidence_records_active_runtime_capability() -> None:
     evidence = _evidence()
     runtime = evidence["runtime"]
-    assert runtime["dependency_metadata_version"] == "0.7.3"
+    assert runtime["dependency_metadata_version"] == TODO_DB_VERSION
     assert runtime["schema_version"] == 3
     assert runtime["tool_count"] == 14
     assert set(runtime["registered_batch_tools"]) == REQUIRED_BATCH_TOOLS

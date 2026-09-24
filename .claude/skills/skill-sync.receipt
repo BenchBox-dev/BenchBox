@@ -8,7 +8,7 @@ dir = skills
 skill = benchbox
 
 source = https://github.com/joeharris76/skill-sync-skills.git
-rev = c8473708b5c7809700e8449ecde0dabcdc8e9892
+rev = 67ab679ded13f2ab47151a3bd7d1e41855357202
 dir = skills
 skill = blog
 skill = bossmode

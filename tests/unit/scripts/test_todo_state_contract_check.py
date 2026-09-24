@@ -30,7 +30,10 @@ def test_contract_rejects_database_runtime(tmp_path: Path) -> None:
         archive.writestr("todo_db/cli.py", "")
         archive.writestr("todo_db/mcp/server.py", "")
         archive.writestr("todo_db/mcp/tools.py", "")
-        archive.writestr("todo_db-0.7.3.dist-info/METADATA", "Name: todo-db\nVersion: 0.7.3\n")
+        archive.writestr(
+            f"todo_db-{check.EXPECTED_VERSION}.dist-info/METADATA",
+            f"Name: todo-db\nVersion: {check.EXPECTED_VERSION}\n",
+        )
     scripts = tmp_path / "_project/scripts"
     scripts.mkdir(parents=True, exist_ok=True)
     (scripts / "pyproject.toml").write_text(
