@@ -565,6 +565,8 @@ class TestTPCDIPhase3PerformanceIntegration:
             "Country",
             "Phone1",
             "Email1",
+            "EffectiveDate",
+            "EndDate",
         ]
         source_files = {"csv": []}
         for index in range(3):
@@ -572,7 +574,9 @@ class TestTPCDIPhase3PerformanceIntegration:
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(",".join(customer_columns) + "\n")
                 for row in range(5):
-                    handle.write(",".join([f"{col}_{index}_{row}" for col in customer_columns]) + "\n")
+                    values = [f"{column}_{index}_{row}" for column in customer_columns]
+                    values[-2:] = ["1999-01-01", "9999-12-31"]
+                    handle.write(",".join(values) + "\n")
             source_files["csv"].append(str(path))
 
         sequential = performance_benchmark._transform_source_data(dict(source_files), "historical")
@@ -585,6 +589,8 @@ class TestTPCDIPhase3PerformanceIntegration:
         sequential_rows = sequential["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
         parallel_rows = parallel["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
         assert parallel_rows.equals(sequential_rows)
+        assert set(parallel_rows["EffectiveDate"]) == {"1999-01-01"}
+        assert set(parallel_rows["EndDate"]) == {"9999-12-31"}
 
     def test_incremental_loading_performance(self, performance_benchmark):
         """Test incremental loading performance characteristics."""
