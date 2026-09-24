@@ -77,7 +77,7 @@ class TestGetQueryStatisticsRetry:
         assert result["retrieval_attempts"] == 2  # max_retries+1
 
     def test_returns_statistics_error_when_execute_raises(self):
-        """When cursor.execute raises on every attempt, return statistics_error dict."""
+        """A lookup error returns immediately, even when retries were requested."""
         adapter = _make_adapter()
         mock_conn = Mock()
         mock_cursor = Mock()
@@ -89,7 +89,46 @@ class TestGetQueryStatisticsRetry:
 
         assert "statistics_error" in result
         assert "history table unavailable" in result["statistics_error"]
-        assert result["retrieval_attempts"] == 2
+        assert result["retrieval_attempts"] == 1
+        assert mock_cursor.execute.call_count == 1
+
+    def test_default_lookup_makes_one_attempt_without_backoff(self):
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_cursor = mock_conn.cursor.return_value
+        mock_cursor.fetchone.return_value = None
+
+        with patch("time.sleep") as sleep:
+            result = adapter._get_query_statistics(mock_conn, "q-miss")
+
+        assert result["retrieval_attempts"] == 1
+        assert mock_cursor.execute.call_count == 1
+        sleep.assert_not_called()
+
+    def test_query_history_projection_uses_table_function_columns(self):
+        """Pin the projection to the documented Information Schema table function."""
+        import re
+
+        adapter = _make_adapter()
+        mock_conn = Mock()
+        mock_conn.cursor.return_value.fetchone.return_value = None
+        adapter._get_query_statistics(mock_conn, "q1")
+        sql = mock_conn.cursor.return_value.execute.call_args.args[0]
+        projection = re.search(r"SELECT\s+(.*?)\s+FROM TABLE", sql, re.IGNORECASE | re.DOTALL)
+        assert projection is not None
+        columns = {part.strip().upper() for part in projection.group(1).split(",")}
+        # https://docs.snowflake.com/en/sql-reference/functions/query_history#output
+        assert columns == {
+            "QUERY_ID",
+            "TOTAL_ELAPSED_TIME",
+            "EXECUTION_TIME",
+            "COMPILATION_TIME",
+            "BYTES_SCANNED",
+            "ROWS_PRODUCED",
+            "CREDITS_USED_CLOUD_SERVICES",
+            "WAREHOUSE_SIZE",
+            "CLUSTER_NUMBER",
+        }
 
     def test_query_history_sql_contains_query_id(self):
         """The SQL executed must query INFORMATION_SCHEMA.QUERY_HISTORY and filter by query_id."""
@@ -105,6 +144,7 @@ class TestGetQueryStatisticsRetry:
         executed_sqls = [c.args[0] for c in mock_cursor.execute.call_args_list]
         assert any("QUERY_HISTORY" in s for s in executed_sqls), f"No QUERY_HISTORY in: {executed_sqls}"
         assert any("BENCHQ17" in s for s in executed_sqls), f"query_id not in SQL: {executed_sqls}"
+        assert "QUERY_TAG = 'BenchBox_BENCHQ17'" in executed_sqls[0]
 
 
 # ---------------------------------------------------------------------------
