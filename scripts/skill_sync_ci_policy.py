@@ -44,12 +44,13 @@ APPROVED_SOURCE_URLS = frozenset(
     }
 )
 
-# Every skill the config may select, grouped by owning source in config
+# Every skill the config may select, grouped by exact source pin in config
 # order. There is no dependency resolver: shared prerequisites are listed
 # explicitly, and selecting anything else (a new catalog skill, a forked
 # project skill) is a structural change that forces full CI.
 EXPECTED_TARGETS = [".claude/skills", ".agents/skills"]
 EXPECTED_GROUPS = [
+    {"skills": ["benchbox"]},
     {
         "skills": [
             "bossmode",
@@ -57,7 +58,6 @@ EXPECTED_GROUPS = [
             "code",
             "test",
             "docs",
-            "benchbox",
             "tidy-perms",
             "todo",
             "shared-agent-execution",

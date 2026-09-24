@@ -6,6 +6,10 @@ source = https://github.com/joeharris76/skill-sync-skills.git
 rev = ac07efb9ae7affc0a6740cf7c7cf1be1e572e0ac
 dir = skills
 skill = benchbox
+
+source = https://github.com/joeharris76/skill-sync-skills.git
+rev = c8473708b5c7809700e8449ecde0dabcdc8e9892
+dir = skills
 skill = blog
 skill = bossmode
 skill = code
