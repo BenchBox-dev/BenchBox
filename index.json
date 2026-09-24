@@ -2552,17 +2552,12 @@
       "title": "Preserve IF NOT EXISTS semantics in BigQuery DDL conversion"
     },
     "cloud-executor-bq-qualify-correctness": {
-      "claim": {
-        "expires_at": "2026-09-25T18:56:18Z",
-        "generation": "44a28fe8997e430cb28e082dd68c78f5",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:1b61f46fc27c4f9766e3b059"
-      },
+      "claim": null,
       "needs": [
         "cloud-executor-rebase-reverify"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Fix BigQuery per-statement qualification and alias positions"
     },
     "cloud-executor-catalog-versioning": {
