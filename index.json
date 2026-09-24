@@ -12980,9 +12980,9 @@
     },
     "release-canary-incident-alert": {
       "claim": {
-        "expires_at": "2026-09-24T22:45:08Z",
+        "expires_at": "2026-09-25T00:30:31Z",
         "generation": "508096319b204d7e8c12ee5bf31a00aa",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:aed9b6f728777e9a1155090f"
       },
       "needs": [],
