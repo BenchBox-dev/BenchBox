@@ -131,7 +131,26 @@ CANT_AFFECT_CANARY = frozenset(
 # Local medium preflight receives the complete PR path list. Keep product
 # roots and shared test configuration; other paths do not drive medium tests.
 # Shared configuration forces a full run because it can change collection.
-MEDIUM_PRODUCT_ROOTS = ("benchbox/", "scripts/", "_project/scripts/", "tools/", "results-explorer/")
+MEDIUM_PRODUCT_ROOTS = (
+    "benchbox/",
+    "scripts/",
+    "_project/scripts/",
+    "_project/config/",
+    "_project/compat/",
+    "_project/evals/agent-instructions/",
+    "tools/",
+    "results-explorer/",
+    "results-data/",
+    "examples/",
+    "landing/",
+    "docker/",
+    "_binaries/",
+    "_sources/",
+    "publication/",
+    "quality/",
+)
+MEDIUM_DOC_CODE_SUFFIXES = (".py", ".js", ".css", ".html", ".jinja", ".j2")
+MEDIUM_DOC_CODE_ROOTS = ("docs/_extensions/", "docs/_static/", "docs/_templates/")
 MEDIUM_WHOLE_SUITE_PATHS = frozenset(
     {"pyproject.toml", "uv.lock", "pytest.ini", "pytest-ci.ini", "tox.ini", CONFTEST_REPO_PATH, SELECTOR_REPO_PATH}
 )
@@ -139,7 +158,16 @@ MEDIUM_WHOLE_SUITE_PATHS = frozenset(
 
 def medium_relevant_paths(changed_paths: list[str]) -> list[str]:
     """Keep product changes and shared test configuration for local medium tests."""
-    return [path for path in changed_paths if path.startswith(MEDIUM_PRODUCT_ROOTS) or path in MEDIUM_WHOLE_SUITE_PATHS]
+    return [
+        path
+        for path in changed_paths
+        if path.startswith(MEDIUM_PRODUCT_ROOTS)
+        or path in MEDIUM_WHOLE_SUITE_PATHS
+        or (
+            path.startswith("docs/")
+            and (path.startswith(MEDIUM_DOC_CODE_ROOTS) or path.endswith(MEDIUM_DOC_CODE_SUFFIXES))
+        )
+    ]
 
 
 def _is_cant_affect(path: str, cant_affect: frozenset[str] = CANT_AFFECT_CANARY) -> bool:

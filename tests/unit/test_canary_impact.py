@@ -568,6 +568,11 @@ def test_medium_preflight_ignores_non_product_paths() -> None:
     ]
     assert medium_relevant_paths(changed) == ["benchbox/monitoring/performance.py"]
     assert medium_relevant_paths(["tests/conftest.py", "uv.lock"]) == ["tests/conftest.py", "uv.lock"]
+    assert medium_relevant_paths(["examples/demo.py", "docker/compose.yml", "docs/conf.py", "docs/notes.md"]) == [
+        "examples/demo.py",
+        "docker/compose.yml",
+        "docs/conf.py",
+    ]
 
 
 def test_medium_preflight_skips_collection_and_mapping_without_product_paths(tmp_path: Path) -> None:
