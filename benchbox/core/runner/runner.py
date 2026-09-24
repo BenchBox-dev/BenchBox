@@ -412,7 +412,7 @@ def _attach_datagen_version(
         if not _manifest_matches_result(manifest, result, benchmark):
             return result
         result.data_generation_version = manifest.get("data_generation_version")
-        result.data_generation_hash = manifest.get("base_constants_hash")
+        result.data_generation_hash = manifest.get("data_generation_identity_hash", manifest.get("base_constants_hash"))
     except Exception as exc:
         logger.debug("leaving data-generation provenance unset: %s", exc)
     return result
@@ -2024,6 +2024,13 @@ def _validate_manifest_if_present(
             logger.warning("Datagen manifest is stale (%s); regenerating benchmark data", reason)
             if not quiet:
                 emit(f"\u26a0\ufe0f Cached data is stale ({reason}); regenerating (as if --force datagen)")
+            return False, None, True
+
+        identity_matches = getattr(benchmark, "manifest_matches_datagen_identity", None)
+        if callable(identity_matches) and not identity_matches(manifest):
+            logger.warning("Datagen manifest does not match the benchmark's effective configuration; regenerating")
+            if not quiet:
+                emit("Cached data configuration differs from this benchmark; regenerating (as if --force datagen)")
             return False, None, True
 
         from benchbox.utils.datagen_manifest import get_table_files

@@ -24,6 +24,7 @@ compared.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -76,6 +77,22 @@ def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]:
         "data_generation_version": DATA_GENERATION_VERSION,
         "base_constants_hash": compute_base_constants_hash(benchmark),
     }
+
+
+def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[str, Any] | None = None) -> str:
+    """Fingerprint generation constants and an optional effective configuration.
+
+    The existing base-constants hash remains part of this value, allowing a
+    benchmark to add runtime generation inputs without weakening YAML-spec
+    invalidation.
+    """
+    payload = {
+        "base_constants_hash": compute_base_constants_hash(benchmark),
+        "configuration": dict(configuration) if configuration is not None else None,
+        "data_generation_version": DATA_GENERATION_VERSION,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> bool:

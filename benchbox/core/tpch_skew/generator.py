@@ -214,7 +214,21 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         except (OSError, ValueError) as exc:
             logging.getLogger(__name__).debug("ignoring unreadable skew manifest: %s", exc)
             return False
-        return bool(manifest_datagen_is_current(manifest, benchmark="tpch_skew"))
+        return bool(
+            manifest_datagen_is_current(manifest, benchmark="tpch_skew")
+            and self.manifest_matches_datagen_identity(manifest)
+        )
+
+    def manifest_matches_datagen_identity(self, manifest: dict[str, Any]) -> bool:
+        """Return whether a manifest was generated with this effective skew config."""
+        from benchbox.utils.datagen_version import compute_datagen_identity_hash
+
+        identity = self.skew_config.datagen_identity()
+        return (
+            manifest.get("skew_configuration") == identity
+            and manifest.get("skew_configuration_hash") == self.skew_config.datagen_identity_hash()
+            and manifest.get("data_generation_identity_hash") == compute_datagen_identity_hash("tpch_skew", identity)
+        )
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Stamp the skewed output with the current ``tpch_skew`` generation.
@@ -224,10 +238,19 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         """
         from benchbox.utils.datagen_manifest import DataGenerationManifest
 
+        identity = self.skew_config.datagen_identity()
+        from benchbox.utils.datagen_version import compute_datagen_identity_hash
+
         manifest = DataGenerationManifest(
             output_dir=self.output_dir,
             benchmark="tpch_skew",
             scale_factor=self.scale_factor,
+            seed=self.skew_config.seed,
+            extra_metadata={
+                "skew_configuration": identity,
+                "skew_configuration_hash": self.skew_config.datagen_identity_hash(),
+                "data_generation_identity_hash": compute_datagen_identity_hash("tpch_skew", identity),
+            },
         )
         for table_name, file_path in table_paths.items():
             base_rows = _TPCH_BASE_ROW_COUNTS.get(table_name, 0)

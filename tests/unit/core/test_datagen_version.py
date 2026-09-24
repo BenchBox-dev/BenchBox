@@ -10,6 +10,7 @@ import pytest
 from benchbox.utils.datagen_version import (
     DATA_GENERATION_VERSION,
     compute_base_constants_hash,
+    compute_datagen_identity_hash,
     current_datagen_stamp,
     describe_datagen_staleness,
     manifest_datagen_is_current,
@@ -271,6 +272,59 @@ def test_skew_fingerprint_covers_both_specs() -> None:
         )
         is True
     )
+
+
+def test_skew_configuration_changes_data_generation_comparison_identity() -> None:
+    """Result comparison must reject distinct effective skew configurations."""
+    from benchbox.core.results.exporter import ResultExporter
+    from benchbox.core.tpch_skew.skew_config import AttributeSkewConfig, SkewConfiguration
+
+    original = SkewConfiguration(seed=7, attribute_skew=AttributeSkewConfig(part_brand_skew=0.5))
+    changed = SkewConfiguration(seed=7, attribute_skew=AttributeSkewConfig(part_brand_skew=0.9))
+    original_hash = compute_datagen_identity_hash("tpch_skew", original.datagen_identity())
+    changed_hash = compute_datagen_identity_hash("tpch_skew", changed.datagen_identity())
+    assert original_hash != changed_hash
+
+    def _result(identity_hash: str) -> dict:
+        return {
+            "benchmark": {
+                "data_generation_version": DATA_GENERATION_VERSION,
+                "data_generation_hash": identity_hash,
+            }
+        }
+
+    comparison = ResultExporter._check_generation_compatibility(_result(original_hash), _result(changed_hash))
+    assert comparison["status"] == "incompatible"
+    assert comparison["compatible"] is False
+
+
+def test_skew_manifest_identity_reaches_result_provenance(tmp_path: Path) -> None:
+    """Runner provenance uses the skew manifest's composite generation identity."""
+    from benchbox.core.results.loader import reconstruct_benchmark_results
+    from benchbox.core.results.schema import build_result_payload
+    from benchbox.core.runner.runner import _attach_datagen_version
+    from benchbox.core.tpch_skew.generator import TPCHSkewDataGenerator
+    from benchbox.core.tpch_skew.skew_config import AttributeSkewConfig, SkewConfiguration
+    from tests.fixtures.result_dict_fixtures import make_benchmark_results
+
+    config = SkewConfiguration(seed=7, attribute_skew=AttributeSkewConfig(part_brand_skew=0.9))
+    generator = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=config)
+    table_path = tmp_path / "customer.tbl"
+    table_path.write_text("1|x|\n", encoding="utf-8")
+    generator._write_manifest({"customer": table_path})
+    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
+
+    class _Benchmark:
+        output_dir = tmp_path
+
+    result = _attach_datagen_version(
+        make_benchmark_results(benchmark_name="TPC-H Skew", scale_factor=0.01),
+        _Benchmark(),
+    )
+    assert result.data_generation_hash == manifest["data_generation_identity_hash"]
+    payload = build_result_payload(result)
+    assert payload["benchmark"]["data_generation_hash"] == manifest["data_generation_identity_hash"]
+    assert reconstruct_benchmark_results(payload).data_generation_hash == manifest["data_generation_identity_hash"]
 
 
 def test_adapter_reused_database_flag() -> None:

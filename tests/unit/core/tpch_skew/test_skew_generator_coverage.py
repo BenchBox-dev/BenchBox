@@ -113,6 +113,35 @@ def test_written_manifest_carries_current_skew_stamp(tmp_path: Path):
     manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text(encoding="utf-8"))
     assert manifest["benchmark"] == "tpch_skew"
     assert manifest_datagen_is_current(manifest, benchmark="tpch_skew") is True
+    assert manifest["skew_configuration"] == gen.skew_config.datagen_identity()
+    assert manifest["skew_configuration_hash"] == gen.skew_config.datagen_identity_hash()
+    assert manifest["data_generation_identity_hash"]
+
+
+def test_changed_skew_configuration_rejects_manifest_reuse(tmp_path: Path):
+    """The generator and core runner reject a cache after a skew input changes."""
+    from benchbox.core.runner.runner import _validate_manifest_if_present
+
+    tables = ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"]
+    original = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=_make_config())
+    for name in tables:
+        (tmp_path / f"{name}.tbl").write_text("1|x|\n", encoding="utf-8")
+    original._write_manifest({name: tmp_path / f"{name}.tbl" for name in tables})
+    assert original._check_existing_data() is True
+
+    changed_config = _make_config()
+    changed_config.attribute_skew.part_brand_skew = 0.9
+    changed = TPCHSkewDataGenerator(scale_factor=0.01, output_dir=tmp_path, skew_config=changed_config)
+    assert changed._check_existing_data() is False
+
+    valid, manifest, found = _validate_manifest_if_present(
+        changed,
+        SimpleNamespace(name="tpch_skew", scale_factor=0.01),
+        quiet=True,
+    )
+    assert found is True
+    assert valid is False
+    assert manifest is None
 
 
 def test_read_and_write_tbl_file_roundtrip(tmp_path: Path):
