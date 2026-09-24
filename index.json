@@ -2016,12 +2016,17 @@
       "title": "Decision gate: choose the public-site visual comparison lane policy"
     },
     "ci-dedupe-11-required-public-site-visual-check": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T18:06:48Z",
+        "generation": "c2ffa0fe0fad472eb39cc574969f70c4",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ecc7115a6c4982502bfd2e92"
+      },
       "needs": [
         "ci-dedupe-10-docs-visual-lane-decision"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Require public-site visual acceptance before merging into develop"
     },
     "ci-failure-baseline-dev-loop-metrics": {
