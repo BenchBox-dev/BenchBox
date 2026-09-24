@@ -118,6 +118,13 @@ CANT_AFFECT_CANARY = frozenset(
         # Decision and audit reports: read only by fast unit tests, never by
         # canary tests, and outside the docs build source tree.
         "_project/audits/",
+        # Fast-lane timing policy and its ceiling log: consumed by the
+        # timing-policy gate and lane checks, never imported or read by a
+        # canary test (the four policy-reading tests are medium-tier but
+        # outside the canary set, verified 2026-09-24). A ceiling bump
+        # riding along with a fix must not force the whole suite.
+        "_project/config/fast_test_lane_policy.json",
+        "_project/config/fast_lane_ceiling_log.md",
     }
 )
 
@@ -1549,10 +1556,9 @@ def compute_selection(  # noqa: C901
                 whole_suite = f"whole_suite_path:{path}"
                 trigger_paths.append(path)
     unmapped: list[str] = []
+    ignored: list[str] = []
     if whole_suite is None:
         for path in changed:
-            if _is_cant_affect(path):
-                continue
             if any(_change_covers(path, dep) for deps in dep_map.values() for dep in deps.deps):
                 continue
             if any(path == test_file or path.startswith(test_file + "/") for test_file in dep_map):
@@ -1560,6 +1566,13 @@ def compute_selection(  # noqa: C901
             # The same-directory rule handles non-Python benchbox files
             # without a direct edge; they are mapped, not unmapped.
             if any(_same_directory_non_python(path, deps.deps) for deps in dep_map.values()):
+                continue
+            # Edges win over the safe list: a reviewed safe path that a
+            # test actually references still selects that test. The safe
+            # list only suppresses the whole-suite fallback for paths
+            # nothing references.
+            if _is_cant_affect(path):
+                ignored.append(path)
                 continue
             unmapped.append(path)
         if unmapped:
@@ -1573,7 +1586,7 @@ def compute_selection(  # noqa: C901
                 {"changed_path": "", "edge": "whole_suite"}
             ]
     elif changed:
-        effective = [path for path in changed if not _is_cant_affect(path)]
+        effective = [path for path in changed if path not in ignored]
         for test_file, file_deps in dep_map.items():
             nodes = file_nodes.get(test_file, [])
             if not nodes:

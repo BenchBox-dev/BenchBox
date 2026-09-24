@@ -451,6 +451,23 @@ class TestFailSafeRules:
         assert selection["whole_suite"] is False
         assert selection["selected"] == []
 
+    def test_safe_listed_path_with_edge_still_selects(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                "CHANGELOG.md": "notable change\n",
+                "tests/test_x.py": (
+                    "from pathlib import Path\n"
+                    "CHANGELOG = Path(__file__).resolve().parents[1] / 'CHANGELOG.md'\n"
+                    "def test_a():\n"
+                    "    assert CHANGELOG.is_file()\n"
+                ),
+            },
+        )
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["CHANGELOG.md"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
+
     def test_json_contract_shape(self, tmp_path: Path) -> None:
         root = _fixture_root(
             tmp_path,
