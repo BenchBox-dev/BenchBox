@@ -14,6 +14,7 @@ Architecture Decision Records
 - [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md)
 - [ADR: `clickhouse-server` Containerization and Linux SF1 Certification](adr-clickhouse-server-containerization.md)
 - [ADR: Corpus Public-Mirror Validation-Status Admission Policy](adr-corpus-validation-admission-policy.md)
+- [ADR: Require complete TPC-Havoc variants for public submissions](adr-tpchavoc-submission-variant-coverage.md)
 - [ADR: Client-to-Platform Locality Disclosure and Statement Overhead Probe](adr-client-link-locality-disclosure.md)
 - [ADR: Scan billing units — decimal terabytes for Athena/Synapse, tebibytes for BigQuery](adr-billing-unit-tb-tib-contract.md)
 - [ADR: Concurrency Utility APIs — Remove the Quarantined Executors](adr-concurrency-public-api-reconciliation.md)

@@ -199,6 +199,119 @@ CANONICAL_LOGICAL_QUERY_IDS: dict[str, frozenset[str]] = {
     "clickbench": _CLICKBENCH_CANONICAL_IDS,
 }
 
+# Keep this stdlib-only snapshot in sync with the TPC-Havoc variant registry and
+# execution-filter skip dictionaries. The public results mirror does not ship
+# those modules; the unit contract test checks both copies on the source branch.
+TPCHAVOC_CANONICAL_VARIANTS = frozenset(f"{query}_v{variant}" for query in range(1, 23) for variant in range(1, 11))
+TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
+    "datafusion": frozenset(
+        [
+            "12_v1",
+            "14_v2",
+            "14_v8",
+            "16_v10",
+            "16_v7",
+            "17_v10",
+            "17_v7",
+            "1_v7",
+            "4_v10",
+            "4_v7",
+            "6_v2",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "lakesail": frozenset(
+        [
+            "10_v1",
+            "11_v4",
+            "11_v9",
+            "12_v1",
+            "14_v2",
+            "14_v8",
+            "16_v1",
+            "16_v10",
+            "16_v7",
+            "17_v10",
+            "17_v2",
+            "17_v4",
+            "17_v7",
+            "1_v7",
+            "1_v8",
+            "2_v5",
+            "2_v7",
+            "3_v1",
+            "4_v10",
+            "4_v7",
+            "5_v4",
+            "6_v2",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "clickhouse": frozenset(
+        [
+            "10_v1",
+            "11_v4",
+            "12_v7",
+            "13_v8",
+            "14_v8",
+            "16_v1",
+            "16_v4",
+            "17_v10",
+            "17_v7",
+            "1_v10",
+            "1_v6",
+            "1_v7",
+            "3_v1",
+            "3_v10",
+            "3_v9",
+            "4_v10",
+            "4_v7",
+            "5_v1",
+            "5_v10",
+            "5_v4",
+            "7_v1",
+            "8_v1",
+            "9_v1",
+        ]
+    ),
+    "postgres": frozenset(
+        [
+            "10_v7",
+            "10_v9",
+            "11_v7",
+            "11_v9",
+            "13_v9",
+            "17_v2",
+            "17_v4",
+            "1_v7",
+            "2_v5",
+            "3_v7",
+            "4_v7",
+            "5_v7",
+            "5_v9",
+            "7_v7",
+            "7_v9",
+            "9_v7",
+            "9_v9",
+        ]
+    ),
+}
+
+
+def _tpchavoc_documented_skips(platform_name: Any) -> frozenset[str]:
+    if not isinstance(platform_name, str):
+        return frozenset()
+    platform = re.sub(r"[^a-z0-9]+", "-", platform_name.lower()).strip("-")
+    if platform in {"clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
+        return TPCHAVOC_DOCUMENTED_SKIPS["clickhouse"]
+    if platform in {"pg-duckdb", "pg-mooncake", "timescaledb"}:
+        return TPCHAVOC_DOCUMENTED_SKIPS["postgres"]
+    return TPCHAVOC_DOCUMENTED_SKIPS.get(platform, frozenset())
+
 
 def _normalize_coverage_query_id(raw_id: Any) -> str | None:
     """Normalize a bundle query ID for coverage membership, or None.
@@ -1242,6 +1355,26 @@ def _validate_query_coverage(
             observed.discard(base_id)
             if {f"{base_id}a", f"{base_id}b"} <= observed:
                 observed.add(base_id)
+    variant_hint = ""
+    if normalized_id == "tpchavoc":
+        platform = data.get("platform")
+        platform_name = platform.get("name") if isinstance(platform, dict) else None
+        documented_skips = _tpchavoc_documented_skips(platform_name)
+        successful = {
+            _normalize_coverage_query_id(q.get("id"))
+            for q in queries
+            if isinstance(q, dict)
+            and isinstance(q.get("status"), str)
+            and q["status"].upper() in {"SUCCESS", "PASS"}
+            and str(q.get("run_type") or "measurement").strip().lower() == "measurement"
+        }
+        missing_variants = TPCHAVOC_CANONICAL_VARIANTS - documented_skips - successful
+        observed = canonical - {variant.split("_v")[0] for variant in missing_variants}
+        if missing_variants:
+            shown = ", ".join(sorted(missing_variants, key=lambda v: tuple(map(int, v.split("_v"))))[:12])
+            if len(missing_variants) > 12:
+                shown += f", … (+{len(missing_variants) - 12} more)"
+            variant_hint = f" (missing successful or documented-skip variants: {shown})"
     missing = sorted(
         canonical - observed,
         key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
@@ -1254,7 +1387,7 @@ def _validate_query_coverage(
         hint = f" ({uncounted} queries carry a non-string or blank id)" if uncounted else ""
         vr.error(
             f"benchmark {bm_id!r} covers {covered} of {len(canonical)} canonical queries{hint} "
-            f"(missing: {shown}); partial runs remain local artifacts "
+            f"(missing: {shown}){variant_hint}; partial runs remain local artifacts "
             "unless validated through the trusted mirror path"
         )
 
