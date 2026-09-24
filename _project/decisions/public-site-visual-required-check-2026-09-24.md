@@ -18,8 +18,12 @@ The [documentation failure triage](../analysis/docs-failure-triage-2026-09-17.md
 classified 119 visual job failures among 164 failed Documentation runs from
 2026-08-23 through 2026-09-16. About 100 were real differences on pages the
 PR changed; sampled PRs merged without a recorded approval. The subsequent
-2026-09-17 through 2026-09-24 measurement recorded in the tracker found 21
-visual failures among 23 failed documentation PR runs. The link repair reduced
+2026-09-17 through 2026-09-24 window found 21 visual failures among 23 failed
+documentation PR runs. That follow-up count is pinned, with its collection
+method and per-job rows, in the checked-in
+[census for that window](../analysis/docs-failure-visual-census-2026-09-24.md);
+it is measured as of this decision's commit, and two later failures on the
+v0.4.1 develop sync postdate it. The link repair reduced
 linkcheck failures to two, leaving visual comparison as the dominant cause.
 
 ## Alternatives considered
@@ -27,8 +31,12 @@ linkcheck failures to two, leaving visual comparison as the dominant cause.
 Filtering the visual job to site-rendered paths would still run it for the
 page-changing PRs that caused most of the failures. It would also accept the
 risk of missing a rendered-site input omitted from the path list. Keeping the
-current advisory policy accepts roughly 70 red runs per 25 days with no
-required response. A required check makes the observed differences actionable.
+current advisory policy accepts the failure rate measured in
+[that census](../analysis/docs-failure-visual-census-2026-09-24.md): 21 visual
+failures in the 7.69 days from 2026-09-17 to this decision, which scales to
+about 68 red runs per 25 days, against 119 in the prior 25-day window. Either
+rate leaves no required response. A required check makes the observed
+differences actionable.
 
 The cost is longer or blocked merges for intentional page changes until a
 maintainer reviews diagnostics and approves the exact head. Baseline producer
@@ -58,6 +66,19 @@ an aggregate visual context must report on every PR and merge group, and fail
 closed when comparison is applicable but did not run or could not establish its
 exact baseline. Preserve all current visual inputs; any future exclusion must
 name the rendered-site input it removes and the resulting coverage loss.
+
+Approval must stay bound to the exact tree under review, so a queued merge
+group cannot inherit a PR approval: the group runs a synthetic tree that GitHub
+reports as `merge_group.head_sha`, not the PR head. The implementation
+therefore needs a second, separate approval slot keyed to that synthetic SHA,
+paired with its own nonempty review note, and the PR approval values must not
+satisfy it. The maintainer inspects that group's own diagnostics artifact
+before approving, and both group values are cleared after the reviewed run so
+only one reviewed tree occupies each repository-wide slot. Naming those values
+and the rerun steps in
+[browser testing](../../docs/development/results-explorer-browser-testing.md)
+is part of this implementation, since that document currently describes only
+the PR-head approval path.
 
 The no-baseline-bound-to-base-SHA failures are a distinct baseline-supply
 problem within that implementation, not a reason to loosen comparison. The
