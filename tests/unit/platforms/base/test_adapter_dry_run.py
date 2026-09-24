@@ -5,7 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -142,3 +142,15 @@ class TestAdapterDryRunFlag:
         adapter.disable_dry_run()
         assert adapter.dry_run is True
         assert adapter.is_dry_run is True
+
+    def test_disable_dry_run_resets_connection_default_job_config(self):
+        adapter = self._make_adapter(dry_run=False)
+        adapter.enable_dry_run()
+
+        mock_conn = Mock()
+        mock_conn._default_job_config = Mock()
+        mock_conn._default_job_config.dry_run = True
+
+        adapter.disable_dry_run(mock_conn)
+        assert adapter.dry_run is False
+        assert mock_conn._default_job_config.dry_run is False

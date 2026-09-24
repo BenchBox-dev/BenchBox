@@ -697,6 +697,27 @@ class TestBigQueryAdapter:
         assert mock_client._default_job_config.use_legacy_sql is False
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_dry_run_disable_resets_cached_connection_job_config(self, mock_bigquery, dependencies_available):
+        """Test that disabling dry-run mode clears cached dry_run flag on configured connection."""
+        mock_client = Mock()
+        mock_job_config = Mock()
+        mock_job_config.dry_run = False
+        mock_bigquery.QueryJobConfig.return_value = mock_job_config
+        mock_bigquery.Client.return_value = mock_client
+
+        adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
+
+        # Enable dry run, then configure connection
+        adapter.enable_dry_run()
+        adapter.configure_for_benchmark(mock_client, "olap")
+        assert mock_job_config.dry_run is True
+
+        # Disable dry run without passing connection explicitly - tracked connection should be updated
+        adapter.disable_dry_run()
+        assert adapter.dry_run is False
+        assert mock_job_config.dry_run is False
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_success(self, mock_bigquery, dependencies_available):
         """Test successful query execution."""
         mock_client = Mock()

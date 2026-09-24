@@ -1533,19 +1533,31 @@ class TestDriversMixin:
     # Dry-run and SQL capture helpers (extracted w9)
     # -------------------------------------------------------------------------
 
-    def enable_dry_run(self) -> None:
+    def enable_dry_run(self, connection: Any = None) -> None:
         """Enable dry-run mode for SQL capture without execution."""
         self.dry_run = True
         self.dry_run_mode = True
         self.captured_sql = []
         self.query_counter = 0
+        if connection is not None and hasattr(connection, "_default_job_config"):
+            default_config = connection._default_job_config
+            if hasattr(default_config, "dry_run"):
+                default_config.dry_run = True
         self.logger.info("Dry-run mode enabled - SQL will be captured instead of executed")
 
-    def disable_dry_run(self) -> None:
+    def disable_dry_run(self, connection: Any = None) -> None:
         """Disable dry-run mode and return to normal execution."""
         self.dry_run = bool(getattr(self, "_initial_dry_run", False))
         self.dry_run_mode = False
+        self._reset_cached_dry_run_state(connection)
         self.logger.info("Dry-run mode disabled - returning to normal execution")
+
+    def _reset_cached_dry_run_state(self, connection: Any = None) -> None:
+        """Reset or invalidate platform-specific configuration cached on connection objects."""
+        if connection is not None and hasattr(connection, "_default_job_config"):
+            default_config = connection._default_job_config
+            if hasattr(default_config, "dry_run"):
+                default_config.dry_run = bool(getattr(self, "dry_run", False))
 
     def capture_sql(self, sql: str, operation_type: str = "query", table_name: str | None = None) -> None:
         """Capture SQL statement for dry-run mode.

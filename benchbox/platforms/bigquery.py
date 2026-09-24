@@ -1635,7 +1635,34 @@ class BigQueryAdapter(PlatformAdapter):
             job_config.flatten_results = False  # Keep nested/repeated fields
 
         # Store job config for use in execute_query
+        job_config.dry_run = self.dry_run
         connection._default_job_config = job_config
+        self._track_configured_connection(connection)
+
+    def _track_configured_connection(self, connection: Any) -> None:
+        """Track connection object for lifecycle updates (e.g. dry-run resets)."""
+        if not hasattr(self, "_configured_connections"):
+            import weakref
+
+            self._configured_connections = weakref.WeakSet()
+        try:
+            self._configured_connections.add(connection)
+        except TypeError:
+            pass
+
+    def _reset_cached_dry_run_state(self, connection: Any = None) -> None:
+        """Reset cached BigQuery QueryJobConfig dry_run state to match adapter."""
+        target_connections = set()
+        if connection is not None:
+            target_connections.add(connection)
+        if hasattr(self, "_configured_connections"):
+            for conn in list(self._configured_connections):
+                target_connections.add(conn)
+
+        for conn in target_connections:
+            default_config = getattr(conn, "_default_job_config", None)
+            if default_config is not None and hasattr(default_config, "dry_run"):
+                default_config.dry_run = bool(getattr(self, "dry_run", False))
 
     def execute_query(
         self,
@@ -1686,6 +1713,8 @@ class BigQueryAdapter(PlatformAdapter):
 
             # Use default job config if available
             job_config = getattr(connection, "_default_job_config", bigquery.QueryJobConfig())
+            if hasattr(job_config, "dry_run") and job_config.dry_run != self.dry_run:
+                job_config.dry_run = self.dry_run
 
             # Execute the query
             query_job = connection.query(translated_query, job_config=job_config)

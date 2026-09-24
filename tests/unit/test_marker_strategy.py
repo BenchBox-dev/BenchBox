@@ -288,29 +288,27 @@ def _selects(expression: str, markers: set[str]) -> bool:
     return bool(eval(expression, {"__builtins__": {}}, _MarkerNamespace.fromkeys(markers, True)))  # noqa: S307
 
 
-def _explicitly_invoked_test_paths() -> set[str]:
-    """Test paths named directly in a workflow's pytest invocation.
+def _run_blocks(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "run" and isinstance(child, str):
+                yield child
+            else:
+                yield from _run_blocks(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _run_blocks(child)
 
-    The escape hatch for a module no tree-wide lane selects is a dedicated step
+
+def _explicitly_invoked_test_paths() -> set[str]:
+    """Integration tests may also be run directly by an explicit pytest command
     that names the file (see pr.yml's promoted-reproducer steps). Those count as
     covered, so scan for them rather than reporting a false positive.
     """
     paths: set[str] = set()
-
-    def run_blocks(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key == "run" and isinstance(child, str):
-                    yield child
-                else:
-                    yield from run_blocks(child)
-        elif isinstance(value, list):
-            for child in value:
-                yield from run_blocks(child)
-
     for workflow in sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml")):
         document = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
-        for command in run_blocks(document):
+        for command in _run_blocks(document):
             try:
                 tokens = shlex.split(command, comments=True, posix=True)
             except ValueError:
@@ -322,6 +320,30 @@ def _explicitly_invoked_test_paths() -> set[str]:
                     if _WORKFLOW_TEST_PATH_RE.fullmatch(path):
                         paths.add(path)
     return paths
+
+
+def _workflow_marker_expressions(workflow_filenames: tuple[str, ...] | None = None) -> set[str]:
+    """Extract all marker expressions passed via `-m <expression>` to pytest in workflow files."""
+    expressions: set[str] = set()
+    workflow_files = (
+        [(_REPO_ROOT / ".github" / "workflows" / fn) for fn in workflow_filenames]
+        if workflow_filenames
+        else sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+    )
+    for workflow in workflow_files:
+        if not workflow.is_file():
+            continue
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
+        for command in _run_blocks(document):
+            try:
+                tokens = shlex.split(command, comments=True, posix=True)
+            except ValueError:
+                tokens = []
+            for i, token in enumerate(tokens):
+                if token == "-m" and i + 1 < len(tokens):
+                    if any("pytest" in t for t in tokens[:i]):
+                        expressions.add(tokens[i + 1])
+    return expressions
 
 
 def test_every_integration_module_is_selected_by_at_least_one_lane():
@@ -367,6 +389,30 @@ def test_every_integration_module_is_selected_by_at_least_one_lane():
     )
 
 
+def test_declared_automated_workflow_lanes_occur_in_workflows():
+    """Verify that every lane in _SCHEDULED_OR_RELEASE_WIDE_LANES occurs in an active workflow.
+
+    Guards against drift where a scheduled or release lane is deleted or modified in CI workflows,
+    leaving _SCHEDULED_OR_RELEASE_WIDE_LANES falsely reporting dead modules as automated.
+    """
+    workflow_expressions = _workflow_marker_expressions()
+    for lane in _SCHEDULED_OR_RELEASE_WIDE_LANES:
+        assert lane in workflow_expressions, (
+            f"Declared automated lane '{lane}' does not occur in any .github/workflows/*.yml file."
+        )
+
+
+def test_declared_pr_workflow_lanes_occur_in_pr_workflows():
+    """Verify that automated PR wide lanes occur in pr.yml or test.yml."""
+    pr_expressions = _workflow_marker_expressions(("pr.yml", "test.yml"))
+    for lane in (
+        "fast and not (slow or stress or resource_heavy or live_integration)",
+        "platform_smoke or (integration and fast)",
+        "integration and not (slow or stress or resource_heavy or live_integration)",
+    ):
+        assert lane in pr_expressions, f"Declared PR wide lane '{lane}' does not occur in pr.yml or test.yml."
+
+
 def test_report_workflow_wide_lane_coverage_gaps():
     """Verify that every test module is covered by automated workflow lanes.
 
@@ -378,6 +424,12 @@ def test_report_workflow_wide_lane_coverage_gaps():
     - Also verifies that modules deferred from PR routine lanes are covered by scheduled
       nightly observation or release validation workflows.
     """
+    workflow_expressions = _workflow_marker_expressions()
+    for lane in _SCHEDULED_OR_RELEASE_WIDE_LANES:
+        assert lane in workflow_expressions, (
+            f"Declared automated lane '{lane}' does not occur in any .github/workflows/*.yml file."
+        )
+
     explicit_paths = _explicitly_invoked_test_paths()
     uncovered_automated: list[str] = []
     deferred_to_scheduled_or_release: list[str] = []
