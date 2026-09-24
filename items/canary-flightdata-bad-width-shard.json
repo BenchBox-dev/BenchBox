@@ -5,7 +5,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2322 at b40ec340bbd505123f3d4609e2fcd4f0445097d7. Existing manifest-free cache regeneration was intentional; the bad-width test had no manifest and never exercised reuse. The regression now creates a valid manifested cache, corrupts a shard, constructs a second downloader, and asserts the 27-versus-28-width error plus unchanged manifest/shard bytes. Fourteen focused tests and committed-head make pr-preflight passed (31495 fast, 2090 medium); hosted CI is green with no review threads. Maintainer approval and merge into develop remain before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2322 merged into develop at cabaf76bcc3f354826cb71ee292e7ed169180cba. Genuine reusable FlightData cache with malformed shard is rejected with bad-width error and not replaced. make pr-preflight and CI passed.",
   "description": "The release canary's bad-width shard test became stale when source-contract pinning made manifest-free caches regenerate. Build a genuine reusable shard cache with a matching manifest, corrupt one row, and verify download rejects that shard without replacing the manifest or cache. Preserve the product's fail-closed reuse validation and the no-manifest regeneration policy; do not skip tests or change markers.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2322"
@@ -68,6 +68,14 @@
       "generation": "1b338c77c47944cf96b997af1b9e7fdb",
       "op": "take",
       "op_id": "605394dafa674f9a8b2dcc5b63ef42c0",
+      "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829",
+      "at": "2026-09-24T03:48:14Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "5e833512b45b492085264d2754be5b54",
       "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
     }
   ]
