@@ -55,9 +55,12 @@ make release-finalize VERSION=X.Y.Z
 context is missing, pending, skipped, failed, or canceled, stop and fix the
 release PR or ruleset/workflow contract before rerunning the command.
 
-After that pre-merge check passes, `release-finalize` squash-merges this PR,
-fast-forwards `release`, tags `vX.Y.Z`, and pushes the tag — which fires
-`.github/workflows/release.yml`: `dependency-bounds` → `build` (with
+After that pre-merge check passes, `release-finalize` squash-merges this PR at
+its checked head SHA, confirms the merge commit is reachable from fetched
+`origin/release`, then creates or verifies `vX.Y.Z` at that exact merge commit
+and pushes the tag without checking out a local `release` branch. Rerunning
+after the merge resumes from that commit instead of merging twice. The tag push
+fires `.github/workflows/release.yml`: `dependency-bounds` → `build` (with
 `SOURCE_DATE_EPOCH` from the tag commit) → `publish` (PyPI trusted
 publisher) → `github-release` → `test-installation` (cross-platform pip
 install verification).

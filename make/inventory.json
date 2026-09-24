@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "ba1c5660f0293ad0b76455af981fcb23bfd7cd943a2036d0ebbe4020817da02e",
+  "contract_sha256": "4fbb3a1a545cc7a7175caff6e3186adc0e2b8be7ada8cfacb5cb9ea31b37a4e7",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1364,8 +1364,8 @@
     "release-finalize": [
       {
         "header": "release-finalize:",
-        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\t@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \\\n\ttest -n \"$$PR\" || (echo \"Error: no open PR found for v$(VERSION) \u2192 release\" && exit 1); \\\n\techo \"==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR\"; \\\n\tfor context in $(RELEASE_REQUIRED_CONTEXTS); do \\\n\t\tCHECK_BUCKET=$$(gh pr checks \"$$PR\" --required --json name,bucket,state --jq \"map(select(.name == \\\"$$context\\\")) | if length == 1 then .[0].bucket elif length == 0 then \\\"missing\\\" else \\\"duplicate\\\" end\"); \\\n\t\tCHECK_RC=$$?; \\\n\t\tif [ \"$$CHECK_RC\" = \"8\" ]; then \\\n\t\t\techo \"Error: required PR checks are pending. Wait for GitHub Actions, then rerun.\" >&2; \\\n\t\t\texit 1; \\\n\t\telif [ \"$$CHECK_RC\" != \"0\" ]; then \\\n\t\t\techo \"Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)\" >&2; \\\n\t\t\texit \"$$CHECK_RC\"; \\\n\t\tfi; \\\n\t\tcase \"$$CHECK_BUCKET\" in \\\n\t\t\tpass) echo \"==> $$context is green\";; \\\n\t\t\tmissing) echo \"Error: required release context '$$context' is missing. Check release-only and release workflows.\" >&2; exit 1;; \\\n\t\t\tpending) echo \"Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun.\" >&2; exit 1;; \\\n\t\t\tfail|cancel|skipping) echo \"Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing.\" >&2; exit 1;; \\\n\t\t\tduplicate) echo \"Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift.\" >&2; exit 1;; \\\n\t\t\t*) echo \"Error: unexpected $$context status '$$CHECK_BUCKET'.\" >&2; exit 1;; \\\n\t\tesac; \\\n\tdone; \\\n\techo \"==> Squash-merging PR #$$PR (required release contexts are green)\"; \\\n\tgh pr merge --squash \"$$PR\"\n\tgit fetch origin --tags\n\tgit checkout release\n\tgit pull --ff-only origin release\n\tgit tag v$(VERSION)\n\t@# release-cut intentionally leaves the local v$(VERSION) branch in place.\n\t@# Name both sides of the tag refspec so Git cannot resolve the short name to\n\t@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).\n\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)\n\t@echo\n\t@echo \"Tag v$(VERSION) pushed; release.yml will publish to PyPI.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
-        "recipe_sha256": "b3c4b000da9c913dbf24df98d9620eb21016f680f0256978bd2917db3f1d7769"
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_finalize.py --version \"$(VERSION)\" --required-contexts \"$(RELEASE_REQUIRED_CONTEXTS)\"\n\t@echo\n\t@echo \"Check the matching release.yml run before reporting publication.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
+        "recipe_sha256": "3cde08716cc0d143e62528afa6973f16a0c21426c675aed8668f5f8bfeb11f8e"
       }
     ],
     "run-test": [
@@ -2139,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "85332f32675b0113794ab7cf23779d3c3ecbcc3ee18b4bebf3106f44cb7ec5d0",
+  "semantic_sha256": "efced0595ab00190d7105650a195096958a3dafba0fc07b7d5fc175367c895f4",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3768,9 +3768,9 @@
       ]
     },
     {
-      "body": "release-finalize:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\t@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \\\n\ttest -n \"$$PR\" || (echo \"Error: no open PR found for v$(VERSION) \u2192 release\" && exit 1); \\\n\techo \"==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR\"; \\\n\tfor context in $(RELEASE_REQUIRED_CONTEXTS); do \\\n\t\tCHECK_BUCKET=$$(gh pr checks \"$$PR\" --required --json name,bucket,state --jq \"map(select(.name == \\\"$$context\\\")) | if length == 1 then .[0].bucket elif length == 0 then \\\"missing\\\" else \\\"duplicate\\\" end\"); \\\n\t\tCHECK_RC=$$?; \\\n\t\tif [ \"$$CHECK_RC\" = \"8\" ]; then \\\n\t\t\techo \"Error: required PR checks are pending. Wait for GitHub Actions, then rerun.\" >&2; \\\n\t\t\texit 1; \\\n\t\telif [ \"$$CHECK_RC\" != \"0\" ]; then \\\n\t\t\techo \"Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)\" >&2; \\\n\t\t\texit \"$$CHECK_RC\"; \\\n\t\tfi; \\\n\t\tcase \"$$CHECK_BUCKET\" in \\\n\t\t\tpass) echo \"==> $$context is green\";; \\\n\t\t\tmissing) echo \"Error: required release context '$$context' is missing. Check release-only and release workflows.\" >&2; exit 1;; \\\n\t\t\tpending) echo \"Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun.\" >&2; exit 1;; \\\n\t\t\tfail|cancel|skipping) echo \"Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing.\" >&2; exit 1;; \\\n\t\t\tduplicate) echo \"Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift.\" >&2; exit 1;; \\\n\t\t\t*) echo \"Error: unexpected $$context status '$$CHECK_BUCKET'.\" >&2; exit 1;; \\\n\t\tesac; \\\n\tdone; \\\n\techo \"==> Squash-merging PR #$$PR (required release contexts are green)\"; \\\n\tgh pr merge --squash \"$$PR\"\n\tgit fetch origin --tags\n\tgit checkout release\n\tgit pull --ff-only origin release\n\tgit tag v$(VERSION)\n\t@# release-cut intentionally leaves the local v$(VERSION) branch in place.\n\t@# Name both sides of the tag refspec so Git cannot resolve the short name to\n\t@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).\n\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)\n\t@echo\n\t@echo \"Tag v$(VERSION) pushed; release.yml will publish to PyPI.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
+      "body": "release-finalize:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_finalize.py --version \"$(VERSION)\" --required-contexts \"$(RELEASE_REQUIRED_CONTEXTS)\"\n\t@echo\n\t@echo \"Check the matching release.yml run before reporting publication.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
       "kind": "rule",
-      "sha256": "7751ab51d7f485c93d9f1d8ff483fc03b2216972f867c611d2fad07ff60cbe9d",
+      "sha256": "736088d0645a292c23ffc49483f39acee4e6f1d7c75f286f7f3017d95097ae65",
       "targets": [
         "release-finalize"
       ]

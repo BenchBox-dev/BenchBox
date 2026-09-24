@@ -172,6 +172,7 @@ def test_non_lane_inputs_skipped_in_changed_paths() -> None:
         "scripts/pr_landing.py",
         "scripts/ruleset_drift_check.py",
         "scripts/check_release_curation.py",
+        "scripts/release_finalize.py",
         "scripts/check_untracked_skill_mirrors.sh",
         "scripts/path_filter_decision.py",
         "scripts/pr_refresh_certification.py",

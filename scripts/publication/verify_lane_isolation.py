@@ -115,6 +115,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/validate_corpus.py",
     # CI/dev plumbing never read by lane artifact builds.
     "scripts/check_release_curation.py",
+    "scripts/release_finalize.py",
     "scripts/check_untracked_skill_mirrors.sh",
     "scripts/path_filter_decision.py",
     "scripts/pr_refresh_certification.py",

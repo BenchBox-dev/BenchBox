@@ -1271,46 +1271,15 @@ release-cut-abort:
 	git branch -D v$(VERSION)
 	@echo "==> Aborted: v$(VERSION) deleted; develop untouched."
 
-# After release-cut's PR is approved and all required release contexts are
-# green: squash-merge it, tag release, push the tag (fires release.yml), and
-# leave develop alone.
+# After release-cut's PR has the required contexts green: merge its exact
+# checked head, tag the confirmed merge commit, and push the tag. A rerun after
+# merge or tag creation resumes from hosted PR and tag state.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
-	@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \
-	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → release" && exit 1); \
-	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
-	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
-		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
-		CHECK_RC=$$?; \
-		if [ "$$CHECK_RC" = "8" ]; then \
-			echo "Error: required PR checks are pending. Wait for GitHub Actions, then rerun." >&2; \
-			exit 1; \
-		elif [ "$$CHECK_RC" != "0" ]; then \
-			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
-			exit "$$CHECK_RC"; \
-		fi; \
-		case "$$CHECK_BUCKET" in \
-			pass) echo "==> $$context is green";; \
-			missing) echo "Error: required release context '$$context' is missing. Check release-only and release workflows." >&2; exit 1;; \
-			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
-			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
-			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
-			*) echo "Error: unexpected $$context status '$$CHECK_BUCKET'." >&2; exit 1;; \
-		esac; \
-	done; \
-	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
-	gh pr merge --squash "$$PR"
-	git fetch origin --tags
-	git checkout release
-	git pull --ff-only origin release
-	git tag v$(VERSION)
-	@# release-cut intentionally leaves the local v$(VERSION) branch in place.
-	@# Name both sides of the tag refspec so Git cannot resolve the short name to
-	@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).
-	PRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)
+	uv run -- python scripts/release_finalize.py --version "$(VERSION)" --required-contexts "$(RELEASE_REQUIRED_CONTEXTS)"
 	@echo
-	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
+	@echo "Check the matching release.yml run before reporting publication."
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
