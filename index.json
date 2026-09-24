@@ -2009,10 +2009,15 @@
       "title": "Run only impact-selected tests in the local preflight medium tier"
     },
     "ci-dedupe-10-docs-visual-lane-decision": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T16:09:51Z",
+        "generation": "02b83dfff3f6460ca0457b757901ea07",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ecc7115a6c4982502bfd2e92"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Decision gate: choose the public-site visual comparison lane policy"
     },
     "ci-failure-baseline-dev-loop-metrics": {
