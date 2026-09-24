@@ -380,3 +380,121 @@ jobs:
             exit 1
           fi
           echo "Release canary passed."
+
+  release-canary-incident:
+    # A red canary blocks every release PR, so it must reach an owner the day
+    # it goes red instead of waiting to be found at release time. One open
+    # issue tracks each red episode; the next green run closes it.
+    # Release readiness reads this run's conclusion, so a failure here (for
+    # example, a GitHub API error) must never turn a green canary red.
+    name: release-canary-incident
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    needs:
+      [
+        collect-credential-free-non-fast,
+        credential-free-non-fast,
+        ruleset-drift,
+        pypi-latest-installability,
+        release-canary-result,
+      ]
+    if: ${{ always() && !cancelled() }}
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ env.RELEASE_CANARY_REF }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Download shard artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        continue-on-error: true
+        with:
+          pattern: release-canary-non-fast-shard-*
+          path: release-canary-shards
+
+      - name: Summarize canary run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHECKED_SHA: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
+          COLLECTION_RESULT: ${{ needs.collect-credential-free-non-fast.result }}
+          NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
+          RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
+          PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
+          AGGREGATE_RESULT: ${{ needs.release-canary-result.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # An empty last-green SHA is valid; the summary then says no green run was found.
+          last_green_sha="$(gh run list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --workflow release-canary.yml \
+            --status success \
+            --limit 1 \
+            --json headSha \
+            --jq '.[0].headSha // ""' || true)"
+          uv run --no-project --python 3.12 -- python scripts/release_canary_incident.py \
+            --artifacts-dir release-canary-shards \
+            --job-result "collect-credential-free-non-fast=${COLLECTION_RESULT}" \
+            --job-result "credential-free-non-fast=${NON_FAST_RESULT}" \
+            --job-result "ruleset-drift=${RULESET_DRIFT_RESULT}" \
+            --job-result "pypi-latest-installability=${PYPI_LATEST_RESULT}" \
+            --job-result "release-canary-result=${AGGREGATE_RESULT}" \
+            --run-url "${RUN_URL}" \
+            --checked-sha "${CHECKED_SHA}" \
+            --last-green-sha "${last_green_sha}" \
+            --repo-url "${REPO_URL}" \
+            --output release-canary-incident.json
+
+      - name: Open, update, or close the incident issue
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          label="incident:release-canary-red"
+          gh label create "${label}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --description "Release canary is red; release PRs are blocked" \
+            --color B60205 >/dev/null 2>&1 || true
+
+          state="$(jq -r '.state' release-canary-incident.json)"
+          existing_issue_url="$(gh issue list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --state open \
+            --label "${label}" \
+            --json url \
+            --jq '.[0].url // ""')"
+          comment_file="$(mktemp)"
+          jq -r '.comment' release-canary-incident.json > "${comment_file}"
+
+          if [ "${state}" = "green" ]; then
+            if [ -n "${existing_issue_url}" ]; then
+              gh issue comment "${existing_issue_url}" --body-file "${comment_file}"
+              gh issue close "${existing_issue_url}" --reason completed
+              echo "Closed ${existing_issue_url}"
+            fi
+            exit 0
+          fi
+
+          if [ -n "${existing_issue_url}" ]; then
+            gh issue comment "${existing_issue_url}" --body-file "${comment_file}"
+            echo "Updated ${existing_issue_url}"
+          else
+            body_file="$(mktemp)"
+            jq -r '.body' release-canary-incident.json > "${body_file}"
+            gh issue create \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "$(jq -r '.title' release-canary-incident.json)" \
+              --label "${label}" \
+              --body-file "${body_file}"
+          fi

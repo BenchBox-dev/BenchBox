@@ -126,6 +126,7 @@ def test_release_canary_workflow_uses_collection_artifact_and_six_single_threade
         "ruleset-drift",
         "pypi-latest-installability",
         "release-canary-result",
+        "release-canary-incident",
     }
 
     collection = jobs["collect-credential-free-non-fast"]
