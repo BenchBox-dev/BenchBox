@@ -24,6 +24,7 @@ GREEN_JOBS = {
     "credential-free-non-fast": "success",
     "ruleset-drift": "success",
     "pypi-latest-installability": "success",
+    "release-canary-result": "success",
 }
 
 SHARD_LOG = """\
@@ -98,6 +99,12 @@ def test_any_non_success_job_is_red(result: str) -> None:
     update = _render({**GREEN_JOBS, "ruleset-drift": result})
     assert update["state"] == "red"
     assert update["failed_jobs"] == ["ruleset-drift"]
+
+
+def test_aggregate_failure_is_red_when_component_jobs_succeed() -> None:
+    update = _render({**GREEN_JOBS, "release-canary-result": "failure"})
+    assert update["state"] == "red"
+    assert update["failed_jobs"] == ["release-canary-result"]
 
 
 def test_red_run_names_failures_changes_and_owner_action() -> None:

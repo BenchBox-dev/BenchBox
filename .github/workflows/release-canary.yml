@@ -429,6 +429,7 @@ jobs:
           NON_FAST_RESULT: ${{ needs.credential-free-non-fast.result }}
           RULESET_DRIFT_RESULT: ${{ needs.ruleset-drift.result }}
           PYPI_LATEST_RESULT: ${{ needs.pypi-latest-installability.result }}
+          AGGREGATE_RESULT: ${{ needs.release-canary-result.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: |
@@ -447,6 +448,7 @@ jobs:
             --job-result "credential-free-non-fast=${NON_FAST_RESULT}" \
             --job-result "ruleset-drift=${RULESET_DRIFT_RESULT}" \
             --job-result "pypi-latest-installability=${PYPI_LATEST_RESULT}" \
+            --job-result "release-canary-result=${AGGREGATE_RESULT}" \
             --run-url "${RUN_URL}" \
             --checked-sha "${CHECKED_SHA}" \
             --last-green-sha "${last_green_sha}" \

@@ -536,9 +536,14 @@ class TestReleaseInfrastructure:
         assert incident_job["permissions"]["issues"] == "write"
         # Readiness reads the run conclusion; the alert must not be able to block a release.
         assert incident_job["continue-on-error"] is True
-        assert {"collect-credential-free-non-fast", "credential-free-non-fast"} <= set(incident_job["needs"])
+        assert {
+            "collect-credential-free-non-fast",
+            "credential-free-non-fast",
+            "release-canary-result",
+        } <= set(incident_job["needs"])
         incident_text = _workflow_job_run_text("release-canary.yml", "release-canary-incident")
         assert "scripts/release_canary_incident.py" in incident_text
+        assert '"release-canary-result=${AGGREGATE_RESULT}"' in incident_text
         assert "incident:release-canary-red" in incident_text
         assert "gh issue close" in incident_text
 
