@@ -5,7 +5,7 @@
     "The decision states whether the no-baseline-bound-to-base-SHA failure class is in scope or is tracked separately.",
     "If option 3 is chosen, the ruleset change making Documentation required is named explicitly, since it is currently a non-required check."
   ],
-  "context": "Deferred to its own review by the ci-dedupe-08 triage, which recorded a deliberate no-lane-change decision and left this open. Follows the decision-gate pattern of ci-dedupe-04: the outcome is a recorded choice, not an implementation. Measurement method for both windows is the Actions runs and jobs APIs; run IDs for the original classification are pinned in the triage note and its job-level census.\n\nDecision selected 2026-09-24: option 3, make public-site visual acceptance required for develop merges. The dominant failures are real page differences; path scoping would leave most of them and risk missing rendered inputs, while keeping the advisory lane accepts about 70 red runs per 25 days without action. Accept longer or blocked merges for intentional visual changes until exact-head maintainer approval. The no-baseline-bound-to-base-SHA class is a distinct baseline-supply problem in the implementation scope; preserve fail-closed SHA binding and add protected baseline recovery. Decision record: _project/decisions/public-site-visual-required-check-2026-09-24.md (PR pending). Implementation tracked separately as ci-dedupe-11-required-public-site-visual-check, including the always-reporting PR/merge-group context, hosted develop-squash-only ruleset change, drift guard, and baseline availability.",
+  "context": "Deferred to its own review by the ci-dedupe-08 triage, which recorded a deliberate no-lane-change decision and left this open. Follows the decision-gate pattern of ci-dedupe-04: the outcome is a recorded choice, not an implementation. Measurement method for both windows is the Actions runs and jobs APIs; run IDs for the original classification are pinned in the triage note and its job-level census.\n\nDecision selected 2026-09-24: option 3, make public-site visual acceptance required for develop merges. The dominant failures are real page differences; path scoping would leave most of them and risk missing rendered inputs, while keeping the advisory lane accepts about 70 red runs per 25 days without action. Accept longer or blocked merges for intentional visual changes until exact-head maintainer approval. The no-baseline-bound-to-base-SHA class is a distinct baseline-supply problem in the implementation scope; preserve fail-closed SHA binding and add protected baseline recovery. Decision record: _project/decisions/public-site-visual-required-check-2026-09-24.md, published for review in https://github.com/BenchBox-dev/BenchBox/pull/2334 at head 96dc78778. Implementation tracked separately as ci-dedupe-11-required-public-site-visual-check, including the always-reporting PR/merge-group context, hosted develop-squash-only ruleset change, drift guard, and baseline availability.",
   "description": "The public-site visual regression job is the dominant source of Documentation workflow failures, and its failures are routinely merged past. It is not a required check, so a red result produces noise and reruns without blocking anything.\n\nTriage evidence (_project/analysis/docs-failure-triage-2026-09-17.md, window 2026-08-23 to 2026-09-16): the visual job accounted for 119 of 164 failed docs runs, 73%. About 100 of those were real mismatches on pages the PR had changed, and every sampled PR merged with no approval recorded. A further 20 failures came from no baseline being bound to the exact base SHA.\n\nPost-repair measurement (2026-09-17 to 2026-09-24): of 23 failing docs pull_request runs, 21 were the visual job and 2 were linkcheck. The link repair in #2147 worked - linkcheck fell from 41 failures (25% of the old window) to 2 - which leaves visual at 91% of all docs PR failures. The rate is roughly 70 per 25 days against the ~100 per 25 days the triage set as its watch threshold, so the condition it deferred this decision on is effectively met.\n\nThe gate is not malfunctioning: it reports true positives that nobody is required to act on. That is the decision. Choose one:\n\n1. Keep the friction as the price of the approval flow, and accept a standing ~70 red runs per 25 days on a non-required check.\n2. Scope comparison to runs touching site-rendered paths, accepting that a change reaching the rendered site through an unlisted path goes uncompared.\n3. Make visual a required check, so its failures must be approved or fixed before merge.\n\nRecord the decision and its rationale. Option 2 or 3 changes a reviewed gate, so the implementation lands with the decision or spawns its own item; do not narrow the lane by a silent filter edit. Separately consider whether the no-baseline-for-base-SHA class should be treated as a distinct defect rather than strictness by design, since it is failing runs without comparing anything.",
   "links": [
     "_project/analysis/docs-failure-triage-2026-09-17.md",
@@ -14,7 +14,8 @@
     "ci-dedupe-08-docs-pr-failure-triage",
     "ci-dedupe-04-heavy-tier-queue-only-decision-gate",
     "_project/decisions/public-site-visual-required-check-2026-09-24.md",
-    "ci-dedupe-11-required-public-site-visual-check"
+    "ci-dedupe-11-required-public-site-visual-check",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2334"
   ],
   "sessions": [
     {
@@ -32,6 +33,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "09745d1f0d8941c0a35637ad2b7ea8df",
+      "session_id": "58595f50fecb4424b73e70103336ea29"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ecc7115a6c4982502bfd2e92",
+      "at": "2026-09-24T16:40:33Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "532913e2e32f4d3081fb42c9146f3e2f",
       "session_id": "58595f50fecb4424b73e70103336ea29"
     }
   ]
