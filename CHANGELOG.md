@@ -7,49 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-24
+
+### Before you upgrade
+
+- **BREAKING: Python 3.11 or later is required.** Python 3.10 reaches end of
+  life in October 2026. We plan to require Python 3.12 after Python 3.11
+  reaches end of life in October 2027.
+- **BREAKING: Newer dependencies.** DataFrame platforms need pandas 3 and
+  `dask[distributed]>=2025.1.0`; with pandas 2, BenchBox reports `pandas-df`
+  and Dask as unavailable. DuckDB must be 1.5 or later, DataFusion 54 or later,
+  and `databricks-connect` below 19.
+- **BREAKING: Removed features.** Modin is no longer supported: use `pandas-df`
+  or `dask-df` instead of the `modin` and `modin-df` platforms and extras.
+  `PowerRunExecutor` and `ConcurrentQueryExecutor` are removed; see
+  `docs/advanced/power-run-concurrent-queries.md` for replacements.
+
 ### Added
 
-- **DuckDB 2.0 preview compatibility** - BenchBox can parse the analyzed-plan
-  JSON emitted by the DuckDB 2.0 alpha engine. A pinned nightly lane checks the
-  preview package while stable DuckDB remains the default installation.
-- **Client-platform link locality disclosure** - Result bundles may carry an
-  optional `environment.client_link` block with client cloud/region locality
-  and statement-overhead probe metrics, projected into Explorer read model
-  v10 (#2030).
-- **Per-table load timings** - Result bundles may carry an optional `tables`
-  block with per-table `load_ms` timings for bundle-level diagnostics
-  (#2178).
-- **Databricks no-clustering default for untuned runs** - Untuned Databricks
-  runs record `platform.config.databricks_clustering_strategy` as `"none"`
-  instead of leaving the strategy unresolved (#2177).
-- **Plan companion `plan_max_depth` threading** - CLI canonical commands
-  thread `plan_max_depth` into the plans companion builder (#2122).
+- **More lakehouse and external-table support.** ClickHouse can read Delta
+  tables, Redshift Spectrum and BigQuery can read Iceberg tables, and Databricks
+  can use Hudi tables. `--table-mode external` works on Athena Spark, EMR
+  Serverless, Dataproc Serverless, and Glue. Delta, Iceberg, and Hudi tables
+  support optimize and vacuum.
+- **Better comparisons in Results Explorer.** You can browse results by engine
+  version, compare several runs against a baseline, and preview your own
+  results before you submit them.
+- **Repeatable downloaded datasets.** NYC Taxi and FlightData download a fixed
+  set of files, so every run uses the same data.
+- **More detail in result files.** Results record the tuning you requested and
+  the tuning BenchBox applied, the client's cloud region, and each table's load
+  time.
+- **Throughput concurrency option.** `benchbox run --streams` sets how many
+  query streams a throughput test runs at once.
+- **More DataFrame queries.** TPC-DS One Big Table has 17 DataFrame queries, up
+  from 3.
+- **DuckDB 2.0 preview.** BenchBox can read query plans from the DuckDB 2.0
+  preview. Stable DuckDB 1.x remains the default.
 
 ### Changed
 
-- **Result bundle version aliases reconciled** - Producers emit
-  `result_schema_version` together with the legacy `version` alias during the
-  compatibility window; readers accept `result_schema_version`, legacy
-  `version`, then `schema_version` via a shared helper, and reject conflicting
-  explicit aliases. Bundles record `export.benchbox_version` (#2199).
-- **BREAKING: Python 3.11 is now required.** BenchBox has removed Python 3.10
-  support ahead of CPython's end-of-life date in October 2026. BenchBox plans
-  to require Python 3.12 in its first release after Python 3.11 reaches end of
-  life in October 2027.
-- **BREAKING: pandas 3.x is now required for DataFrame platforms.** The
-  `pandas`, `dask`, `dataframe-pandas-family`, and related extras now require
-  `pandas>=3.0.0` with `dask[distributed]>=2025.1.0`. Existing pandas 2.x
-  installs report the `pandas-df` platform (and the dependent Dask paths) as
-  unavailable instead of running against an untested combination. TPC-DI JSON
-  ingest no longer infers datetimes by column name (`convert_dates=False`),
-  so date-like JSON fields stay text through ingest.
+- **Stricter checks on submitted results.** Unofficial TPC-H runs can no longer
+  be submitted, as was already true for TPC-DS. A submission must include every
+  query in the benchmark. BenchBox also warns, without blocking, when timings
+  look implausible.
+- **No more guessed costs.** When BenchBox doesn't know a price, size, or
+  region, it reports the cost as unavailable instead of guessing. Prices now
+  come from vendor price lists, and Snowflake cost reflects run time and
+  warehouse size.
+- **Safer throughput tests.** BenchBox waits for timed-out queries to stop
+  before the next phase starts. If the throughput phase fails, official results
+  omit Throughput@Size.
 
-### Removed
+### Fixed
 
-- **BREAKING: Modin platform support removed** - The `modin` and `modin-df`
-  platform selectors and the `modin` and `dataframe-modin` install extras are
-  no longer available. Use `pandas-df` for pandas-compatible execution or
-  `dask-df` for distributed DataFrames.
+- **Cloud platforms.** ClickBench, TPC-DS, TPC-DI, and FlightData now load and
+  run on BigQuery, Snowflake, and Databricks. Several Spark platform issues are
+  fixed, including TPC-Havoc queries that Spark rejected.
+- **Correct results.** DataFrame queries for Data Vault and FlightData return
+  the same results as SQL, and results record the real CPU model.
+- **Other fixes.** BenchBox no longer drops benchmark options you pass on the
+  command line, and exporting results no longer fails on Windows.
 
 ## [0.4.0] - 2026-08-27
 
@@ -820,7 +838,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Discussions**: [Ask questions and request features](https://github.com/BenchBox-dev/BenchBox/discussions)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.2.1...v0.3.0
