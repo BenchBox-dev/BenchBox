@@ -6,7 +6,7 @@
     "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
     "make pr-preflight passes on the implementation PR."
   ],
-  "context": "Implementation is committed at 9d361bb30752eb330fbe9290e7458c0978ae5d89 in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery. The helper verifies exact required contexts and PR head before a SHA-pinned squash merge; on resume it requires a confirmed merged PR and tags only its exact merge commit after proving ancestry on fetched origin/release. It never checks out local release. PR #2321 is OPEN/non-draft at that exact head on base 435d07e97c2e0f30a002d721fbc42aca508d6a52, mergeable; no merge or release tag has been performed. Current local-focused, medium, and required-preflight receipts for 9d361 are absent; a make pr-preflight is active, with medium pytest PID 79431. Preserve that process. A new unresolved P2 review thread PRRT_kwDOQ7J64c6lXzuz says .github/RELEASE_PR_TEMPLATE.md still promises a local release fast-forward. Accepted: the exact uncommitted diff in that worktree corrects the template to describe checked-head merge, exact merge-commit tagging, and post-merge resume. The diff is six insertions and three deletions, but ownership is unknown; preserve it, do not overwrite or stage it until the active run exits and provenance/worktree status is reconciled. Recheck local receipts and PR threads after the run. No authorization to mark ready, merge, or publish a release. Prior P1 on PR #2318 is addressed by this helper but its thread should stay open until exact fix is hosted. Ledger: /Users/joe/Developer/BenchBox.wt-release-process/.todo-batch/release-process.txt.",
+  "context": "Implementation and release-template follow-up are committed in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery at 56882087a12b87f60255a4d94dcad82ac9103d59. The helper verifies exact required contexts and PR head before a SHA-pinned squash merge; on resume it requires a confirmed merged PR and tags only its exact merge commit after proving ancestry on fetched origin/release. It never checks out local release. PR #2321 is OPEN/non-draft at exact head 56882087a12b87f60255a4d94dcad82ac9103d59 on base 435d07e97c2e0f30a002d721fbc42aca508d6a52, mergeable. Review thread PRRT_kwDOQ7J64c6lXzuz about the generated release PR template is addressed by commit 56882087a and resolved. Earlier local preflight exercised head 9d361 before this docs commit; focused, medium, and required-preflight receipts for 568820 are absent. Other active shared test-lock owners are unrelated canary suites PID 27660 and 77904; wait for them to exit before rerunning exact-head preflight. Hosted checks on 568820 are in progress. No release merge or tag has been performed. P1 on cut PR #2318 is addressed by this PR but remains open until that fix lands. No authorization to merge or publish a release.",
   "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
   "links": [
     "Makefile",
@@ -165,6 +165,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "0a1e79785dde4e3bba1f990b7900cee9",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-24T00:43:38Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "14c74c879dbe486d97087e6bf9356525",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
