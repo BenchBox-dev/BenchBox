@@ -1,4 +1,4 @@
-"""Select the release-canary tests that a set of changed paths can affect.
+"""Select release-canary or local-medium tests that changed paths can affect.
 
 The daily release canary runs the full non-fast suite (about 644 tests in
 72 files); running all of it in the merge queue would roughly double
@@ -31,9 +31,9 @@ Fail-safe rules (when unsure, select -- the selector may over-select but
 must never under-select silently):
 
 - per test: a canary test containing a dynamic edge the selector cannot
-  resolve (an import name or path built at runtime), in its own code, its
-  conftest chain, or anywhere in its transitive closure, is always
-  selected;
+  resolve (an import name or path built at runtime), in its own code or its
+  conftest chain, is always selected. Unresolved imports in its test-specific
+  library closure also select it;
 - whole suite: ``pyproject.toml``, ``uv.lock``, pytest configuration,
   ``tests/conftest.py``, ``release-canary.yml``, or the selector itself
   changed;
@@ -47,14 +47,14 @@ are imported from ``scripts/release_canary_sharding.py``, not copied.
 
 Output is JSON with the selected node IDs, the reason each was selected
 (which changed path, through which edge), whether a whole-suite fallback
-fired and why, the dynamic edges observed in library code that do not
-force selection (``dynamic_library_sites``, for the shadow watch), and
+fired and why, the dynamic edges observed in library code
+(``dynamic_library_sites``, for the shadow watch), and
 the canary collection it was computed against.
 
-Known limitation: registry-style dynamic loading inside library code
-(``import_module(name)`` with a runtime name) is unbounded, so it is
+Known limitation: registry-style dynamic loading inside the shared fixture
+closure (``import_module(name)`` with a runtime name) is unbounded, so it is
 reported rather than propagated: propagating it would always-select
-every test importing the registry. A changed file no test references
+every test. A changed file no test references
 still runs the whole suite through the unmapped-path backstop; the
 residual shape (a mapped file affecting a test only through dynamic
 loading) is pinned by known-regression replay tests.
@@ -128,12 +128,25 @@ CANT_AFFECT_CANARY = frozenset(
     }
 )
 
+# Local medium preflight receives the complete PR path list. Keep product
+# roots and shared test configuration; other paths do not drive medium tests.
+# Shared configuration forces a full run because it can change collection.
+MEDIUM_PRODUCT_ROOTS = ("benchbox/", "scripts/", "_project/scripts/", "tools/", "results-explorer/")
+MEDIUM_WHOLE_SUITE_PATHS = frozenset(
+    {"pyproject.toml", "uv.lock", "pytest.ini", "pytest-ci.ini", "tox.ini", CONFTEST_REPO_PATH, SELECTOR_REPO_PATH}
+)
 
-def _is_cant_affect(path: str) -> bool:
+
+def medium_relevant_paths(changed_paths: list[str]) -> list[str]:
+    """Keep product changes and shared test configuration for local medium tests."""
+    return [path for path in changed_paths if path.startswith(MEDIUM_PRODUCT_ROOTS) or path in MEDIUM_WHOLE_SUITE_PATHS]
+
+
+def _is_cant_affect(path: str, cant_affect: frozenset[str] = CANT_AFFECT_CANARY) -> bool:
     """Return whether a changed path is on the reviewed safe list."""
-    if path in CANT_AFFECT_CANARY:
+    if path in cant_affect:
         return True
-    return any(entry.endswith("/") and path.startswith(entry) for entry in CANT_AFFECT_CANARY)
+    return any(entry.endswith("/") and path.startswith(entry) for entry in cant_affect)
 
 
 # Extra roots for resolving bare (non-dotted) module names, mirroring the
@@ -1469,8 +1482,8 @@ def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, F
     the transitive closure of the test's own edges. A dynamic edge in
     the test file or its conftest chain selects that test always; a
     dynamic edge in the shared fixtures falls back to the whole suite.
-    Dynamic edges deeper in library code are reported as library sites
-    (see ``_build_shared_deps``) rather than forcing selection.
+    Unresolved library imports in a test-specific closure force selection
+    because a computed import can name a changed module that other tests map.
     Returns ``(map, fallback, library_sites)`` where ``fallback`` is the
     whole-suite reason when the shared fixtures cannot be resolved (None
     on success).
@@ -1509,6 +1522,14 @@ def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, F
                     _seed_with_parent_inits(seeds, plugin_file, root)
         expanded, closure_dynamic = _expand_closure(seeds, root, cache)
         handled = set(chain_files) | {test_file}
+        dynamic_kinds.extend(
+            f"transitive:{kind}:{rel}"
+            for rel, kinds in closure_dynamic.items()
+            for kind in kinds
+            if rel not in handled
+            and rel not in shared_deps
+            and (kind == "dynamic_import" or kind.startswith("unresolvable_import:"))
+        )
         library_sites.extend(
             f"{rel}:{kind}" for rel, kinds in closure_dynamic.items() for kind in kinds if rel not in handled
         )
@@ -1522,8 +1543,10 @@ def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, F
     return dep_map, None, sorted(set(library_sites))
 
 
-def collect_canary_node_ids(root: Path, timeout_seconds: int = 600) -> list[str]:
-    """Collect canary node IDs with the canonical marker expression."""
+def collect_canary_node_ids(
+    root: Path, timeout_seconds: int = 600, marker_expression: str = MARKER_EXPRESSION
+) -> list[str]:
+    """Collect node IDs for the requested test marker expression."""
     completed = subprocess.run(
         [
             sys.executable,
@@ -1536,7 +1559,7 @@ def collect_canary_node_ids(root: Path, timeout_seconds: int = 600) -> list[str]
             "-p",
             "no:cacheprovider",
             "-m",
-            MARKER_EXPRESSION,
+            marker_expression,
             "tests",
         ],
         cwd=str(root),
@@ -1588,6 +1611,9 @@ def compute_selection(  # noqa: C901
     *,
     collection_info: dict[str, Any] | None = None,
     fallback_reason: str | None = None,
+    marker_expression: str = MARKER_EXPRESSION,
+    cant_affect: frozenset[str] = CANT_AFFECT_CANARY,
+    whole_suite_paths: frozenset[str] = WHOLE_SUITE_PATHS,
 ) -> dict[str, Any]:
     """Select canary node IDs affected by the changed paths.
 
@@ -1604,7 +1630,7 @@ def compute_selection(  # noqa: C901
     trigger_paths: list[str] = []
     if whole_suite is None:
         for path in changed:
-            if path in WHOLE_SUITE_PATHS:
+            if path in whole_suite_paths:
                 whole_suite = f"whole_suite_path:{path}"
                 trigger_paths.append(path)
     unmapped: list[str] = []
@@ -1623,7 +1649,7 @@ def compute_selection(  # noqa: C901
             # test actually references still selects that test. The safe
             # list only suppresses the whole-suite fallback for paths
             # nothing references.
-            if _is_cant_affect(path):
+            if _is_cant_affect(path, cant_affect):
                 ignored.append(path)
                 continue
             unmapped.append(path)
@@ -1662,7 +1688,7 @@ def compute_selection(  # noqa: C901
                             {"changed_path": path, "edge": "unresolvable_dynamic_edge"}
                         )
     return {
-        "marker_expression": MARKER_EXPRESSION,
+        "marker_expression": marker_expression,
         "collection": collection_info,
         "changed_paths": changed,
         "whole_suite": whole_suite is not None,
@@ -1700,9 +1726,45 @@ def _build_parser() -> argparse.ArgumentParser:
     source.add_argument("--changed-path", action="append", default=[], help="changed repo-relative path (repeatable)")
     source.add_argument("--base-ref", help="git ref to diff against HEAD (e.g. origin/develop)")
     source.add_argument("--from-stdin", action="store_true", help="read changed paths (one per line) from stdin")
+    source.add_argument("--changed-json-env", help="environment variable containing a JSON array of changed paths")
     parser.add_argument("--collection-file", type=Path, help="newline-delimited node IDs (skip live collection)")
     parser.add_argument("--output", type=Path, help="write the JSON selection (default: stdout)")
+    parser.add_argument(
+        "--marker-expression", default=MARKER_EXPRESSION, help="pytest marker expression to collect and run"
+    )
+    parser.add_argument("--cant-affect-list", choices=("canary", "empty"), default="canary")
+    parser.add_argument("--product-code-only", action="store_true", help="ignore non-product paths for local preflight")
+    parser.add_argument(
+        "--run-selected", action="store_true", help="run selected tests with the medium tier's pytest options"
+    )
     return parser
+
+
+def run_selected_tests(
+    selection: dict[str, Any], root: Path, marker_expression: str, changed_json_env: str | None
+) -> int:
+    """Run selected medium test files, keeping each file's fixtures on one worker."""
+    whole_suite = selection["whole_suite"]
+    target = ["tests"] if whole_suite else sorted({entry["file"] for entry in selection["selected"]})
+    if not target:
+        print("[impact] no medium tests selected", file=sys.stderr)
+        return 0
+    if whole_suite:
+        print("[impact] running the full medium tier", file=sys.stderr, flush=True)
+    else:
+        print(
+            f"[impact] running {len(target)} test files covering {selection['selected_count']} selected cases",
+            file=sys.stderr,
+            flush=True,
+        )
+    command = [sys.executable, "-m", "pytest", "-m", marker_expression, "--tb=short", "--timeout=60", "-n", "5"]
+    if not whole_suite:
+        command.append("--dist=loadfile")
+    command.extend(target)
+    pytest_env = os.environ.copy()
+    if changed_json_env:
+        pytest_env.pop(changed_json_env, None)
+    return subprocess.run(command, cwd=str(root), env=pytest_env, check=False).returncode
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1713,26 +1775,42 @@ def main(argv: list[str] | None = None) -> int:
             changed = _git_changed_paths(root, args.base_ref)
         elif args.from_stdin:
             changed = [line for line in (normalize_rel(line) for line in sys.stdin.read().splitlines()) if line]
+        elif args.changed_json_env:
+            changed_json = os.environ.get(args.changed_json_env)
+            if changed_json is None:
+                raise ValueError(f"missing changed-path environment variable: {args.changed_json_env}")
+            changed_value = json.loads(changed_json)
+            if not isinstance(changed_value, list) or not all(isinstance(path, str) for path in changed_value):
+                raise ValueError("changed paths must be a JSON array of strings")
+            changed = [path for path in (normalize_rel(path) for path in changed_value) if path]
         else:
             changed = list(args.changed_path)
+        if args.product_code_only:
+            changed = medium_relevant_paths(changed)
         fallback_reason: str | None = None
         node_ids: list[str] = []
-        if args.collection_file is not None:
+        if args.product_code_only and not changed:
+            collection_info = {
+                "source": "skipped_no_product_code",
+                "marker_expression": args.marker_expression,
+                "node_count": 0,
+            }
+        elif args.collection_file is not None:
             node_ids = parse_collection_output(args.collection_file.read_text(encoding="utf-8"))
             collection_info: dict[str, Any] = {"source": str(args.collection_file), "node_count": len(node_ids)}
         else:
             try:
-                node_ids = collect_canary_node_ids(root)
+                node_ids = collect_canary_node_ids(root, marker_expression=args.marker_expression)
             except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
                 fallback_reason = f"collection_failed:{exc}"
             collection_info = {
                 "source": "live_collection",
-                "marker_expression": MARKER_EXPRESSION,
+                "marker_expression": args.marker_expression,
                 "node_count": len(node_ids),
             }
         dep_map: dict[str, FileDeps] = {}
         library_sites: list[str] = []
-        if fallback_reason is None:
+        if fallback_reason is None and not (args.product_code_only and not changed):
             dep_map, map_fallback, library_sites = build_dependency_map(root, files_from_node_ids(node_ids))
             if map_fallback is not None:
                 fallback_reason = f"dependency_map_failed:{map_fallback}"
@@ -1742,6 +1820,9 @@ def main(argv: list[str] | None = None) -> int:
             node_ids,
             collection_info=collection_info,
             fallback_reason=fallback_reason,
+            marker_expression=args.marker_expression,
+            cant_affect=CANT_AFFECT_CANARY if args.cant_affect_list == "canary" else frozenset(),
+            whole_suite_paths=MEDIUM_WHOLE_SUITE_PATHS if args.product_code_only else WHOLE_SUITE_PATHS,
         )
         selection["dynamic_library_sites"] = sorted(set(library_sites))
         rendered = json.dumps(selection, indent=2) + "\n"
@@ -1750,6 +1831,8 @@ def main(argv: list[str] | None = None) -> int:
             args.output.write_text(rendered, encoding="utf-8")
         else:
             sys.stdout.write(rendered)
+        if args.run_selected:
+            return run_selected_tests(selection, root, args.marker_expression, args.changed_json_env)
     except (OSError, ValueError, RuntimeError) as exc:
         print(f"canary-impact error: {exc}", file=sys.stderr)
         return 1

@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from scripts.canary_impact import (
+    MEDIUM_WHOLE_SUITE_PATHS,
     FileDeps,
     _build_shared_deps,
     _conftest_chain,
@@ -20,6 +21,7 @@ from scripts.canary_impact import (
     _rel,
     analyze_python_file,
     build_dependency_map,
+    collect_canary_node_ids,
     compute_selection,
     files_from_node_ids,
 )
@@ -36,6 +38,15 @@ class TestLiveTree:
 
         node_ids = collect_canary_node_ids(REPO_ROOT)
         assert node_ids, "expected a non-empty canary collection"
+        dep_map, fallback, _sites = build_dependency_map(REPO_ROOT, files_from_node_ids(node_ids))
+        assert fallback is None, fallback
+        return node_ids, dep_map
+
+    @pytest.fixture(scope="class")
+    def live_medium(self) -> tuple[list[str], dict[str, FileDeps]]:
+        marker = "medium and not (slow or stress or resource_heavy or live_integration)"
+        node_ids = collect_canary_node_ids(REPO_ROOT, marker_expression=marker)
+        assert node_ids
         dep_map, fallback, _sites = build_dependency_map(REPO_ROOT, files_from_node_ids(node_ids))
         assert fallback is None, fallback
         return node_ids, dep_map
@@ -100,3 +111,34 @@ class TestLiveTree:
         for selected_entry in selection["selected"]:
             if selected_entry["file"] == test_file:
                 assert selected_entry["reasons"], "every selection needs a reason"
+
+    def test_monitoring_lazy_export_selects_resource_monitoring(
+        self, live_medium: tuple[list[str], dict[str, FileDeps]]
+    ) -> None:
+        marker = "medium and not (slow or stress or resource_heavy or live_integration)"
+        node_ids, dep_map = live_medium
+        selection = compute_selection(
+            ["benchbox/monitoring/performance.py"],
+            dep_map,
+            node_ids,
+            marker_expression=marker,
+            cant_affect=frozenset(),
+            whole_suite_paths=MEDIUM_WHOLE_SUITE_PATHS,
+        )
+        expected = {node for node in node_ids if node.startswith("tests/unit/monitoring/test_resource_monitoring.py::")}
+        assert expected
+        selected = {entry["node_id"] for entry in selection["selected"]}
+        assert expected <= selected
+
+    def test_medium_single_module_diff_selects_subset(self, live_medium: tuple[list[str], dict[str, FileDeps]]) -> None:
+        node_ids, dep_map = live_medium
+        selection = compute_selection(
+            ["benchbox/monitoring/profiler.py"],
+            dep_map,
+            node_ids,
+            marker_expression="medium and not (slow or stress or resource_heavy or live_integration)",
+            cant_affect=frozenset(),
+            whole_suite_paths=MEDIUM_WHOLE_SUITE_PATHS,
+        )
+        assert selection["whole_suite"] is False
+        assert 0 < selection["selected_count"] < selection["total_count"]

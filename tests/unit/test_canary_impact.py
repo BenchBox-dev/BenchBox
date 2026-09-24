@@ -12,12 +12,14 @@ import yaml
 from scripts import canary_impact
 from scripts.canary_impact import (
     CANT_AFFECT_CANARY,
+    MEDIUM_WHOLE_SUITE_PATHS,
     WHOLE_SUITE_PATHS,
     FileDeps,
     _resolve_plugin_file,
     build_dependency_map,
     compute_selection,
     files_from_node_ids,
+    medium_relevant_paths,
 )
 from scripts.release_canary_sharding import MARKER_EXPRESSION as SHARDING_MARKER
 
@@ -369,7 +371,7 @@ class TestFailSafeRules:
         assert fallback is None
         assert dep_map["tests/test_x.py"].dynamic
 
-    def test_transitive_dynamic_edge_is_reported_not_propagated(self, tmp_path: Path) -> None:
+    def test_transitive_dynamic_import_is_reported_and_selects_test(self, tmp_path: Path) -> None:
         root = _fixture_root(
             tmp_path,
             {
@@ -380,10 +382,9 @@ class TestFailSafeRules:
         )
         dep_map, fallback, sites = build_dependency_map(root, ["tests/test_x.py"])
         assert fallback is None
-        # Library dynamics are reported for the shadow watch, not
-        # propagated: propagating them would always-select every test
-        # importing the registry.
-        assert not dep_map["tests/test_x.py"].dynamic
+        # Test-specific unresolved imports select this test for changed paths
+        # that another test may map through a static edge.
+        assert dep_map["tests/test_x.py"].dynamic
         assert any(site.startswith("mypkg/helper.py:") for site in sites)
         selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/__init__.py"])
         assert selection["whole_suite"] is False
@@ -555,3 +556,151 @@ def test_marker_expression_matches_release_canary_workflow() -> None:
     run_text = "\n".join(str(step.get("run", "")) for step in shards["steps"])
     assert canary_impact.MARKER_EXPRESSION in run_text
     assert canary_impact.MARKER_EXPRESSION == SHARDING_MARKER
+
+
+def test_medium_preflight_ignores_non_product_paths() -> None:
+    changed = [
+        "docs/readme.md",
+        ".github/workflows/pr.yml",
+        "tests/unit/test_canary_impact.py",
+        "Makefile",
+        "benchbox/monitoring/performance.py",
+    ]
+    assert medium_relevant_paths(changed) == ["benchbox/monitoring/performance.py"]
+    assert medium_relevant_paths(["tests/conftest.py", "uv.lock"]) == ["tests/conftest.py", "uv.lock"]
+
+
+def test_medium_preflight_skips_collection_and_mapping_without_product_paths(tmp_path: Path) -> None:
+    output = tmp_path / "selection.json"
+    rc = canary_impact.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--changed-path",
+            "tests/test_x.py",
+            "--product-code-only",
+            "--output",
+            str(output),
+        ]
+    )
+    assert rc == 0
+    selection = json.loads(output.read_text(encoding="utf-8"))
+    assert selection["collection"]["source"] == "skipped_no_product_code"
+    assert selection["whole_suite"] is False
+    assert selection["selected_count"] == 0
+
+
+def test_medium_profile_parameters_select_only_affected_nodes() -> None:
+    node_ids = ["tests/test_x.py::test_a", "tests/test_y.py::test_b"]
+    dep_map = {
+        "tests/test_x.py": FileDeps(frozenset({"benchbox/x.py"}), False, ()),
+        "tests/test_y.py": FileDeps(frozenset({"benchbox/y.py"}), False, ()),
+    }
+    selection = compute_selection(
+        ["benchbox/x.py"],
+        dep_map,
+        node_ids,
+        marker_expression="medium",
+        cant_affect=frozenset(),
+        whole_suite_paths=MEDIUM_WHOLE_SUITE_PATHS,
+    )
+    assert selection["marker_expression"] == "medium"
+    assert [entry["node_id"] for entry in selection["selected"]] == ["tests/test_x.py::test_a"]
+
+
+def test_cant_affect_list_is_parameterized() -> None:
+    nodes = ["tests/test_x.py::test_a"]
+    dep_map = {"tests/test_x.py": FileDeps(frozenset({"benchbox/x.py"}), False, ())}
+    ignored = compute_selection(["docs/note.md"], dep_map, nodes, cant_affect=frozenset({"docs/"}))
+    assert ignored["selected_count"] == 0
+    assert ignored["whole_suite"] is False
+    fallback = compute_selection(["docs/note.md"], dep_map, nodes, cant_affect=frozenset())
+    assert fallback["whole_suite_reason"] == "unmapped_path:docs/note.md"
+
+
+def test_shared_dynamic_import_does_not_select_every_test(tmp_path: Path) -> None:
+    root = _fixture_root(
+        tmp_path,
+        {
+            "tests/conftest.py": "import pkg.registry\n",
+            "pkg/__init__.py": "",
+            "pkg/registry.py": "import importlib\nmod = importlib.import_module(name)\n",
+            "pkg/a.py": "VALUE = 1\n",
+            "pkg/b.py": "VALUE = 2\n",
+            "tests/test_a.py": "import pkg.a\n",
+            "tests/test_b.py": "import pkg.b\n",
+        },
+    )
+    files = ["tests/test_a.py", "tests/test_b.py"]
+    nodes = ["tests/test_a.py::test_a", "tests/test_b.py::test_b"]
+    dep_map, fallback, _sites = build_dependency_map(root, files)
+    assert fallback is None
+    selection = compute_selection(["pkg/a.py"], dep_map, nodes)
+    assert [entry["node_id"] for entry in selection["selected"]] == ["tests/test_a.py::test_a"]
+
+
+def test_unresolved_library_import_selects_lazy_export_test(tmp_path: Path) -> None:
+    root = _fixture_root(
+        tmp_path,
+        {
+            "pkg/__init__.py": (
+                "import importlib\n"
+                "def __getattr__(name):\n"
+                "    module_name = 'backing' if name == 'Resource' else name\n"
+                "    return getattr(importlib.import_module(f'{__name__}.{module_name}'), name)\n"
+            ),
+            "pkg/backing.py": "class Resource: ...\n",
+            "tests/test_lazy.py": "from pkg import Resource\n\ndef test_lazy(): ...\n",
+            "tests/test_direct.py": "import pkg.backing\n\ndef test_direct(): ...\n",
+        },
+    )
+    files = ["tests/test_lazy.py", "tests/test_direct.py"]
+    nodes = ["tests/test_lazy.py::test_lazy", "tests/test_direct.py::test_direct"]
+    dep_map, fallback, _sites = build_dependency_map(root, files)
+    assert fallback is None
+    assert "pkg/backing.py" not in dep_map["tests/test_lazy.py"].deps
+    selection = compute_selection(["pkg/backing.py"], dep_map, nodes)
+    assert {entry["node_id"] for entry in selection["selected"]} == set(nodes)
+
+
+def test_medium_runner_uses_file_targets_and_scrubs_changed_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _fixture_root(
+        tmp_path,
+        {"benchbox/x.py": "VALUE = 1\n", "tests/test_x.py": "import benchbox.x\n\ndef test_x(): ...\n"},
+    )
+    collection = tmp_path / "nodes.txt"
+    collection.write_text("tests/test_x.py::test_x\n", encoding="utf-8")
+    monkeypatch.setenv("BENCHBOX_MEDIUM_CHANGED_PATHS_JSON", json.dumps(["benchbox/x.py"]))
+    calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((command, kwargs["env"]))  # type: ignore[arg-type]
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(canary_impact.subprocess, "run", fake_run)
+    rc = canary_impact.main(
+        [
+            "--repo-root",
+            str(root),
+            "--collection-file",
+            str(collection),
+            "--changed-json-env",
+            "BENCHBOX_MEDIUM_CHANGED_PATHS_JSON",
+            "--marker-expression",
+            "medium",
+            "--cant-affect-list",
+            "empty",
+            "--product-code-only",
+            "--run-selected",
+            "--output",
+            str(tmp_path / "selection.json"),
+        ]
+    )
+    assert rc == 0
+    assert len(calls) == 1
+    command, env = calls[0]
+    assert "--dist=loadfile" in command
+    assert command[-1] == "tests/test_x.py"
+    assert "BENCHBOX_MEDIUM_CHANGED_PATHS_JSON" not in env
