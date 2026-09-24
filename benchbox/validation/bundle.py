@@ -1234,6 +1234,14 @@ def _validate_query_coverage(
             uncounted += 1
         else:
             observed.add(normalized_qid)
+    if normalized_id == "tpcds":
+        # The official TPC-DS stream executes both parts of these queries
+        # instead of a single unsuffixed query. Require the full pair before
+        # counting its logical query ID toward the 99-query denominator.
+        for base_id in ("14", "23", "24", "39"):
+            observed.discard(base_id)
+            if {f"{base_id}a", f"{base_id}b"} <= observed:
+                observed.add(base_id)
     missing = sorted(
         canonical - observed,
         key=lambda s: [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", s)],
