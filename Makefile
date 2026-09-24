@@ -70,9 +70,9 @@ publication-help:
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
-	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)"
+	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
-	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0
+	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
 test-unit:
 	uv run -- python -m pytest -m "unit" --tb=short
@@ -85,7 +85,7 @@ test-tpch:
 
 # Curated lightweight smoke lane
 test-quick:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5
+	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
 # Verbose test output for all tests
 test-verbose:
@@ -97,7 +97,7 @@ test-pytest:
 
 # Speed-based testing
 test-fast:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short
+	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
@@ -112,14 +112,14 @@ test-medium:
 	uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
 test-slow:
-	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v
+	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
 test-stress:
-	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v
+	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
 # Development cycle testing using the curated fast unit subset
 test-dev:
-	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3
+	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
@@ -370,7 +370,7 @@ test-window:
 # CI/CD testing
 # Maintained broad local CI profile (literal root-text compatibility contract).
 test-ci:
-	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300
 
 # Fast CI feedback (excludes cloud platform tests for speed)
 test-no-cloud:
@@ -385,13 +385,13 @@ test-parallel:
 	uv run -- python -m pytest -n auto --tb=short
 
 test-parallel-fast:
-	uv run -- python -m pytest -n auto -m "fast" --tb=short
+	uv run -- python -m pytest -n auto -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
 # Coverage commands using pytest
 coverage-fast:
-	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0
+	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120
 
 coverage-all:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
@@ -852,7 +852,7 @@ ci-lint:
 # non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
-	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
+	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
 # CI docs build - exact match for docs.yml workflow
@@ -1382,7 +1382,7 @@ pr-preflight-fast-tests:
 	fi; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
-		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
+		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -q; \
 	else \
 		echo "No code changes detected; skipping fast tests."; \
 	fi

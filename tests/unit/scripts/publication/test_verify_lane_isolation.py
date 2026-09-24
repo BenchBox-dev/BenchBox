@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 from scripts.publication.verify_lane_isolation import (
+    LANE_ARTIFACTS,
+    LANE_WORKFLOWS,
     REPO_ROOT,
     classify_path,
     compute_all_lane_digests,
@@ -124,10 +126,35 @@ def test_verify_lane_isolation_current_repo() -> None:
     assert not report.errors
 
 
-def test_verify_lane_isolation_mixed_paths_succeed_for_all_affected_lanes() -> None:
+def test_verify_lane_isolation_mixed_paths_succeed_for_all_affected_lanes(tmp_path: Path) -> None:
+    # This checks changed-path routing and mutation isolation. A small repo
+    # exercises both without hashing the unrelated live checkout four times.
+    for lane, workflow in LANE_WORKFLOWS.items():
+        path = tmp_path / workflow
+        path.parent.mkdir(parents=True, exist_ok=True)
+        artifact_steps = "".join(
+            f"      - uses: actions/upload-artifact@v4\n        with:\n          name: {artifact}\n"
+            for artifact in LANE_ARTIFACTS[lane]
+        )
+        path.write_text(
+            "permissions:\n  contents: read\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n"
+            + artifact_steps,
+            encoding="utf-8",
+        )
+
+    for relative_path in (
+        "docs/index.rst",
+        "landing/index.html",
+        "results-explorer/package.json",
+        "results-data/bundles/test.json",
+    ):
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("test input\n", encoding="utf-8")
+
     # Clean paths for site
     clean_paths = ["docs/index.rst", "landing/index.html"]
-    clean_report = verify_lane_isolation("site", repo_root=REPO_ROOT, changed_paths=clean_paths)
+    clean_report = verify_lane_isolation("site", repo_root=tmp_path, changed_paths=clean_paths)
     assert clean_report.success is True
     assert clean_report.details["affected_lanes"] == ["site"]
 
@@ -139,7 +166,7 @@ def test_verify_lane_isolation_mixed_paths_succeed_for_all_affected_lanes() -> N
     ]
     # D7: Changed paths determine affected lanes; mixed PRs succeed for all affected lanes
     for lane in ("site", "explorer", "corpus"):
-        report = verify_lane_isolation(lane, repo_root=REPO_ROOT, changed_paths=mixed_paths)
+        report = verify_lane_isolation(lane, repo_root=tmp_path, changed_paths=mixed_paths)
         assert report.success is True
         assert not report.errors
         assert report.details["affected_lanes"] == ["corpus", "explorer", "site"]

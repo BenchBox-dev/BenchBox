@@ -271,6 +271,24 @@ class TestMakefileCommands:
         assert "test-fast:" in makefile_content
         assert '-m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short' in makefile_content
 
+    def test_default_test_lanes_arm_explicit_timeouts(self):
+        makefile_content = (Path.cwd() / "Makefile").read_text()
+        expected = {
+            "test-fast": "--timeout=120",
+            "test-medium": "--timeout=60",
+            "test-slow": "--timeout=1200",
+            "test-stress": "--timeout=1800",
+            "test-ci": "--timeout=300",
+            "ci-test": "--timeout=120",
+            "pr-preflight-fast-tests": "--timeout=120",
+        }
+        for target, timeout in expected.items():
+            assert timeout in _makefile_target_body(makefile_content, target)
+
+        test_all = _makefile_target_body(makefile_content, "test-all")
+        assert "--timeout=300" in test_all
+        assert "--timeout=1200" in test_all
+
     def test_skill_integrity_preflight_pure_skill_selects_only_focused_lane(self, tmp_path: Path):
         result, calls = _run_skill_integrity_preflight_route(
             tmp_path,
@@ -488,6 +506,8 @@ class TestMakefileCommands:
         assert "-m fast -q" not in preflight_body
         assert f'-m "{CI_FAST_EXPRESSION}"' in develop_pr_run_text
         assert f'-m "{CI_FAST_EXPRESSION}"' in main_pr_run_text
+        assert "--timeout=120" in develop_pr_run_text
+        assert "--timeout=120" in main_pr_run_text
         assert "--cov-fail-under=70" in develop_pr_run_text
         assert "--cov-fail-under=70" in main_pr_run_text
         assert "coverage remains CI-only" in makefile_content

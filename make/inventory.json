@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "4fbb3a1a545cc7a7175caff6e3186adc0e2b8be7ada8cfacb5cb9ea31b37a4e7",
+  "contract_sha256": "10dfe995971e1fa1cb3a21df846be76c783f630547c8ae5ae834e41d69f2b851",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -611,8 +611,8 @@
     "ci-test": [
       {
         "header": "ci-test:",
-        "recipe": "\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
-        "recipe_sha256": "f91848e652e649165d0584fd56ee410839f380b6b40d5d0087836d3072b3d182"
+        "recipe": "\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
+        "recipe_sha256": "52e26351f1db97053a91ad1dc9509b1097a479aa1e3ce4e66280006ff7d8301e"
       }
     ],
     "clean": [
@@ -710,8 +710,8 @@
     "coverage-fast": [
       {
         "header": "coverage-fast:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0",
-        "recipe_sha256": "0d5f539509e76207440186871ebfeafc49e39803f74a4663abf585712c03b299"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120",
+        "recipe_sha256": "944c7188b5f1d349182a755143a1766825d903b80ed6a0a85e5860e8550b7ab7"
       }
     ],
     "coverage-html": [
@@ -1216,8 +1216,8 @@
     "pr-preflight-fast-tests": [
       {
         "header": "pr-preflight-fast-tests:",
-        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
-        "recipe_sha256": "be6d0e1afed5ae70a012cee2e58ef0492d9e4cf77bdad8eea6fee4bf3c94ef06"
+        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
+        "recipe_sha256": "9fc5f7fdf10f10264f6fbc1ed4ef514be9eff55ff7805b2fdc86286d5e10958e"
       }
     ],
     "pr-preflight-focused-tests": [
@@ -1473,8 +1473,8 @@
     "test-all": [
       {
         "header": "test-all:",
-        "recipe": "\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\"\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0",
-        "recipe_sha256": "b54f1e5d0c9797a62533a0766b9ae5f7c4453f9fded1c7795b383b52d585fbba"
+        "recipe": "\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
+        "recipe_sha256": "934b5dd7638f8a21cf7288c27f2a3f06938b6ceba72e430214841e15771987fe"
       }
     ],
     "test-benchmarks": [
@@ -1487,8 +1487,8 @@
     "test-ci": [
       {
         "header": "test-ci:",
-        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0",
-        "recipe_sha256": "269fc051212f3fc2d7a0d9df4964fba0ecdfd4ea8c14d88c65ffebe286ab6f2a"
+        "recipe": "\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300",
+        "recipe_sha256": "1a0e28b21d540cfd187d12bf0035da183498eb00757b7fb219c938db155ba257"
       }
     ],
     "test-correctness-gate": [
@@ -1501,8 +1501,8 @@
     "test-dev": [
       {
         "header": "test-dev:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3",
-        "recipe_sha256": "9cd3a2a7af9d6ef4e12a96ee8fa8a4e97eb3b78104eb1c0ff2bc1a73b13d4497"
+        "recipe": "\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
+        "recipe_sha256": "cd32b99fb28399f0aa8eb9c52a749780d4f1f531c1750fdc3e49aed58419a860"
       }
     ],
     "test-docker-%": [
@@ -1597,8 +1597,8 @@
     "test-fast": [
       {
         "header": "test-fast:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short",
-        "recipe_sha256": "9bcfa61e0b8a7fab3da7591b562f96423f2dcb29b93e26dcfa14857cfd5493f8"
+        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
+        "recipe_sha256": "c2436d9fab2248df50bc4e7eca6edd1fb84a00397b64591bae1e42cfebca4dd8"
       }
     ],
     "test-full": [
@@ -1765,8 +1765,8 @@
     "test-parallel-fast": [
       {
         "header": "test-parallel-fast:",
-        "recipe": "\tuv run -- python -m pytest -n auto -m \"fast\" --tb=short",
-        "recipe_sha256": "2b5ad5912ea6e83f66049bf232db7821ce5df2f7c1674e6e1a274e1889049d66"
+        "recipe": "\tuv run -- python -m pytest -n auto -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
+        "recipe_sha256": "177b4a4a2260f24bac39d65133409bd328eab28abff1ca5a7ee7586ab5fbea06"
       }
     ],
     "test-pyspark": [
@@ -1786,8 +1786,8 @@
     "test-quick": [
       {
         "header": "test-quick:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5",
-        "recipe_sha256": "a06254869da01e4d57d77b78bd46e194a9445824beaafdaf333b7a511e866093"
+        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
+        "recipe_sha256": "21c3ddb117a0f815c3505983a5d36f56d227274dfc4f7a87ca4ebdbb138f9bf9"
       }
     ],
     "test-read-primitives": [
@@ -1800,8 +1800,8 @@
     "test-slow": [
       {
         "header": "test-slow:",
-        "recipe": "\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v",
-        "recipe_sha256": "4b7747c5e86bac95fa107c3b50346f3c628be546e10829791db909d44a6297ee"
+        "recipe": "\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
+        "recipe_sha256": "0b91dfe255f023f6d6b79e66f3bfc11da57e313726f4073bc91f7767df7e46db"
       }
     ],
     "test-smoke": [
@@ -1821,8 +1821,8 @@
     "test-stress": [
       {
         "header": "test-stress:",
-        "recipe": "\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v",
-        "recipe_sha256": "953d1c3b264b9f766158a1c7ef748d02b7fb6d15d9e25a308963308509f938e5"
+        "recipe": "\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
+        "recipe_sha256": "45cccb9bf979749e2725426908e6fdc8c585a2d2de68b1c2c9aa191e286103a2"
       }
     ],
     "test-tpcds": [
@@ -2139,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "efced0595ab00190d7105650a195096958a3dafba0fc07b7d5fc175367c895f4",
+  "semantic_sha256": "2050c6dce832669bdf15c3cd33fa78d1ce5c35e0fb20b2aacc333bd6bcda27b9",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2368,9 +2368,9 @@
       ]
     },
     {
-      "body": "test-all:\n\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\"\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0",
+      "body": "test-all:\n\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
       "kind": "rule",
-      "sha256": "0219bc89caaa2ab508b2b512ca82a94f2e137ea3614810e1163b0c53d0523ede",
+      "sha256": "0ad0497cf5911710df528314fea71db989f8b7f469d823cad7aa52a11cc03d96",
       "targets": [
         "test-all"
       ]
@@ -2400,9 +2400,9 @@
       ]
     },
     {
-      "body": "test-quick:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5",
+      "body": "test-quick:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
       "kind": "rule",
-      "sha256": "28c1294ca0a846eb173e76ba3595c43cbb48d3bb0ac9d9456e1f3443f221243a",
+      "sha256": "17951970b9098576d5878194b14fde3408c9aa27df9d45b8661f4cb8b3236eac",
       "targets": [
         "test-quick"
       ]
@@ -2424,9 +2424,9 @@
       ]
     },
     {
-      "body": "test-fast:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short",
+      "body": "test-fast:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
       "kind": "rule",
-      "sha256": "47092f2de10dd00c38209cb3e498b9f21043dc010bda778646b25c8ec7a8d8e9",
+      "sha256": "3ecb68d9907aaf8f74a4de8c75a26eef4f2286fba650f86f9546abfa110187c1",
       "targets": [
         "test-fast"
       ]
@@ -2448,25 +2448,25 @@
       ]
     },
     {
-      "body": "test-slow:\n\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v",
+      "body": "test-slow:\n\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
       "kind": "rule",
-      "sha256": "d24b83fc409f9c9b9df11cbb5b84acd438aa6a4be10a2e4ac3fa090264e29f4b",
+      "sha256": "c3a76fa9345a30dc82fd6bd6da8aa6707117ec6004e2f616d1b48a465d1df254",
       "targets": [
         "test-slow"
       ]
     },
     {
-      "body": "test-stress:\n\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v",
+      "body": "test-stress:\n\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
       "kind": "rule",
-      "sha256": "b7651d6e14f86d81dc6ecebf502a265c4701d1c1af349a20a8e42c270a5b833f",
+      "sha256": "ede6d29ba1df45f7a2a058dbb13b4671608d6c4335ccc296daffa319889010cb",
       "targets": [
         "test-stress"
       ]
     },
     {
-      "body": "test-dev:\n\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3",
+      "body": "test-dev:\n\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
       "kind": "rule",
-      "sha256": "43f96afe35fb000a968738937e6c1494cf21ca514861a90911927963acc43070",
+      "sha256": "f1b41cd861c58b9da2a78867747a9389339fdc59a10a725c111999b6d14afeb4",
       "targets": [
         "test-dev"
       ]
@@ -2742,9 +2742,9 @@
       ]
     },
     {
-      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0",
+      "body": "test-ci:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (slow or stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300",
       "kind": "rule",
-      "sha256": "4e63cea6216f1a98a959bca0bd7ff3693c16040378ba2f892bfc16b3819e7ad1",
+      "sha256": "b19cfa2ec246b1c0de37cdf2a1a2bde759f3f83943fa1ecaaf413a47e4ee641d",
       "targets": [
         "test-ci"
       ]
@@ -2774,9 +2774,9 @@
       ]
     },
     {
-      "body": "test-parallel-fast:\n\tuv run -- python -m pytest -n auto -m \"fast\" --tb=short",
+      "body": "test-parallel-fast:\n\tuv run -- python -m pytest -n auto -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
       "kind": "rule",
-      "sha256": "50900f4cf7375d40c50f4616b2f4b63485adc72bea7e77e677c1013320ad39bf",
+      "sha256": "14fc436535510ef79dc42f9908a739dc17228c44b1b4603e3a67f94ae744964b",
       "targets": [
         "test-parallel-fast"
       ]
@@ -3032,9 +3032,9 @@
       ]
     },
     {
-      "body": "coverage-fast:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0",
+      "body": "coverage-fast:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120",
       "kind": "rule",
-      "sha256": "5201398487e85b124f34135bb0e9f02b86e45501a649728bdcc46f247ccb4eb7",
+      "sha256": "eed50a348183411a5a517fcaf478da5824dd19036b8ca6271b526f33d97d990c",
       "targets": [
         "coverage-fast"
       ]
@@ -3402,9 +3402,9 @@
       ]
     },
     {
-      "body": "ci-test:\n\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
+      "body": "ci-test:\n\t@echo \"Running CI test suite...\"\n\tuv run -- python -m pytest tests -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70\n\t@echo \"\u2705 CI test suite passed\"",
       "kind": "rule",
-      "sha256": "695ed46a2e6bfaa3c7fe27e594919e5a1dc9029a36c5210d0f0aeb03ec5ede64",
+      "sha256": "52b4fbc1f924a7fc6066fa20ebcbb3b2f84c66e13f2ae9307fd333a442837717",
       "targets": [
         "ci-test"
       ]
@@ -3824,9 +3824,9 @@
       ]
     },
     {
-      "body": "pr-preflight-fast-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
+      "body": "pr-preflight-fast-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ] || [ -n \"$(PATH_LISTS)\" ]; then \\\n\t\t[ -n \"$(PATH_DECISION)\" ] && [ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\t[ -n \"$(PATH_LISTS)\" ] && [ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\t\tLISTS=\"$(PATH_LISTS)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\tLISTS=$$(mktemp -d); \\\n\t\ttrap 'rm -f \"$$DECISION\"; rm -rf \"$$LISTS\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" --lists-dir \"$$LISTS\" >/dev/null; \\\n\tfi; \\\n\tif [ \"$(SKIP_CONTENT_GUARD)\" = \"1\" ]; then \\\n\t\techo \"Focused checks defer content guard to required preflight.\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-content-guard PATH_LISTS=\"$$LISTS\"; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> fast tests (CI marker selection; coverage remains CI-only)\"; \\\n\t\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120 -q; \\\n\telse \\\n\t\techo \"No code changes detected; skipping fast tests.\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "09ce5d931e7cba452e441482581e8bfa5427b429180d1a3bc2e739ab7a34e65c",
+      "sha256": "d289cdd58ad0d569278d30f58e2f2e160b6fbcfc940b5db6ee7f4cd5aeb8aac6",
       "targets": [
         "pr-preflight-fast-tests"
       ]
