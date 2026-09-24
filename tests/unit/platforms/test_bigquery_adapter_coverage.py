@@ -115,23 +115,18 @@ class TestFromConfigProjectAutoDetect:
         assert adapter.project_id == "explicit-proj"
 
     def test_silences_default_credentials_error(self):
-        """DefaultCredentialsError during auto-detect is swallowed; no project_id set."""
+        """Missing ADC falls through to the actionable project ID validation error."""
         import benchbox.platforms.bigquery as bq_module
+        from benchbox.core.exceptions import ConfigurationError
 
         with patch("benchbox.platforms.bigquery.google") as mock_google:
             mock_google.auth.exceptions.DefaultCredentialsError = RuntimeError
             mock_google.auth.default.side_effect = RuntimeError("no credentials")
 
-            # Needs explicit project_id to construct adapter without error
-            adapter = bq_module.BigQueryAdapter.from_config(
-                {
-                    "project_id": "fallback-proj",
-                    "benchmark": "tpch",
-                    "scale_factor": 1.0,
-                }
-            )
+            with pytest.raises(ConfigurationError, match="requires project_id"):
+                bq_module.BigQueryAdapter.from_config({"benchmark": "tpch", "scale_factor": 1.0})
 
-        assert adapter.project_id == "fallback-proj"
+        mock_google.auth.default.assert_called_once_with()
 
     def test_from_config_passes_result_metadata_options(self):
         import benchbox.platforms.bigquery as bq_module
@@ -1450,14 +1445,18 @@ class TestApplyTableTunings:
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = False
 
-        # Should complete without error
         adapter.apply_table_tunings(mock_tuning, mock_conn)
+
+        mock_tuning.has_any_tuning.assert_called_once_with()
+        assert mock_conn.mock_calls == []
 
     def test_none_tuning_returns_early(self):
         adapter = _make_adapter()
         mock_conn = Mock()
 
         adapter.apply_table_tunings(None, mock_conn)
+
+        assert mock_conn.mock_calls == []
 
     def test_tuning_with_recreation_needed_logs_warning(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -1495,8 +1494,11 @@ class TestApplyTableTunings:
 
         mock_tuning.get_columns_by_type.side_effect = get_cols_by_type
 
-        # Should complete without raising; warning is logged internally
-        adapter.apply_table_tunings(mock_tuning, mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.apply_table_tunings(mock_tuning, mock_conn)
+
+        mock_conn.get_table.assert_called_once_with(mock_table_ref)
+        assert any("Consider recreating the table" in call.args[0] for call in mock_warning.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -1646,8 +1648,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("credential refresh failed")
 
-        # Should not raise
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_not_called()
 
     def test_auth_error_suppressed(self):
         adapter = _make_adapter()
@@ -1655,8 +1659,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("auth token expired")
 
-        # Should not raise
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_not_called()
 
     def test_non_credential_error_logged_as_warning(self):
         adapter = _make_adapter()
@@ -1664,8 +1670,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("network timeout")
 
-        # Should not raise (logs warning instead)
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_called_once_with("Error closing connection: network timeout")
 
     def test_none_connection_handled(self):
         adapter = _make_adapter()
@@ -1843,14 +1851,22 @@ class TestApplyPlatformOptimizations:
         adapter = _make_adapter()
         mock_conn = Mock()
 
-        adapter.apply_platform_optimizations(None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(None, mock_conn)
+
+        mock_info.assert_not_called()
+        assert mock_conn.mock_calls == []
 
     def test_valid_config_logs_message(self):
         adapter = _make_adapter()
         mock_conn = Mock()
 
         mock_config = Mock()
-        adapter.apply_platform_optimizations(mock_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(mock_config, mock_conn)
+
+        mock_info.assert_called_once_with("BigQuery platform optimizations stored for query execution")
+        assert mock_conn.mock_calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -2000,7 +2016,17 @@ class TestApplyUnifiedTuning:
         adapter = _make_adapter()
         mock_conn = Mock()
 
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraints,
+            patch.object(adapter, "apply_platform_optimizations") as mock_optimizations,
+            patch.object(adapter, "apply_table_tunings") as mock_table_tunings,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+
+        mock_constraints.assert_not_called()
+        mock_optimizations.assert_not_called()
+        mock_table_tunings.assert_not_called()
+        assert mock_conn.mock_calls == []
 
     def test_valid_config_applies_all_tunings(self):
         adapter = _make_adapter()
