@@ -2570,17 +2570,12 @@
       "title": "Version the operations catalog change and land it separately"
     },
     "cloud-executor-failed-payload-coverage": {
-      "claim": {
-        "expires_at": "2026-09-25T17:42:39Z",
-        "generation": "cb0bc80f4afc4857b0bb3f12e9100144",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:1b61f46fc27c4f9766e3b059"
-      },
+      "claim": null,
       "needs": [
         "cloud-executor-rebase-reverify"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Apply FAILED-payload checks at all primitives execution boundaries"
     },
     "cloud-executor-live-verification": {
