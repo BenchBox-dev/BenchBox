@@ -222,9 +222,10 @@ so the metric and the budget it measures cannot drift apart.
 ## Required-gate versus whole-event fan-out
 
 Merge-unblock latency is the last **required** context (`ci-required-result`,
-`Results Explorer browser gate`, `ruleset-drift`). Documentation, integration
-samples, and other synchronize workflows are all-workflow fan-out: they consume
-runner-minutes and can extend wall time after the PR is already mergeable.
+`Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`).
+The remaining documentation, integration samples, and other synchronize jobs
+are all-workflow fan-out: they consume runner-minutes and can extend wall time
+after the PR is already mergeable.
 `dev_loop_pr_metrics.py --event-fanout` emits the versioned
 `event_fanout_v1` section that keeps those clocks separate. Public
 standard-runner dollar cost is reported as zero. See

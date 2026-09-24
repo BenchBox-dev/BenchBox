@@ -159,6 +159,7 @@ def test_green_at_is_the_last_required_context_to_finish() -> None:
         "ci-required-result": "2026-07-21T08:00:00Z",
         "Results Explorer browser gate": "2026-07-23T02:00:00Z",
         "ruleset-drift": "2026-07-22T08:00:00Z",
+        "Public-site visual acceptance": "2026-07-22T09:00:00Z",
     }
     runs = [_run(name, "success", completed_at=completed_at[name]) for name in mod.REQUIRED_CHECK_NAMES]
     assert mod.required_lane_green_at(runs) == "2026-07-23T02:00:00Z"
@@ -169,6 +170,7 @@ def test_green_at_is_order_independent() -> None:
         "ci-required-result": "2026-07-21T08:00:00Z",
         "Results Explorer browser gate": "2026-07-23T02:00:00Z",
         "ruleset-drift": "2026-07-22T08:00:00Z",
+        "Public-site visual acceptance": "2026-07-22T09:00:00Z",
     }
     runs = [_run(name, "success", completed_at=completed_at[name]) for name in reversed(mod.REQUIRED_CHECK_NAMES)]
     assert mod.required_lane_green_at(runs) == "2026-07-23T02:00:00Z"
@@ -200,6 +202,7 @@ def test_park_time_anchors_on_the_last_required_context() -> None:
             _run("ci-required-result", "success", completed_at="2026-07-21T08:00:00Z"),
             _run("Results Explorer browser gate", "success", completed_at="2026-07-23T02:00:00Z"),
             _run("ruleset-drift", "success", completed_at="2026-07-22T08:00:00Z"),
+            _run("Public-site visual acceptance", "success", completed_at="2026-07-22T09:00:00Z"),
         ],
     }
     assert mod.park_time_hours(pr, _now(), required_green=True) == pytest.approx(10.0)
