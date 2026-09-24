@@ -500,7 +500,7 @@ tests_dir = ["tests/unit/"]
 
 [tool.ruff]
 line-length = 120
-target-version = "0.4.1"
+target-version = "py311"
 exclude = [
     "migrations",
     "venv",
