@@ -3,6 +3,7 @@
     "A release-canary.yml run on a develop SHA containing all required fixes succeeds for every shard and release-canary-result.",
     "Record the run ID and SHA before finishing."
   ],
+  "context": "Dispatched release-canary.yml run 35993930883 on develop HEAD 1ba01a835b13d006057282892e526c0d0eeb4c4a at 2026-09-24T11:35:43Z. The commit incorporates all three canary fixes (#2316, #2319, #2322) plus #2323 and the release-process tooling PRs (#2318, #2320, #2321). Awaiting run completion.",
   "description": "After the three canary fixes merge into develop, verify a scheduled release-canary.yml run on a develop SHA containing all three merges. If new failures appear, create an owned item for each cause, add it to this item's dependencies, and keep this item open. Version bump, release cut, changelog, and UAT evidence are outside this item.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "op": "create",
       "op_id": "a575a9ac710e42efbee8a1a9fb59d00c",
       "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:de56a90ed87d9646e9c2dd8d",
+      "at": "2026-09-24T11:36:11Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "66765b238f3e4a9ba6c8ef0367e7ccea",
+      "session_id": "7e6ffcac0356464fbb4caab26793b9e0"
     }
   ]
 }
