@@ -13007,15 +13007,10 @@
       "title": "Release canonical todo-db holder-only runtime"
     },
     "release-cut-origin-head-linked-worktree": {
-      "claim": {
-        "expires_at": "2026-09-25T11:31:49Z",
-        "generation": "4f1163ad9ffc470e87945983309c0bff",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:de56a90ed87d9646e9c2dd8d"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Cut releases from an exact origin/develop head in a linked worktree"
     },
     "release-finalize-merged-pr-tag-recovery": {
