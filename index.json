@@ -1948,15 +1948,10 @@
       "title": "Make the hourly post-merge sweep exit when the develop tip is already tested"
     },
     "ci-dedupe-03-docs-cancel-superseded-pr-runs": {
-      "claim": {
-        "expires_at": "2026-09-25T15:55:19Z",
-        "generation": "e9ce8681bda24bd69d35fe527065eb24",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:b8606aa857d6b408645943eb"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Cancel superseded Documentation workflow runs on pull requests"
     },
     "ci-dedupe-04-heavy-tier-queue-only-decision-gate": {
