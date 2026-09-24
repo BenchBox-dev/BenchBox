@@ -418,6 +418,7 @@ class TestReleaseInfrastructure:
         collection_job = jobs["collect-credential-free-non-fast"]
         assert collection_job["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
+        assert jobs["ruleset-drift"]["outputs"]["drift_sha"] == "${{ steps.drift-ref.outputs.drift_sha }}"
         non_fast_job = jobs["credential-free-non-fast"]
         assert non_fast_job["timeout-minutes"] == 75
         assert non_fast_job["strategy"]["fail-fast"] is False
@@ -479,6 +480,7 @@ class TestReleaseInfrastructure:
         assert '"checked_ref": "develop"' in result_text
         assert '"commit_sha": "${CHECKED_SHA}"' in result_text
         assert '"collection_result": "${COLLECTION_RESULT}"' in result_text
+        assert '"ruleset_drift_sha": "${RULESET_DRIFT_SHA}"' in result_text
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
 
