@@ -1683,10 +1683,15 @@
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
     "canary-flightdata-bad-width-shard": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T03:47:57Z",
+        "generation": "1b338c77c47944cf96b997af1b9e7fdb",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Verify malformed reusable FlightData shards are rejected"
     },
     "canary-green-for-v0-4-1": {
