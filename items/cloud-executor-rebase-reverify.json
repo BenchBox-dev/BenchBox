@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Branch rebased onto current origin/develop with conflicts resolved",
+    "Dirty tree re-audited against the pre-rebase file list; any new files dispositioned",
+    "Affected unit suites re-run green and counts recorded in the item context",
+    "make pr-preflight passes on the rebased tree"
+  ],
+  "context": "Staging worktree /Users/joe/Developer/BenchBox.wt-cloud-executor-loader, branch fix/cloud-executor-loader-gaps, was pinned at develop 3931487d8 with all work uncommitted. origin/develop has since moved (seen at 4f3075552); rebase first because every finding below is stated against the rebased tree. Adversarial review (codex gpt-6-sol, Revise-and-resubmit) of the full uncommitted diff produced 2 Critical / 4 Required / 1 nit findings tracked in follow-up items. Guardrails: never git add -A, stage explicit paths only, implement in the linked worktree, run the repo's own touched suites (not a self-authored oracle).",
+  "description": "Rebase the uncommitted cloud-executor work onto current develop, resolve conflicts, and re-establish the green baseline before any finding is fixed. The staging tree holds ~1,863 uncommitted insertions (transaction/write primitives cloud hardening: dialect-aware identifier quoting, FAILED-payload guards, BigQuery job-client support, connection adaptation, catalog and adapter rewrites) plus one untracked test file. Adopt the tree only after re-auditing its dirty file list.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:37:26Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "0ac2d3dc37074ea0be1a6102fcdecef0",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}

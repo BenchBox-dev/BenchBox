@@ -2514,6 +2514,13 @@
       "status": "done",
       "title": "Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning"
     },
+    "cloud-executor-rebase-reverify": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Rebase cloud-executor work onto current develop and re-verify baseline"
+    },
     "cloud-integration-test-gaps": {
       "claim": null,
       "needs": [],
