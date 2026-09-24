@@ -5,7 +5,7 @@
     "make skill-sync-check and the repository skill-integrity gate pass on the BenchBox PR, and the two release action mirrors agree with the pinned source.",
     "The revised skill describes a linked-worktree release cut once the release-cut guard exists, or explicitly avoids promising that path until it lands."
   ],
-  "context": "Upstream skill-sync-skills PR #84 is MERGED at exact commit ac07efb9ae7affc0a6740cf7c7cf1be1e572e0ac (merged 2026-09-23T22:45:14Z). BenchBox worktree /Users/joe/Developer/BenchBox.wt-release-skill-pin, branch docs/pin-release-skill-uat-advisory, exact clean HEAD bc99338cf343ff4ed1b3bd3aaa2dd578c826308a matches origin. BenchBox PR #2320 is OPEN/non-draft/mergeable on base 435d07e97c2e0f30a002d721fbc42aca508d6a52. Live hosted checks: 21 SUCCESS, 19 SKIPPED, all complete. Review thread PRRT_kwDOQ7J64c6lXlos is resolved and outdated. Exact-head static checks passed: make skill-sync-check, make skill-integrity-check, make uat-artifact-hygiene, Ruff, and diff check; instruction budget 15,949 / 16,000 bytes. Exact-head local make pr-preflight receipts are absent. Current lock blocker (2026-09-24 01:59 UTC): unrelated preflight PID 84903 is active and medium test PID 10267 owns /Users/joe/.benchbox/test.lock. Preserve both. After they exit, verify the lock is unowned, then run exact-head make pr-preflight sequentially after PR #2321. Handoff: /tmp/benchbox-release-process-handoff.md. Keep this task open until PR merge; do not cut a release.",
+  "context": "Upstream skill-sync-skills PR #84 is MERGED at exact commit ac07efb9ae7affc0a6740cf7c7cf1be1e572e0ac (merged 2026-09-23T22:45:14Z). BenchBox worktree /Users/joe/Developer/BenchBox.wt-release-skill-pin, branch docs/pin-release-skill-uat-advisory, exact clean HEAD bc99338cf343ff4ed1b3bd3aaa2dd578c826308a matches origin. BenchBox PR #2320 is OPEN/non-draft/mergeable on base 435d07e97c2e0f30a002d721fbc42aca508d6a52. Live hosted checks: 21 SUCCESS, 19 SKIPPED, all complete. Review thread PRRT_kwDOQ7J64c6lXlos is resolved and outdated. Exact-head static checks passed: make skill-sync-check, make skill-integrity-check, make uat-artifact-hygiene, Ruff, and diff check; instruction budget 15,949 / 16,000 bytes. Exact-head local make pr-preflight receipts are absent. Handoff snapshot 2026-09-24 02:02 UTC: unrelated preflight PIDs 84903/10265/10267 have exited; ps shows none and lsof shows no process holds /Users/joe/.benchbox/test.lock. The lock file remains with mtime 2026-09-23 21:51:42 -0400. Before tests, recheck no owner; if it remains stale, run make test-unlock. Run exact-head make pr-preflight sequentially after PR #2321. Handoff: /tmp/benchbox-release-process-handoff.md. Keep this task open until PR merge; do not cut a release.",
   "description": "The agent release skill says committed UAT evidence no older than 21 days is required and stale evidence fails validate-base, but the current release guide and scripts/release_readiness_check.py make the three-stage UAT campaign advisory. The demotion landed in PR #1927. Correct the canonical benchbox release action in skill-sync-skills, then update BenchBox's immutable catalog rev in skill-sync.conf and regenerate the tracked .claude/skills mirror and ignored .agents/skills mirror through make skill-sync. Prior art: skill-sync.conf:7-17,33 declares the catalog source/pin; AGENTS.md forbids hand-editing generated mirrors. Decision: retain the local-develop-equals-origin/develop prose as a useful operator check or replace it with a reference to the new mechanical release-cut guard once that guard lands. Keep UAT advisory under current policy; any decision to make it blocking again requires an explicit later policy change and trusted-base rollout. Do not edit mirrors directly, treat tracker done as proof of current gate behavior, or make a release wait for optional UAT.",
   "links": [
     "skill-sync.conf",
@@ -165,6 +165,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "bb5a4ad226c4479dbc7d9830413d8df4",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-24T02:03:28Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "d02d8f54dddc45529218fb7ac42cc782",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
