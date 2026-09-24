@@ -4,16 +4,22 @@ BenchBox releases follow a **version-branch flow** on a single repo
 (`BenchBox-dev/BenchBox`) with two long-lived branches: `develop` (dev work)
 and `release` (release-only). This guide is the maintainer runbook.
 
-## The flow (2 commands)
+## The flow
 
 ```bash
-git checkout develop && git pull
+make worktree-create BRANCH=chore/cut-next-release WORKTREE_PATH=../BenchBox.wt-cut-next-release
+cd ../BenchBox.wt-cut-next-release
+make agent-write-preflight
 make release-cut VERSION=X.Y.Z
 # review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z
 ```
 
-That's the entire flow. The two Make targets do the rest. Wheel install,
+Choose an unused version and resolve any existing `vX.Y.Z` branch or tag before
+starting. `release-cut` fetches `origin` and accepts a new cut only from a clean
+linked worktree whose HEAD is exactly the fetched `origin/develop` commit. An
+ahead, behind, or dirty checkout stops before any version file changes. The
+two release Make targets handle the cut and finalization. Wheel install,
 release canary, and correctness remain the blocking gates; UAT is a
 non-blocking matrix campaign.
 
@@ -116,7 +122,8 @@ must not be bypassed with an undocumented local change.
 
 ### What `release-cut` does
 
-1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
+1. Cuts a `vX.Y.Z` branch from the exact fetched `origin/develop` commit in a
+   linked worktree (`develop` itself is never modified).
 2. Bumps the 6 version sources via `scripts/update_version.py` and generates
    the CHANGELOG entry via `scripts/generate_changelog_entry.py --since-ref
    origin/release`. The release note boundary is the current release branch patch
@@ -171,12 +178,20 @@ untouched — so a section you curated between runs survives. To throw the cut
 away instead:
 
 ```bash
-make release-cut-abort VERSION=X.Y.Z   # reset, return to develop, delete the branch
+make release-cut-abort VERSION=X.Y.Z   # discard tracked edits and restore the creating worktree branch
 ```
 
-`release-cut-abort` refuses once `vX.Y.Z` exists on origin, and refuses to run
-from any branch other than `vX.Y.Z` or `develop`. `release-cut` likewise
-refuses to resume a branch that already carries its `Release vX.Y.Z` commit.
+`release-cut-abort` works in the creating linked worktree, even if the primary
+clone holds `develop`. It returns to the branch recorded when the worktree was
+created and deletes only an uncommitted local release branch. It refuses a
+pushed branch or tag, any local tag, a moved or committed branch, and untracked
+files. Inspect the edits before deliberately discarding them. `release-cut`
+refuses to resume a branch that already carries its `Release vX.Y.Z` commit or
+exists on origin or when a local release tag already exists. It also refuses
+when fetched `origin/develop` has advanced
+past the cut's starting commit. The branch and curated files remain untouched;
+review the new develop commits and preserve any authored changelog text before
+deciding whether to discard the cut and start again.
 
 Changelog summarization shells out to the `claude` CLI. It is skipped
 automatically inside a Claude Code session (where the nested call blocks until
@@ -322,7 +337,9 @@ The forward-fix path uses the same flow as any other release — there is no
 separate recovery procedure:
 
 ```bash
-git checkout develop && git pull
+make worktree-create BRANCH=chore/cut-patch-release WORKTREE_PATH=../BenchBox.wt-cut-patch-release
+cd ../BenchBox.wt-cut-patch-release
+make agent-write-preflight
 make release-cut VERSION=X.Y.Z
 # review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z

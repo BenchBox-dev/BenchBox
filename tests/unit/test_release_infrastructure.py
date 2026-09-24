@@ -746,24 +746,25 @@ class TestReleaseInfrastructure:
             .split()
         )
         assert "release-cut" not in development_only
-        assert "Resuming interrupted cut" in recipe
-        assert "already carries its release commit" in recipe
-        assert "git checkout -b v$(VERSION) develop" in recipe
-        assert "git rev-parse --verify --quiet refs/heads/v$(VERSION)" in recipe
+        assert 'sh scripts/release_cut_start.sh "$(VERSION)"' in recipe
+        start = (REPO_ROOT / "scripts" / "release_cut_start.sh").read_text(encoding="utf-8")
+        assert "Resuming interrupted cut" in start
+        assert "already carries its release commit" in start
+        assert 'git switch -c "$branch" "$develop"' in start
+        assert 'git show-ref --verify --quiet "refs/heads/$branch"' in start
 
-        assert "--first-parent" in recipe, (
+        assert "--first-parent" in start, (
             "the resume guard must walk first-parent: the `-s ours` alignment merge puts "
             "origin/release's release ledger (full of 'Release vX.Y.Z' subjects) on the second parent, "
             "and a plain `git log -1` misses a release commit sitting beneath that merge"
         )
 
         abort = _make_target_recipe("release-cut-abort")
-        assert "git reset --hard HEAD" in abort
-        assert "git checkout develop" in abort
-        assert "git branch -D v$(VERSION)" in abort
-        assert "git ls-remote --exit-code --heads origin" in abort, (
-            "abort must refuse to discard a release branch that already exists on origin"
-        )
+        assert 'sh scripts/release_cut_abort.sh "$(VERSION)"' in abort
+        abort_script = (REPO_ROOT / "scripts" / "release_cut_abort.sh").read_text(encoding="utf-8")
+        assert "git switch --discard-changes" in abort_script
+        assert 'git branch -d "$branch"' in abort_script
+        assert "git ls-remote --heads origin" in abort_script
         assert ".PHONY: release-cut release-cut-abort release-finalize" in _makefile_text()
 
     def test_release_cut_curation_survives_untracked_paths(self):
