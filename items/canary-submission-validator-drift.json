@@ -5,7 +5,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "Commit 8fedfbe79 on fix/canary-submission-validator-contract; PR https://github.com/BenchBox-dev/BenchBox/pull/2319 targets develop and is open, held. The canonical coverage gate now treats both a/b variants as one logical TPC-DS query; short TPC-H fixtures were replaced with complete evidence and the slim fixture copies schema_policy.py. Targeted validator and official TPC-DS suite: 259 passed; hosted-service upload suite: 4 passed; committed-head make pr-preflight passed (31496 fast and 2090 medium tests). Await hosted CI, maintainer review for soundness path, and merge before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2319 at 4c0acdc487512d48ab326a43b47ce84743f2b18d. Hosted-submit fixture now uses a full canonical TPC-H bundle and canonical bytes; slim validator fixture includes schema_policy.py; TPC-DS coverage requires both a/b variants and refuses bare multipart IDs. Positive official 103-query and negative 99-bare/one-variant tests protect the contract. Focused 259 tests plus four hosted transport integration tests passed; committed-head make pr-preflight passed with 31497 fast and 2090 medium. Hosted CI green, review finding replied and resolved. This is a soundness path: maintainer approval and manual merge into develop are still required before closing.",
   "description": "Diagnose and fix hosted-submit bundle schema drift, slim-checkout validator imports, and the official TPC-DS submission failure. Determine whether TPC-DS has the same root cause; if independent, create a separate owned item. Identify causing commits before changing code. Keep submission validation strict and do not skip tests.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2319"
@@ -43,6 +43,14 @@
       "generation": "f0fd906042e94ff1b8121ca355d7206a",
       "op": "release",
       "op_id": "417e3f229f6d436a9f49129a1ba9058f",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-24T01:24:56Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "7324cb608c2e4c80a4010ae9d8bad78a",
       "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
