@@ -4,7 +4,7 @@
     "Setup time and test time per shard are recoverable from the run (step timings or a small summary field).",
     "Workflow contract tests assert the JUnit output path and that the marker expression, shard count, and aggregation are unchanged."
   ],
-  "context": "Agent work complete on branch fix/canary-junit-durations (worktree ../BenchBox.wt-canary-junit-durations, commit 1b5afded3, stacked on fix/release-canary-incident per guardrail). make pr-preflight green (2090 passed). PR on hold until #2323 merges (stacked PRs fail pr-base-guard); then rebase onto develop, open PR, and verify JUnit XML + setup/test timing appear in a real canary run's shard artifacts.",
+  "context": "PR #2340 open against develop: branch fix/canary-junit-durations, commit 4067f2dce (rebased onto 90a76a336). make pr-preflight green at that head: focused fast lane 2120 passed / 21 skipped, medium-tier exit 0, required-pr-preflight exit 0, ordered_success; receipts reused on re-check. Workflow contract tests assert the JUnit path and that marker expression, shard count, and aggregation are unchanged. Both shard branches simulated locally (empty shard -> fallback report marked junit_captured=false; populated shard -> real JUnit), and the summary JSON parses with the marker expression intact. release_canary_incident.py only globs shard-*-pytest.log, so the new XML files do not affect the incident job.\n\nNote for whoever runs preflight here: BENCHBOX_TEST_LOCK_WAIT_SECONDS matches VALIDATION_ENV_PREFIXES (BENCHBOX_), so changing its value between runs forks the receipt identity and forces full re-execution. Keep one value per branch. Under heavy local load, tests/integration/test_database_integration.py::test_database_resource_management (RSS growth < 50MB) can fail on macOS; CI runs make test-medium on ubuntu-latest only, and it fails in isolation on unrelated trees, so it is a pre-existing environment flake, not a regression from this branch.\n\nRemaining acceptance item: verify JUnit XML and setup/test timings appear in a real canary run's shard artifacts. That needs a live release-canary run after merge.\n\nSession 8f92cfd3 (antigravity) died on API quota exhaustion while this was in flight; its claim on this item expires 2026-09-25T19:10Z. The claim could not be taken over (E_CONFLICT) and todo-db has no force-release, so finish must happen once that claim expires or is released.",
   "description": "The pre-merge canary-impact selector needs measured per-test durations to size shards and to estimate runner-minutes and wall time; selected-file counts alone cannot establish cost, because each shard also pays several minutes of setup and test runtimes vary widely. Today the canary shards write only a pytest text log.\n\nChange: each release-canary.yml shard also writes a JUnit XML report (pytest --junitxml) into its existing uploaded artifact directory, and the run records per-shard setup time (checkout, uv sync) separately from test time.",
   "links": [
     ".github/workflows/release-canary.yml",
@@ -20,6 +20,14 @@
       "op": "take",
       "op_id": "342be35c9c624b47b23e84d8a363d0f3",
       "session_id": "894293983a5247c696200b222be4e701"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:77ce0c25be6b85c4006c7459",
+      "at": "2026-09-24T21:58:03Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "5b6ddf5a72274ee3b540e1911c6b6f2b",
+      "session_id": "93de43fbd69345b38c8ad7ced05d0986"
     }
   ]
 }
