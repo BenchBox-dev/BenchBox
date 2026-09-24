@@ -349,6 +349,48 @@ def test_current_request_accounts_for_every_active_non_replayable_execution_cont
     )
 
 
+def _live_state(concurrency):
+    return SimpleNamespace(
+        platform="duckdb",
+        benchmark="tpch",
+        scale=1.0,
+        phases="power",
+        queries=None,
+        tuning="notuning",
+        table_mode="native",
+        output=None,
+        mode="sql",
+        seed=7,
+        compression=CompressionConfig(),
+        concurrency=concurrency,
+        iterations=None,
+        comp_config=None,
+        compression_enabled=False,
+        compression_type=None,
+        compression_level=None,
+    )
+
+
+def test_current_request_rejects_zero_concurrency():
+    """Explicit concurrency=0 must be rejected, not promoted to the default of 1."""
+    with pytest.raises(ValueError, match="at least one"):
+        _run_module._current_run_request(_live_state(0))
+
+
+def test_current_request_rejects_non_integer_concurrency():
+    with pytest.raises(ValueError, match="must be an integer"):
+        _run_module._current_run_request(_live_state("lots"))
+
+
+def test_current_request_defaults_missing_concurrency_to_one():
+    assert _run_module._current_run_request(_live_state(None)).concurrency == 1
+
+
+def test_current_request_keeps_valid_concurrency():
+    assert _run_module._current_run_request(_live_state(4)).concurrency == 4
+    assert _run_module._current_run_request(_live_state("3")).concurrency == 3
+
+
 @pytest.mark.parametrize(
     ("saved_queries", "expected"),
     [(["Q1", "Q6"], "Q1,Q6"), ((1, 6), "1,6"), ("Q1,Q6", "Q1,Q6"), (None, None)],

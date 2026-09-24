@@ -92,7 +92,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      class={`inline-flex rounded-md panel-muted p-0.5 ${extraClass}`}
+      class={`inline-flex rounded-md border border-[var(--bb-data-border-strong)] panel-muted p-0.5 ${extraClass}`}
     >
       {options.map((option, index) => {
         const selected = option.value === value;

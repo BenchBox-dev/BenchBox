@@ -1,7 +1,7 @@
 """Tests for tuning provenance/requested-config export (ADR-1).
 
 Covers the tuning-bundle-provenance-and-config-export-20260712 TODO: the
-platform.tuning summary block and the .tuning.json companion payload built by
+platform.tuning summary block and the requested-tuning payload built by
 build_tuning_payload()/_build_tuning_summary() in benchbox/core/results/schema.py.
 
 Copyright 2026 Joe Harris / BenchBox Project
@@ -247,7 +247,7 @@ def test_no_absolute_paths_anywhere_in_emitted_bundle_or_companion():
         assert "C:\\\\" not in text
 
 
-def test_anonymized_tuning_companion_hides_identifiers_and_preserves_source(tmp_path):
+def test_anonymized_requested_tuning_hides_identifiers_and_preserves_source(tmp_path):
     config = _tuned_config()
     result = _make_result(
         tunings_applied=config.to_dict(),
@@ -257,8 +257,7 @@ def test_anonymized_tuning_companion_hides_identifiers_and_preserves_source(tmp_
     )
 
     exporter = ResultExporter(output_dir=tmp_path, anonymize=True)
-    exporter._write_companion_files(result, "run-1")
-    payload = json.loads((tmp_path / "run-1.tuning.json").read_text(encoding="utf-8"))
+    payload = exporter._build_export_tuning_payload(result)
 
     table_tunings = payload["requested"]["table_tunings"]
     table_key = next(iter(table_tunings))
@@ -268,7 +267,7 @@ def test_anonymized_tuning_companion_hides_identifiers_and_preserves_source(tmp_
     assert payload["source_file"] == "examples/tunings/custom.yaml:0123456789abcdef"
 
 
-def test_anonymized_tuning_companion_hashes_legacy_absolute_source(tmp_path):
+def test_anonymized_requested_tuning_hashes_legacy_absolute_source(tmp_path):
     config = _tuned_config()
     result = _make_result(
         tunings_applied=config.to_dict(),
@@ -277,8 +276,7 @@ def test_anonymized_tuning_companion_hashes_legacy_absolute_source(tmp_path):
         tuning_config_hash=config.get_configuration_hash(),
     )
 
-    ResultExporter(output_dir=tmp_path, anonymize=True)._write_companion_files(result, "run-1")
-    payload = json.loads((tmp_path / "run-1.tuning.json").read_text(encoding="utf-8"))
+    payload = ResultExporter(output_dir=tmp_path, anonymize=True)._build_export_tuning_payload(result)
 
     assert payload["source_file"].startswith("path_")
     assert "alice" not in json.dumps(payload)

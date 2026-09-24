@@ -163,6 +163,10 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         repaired = self.downloader.repair_reusable_layout()
         if repaired:
             self.tables = repaired
+        else:
+            # Heal pre-fix manifests whose entries lack the empty-means-NULL
+            # marker; the runner reuses such caches without regenerating.
+            self.downloader.backfill_csv_dialect_metadata()
 
     @staticmethod
     def _flatten_table_paths(tables: dict[str, Path | list[Path]]) -> list[Path]:
@@ -293,7 +297,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         Returns the QueryRegistry containing DataFrame implementations of all
         20 FlightData queries for both expression-family (Polars, PySpark,
-        DataFusion) and pandas-family (Pandas, Modin, Dask) platforms.
+        DataFusion) and pandas-family (Pandas and Dask) platforms.
 
         Returns:
             QueryRegistry with all 20 FlightData DataFrame queries
@@ -448,4 +452,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
+    benchmark_class=FlightDataBenchmark,
 )

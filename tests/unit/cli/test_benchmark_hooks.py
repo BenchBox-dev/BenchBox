@@ -140,8 +140,13 @@ def _register_real_benchmark_specs():
     them all here, module-scoped (runs before any function-scoped autouse
     fixture), guarantees every snapshot/restore cycle includes their specs.
     """
+    import benchbox.core.datavault.benchmark  # noqa: F401
+    import benchbox.core.flightdata.benchmark  # noqa: F401
     import benchbox.core.joinorder.benchmark  # noqa: F401
+    import benchbox.core.joinorder_synthetic.benchmark  # noqa: F401
     import benchbox.core.nyctaxi.benchmark  # noqa: F401
+    import benchbox.core.tpcdi.benchmark  # noqa: F401
+    import benchbox.core.tpcds_obt.benchmark  # noqa: F401
     import benchbox.core.tpch_skew.benchmark  # noqa: F401
     import benchbox.core.tsbs_devops.benchmark  # noqa: F401
     import benchbox.core.vector_search.benchmark  # noqa: F401
@@ -154,9 +159,11 @@ def _clean_registry():
 
     saved_specs = copy.deepcopy(BenchmarkHookRegistry._option_specs)
     saved_aliases = copy.deepcopy(BenchmarkHookRegistry._alias_index)
+    saved_validated = set(BenchmarkHookRegistry._validated_benchmarks)
     yield
     BenchmarkHookRegistry._option_specs = saved_specs
     BenchmarkHookRegistry._alias_index = saved_aliases
+    BenchmarkHookRegistry._validated_benchmarks = saved_validated
 
 
 class TestBenchmarkHookRegistry:
@@ -257,6 +264,132 @@ class TestBenchmarkHookRegistry:
 
 
 # ---------------------------------------------------------------------------
+# Registration-time constructor validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestRegistrationTimeConstructorValidation:
+    def test_omitted_class_skips_validation(self):
+        # "test_bench" doubles never pass a class, so registration must not fail.
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="anything_goes_here"),
+        )
+        assert "anything_goes_here" in BenchmarkHookRegistry.list_option_specs("test_bench")
+        assert "test_bench" not in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_mismatched_spec_rejected(self):
+        class FakeBench:
+            def __init__(self, ok_param=None, **kwargs):
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="does not match any constructor parameter"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="definitely_not_a_ctor_param"),
+                benchmark_class=FakeBench,
+            )
+        assert "test_bench" not in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_matching_spec_accepted_and_recorded(self):
+        class FakeBench:
+            def __init__(self, ok_param=None, **kwargs):
+                self.ok_param = ok_param
+
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param", parser=parse_int),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+        assert "test_bench" in BenchmarkHookRegistry._validated_benchmarks
+
+    def test_alias_is_not_validated_against_constructor(self):
+        class FakeBench:
+            def __init__(self, ok_param=None):
+                self.ok_param = ok_param
+
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param", aliases=("not-a-ctor-param",)),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+
+    def test_positional_only_param_rejected(self):
+        class FakeBench:
+            def __init__(self, pos_only, /, ok_param=None):
+                self.pos_only = pos_only
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="does not match any constructor parameter"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="pos_only"),
+                benchmark_class=FakeBench,
+            )
+        BenchmarkHookRegistry.register_option_specs(
+            "test_bench",
+            BenchmarkOptionSpec(name="ok_param"),
+            benchmark_class=FakeBench,
+        )
+        assert "ok_param" in BenchmarkHookRegistry.list_option_specs("test_bench")
+
+    def test_uninspectable_signature_raises(self, monkeypatch):
+        import inspect as inspect_module
+
+        def _no_signature(cls):
+            raise ValueError("no signature found")
+
+        monkeypatch.setattr(inspect_module, "signature", _no_signature)
+
+        class FakeBench:
+            def __init__(self, ok_param=None):
+                self.ok_param = ok_param
+
+        with pytest.raises(BenchmarkOptionError, match="signature of FakeBench is unavailable"):
+            BenchmarkHookRegistry.register_option_specs(
+                "test_bench",
+                BenchmarkOptionSpec(name="ok_param"),
+                benchmark_class=FakeBench,
+            )
+
+    def test_all_registered_specs_match_constructors(self):
+        """Tree-wide invariant: every registered spec names a keyword-passable ctor param."""
+        import inspect
+
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        for benchmark, specs in BenchmarkHookRegistry._option_specs.items():
+            try:
+                benchmark_class = get_core_benchmark_class(benchmark)
+            except Exception:
+                continue
+            explicit = {
+                name
+                for name, parameter in inspect.signature(benchmark_class).parameters.items()
+                if parameter.kind
+                in (
+                    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                    inspect.Parameter.KEYWORD_ONLY,
+                )
+            }
+            for spec_name in specs:
+                assert spec_name in explicit, f"{benchmark}.{spec_name}"
+
+    def test_all_resolvable_benchmarks_validated_at_registration(self):
+        """Every resolvable registered benchmark passed its class at registration."""
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        for benchmark in BenchmarkHookRegistry._option_specs:
+            try:
+                get_core_benchmark_class(benchmark)
+            except Exception:
+                continue
+            assert benchmark in BenchmarkHookRegistry._validated_benchmarks, benchmark
+
+
+# ---------------------------------------------------------------------------
 # Click param type test
 # ---------------------------------------------------------------------------
 
@@ -346,3 +479,73 @@ class TestRealBenchmarkSpecs:
         """Benchmarks with no registered specs should not raise on empty parse."""
         # tpch has no registered specs - parsing with no options should be fine
         assert not BenchmarkHookRegistry.has_specs("tpch")
+
+
+class TestBenchmarkOptionShellCompletion:
+    """--benchmark-option completes registered keys and declared choice values."""
+
+    def _ctx(self, benchmark=None, pairs=()):
+        from click import Context
+        from click.core import Command
+
+        ctx = Context(Command("run"))
+        ctx.params = {"benchmark": benchmark, "benchmark_option_pairs": pairs}
+        return ctx
+
+    def _completer(self):
+        from benchbox.cli.commands.run import BenchmarkOptionParamType
+
+        return BenchmarkOptionParamType()
+
+    def test_completes_keys_for_selected_benchmark(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_key_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "sk")
+        values = [item.value for item in items]
+        assert values
+        assert all(value.startswith("sk") for value in values)
+        assert "skew_preset=" in values
+
+    def test_completes_declared_choice_values(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=h")
+        assert [item.value for item in items] == ["heavy"]
+
+    def test_choice_prefix_filters(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "skew_preset=")
+        assert {item.value for item in items} == {"none", "light", "moderate", "heavy", "extreme", "realistic"}
+
+    def test_spec_without_choices_completes_no_values(self):
+        items = self._completer().shell_complete(self._ctx("nyctaxi"), None, "year=20")
+        assert items == []
+
+    def test_unknown_or_missing_benchmark_completes_nothing(self):
+        assert self._completer().shell_complete(self._ctx("tpch"), None, "") == []
+        assert self._completer().shell_complete(self._ctx(None), None, "") == []
+
+    def test_used_keys_omitted(self):
+        items = self._completer().shell_complete(self._ctx("tpch_skew", pairs=(("skew_preset", "heavy"),)), None, "")
+        assert "skew_preset=" not in [item.value for item in items]
+
+    def test_completion_imports_lazy_benchmark(self, monkeypatch):
+        """A not-yet-imported benchmark resolves via lazy module import."""
+        import sys
+
+        from benchbox.core.hooks.benchmark_hooks import BenchmarkHookRegistry
+
+        module_name = "benchbox.core.tpch_skew.benchmark"
+        assert module_name in sys.modules  # pre-imported by the module fixture
+        monkeypatch.delitem(sys.modules, module_name)
+        monkeypatch.delitem(BenchmarkHookRegistry._option_specs, "tpch_skew")
+        monkeypatch.delitem(BenchmarkHookRegistry._alias_index, "tpch_skew", raising=False)
+
+        assert BenchmarkHookRegistry.list_option_specs("tpch_skew") == {}
+        items = self._completer().shell_complete(self._ctx("tpch_skew"), None, "")
+
+        assert "skew_preset=" in [item.value for item in items]
+
+    def test_completion_unknown_benchmark_is_silent(self):
+        items = self._completer().shell_complete(self._ctx("no_such_bench"), None, "")
+
+        assert items == []

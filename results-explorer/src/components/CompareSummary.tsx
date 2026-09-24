@@ -14,23 +14,48 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
     summary.winner !== null
       ? summary.percentiles.find((entry) => entry.resultId === summary.winner?.resultId)
       : undefined;
+  const hasValidationCaveat = summary.nonCleanValidation.length > 0;
 
   return (
     <section aria-labelledby="compare-decision-summary-title" class="card mb-8">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="compare-decision-summary-title" class="text-base font-semibold text-[var(--bb-data-fg-primary)]">
-            Decision Summary
+            Comparison summary
           </h2>
           <p class="mt-1 text-sm font-medium text-[var(--bb-data-fg-primary)]">{summary.headline}</p>
         </div>
-        <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
-          {summary.claimSuppressed ? "Claims suppressed" : "Computed from selected runs"}
-        </StatusBadge>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          {hasValidationCaveat && (
+            <StatusBadge role="validation" tone="warning">
+              Unvalidated result{summary.nonCleanValidation.length > 1 ? "s" : ""}
+            </StatusBadge>
+          )}
+          <StatusBadge role="computed" tone={summary.claimSuppressed ? "warning" : "info"}>
+            {summary.claimSuppressed ? "No winner named" : "Based on the selected runs"}
+          </StatusBadge>
+        </div>
       </div>
 
+      {hasValidationCaveat && (
+        <div
+          class="mb-4 rounded-md border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-3 py-2 text-xs text-[var(--bb-tone-warning-fg)]"
+          data-testid="compare-validation-caveat"
+        >
+          <span class="font-semibold">Validation caution:</span>{" "}
+          {summary.nonCleanValidation.map((entry, index) => (
+            <span key={entry.resultId}>
+              {index > 0 ? "; " : ""}
+              <span class="font-medium">{entry.platform}</span> is {entry.label}
+            </span>
+          ))}
+          . This comparison rests on at least one unvalidated or non-clean result - treat the leading-run claim above as
+          provisional.
+        </div>
+      )}
+
       <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Winner">
+        <SummaryCard label={`Leading run on ${summary.primaryMetricLabel}`}>
           {summary.claimSuppressed ? (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Not claimed</p>
           ) : summary.isTie ? (
@@ -63,16 +88,18 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label="Query wins">
+        {/* The card label already names the run and the question, so the
+            value says the number and nothing else. */}
+        <SummaryCard label={summary.winnerLabel ? `Where ${summary.winnerLabel} wins` : "Query comparison"}>
           {summary.claimSuppressed ? (
             <>
-              <p class="text-sm text-[var(--bb-data-fg-muted)]">Winner claim suppressed</p>
-              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Use the query diff table for raw evidence.</p>
+              <p class="text-sm text-[var(--bb-data-fg-muted)]">No winner named</p>
+              <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Review the individual query measurements below.</p>
             </>
           ) : (
             <>
               <p class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">
-                {summary.queryRecord.wins} fastest of {summary.queryRecord.comparableQueries} comparable
+                {summary.queryRecord.wins} of {summary.queryRecord.comparableQueries} queries
               </p>
               <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
                 {summary.queryRecord.losses} slower · {summary.queryRecord.ties} tied
@@ -89,15 +116,27 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        <SummaryCard label="Tail shape">
+        <SummaryCard
+          label={summary.winnerLabel ? `Latency profile · ${summary.winnerLabel}` : "Latency profile"}
+        >
           {winnerPercentiles?.p50 !== null &&
           winnerPercentiles?.p50 !== undefined &&
           winnerPercentiles.p90 !== null &&
           winnerPercentiles.p99 !== null ? (
-            <p class="font-mono text-xs text-[var(--bb-data-fg-primary)]">
-              p50 {fmtMs(winnerPercentiles.p50)} · p90 {fmtMs(winnerPercentiles.p90)} · p99{" "}
-              {fmtMs(winnerPercentiles.p99)}
-            </p>
+            <dl class="grid grid-cols-3 gap-x-2 text-center">
+              {(
+                [
+                  ["p50", winnerPercentiles.p50],
+                  ["p90", winnerPercentiles.p90],
+                  ["p99", winnerPercentiles.p99],
+                ] as const
+              ).map(([name, value]) => (
+                <div key={name}>
+                  <dt class="text-xs text-[var(--bb-data-fg-muted)]">{name}</dt>
+                  <dd class="font-mono text-sm font-semibold text-[var(--bb-data-fg-primary)]">{fmtMs(value)}</dd>
+                </div>
+              ))}
+            </dl>
           ) : (
             <p class="text-sm text-[var(--bb-data-fg-muted)]">Percentiles unavailable</p>
           )}

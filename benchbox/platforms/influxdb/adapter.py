@@ -86,6 +86,9 @@ class InfluxDBAdapter(
     """
 
     plan_capture_phase_eligible = True
+    # Reference docker deployment serves InfluxDB 3 on 8181; Core/Cloud modes
+    # configure their own port (default 8086) via adapter options.
+    default_service_port = 8181
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 

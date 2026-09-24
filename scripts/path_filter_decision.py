@@ -313,9 +313,9 @@ def main() -> int:
         forced_code_paths: list[str] = []
         manifest_reason: str | None = None
         manifest_base_sha: str | None = None
-        if "skill-sync.yaml" in changed_paths:
+        if "skill-sync.conf" in changed_paths:
             if not args.base_ref:
-                forced_code_paths.append("skill-sync.yaml")
+                forced_code_paths.append("skill-sync.conf")
                 manifest_reason = "manifest_base_ref_missing"
             else:
                 resolved = subprocess.run(
@@ -325,7 +325,7 @@ def main() -> int:
                     capture_output=True,
                 )
                 if resolved.returncode != 0:
-                    forced_code_paths.append("skill-sync.yaml")
+                    forced_code_paths.append("skill-sync.conf")
                     manifest_reason = "manifest_base_ref_unresolvable"
                 else:
                     base_sha = resolved.stdout.strip()
@@ -333,7 +333,7 @@ def main() -> int:
                     manifest_decision = compare_repository_manifest(base_sha)
                     manifest_reason = manifest_decision.reason
                     if not manifest_decision.narrow_eligible:
-                        forced_code_paths.append("skill-sync.yaml")
+                        forced_code_paths.append("skill-sync.conf")
         decision = classify_paths(
             changed_paths,
             rules,

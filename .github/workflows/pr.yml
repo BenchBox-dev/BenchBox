@@ -30,6 +30,7 @@ jobs:
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      heavy-needed: ${{ steps.heavy.outputs.heavy-needed }}
       viz-needed: ${{ steps.classify.outputs.viz-needed }}
       explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
       explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
@@ -37,14 +38,14 @@ jobs:
       site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
-      - name: Validate TODO schema migration contract
+      - name: Validate TODO JSON/Git state contract
         # Bare python is intentional: this static guard is stdlib-only and
         # must run for every PR without tracker credentials or dependencies.
-        run: python _project/scripts/todo_schema_migration_check.py
+        run: python _project/scripts/todo_state_contract_check.py
 
       - name: Fetch base branch
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
@@ -65,19 +66,37 @@ jobs:
             --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload path decision
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: ci-path-decision
           path: ci-path-decision.json
           retention-days: 30
 
+      - name: Decide heavy-tier need
+        id: heavy
+        # Bare python is intentional: stdlib-only, no dependency sync. The
+        # event gate lives in the script (not a step `if:`): downstream jobs
+        # read this output on every event, and references to a skipped
+        # step's outputs do not evaluate reliably. Fail-closed: any lookup
+        # error reports heavy-needed=true so the tier runs.
+        run: |
+          set -euo pipefail
+          python scripts/heavy_tier_needed.py \
+            --decision-in ci-path-decision.json \
+            --event "${{ github.event_name }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
   # Pre-merge foreign-platform smoke coverage for the bundled TPC-H binaries.
-  # Every code PR gets direct macOS and Windows execution before merge, while
-  # nightly retains the complete three-platform matrix.
+  # The merge queue runs direct macOS and Windows execution on every
+  # code-routed tree, while pull_request runs skip it unless a carve-out
+  # applies (merge_group event, soundness paths, or packaging paths via the
+  # heavy-needed output). Nightly retains the complete three-platform matrix.
   tpch-binary-framing:
     name: TPC-H binary framing (${{ matrix.os }})
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -86,15 +105,15 @@ jobs:
         os: [macos-latest, windows-latest]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -112,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -120,7 +139,7 @@ jobs:
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -291,42 +310,50 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Validate skill source and target trust policy
-        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml
+      - name: Validate skill config, receipt, and tool pin
+        # Stdlib-only and offline: checks skill-sync.conf shape and skill
+        # selection, the committed receipt's approved source URLs, and the
+        # vendored tools/skill-sync bytes against the pinned tool revision.
+        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build independently pinned skill-sync verifier
+      - name: Clone skill sources to the configured checkout paths
+        # The wrapper resolves every configured rev from these checkouts and
+        # fails closed when one is absent, so a transient local SHA can never
+        # pass: only published upstream commits survive this step.
         shell: bash
         run: |
           set -euo pipefail
-          git clone --quiet --filter=blob:none \
-            https://github.com/joeharris76/skill-sync.git \
-            "$RUNNER_TEMP/skill-sync-verifier"
-          git -C "$RUNNER_TEMP/skill-sync-verifier" checkout --quiet \
-            6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa
-          (
-            cd "$RUNNER_TEMP/skill-sync-verifier"
-            npm ci --ignore-scripts
-            npm run build
-          )
+          mkdir -p "$RUNNER_TEMP/skill-home/Developer"
+          git clone --quiet https://github.com/joeharris76/skill-sync-skills.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync-skills"
+          git clone --quiet https://github.com/joeharris76/todo-db.git \
+            "$RUNNER_TEMP/skill-home/Developer/todo-db"
+          git clone --quiet https://github.com/joeharris76/skill-sync.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync"
 
-      - name: Verify tracked skill mirror and lock
+      - name: Preview, apply, verify, and re-check the skill mirrors
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/empty-home"
-          HOME="$RUNNER_TEMP/empty-home" node \
-            "$RUNNER_TEMP/skill-sync-verifier/dist/cli/index.js" \
-            verify --project "$GITHUB_WORKSPACE"
+          export HOME="$RUNNER_TEMP/skill-home"
+          echo "--- preview (read-only) ---"
+          sh tools/skill-sync preview
+          echo "--- apply ---"
+          sh tools/skill-sync apply
+          echo "--- the committed snapshot must be untouched by apply ---"
+          # Apply may only write gitignored paths (the agents mirror and the
+          # curated-out blog skill). Any tracked modification means the PR's
+          # committed snapshot drifted from its own config.
+          test -z "$(git status --porcelain)"
+          echo "--- verify the payload offline against its manifest ---"
+          sh tools/skill-sync verify
+          echo "--- second check must be clean ---"
+          sh tools/skill-sync check
 
       - name: Enforce untracked mirror boundary
         run: sh scripts/check_untracked_skill_mirrors.sh
@@ -339,15 +366,18 @@ jobs:
           python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install focused test dependencies
         run: uv sync --group dev
 
-      - name: Run skill wrapper and instruction audit contracts
+      - name: Run skill policy and instruction audit contracts
         run: |
           uv run -- python -m pytest \
-            tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness \
+            tests/unit/scripts/test_skill_sync_ci_policy.py \
+            tests/unit/scripts/test_path_filter_decision.py \
+            tests/unit/scripts/test_ci_lint_environment_boundary.py \
+            tests/unit/workflows/test_pr_workflow_path_classifier.py \
             tests/unit/scripts/test_agent_instruction_audit.py \
             -q
 
@@ -361,17 +391,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -463,7 +493,7 @@ jobs:
         # guard below fails open on. The key is the PR event's actual develop
         # base SHA; a prefix restore would compare the PR against an unrelated
         # develop tip when merges or baseline jobs complete out of order.
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: fast-lane-count.txt
           key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
@@ -505,6 +535,11 @@ jobs:
         continue-on-error: true
         run: make oracle-coverage-map-check
 
+      - name: Pricing data drift check
+        id: guard-pricing-data
+        continue-on-error: true
+        run: make pricing-data-check
+
       - name: Public contract drift check
         id: guard-public-contract-drift
         continue-on-error: true
@@ -526,11 +561,11 @@ jobs:
         run: uv run -- python scripts/check_release_curation.py
 
       - name: Untracked skill-mirror drift guard (cloud parity)
-        # The codex/gemini/antigravity mirrors and the curated-out `blog` skill are
-        # deliberately untracked: cloud is Claude-only and `blog` is published
-        # separately. `skill-sync verify` only inspects the tracked `claude` target
-        # (it skips untracked targets and `ignore`d paths), so it cannot catch these
-        # being force-added. Fail the build if any become git-tracked.
+        # The agents mirror and the curated-out `blog` skill are deliberately
+        # untracked: cloud is Claude-only and `blog` is published separately.
+        # `skill-sync verify` checks payload bytes, not Git tracking state, so
+        # it cannot catch these being force-added. Fail the build if any
+        # become git-tracked.
         # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
         id: guard-skill-mirror-drift
         continue-on-error: true
@@ -615,17 +650,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -687,15 +722,10 @@ jobs:
 
       - name: Run DuckLake in-process adapter integration tests
         run: |
-          # ducklake-post-merge-review-followups w3: this module is
-          # [integration, slow], so no PR-lane marker expression selects it -
-          # core adapter behaviour (cursor catalog scoping, ATTACH, catalog
-          # reuse, sqlite catalog end-to-end) was gated only by the release-time
-          # non-fast lane. The service-dependent Postgres/S3 classes keep
-          # live_integration and are excluded here; what remains needs nothing
-          # but a real DuckDB, and skips cleanly - loudly, via the probe's
-          # warning - when the ducklake extension cannot be installed.
-          # Bounded: one file, 7 tests at SF=0.01.
+          # Exercise cursor catalog scoping, ATTACH, catalog reuse, SQLite
+          # catalog operation, and representative write primitives. The
+          # service-dependent PostgreSQL and S3 cases remain live-only.
+          # Bounded: one file, 8 tests at SF=0.01.
           uv run -- python -m pytest \
             tests/integration/test_ducklake_integration.py \
             -m "slow and not live_integration" -n 0 --tb=short -q
@@ -736,19 +766,19 @@ jobs:
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
 
   medium-test:
     name: medium-test
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
     # Sized to observed p95 + >=30% headroom, not to a value that never needs
     # thinking about: this timeout is the only backstop against a hung medium
@@ -759,15 +789,15 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -778,22 +808,24 @@ jobs:
   correctness-gate:
     name: correctness-gate
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Nine enforced gates plus setup must fit: the FlightData promotion added
+    # the ninth gate step to this job.
+    timeout-minutes: 25
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -831,25 +863,31 @@ jobs:
       - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
         run: make read-primitives-cross-surface-equivalence-report
 
+      - name: Run FlightData cross-surface SQL<->DataFrame equivalence gate
+        run: make flightdata-cross-surface-equivalence-report
+
+      - name: Run Data Vault cross-surface SQL<->DataFrame equivalence gate
+        run: make datavault-cross-surface-equivalence-report
+
   plan-capture-gate:
     name: plan-capture-gate
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -863,7 +901,7 @@ jobs:
   postgres-integration:
     name: postgres-integration
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Non-blocking: service container startup can be flaky; failures surfaced as
@@ -885,15 +923,15 @@ jobs:
           --health-retries 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -959,7 +997,7 @@ jobs:
   datafusion-integration:
     name: datafusion-integration
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Non-blocking: this is the THIRD-engine equivalence SAMPLE, not a gate.
@@ -970,15 +1008,15 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -999,7 +1037,7 @@ jobs:
   clickhouse-integration:
     name: clickhouse-integration
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Non-blocking: this is the FOURTH-engine equivalence SAMPLE, not a gate.
@@ -1013,15 +1051,15 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -1046,7 +1084,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -1065,7 +1103,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -1088,15 +1126,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Build package
         run: |
@@ -1131,21 +1169,25 @@ jobs:
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
       # Keep empty unless triage is documented in the TODO item.
-      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
-      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # PYSEC-2026-3696..3699 (sqlparse): firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
-      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87,PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699"
+      # PYSEC-2026-3696..3699 and PYSEC-2026-3923 (sqlparse):
+      # firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
+      # PYSEC-2026-3447 (setuptools MANIFEST.in exclusion bypass in sdist
+      # builds, macOS-only): torch==2.11.0 requires setuptools<82 while the
+      # fix needs >=83.0.0, so the lock cannot take the fix. Accepted because
+      # the flaw only affects building sdists from projects with a malicious
+      # MANIFEST.in on macOS; BenchBox builds its own project.
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699,PYSEC-2026-3923,PYSEC-2026-3447"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -1177,22 +1219,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: results-explorer/package-lock.json
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install Python dependencies
         run: uv sync --group dev
@@ -1228,21 +1270,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Verify parity fixtures match Python source
         run: make parity-check
+
+  publication-reconciliation:
+    name: publication reconciliation
+    needs: ci-paths
+    # Run for any code PR and also for decision/publication script changes,
+    # which are classified as safe-content and would otherwise skip code CI.
+    if: ${{ needs.ci-paths.outputs.needs-code-ci == 'true' || contains(needs.ci-paths.outputs.changed-paths, '_project/decisions/') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/publication/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run publication plan reconciliation (live Git state)
+        run: |
+          uv run python scripts/publication/check_plan_reconciliation.py --todo-prefix independent-publication-
 
   audit-sha:
     name: audit-sha
@@ -1251,7 +1321,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -1260,8 +1330,24 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'develop' }}
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
+      - name: Fetch PR head for audit ancestry (merge queue only)
+        # Merge-queue runs check out a squashed preview commit whose
+        # single-parent history never contains the PR's branch commits, so an
+        # audit measured on the branch tree cannot descend from HEAD. Fetch
+        # the PR head (parsed from the queue's gh-readonly-queue/.../pr-N-...
+        # branch name) and validate measurement ancestry against it instead.
+        # Falls back to HEAD with a warning if the PR number cannot be parsed.
+        if: github.event_name == 'merge_group'
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" =~ /pr-([0-9]+)- ]]; then
+            git fetch --no-tags origin "pull/${BASH_REMATCH[1]}/head:refs/remotes/origin/audit-ancestry-pr-head"
+          else
+            echo "::warning::Could not parse PR number from ${GITHUB_REF:-}; audit measurement ancestry falls back to HEAD."
+          fi
+
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Validate changed audit develop SHA stamps
         shell: bash
@@ -1273,8 +1359,12 @@ jobs:
             echo "No changed audit Markdown files to validate."
             exit 0
           fi
+          ANCESTRY_REF="HEAD"
+          if [ "${{ github.event_name }}" = "merge_group" ] && git rev-parse --verify --quiet origin/audit-ancestry-pr-head >/dev/null; then
+            ANCESTRY_REF="origin/audit-ancestry-pr-head"
+          fi
           while IFS= read -r audit_path; do
-            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}"
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}" AUDIT_SHA_ANCESTRY_REF="$ANCESTRY_REF"
           done < /tmp/changed-audits.txt
 
   certification-identity:
@@ -1284,7 +1374,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -1298,6 +1388,7 @@ jobs:
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
+          HEAVY_NEEDED: ${{ needs.ci-paths.outputs.heavy-needed }}
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -1328,8 +1419,14 @@ jobs:
           needs_code_ci = os.environ["NEEDS_CODE_CI"] == "true"
           skill_integrity_needed = os.environ["SKILL_INTEGRITY_NEEDED"] == "true"
           content_guard_needed = os.environ["CONTENT_GUARD_NEEDED"] == "true"
-          if needs_code_ci:
+          heavy_needed = os.environ.get("HEAVY_NEEDED") == "true"
+          # A PR run without the heavy tier must not claim "full": only
+          # "full" binds prior certification, so a light-lane code run
+          # claims "fast" (non-binding, like skill_integrity/content).
+          if needs_code_ci and heavy_needed:
               certification_kind = "full"
+          elif needs_code_ci:
+              certification_kind = "fast"
           elif skill_integrity_needed:
               certification_kind = "skill_integrity"
           else:
@@ -1360,7 +1457,7 @@ jobs:
 
       - name: Upload certification identity
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-certification-identity
           path: pr-certification-identity.json
@@ -1369,7 +1466,7 @@ jobs:
 
   ci-required-result:
     name: ci-required-result
-    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check]
+    needs: [ci-paths, tpch-binary-framing, content-guard, skill-integrity, code-lint, code-test, correctness-gate, plan-capture-gate, medium-test, explorer-tokens, site-theme-tokens, explorer-vitest, audit-sha, package-smoke, dependency-audit, parity-check, publication-reconciliation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -1391,10 +1488,12 @@ jobs:
           PACKAGE_SMOKE_RESULT: ${{ needs.package-smoke.result }}
           DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
+          PUBLICATION_RECONCILIATION_RESULT: ${{ needs.publication-reconciliation.result }}
           CONTENT_GUARD_NEEDED: ${{ needs.ci-paths.outputs.content-guard-needed }}
           SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SAFE_CONTENT_ONLY: ${{ needs.ci-paths.outputs.safe-content-only }}
+          HEAVY_NEEDED: ${{ needs.ci-paths.outputs.heavy-needed }}
         run: |
           set -euo pipefail
 
@@ -1403,7 +1502,30 @@ jobs:
             exit 1
           fi
 
-          if [ "$NEEDS_CODE_CI" = "true" ] && [ "$TPCH_BINARY_FRAMING_RESULT" != "success" ]; then
+          # Third-state heavy tier: when heavy-needed is true the tier must
+          # have run to success; when false each heavy job must read
+          # "skipped" (it never ran); anything else fails. A skipped
+          # required check counts as passing, so the umbrella models the
+          # skip explicitly instead of trusting it.
+          check_heavy() {
+            local name="$1" result="$2"
+            if [ "$HEAVY_NEEDED" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "$name=$result (heavy tier was required)"
+                exit 1
+              fi
+            else
+              if [ "$result" != "skipped" ]; then
+                echo "$name=$result (heavy tier was not required; expected skipped)"
+                exit 1
+              fi
+            fi
+          }
+
+          if [ "$NEEDS_CODE_CI" = "true" ]; then
+            check_heavy tpch-binary-framing "$TPCH_BINARY_FRAMING_RESULT"
+          elif [ "$TPCH_BINARY_FRAMING_RESULT" != "success" ] \
+              && [ "$TPCH_BINARY_FRAMING_RESULT" != "skipped" ]; then
             echo "tpch-binary-framing=$TPCH_BINARY_FRAMING_RESULT"
             exit 1
           fi
@@ -1460,6 +1582,11 @@ jobs:
             exit 1
           fi
 
+          if [ "$NEEDS_CODE_CI" = "true" ] && [ "$PUBLICATION_RECONCILIATION_RESULT" != "success" ]; then
+            echo "publication-reconciliation=$PUBLICATION_RECONCILIATION_RESULT"
+            exit 1
+          fi
+
           if [ "$NEEDS_CODE_CI" = "false" ]; then
             if [ "$SKILL_INTEGRITY_NEEDED" = "true" ]; then
               echo "Skill-integrity-only PR; required skill checks passed and product CI was skipped."
@@ -1498,16 +1625,21 @@ jobs:
             exit 1
           fi
 
+          check_heavy correctness-gate "$CORRECTNESS_RESULT"
+          check_heavy plan-capture-gate "$PLAN_CAPTURE_RESULT"
+          check_heavy medium-test "$MEDIUM_TEST_RESULT"
+
           if [ "$LINT_RESULT" = "success" ] \
-              && [ "$TEST_RESULT" = "success" ] \
-              && [ "$CORRECTNESS_RESULT" = "success" ] \
-              && [ "$PLAN_CAPTURE_RESULT" = "success" ] \
-              && [ "$MEDIUM_TEST_RESULT" = "success" ]; then
-            echo "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed."
+              && [ "$TEST_RESULT" = "success" ]; then
+            if [ "$HEAVY_NEEDED" = "true" ]; then
+              echo "Code/infra PR; lint, fast tests, and the required heavy tier passed."
+            else
+              echo "Code/infra PR on the light lane; lint and fast tests passed, heavy tier deferred to the merge queue."
+            fi
             exit 0
           fi
 
-          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT plan-capture-gate=$PLAN_CAPTURE_RESULT medium-test=$MEDIUM_TEST_RESULT"
+          echo "code-lint=$LINT_RESULT code-test=$TEST_RESULT correctness-gate=$CORRECTNESS_RESULT plan-capture-gate=$PLAN_CAPTURE_RESULT medium-test=$MEDIUM_TEST_RESULT heavy-needed=$HEAVY_NEEDED"
           exit 1
 
       - name: Record certification lane evidence
@@ -1531,6 +1663,7 @@ jobs:
           PARITY_CHECK_RESULT: ${{ needs.parity-check.result }}
           NEEDS_CODE_CI: ${{ needs.ci-paths.outputs.needs-code-ci }}
           SKILL_INTEGRITY_NEEDED: ${{ needs.ci-paths.outputs.skill-integrity-needed }}
+          HEAVY_NEEDED: ${{ needs.ci-paths.outputs.heavy-needed }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           RUN_ID: ${{ github.run_id }}
@@ -1547,6 +1680,7 @@ jobs:
               "base_sha": os.environ.get("BASE_SHA") or "",
               "needs_code_ci": os.environ.get("NEEDS_CODE_CI") or "",
               "skill_integrity_needed": os.environ.get("SKILL_INTEGRITY_NEEDED") or "",
+              "heavy_needed": os.environ.get("HEAVY_NEEDED") or "",
               "lanes": {
                   "ci-paths": os.environ.get("CI_PATHS_RESULT") or "",
                   "tpch-binary-framing": os.environ.get("TPCH_BINARY_FRAMING_RESULT") or "",
@@ -1574,7 +1708,7 @@ jobs:
       - name: Upload certification lane evidence
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: pr-certification-lanes
           path: pr-certification-lanes.json

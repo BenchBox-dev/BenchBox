@@ -63,9 +63,11 @@ def parse_main_only_allowlist(doc: Path) -> set[str]:
     text = doc.read_text(encoding="utf-8")
     # Allow optional descriptive text after "main only" before the colon,
     # e.g. "**`main` only** (extension to A3):" so amendments can extend
-    # the allowlist without changing the original A3 row.
+    # the allowlist without changing the original A3 row. A trailing bullet
+    # at end of file has no blank-line terminator (end-of-file-fixer forbids
+    # it), so end of input terminates a bullet too.
     matches = re.findall(
-        r"\*\*`main` only\*\*[^:\n]*:(.*?)(?=\n\s*-\s*\*\*|\n\n)",
+        r"\*\*`main` only\*\*[^:\n]*:(.*?)(?=\n\s*-\s*\*\*|\n\n|\s*\Z)",
         text,
         re.DOTALL,
     )

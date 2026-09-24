@@ -71,6 +71,40 @@ def joinorder_canonical_tiny(tmp_path: Path) -> Path:
 # ── Parallel test run mutual exclusion ──────────────────────────────────────
 _test_lock_fd: int | None = None  # Kept open to hold the flock for the session lifetime.
 _test_databases_created = False
+_lock_waiter: Any = None  # Lazily loaded wait_on_fd from scripts/local_validation.py.
+_lock_waiter_attempted = False
+
+
+def _load_lock_waiter() -> Any:
+    """Shared bounded-wait helper; None when the script is unavailable.
+
+    Falls back to immediate fail-fast so pytest startup never depends on it.
+    """
+    global _lock_waiter, _lock_waiter_attempted
+    if _lock_waiter_attempted:
+        return _lock_waiter
+    _lock_waiter_attempted = True
+    try:
+        import importlib.util
+
+        path = Path(__file__).resolve().parents[1] / "scripts" / "local_validation.py"
+        spec = importlib.util.spec_from_file_location("benchbox_local_validation", path)
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _lock_waiter = module
+    except Exception:
+        _lock_waiter = None
+    return _lock_waiter
+
+
+def _lock_wait_seconds() -> float:
+    try:
+        return max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "0") or 0))
+    except ValueError:
+        return 0.0
 
 
 def _get_test_lock_path() -> Path:
@@ -149,20 +183,37 @@ def pytest_configure(config) -> None:
 
     # Acquire exclusive lock to prevent concurrent parallel test runs from
     # competing for CPU. Only the controller process (not xdist workers) locks.
+    # BENCHBOX_TEST_LOCK_WAIT_SECONDS=0 (default) keeps the historical
+    # immediate fail-fast; a positive value waits that long with owner
+    # visibility before failing the same way. Ctrl-C cancels the wait.
     if _should_acquire_test_lock(config):
         test_lock_path = _get_test_lock_path()
         test_lock_path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(str(test_lock_path), os.O_CREAT | os.O_RDWR | getattr(os, "O_CLOEXEC", 0), 0o644)
-        try:
-            if sys.platform == "win32":
-                import msvcrt
+        waiter = None if sys.platform == "win32" else _load_lock_waiter()
+        wait_seconds = 0.0 if waiter is None else _lock_wait_seconds()
+        lock_error: Exception | None = None
+        if waiter is not None and wait_seconds > 0:
+            try:
+                waiter.wait_on_fd(fd, test_lock_path, wait_seconds)
+            except TimeoutError as exc:
+                lock_error = exc
+            except BaseException:
+                os.close(fd)
+                raise
+        else:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
 
-                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
+                    msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
 
-                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except (BlockingIOError, OSError):
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except (BlockingIOError, OSError) as exc:
+                lock_error = exc
+        if lock_error is not None:
             # Another parallel run holds the lock - fail fast with a clear message.
             try:
                 holder_info = test_lock_path.read_text(encoding="utf-8").strip()
@@ -172,10 +223,14 @@ def pytest_configure(config) -> None:
             # Use os._exit() rather than sys.exit(): pytest_configure is called
             # before the session loop so SystemExit bubbles up as INTERNALERROR.
             # os._exit() terminates the process immediately with the given code.
+            waited_note = (
+                f"  Waited    : {wait_seconds:g}s (BENCHBOX_TEST_LOCK_WAIT_SECONDS)\n" if wait_seconds > 0 else ""
+            )
             sys.stderr.write(
                 f"\n\033[91m[benchbox] BLOCKED: A parallel test run is already active.\033[0m\n"
                 f"  Lock file : {test_lock_path}\n"
-                f"  Holder    : {holder_info}\n\n"
+                f"  Holder    : {holder_info}\n"
+                f"{waited_note}\n"
                 f"  Options:\n"
                 f"    \u2022 Wait for the other run to finish and retry.\n"
                 f"    \u2022 Kill the other run, then retry.\n"
@@ -187,13 +242,16 @@ def pytest_configure(config) -> None:
         # Write diagnostic info so other processes can identify the lock holder.
         # ftruncate is safe here: O_RDWR opens at position 0, so the subsequent
         # write lands at offset 0 without needing an explicit seek.
-        started = time.strftime("%Y-%m-%d %H:%M:%S")
-        cmd = " ".join(sys.argv[:4])
-        try:
-            os.ftruncate(fd, 0)
-            os.write(fd, f"pid:{os.getpid()} started:{started} cmd:{cmd}\n".encode())
-        except OSError:
-            pass
+        if waiter is not None:
+            waiter.write_holder(fd, test_lock_path, phase="pytest-session", gate="xdist")
+        else:
+            started = time.strftime("%Y-%m-%d %H:%M:%S")
+            cmd = " ".join(sys.argv[:4])
+            try:
+                os.ftruncate(fd, 0)
+                os.write(fd, f"pid:{os.getpid()} started:{started} phase:pytest-session cmd:{cmd}\n".encode())
+            except OSError:
+                pass
         _test_lock_fd = fd  # Keep fd open to maintain the lock for the whole session.
 
     # Limit DuckDB internal threads.  DuckDB ignores environment variables;
@@ -373,24 +431,6 @@ def _reset_global_config_provider():
     set_config_provider(None)
 
 
-def pytest_runtest_setup(item) -> None:
-    """Set up test-specific configurations based on markers."""
-    # Set timeouts based on speed markers
-    if item.get_closest_marker("fast"):
-        item.config.option.timeout = 30
-    elif item.get_closest_marker("medium"):
-        item.config.option.timeout = 120
-    elif item.get_closest_marker("slow"):
-        item.config.option.timeout = 600
-
-    # Skip tests based on environment
-    if item.get_closest_marker("skip_ci") and os.environ.get("CI"):
-        pytest.skip("Skipped in CI environment")
-
-    if item.get_closest_marker("local_only") and os.environ.get("CI"):
-        pytest.skip("Local-only test skipped in CI")
-
-
 def pytest_sessionfinish(session, exitstatus) -> None:
     """Clean up test databases after the test session ends."""
     from pathlib import Path
@@ -431,7 +471,7 @@ def pytest_terminal_summary(terminalreporter, config, exitstatus) -> None:
         threshold = 80.0
 
         # Load existing coverage data written by pytest-cov
-        cov = coverage.Coverage(data_file=".coverage", config_file=".coveragerc_core")
+        cov = coverage.Coverage(data_file=".coverage", config_file="pyproject.toml")
         cov.load()
 
         buf = io.StringIO()

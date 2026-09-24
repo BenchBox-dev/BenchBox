@@ -77,6 +77,16 @@ def test_spark_platform_options_adaptive_enabled():
     assert parsed["adaptive_enabled"] is False
 
 
+def test_lakesail_platform_options_adaptive_enabled():
+    # LakeSail exposes the same AQE toggle as spark/velox; without this spec
+    # row --platform-option adaptive_enabled=false is rejected as unknown.
+    parsed = PlatformHookRegistry.parse_options("lakesail", [])
+    assert parsed["adaptive_enabled"] is True
+
+    parsed = PlatformHookRegistry.parse_options("lakesail", [("adaptive_enabled", "false")])
+    assert parsed["adaptive_enabled"] is False
+
+
 @pytest.mark.parametrize(
     ("platform", "option", "expected"),
     [
@@ -410,6 +420,21 @@ class TestPlatformConfigBuilders:
         assert config.name == "Snowflake"
         assert config.driver_package == "snowflake-connector-python"
 
+    def test_snowflake_config_builder_forwards_edition(self, mock_credential_manager):
+        """The operator-supplied edition must survive config construction.
+
+        Normalized Snowflake cost requires the edition, which is not
+        service-observable; dropping it here silently pins every run to
+        cost_status unavailable.
+        """
+        from benchbox.platforms.snowflake import _build_snowflake_config
+
+        mock_credential_manager.get_platform_credentials.return_value = {}
+
+        config = _build_snowflake_config("snowflake", {"edition": "enterprise"}, {}, None)
+
+        assert config.options["edition"] == "enterprise"
+
     def test_redshift_config_builder_loads_credentials(self, mock_credential_manager):
         """Test Redshift config builder loads and merges credentials."""
         from benchbox.platforms.redshift import _build_redshift_config
@@ -574,3 +599,26 @@ class TestPlatformConfigBuilders:
         from benchbox.platforms.databricks import _build_databricks_config
 
         assert callable(_build_databricks_config)
+
+
+def test_plan_capture_options_accepted_on_all_platforms():
+    """plan_max_depth/plan_capture_timeout_seconds are settable via --platform-option."""
+    for platform in ("duckdb", "clickhouse", "databricks"):
+        parsed = PlatformHookRegistry.parse_options(platform, [("plan_max_depth", "7")])
+        assert parsed["plan_max_depth"] == 7
+        parsed = PlatformHookRegistry.parse_options(platform, [("plan_capture_timeout_seconds", "45")])
+        assert parsed["plan_capture_timeout_seconds"] == 45
+
+
+def test_plan_capture_options_omitted_when_unset():
+    """Unset plan-capture knobs stay out of parsed options so adapter defaults apply."""
+    parsed = PlatformHookRegistry.parse_options("duckdb", [])
+    assert "plan_max_depth" not in parsed
+    assert "plan_capture_timeout_seconds" not in parsed
+
+
+def test_plan_capture_options_reject_non_integer():
+    with pytest.raises(PlatformOptionError):
+        PlatformHookRegistry.parse_options("duckdb", [("plan_max_depth", "deep")])
+    with pytest.raises(PlatformOptionError):
+        PlatformHookRegistry.parse_options("duckdb", [("plan_capture_timeout_seconds", "soon")])

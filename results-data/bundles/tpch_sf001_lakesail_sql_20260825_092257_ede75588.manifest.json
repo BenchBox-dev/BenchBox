@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf001_lakesail_sql_20260825_092257_ede75588.json",
+  "bundle_hash": "b1e4e2ee6edba4437442a2f7e2e5e8b9f40ac8bc8a4e3f2ee62e6a00e90d58d4",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

@@ -27,8 +27,8 @@ test.describe("Compare", () => {
     await expect(main.locator(`a[href="/results/r/${LONG_DUCKDB}"]`)).toBeVisible();
     await expect(main.locator(`a[href="/results/r/${LONG_DATAFUSION}"]`)).toBeVisible();
 
-    // Query-Level Diff is the stable landmark for the per-query evidence table.
-    await expect(main.getByRole("heading", { name: /Query-Level Diff/ })).toBeVisible();
+    // Query-level differences is the stable landmark for the per-query evidence table.
+    await expect(main.getByRole("heading", { name: /Query-level differences/ })).toBeVisible();
   });
 
   test("the explicit trailing-slash compare route resolves the same comparison page", async ({
@@ -55,44 +55,23 @@ test.describe("Compare", () => {
       .toMatch(/^[0-9a-f]{8},[0-9a-f]{8}$/);
   });
 
-  test("a single-id compare URL opens the compare builder with the run pinned", async ({ page }) => {
+  test("a single-id compare URL sends the selected run to Find runs", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
     await waitForShell(page);
 
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", /\/results\/query/);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toHaveAttribute("href", /\/results\/query\?pick=/);
   });
 
-  test("Share URL button copies the current URL and updates its label", async ({
-    page,
-    context,
-  }) => {
-    // Clipboard reads/writes require explicit grants under Chromium and
-    // are a no-op under WebKit/Firefox. This test runs under every project
-    // but only the permission grant is Chromium-only guarded.
-    const browserName = page.context().browser()?.browserType().name();
-    if (browserName === "chromium") {
-      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    }
-
+  test("the browser URL reproduces the selected comparison", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
-    await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison/);
-
-    const shareButton = page.getByRole("button", { name: /Share URL/ });
-    await shareButton.click();
-
-    // Label flips to "Copied!" for two seconds. We only assert the label
-    // change because clipboard readback varies across browsers.
-    await expect(page.getByRole("button", { name: /Copied!/ })).toBeVisible();
-
-    if (browserName === "chromium") {
-      const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
-      expect(clipboardText).toContain("/results/compare?ids=");
-    }
+    const sharedUrl = page.url();
+    await page.goto("/results/");
+    await page.goto(sharedUrl);
+    await waitForDataLoaded(page, /TPC-H Comparison/);
+    await expect(page.getByRole("main").locator(`a[href="/results/r/${LONG_DUCKDB}"]`)).toBeVisible();
+    await expect(page.getByRole("main").locator(`a[href="/results/r/${LONG_DATAFUSION}"]`)).toBeVisible();
   });
 
   test("selecting two platforms on BenchmarkIndex routes to Compare via the sticky bar", async ({
@@ -109,8 +88,9 @@ test.describe("Compare", () => {
     await duckdb.first().check();
     await datafusion.first().check();
 
-    // Sticky compare bar materializes once two platforms are selected.
-    const compareLink = page.getByRole("link", { name: /Compare 2 selected/ });
+    // Sticky compare bar materializes once two platforms are selected. The
+    // page-level guidance slot offers the same link, so target the tray.
+    const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();
 

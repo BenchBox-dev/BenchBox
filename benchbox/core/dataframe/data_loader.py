@@ -64,6 +64,7 @@ from benchbox.utils.path_utils import get_benchmark_runs_dataframe_path, get_ben
 
 if TYPE_CHECKING:
     from benchbox.core.tpch.schema import Table
+    from benchbox.platforms.base.data_loading import CsvDialect
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,19 @@ DEFAULT_CACHE_DIR = Path("benchmark_runs") / "datagen"
 # supplied. Pre-v5 caches for such benchmarks either failed conversion (and
 # silently fell back to an untyped read of the source file) or embedded the header
 # row as data, so they must be regenerated.
-DATAFRAME_CACHE_VERSION = "v5"
+# v6: inferred TIME columns (time32/time64) are now cast to string before the
+# Parquet write. Pre-v6 caches may embed INT32 TIME(MILLIS,false), which Spark
+# rejects on read (PARQUET_TYPE_ILLEGAL), so they must be regenerated.
+# v7: CSV dialect (delimiter, header, null marker) now resolves through the
+# shared resolve_csv_dialect() single source -- manifest metadata first, then
+# benchmark attributes -- instead of benchmark attributes alone. Pre-v7 caches
+# for manifest-annotated benchmarks may embed the attribute-only reading, so
+# they must be regenerated.
+# v8: dialects with a non-empty NULL sentinel (e.g. ClickBench's __NULL__,
+# where only the sentinel is NULL) now keep empty string fields as '' instead
+# of NULL. Pre-v8 caches for such dialects embed NULL where the SQL surface
+# emits '', so they must be regenerated.
+DATAFRAME_CACHE_VERSION = "v8"
 
 # Format subdirectory names that belong to the DataFrame cache layer.
 # Used by clear_cache() to selectively remove cached conversions without
@@ -389,10 +402,12 @@ class FormatConverter:
                 read as strings.
             null_marker: CSV null marker matching the SQL loader's resolved
                 dialect. ``""`` (default) converts empty string fields to NULL,
-                preserving prior behavior; ``None`` keeps empty fields as empty
-                strings so a string column materializes the same way the DuckDB
-                SQL reference does (its ``nullstr`` sentinel never matches an
-                empty field), instead of emitting NULL where SQL emits "".
+                preserving prior behavior; ``None`` (no NULL conversion) or a
+                non-empty sentinel (only that literal is NULL, e.g. ClickBench's
+                ``__NULL__``) keeps empty fields as empty strings so a string
+                column materializes the same way the DuckDB SQL reference does
+                (its ``nullstr`` sentinel never matches an empty field), instead
+                of emitting NULL where SQL emits "".
 
         Returns:
             Tuple of (conversion status, row count)
@@ -430,11 +445,15 @@ class FormatConverter:
             arrow_column_types = FormatConverter._resolve_arrow_types(column_types)
 
             # When the SQL loader's dialect keeps empty fields as empty strings
-            # (null_marker is None), do the same here so the DataFrame surface
-            # does not emit NULL where the SQL surface emits "".
+            # (no NULL conversion, or a non-empty sentinel where only the
+            # sentinel is NULL), do the same here so the DataFrame surface
+            # does not emit NULL where the SQL surface emits "". Only "" maps
+            # empty fields to NULL.
+            from benchbox.core.dataframe.csv_dialect import dialect_preserves_empty_strings
+
             convert_options = pv.ConvertOptions(
                 auto_dict_encode=True,
-                strings_can_be_null=null_marker is not None,
+                strings_can_be_null=not dialect_preserves_empty_strings(null_marker),
                 column_types=arrow_column_types,
             )
 
@@ -445,6 +464,11 @@ class FormatConverter:
 
             if is_tbl_file and column_names and has_trailing:
                 table = table.select(column_names)
+
+            # PyArrow CSV inference types time-like fields as time32/time64,
+            # which Parquet stores as TIME(...,false) that Spark cannot read
+            # (PARQUET_TYPE_ILLEGAL). Persist them as strings instead.
+            table = FormatConverter._coerce_time_columns_to_string(table)
 
             # Apply physical layout options from write_config
             if write_config:
@@ -486,6 +510,38 @@ class FormatConverter:
             "string": pa.string(),
         }
         return {col: type_lookup.get(dtype, pa.string()) for col, dtype in column_types.items()}
+
+    @staticmethod
+    def _coerce_time_columns_to_string(table: Any) -> Any:
+        """Cast inferred TIME columns to string for Parquet/Spark compatibility.
+
+        PyArrow's CSV inference types ``HH:MM:SS`` fields as ``time32``/``time64``
+        when no explicit column type pins them to string (e.g. the benchmark
+        schema is unavailable). Parquet stores those as ``TIME(MILLIS/MICROS,false)``,
+        which Spark rejects on read (``PARQUET_TYPE_ILLEGAL``); TIME also has no
+        reliable DataFrame dtype across backends (see :class:`SchemaMapper`), so
+        persist such columns as strings.
+
+        Boundary: this runs on the CSV/TBL/DAT conversion path only. A
+        pre-existing external Parquet source that already embeds a TIME
+        logical type bypasses conversion and is not coerced here.
+
+        Returns:
+            The table with every ``time32``/``time64`` column cast to string.
+        """
+        import pyarrow as pa
+        import pyarrow.compute as pc
+
+        time_columns = [
+            field.name for field in table.schema if pa.types.is_time32(field.type) or pa.types.is_time64(field.type)
+        ]
+        if not time_columns:
+            return table
+        logger.info(f"Casting inferred TIME column(s) to string for Parquet compatibility: {time_columns}")
+        for name in time_columns:
+            index = table.schema.get_field_index(name)
+            table = table.set_column(index, name, pc.cast(table.column(name), pa.string()))
+        return table
 
     @staticmethod
     def _build_write_kwargs(compression: str, write_config: Any, table: Any) -> dict[str, Any]:
@@ -597,14 +653,14 @@ class DataCache:
             nation.tbl              ← raw generated data (not managed by cache)
             _datagen_manifest.json  ← SQL datagen manifest (not managed by cache)
             parquet/                ← cached format conversions
-              v3/
+              v6/
                 _manifest.json
                 customer.parquet
                 lineitem.parquet
                 ...
           tpch_sf001/
             parquet/
-              v3/
+              v6/
                 ...
           tpcds_sf1/
             ...
@@ -1033,6 +1089,19 @@ class DataFrameDataLoader:
             data_dir or Path(first_path).parent,
             source_files,
         )
+        # Fold the resolved per-table CSV dialect into the cache key: manifest
+        # dialect metadata (delimiter/header/NULL marker) changes how bytes are
+        # interpreted without touching the CSV files, so file stats alone would
+        # reuse stale Parquet indefinitely. Resolution is cheap (one small
+        # manifest read) and falls back exactly as conversion does.
+        table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
+        dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
+        dialect_key = "|".join(
+            f"{table}:{dialects[table].delimiter}:{dialects[table].has_header}:"
+            f"{dialects[table].null_marker}:{dialects[table].normalize_booleans}"
+            for table in sorted(dialects)
+        )
+        source_hash = hashlib.md5(f"{source_hash}:{dialect_key}".encode()).hexdigest()[:12]
 
         # Include write_config in cache key if it affects output
         if effective_write_config and not effective_write_config.is_default():
@@ -1065,6 +1134,7 @@ class DataFrameDataLoader:
             target_format=target_format,
             source_hash=source_hash,
             write_config=effective_write_config,
+            data_dir=data_dir,
         )
         if layout_applied:
             self.applied_write_layout = effective_write_config
@@ -1238,6 +1308,7 @@ class DataFrameDataLoader:
         target_format: DataFormat,
         source_hash: str,
         write_config: DataFrameWriteConfiguration | None = None,
+        data_dir: Path | None = None,
     ) -> dict[str, Path | list[Path]]:
         """Convert data files to target format.
 
@@ -1276,19 +1347,22 @@ class DataFrameDataLoader:
         # Get schema info for column names and types
         schema_info = self._get_schema_info(benchmark)
         pyarrow_types = self._get_pyarrow_types(benchmark)
-        null_markers = self._get_null_markers(benchmark, source_files)
+        # Single CSV dialect source: one resolved dialect per table (manifest
+        # metadata, then benchmark attributes, then format defaults) feeds the
+        # null marker, delimiter, and header alike, so the DataFrame surface
+        # cannot interpret the same metadata differently from the SQL loader.
+        table_metadata_hints = self._read_manifest_dialect_hints(data_dir, list(source_files))
+        dialects = self._resolve_table_dialects(benchmark, source_files, table_metadata_hints)
 
         converted_files: dict[str, Path | list[Path]] = {}
         table_metadata: dict[str, dict[str, Any]] = {}
-
-        benchmark_delimiter = getattr(benchmark, "csv_delimiter", None)
-        benchmark_has_header = bool(getattr(benchmark, "csv_has_header", False))
 
         for table_name, source_path in source_files.items():
             source_list = source_path if isinstance(source_path, list) else [source_path]
             column_names = schema_info.get(table_name)
             column_types = pyarrow_types.get(table_name)
             table_write_config = self._get_table_write_config(write_config, table_name, column_names)
+            table_dialect = dialects[table_name]
 
             converted_list, table_entries = self._convert_table_files(
                 table_name,
@@ -1296,10 +1370,10 @@ class DataFrameDataLoader:
                 column_names,
                 column_types,
                 table_write_config,
-                benchmark_delimiter,
+                table_dialect.delimiter,
                 cache_path,
-                null_marker=null_markers.get(table_name, ""),
-                has_header=benchmark_has_header,
+                null_marker=table_dialect.null_marker,
+                has_header=table_dialect.has_header,
             )
 
             if len(converted_list) == 1:
@@ -1456,7 +1530,64 @@ class DataFrameDataLoader:
             skip_dictionary_columns=filtered_skip_dict_cols,
         )
 
-    def _get_null_markers(self, benchmark: Any, source_files: dict[str, Path | list[Path]]) -> dict[str, str | None]:
+    @staticmethod
+    def _read_manifest_dialect_hints(data_dir: Path | None, table_names: list[str]) -> dict[str, dict[str, Any]]:
+        """Read per-table CSV dialect metadata from the datagen manifest, if present.
+
+        Returns an empty mapping when there is no data directory or no usable
+        manifest, in which case dialect resolution falls back to benchmark
+        attributes and format defaults exactly as before.
+        """
+        if data_dir is None or not table_names:
+            return {}
+        from benchbox.platforms.base.data_loading import ManifestFileSource
+
+        manifest_path = Path(data_dir) / "_datagen_manifest.json"
+        return ManifestFileSource().read_table_metadata_hints(manifest_path, table_names)
+
+    def _resolve_table_dialects(
+        self,
+        benchmark: Any,
+        source_files: dict[str, Path | list[Path]],
+        table_metadata: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, CsvDialect]:
+        """Resolve one shared CSV dialect per table through ``resolve_csv_dialect``.
+
+        Manifest metadata (when provided) wins per field, then benchmark
+        attributes, then format defaults -- the same precedence the SQL loader
+        uses. On any per-table resolution failure the dialect falls back to the
+        historical attribute-only reading (benchmark delimiter/header, empty ->
+        NULL marker).
+        """
+        from benchbox.platforms.base.data_loading import CsvDialect, DataSource, resolve_csv_dialect
+
+        dialects: dict[str, CsvDialect] = {}
+        source = DataSource(
+            source_type="benchmark_instance",
+            tables={},
+            table_metadata=dict(table_metadata) if table_metadata else {},
+        )
+        for table_name, paths in source_files.items():
+            first = paths[0] if isinstance(paths, list) else paths
+            try:
+                dialects[table_name] = resolve_csv_dialect(source, table_name, Path(first), benchmark)
+            except Exception:
+                logger.debug("Falling back to attribute-only CSV dialect for table '%s'", table_name)
+                dialects[table_name] = CsvDialect(
+                    delimiter=getattr(benchmark, "csv_delimiter", None) or ",",
+                    has_header=bool(getattr(benchmark, "csv_has_header", False)),
+                    null_marker="",
+                    normalize_booleans=False,
+                    quote=None,
+                )
+        return dialects
+
+    def _get_null_markers(
+        self,
+        benchmark: Any,
+        source_files: dict[str, Path | list[Path]],
+        table_metadata: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, str | None]:
         """Resolve each table's CSV null marker the same way the SQL loader does.
 
         Returns a per-table marker: ``None`` means empty fields are kept as empty
@@ -1466,18 +1597,10 @@ class DataFrameDataLoader:
         the same way its DuckDB SQL reference does. On any resolution failure the
         marker defaults to ``""`` (prior behavior: empty -> NULL).
         """
-        from benchbox.platforms.base.data_loading import DataSource, resolve_csv_dialect
-
-        markers: dict[str, str | None] = {}
-        source = DataSource(source_type="benchmark_instance", tables={})
-        for table_name, paths in source_files.items():
-            first = paths[0] if isinstance(paths, list) else paths
-            try:
-                dialect = resolve_csv_dialect(source, table_name, Path(first), benchmark)
-                markers[table_name] = dialect.null_marker
-            except Exception:
-                markers[table_name] = ""
-        return markers
+        return {
+            table_name: dialect.null_marker
+            for table_name, dialect in self._resolve_table_dialects(benchmark, source_files, table_metadata).items()
+        }
 
     def _get_schema_info(self, benchmark: Any) -> dict[str, list[str]]:
         """Extract column names from benchmark schema.

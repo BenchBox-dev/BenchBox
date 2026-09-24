@@ -12,9 +12,11 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from dataclasses import dataclass, field
+import hashlib
+import json
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
 class SkewType(Enum):
@@ -160,6 +162,21 @@ class SkewConfiguration:
     enable_attribute_skew: bool = True
     enable_join_skew: bool = True
     enable_temporal_skew: bool = False
+
+    def datagen_identity(self) -> dict[str, Any]:
+        """Return the complete effective configuration that shapes generated data.
+
+        Presets are resolved before constructing this object, so a preset and a
+        custom configuration with the same effective values deliberately share
+        one identity. Keeping the seed and every per-column knob here prevents
+        cache reuse and result comparison across differently generated data.
+        """
+        return asdict(self)
+
+    def datagen_identity_hash(self) -> str:
+        """Return a stable hash of :meth:`datagen_identity`."""
+        encoded = json.dumps(self.datagen_identity(), sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     def get_skew_summary(self) -> dict:
         """Get summary of active skew settings.

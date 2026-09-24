@@ -15,11 +15,13 @@ import math
 import threading
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
+from benchbox.core.throughput.containment import await_quiescence
 from benchbox.core.tuning.applied_ledger import (
     APPLIED_UNVERIFIED,
     APPLIED_VERIFIED,
@@ -33,6 +35,7 @@ from benchbox.core.tuning.applied_ledger import (
     recording_connection,
 )
 from benchbox.core.tuning.introspection import Introspector, corroborate
+from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
@@ -42,10 +45,13 @@ from benchbox.platforms.base.connection_wrappers import (
     _make_stream_cursor,
     _NoCloseProxy,  # noqa: F401 - re-exported for external imports
     check_isolation_capability,  # noqa: F401 - re-exported for external imports
+    require_throughput_stream_capability,  # noqa: F401 - re-exported for execution drivers
+    resolve_stream_connection_capability,  # noqa: F401 - re-exported for manifest sweep
 )
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
 from benchbox.platforms.base.execution import TestDriversMixin
+from benchbox.platforms.base.link_probe import probe_statement_overhead
 from benchbox.platforms.base.models import (
     SetupPhase,
     StatisticsGatheringPhase,
@@ -61,6 +67,7 @@ from benchbox.platforms.base.tuning import TuningHooksMixin
 from benchbox.platforms.base.tuning_config import TuningConfigMixin
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import quiet_console
+from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
 # Import result models for type hints and re-export alias
@@ -98,6 +105,16 @@ except ImportError:
 EnhancedBenchmarkResults = BenchmarkResults
 
 
+def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float:
+    """Return a run duration with post-benchmark probe wall time removed.
+
+    The statement overhead probe issues live statements after the workload
+    succeeded; its time is measurement overhead, not benchmark time, and the
+    published ``total_duration`` must not include it.
+    """
+    return max(0.0, total_seconds - probe_seconds)
+
+
 class PlatformAdapter(
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
@@ -129,8 +146,16 @@ class PlatformAdapter(
     # per stream must set this to INDEPENDENT_CONNECTION *and* override
     # new_stream_connection() below - declaring the capability alone is not
     # enough, since the base new_stream_connection() raises for that value to
-    # fail fast instead of silently falling back to cursor sharing.
+    # fail fast instead of silently falling back to cursor sharing. Adapters
+    # that cannot serve concurrent streams at all declare UNSUPPORTED, which
+    # the throughput entry points refuse before stream submission.
     stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
+    # Default in-container service port the adapter connects to in the reference
+    # docker deployment (the container side of the compose `ports:` mapping).
+    # UAT derives its reachability table from these declarations instead of
+    # hardcoding them. None means the platform has no single default (embedded
+    # engines, cloud services with per-deployment endpoints).
+    default_service_port: int | None = None
     # External table mode capability declaration.
     # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False
@@ -246,7 +271,8 @@ class PlatformAdapter(
         self.requested_table_format: str | None = None
 
         # Dry-run mode support
-        self.dry_run = config.get("dry_run", False)
+        self._initial_dry_run = bool(config.get("dry_run", False))
+        self.dry_run = self._initial_dry_run
         self.dry_run_mode = False
         self.captured_sql = []
         self.query_counter = 0
@@ -255,18 +281,27 @@ class PlatformAdapter(
 
         # Track latest throughput metrics for phase construction
         self._last_throughput_test_result = None
+        # Latest per-table load timings for result construction (reset per run)
+        self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
         self._reset_plan_capture_stats()
+        self._client_link_metadata: dict[str, Any] | None = None
+        self._link_probe_timed_out = False
+        self._post_measurement_contained = False
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
         self.database_was_reused = False
         self._last_power_test_result = None
         self._last_throughput_test_result = None
+        self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables = []
         self._sorted_ingestion_total_apply_seconds = 0.0
         self._reset_plan_capture_stats()
+        self._client_link_metadata = None
+        self._link_probe_timed_out = False
+        self._post_measurement_contained = False
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -291,6 +326,11 @@ class PlatformAdapter(
         Returns:
             Platform adapter instance
         """
+
+    @property
+    def is_dry_run(self) -> bool:
+        """Return True if dry run is active via configuration or execution mode."""
+        return bool(getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False))
 
     @property
     def platform_name(self) -> str:
@@ -669,7 +709,7 @@ class PlatformAdapter(
         if connection and hasattr(connection, "close"):
             connection.close()
 
-    def new_stream_connection(self, connection: Any) -> Any:
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         """Return a per-stream execution handle for one concurrent throughput
         (or connection-pool test) stream.
 
@@ -679,7 +719,13 @@ class PlatformAdapter(
         ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
         call this once per stream instead of unconditionally sharing one
         cursor, so the behavior is now a declared, overridable platform
-        capability rather than an implicit one-size-fits-all default.
+        capability rather than an implicit one-size-fits-all default. The
+        ``benchmark_type`` keyword (``"olap"`` for the TPC-H/TPC-DS throughput
+        drivers unless the caller overrides it via run config) lets
+        ``INDEPENDENT_CONNECTION`` overrides reproduce the benchmark-type
+        session tuning the shared connection carries - see equivalence
+        dimension 4 in ``StreamConnectionCapability``. The keyword is optional
+        so pre-existing overrides and test doubles keep working unchanged.
 
         Dispatches on ``stream_connection_capability``:
 
@@ -691,7 +737,8 @@ class PlatformAdapter(
           see docs/benchmarks/tpc-h.md). No new connections are opened, and
           closing the returned handle never closes the shared connection
           (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
-          only closes the cursor).
+          only closes the cursor). ``benchmark_type`` is ignored: the shared
+          connection already carries its tuning.
         - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
           engines whose driver does not support true concurrent statement
           execution across cursors of one connection) MUST override this
@@ -701,18 +748,30 @@ class PlatformAdapter(
           capability value instead of falling back to cursor sharing, so a
           subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
           fails loudly rather than silently reproducing the shared-session bug
-          this capability exists to fix.
+          this capability exists to fix. Overrides should apply
+          ``configure_for_benchmark(stream_conn, benchmark_type or "olap")``
+          (plus the ``_apply_stream_session_state`` hook for
+          connection-establishment state) so the stream session measures the
+          same tuning as the setup session.
+        - ``UNSUPPORTED``: never reaches this method - the throughput entry
+          points refuse via ``require_throughput_stream_capability`` before
+          any stream is submitted.
 
         Args:
             connection: The adapter's shared platform connection (as created by
                 ``create_connection``). Used as-is for ``SHARED_CURSOR``;
                 available for reference (e.g. to read connection parameters)
                 but not required for ``INDEPENDENT_CONNECTION`` overrides.
+            benchmark_type: Benchmark tuning vocabulary (e.g. ``"olap"``) for
+                per-stream session parity. Optional; overrides replay tuning
+                only when it is supplied, so callers that pass nothing keep
+                their previous behavior.
 
         Returns:
             A connection-like object suitable for one stream: either a cursor/
             proxy over the shared connection, or an independent connection.
         """
+        del benchmark_type  # SHARED_CURSOR reuses the already-tuned shared connection
         if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
             raise NotImplementedError(
                 f"{self.platform_name} declares stream_connection_capability="
@@ -893,6 +952,7 @@ class PlatformAdapter(
                     tuning_validation_status,
                     tuning_metadata_saved,
                     requested_config_hash,
+                    per_table_timings=getattr(self, "_last_per_table_timings", None),
                 )
                 self._attach_applied_ledger_payload(failed_result, tuning_validation_status)
                 return failed_result
@@ -943,20 +1003,25 @@ class PlatformAdapter(
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
             query_results = self._execute_queries_by_type(benchmark, connection, run_config)
+            # The overhead probe issues live statements after the workload
+            # succeeded. Its wall time is excluded from the published run
+            # duration below so the probe never inflates the number it
+            # exists to contextualise.
+            probe_elapsed_s = self._collect_post_measurement_metadata(connection, run_config)
 
             # Get queries for definitions - pass canonical slug so dialect selection
             # doesn't have to infer benchmark family from object internals.
             queries = self._get_dialect_queries(
                 benchmark,
                 benchmark_slug=run_config.get("benchmark_name", ""),
-                connection=connection,
+                connection=None if self._post_measurement_contained else connection,
             )
             stream_id = "standard"
             self._extract_query_definitions(benchmark, queries, stream_id)
             query_executions = self._create_standard_execution_phase(query_results, stream_id)
 
             # Step 7: Compile enhanced results
-            total_duration = elapsed_seconds(start_time)
+            total_duration = exclude_probe_wall_time(elapsed_seconds(start_time), probe_elapsed_s)
 
             setup_phase = SetupPhase(
                 data_generation=data_generation_phase,
@@ -970,10 +1035,8 @@ class PlatformAdapter(
                 query_results, query_executions, run_config, setup_phase
             )
 
-            platform_info = self.get_platform_info(connection)
-            normalized_metadata = self.get_normalized_result_metadata(
-                connection=connection,
-                platform_info=platform_info,
+            platform_info, normalized_metadata = self._collect_platform_metadata(
+                None if self._post_measurement_contained else connection
             )
             execution_metadata, system_profile, anonymous_machine_id = self._build_execution_metadata(run_config)
 
@@ -1067,6 +1130,7 @@ class PlatformAdapter(
                 total_rows_loaded=total_rows_loaded,
                 data_size_mb=data_size_mb,
                 table_statistics=table_stats or {},
+                per_table_timings=getattr(self, "_last_per_table_timings", None),
                 platform_info=platform_info,
                 **normalized_metadata,
                 tunings_applied=tunings_applied_dict,
@@ -1093,8 +1157,167 @@ class PlatformAdapter(
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
-                self.close_connection(self.connection)
-                self.connection = None
+                self._close_run_connection()
+
+    def _defer_connection_close_until_quiescent(self, connection: Any, throughput_result: Any) -> None:
+        """Close a measurement connection only after timed-out work terminates."""
+        if throughput_result is None:
+            self.close_connection(connection)
+            return
+
+        def _close_when_quiescent() -> None:
+            while not await_quiescence(throughput_result, timeout=1.0):
+                pass
+            try:
+                self.close_connection(connection)
+            except Exception as exc:  # noqa: BLE001 - deferred cleanup must not crash a worker
+                self.logger.warning("Deferred benchmark connection cleanup failed: %r", exc)
+
+        threading.Thread(
+            target=_close_when_quiescent,
+            name="benchbox-throughput-connection-cleanup",
+            daemon=True,
+        ).start()
+
+    def _collect_post_measurement_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> float:
+        """Collect link metadata unless throughput work still owns the connection."""
+        if self._post_measurement_contained:
+            self._client_link_metadata = {
+                "collection_status": "unavailable",
+                "source": "unavailable",
+                "client_region": None,
+                "client_cloud": None,
+                "statement_overhead_ms": None,
+                "collection_error_class": "OutstandingThroughputWork",
+                "collection_error_message": (
+                    "Post-measurement metadata collection was skipped because a timed-out "
+                    "throughput worker still owns benchmark resources."
+                ),
+            }
+            self._link_probe_timed_out = True
+            return 0.0
+
+        probe_start = mono_time()
+        self._collect_client_link_metadata(connection, run_config)
+        return elapsed_seconds(probe_start)
+
+    def _close_run_connection(self) -> None:
+        """Close or defer the run connection according to containment state."""
+        connection = self.connection
+        if self._post_measurement_contained:
+            self._defer_connection_close_until_quiescent(
+                connection,
+                getattr(self, "_last_throughput_test_result", None),
+            )
+        else:
+            self.close_connection(connection)
+        self.connection = None
+
+    def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
+        """Probe statement overhead and discover client region post-benchmark.
+
+        Collection must never fail a benchmark run that already succeeded, so
+        unexpected errors degrade to an ``unavailable`` block (same rule as
+        the applied-tuning ledger guard).
+        """
+        try:
+            self._client_link_metadata = self._build_client_link_metadata(connection, run_config)
+            self._link_probe_timed_out = bool(
+                (self._client_link_metadata or {}).get("collection_error_class") == "TimeoutError"
+            )
+        except Exception as exc:  # noqa: BLE001 - collection must never break a run
+            self.logger.warning("Client-link metadata collection failed: %r", exc)
+            self._link_probe_timed_out = False
+            self._client_link_metadata = {
+                "collection_status": "unavailable",
+                "source": "unavailable",
+                "client_region": None,
+                "client_cloud": None,
+                "statement_overhead_ms": None,
+                "collection_error_class": type(exc).__name__,
+                "collection_error_message": f"{type(exc).__name__}: client-link metadata collection failed",
+            }
+
+    def _build_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> dict[str, Any]:
+        """Assemble the ``client_link`` block from probe and region discovery."""
+        dry_run = bool(getattr(self, "dry_run_mode", False) or run_config.get("dry_run_mode", False))
+        probe_requested = is_probe_requested(run_config.get("link_probe", True)) and not dry_run
+        probe_result: dict[str, Any] | None = None
+        if probe_requested:
+            probe_result = probe_statement_overhead(connection)
+
+        # run_config always carries client_region/client_cloud keys (None by
+        # default), which would shadow platform-config values: merge only
+        # explicitly set entries.
+        merged_config = {
+            **self.platform_config,
+            **{key: value for key, value in run_config.items() if value is not None},
+        }
+        if dry_run:
+            region_info: dict[str, Any] = {"client_region": None, "client_cloud": None, "source": "unavailable"}
+        else:
+            region_info = discover_client_region(merged_config)
+
+        has_region = bool(region_info.get("client_region"))
+        probe_available = bool(probe_result and probe_result.get("collection_status") == "available")
+
+        if has_region and probe_available:
+            collection_status = "available"
+        elif has_region or probe_available:
+            collection_status = "partial"
+        elif not probe_requested and not has_region:
+            collection_status = "not_requested"
+        else:
+            collection_status = "unavailable"
+
+        return {
+            "collection_status": collection_status,
+            "source": region_info.get("source", "unavailable"),
+            "client_region": region_info.get("client_region"),
+            "client_cloud": region_info.get("client_cloud"),
+            "statement_overhead_ms": probe_result.get("statement_overhead_ms") if probe_result else None,
+            "collection_error_class": probe_result.get("collection_error_class") if probe_result else None,
+            "collection_error_message": probe_result.get("collection_error_message") if probe_result else None,
+        }
+
+    def _collect_platform_metadata(self, connection: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Collect platform info and normalized metadata for a finished run.
+
+        When the statement overhead probe timed out, its abandoned worker may
+        still hold the connection: any further use (even driver-level locks)
+        can hang or crash this completed run, so collect nothing more from it
+        and degrade to the safely collected client_link block.
+        """
+        if self._link_probe_timed_out:
+            self.logger.warning(
+                "Statement overhead probe timed out; skipping live platform "
+                "metadata collection on the possibly-held connection."
+            )
+            return {}, self._client_link_only_metadata()
+        platform_info = self.get_platform_info(connection)
+        return platform_info, self._resolve_normalized_metadata(connection, platform_info)
+
+    def _client_link_only_metadata(self) -> dict[str, Any]:
+        """Degraded normalized metadata for a probe-tainted connection.
+
+        Carries only the safely collected ``client_link`` block so a timed-out
+        probe degrades the bundle instead of risking the completed run.
+        """
+        if self._client_link_metadata:
+            return {"execution_environment": {"client_link": dict(self._client_link_metadata)}}
+        return {}
+
+    def _resolve_normalized_metadata(self, connection: Any, platform_info: Mapping[str, Any] | None) -> dict[str, Any]:
+        """Obtain normalized metadata and ensure run-scoped client_link metadata is included."""
+        metadata = self.get_normalized_result_metadata(
+            connection=connection,
+            platform_info=platform_info,
+        )
+        if self._client_link_metadata:
+            exec_env = metadata.setdefault("execution_environment", {})
+            if isinstance(exec_env, dict) and ("client_link" not in exec_env or not exec_env["client_link"]):
+                exec_env["client_link"] = dict(self._client_link_metadata)
+        return metadata
 
     def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
         """Corroborate the applied ledger against the live catalog.
@@ -1239,6 +1462,7 @@ class PlatformAdapter(
             _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
             quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
             data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+            self._last_per_table_timings = per_table_timings
             return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
         quiet_console.print("Creating database schema...")
@@ -1276,6 +1500,7 @@ class PlatformAdapter(
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
         quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        self._last_per_table_timings = per_table_timings
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:

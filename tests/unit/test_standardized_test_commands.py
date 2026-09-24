@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from configparser import ConfigParser
 from pathlib import Path
 
@@ -187,8 +188,6 @@ class TestStandardizedTestCommands:
         assert "fast:" in pytest_ini_content
         assert "unit:" in pytest_ini_content
         assert "integration:" in pytest_ini_content
-        assert "flaky:" in pytest_ini_content
-        assert "local_only:" in pytest_ini_content
         assert "markers =" in pytest_ini_content
         assert "not slow and not stress and not live_integration and not resource_heavy" in pytest_ini_content
 
@@ -256,7 +255,8 @@ class TestMakefileCommands:
         assert expected_path in result.stdout
         assert "~/tmp/benchbox-lock-probe/test.lock" not in result.stdout
         assert "uv:" not in result.stdout + result.stderr
-        assert not lock_path.exists()
+        assert lock_path.exists()
+        assert lock_path.read_text(encoding="utf-8") == ""
 
     def test_makefile_test_all_splits_parallel_and_serial_lanes_explicitly(self):
         makefile_content = (Path.cwd() / "Makefile").read_text()
@@ -270,6 +270,58 @@ class TestMakefileCommands:
 
         assert "test-fast:" in makefile_content
         assert '-m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short' in makefile_content
+
+    def test_default_test_lanes_arm_explicit_timeouts(self):
+        makefile_content = (Path.cwd() / "Makefile").read_text()
+        expected = {
+            "test-fast": "--timeout=120",
+            "test-medium": "--timeout=60",
+            "test-slow": "--timeout=1200",
+            "test-stress": "--timeout=1800",
+            "test-ci": "--timeout=300",
+            "ci-test": "--timeout=120",
+            "pr-preflight-fast-tests": "--timeout=120",
+        }
+        for target, timeout in expected.items():
+            assert timeout in _makefile_target_body(makefile_content, target)
+
+        test_all = _makefile_target_body(makefile_content, "test-all")
+        assert "--timeout=300" in test_all
+        assert "--timeout=1200" in test_all
+
+    def test_pytest_ini_declares_baseline_timeout(self):
+        repo_root = Path.cwd()
+        pytest_ini = (repo_root / "pytest.ini").read_text(encoding="utf-8")
+        pytest_ci_ini = (repo_root / "pytest-ci.ini").read_text(encoding="utf-8")
+
+        assert "timeout = 300" in pytest_ini
+        assert "timeout = 300" in pytest_ci_ini
+
+    def test_pytest_timeout_kills_hanging_test(self, tmp_path: Path):
+        """Verify that pytest reads timeout configuration directly from ini without a CLI flag."""
+        ini_file = tmp_path / "pytest.ini"
+        ini_file.write_text("[pytest]\ntimeout = 1\n", encoding="utf-8")
+
+        test_file = tmp_path / "test_hang.py"
+        test_file.write_text(
+            "import time\ndef test_hang():\n    time.sleep(5)\n",
+            encoding="utf-8",
+        )
+        env = {**os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", str(test_file), "-q", "--tb=short", "-p", "no:cov"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+        )
+        assert result.returncode != 0
+        assert (
+            "Timeout (>1.0s) from pytest-timeout" in result.stdout
+            or "Timeout" in result.stdout
+            or "Timeout" in result.stderr
+        )
 
     def test_skill_integrity_preflight_pure_skill_selects_only_focused_lane(self, tmp_path: Path):
         result, calls = _run_skill_integrity_preflight_route(
@@ -390,7 +442,7 @@ class TestMakefileCommands:
         assert make is not None
 
         result = subprocess.run(
-            [make, "--no-print-directory", "pr-preflight", f"MAKE={fake_make}"],
+            [make, "--no-print-directory", "pr-preflight-uncached", f"MAKE={fake_make}"],
             cwd=Path.cwd(),
             capture_output=True,
             text=True,
@@ -463,11 +515,13 @@ class TestMakefileCommands:
     def test_skill_integrity_preflight_consumes_one_classifier_artifact_without_path_globs(self):
         makefile_content = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
         preflight_body = _makefile_target_body(makefile_content, "pr-preflight")
+        uncached_body = _makefile_target_body(makefile_content, "pr-preflight-uncached")
         route_body = _makefile_target_body(makefile_content, ".pr-preflight-route")
         fast_tests_body = _makefile_target_body(makefile_content, "pr-preflight-fast-tests")
 
-        assert 'PATH_DECISION="$$DECISION"' in preflight_body
-        assert "scripts/path_filter_decision.py --base-ref origin/develop" in preflight_body
+        assert "scripts/local_validation.py ordered" in preflight_body
+        assert 'PATH_DECISION="$$DECISION"' in uncached_body
+        assert "scripts/path_filter_decision.py --base-ref origin/develop" in uncached_body
         assert "path_filter_decision.py --base-ref" not in route_body
         assert ".claude/skills" not in route_body
         assert "skill-sync.yaml" not in route_body
@@ -486,6 +540,8 @@ class TestMakefileCommands:
         assert "-m fast -q" not in preflight_body
         assert f'-m "{CI_FAST_EXPRESSION}"' in develop_pr_run_text
         assert f'-m "{CI_FAST_EXPRESSION}"' in main_pr_run_text
+        assert "--timeout=120" in develop_pr_run_text
+        assert "--timeout=120" in main_pr_run_text
         assert "--cov-fail-under=70" in develop_pr_run_text
         assert "--cov-fail-under=70" in main_pr_run_text
         assert "coverage remains CI-only" in makefile_content
@@ -493,19 +549,34 @@ class TestMakefileCommands:
     def test_test_ci_is_maintained_broad_local_profile(self):
         repo_root = Path.cwd()
         makefile_content = (repo_root / "Makefile").read_text()
-        pytest_ci_content = (repo_root / "pytest-ci.ini").read_text()
+        pytest_ci_config = ConfigParser()
+        pytest_ci_config.read(repo_root / "pytest-ci.ini")
         pytest_ci_addopts = _load_ini_section(repo_root / "pytest-ci.ini", "pytest")["addopts"]
+        coverage_run = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["coverage"][
+            "run"
+        ]
 
         test_ci_body = _makefile_target_body(makefile_content, "test-ci")
         assert "-c pytest-ci.ini" in test_ci_body
-        assert '-m "not (slow or flaky or local_only)"' in test_ci_body
+        assert '-m "not (slow or stress or resource_heavy or live_integration)"' in test_ci_body
         assert "--cov=benchbox" in test_ci_body
+        assert "--cov-fail-under=0" in test_ci_body
         assert "Maintained broad local CI profile" in makefile_content
-        assert "flaky:" in pytest_ci_content
-        assert "local_only:" in pytest_ci_content
-        assert "source = benchbox" in pytest_ci_content
-        assert "--cov-config=.coveragerc_core" in pytest_ci_addopts
-        assert _marker_names(repo_root / "pytest.ini") <= _marker_names(repo_root / "pytest-ci.ini")
+        assert pytest_ci_config.sections() == ["pytest"]
+        assert "--cov-config=pyproject.toml" in pytest_ci_addopts
+        assert coverage_run["source"] == ["benchbox"]
+        assert coverage_run["branch"] is True
+        assert "benchbox/core/tpcdi/etl/scd_processor.py" in coverage_run["omit"]
+        assert _marker_names(repo_root / "pytest.ini") == _marker_names(repo_root / "pytest-ci.ini")
+        for target in ("coverage-fast", "coverage-all", "coverage-opt-in-all", "coverage-html", "coverage-report"):
+            assert "--cov-fail-under=0" in _makefile_target_body(makefile_content, target)
+
+        coverage_filter = '-m "not (stress or resource_heavy or live_integration)"'
+        for target in ("coverage-all", "coverage-html", "coverage-report"):
+            assert coverage_filter in _makefile_target_body(makefile_content, target)
+        assert '-m "not (stress or resource_heavy or live_integration)"' not in _makefile_target_body(
+            makefile_content, "coverage-opt-in-all"
+        )
 
     def test_coverage_threshold_policy_distinguishes_blocking_and_advisory_thresholds(self):
         repo_root = Path.cwd()
@@ -531,13 +602,15 @@ class TestMakefileCommands:
             in makefile_content
         )
 
-    def test_medium_marker_policy_is_documented_as_explicit_routing(self):
+    def test_medium_marker_policy_is_documented_with_pr_routing(self):
         repo_root = Path.cwd()
         readme_content = (repo_root / "tests" / "README.md").read_text()
         makefile_content = (repo_root / "Makefile").read_text()
 
-        assert "Medium tests are an explicit local routing tier" in readme_content
-        assert "Correctness-relevant medium tests must be promoted" in readme_content
+        assert "The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`" in readme_content
+        assert "only when the heavy tier is needed" in readme_content
+        assert "Ordinary\ncode-change PRs skip it" in readme_content
+        assert "Product-critical tests that need a different" in readme_content
         assert "test-medium:" in makefile_content
 
     def test_every_speed_marker_tier_has_a_ci_consumer(self):
@@ -652,7 +725,9 @@ class TestMakefileCommands:
         aggregate = workflow["jobs"]["ci-required-result"]
 
         assert job["needs"] == "ci-paths"
-        assert "needs-code-ci == 'true'" in job["if"]
+        # Heavy-tier queue-only: correctness-gate is in the moved set, so it
+        # gates on heavy-needed (merge queue or carve-out), not needs-code-ci.
+        assert "heavy-needed == 'true'" in job["if"]
         assert "make test-correctness-gate" in _workflow_job_run_text(
             repo_root / ".github" / "workflows" / "pr.yml",
             "correctness-gate",

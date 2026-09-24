@@ -8,6 +8,7 @@ import benchbox
 import benchbox.cli.platform_defaults as _platform_defaults  # noqa: F401
 from benchbox.cli.commands import register_commands
 from benchbox.cli.help import BenchBoxGroup
+from benchbox.cli.logo import styled_logo
 
 CLI_HELP = f"""\
 BenchBox {benchbox.__version__} - Interactive database benchmark runner.
@@ -34,6 +35,10 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
     """Custom version callback with enhanced version information."""
     if not value or ctx.resilient_parsing:
         return
+
+    logo = styled_logo()
+    if logo:
+        click.echo(logo + "\n")
 
     try:
         from benchbox.utils.version import format_version_report

@@ -108,11 +108,11 @@ describe("BenchmarkIndex visible disabled reasons accessibility", () => {
     });
   });
 
-  it("keeps zero-selectable benchmark matrix reasons accessible", async () => {
+  it("keeps zero-selectable Results table reasons accessible", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
 
     await waitFor(() => expect(screen.getByTestId("benchmark-zero-selectable")).toBeTruthy());
-    expect(screen.getAllByTestId("query-heatmap-disabled-reason").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getAllByTestId("list-row-disabled-reason").length).toBeGreaterThan(0));
     await expectNoAxeViolations(container);
   });
 });

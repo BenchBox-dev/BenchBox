@@ -20,11 +20,14 @@ import {
   preserveUniqueAfterTruncation,
   type RunIdentitySource,
 } from "@/lib/runIdentity";
+import { resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
 
 export { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
+  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
+  preserveOrder?: boolean;
 }
 
 function ordinal(n: number): string {
@@ -33,10 +36,10 @@ function ordinal(n: number): string {
   return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
 }
 
-export function RankTable({ summary }: Props) {
+export function RankTable({ summary, preserveOrder = false }: Props) {
   const { platforms, query_ids } = summary;
   if (platforms.length === 0 || query_ids.length === 0) return null;
-  const sortedQueryIds = sortQueryIds(query_ids);
+  const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
   const rankableCellCount = countRankableTimingCells(platforms, sortedQueryIds);
 
   if (rankableCellCount === 0) {
@@ -99,6 +102,7 @@ export function RankTable({ summary }: Props) {
         >
         <thead>
           <tr>
+            {/* Keep row labels visible while timing columns scroll. */}
             <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
               Query
             </th>
@@ -116,9 +120,20 @@ export function RankTable({ summary }: Props) {
                     class="inline-block w-2 h-2 rounded-full mr-1 align-middle"
                     style={{ backgroundColor: paletteColor(i) }}
                   />
-                  {truncated}
+                  <a
+                    href={resultReceiptHref(p)}
+                    aria-label={resultIdentityAriaLabel(p, "receipt")}
+                    class="text-[var(--bb-data-fg-primary)] no-underline hover:text-[var(--bb-accent-hover)] hover:underline"
+                  >
+                    {truncated}
+                  </a>
                   {exclusion && (
-                    <span class="ml-1 text-[var(--bb-data-fg-subtle)]" aria-label={exclusion}>
+                    <span
+                      class="ml-1 text-[var(--bb-data-fg-subtle)]"
+                      aria-label={exclusion}
+                      title={exclusion}
+                      tabIndex={0}
+                    >
                       *
                     </span>
                   )}
@@ -172,7 +187,7 @@ export function RankTable({ summary }: Props) {
       </div>
       {excludedPlatformCount > 0 && (
         <p class="mt-2 text-[11px] text-[var(--bb-data-fg-subtle)]">
-          Excluded columns are marked with * and are shown for provenance, not as rankable competitors.
+          Columns marked with * are shown for reference but are not included in the ranking.
         </p>
       )}
     </div>
@@ -196,7 +211,7 @@ function RankTableEmptyState({ summary, queryIds }: { summary: BenchmarkSummary;
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">Rank chart unavailable</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        No rankable timing cells are available for this ranking. Submitted evidence is Excluded or lacks valid timing,
+        No timings in this ranking meet the requirements for ranking. The published runs are excluded or have no usable timing,
         so a normal rank matrix would be all dashes.
       </p>
       {reasons.length > 0 && (

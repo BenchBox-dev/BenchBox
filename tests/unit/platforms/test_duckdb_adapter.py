@@ -254,6 +254,26 @@ class TestDuckDBAdapter:
         with pytest.raises(RuntimeError, match="DuckDB cannot read these Vortex files"):
             adapter.create_external_tables(benchmark, connection, tmp_path)
 
+    def test_from_config_passes_through_temp_size_and_progress_bar(self):
+        """from_config must not drop max_temp_directory_size or progress_bar."""
+        with patch("benchbox.platforms.duckdb.duckdb") as mock_duckdb:
+            mock_connection = Mock()
+            mock_duckdb.connect.return_value = mock_connection
+            config = {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "database_path": ":memory:",
+                "max_temp_directory_size": "4GB",
+                "progress_bar": True,
+            }
+            adapter = DuckDBAdapter.from_config(config)
+            assert adapter.max_temp_directory_size == "4GB"
+            assert adapter.enable_progress_bar is True
+            with patch.object(adapter, "handle_existing_database"):
+                adapter.create_connection()
+            mock_connection.execute.assert_any_call("SET max_temp_directory_size = '4GB'")
+            mock_connection.execute.assert_any_call("SET enable_progress_bar = true")
+
     def test_from_config_with_output_dir_places_db_under_databases(self, tmp_path):
         """Auto-generated DB path should use a databases/ subdirectory for output_dir."""
         with patch("benchbox.platforms.duckdb.duckdb"):

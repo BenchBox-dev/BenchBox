@@ -324,6 +324,35 @@ class TestLocalStaging:
             assert staging.tables_exist(["lineitem"])
             assert not staging.tables_exist(["lineitem", "orders"])
 
+    def test_fingerprint_gates_reuse(self):
+        """Reuse requires the dataset manifest, not just table files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source_dir = Path(tmpdir) / "source"
+            staging_dir = Path(tmpdir) / "staging"
+            source_dir.mkdir()
+            (source_dir / "lineitem.parquet").write_text("lineitem data")
+
+            config = StagingConfig(
+                uri=f"file://{staging_dir}",
+                provider=CloudProvider.LOCAL,
+                bucket="",
+                prefix=str(staging_dir),
+            )
+            staging = LocalStaging(config)
+
+            uploaded = staging.upload_tables(
+                tables=["lineitem"],
+                source_dir=source_dir,
+                file_format="parquet",
+                fingerprint="abc123",
+            )
+            assert "lineitem" in uploaded
+
+            assert staging.tables_exist(["lineitem"], "parquet", "abc123")
+            assert not staging.tables_exist(["lineitem"], "parquet", "other-fp")
+            # Name-only checks keep their legacy behavior without a fingerprint.
+            assert staging.tables_exist(["lineitem"])
+
     def test_get_table_uri(self):
         """Test getting table URI."""
         config = StagingConfig(

@@ -28,6 +28,10 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # relocate-cli-hook-registries: these two are now thin back-compat
     # re-export shims; the real registries live in benchbox/core/hooks/
     # (outside the CLI surface this guard protects).
+    # cli-logo: holds the README block-character logo and the encoding check
+    # that decides whether to print it above help, version, run, and welcome
+    # output. No click decorators; no command, option, or argument changed.
+    "benchbox/cli/logo.py",
     "benchbox/cli/benchmark_hooks.py",
     "benchbox/cli/platform_hooks.py",
     "benchbox/cli/benchmarks.py",
@@ -116,6 +120,14 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/main.py",
     "benchbox/cli/onboarding.py",
     "benchbox/cli/orchestrator.py",
+    # Removing Modin also removes its readiness alias and package/backend
+    # checks. The remaining readiness checks and Click surface are unchanged.
+    "benchbox/cli/platform_readiness.py",
+    # plan-capture knobs (plan_max_depth, plan_capture_timeout_seconds)
+    # registered as --platform-option specs. Registry data only; no @click
+    # decorator, option, or function signature changed, so the guard's
+    # decorator/signature snapshot stays equal.
+    "benchbox/cli/platform_defaults.py",
     # fix-datafusion-df-mode-erasure: comment-only clarification of
     # PLATFORM_ALIASES' -df entries; no click surface in this module.
     "benchbox/cli/platform.py",
@@ -124,6 +136,9 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # or function signature changed; the guard's decorator/signature snapshot
     # stays equal. File-level allow is required because this test first diffs
     # names under benchbox/cli/ against the allowlist.
+    # Live run concurrency validation mirrors the saved-path check via a
+    # private helper; no Click decorator, option, or command signature changed.
+    "benchbox/cli/run_resolution.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",
@@ -131,6 +146,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/commands/profile.py",
     "benchbox/cli/commands/results.py",
     "benchbox/cli/commands/shell.py",
+    # databricks-clustering-strategy-default: build_baseline_unified_config now
+    # pins databricks_clustering_strategy="none" so untuned runs stop reporting
+    # a z_order strategy they never requested or applied. Function body only;
+    # no click decorator or command signature changed.
+    "benchbox/cli/tuning_runtime.py",
 }
 ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # pr-review-followup-1394: SingleStore credential setup is intentionally
@@ -143,6 +163,12 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     "benchbox/cli/commands/df_tuning.py",
     "benchbox/cli/commands/run_official.py",
     "benchbox/cli/commands/tuning.py",
+    # datafusion-tuning-support: `tuning validate --platform` now accepts
+    # datafusion, matching the existing `tuning init --platform datafusion
+    # --mode dataframe` path and the core DataFusion tuning capability map.
+    # This is an intentional public choice expansion; once merged, develop's
+    # baseline carries it and this temporary exception can be removed.
+    "benchbox/cli/commands/tuning_group.py",
     # Temporary (mirrors PR #800's --show-plans landing): the canonical plan-capture
     # work adds the first-class --analyze-plans/--no-analyze-plans option to `run`,
     # which intentionally changes run()'s signature surface. Skip the surface check
@@ -168,6 +194,12 @@ ALLOWED_HIDDEN_COMPAT_CLI_FILES = {
     # guard diffs against the base ref, so once this lands on develop the
     # baseline already carries the new signature and the entry can go.
     "benchbox/cli/platform.py",
+    # qpc-history-version-awareness: `plan-history` gains --platform plus a
+    # platform keyword on the history read path, intentionally changing the
+    # command's surface so multi-platform lineages are never compared as one
+    # sequence. Temporary, like the run.py entry above: once this lands on
+    # develop the baseline carries the new signature and the entry can go.
+    "benchbox/cli/commands/plan_history.py",
 }
 ALLOWED_INTERNAL_CLI_FILES = ALLOWED_INTERNAL_CLI_FILES | ALLOWED_HIDDEN_COMPAT_CLI_FILES
 FORBIDDEN_CLI_SURFACE_DECORATORS = {"argument", "command", "group", "option"}
@@ -314,6 +346,49 @@ def test_git_output_decoding_is_independent_of_the_host_locale(monkeypatch: pyte
     assert result.stdout == "benchbox/cli/commands/λ.py\n"
 
 
+def test_cli_surface_guard_uses_branch_fork_when_target_advances(monkeypatch: pytest.MonkeyPatch):
+    fork = "a" * 40
+    monkeypatch.setenv("BENCHBOX_BASE_REF", "origin/develop")
+
+    def fake_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        if args == ("rev-parse", "--is-inside-work-tree"):
+            output = "true\n"
+        elif args == ("rev-parse", "--verify", "origin/develop^{commit}"):
+            output = "b" * 40 + "\n"
+        elif args == ("merge-base", "origin/develop", "HEAD"):
+            output = fork + "\n"
+        elif args == ("diff", "--name-only", fork, "--", "benchbox/cli/"):
+            output = ""
+        elif args == ("diff", "--name-only", "origin/develop", "--", "benchbox/cli/"):
+            output = "benchbox/cli/logo.py\n"
+        else:
+            raise AssertionError(f"Unexpected git call: {args}")
+        return subprocess.CompletedProcess(args, 0, output, "")
+
+    monkeypatch.setitem(globals(), "_git", fake_git)
+    monkeypatch.setitem(globals(), "ALLOWED_INTERNAL_CLI_FILES", set())
+
+    test_uat_did_not_modify_benchbox_cli_surface()
+
+
+def test_cli_surface_guard_rejects_unrelated_base_history(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("BENCHBOX_BASE_REF", "origin/develop")
+
+    def fake_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        if args == ("rev-parse", "--is-inside-work-tree"):
+            return subprocess.CompletedProcess(args, 0, "true\n", "")
+        if args == ("rev-parse", "--verify", "origin/develop^{commit}"):
+            return subprocess.CompletedProcess(args, 0, "b" * 40 + "\n", "")
+        if args == ("merge-base", "origin/develop", "HEAD"):
+            return subprocess.CompletedProcess(args, 1, "", "no common ancestor")
+        raise AssertionError(f"Unexpected git call: {args}")
+
+    monkeypatch.setitem(globals(), "_git", fake_git)
+
+    with pytest.raises(AssertionError, match="cannot find a common ancestor"):
+        _verified_base_ref()
+
+
 def _verified_base_ref() -> str:
     inside = _git("rev-parse", "--is-inside-work-tree", check=False)
     if inside.returncode != 0 or inside.stdout.strip() != "true":
@@ -323,7 +398,10 @@ def _verified_base_ref() -> str:
     verified = _git("rev-parse", "--verify", f"{base}^{{commit}}", check=False)
     if verified.returncode != 0:
         pytest.skip(f"CLI surface drift guard base ref {base!r} is not available")
-    return base
+    fork = _git("merge-base", base, "HEAD", check=False)
+    if fork.returncode != 0 or not fork.stdout.strip():
+        raise AssertionError(f"CLI surface drift guard cannot find a common ancestor for {base!r} and HEAD")
+    return fork.stdout.strip()
 
 
 def _source_at_ref(ref: str, path: str) -> str:

@@ -1155,8 +1155,8 @@ class TestClickHouseNativeHandlerBulk:
 
         handler = self._make_handler(server_mode=True)
         connection = Mock()
-        connection.execute.side_effect = (
-            lambda query, params=None, **kwargs: list(params) if params is not None else None
+        connection.execute.side_effect = lambda query, params=None, **kwargs: (
+            list(params) if params is not None else None
         )
         benchmark = Mock()
         benchmark.get_schema.return_value = {

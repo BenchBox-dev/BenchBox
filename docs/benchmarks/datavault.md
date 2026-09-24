@@ -109,6 +109,12 @@ Tables must be loaded respecting referential integrity:
 
 All 22 TPC-H queries are adapted for the Data Vault schema using Hub→Satellite→Link join patterns. Each query filters for current records using `load_end_dts IS NULL`.
 
+```{tip}
+Each query has a [query template](queries/datavault/index.md) with a
+representative SQL and DataFrame rendering, plus how to extract the exact
+statement for your platform and scale.
+```
+
 ### Query Complexity
 
 | Category | Queries | Pattern |

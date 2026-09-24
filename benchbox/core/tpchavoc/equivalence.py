@@ -113,7 +113,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -210,6 +210,17 @@ def _identity(sql: str) -> str:
     return sql
 
 
+def _rstrip_char_cells(rows: list[tuple[Any, ...]], column_indexes: Collection[int]) -> list[tuple[Any, ...]]:
+    """Strip ASCII blank-padding only from columns known to have ``CHAR`` semantics."""
+    indexes = set(column_indexes)
+    return [
+        tuple(
+            cell.rstrip(" ") if index in indexes and isinstance(cell, str) else cell for index, cell in enumerate(row)
+        )
+        for row in rows
+    ]
+
+
 def find_divergences(
     connection: Any,
     benchmark: TPCHavocBenchmark,
@@ -219,6 +230,7 @@ def find_divergences(
     translate_variant: Callable[[str], str] | None = None,
     skip_variants: Collection[str] | None = None,
     execute_transform: Callable[[str], str] | None = None,
+    char_padding_columns: Mapping[int, Collection[int]] | None = None,
 ) -> list[Divergence]:
     """Compare every variant of each query to canonical TPC-H on ``connection``.
 
@@ -257,6 +269,10 @@ def find_divergences(
             sample exercises the real execution path; applied identically to
             canonical and variant, so shared transforms still cancel out. Defaults
             to identity, leaving the DuckDB/Postgres/DataFusion samples unchanged.
+        char_padding_columns: Optional mapping of query ID to result-column
+            indexes whose source SQL type is ``CHAR``. Only ASCII space padding
+            in those columns is ignored. Other string columns and all other
+            whitespace remain byte-strict.
 
     Returns:
         One :class:`Divergence` per variant whose result is not equivalent to
@@ -286,8 +302,11 @@ def find_divergences(
     excluded = set(skip_variants or ())
     divergences: list[Divergence] = []
     for query_id in ids:
+        normalize = lambda rows: _rstrip_char_cells(rows, (char_padding_columns or {}).get(query_id, ()))
         try:
-            original = connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
+            original = normalize(
+                connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
+            )
         except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
             continue
@@ -313,7 +332,7 @@ def find_divergences(
                 variant_sql = transform_for_engine(
                     render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
                 )
-                variant_rows = connection.execute(variant_sql).fetchall()
+                variant_rows = normalize(connection.execute(variant_sql).fetchall())
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
                 divergences.append(Divergence(query_id, variant_id, str(exc)))
@@ -579,6 +598,34 @@ def run_duckdb_gate() -> int:
     )
 
 
+def _dialect_sample_divergences(
+    connection: Any,
+    tpchavoc: TPCHavocBenchmark,
+    tpch: TPCH,
+    target_dialect: str,
+    skip_variants: Collection[str],
+    *,
+    query_ids: list[int] | None = None,
+    **sweep_kwargs: Any,
+) -> list[Divergence]:
+    """Run a same-dialect sweep: canonical and variants share one seam.
+
+    Both sides are rendered into ``target_dialect`` through the same
+    translation (``netezza`` -> target for variants) so shared translation
+    cancels out; ``skip_variants`` are excluded, never marked equivalent.
+    Extra ``sweep_kwargs`` pass through to :func:`find_divergences`.
+    """
+    return find_divergences(
+        connection,
+        tpchavoc,
+        lambda q: tpch.get_query(q, dialect=target_dialect),
+        query_ids=query_ids,
+        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", target_dialect),
+        skip_variants=set(skip_variants),
+        **sweep_kwargs,
+    )
+
+
 def find_postgres_divergences(
     connection: Any,
     tpchavoc: TPCHavocBenchmark,
@@ -596,13 +643,16 @@ def find_postgres_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
-    return find_divergences(
+    return _dialect_sample_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=POSTGRES_TARGET_DIALECT),
+        tpch,
+        POSTGRES_TARGET_DIALECT,
+        POSTGRES_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", POSTGRES_TARGET_DIALECT),
-        skip_variants=set(POSTGRES_TPCHAVOC_SKIPS),
+        # Keep PostgreSQL's expression-over-CHAR exception limited to result
+        # columns whose TPC-H source type is actually CHAR.
+        char_padding_columns={4: (0,), 5: (0,), 7: (0, 1), 12: (0,)},
     )
 
 
@@ -947,13 +997,13 @@ def find_clickhouse_divergences(
     """
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 
-    return find_divergences(
+    return _dialect_sample_divergences(
         connection,
         tpchavoc,
-        lambda q: tpch.get_query(q, dialect=CLICKHOUSE_TARGET_DIALECT),
+        tpch,
+        CLICKHOUSE_TARGET_DIALECT,
+        CLICKHOUSE_TPCHAVOC_SKIPS,
         query_ids=query_ids,
-        translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", CLICKHOUSE_TARGET_DIALECT),
-        skip_variants=set(CLICKHOUSE_TPCHAVOC_SKIPS),
         execute_transform=_clickhouse_execute_transform,
     )
 

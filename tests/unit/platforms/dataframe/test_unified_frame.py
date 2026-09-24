@@ -1049,3 +1049,180 @@ class TestUnifiedExprNUnique:
         result = ulf.group_by("group").agg(val_col.n_unique().alias("distinct")).sort("group").collect()
         # A has 1 unique, B has 1 unique
         assert result["distinct"].to_list() == [1, 1]
+
+
+class TestFrameAggFacade:
+    """Tests for the frame-level UnifiedLazyFrame.agg global-aggregation facade."""
+
+    @pytest.fixture
+    def frame(self):
+        """Three-row frame wrapped with a mock adapter."""
+        polars = pytest.importorskip("polars")
+
+        unified_lazy_frame_cls = _get_unified_lazy_frame()
+        mock_adapter = _create_mock_adapter()
+        unified_expr_cls = _get_unified_expr()
+
+        df = polars.DataFrame({"x": [1.0, 2.0, 3.0], "y": [10.0, 20.0, 30.0]}).lazy()
+        return {
+            "polars": polars,
+            "df": unified_lazy_frame_cls(df, mock_adapter),
+            "expr": unified_expr_cls,
+        }
+
+    def test_global_sum(self, frame):
+        """agg with a single aggregate yields one row."""
+        pl = frame["polars"]
+        result = frame["df"].agg(frame["expr"](pl.col("x").sum().alias("s"))).collect()
+        assert result.to_dicts() == [{"s": 6.0}]
+
+    def test_plain_aggregates_with_select_arithmetic(self, frame):
+        """agg takes plain column aggregates; arithmetic goes in a later select."""
+        pl = frame["polars"]
+        expr_cls = frame["expr"]
+        result = (
+            frame["df"]
+            .agg(expr_cls(pl.col("x").sum().alias("s")), expr_cls(pl.col("y").sum().alias("t")))
+            .select((expr_cls(pl.col("s")) * 100.0 / expr_cls(pl.col("t"))).alias("r"))
+            .collect()
+        )
+        assert result.to_dicts() == [{"r": 10.0}]
+
+    def test_list_form(self, frame):
+        """agg accepts a single list of expressions like group_by().agg() does."""
+        pl = frame["polars"]
+        expr_cls = frame["expr"]
+        result = frame["df"].agg([expr_cls(pl.col("x").max().alias("m"))]).collect()
+        assert result.to_dicts() == [{"m": 3.0}]
+
+    def test_empty_frame_yields_single_row(self, frame):
+        """agg over an empty frame still yields one row (SQL global-agg shape)."""
+        pl = frame["polars"]
+
+        unified_lazy_frame_cls = _get_unified_lazy_frame()
+        mock_adapter = _create_mock_adapter()
+        empty = unified_lazy_frame_cls(pl.DataFrame({"x": []}, schema={"x": pl.Float64}).lazy(), mock_adapter)
+        result = empty.agg(frame["expr"](pl.col("x").count().alias("n"))).collect()
+        assert result.to_dicts() == [{"n": 0}]
+
+
+class TestFrameAggFacadeDataFusion:
+    """The supported agg idioms through the real DataFusion adapter.
+
+    Arithmetic inside an aggregate is not portable (it mis-rewrites on
+    DataFusion), so queries precompute row-level values or post-process plain
+    aggregates. These tests pin exactly those idioms on DataFusion.
+    """
+
+    @pytest.fixture
+    def dframe(self):
+        pytest.importorskip("datafusion")
+        pa = pytest.importorskip("pyarrow")
+
+        from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
+
+        adapter = DataFusionDataFrameAdapter()
+        ctx = adapter.create_context()
+        table = pa.table({"x": [10.0, 20.0, 30.0, 40.0], "d": [0.1, 0.2, 0.0, 0.5], "g": ["a", "a", "b", "b"]})
+        adapter.session_ctx.register_record_batches("t", [table.to_batches()])
+        ctx.register_table("t", adapter.session_ctx.sql("SELECT * FROM t"))
+        return ctx
+
+    def test_plain_global_sums(self, dframe):
+        col = dframe.col
+        result = dframe.get_table("t").agg(col("x").sum().alias("s"), col("d").sum().alias("t")).collect()
+        as_dict = result.to_pydict()
+        assert as_dict["s"] == [100.0]
+        assert as_dict["t"] == pytest.approx([0.8])
+
+    def test_precomputed_product_sums_correctly(self, dframe):
+        """The Q19 idiom: with_columns product, then a plain sum."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .with_columns((col("x") * (lit(1) - col("d"))).alias("revenue"))
+            .agg(col("revenue").sum().alias("revenue"))
+            .collect()
+        )
+        assert result.to_pydict()["revenue"] == pytest.approx([75.0])
+
+    def test_ratio_over_plain_sums(self, dframe):
+        """The Q14 idiom: plain sums, ratio as column arithmetic in select."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .agg(col("x").sum().alias("s"), col("d").sum().alias("t"))
+            .select((col("s") * lit(100.0) / col("t")).alias("r"))
+            .collect()
+        )
+        assert result.to_pydict()["r"] == pytest.approx([10000.0 / 0.8])
+
+    def test_grouped_precomputed_sums(self, dframe):
+        """The Q1/Q3/Q5/Q7/Q10 idiom: precompute, then plain grouped sums."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .with_columns((col("x") * (lit(1) - col("d"))).alias("revenue"))
+            .group_by("g")
+            .agg(col("revenue").sum().alias("revenue"))
+            .sort("g")
+            .collect()
+        )
+        as_dict = result.to_pydict()
+        assert as_dict["g"] == ["a", "b"]
+        assert as_dict["revenue"] == pytest.approx([10 * 0.9 + 20 * 0.8, 30 * 1.0 + 40 * 0.5])
+
+    def test_empty_set_selects_null_row(self, dframe):
+        """The Q17 idiom: zero-row counts select a single NULL row."""
+        col, lit = dframe.col, dframe.lit
+        result = (
+            dframe.get_table("t")
+            .filter(col("x") > lit(1000.0))
+            .agg(col("x").sum().alias("total"), col("x").count().alias("n"))
+            .select(
+                dframe.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly")
+            )
+            .collect()
+        )
+        as_dict = result.to_pydict()
+        assert as_dict["avg_yearly"] == [None]
+
+
+@pytest.mark.slow
+class TestFrameAggIdiomsPySpark:
+    """The Q17 NULL-selection idiom through the real PySpark adapter."""
+
+    @pytest.fixture(scope="class")
+    def sframe(self):
+        pytest.importorskip("pyspark")
+        from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
+
+        _java_version, _ = ensure_compatible_java()
+        if not is_java_compatible(_java_version):
+            pytest.skip("no compatible Java for PySpark")
+
+        from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
+
+        adapter = PySparkDataFrameAdapter(master="local[2]", driver_memory="1g")
+        ctx = adapter.create_context()
+        ctx.register_table("t", adapter.spark.createDataFrame([(10.0,), (20.0,)], ["x"]))
+        yield ctx
+        adapter.close()
+
+    def _avg_yearly(self, sframe, pred):
+        col, lit = sframe.col, sframe.lit
+        return (
+            sframe.get_table("t")
+            .filter(pred(col, lit))
+            .agg(col("x").sum().alias("total"), col("x").count().alias("n"))
+            .select(
+                sframe.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly")
+            )
+            .collect_column_as_list("avg_yearly")
+        )
+
+    def test_empty_set_selects_null_row(self, sframe):
+        assert self._avg_yearly(sframe, lambda col, lit: col("x") > lit(1000.0)) == [None]
+
+    def test_nonempty_set_selects_value(self, sframe):
+        assert self._avg_yearly(sframe, lambda col, lit: col("x") > lit(0.0)) == pytest.approx([30.0 / 7.0])

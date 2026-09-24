@@ -1,0 +1,332 @@
+# Vendor pricing observations backing the generated sections of pricing_data.yaml.
+#
+# Each entry records the vendor-native observation for one emitted value: the
+# source API, the SKU or meter identifier, the region, the currency, and the
+# retrieval date. scripts/generate_pricing_data.py applies deterministic
+# derivation rules (region-to-tier mapping, DWU linear scaling, `other` bucket
+# selection, tier-independent meter reuse) to render the BenchBox-shaped
+# tables; `make pricing-data-check` fails when the committed tables diverge
+# from what these observations derive.
+#
+# Only individually selected values are vendored here, each with
+# per-value provenance. Bulk snapshots of either vendor catalog are out of
+# scope. Redistribution of these derived values in the wheel and the repo
+# ships under the accepted project-owner risk recorded in
+# _project/decisions/pricing-vendor-api-redistribution-aws-azure-2026-09-18.md
+# (landed via the redistribution-check item; this file assumes that
+# determination). That decision, not this file, is the authority to emit
+# vendor-derived values.
+#
+# Layout is one observation per line so the scheduled refresh job diffs
+# cell-by-cell. --refresh edits this file in place and preserves these
+# comments; its rule is: a fetched price numerically equal to the recorded
+# one keeps its recorded `retrieved` date, so an unchanged upstream
+# regenerates byte-identical output. A changed price takes the fetched value
+# with `retrieved` set to the refresh date.
+meta:
+  evidence_version: 1
+  currency: USD
+redshift_node_prices:
+  offer_code: AmazonRedshift
+  url_template: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRedshift/current/{region}/index.json'
+  upstream_published: '2026-09-11T12:45:05Z'
+  retrieved: '2026-09-18'
+  match_product_family: 'Compute Instance'
+  match_term: 'OnDemand'
+  match_unit: 'Hrs'
+  match_key_attribute: 'instanceType'
+  regions:
+    - us-east-1
+    - us-east-2
+    - us-west-1
+    - us-west-2
+    - eu-west-1
+    - eu-west-2
+    - eu-central-1
+    - ap-southeast-1
+    - ap-southeast-2
+    - ap-northeast-1
+    - sa-east-1
+  other_from: sa-east-1
+  nodes:
+    dc2.large:
+      us-east-1: '0.25'
+      us-east-2: '0.25'
+      us-west-1: '0.33'
+      us-west-2: '0.25'
+      eu-west-1: '0.30'
+      eu-west-2: '0.32'
+      eu-central-1: '0.324'
+      ap-southeast-1: '0.33'
+      ap-southeast-2: '0.33'
+      ap-northeast-1: '0.314'
+      sa-east-1: '0.40'
+    dc2.8xlarge:
+      us-east-1: '4.80'
+      us-east-2: '4.80'
+      us-west-1: '6.40'
+      us-west-2: '4.80'
+      eu-west-1: '5.60'
+      eu-west-2: '5.88'
+      eu-central-1: '6.048'
+      ap-southeast-1: '6.40'
+      ap-southeast-2: '6.40'
+      ap-northeast-1: '6.095'
+      sa-east-1: '7.68'
+    ra3.large:
+      us-east-1: '0.543'
+      us-east-2: '0.543'
+      us-west-1: '0.601'
+      us-west-2: '0.543'
+      eu-west-1: '0.601'
+      eu-west-2: '0.632'
+      eu-central-1: '0.649'
+      ap-southeast-1: '0.652'
+      ap-southeast-2: '0.652'
+      ap-northeast-1: '0.639'
+      sa-east-1: '0.866'
+    ra3.xlplus:
+      us-east-1: '1.086'
+      us-east-2: '1.086'
+      us-west-1: '1.202'
+      us-west-2: '1.086'
+      eu-west-1: '1.202'
+      eu-west-2: '1.264'
+      eu-central-1: '1.298'
+      ap-southeast-1: '1.303'
+      ap-southeast-2: '1.303'
+      ap-northeast-1: '1.278'
+      sa-east-1: '1.731'
+    ra3.4xlarge:
+      us-east-1: '3.26'
+      us-east-2: '3.26'
+      us-west-1: '3.606'
+      us-west-2: '3.26'
+      eu-west-1: '3.606'
+      eu-west-2: '3.793'
+      eu-central-1: '3.894'
+      ap-southeast-1: '3.909'
+      ap-southeast-2: '3.909'
+      ap-northeast-1: '3.836'
+      sa-east-1: '5.195'
+    ra3.16xlarge:
+      us-east-1: '13.04'
+      us-east-2: '13.04'
+      us-west-1: '14.424'
+      us-west-2: '13.04'
+      eu-west-1: '14.424'
+      eu-west-2: '15.174'
+      eu-central-1: '15.578'
+      ap-southeast-1: '15.636'
+      ap-southeast-2: '15.636'
+      ap-northeast-1: '15.347'
+      sa-east-1: '20.78'
+    rg.large:
+      us-east-1: '0.3801'
+      us-east-2: '0.3801'
+      us-west-1: '0.4207'
+      us-west-2: '0.3801'
+      eu-west-1: '0.4207'
+      eu-west-2: '0.4424'
+      eu-central-1: '0.4543'
+      ap-southeast-1: '0.4564'
+      ap-southeast-2: '0.4564'
+      ap-northeast-1: '0.4473'
+      sa-east-1: '0.6062'
+    rg.xlarge:
+      us-east-1: '0.7602'
+      us-east-2: '0.7602'
+      us-west-1: '0.8414'
+      us-west-2: '0.7602'
+      eu-west-1: '0.8414'
+      eu-west-2: '0.8848'
+      eu-central-1: '0.9086'
+      ap-southeast-1: '0.9121'
+      ap-southeast-2: '0.9121'
+      ap-northeast-1: '0.8946'
+      sa-east-1: '1.2117'
+    rg.4xlarge:
+      us-east-1: '3.0427'
+      us-east-2: '3.0427'
+      us-west-1: '3.3656'
+      us-west-2: '3.0427'
+      eu-west-1: '3.3656'
+      eu-west-2: '3.5401'
+      eu-central-1: '3.6344'
+      ap-southeast-1: '3.6484'
+      ap-southeast-2: '3.6484'
+      ap-northeast-1: '3.5803'
+      sa-east-1: '4.8487'
+    rg.12xlarge:
+      us-east-1: '9.128'
+      us-east-2: '9.128'
+      us-west-1: '10.0968'
+      us-west-2: '9.128'
+      eu-west-1: '10.0968'
+      eu-west-2: '10.6218'
+      eu-central-1: '10.9046'
+      ap-southeast-1: '10.9452'
+      ap-southeast-2: '10.9452'
+      ap-northeast-1: '10.7429'
+      sa-east-1: '14.546'
+athena_price_per_tb:
+  offer_code: AmazonAthena
+  url_template: 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonAthena/current/{region}/index.json'
+  upstream_published: '2026-09-11T12:44:08Z'
+  retrieved: '2026-09-18'
+  match_product_family: 'Athena Queries'
+  match_term: 'OnDemand'
+  match_unit: 'Terabytes'
+  # Every observed region below renders as a cell of the region-keyed table;
+  # pricing.py resolves each run by region key (sa-east-1 bills $9.00/TB
+  # against $5.00 elsewhere), so the `regions` map is the emitted table.
+  regions:
+    us-east-1: '5.0'
+    eu-west-1: '5.0'
+    ap-southeast-1: '5.0'
+    ap-northeast-1: '5.0'
+    sa-east-1: '9.0'
+synapse_dedicated_dwu_prices:
+  source: 'https://prices.azure.com/api/retail/prices'
+  retrieved: '2026-09-18'
+  upstream_published: unknown
+  match_service: 'Azure Synapse Analytics'
+  match_product: 'Azure Synapse Analytics SQL Provisioned DWU'
+  match_meter: '100 DWU'
+  match_unit: '1/Hour'
+  base_rates_100dwu:
+    us:
+      region: eastus
+      price: '1.51'
+    eu:
+      region: westeurope
+      price: '1.51'
+    ap:
+      region: southeastasia
+      price: '1.81'
+    ca:
+      region: canadacentral
+      price: '1.33'
+    other:
+      region: brazilsouth
+      price: '2.42'
+synapse_serverless_price_per_tb:
+  source: 'https://prices.azure.com/api/retail/prices'
+  retrieved: '2026-09-18'
+  upstream_published: unknown
+  match_service: 'Azure Synapse Analytics'
+  match_product: 'Azure Synapse Analytics Serverless SQL Pool'
+  match_meter: 'Standard Data Processed'
+  match_unit: '1 TB'
+  # Every observed region below renders as a cell of the region-keyed table;
+  # pricing.py resolves each run by region key, so the `regions` map is the
+  # emitted table (see the Athena note above).
+  regions:
+    eastus: '5.0'
+    westeurope: '5.0'
+    southeastasia: '6.75'
+    canadacentral: '5.5'
+    brazilsouth: '9.0'
+fabric_cu_prices:
+  source: 'https://prices.azure.com/api/retail/prices'
+  retrieved: '2026-09-18'
+  upstream_published: unknown
+  match_service: 'Microsoft Fabric'
+  match_product: 'Fabric Capacity'
+  match_unit: '1 Hour'
+  tiers:
+    us:
+      region: eastus
+      price: '0.18'
+    eu:
+      region: westeurope
+      price: '0.22'
+    ap:
+      region: southeastasia
+      price: '0.22'
+    ca:
+      region: canadacentral
+      price: '0.20'
+    other:
+      region: brazilsouth
+      price: '0.28'
+databricks_dbu_prices_azure:
+  source: 'https://prices.azure.com/api/retail/prices'
+  retrieved: '2026-09-18'
+  upstream_published: unknown
+  region: eastus
+  cells:
+    standard.all_purpose:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Standard All-purpose Compute DBU'
+      price: '0.40'
+    standard.jobs:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Standard Jobs Compute DBU'
+      price: '0.15'
+    standard.sql_warehouse:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Standard SQL Analytics DBU'
+      price: '0.22'
+    standard.sql_classic:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Standard SQL Analytics DBU'
+      price: '0.22'
+    standard.sql_pro:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks Regional'
+      meter: 'Premium SQL Compute Pro DBU'
+      price: '0.55'
+      note: 'tier-independent: no Standard SQL Pro meter exists; the Premium meter applies'
+    standard.sql_serverless:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks Regional'
+      meter: 'Premium Serverless SQL DBU'
+      price: '0.70'
+      note: 'tier-independent: no Standard Serverless SQL meter exists; the Premium meter applies'
+    standard.ml:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Standard All-purpose Compute DBU'
+      price: '0.40'
+      note: 'convention: ML runtime bills at the all-purpose rate'
+    premium.all_purpose:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Premium All-purpose Compute DBU'
+      price: '0.55'
+    premium.jobs:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Premium Jobs Compute DBU'
+      price: '0.30'
+    premium.sql_warehouse:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Premium SQL Analytics DBU'
+      price: '0.22'
+    premium.sql_classic:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Premium SQL Analytics DBU'
+      price: '0.22'
+    premium.sql_pro:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks Regional'
+      meter: 'Premium SQL Compute Pro DBU'
+      price: '0.55'
+    premium.sql_serverless:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks Regional'
+      meter: 'Premium Serverless SQL DBU'
+      price: '0.70'
+    premium.ml:
+      service: 'Azure Databricks'
+      product: 'Azure Databricks'
+      meter: 'Premium All-purpose Compute DBU'
+      price: '0.55'
+      note: 'convention: ML runtime bills at the all-purpose rate'

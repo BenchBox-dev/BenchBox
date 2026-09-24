@@ -83,7 +83,7 @@ def test_recommendation_helpers() -> None:
     assert t._get_recommended_memory_limit(16.0, "bigquery") is None
     assert t._get_recommended_max_scale(4.0, "tpch") == 0.01
     assert t._get_recommended_max_scale(64.0, "tpcds") == 0.1
-    assert t._get_recommended_max_scale(64.0, "clickbench") == 1.0
+    assert t._get_recommended_max_scale(64.0, "clickbench") == 10.0
 
 
 def test_autofill_defaults_cloud_and_local() -> None:

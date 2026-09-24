@@ -305,6 +305,26 @@ def test_submit_calculation_with_wait() -> None:
     mock_wait.assert_called_once_with("calc-1")
 
 
+def test_submit_calculation_escapes_quote_bearing_sql() -> None:
+    import json
+
+    adapter = _adapter()
+    adapter._session_id = "sess-1"
+    client = MagicMock()
+    client.start_calculation_execution.return_value = {
+        "CalculationExecutionId": "calc-3",
+        "State": "COMPLETED",
+    }
+
+    query = "SELECT 'it''s' FROM t WHERE x = 'a\nb\\'"
+    with patch.object(adapter, "_get_athena_client", return_value=client):
+        adapter._submit_calculation(query, wait_for_completion=False)
+
+    code = client.start_calculation_execution.call_args.kwargs["CodeBlock"]
+    compile(code, "<generated>", "exec")
+    assert json.dumps(query) in code
+
+
 def test_submit_calculation_python_code_type() -> None:
     adapter = _adapter()
     adapter._session_id = "sess-1"

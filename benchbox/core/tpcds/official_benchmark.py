@@ -18,6 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
+from benchbox.core.throughput.containment import check_phase_boundary
 from benchbox.core.tpc_patterns import generate_official_benchmark_audit_trail
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -73,6 +74,13 @@ def _extract_metric(result: Any, attr: str, default: float = 0.0) -> float:
         if val is not None:
             return val
     return default
+
+
+def _phase_succeeded(result: Any) -> bool:
+    """Return a phase's explicit outcome for either mapping or object results."""
+    if isinstance(result, dict):
+        return result.get("success") is not False
+    return getattr(result, "success", None) is not False
 
 
 class TPCDSOfficialBenchmark:
@@ -188,32 +196,54 @@ class TPCDSOfficialBenchmark:
 
                     throughput_result = throughput_test.run()
                     result.throughput_test_result = throughput_result
-                    result.throughput_at_size = _extract_metric(throughput_result, "throughput_at_size")
+                    # Publish the metric only when the phase explicitly
+                    # succeeded; a timed-out or otherwise failed phase must
+                    # not export its numeric sentinel as a measurement.
+                    throughput_metric = _extract_metric(throughput_result, "throughput_at_size")
+                    if not _phase_succeeded(throughput_result) or throughput_metric <= 0:
+                        result.errors.append("Throughput Test failed: Throughput@Size withheld from results.")
+                        result.success = False
+                    else:
+                        result.throughput_at_size = throughput_metric
 
                 except Exception as e:
                     result.errors.append(f"Throughput Test failed: {e}")
                     result.success = False
 
-            # Phase 3: Maintenance Test
+            # Phase 3: Maintenance Test -- refused while throughput work is
+            # outstanding, so maintenance never overlaps leaked streams or
+            # reuses their still-owned resources for measured work.
             if config.maintenance_test_enabled:
-                try:
-                    from benchbox.core.tpcds.maintenance_test import (
-                        TPCDSMaintenanceTest,
-                    )
-
-                    maintenance_test = TPCDSMaintenanceTest(
-                        benchmark=self.benchmark,
-                        connection_factory=connection_factory,
-                        verbose=config.verbose,
-                        dialect=self.dialect,
-                    )
-
-                    maintenance_result = maintenance_test.run()
-                    result.maintenance_test_result = maintenance_result
-
-                except Exception as e:
-                    result.errors.append(f"Maintenance Test failed: {e}")
+                boundary = check_phase_boundary(result.throughput_test_result)
+                if not boundary.proceed:
+                    refusal = f"Maintenance Test refused: {boundary.reason}"
+                    result.errors.append(refusal)
+                    result.maintenance_test_result = {
+                        "success": False,
+                        "status": "contained",
+                        "reason": refusal,
+                        "outstanding_stream_ids": list(boundary.outstanding_stream_ids),
+                    }
                     result.success = False
+                else:
+                    try:
+                        from benchbox.core.tpcds.maintenance_test import (
+                            TPCDSMaintenanceTest,
+                        )
+
+                        maintenance_test = TPCDSMaintenanceTest(
+                            benchmark=self.benchmark,
+                            connection_factory=connection_factory,
+                            verbose=config.verbose,
+                            dialect=self.dialect,
+                        )
+
+                        maintenance_result = maintenance_test.run()
+                        result.maintenance_test_result = maintenance_result
+
+                    except Exception as e:
+                        result.errors.append(f"Maintenance Test failed: {e}")
+                        result.success = False
 
             # Calculate QphDS@Size (geometric mean)
             if result.power_at_size > 0 and result.throughput_at_size > 0:

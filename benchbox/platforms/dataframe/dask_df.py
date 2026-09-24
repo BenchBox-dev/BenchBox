@@ -197,6 +197,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         if use_distributed or scheduler_address:
             self._setup_distributed()
+            self._record_distributed_tuning()
 
     def _apply_tuning(self) -> None:
         """Apply Dask-specific tuning configuration.
@@ -236,6 +237,37 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         spill_directory = getattr(config.memory, "spill_directory", None)
         if spill_directory is not None:
             self._configured_spill_directory = Path(spill_directory).expanduser()
+
+    def _record_distributed_tuning(self) -> None:
+        """Record settings consumed by a newly created local Dask cluster."""
+        if not self.use_distributed or self.scheduler_address:
+            return
+
+        config = self._tuning_config
+        if config.parallelism.worker_count is not None:
+            self._record_runtime_tuning(f"n_workers={self.n_workers}")
+        if config.parallelism.threads_per_worker is not None:
+            self._record_runtime_tuning(f"threads_per_worker={self.threads_per_worker}")
+        if config.memory.memory_limit is not None:
+            self._record_runtime_tuning(f"memory_limit={self._memory_limit}")
+        if config.memory.spill_to_disk:
+            self._record_runtime_tuning("spill_to_disk=on")
+        # The spill directory is recorded on effective consumption, not on the
+        # spill_to_disk flag: the local resource envelope may enable spilling
+        # by default after _apply_tuning ran, in which case a user-configured
+        # directory still reaches the cluster (local_directory) and must be
+        # claimed. An auto-created temp dir is never a tuned setting, so only
+        # a configured directory that setup actually resolved is recorded.
+        # Like every other entry here, the directory must come from the tuning
+        # configuration: a bare constructor/platform-option spill directory
+        # with no tuning config is infrastructure, not tuning, and claiming it
+        # would flip an untuned baseline from noop to applied_unverified.
+        if (
+            getattr(config.memory, "spill_directory", None) is not None
+            and self._configured_spill_directory is not None
+            and self._spill_directory is not None
+        ):
+            self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
 
     def _apply_local_resource_envelope_defaults(self) -> None:
         """Apply conservative defaults for local distributed Dask runs."""
@@ -672,6 +704,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         by: str | list[str],
         agg_spec: dict[str, Any],
         as_index: bool = False,
+        **kwargs: Any,
     ) -> DaskDF:
         """Perform grouped aggregation with Dask-specific handling.
 
@@ -708,7 +741,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
                 regular_aggs[name] = spec
 
         if nunique_aggs:
-            return self._groupby_agg_with_nunique(df, by_list, regular_aggs, nunique_aggs)
+            return self._groupby_agg_with_nunique(df, by_list, regular_aggs, nunique_aggs, **kwargs)
 
         # Detect if this is named aggregation (tuples) or direct style
         # Named: {"sum_qty": ("qty", "sum")} -> use **agg_spec
@@ -718,9 +751,9 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         # Standard case: groupby().agg().reset_index()
         # Keep if/else for clarity: **aggs vs aggs is a subtle but important API difference
         if is_named_agg:  # noqa: SIM108
-            result = df.groupby(by_list).agg(**regular_aggs)
+            result = df.groupby(by_list, **kwargs).agg(**regular_aggs)
         else:
-            result = df.groupby(by_list).agg(regular_aggs)
+            result = df.groupby(by_list, **kwargs).agg(regular_aggs)
 
         # Reset index to match as_index=False behavior
         if not as_index:
@@ -734,6 +767,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         by: list[str],
         regular_aggs: dict[str, Any],
         nunique_aggs: dict[str, tuple[str, str]],
+        **kwargs: Any,
     ) -> DaskDF:
         """Handle groupby with nunique aggregations separately.
 
@@ -745,17 +779,18 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             by: Group by columns
             regular_aggs: Standard aggregations
             nunique_aggs: Nunique aggregations to handle separately
+            **kwargs: Extra native groupby options (e.g. dropna=False)
 
         Returns:
             Combined aggregation result
         """
         # Compute regular aggregations if any
         if regular_aggs:
-            result = df.groupby(by).agg(**regular_aggs).reset_index()
+            result = df.groupby(by, **kwargs).agg(**regular_aggs).reset_index()
         else:
             # No regular aggs, just create a frame with group keys
             # Dask reset_index() doesn't support 'name' parameter
-            size_result = df.groupby(by).size().reset_index()
+            size_result = df.groupby(by, **kwargs).size().reset_index()
             # Rename the size column (default name is 0 or 'size') and drop it
             size_cols = [c for c in size_result.columns if c not in by]
             result = size_result.drop(columns=size_cols) if size_cols else size_result
@@ -763,7 +798,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         # Add nunique columns separately
         for col_name, (source_col, _) in nunique_aggs.items():
             # Dask reset_index() doesn't support 'name' parameter
-            nunique_result = df.groupby(by)[source_col].nunique().reset_index()
+            nunique_result = df.groupby(by, **kwargs)[source_col].nunique().reset_index()
             # Rename the nunique column (will be named after source_col)
             nunique_result = nunique_result.rename(columns={source_col: col_name})
             result = result.merge(nunique_result, on=by)

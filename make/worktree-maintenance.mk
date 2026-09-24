@@ -15,3 +15,9 @@ soundness-drain-report:
 
 soundness-drain-self-test:
 	@uv run -- python _project/scripts/soundness_drain_report.py --self-test
+
+# Bounded read-only inventory and lifecycle audit of registered worktrees and local branches.
+# Emits human-readable text by default, or schema-versioned JSON with FORMAT=json.
+.PHONY: worktree-audit
+worktree-audit:
+	@uv run -- python _project/scripts/worktree_audit.py $(if $(FORMAT),--format $(FORMAT),)

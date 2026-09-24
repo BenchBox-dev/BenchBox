@@ -1,9 +1,12 @@
-# Installation & Environment Setup
+# Installation and environment setup
 
 ```{tags} beginner, quickstart
 ```
 
-BenchBox targets Python 3.10+ and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+BenchBox requires Python 3.11 or newer and ships as a single Python package. The recommended workflow uses [uv](https://docs.astral.sh/uv/) for fast installs, but the commands below include alternatives for `pip` and `pipx`.
+
+BenchBox plans to require Python 3.12 in its first release after Python 3.11
+reaches end of life in October 2027.
 
 ## 1. Install BenchBox
 
@@ -28,6 +31,11 @@ BenchBox installs a `benchbox` executable. If you use `uv`, prefer `uv run -- be
 
 Extras keep the base install lean.
 
+Choose the smallest extra that supports the platform you plan to run. This
+keeps installation faster, reduces dependency conflicts, and avoids installing
+cloud SDKs or database drivers that you do not use. You can add another extra
+later by running the matching install command again.
+
 | Extra | Enables | Recommended (uv) | Alternative (pip-compatible) |
 | --- | --- | --- | --- |
 | `(none)` | SQLite only (core package, no DuckDB) | `uv add benchbox` | `uv pip install benchbox` |
@@ -37,6 +45,26 @@ Extras keep the base install lean.
 | `[clickhouse]` | ClickHouse native driver | `uv add benchbox --extra clickhouse` | `uv pip install "benchbox[clickhouse]"` |
 | `[databricks]` / `[bigquery]` / `[redshift]` / `[snowflake]` | Single-platform installs | `uv add benchbox --extra databricks` | `uv pip install "benchbox[databricks]"` |
 | `[all]` | Everything listed above | `uv add benchbox --extra all` | `uv pip install "benchbox[all]"` |
+
+### DuckDB 2.0 Preview
+
+Stable DuckDB releases remain the default. To test the current
+[DuckDB 2.0 preview](https://duckdb.org/install/preview), install BenchBox's
+DuckDB extra and then select the preview package explicitly:
+
+```bash
+# uv project
+uv add benchbox --extra duckdb
+uv add --prerelease=allow "duckdb==1.6.0.dev379"
+
+# Active pip environment
+python -m pip install "benchbox[duckdb]" "duckdb==1.6.0.dev379"
+```
+
+DuckDB distributes the 2.0 alpha engine in the Python package's 1.6 development
+series. BenchBox's nightly checks pin `1.6.0.dev379`, which contains engine
+`v2.0.0-alpha39998`, so a later preview does not enter supported environments
+without a compatibility run and an explicit pin update.
 
 ### Cloud Spark Platforms
 
@@ -73,6 +101,15 @@ uv pip install "benchbox[cloud,clickhouse]"
 ```
 
 Re-run the installer at any time to add extras. For `pipx`, use `pipx inject benchbox "benchbox[cloud]"`.
+
+### Choose an installer
+
+- Use `uv add` when BenchBox is a dependency of a Python project.
+- Use `python -m pip install` in an activated virtual environment when your
+  project uses pip.
+- Use `pipx install` when you want an isolated, system-wide `benchbox` command.
+- Quote `"benchbox[extra]"` with pip-compatible commands so shells such as zsh
+  do not interpret the brackets.
 
 ## 3. Verify the CLI
 

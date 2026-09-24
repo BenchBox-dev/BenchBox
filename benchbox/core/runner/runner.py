@@ -79,6 +79,7 @@ from benchbox.utils.dialect_utils import (
 )
 from benchbox.utils.format_converters import ConversionOptions
 from benchbox.utils.printing import emit
+from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
 logger = logging.getLogger(__name__)
@@ -318,6 +319,128 @@ def _resolve_strict_translation_mode(options: Mapping[str, Any]) -> bool:
                 return _coerce_bool_option(benchmark_options[key])
 
     return False
+
+
+def _manifest_matches_result(manifest: Any, result: BenchmarkResults, benchmark: Any = None) -> bool:
+    """Check a manifest plausibly describes the dataset behind a result.
+
+    Compares benchmark identity (punctuation-insensitive) and scale factor,
+    but only on fields both sides provide; absent fields do not disqualify.
+    Benchmarks that intentionally reuse another benchmark's dataset (via
+    ``get_data_source_benchmark``) accept the shared manifest identity, mirroring
+    ``_resolve_manifest_allowed_names``. This is a tripwire against output dirs
+    pointing at another benchmark's data, not a proof that these exact files
+    were read.
+    """
+    import re as _re
+
+    if not isinstance(manifest, dict):
+        return False
+
+    def _slug(value: Any) -> str | None:
+        if value is None:
+            return None
+        return _re.sub(r"[^a-z0-9]", "", str(value).lower()) or None
+
+    manifest_benchmark = _slug(manifest.get("benchmark"))
+    allowed = {_slug(getattr(result, "benchmark_name", None))}
+    if benchmark is not None:
+        getter = getattr(benchmark, "get_data_source_benchmark", None)
+        if callable(getter):
+            try:
+                allowed.add(_slug(getter()))
+            except Exception as exc:
+                logger.debug("ignoring data-source alias lookup failure: %s", exc)
+    allowed.discard(None)
+    if manifest_benchmark and allowed and manifest_benchmark not in allowed:
+        return False
+    try:
+        manifest_scale = manifest.get("scale_factor")
+        result_scale = getattr(result, "scale_factor", None)
+        if manifest_scale is not None and result_scale is not None:
+            if float(manifest_scale) != float(result_scale):
+                return False
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _adapter_reused_database(adapter: Any) -> bool:
+    """Whether the adapter skipped loading by reusing an existing database.
+
+    Adapters record this on ``database_was_reused`` when a compatible
+    persistent database lets them skip schema creation and data loading even
+    though load was requested; results measured then describe the older
+    reused database, not the output-dir manifest. Adapters without the
+    attribute behave as before.
+    """
+    return bool(getattr(adapter, "database_was_reused", False))
+
+
+def _attach_datagen_version(
+    result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
+) -> BenchmarkResults:
+    """Stamp the result with the verified data-generation version behind it.
+
+    The version is read back from the benchmark's datagen manifest and
+    recorded only when that manifest's stamp is current and the manifest
+    plausibly describes this result's dataset (matching benchmark/scale).
+    Callers pass ``dataset_identity_established=False`` when this run did not
+    establish that link (execute-only runs against an existing database,
+    caller-supplied external tables); those paths leave the fields unset
+    rather than asserting unverified provenance.
+    """
+    try:
+        if not dataset_identity_established:
+            return result
+        if getattr(result, "data_generation_version", None) is not None:
+            return result
+        from benchbox.utils.datagen_version import manifest_datagen_is_current
+
+        output_dir = getattr(benchmark, "output_dir", None) if benchmark is not None else None
+        if output_dir is None:
+            return result
+        manifest_path = output_dir.joinpath("_datagen_manifest.json")
+        if not hasattr(manifest_path, "exists") or not manifest_path.exists():
+            return result
+        import json as _json
+
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = _json.load(handle)
+        if not manifest_datagen_is_current(manifest):
+            return result
+        if not _manifest_matches_result(manifest, result, benchmark):
+            return result
+        result.data_generation_version = manifest.get("data_generation_version")
+        result.data_generation_hash = manifest.get("data_generation_identity_hash", manifest.get("base_constants_hash"))
+    except Exception as exc:
+        logger.debug("leaving data-generation provenance unset: %s", exc)
+    return result
+
+
+def _attach_variant_comparability_metadata(result: BenchmarkResults, benchmark: Any) -> BenchmarkResults:
+    """Attach read_primitives variant comparability to execution metadata.
+
+    Reads the ``variant_comparability`` summary the benchmark exposes via
+    ``get_benchmark_info()`` (see
+    ``benchbox.core.read_primitives.variant_contracts``) and persists it on
+    ``execution_metadata["variant_comparability"]`` so CLI output and saved
+    result artifacts report which query variants were compared. Benchmarks
+    without the summary are untouched. Best-effort: never fails the run.
+    """
+    try:
+        info_getter = getattr(benchmark, "get_benchmark_info", None)
+        if info_getter is None:
+            return result
+        summary = (info_getter() or {}).get("variant_comparability")
+        if not isinstance(summary, dict) or not summary:
+            return result
+        if not isinstance(result.execution_metadata, dict):
+            result.execution_metadata = {}
+        result.execution_metadata["variant_comparability"] = summary
+    except Exception as exc:
+        logger.debug("leaving variant comparability metadata unset: %s", exc)
+    return result
 
 
 def _attach_translation_metadata(
@@ -774,6 +897,11 @@ def _build_run_config_from_options(
         table_format=table_format,
         table_format_compression=str(options.get("table_format_compression", "snappy") or "snappy"),
         table_format_partition_cols=_parse_partition_cols(options.get("table_format_partition_cols")),
+        client_region=getattr(benchmark_config, "client_region", None) or options.get("client_region"),
+        client_cloud=getattr(benchmark_config, "client_cloud", None) or options.get("client_cloud"),
+        # BenchmarkConfig.link_probe defaults True, so the toggle always
+        # resolves from config; there is intentionally no options fallback.
+        link_probe=is_probe_requested(getattr(benchmark_config, "link_probe", None)),
     )
 
 
@@ -837,8 +965,13 @@ def _run_data_generation_phase(
     output_dir_handler: Any,
     monitor: Any,
     validation_records: list[tuple[str, ValidationResult]],
-) -> float:
-    """Run preflight+datagen+manifest-validation+format-conversion, return elapsed seconds."""
+) -> tuple[float, bool, bool]:
+    """Run preflight+datagen+manifest-validation+format-conversion.
+
+    Returns ``(elapsed_seconds, freshly_generated, manifest_reused)`` so the
+    lifecycle can tell whether this run established the dataset identity
+    behind the output-dir manifest.
+    """
     datagen_start = time.monotonic()
 
     if phases.generate and validation_opts.enable_preflight_validation:
@@ -848,13 +981,15 @@ def _run_data_generation_phase(
             error_msg = ", ".join(preflight_result.errors) or "Unknown preflight validation error"
             raise RuntimeError(f"Preflight validation failed: {error_msg}")
 
+    freshly_generated = False
+    manifest_reused = False
     if monitor is not None:
         with monitor.time_operation("data_generation"):
-            data_was_generated = _ensure_data_generated(benchmark, benchmark_config)
-            if data_was_generated:
+            freshly_generated, manifest_reused = _ensure_data_generated(benchmark, benchmark_config)
+            if freshly_generated:
                 monitor.increment_counter("tables_generated", len(getattr(benchmark, "tables", []) or []))
     else:
-        _ensure_data_generated(benchmark, benchmark_config)
+        freshly_generated, manifest_reused = _ensure_data_generated(benchmark, benchmark_config)
 
     if validation_opts.enable_postgen_manifest_validation:
         manifest_result = _run_manifest_validation(benchmark, benchmark_config)
@@ -863,7 +998,7 @@ def _run_data_generation_phase(
     if phases.generate:
         _run_format_conversion(benchmark, benchmark_config)
 
-    return time.monotonic() - datagen_start
+    return time.monotonic() - datagen_start, freshly_generated, manifest_reused
 
 
 def _build_data_only_result(
@@ -897,7 +1032,7 @@ def _build_data_only_result(
     result_obj = _enrich_driver_runtime_metadata(result_obj, adapter=None, database_config=database_config)
     if execution_context is not None:
         result_obj.execution_context = execution_context.model_dump()
-    return result_obj
+    return _attach_datagen_version(result_obj, benchmark)
 
 
 def _clickhouse_load_failure_details(
@@ -1276,8 +1411,10 @@ def run_benchmark_lifecycle(
     needs_data = test_type != "data_only"
 
     datagen_duration = 0.0
+    freshly_generated = False
+    manifest_reused = False
     if needs_data or phases.generate:
-        datagen_duration = _run_data_generation_phase(
+        datagen_duration, freshly_generated, manifest_reused = _run_data_generation_phase(
             benchmark=benchmark,
             benchmark_config=benchmark_config,
             phases=phases,
@@ -1286,6 +1423,15 @@ def run_benchmark_lifecycle(
             monitor=monitor,
             validation_records=validation_records,
         )
+    # Result provenance may only describe the output-dir manifest when this
+    # run established the dataset identity through the load path: a manifest
+    # reuse whose files the load phase reads, or a fresh generation the load
+    # phase then loads. Generate-plus-execute without load measures the
+    # pre-existing database, not the fresh files, and caller-supplied tables
+    # bypass the manifest entirely. (Adapter-level database reuse is folded
+    # in at the attach sites via _adapter_reused_database: the reuse flag is
+    # only final after the load decision, which happens later.)
+    dataset_identity_established = bool(phases.load) and (freshly_generated or manifest_reused)
 
     if test_type == "data_only":
         return _build_data_only_result(
@@ -1353,7 +1499,13 @@ def run_benchmark_lifecycle(
         )
         if execution_context is not None:
             result_obj.execution_context = execution_context.model_dump()
-        return _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
+        result_obj = _attach_translation_metadata(result_obj, translation_outcomes, strict_mode=strict_translation)
+        result_obj = _attach_variant_comparability_metadata(result_obj, benchmark)
+        return _attach_datagen_version(
+            result_obj,
+            benchmark,
+            dataset_identity_established=dataset_identity_established and not _adapter_reused_database(adapter),
+        )
 
     if adapter is None or (not phases.execute and not phases.load):
         return _build_setup_only_result(
@@ -1423,7 +1575,13 @@ def run_benchmark_lifecycle(
         resource_monitor=resource_monitor,
         execution_context=execution_context,
     )
-    return _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
+    finalized = _attach_translation_metadata(finalized, translation_outcomes, strict_mode=strict_translation)
+    finalized = _attach_variant_comparability_metadata(finalized, benchmark)
+    return _attach_datagen_version(
+        finalized,
+        benchmark,
+        dataset_identity_established=dataset_identity_established and not _adapter_reused_database(adapter),
+    )
 
 
 def _flatten_manifest_v2_entries(table_formats: Any, preferred_formats: list[str] | None = None) -> list[Any]:
@@ -1511,7 +1669,40 @@ def _read_datagen_stats_from_manifest(benchmark: Any) -> dict[str, int]:
         return {}
 
 
-def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
+def _run_ensure_auxiliary_hook(benchmark: Any) -> None:
+    """Run a benchmark's auxiliary-data hook, tolerating non-critical failures.
+
+    Shared by the manifest-reuse and populated-tables-reuse paths so stale
+    manifests are healed whenever data is reused, not only when the manifest
+    itself drives the reuse.
+    """
+    ensure_auxiliary = getattr(benchmark, "ensure_auxiliary_data_files", None)
+    if not callable(ensure_auxiliary):
+        return
+    try:
+        ensure_auxiliary()
+    except (OSError, PermissionError) as e:
+        # Critical system errors - re-raise (disk full, permissions, I/O failure)
+        raise RuntimeError(
+            f"Failed to generate auxiliary data files due to system error: {e}. "
+            "Check disk space, permissions, and file system health."
+        ) from e
+    except ImportError as e:
+        # Missing optional dependency - log warning and continue
+        logger = logging.getLogger("benchbox.core.runner")
+        logger.warning(
+            f"Failed to generate auxiliary data files due to missing dependency: {e}. "
+            "Some benchmark operations may not be available."
+        )
+    except Exception as e:
+        # Other errors - log warning but continue (auxiliary files may not be critical)
+        logger = logging.getLogger("benchbox.core.runner")
+        logger.warning(
+            f"Failed to generate auxiliary data files: {type(e).__name__}: {e}. Some benchmark operations may fail."
+        )
+
+
+def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
     """Ensure data is generated, respecting manifest and generator validator.
 
     Implements the idempotent behavior: reuse valid existing data when possible,
@@ -1519,7 +1710,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     and data is missing/invalid.
 
     Returns:
-        True if data was freshly generated, False if reused from existing manifest
+        ``(freshly_generated, manifest_reused)``: whether this call generated
+        data, and whether it reused a manifest validated on this run. Both
+        False means caller-supplied tables bypassed manifest reuse entirely.
     """
     options = getattr(config, "options", {}) or {}
     force_regenerate_flag = bool(options.get("force_regenerate"))
@@ -1529,8 +1722,16 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     # Validate populated tables too. Callers may provide stale or incomplete
     # mappings, so truthiness alone must not bypass manifest and file checks.
     if getattr(benchmark, "tables", None) and not force_regenerate_flag:
-        if _populated_tables_are_valid(benchmark, config):
-            return False
+        tables_usable, tables_reuse_manifest = _populated_tables_are_valid(benchmark, config)
+        if tables_usable:
+            # Caller-supplied tables bypass manifest reuse, but stale manifests
+            # still need healing (e.g. FlightData dialect backfill). When the
+            # mapping exactly matches the current output-dir manifest, the
+            # manifest still describes this dataset, so reuse is reported and
+            # a later load establishes provenance; anything else stays
+            # unprovenanced.
+            _run_ensure_auxiliary_hook(benchmark)
+            return False, tables_reuse_manifest
         populated_tables_invalid = True
         if no_regenerate_flag:
             raise RuntimeError("no_regenerate is set but populated benchmark tables are missing or stale")
@@ -1542,7 +1743,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     manifest_data: dict | None = None
 
     if output_dir and not force_regenerate_flag and not populated_tables_invalid:
-        manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(benchmark, config)
+        manifest_valid, manifest_data, manifest_found = _validate_manifest_if_present(
+            benchmark, config, quiet=no_regenerate_flag
+        )
         if manifest_valid:
             summary = _populate_tables_from_manifest(benchmark, manifest_data)
             if summary:
@@ -1550,32 +1753,9 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
 
             # Allow benchmarks to ensure auxiliary files exist even when reusing data
             # This is needed for benchmarks that generate additional test files beyond the main data
-            ensure_auxiliary = getattr(benchmark, "ensure_auxiliary_data_files", None)
-            if callable(ensure_auxiliary):
-                try:
-                    ensure_auxiliary()
-                except (OSError, PermissionError) as e:
-                    # Critical system errors - re-raise (disk full, permissions, I/O failure)
-                    raise RuntimeError(
-                        f"Failed to generate auxiliary data files due to system error: {e}. "
-                        "Check disk space, permissions, and file system health."
-                    ) from e
-                except ImportError as e:
-                    # Missing optional dependency - log warning and continue
-                    logger = logging.getLogger("benchbox.core.runner")
-                    logger.warning(
-                        f"Failed to generate auxiliary data files due to missing dependency: {e}. "
-                        "Some benchmark operations may not be available."
-                    )
-                except Exception as e:
-                    # Other errors - log warning but continue (auxiliary files may not be critical)
-                    logger = logging.getLogger("benchbox.core.runner")
-                    logger.warning(
-                        f"Failed to generate auxiliary data files: {type(e).__name__}: {e}. "
-                        "Some benchmark operations may fail."
-                    )
+            _run_ensure_auxiliary_hook(benchmark)
 
-            return False
+            return False, True
 
     if no_regenerate_flag and not force_regenerate_flag:
         reason = "manifest is invalid or stale" if manifest_found else "manifest is missing"
@@ -1590,37 +1770,43 @@ def _ensure_data_generated(benchmark: Any, config: BenchmarkConfig) -> bool:
     _gen_start = time.monotonic()
     benchmark.generate_data()
     emit(f"✅ Data generation completed in {time.monotonic() - _gen_start:.2f}s")
-    return True
+    return True, False
 
 
-def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> bool:
-    """Return whether caller-provided table mappings are safe to reuse."""
+def _populated_tables_are_valid(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, bool]:
+    """Check whether caller-provided table mappings are safe to reuse.
+
+    Returns ``(usable, reuse_manifest)``: usability, plus whether the mapping
+    exactly matches the current output-dir manifest (native mode only), in
+    which case the manifest still describes this dataset for provenance.
+    """
     tables = getattr(benchmark, "tables", None)
     table_mode = str((getattr(config, "options", {}) or {}).get("table_mode", "native") or "native").lower()
     if not tables or not _table_mapping_paths_exist(tables, allow_cloud_uris=table_mode == "external"):
-        return False
+        return False, False
 
     if table_mode == "external":
         # External table mappings are supplied by the caller and may not have a
         # local datagen manifest. Their paths are validated at the adapter
         # boundary, so local manifest comparison would incorrectly regenerate
         # otherwise usable external data.
-        return True
+        return True, False
 
     output_dir = getattr(benchmark, "output_dir", None)
     if not output_dir:
         # External table mappings have no local manifest to compare against;
         # existence is the strongest validation available at this boundary.
-        return True
+        return True, False
 
-    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config)
+    manifest_valid, manifest_data, _manifest_found = _validate_manifest_if_present(benchmark, config, quiet=True)
     if not manifest_valid or manifest_data is None:
-        return False
+        return False, False
 
     manifest_benchmark = copy(benchmark)
     manifest_benchmark.tables = None
     _populate_tables_from_manifest(manifest_benchmark, manifest_data)
-    return _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+    reuse = _normalize_table_mapping(tables) == _normalize_table_mapping(getattr(manifest_benchmark, "tables", None))
+    return reuse, reuse
 
 
 def _table_mapping_paths_exist(value: Any, *, allow_cloud_uris: bool = False) -> bool:
@@ -1805,7 +1991,9 @@ def _check_table_directory_collisions(output_dir: Any, tables: dict) -> bool:
     return False
 
 
-def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tuple[bool, dict | None, bool]:
+def _validate_manifest_if_present(
+    benchmark: Any, config: BenchmarkConfig, *, quiet: bool = False
+) -> tuple[bool, dict | None, bool]:
     """Validate manifest structure and referenced files.
 
     Returns (valid, manifest_dict or None). Non-fatal; failures are signaled by return value.
@@ -1827,6 +2015,22 @@ def _validate_manifest_if_present(benchmark: Any, config: BenchmarkConfig) -> tu
             return False, None, True
 
         if float(manifest.get("scale_factor", -1)) != float(config.scale_factor):
+            return False, None, True
+
+        from benchbox.utils.datagen_version import describe_datagen_staleness, manifest_datagen_is_current
+
+        if not manifest_datagen_is_current(manifest, benchmark=manifest_benchmark):
+            reason = describe_datagen_staleness(manifest, benchmark=manifest_benchmark)
+            logger.warning("Datagen manifest is stale (%s); regenerating benchmark data", reason)
+            if not quiet:
+                emit(f"\u26a0\ufe0f Cached data is stale ({reason}); regenerating (as if --force datagen)")
+            return False, None, True
+
+        identity_matches = getattr(benchmark, "manifest_matches_datagen_identity", None)
+        if callable(identity_matches) and not identity_matches(manifest):
+            logger.warning("Datagen manifest does not match the benchmark's effective configuration; regenerating")
+            if not quiet:
+                emit("Cached data configuration differs from this benchmark; regenerating (as if --force datagen)")
             return False, None, True
 
         from benchbox.utils.datagen_manifest import get_table_files

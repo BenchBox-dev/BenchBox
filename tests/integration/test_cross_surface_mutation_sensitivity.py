@@ -106,6 +106,15 @@ _TARGETS: dict[str, str] = {
     "joinorder_synthetic": "4a",  # 1 row x 2 non-NULL string cols (single-row caveat)
     "h2odb": "Q6",  # multiple rows x 4 cols, GROUP BY + ORDER BY at _H2ODB_SCALE
     "read_primitives": "orderby_bigint",  # many rows x 2 cols, GROUP BY + ORDER BY at _READ_PRIMITIVES_SCALE
+    # flightdata targets ontime-by-carrier (10 rows x 6 cols at SF=0.01):
+    # GROUP BY carrier + ORDER BY ontime_pct DESC with NO trailing LIMIT, so
+    # the strict comparator path sees a discriminating order key (no BS3
+    # tie-at-1 artifact, no LIMIT boundary-swap acceptance).
+    "flightdata": "ontime-by-carrier",
+    # datavault targets Q16 (296 rows x 4 cols at SF=0.01): GROUP BY brand +
+    # ORDER BY supplier_cnt DESC with NO trailing LIMIT, so the strict
+    # comparator path sees a discriminating order key.
+    "datavault": "Q16",
 }
 
 

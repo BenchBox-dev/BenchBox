@@ -183,4 +183,3 @@ for platform, data in results.items():
 
 - [DataFrame Benchmarking](dataframe-quickstart.md) - SQL vs DataFrame comparison
 - [Platform Selection Guide](../platforms/platform-selection-guide.md) - Choosing a platform
-- [Cost Optimization](../advanced/cost-optimization.md) - Cloud cost management

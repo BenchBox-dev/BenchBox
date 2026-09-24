@@ -91,10 +91,9 @@ The following inventory is generated from the manifest:
 | `glue` | — | SQL + DataFrame | `experimental` | #33 `benchbox.platforms.aws:AWSGlueAdapter` |
 | `influxdb` | — | SQL | `beta` | #30 `benchbox.platforms.influxdb:InfluxDBAdapter` |
 | `lakesail` | `lakesail-df` (cli, mode=dataframe) | SQL + DataFrame | `experimental` | #42 `benchbox.platforms.lakesail:LakeSailAdapter` |
-| `modin` | `modin-df` (cli, mode=dataframe) | DataFrame | `experimental` | DataFrame factory only |
 | `motherduck` | — | SQL | `beta` | #1 `benchbox.platforms.motherduck:MotherDuckAdapter` |
 | `pandas` | `pandas-df` (cli, mode=dataframe) | DataFrame | `stable` | DataFrame factory only |
-| `pg-duckdb` | — | SQL | `experimental` | #20 `benchbox.platforms.pg_duckdb:PgDuckDBAdapter` |
+| `pg-duckdb` | `pg_duckdb` (registry) | SQL | `experimental` | #20 `benchbox.platforms.pg_duckdb:PgDuckDBAdapter` |
 | `pg-mooncake` | — | SQL | `experimental` | #21 `benchbox.platforms.pg_mooncake:PgMooncakeAdapter` |
 | `polars` | `polars-df` (cli, mode=dataframe) | DataFrame | `stable` | #44 `benchbox.platforms.polars_platform:PolarsAdapter` |
 | `postgresql` | `pg` (cli), `pgsql` (cli), `postgres` (cli) | SQL | `beta` | #18 `benchbox.platforms.postgresql:PostgreSQLAdapter` |

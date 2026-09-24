@@ -31,9 +31,12 @@ def test_validator_builds_manifest_from_scan(tmp_path: Path):
     assert manifest.get("benchmark") == "ssb"
     assert "tables" in manifest and len(manifest["tables"]) >= 1
 
-    # Validate again; should still be valid and not raise
+    # Validate again: the scan-rebuilt manifest carries no provenance stamp,
+    # so the directory honestly reports stale (regenerate) instead of
+    # laundering unknown-vintage files into current provenance.
     res2 = v.validate_data_directory(data_dir)
-    assert res2.valid is True
+    assert res2.valid is False
+    assert any("stale" in issue for issue in res2.issues)
 
 
 class TestComputeEntrySize:
@@ -83,10 +86,13 @@ class TestDataValidationDirectoryEntries:
 
         total_size = sum(f.stat().st_size for f in table_dir.rglob("*") if f.is_file())
 
+        from benchbox.utils.datagen_version import current_datagen_stamp
+
         manifest = {
             "version": 2,
             "benchmark": "ssb",
             "scale_factor": 0.01,
+            **current_datagen_stamp("ssb"),
             "format_preference": ["delta"],
             "tables": {
                 table_name: {

@@ -52,7 +52,6 @@ EXPECTED_CLI_ALIASES = {
     "fusion": "datafusion",
     "gbq": "bigquery",
     "lakesail-df": "lakesail",
-    "modin-df": "modin",
     "pandas-df": "pandas",
     "pg": "postgresql",
     "pgsql": "postgresql",
@@ -68,6 +67,7 @@ EXPECTED_REGISTRY_ALIASES = {
     "azure_synapse": "synapse",
     "fabric-dw": "fabric_dw",
     "fabric_lakehouse": "fabric-lakehouse",
+    "pg_duckdb": "pg-duckdb",
     "sqlite3": "sqlite",
 }
 EXPECTED_ADAPTER_REGISTRATION_ORDER = (
@@ -574,7 +574,7 @@ class TestPlatformManifest:
         from benchbox.cli.platform import PLATFORM_ALIASES
         from benchbox.core.platform_registry import _OPTIONAL_ADAPTERS
 
-        assert len(PLATFORM_MANIFEST) == 51
+        assert len(PLATFORM_MANIFEST) == 50
         assert PlatformRegistry.get_all_platform_metadata() == get_platform_metadata()
         assert get_platform_aliases("cli") == EXPECTED_CLI_ALIASES
         assert get_platform_aliases("registry") == EXPECTED_REGISTRY_ALIASES
@@ -649,9 +649,8 @@ raise SystemExit('optional SDKs loaded: ' + ', '.join(loaded) if loaded else 0)
 
     @requires_dev_manifest_generator
     def test_dataframe_availability_typo_is_detected_and_restoration_passes(self, monkeypatch):
-        from _project.scripts.platform_manifest import validate_platform_surfaces
-
         import benchbox.platforms as platform_package
+        from _project.scripts.platform_manifest import validate_platform_surfaces
 
         adapter_name, availability_name, guidance = platform_package._DATAFRAME_PLATFORM_INFO["polars-df"]
         assert availability_name == "POLARS_AVAILABLE"

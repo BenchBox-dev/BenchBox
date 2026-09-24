@@ -362,9 +362,9 @@ for dialect in dialects:
 
 ## See Also
 
-- [Getting Started](getting-started.md) - Basic usage tutorial
-- [Examples](examples.md) - Practical code examples
-- [Configuration](configuration.md) - Configuration guide
+- [Getting Started](../usage/cli-quick-start.md) - Basic usage tutorial
+- [Examples](../usage/examples/index.md) - Practical code examples
+- [Configuration](../usage/configuration.md) - Configuration guide
 - [Benchmarks](../benchmarks/index.md) - Individual benchmark documentation
 
 ---

@@ -27,10 +27,11 @@ function fmtScore(s: number | null): string {
   return formatPowerScore(s, { missingText: "-" }).valueText;
 }
 
-// Inline bar: MAX_BAR_PX pixels = full-width bar.
+// Inline bar: the bar fills its own cell, and the cell takes whatever width
+// the table has. A fixed pixel bar made the whole table render at its mobile
+// size on a desktop-width page, wasting most of the row.
 // MIN_FRAC reserves a small stub for the worst value so the row never
 // collapses to zero width and the slowest platform is still visually located.
-const MAX_BAR_PX = 48;
 const MIN_FRAC = 0.08;
 
 interface SparkProps {
@@ -48,12 +49,11 @@ function SparkBar({ value, max, color, higherIsBetter = false }: SparkProps) {
   const ratio = value / max;
   const scaled = higherIsBetter ? ratio : 1 - ratio;
   const barFraction = MIN_FRAC + Math.max(0, Math.min(1, scaled)) * (1 - MIN_FRAC);
-  const barW = Math.max(2, Math.round(barFraction * MAX_BAR_PX));
   return (
-    <span class="inline-flex items-center gap-1.5">
+    <span class="block w-full min-w-[3rem]">
       <span
-        class="inline-block h-2 rounded-sm align-middle flex-shrink-0"
-        style={{ width: `${barW}px`, backgroundColor: color, opacity: 0.75 }}
+        class="block h-2 rounded-sm"
+        style={{ width: `${(barFraction * 100).toFixed(1)}%`, backgroundColor: color, opacity: 0.75 }}
       />
     </span>
   );
@@ -88,13 +88,16 @@ export function SparklineTable({ summary }: Props) {
   return (
     <div class="w-full overflow-x-auto">
       <table
-        class="text-xs border-collapse min-w-full"
+        class="w-full min-w-[30rem] text-xs border-collapse"
         role="grid"
         aria-label="Compact performance metrics overview"
       >
         <thead>
           <tr class="border-b border-[var(--bb-data-border)]">
-            <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal min-w-[10rem]">Platform</th>
+            {/* Keep labels compact on wide screens and wrap long cohort
+                identities on phones. The table scrolls horizontally when
+                its minimum readable width exceeds the available space. */}
+            <th class="text-left px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal w-px whitespace-normal sm:whitespace-nowrap">Platform</th>
             <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
               Geomean
             </th>
@@ -122,7 +125,7 @@ export function SparklineTable({ summary }: Props) {
             const p99Value = isTimingDisplayable(p) ? p.percentile_stats?.p99 ?? null : null;
             return (
               <tr key={p.result_id} class="border-b border-[var(--bb-data-border)] hover:bg-[var(--bb-surface-data-muted)]">
-                <td class="px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
+                <td class="w-px whitespace-normal sm:whitespace-nowrap px-2 py-1.5 font-medium text-[var(--bb-data-fg-primary)]">
                   <span
                     class="inline-block w-2 h-2 rounded-full mr-1.5 align-middle"
                     style={{ backgroundColor: color }}
@@ -130,16 +133,16 @@ export function SparklineTable({ summary }: Props) {
                   {cohortLabels[i] ?? p.platform}
                 </td>
                 {/* Geomean spark + value */}
-                <td class="px-1 py-1.5">
+                <td class="w-2/5 px-1 py-1.5">
                   <SparkBar value={geomeanValue} max={maxGeomean} color={color} />
                 </td>
-                <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
+                <td class="w-px whitespace-nowrap px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
                   {fmtMs(geomeanValue)}
                 </td>
                 {/* Power score spark + value */}
                 {showPower && (
                   <>
-                    <td class="px-1 py-1.5">
+                    <td class="w-2/5 px-1 py-1.5">
                       <SparkBar
                         value={powerValue}
                         max={maxPower}
@@ -147,7 +150,7 @@ export function SparklineTable({ summary }: Props) {
                         higherIsBetter
                       />
                     </td>
-                    <td class="px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
+                    <td class="w-px whitespace-nowrap px-2 py-1.5 text-right font-mono text-[var(--bb-data-fg-primary)]">
                       {fmtScore(powerValue)}
                     </td>
                   </>

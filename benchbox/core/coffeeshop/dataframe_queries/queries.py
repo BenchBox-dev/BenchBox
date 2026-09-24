@@ -38,13 +38,18 @@ def _date_between(series: Any, start: str | date, end: str | date) -> Any:
     against ``datetime.date`` bounds is correct. Some contexts/fixtures instead
     provide ``datetime64[ns]``; pandas refuses to compare those against ``date``, so
     align the bounds to ``Timestamp`` when the column is datetime-typed.
+    Pandas 3 reports ``is_datetime64_any_dtype`` as True for Arrow ``date32``
+    as well, but ``date32`` refuses ``Timestamp`` bounds while accepting
+    ``date`` bounds - so Arrow date columns keep ``date`` bounds.
     """
     import pandas as pd
 
     low, high = _parse_date(start), _parse_date(end)
     # Guard the dtype check with isinstance so non-Series inputs (e.g. expression
     # mocks in unit tests) skip introspection and just use the comparison operators.
-    if isinstance(series, pd.Series) and pd.api.types.is_datetime64_any_dtype(series):
+    dtype = series.dtype if isinstance(series, pd.Series) else None
+    is_arrow_date = isinstance(dtype, pd.ArrowDtype) and str(dtype).startswith(("date32", "date64"))
+    if isinstance(series, pd.Series) and pd.api.types.is_datetime64_any_dtype(series) and not is_arrow_date:
         low, high = pd.Timestamp(low), pd.Timestamp(high)
     return (series >= low) & (series <= high)
 

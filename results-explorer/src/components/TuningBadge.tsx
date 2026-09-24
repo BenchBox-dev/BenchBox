@@ -12,63 +12,93 @@ interface TuningEntry {
 }
 
 const NOT_RECORDED_CONFIG: TuningEntry = {
-  label: "Not Recorded",
+  label: "Not recorded",
   tone: "neutral",
-  title: "Tuning state unknown - the run predates tuning metadata or did not record it",
+  title: "This run did not record whether it used tuning settings.",
 };
 
 export const TUNING_CONFIG: Record<string, TuningEntry> = {
   tuned: {
     label: "Tuned",
     tone: "success",
-    title: "Platform-recommended tuning applied",
+    title: "This run applied the recommended tuning settings for the platform.",
   },
   "tuned-fallback": {
-    label: "Tuned (Fallback)",
+    label: "Tuned with fallback settings",
     tone: "warning",
     title:
-      "tuned was requested but no platform/benchmark template was found - basic constraints-only " +
-      "config was used instead. Does not represent a curated-template tuned run (ADR-2).",
+      "Tuning was requested, but BenchBox found no recommended settings for this platform and benchmark. It used basic settings instead.",
   },
   notuning: {
-    label: "No Tuning",
+    label: "No tuning",
     tone: "neutral",
-    title: "Platform defaults only - no tuning applied",
+    title: "This run used the platform defaults and applied no tuning settings.",
   },
   auto: {
-    label: "Auto",
+    label: "Automatic tuning",
     tone: "info",
-    title: "Automatic tuning selected by the platform",
+    title: "The platform selected the tuning settings automatically.",
   },
   custom: {
-    label: "Custom Tuning",
+    label: "Custom tuning",
     tone: "warning",
-    title: "User-supplied tuning configuration file",
+    title: "This run used tuning settings supplied by the person who ran it.",
   },
   [NOT_RECORDED_TUNING_MODE]: NOT_RECORDED_CONFIG,
 };
 
 const DEFAULT_CONFIG: TuningEntry = {
-  label: "Custom Tuning",
+  label: "Custom tuning",
   tone: "warning",
-  title: "Non-standard tuning configuration",
+  title: "This run used tuning settings that BenchBox does not recognize.",
 };
 
-function resolveConfig(tuningMode: string | null | undefined): TuningEntry {
+const CUSTOM_REQUESTED_CONFIG: TuningEntry = {
+  label: "Custom tuning requested",
+  tone: "warning",
+  title: "Custom tuning was requested, but the run did not record whether it was applied.",
+};
+
+const CUSTOM_NOOP_CONFIG: TuningEntry = {
+  label: "No tuning applied",
+  tone: "neutral",
+  title: "Custom tuning was requested, but the run recorded no applied tuning settings.",
+};
+
+const CUSTOM_FAILED_CONFIG: TuningEntry = {
+  label: "Tuning failed",
+  tone: "danger",
+  title: "Custom tuning was requested, but BenchBox could not apply it.",
+};
+
+const APPLIED_TUNING_STATUSES = new Set(["applied_unverified", "applied_verified"]);
+
+function resolveConfig(
+  tuningMode: string | null | undefined,
+  tuningValidationStatus?: string | null,
+): TuningEntry {
   if (tuningMode === null || tuningMode === undefined) return NOT_RECORDED_CONFIG;
+  if (tuningMode === "custom") {
+    if (APPLIED_TUNING_STATUSES.has(tuningValidationStatus ?? "")) return TUNING_CONFIG.custom!;
+    if (tuningValidationStatus === "noop" || tuningValidationStatus === "not_applicable") return CUSTOM_NOOP_CONFIG;
+    if (tuningValidationStatus === "failed") return CUSTOM_FAILED_CONFIG;
+    return CUSTOM_REQUESTED_CONFIG;
+  }
   return TUNING_CONFIG[tuningMode] ?? DEFAULT_CONFIG;
 }
 
 export function tuningLabel(tuningMode: string | null | undefined): string {
+  if (tuningMode === "custom") return TUNING_CONFIG.custom!.label;
   return resolveConfig(tuningMode).label;
 }
 
 interface TuningBadgeProps {
   tuningMode: string | null | undefined;
+  tuningValidationStatus?: string | null;
 }
 
-export function TuningBadge({ tuningMode }: TuningBadgeProps) {
-  const config = resolveConfig(tuningMode);
+export function TuningBadge({ tuningMode, tuningValidationStatus }: TuningBadgeProps) {
+  const config = resolveConfig(tuningMode, tuningValidationStatus);
   return (
     <StatusBadge role="computed" tone={config.tone} title={config.title}>
       {config.label}

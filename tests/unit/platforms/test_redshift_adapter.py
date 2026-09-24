@@ -21,6 +21,25 @@ pytestmark = [
 ]
 
 
+def _make_real_iceberg_table(table_dir: Path) -> None:
+    """Build a minimal real Iceberg table with one data file."""
+    pytest.importorskip("pyiceberg", reason="iceberg staging tests need pyiceberg")
+    pa = pytest.importorskip("pyarrow", reason="iceberg staging tests need pyarrow")
+    from pyiceberg.catalog.sql import SqlCatalog
+    from pyiceberg.schema import Schema
+    from pyiceberg.types import LongType, NestedField
+
+    catalog = SqlCatalog("rs-test", uri=f"sqlite:///{table_dir.parent}/cat.db", warehouse=str(table_dir.parent))
+    catalog.create_namespace_if_not_exists("ns")
+    table = catalog.create_table(
+        "ns.t",
+        schema=Schema(NestedField(1, "o_orderkey", LongType())),
+        location=table_dir.as_uri(),
+        properties={"format-version": "2"},
+    )
+    table.overwrite(pa.table({"o_orderkey": [1]}))
+
+
 class TestRedshiftAdapter:
     """Test Redshift platform adapter functionality."""
 
@@ -1058,6 +1077,114 @@ class TestRedshiftAdapter:
         assert table_stats["orders"] == 9
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("TABLE PROPERTIES ('table_type'='DELTA')" in call for call in execute_calls)
+
+    def test_external_table_mode_registers_iceberg_in_glue(self):
+        """External mode should register Iceberg directories in Glue, not ad-hoc DDL.
+
+        Redshift Spectrum reads Iceberg only through the Glue Data Catalog, so
+        the adapter registers the uploaded table and queries the external
+        schema instead of issuing CREATE EXTERNAL TABLE.
+        """
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                s3_bucket="benchbox-test-bucket",
+                s3_prefix="benchbox",
+                iam_role="arn:aws:iam::123456789012:role/benchbox-redshift",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = (7,)
+
+        mock_benchmark = Mock()
+        mock_benchmark.get_schema.return_value = {"orders": {"columns": [{"name": "o_orderkey", "type": "BIGINT"}]}}
+
+        mock_glue = Mock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            iceberg_dir = Path(tmpdir) / "orders"
+            _make_real_iceberg_table(iceberg_dir)
+            mock_benchmark.tables = {"orders": [iceberg_dir]}
+
+            mock_s3 = Mock()
+            with (
+                patch.object(adapter, "_create_s3_client", return_value=mock_s3),
+                patch.object(adapter, "_create_glue_client", return_value=mock_glue),
+            ):
+                table_stats, _, _ = adapter.create_external_tables(mock_benchmark, mock_connection, Path(tmpdir))
+
+        assert table_stats["orders"] == 7
+        execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
+        assert not any("CREATE EXTERNAL TABLE" in call for call in execute_calls)
+        assert any("SELECT COUNT(*)" in call for call in execute_calls)
+        mock_glue.create_table.assert_called_once()
+        table_input = mock_glue.create_table.call_args[1]["TableInput"]
+        assert mock_glue.create_table.call_args[1]["DatabaseName"] == "test_db_external"
+        assert table_input["Parameters"]["table_type"] == "iceberg"
+        assert table_input["StorageDescriptor"]["Location"].startswith("s3://benchbox-test-bucket/")
+        assert table_input["StorageDescriptor"]["Location"].endswith("/orders/")
+        assert table_input["StorageDescriptor"]["Columns"] == [{"Name": "o_orderkey", "Type": "BIGINT"}]
+        metadata_location = table_input["Parameters"]["metadata_location"]
+        assert metadata_location.startswith(table_input["StorageDescriptor"]["Location"] + "metadata/")
+        assert metadata_location.endswith(".metadata.json")
+        # Data files and the relocated graph were uploaded; no stale graph files.
+        uploaded_keys = {call.args[2] for call in mock_s3.upload_file.call_args_list}
+        assert any(key.endswith(".parquet") for key in uploaded_keys)
+        assert any(key.endswith(".avro") for key in uploaded_keys)
+        assert metadata_location[len("s3://benchbox-test-bucket/") :] in uploaded_keys
+
+    def test_iceberg_glue_registration_replaces_existing_table(self):
+        """Glue registration should swallow EntityNotFound on replace but surface real errors."""
+        try:
+            adapter = RedshiftAdapter(
+                host="test-cluster.redshift.amazonaws.com",
+                database="test_db",
+                username="test_user",
+                password="test_pass",
+                s3_bucket="benchbox-test-bucket",
+                s3_prefix="benchbox",
+                iam_role="arn:aws:iam::123456789012:role/benchbox-redshift",
+            )
+        except ImportError:
+            pytest.skip("Redshift drivers not installed")
+
+        class FakeGlueError(Exception):
+            def __init__(self, code):
+                super().__init__(code)
+                self.response = {"Error": {"Code": code}}
+
+        mock_glue = Mock()
+        mock_glue.delete_table.side_effect = FakeGlueError("EntityNotFoundException")
+        adapter._register_iceberg_table_in_glue(
+            mock_glue, "test_db_external", "orders", "s3://bucket/orders/", [("o_orderkey", "BIGINT")], None
+        )
+        mock_glue.create_table.assert_called_once()
+
+        mock_glue = Mock()
+        mock_glue.delete_table.side_effect = FakeGlueError("AccessDeniedException")
+        with pytest.raises(FakeGlueError):
+            adapter._register_iceberg_table_in_glue(
+                mock_glue, "test_db_external", "orders", "s3://bucket/orders/", [("o_orderkey", "BIGINT")], None
+            )
+        mock_glue.create_table.assert_not_called()
+
+    def test_glue_column_type_aliases(self):
+        """Spectrum types without a Hive spelling should be aliased for Glue."""
+        assert RedshiftAdapter._map_external_column_type_to_glue("INTEGER") == "INT"
+        assert RedshiftAdapter._map_external_column_type_to_glue("DOUBLE PRECISION") == "DOUBLE"
+        assert RedshiftAdapter._map_external_column_type_to_glue("REAL") == "FLOAT"
+        assert RedshiftAdapter._map_external_column_type_to_glue("BIGINT") == "BIGINT"
+        assert RedshiftAdapter._map_external_column_type_to_glue("DECIMAL(15,2)") == "DECIMAL(15,2)"
+        assert RedshiftAdapter._map_external_column_type_to_glue("NUMERIC(10,2)") == "DECIMAL(10,2)"
+        assert RedshiftAdapter._map_external_column_type_to_glue("TIMESTAMP WITH TIME ZONE") == "TIMESTAMP"
+        assert RedshiftAdapter._map_external_column_type_to_glue("TIMESTAMP(6)") == "TIMESTAMP"
 
     def test_external_table_mode_requires_iam_role(self):
         """External mode should require IAM role configuration for Spectrum DDL."""

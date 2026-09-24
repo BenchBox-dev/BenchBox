@@ -1,5 +1,32 @@
 # Corpus Generation Notes - 2026-04-03
 
+## DuckDB version matrix (operator-run, 2026-08-29)
+
+The Results Explorer corpus includes a reproducible DuckDB version-over-version matrix at
+TPC-H, TPC-DS, ClickBench, and SSB SF10. BenchBox's ClickBench generator creates
+synthetic data linearly from the scale factor, so it is measured at SF10 like the
+other workloads. It uses three independent power runs per cell and reports medians.
+The published corpus has one median bundle per version/benchmark cell (28 bundles total);
+the 84 raw repetitions are retained only in the external operator output. The package
+points are DuckDB 1.0.0, 1.1.3, 1.2.2, 1.3.2, 1.4.4, 1.5.5, and
+1.6.0.dev365 (the current latest 1.6 development wheel at capture time).
+
+The runner and analyzer are `scripts/run_duckdb_version_matrix.py` and
+`scripts/analyze_duckdb_version_matrix.py`. The analyzer's
+`--explorer-bundles-dir` option creates the 28 median bundles for promotion. All raw
+data, databases, logs, and analysis outputs remain in the external operator output
+directory; only those anonymized median bundles are promoted here. DuckDB development wheels can report a separate internal
+engine build string, so the raw bundle retains it while Explorer identifies the run by
+the resolved package version.
+
+The 28 promoted median bundles carry maintainer-run submission manifests with
+per-bundle SHA-256 hashes. Their Apple M4 CPU identity is an operator attestation,
+not a recovered measurement: the retained raw matrix archive records the same
+Darwin/arm64 client host as the standing single-machine corpus attestation, while
+the historical capture path omitted CPU model and vendor. The exact provenance
+rewrite and old-to-new result IDs are recorded in
+`bundles/cpu-identity-attestation-pr-1946.manifest.json`.
+
 ## Platforms Run
 
 ### TPC-H (SF 0.01)
@@ -75,6 +102,42 @@ future rerun may replace the `not_run` claim only when the validation phase
 records actual evidence. Submission admission also rejects a `passed` or
 `partial` summary claim paired with an unrun validation phase.
 
+## Pre-2026-08-23 results withdrawn (2026-08-28)
+
+All 130 bundles run before 2026-08-23 were removed from the develop corpus,
+together with their 114 `.manifest.json` sidecars (244 files). What remains is
+9 bundles across 3 cohorts.
+
+**This was a trust decision, not a soundness finding.** Unlike the 2026-07-16
+tuned drop (#1176 proved the tuning config never reached platform adapters) and
+the 2026-08-24 zero-query withdrawal (bundles claimed `passed` after executing
+nothing), no defect was found in the removed results. The maintainer no longer
+trusts measurements taken before 2026-08-23 and asked for them to be withdrawn.
+Do not go looking for a bug report; there isn't one.
+
+What went:
+
+- 12 bundles from the original 2026-04-03/04 corpus generation
+- 111 bundles from the 2026-05-02 maintainer UAT sweep (committed in #164)
+- 3 JoinOrder bundles from the 2026-05-12 canonical UAT
+- 4 SSB seed-lane bundles from 2026-07-30
+
+Removing them would have left TPC-H SF1 holding only Polars and PySpark, below
+the three-platform floor in `validate_corpus.py`. A fresh maintainer DuckDB run
+at TPC-H SF1 (DuckDB 1.3.2, 66 queries, 0 failed, validation PASSED) was added
+in the preceding commit to hold the cohort. It also gives that cohort a SQL
+reference point against two DataFrame-mode results.
+
+The three migration manifests in `bundles/` were deliberately kept:
+`path-privacy-migration.manifest.json` is the `DEFAULT_MANIFEST` in
+`_project/scripts/results_explorer_corpus_migrate.py` and is name-referenced by
+`sync-results-data-to-published.yml`. They are tooling audit records, excluded
+from bundle discovery by `COMPANION_SUFFIXES`.
+
+Restoring any withdrawn cohort means fresh runs, not reverting this commit.
+`REGENERATION.md` is the precedent for how to document what a restore needs.
+The removal commit carries the exact 244-path list.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
@@ -123,3 +186,67 @@ policy was not expanded beyond empty optional map omission.
   `client_host` objects remain in primary bundles).
 - Spot check: `rg -n '"client_host": \{\}' results-data/bundles` should not
   match residual hollow maps in primary result JSON.
+
+
+## CPU identity backfill (2026-08-29) — OPERATOR ATTESTATION, NOT MEASURED
+
+Every bundle in this corpus now carries `cpu_model: "Apple M4"`,
+`cpu_vendor: "Apple"`, and `cpu_identity_provenance: "user_attested"`, which
+the Explorer read model normalizes to the family `apple_silicon`. **These values
+were not measured. They are an operator attestation.**
+
+### Why no measured value exists
+
+The capture path was defective, in three independent ways:
+
+1. `get_system_info` sourced `cpu_model` from `platform.processor()`, which on
+   Darwin returns the bare architecture `"arm"`. `normalize_cpu_family("arm")`
+   is `"unknown"`, so even where a value was recorded it said nothing.
+2. `SystemInfo.to_dict` emitted `cpu_cores` / `total_memory_gb` / `os_version`
+   while `ClientHostEnvironment.from_system_profile` reads `cpu_count` /
+   `memory_gb` / `os_release`, so those three were silently dropped from every
+   bundle, and `cpu_vendor` was never produced at all.
+3. The DataFrame adapters descend from a hierarchy that never runs the SQL
+   path's environment capture, so 43 of these 151 bundles recorded no client
+   host whatsoever.
+
+Defects 1 and 2 are fixed in `fix/cpu-identity-capture-source`. Defect 3 is
+tracked as `dataframe-client-host-capture-gap`. Across the 3,845 raw local
+results only 4 carry a CPU, and all four post-date those fixes — so there was
+nothing in the archive to recover.
+
+### The attestation
+
+The project maintainer attests that every run in this corpus executed on a
+single machine — natively, or driving Apple container Linux images whose
+engines share that host's CPU. No other machine has been used in the project's
+development.
+
+Recorded evidence is consistent with it but does not by itself establish the
+model: every bundle that records a client host records `Darwin`/`arm64`, and
+the raw local archive shows a single `machine_id`. `arm64` + `Darwin` implies
+Apple Silicon; it does not distinguish an M1 from an M4. The specific model
+rests on the attestation alone.
+
+### What was and was not written
+
+Only the CPU identity and its typed provenance were written. For the 43 DataFrame bundles
+that had no client host, `os`, `arch` and `python` were **not** synthesized:
+the attestation covers which machine ran the corpus, not a given run's OS
+release or interpreter version. That gap closes forward, not retroactively.
+
+### Result IDs were renumbered
+
+`result_id` embeds a SHA-256 prefix of the raw bundle bytes, so all 151 were
+renumbered. Precedent: `path-privacy-migration` and `unread-identifier-field-drop`
+each renumbered all 207 entries of the corpus of their day. Every old → new
+mapping is recorded in `results-data/bundles/cpu-identity-attestation.manifest.json`.
+The later in-band provenance migration and its second result-ID mapping are
+recorded in `results-data/bundles/cpu-identity-provenance-v2.manifest.json`.
+Readers distinguish attested values from measured ones through the typed
+`cpu_identity_provenance` field rather than by guessing from historical context.
+
+Reproduce with:
+
+    uv run -- python _project/scripts/results_explorer_cpu_attestation_backfill.py
+    # add --write to apply

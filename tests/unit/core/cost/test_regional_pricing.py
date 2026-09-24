@@ -3,10 +3,13 @@
 import pytest
 
 from benchbox.core.cost.pricing import (
+    BIGQUERY_ON_DEMAND_PRICES,
+    REDSHIFT_NODE_PRICES,
+    SNOWFLAKE_CREDIT_PRICES,
     _map_region_to_tier,
-    get_bigquery_price_per_tb,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
+    resolve_bigquery_price_per_tb,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
 )
 
 pytestmark = [
@@ -171,97 +174,165 @@ class TestRegionMapping:
 
 
 class TestSnowflakeRegionalPricing:
-    """Tests for Snowflake regional pricing variations."""
+    """Structural tests for Snowflake regional pricing tiers.
 
-    def test_us_region_pricing(self):
+    Exact cell values are pinned only by the cited goldens in
+    test_pricing_provenance.py; these tests check tier shape instead.
+    """
+
+    def _standard(self, region: str) -> float:
+        return resolve_snowflake_credit_price("standard", "aws", region).value
+
+    def test_us_region_pricing_is_floor(self):
         """Test US region pricing is lowest."""
-        price_us = get_snowflake_credit_price("standard", "aws", "us-east-1")
-        assert price_us == 2.00
+        price_us = self._standard("us-east-1")
+        assert price_us > 0
+        for region in ["eu-west-1", "ap-southeast-1", "ca-central-1", "me-south-1"]:
+            assert price_us <= self._standard(region), f"US not floor vs {region}"
 
-    def test_eu_region_pricing_premium(self):
-        """Test EU regions have 20-25% premium."""
-        price_eu = get_snowflake_credit_price("standard", "aws", "eu-west-1")
-        assert price_eu == 2.50  # 25% premium
-
-    def test_ap_region_pricing_premium(self):
-        """Test AP regions have 20-30% premium."""
-        price_ap = get_snowflake_credit_price("standard", "aws", "ap-southeast-1")
-        assert price_ap == 2.60  # 30% premium
-
-    def test_canada_region_pricing(self):
-        """Test Canada region pricing."""
-        price_ca = get_snowflake_credit_price("standard", "aws", "ca-central-1")
-        assert price_ca == 2.20  # 10% premium
-
-    def test_middle_east_highest_pricing(self):
-        """Test Middle East regions have highest pricing."""
-        price_me = get_snowflake_credit_price("standard", "aws", "me-south-1")
-        assert price_me == 2.70  # 35% premium
+    def test_tier_ordering(self):
+        """Test regional premiums order US < Canada < EU < AP < other."""
+        assert self._standard("us-east-1") < self._standard("ca-central-1")
+        assert self._standard("ca-central-1") < self._standard("eu-west-1")
+        assert self._standard("eu-west-1") < self._standard("ap-southeast-1")
+        assert self._standard("ap-southeast-1") < self._standard("me-south-1")
 
     def test_consistent_across_clouds(self):
         """Test pricing consistent across AWS, Azure, GCP for same region tier."""
-        price_aws = get_snowflake_credit_price("standard", "aws", "us-east-1")
-        price_azure = get_snowflake_credit_price("standard", "azure", "eastus")
-        price_gcp = get_snowflake_credit_price("standard", "gcp", "us-central1")
+        price_aws = resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
+        price_azure = resolve_snowflake_credit_price("standard", "azure", "eastus").value
+        price_gcp = resolve_snowflake_credit_price("standard", "gcp", "us-central1").value
 
-        assert price_aws == price_azure == price_gcp == 2.00
+        assert price_aws == price_azure == price_gcp > 0
 
 
 class TestBigQueryRegionalPricing:
-    """Tests for BigQuery regional pricing variations."""
+    """Tests for BigQuery per-region pricing with continental bucket fallback.
 
-    def test_us_multi_region(self):
-        """Test US multi-region pricing."""
-        assert get_bigquery_price_per_tb("us") == 5.00
+    Captured values come from the vendor pricing page
+    (https://cloud.google.com/bigquery/pricing, retrieved 2026-09-18),
+    which embeds the full regional on-demand schedule in the page data.
+    Locations with no published table fall back to continental buckets;
+    unknown locations fail high via 'other'. The $6.25 US value is pinned
+    only by the cited golden in test_pricing_provenance.py.
+    """
 
-    def test_eu_multi_region(self):
-        """Test EU multi-region pricing."""
-        assert get_bigquery_price_per_tb("eu") == 5.00
+    def test_multi_region_buckets_agree(self):
+        """Test US/EU/Asia multi-region pricing shares one bucket."""
+        price_us = resolve_bigquery_price_per_tb("us").value
+        assert price_us > 0
+        assert resolve_bigquery_price_per_tb("eu").value == price_us
+        assert resolve_bigquery_price_per_tb("asia").value == price_us
+        # Retained 2026-09-18 citation: the page publishes no Asia entry.
+        assert resolve_bigquery_price_per_tb("us-multi").value == price_us
+        assert resolve_bigquery_price_per_tb("eu-multi").value == price_us
+        assert resolve_bigquery_price_per_tb("asia-multi").value == price_us
 
-    def test_asia_multi_region(self):
-        """Test Asia multi-region pricing."""
-        assert get_bigquery_price_per_tb("asia") == 5.00
+    def test_captured_single_region_values(self):
+        """Test a representative sample of captured per-region prices.
 
-    def test_us_single_regions(self):
+        Golden values below cite provenance entry bigquery_on_demand_prices
+        (cloud.google.com/bigquery/pricing, retrieved 2026-09-18). Update
+        only when the vendor page changes.
+        """
+        expected = {
+            "us-east1": 6.25,
+            "us-west2": 8.4375,
+            "us-south1": 7.50,
+            "europe-west1": 7.50,
+            "europe-west2": 7.8125,
+            "europe-west10": 9.625,
+            "europe-west12": 8.0625,
+            "asia-southeast1": 8.4375,
+            "asia-east1": 7.1875,
+            "asia-northeast1": 7.50,
+            "australia-southeast1": 8.125,
+            "southamerica-east1": 11.25,
+            "southamerica-west1": 8.9375,
+            "me-central1": 7.59375,
+            "me-central2": 10.00,
+            "me-west1": 7.50,
+            # Regions added to the matcher by the pricing correction.
+            "africa-south1": 7.50,
+            "northamerica-south1": 6.8125,
+            "asia-southeast3": 7.50,
+            "asia-southeast4": 6.5625,
+            "europe-north2": 6.5625,
+        }
+        for location, price in expected.items():
+            resolution = resolve_bigquery_price_per_tb(location)
+            assert resolution.value == price, location
+            assert resolution.fallback_used is False, location
+
+    def test_every_table_region_resolves_to_its_captured_price(self):
+        """Test no table region is shadowed by routing logic."""
+        for region, price in BIGQUERY_ON_DEMAND_PRICES.items():
+            if region == "other":
+                continue
+            resolution = resolve_bigquery_price_per_tb(region)
+            assert resolution.value == price, region
+            assert resolve_bigquery_price_per_tb(region.upper()).value == price, region
+
+    def test_unlisted_regions_route_to_buckets(self):
+        """Test locations with no published table use continental buckets."""
+        # Listed in the page selector with no published on-demand table.
+        assert resolve_bigquery_price_per_tb("europe-west5").value == BIGQUERY_ON_DEMAND_PRICES["eu-single"]
+        assert resolve_bigquery_price_per_tb("us-central2").value == BIGQUERY_ON_DEMAND_PRICES["us-single"]
+
+    def test_unknown_regions_resolve_to_other(self):
+        """Test unknown locations fail high via 'other' with fallback flagged."""
+        other = BIGQUERY_ON_DEMAND_PRICES["other"]
+        unknown = resolve_bigquery_price_per_tb("unknown-future-region")
+        assert unknown.value == other
+        assert unknown.fallback_used is True
+
+    def test_other_fails_high(self):
+        """Test the fallback is never cheaper than a known region."""
+        known = [price for region, price in BIGQUERY_ON_DEMAND_PRICES.items() if region != "other"]
+        assert BIGQUERY_ON_DEMAND_PRICES["other"] >= max(known)
+
+    def test_us_single_regions_match_multi_region(self):
         """Test US single region pricing matches multi-region."""
-        assert get_bigquery_price_per_tb("us-central1") == 5.00
-        assert get_bigquery_price_per_tb("us-east1") == 5.00
+        price_us = resolve_bigquery_price_per_tb("us").value
+        assert resolve_bigquery_price_per_tb("us-central1").value == price_us
+        assert resolve_bigquery_price_per_tb("us-east1").value == price_us
 
-    def test_eu_single_regions(self):
-        """Test EU single region pricing (slight premium)."""
-        assert get_bigquery_price_per_tb("europe-west1") == 5.50
-        assert get_bigquery_price_per_tb("europe-north1") == 5.50
+    def test_eu_asia_single_regions_carry_premium(self):
+        """Test EU/Asia single regions cost more than multi-region."""
+        price_us = resolve_bigquery_price_per_tb("us").value
+        for location in ["europe-west1", "europe-north1", "asia-southeast1", "asia-northeast1"]:
+            assert resolve_bigquery_price_per_tb(location).value > price_us, location
 
-    def test_asia_single_regions(self):
-        """Test Asia single region pricing."""
-        assert get_bigquery_price_per_tb("asia-southeast1") == 5.50
-        assert get_bigquery_price_per_tb("asia-northeast1") == 5.50
+    def test_remote_buckets_carry_premium(self):
+        """Test Australia/South America/Middle East cost at least the US rate."""
+        price_us = resolve_bigquery_price_per_tb("us").value
+        for location in ["australia-southeast1", "southamerica-east1", "me-west1"]:
+            assert resolve_bigquery_price_per_tb(location).value >= price_us, location
 
-    def test_australia_premium_pricing(self):
-        """Test Australia regions have higher pricing."""
-        assert get_bigquery_price_per_tb("australia-southeast1") == 6.00
-
-    def test_south_america_premium_pricing(self):
-        """Test South America regions have higher pricing."""
-        assert get_bigquery_price_per_tb("southamerica-east1") == 6.25
-
-    def test_middle_east_pricing(self):
-        """Test Middle East region pricing."""
-        assert get_bigquery_price_per_tb("me-west1") == 6.00
+    def test_bucket_boundaries(self):
+        """Test remote regions resolve to their captured per-region entries."""
+        assert (
+            resolve_bigquery_price_per_tb("australia-southeast1").value
+            == BIGQUERY_ON_DEMAND_PRICES["australia-southeast1"]
+        )
+        assert (
+            resolve_bigquery_price_per_tb("southamerica-east1").value == BIGQUERY_ON_DEMAND_PRICES["southamerica-east1"]
+        )
+        assert resolve_bigquery_price_per_tb("me-west1").value == BIGQUERY_ON_DEMAND_PRICES["me-west1"]
 
 
 class TestRedshiftRegionalPricing:
     """Tests for Redshift regional pricing variations."""
 
     def test_us_east_1_pricing(self):
-        """Test US East 1 pricing (typically lowest)."""
-        price = get_redshift_node_price("dc2.large", "us-east-1")
-        assert price == 0.25
+        """Test US East 1 pricing routes to its own table cell."""
+        price = resolve_redshift_node_price("dc2.large", "us-east-1").value
+        assert price == REDSHIFT_NODE_PRICES["dc2.large"]["us-east-1"]
 
     def test_different_regions_same_node_type(self):
         """Test that region affects pricing for same node type."""
-        price_us = get_redshift_node_price("ra3.4xlarge", "us-east-1")
-        price_eu = get_redshift_node_price("ra3.4xlarge", "eu-west-1")
+        price_us = resolve_redshift_node_price("ra3.4xlarge", "us-east-1").value
+        price_eu = resolve_redshift_node_price("ra3.4xlarge", "eu-west-1").value
 
         # Prices should be similar but may vary slightly by region
         assert price_us > 0
@@ -269,9 +340,9 @@ class TestRedshiftRegionalPricing:
 
     def test_node_type_variations(self):
         """Test different node types have different pricing."""
-        price_small = get_redshift_node_price("dc2.large", "us-east-1")
-        price_medium = get_redshift_node_price("ra3.xlplus", "us-east-1")
-        price_large = get_redshift_node_price("ra3.16xlarge", "us-east-1")
+        price_small = resolve_redshift_node_price("dc2.large", "us-east-1").value
+        price_medium = resolve_redshift_node_price("ra3.xlplus", "us-east-1").value
+        price_large = resolve_redshift_node_price("ra3.16xlarge", "us-east-1").value
 
         # Larger nodes should cost more
         assert price_small < price_medium < price_large
@@ -308,9 +379,9 @@ class TestRegionalPricingAccuracy:
     def test_regional_pricing_variance_within_tolerance(self):
         """Test that regional pricing stays within ±5% target accuracy."""
         # For Snowflake standard edition on AWS
-        price_us = get_snowflake_credit_price("standard", "aws", "us-east-1")
-        price_eu = get_snowflake_credit_price("standard", "aws", "eu-west-1")
-        price_ap = get_snowflake_credit_price("standard", "aws", "ap-southeast-1")
+        price_us = resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
+        price_eu = resolve_snowflake_credit_price("standard", "aws", "eu-west-1").value
+        price_ap = resolve_snowflake_credit_price("standard", "aws", "ap-southeast-1").value
 
         # EU and AP should be within reasonable premium range
         eu_premium = (price_eu - price_us) / price_us
@@ -325,8 +396,9 @@ class TestRegionalPricingAccuracy:
         tier = _map_region_to_tier("unknown-future-region")
         assert tier == "other"
 
-        # Should still get a price (not crash)
-        price = get_snowflake_credit_price("standard", "aws", "unknown-future-region")
-        assert price > 0
-        # Should be at higher end (other tier)
-        assert price >= 2.70  # 'other' tier pricing
+        # Should still get a price (not crash), routed to the 'other' cell.
+        # The 'other' tier is a designed, deliberately priced bucket, so this
+        # is not a fallback even though the region was unrecognized.
+        resolution = resolve_snowflake_credit_price("standard", "aws", "unknown-future-region")
+        assert resolution.value == SNOWFLAKE_CREDIT_PRICES["standard"]["aws"]["other"]
+        assert resolution.fallback_used is False

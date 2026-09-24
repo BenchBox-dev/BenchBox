@@ -32,7 +32,7 @@ describe("ProvenanceLegend", () => {
     render(<ProvenanceLegend />);
     fireEvent.click(toggle());
     expect(toggle().getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("heading", { name: "Trust label" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Result source" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Funding" })).toBeTruthy();
   });
 
@@ -64,7 +64,7 @@ describe("ProvenanceLegend", () => {
   it("states that funding is orthogonal to trust", () => {
     render(<ProvenanceLegend />);
     fireEvent.click(toggle());
-    expect(screen.getByText(/disclosure, not a trust signal/i)).toBeTruthy();
+    expect(screen.getByText(/Funding does not change how BenchBox reviews or ranks a result/i)).toBeTruthy();
   });
 
   it("lists canonical trust labels without duplicating their alias spellings", () => {

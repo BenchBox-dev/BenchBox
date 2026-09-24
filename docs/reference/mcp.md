@@ -226,6 +226,7 @@ Authenticated remote mode additionally registers:
 | `get_benchmark_status` | durable execution | No | Read owned job state, attempts, cancellation, and timestamps. |
 | `get_benchmark_result` | durable execution | No | Read the owned result after atomic publication. |
 | `cancel_benchmark` | durable execution | Yes | Cancel queued work or request cancellation at the next safe worker boundary. |
+| `get_benchmark_capacity` | durable execution | No | Read queue depth, running capacity, owned usage, and quarantined jobs. |
 
 ### Run Surface Contract
 
@@ -251,6 +252,7 @@ modes remain available because they do not hold the request for execution.
 | `capture_plans` | boolean | No | `false` | Capture query plans where the selected platform supports them. |
 | `dry_run` | boolean | No | `false` | Preview the run plan without executing queries. |
 | `validate_only` | boolean | No | `false` | Validate platform, benchmark, scale, and mode without executing. |
+| `link_probe` | boolean | No | `true` | Measure post-benchmark statement overhead (6 metered `SELECT 1` statements on billable warehouses). Set `false` to skip; equivalent to the CLI `--no-link-probe` flag. |
 | `platform_options` | object or null | No | `null` | Typed, bounded, non-secret settings approved for the selected platform; credentials, endpoints, paths, and package-install controls are rejected. |
 
 **Behavior**
@@ -290,13 +292,6 @@ modes remain available because they do not hold the request for execution.
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
 - Velox `deployment` is not exposed over MCP. Local execution is the only deployment MCP can fully describe; `remote` would require an operator-approved endpoint (`sc://`) and additional packaging/runtime controls that are not part of the MCP allow-list. Both `remote` and `docker` are rejected at admission, so a request can never redirect execution to an endpoint it did not name via a server-owned profile. `docker` is rejected: the `docker/velox/` tree is packaging infrastructure for local development, not a deployment mode with its own lifecycle, endpoint, isolation, and cleanup contract. See the omission ledger below.
-- Modin `engine` accepts only `ray` and `dask` over MCP. The adapter itself also
-  supports `unidist`, which stays documented for CLI and Python-API callers but
-  is deliberately outside the MCP surface while it is experimental. `pandas` is
-  rejected everywhere: it resembles a valid Modin engine name but is not a
-  supported BenchBox backend, and accepting it would create a public contract
-  that fails late. A pre-set `MODIN_ENGINE` still takes precedence, but it is
-  validated against the same reviewed set rather than trusted.
 - DuckDB `threads` is the public option name and maps to the adapter's
   `thread_limit`, which becomes a `SET threads` statement on the connection. The
   public name is unchanged; only the internal mapping is documented here.
@@ -436,9 +431,12 @@ above.
 | `--analyze-plans` | Omitted | not-yet-demanded | Plan-capture detail toggle is a bounded control with no client demand yet; MCP already exposes only `capture_plans`. |
 | `--stats-reset` | Omitted | not-yet-demanded | Statistics rebuild/reset is a bounded measurement control with no client demand yet. |
 | `--concurrency` | Omitted | security-scoped | Concurrent streams are a resource-budget control; MCP must not admit caller-chosen unbounded fan-out. |
+| `--streams` | Omitted | security-scoped | Canonical alias of `--concurrency` on `benchbox run`; same resource-budget control, same omission. |
 | `--ignore-memory-warnings` | Omitted | security-scoped | Skips memory-admission checks. Resource-budget bypasses stay permanently omitted from MCP. |
 | `--funding` | Omitted | not-yet-demanded | Funding metadata is a bounded provenance field with no client demand yet. |
 | `--result-source` | Omitted | not-yet-demanded | Result-source selection is a bounded provenance control with no client demand yet. |
+| `--client-region` | Omitted | not-yet-demanded | Attested client-region metadata is a bounded provenance field with no client demand yet. |
+| `--client-cloud` | Omitted | not-yet-demanded | Attested client-cloud metadata is a bounded provenance field with no client demand yet. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
 ### Discovery Tools

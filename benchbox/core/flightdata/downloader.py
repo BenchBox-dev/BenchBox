@@ -27,6 +27,7 @@ from __future__ import annotations
 import calendar
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import logging
@@ -41,8 +42,14 @@ from typing import Any
 
 import yaml
 
+from benchbox.core.data_fetch.errors import ChecksumMismatchError
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+from benchbox.utils.datagen_manifest import (
+    MANIFEST_FILENAME,
+    DataGenerationManifest,
+    load_manifest,
+    resolve_compression_metadata,
+)
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 logger = logging.getLogger(__name__)
@@ -60,6 +67,7 @@ _FLIGHT_SHARDS = _DOWNLOADER_SPECS["flight_shards"]
 # BTS TranStats On-Time Performance download URL template
 # Format: YEAR_MONTH (e.g., 2023_1 for January 2023)
 BTS_BASE_URL = _DOWNLOADER_SPECS["bts_base_url"]
+BTS_CSV_ENCODING = str(_DOWNLOADER_SPECS["csv_encoding"])
 
 # Data coverage
 FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
@@ -72,6 +80,13 @@ FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
 
 # BTS CSV field names (subset used in BenchBox schema)
 BTS_FIELD_NAMES = _DOWNLOADER_SPECS["bts_field_names"]
+
+# Pinned reproducible source contract: month windows always end here, never at
+# "latest available", so newly published BTS months cannot silently shift data.
+_PINNED_SOURCE = _DOWNLOADER_SPECS.get("pinned_source") or {}
+PINNED_END_YEAR = int(_PINNED_SOURCE.get("end_year", LAST_AVAILABLE_YEAR))
+PINNED_END_MONTH = int(_PINNED_SOURCE.get("end_month", 12))
+PINNED_SOURCE_SHA256 = {str(url): str(digest) for url, digest in (_PINNED_SOURCE.get("sha256") or {}).items()}
 
 
 def _scale_to_months(scale_factor: float) -> int:
@@ -100,18 +115,28 @@ def _scale_to_months(scale_factor: float) -> int:
     return min(months, max_months)
 
 
-def _months_sequence(num_months: int, end_year: int = LAST_AVAILABLE_YEAR) -> list[tuple[int, int]]:
-    """Generate (year, month) pairs working backwards from end_year.
+def _months_sequence(
+    num_months: int,
+    end_year: int = PINNED_END_YEAR,
+    end_month: int = PINNED_END_MONTH,
+) -> list[tuple[int, int]]:
+    """Generate (year, month) pairs working backwards from the pinned end month.
+
+    The default window ends at the pinned source contract (``PINNED_END_YEAR`` /
+    ``PINNED_END_MONTH``), not at latest-available: BTS publishes new months
+    continuously, and ending at "latest" would silently shift every scale
+    factor's dataset. Bumping the pin is an explicit, reviewed change.
 
     Args:
         num_months: Number of months to generate
-        end_year: Last year to include (uses December of this year)
+        end_year: Last year to include
+        end_month: Last month to include within the end year
 
     Returns:
         List of (year, month) tuples, most recent first
     """
     result = []
-    year, month = end_year, 12
+    year, month = end_year, end_month
     for _ in range(num_months):
         result.append((year, month))
         month -= 1
@@ -163,14 +188,44 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self._num_months = _scale_to_months(scale_factor)
         self._months = _months_sequence(self._num_months)
         self._stats: dict[str, Any] = {
+            "source": "bts-transtats",
             "scale_factor": scale_factor,
             "num_months": self._num_months,
+            "months": list(self._months),
             "months_downloaded": 0,
             "months_synthetic": 0,
             "total_flights": 0,
         }
         self._table_row_counts: dict[str, int] = {}
         self._table_file_row_counts: dict[Path, int] = {}
+        # Observed SHA-256 of each ingested BTS zip, persisted with the
+        # manifest so the recorded corpus pins which bytes were ingested.
+        self._content_hashes: dict[str, str] = {}
+
+    def source_provenance(self) -> dict[str, Any]:
+        """Return fail-closed provenance and promotion eligibility for this corpus."""
+        urls = set(self.source_contract()["urls"])
+        expected = {url: PINNED_SOURCE_SHA256[url] for url in urls if url in PINNED_SOURCE_SHA256}
+        observed = {url: self._content_hashes[url] for url in urls if url in self._content_hashes}
+        synthetic_count = int(self._stats["months_synthetic"])
+        downloaded_count = int(self._stats["months_downloaded"])
+        if synthetic_count and downloaded_count:
+            source = "mixed"
+        elif synthetic_count:
+            source = "synthetic"
+        elif downloaded_count:
+            source = "remote"
+        else:
+            source = "unknown"
+        eligible = (
+            bool(urls) and not synthetic_count and set(expected) == urls == set(observed) and expected == observed
+        )
+        return {
+            "source": source,
+            "expected_sha256": expected,
+            "observed_sha256": observed,
+            "promotion_eligible": eligible,
+        }
 
     def download(self) -> dict[str, Path | list[Path]]:
         """Download or generate flight data and reference tables.
@@ -179,6 +234,24 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             Dictionary mapping table names to local CSV file paths
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Reject a stale or unverifiable cache: without this, an upgraded
+        # installation silently reuses the previous corpus because the output
+        # file names are unchanged.
+        if not self.force_redownload:
+            persisted_id = self._persisted_source_contract_id()
+            if persisted_id is None:
+                self.force_redownload = True
+            elif persisted_id != self.source_contract_id():
+                logger.warning(
+                    "Existing flightdata corpus was generated under a different source contract "
+                    "(%s...); regenerating for the current pin (%s...).",
+                    persisted_id[:12],
+                    self.source_contract_id()[:12],
+                )
+                self.force_redownload = True
+            else:
+                self._restore_persisted_provenance()
 
         flights_path = self.output_dir / self.get_compressed_filename("flights.csv")
         airlines_path = self.output_dir / self.get_compressed_filename("airlines.csv")
@@ -196,7 +269,14 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         if airports_path.exists() and airports_path not in self._table_file_row_counts:
             self._record_existing_csv_file("airports", airports_path)
 
-        flight_files = self._ensure_flights_data(flights_path)
+        try:
+            flight_files = self._ensure_flights_data(flights_path)
+        except ChecksumMismatchError:
+            self.force_redownload = True
+            self._remove_flights_outputs(flights_path)
+            with contextlib.suppress(OSError):
+                (self.output_dir / MANIFEST_FILENAME).unlink()
+            raise
 
         table_files = {
             "flights": flight_files,
@@ -206,6 +286,59 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         if self._table_file_row_counts:
             self._write_manifest(table_files)
         return table_files
+
+    def backfill_csv_dialect_metadata(self) -> bool:
+        """Patch empty-means-NULL dialect metadata into a reused manifest.
+
+        Caches generated before the null-marker fix carry manifests whose
+        entries lack ``csv_null_marker`` (or record ``None``), so SQL loaders
+        would keep loading empty fields as ``""`` even though current
+        generations write ``""``. The runner reuses a structurally valid
+        manifest without regenerating, so heal it in place: set the marker to
+        ``""`` on this benchmark's own csv entries and rewrite the file.
+        Returns True when the manifest was changed.
+        """
+        manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, ValueError):
+            return False
+        if str(manifest.get("benchmark", "")).lower() != "flightdata":
+            return False
+        changed = False
+        tables = manifest.get("tables", {}) or {}
+        for formats in tables.values():
+            if not isinstance(formats, dict):
+                continue
+            inner = formats.get("formats")
+            if not isinstance(inner, dict):
+                continue
+            for format_name, entries in inner.items():
+                if format_name != "csv" or not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    metadata = entry.get("metadata")
+                    if not isinstance(metadata, dict):
+                        continue
+                    if metadata.get("csv_null_marker") != "":
+                        metadata["csv_null_marker"] = ""
+                        changed = True
+        if not changed:
+            return False
+        # Rewrite atomically so an interrupted heal cannot leave an invalid
+        # manifest behind (the next run would then regenerate the data), keep
+        # the trailing newline DataGenerationManifest.write emits, and never
+        # fail a run over a read-only cache: the data itself is still usable.
+        try:
+            tmp_path = manifest_path.with_name(manifest_path.name + ".tmp")
+            tmp_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+            tmp_path.replace(manifest_path)
+        except OSError:
+            logger.warning("Could not heal CSV dialect metadata in %s; continuing", manifest_path)
+            return False
+        return True
 
     def repair_reusable_layout(self) -> dict[str, Path | list[Path]] | None:
         """Repair a reusable FlightData cache when its source layout is loader-hostile.
@@ -585,11 +718,23 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             parallel=1,
             seed=self.seed,
             formats=["csv"],
+            extra_metadata={
+                "source_contract": self.source_contract(),
+                "source_contract_id": self.source_contract_id(),
+                # Observed SHA-256 of each ingested BTS zip: pins which bytes
+                # the corpus came from (a provider-side byte change surfaces
+                # as a new manifest on the next fresh generation).
+                "content_hashes": dict(self._content_hashes),
+                "source_provenance": self.source_provenance(),
+            },
         )
         metadata = {
             "csv_delimiter": ",",
             "csv_has_header": True,
-            "csv_null_marker": None,
+            # Empty fields in the generated CSVs encode NULL (the writers emit ""
+            # for missing delays/times), so the manifest must request empty->NULL
+            # conversion. None would disable conversion and load blanks as "".
+            "csv_null_marker": "",
         }
         for table_name, paths_or_path in table_files.items():
             paths = paths_or_path if isinstance(paths_or_path, list) else [paths_or_path]
@@ -618,6 +763,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         # For small scale factors (SF < 0.1), always use synthetic to avoid
         # network calls in CI/testing. Users wanting real data should use SF >= 0.1.
         if self.scale_factor < 0.1:
+            self._stats["months_synthetic"] += 1
             return self._generate_synthetic_month(writer, year, month, start_id)
 
         url = BTS_BASE_URL.format(year=year, month=month)
@@ -651,7 +797,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         )
         with urllib.request.urlopen(req, timeout=120) as response:
             zip_bytes = response.read()
-
+        actual_sha256 = hashlib.sha256(zip_bytes).hexdigest()
+        expected_sha256 = PINNED_SOURCE_SHA256.get(url)
+        if expected_sha256 is not None and actual_sha256 != expected_sha256:
+            raise ChecksumMismatchError(path=url, expected_sha256=expected_sha256, actual_sha256=actual_sha256)
         rows_written = 0
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             # Find the CSV file inside the ZIP
@@ -660,7 +809,10 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                 raise ValueError(f"No CSV found in ZIP from {url}")
 
             with zf.open(csv_names[0]) as csv_file:
-                reader = csv.DictReader(io.TextIOWrapper(csv_file, encoding="utf-8"))
+                # Historical BTS exports are Windows-1252 CSVs. Using their
+                # declared legacy encoding preserves bytes such as the 0xE4 in
+                # February 2002 tail numbers without lossy replacement.
+                reader = csv.DictReader(io.TextIOWrapper(csv_file, encoding=BTS_CSV_ENCODING))
 
                 for bts_row in reader:
                     row = self._transform_bts_row(bts_row, start_id + rows_written)
@@ -668,6 +820,7 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
                         writer.writerow(row)
                         rows_written += 1
 
+        self._content_hashes[url] = actual_sha256
         return rows_written
 
     def _transform_bts_row(self, bts: dict[str, str], flight_id: int) -> list[Any] | None:
@@ -952,6 +1105,62 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         """Get the number of months of data to process."""
         return self._num_months
 
+    def source_contract(self) -> dict[str, Any]:
+        """Pinned reproducible source contract for the configured window.
+
+        Returns the exact remote file set this downloader will read, so runs
+        record which source snapshot they came from and reviewers can see a
+        source change as a contract change.
+        """
+        return {
+            "source": "bts-transtats",
+            "base_url": BTS_BASE_URL,
+            "csv_encoding": BTS_CSV_ENCODING,
+            "months": list(self._months),
+            "urls": [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months],
+            "expected_sha256": {
+                url: PINNED_SOURCE_SHA256[url]
+                for url in [BTS_BASE_URL.format(year=year, month=month) for year, month in self._months]
+                if url in PINNED_SOURCE_SHA256
+            },
+        }
+
+    def source_contract_id(self) -> str:
+        """Stable identifier for :meth:`source_contract`.
+
+        Persisted in the generation manifest so a later pin change rejects
+        the stale cache instead of silently reusing the previous corpus.
+        """
+        canonical = json.dumps(self.source_contract(), sort_keys=True, default=str)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def _persisted_source_contract_id(self) -> str | None:
+        """Return the contract id recorded in the existing manifest, if any."""
+        manifest_path = Path(self.output_dir) / MANIFEST_FILENAME
+        try:
+            manifest = load_manifest(manifest_path)
+        except (OSError, ValueError):
+            return None
+        contract_id = manifest.get("source_contract_id")
+        return contract_id if isinstance(contract_id, str) else None
+
+    def _restore_persisted_provenance(self) -> None:
+        """Restore evidence needed to classify a reused verified corpus."""
+        try:
+            manifest = load_manifest(Path(self.output_dir) / MANIFEST_FILENAME)
+        except (OSError, ValueError):
+            return
+        hashes = manifest.get("content_hashes")
+        if isinstance(hashes, dict):
+            self._content_hashes = {str(url): str(digest) for url, digest in hashes.items()}
+        provenance = manifest.get("source_provenance")
+        if isinstance(provenance, dict):
+            source = provenance.get("source")
+            if source in {"synthetic", "mixed"}:
+                self._stats["months_synthetic"] = self._num_months
+            if source in {"remote", "mixed"}:
+                self._stats["months_downloaded"] = len(self._content_hashes)
+
     def get_download_stats(self) -> dict[str, Any]:
         """Return statistics about the download operation."""
-        return dict(self._stats)
+        return {**self._stats, "source_provenance": self.source_provenance()}

@@ -125,6 +125,32 @@ stage timing are only available from the executed `QueryJob`), so it sets
 `plan_capture_phase_eligible = False` and harvests its plan from the completed job rather than
 through the isolated phase. `analyze_plans` is a no-op for it.
 
+#### Side-effect engines: classification and policy
+
+Engines are classified by one test: can a standalone `EXPLAIN` reproduce the plan
+(isolatable), or is the plan only available as a side effect of the executed
+query (side-effect-only)?
+
+| Engine | Class | Reason |
+|---|---|---|
+| BigQuery | Side-effect-only (the one exception) | No `EXPLAIN`; plan/stage timing live on the executed `QueryJob` |
+| Snowflake | Isolatable (`EXPLAIN USING JSON`) | Standalone plan, no loss |
+| Spark / Databricks | Isolatable (`EXPLAIN EXTENDED`) | Standalone static plan, no loss |
+| Azure Synapse | Isolatable (`EXPLAIN` XML) | Standalone plan, no loss |
+| Firebolt | Isolatable (`EXPLAIN`) | Standalone plan, no loss |
+| Fabric Warehouse | Isolatable (`EXPLAIN`) | Standalone plan, no loss |
+| Lakesail | Isolatable (`EXPLAIN EXTENDED`) | Standalone static plan, no loss |
+
+Policy decision: **option B (harvest from the measured job)** for BigQuery, carved
+out narrowly and explicitly. A dry-run/estimated-only capture (option A) would lose
+actual-execution detail, and a real re-run would cost bytes (money) and duplicate
+the measured query, so capture reads the already-executed job's `query_plan` via
+`_capture_bq_plan` with `BigQueryQueryPlanParser` — no second paid execution.
+`get_query_plan()` returns `None` per the `str | None` base contract, so generic
+`capture_query_plan` degrades to `explain_failed` instead of crashing. The
+exception must not justify inline capture for any EXPLAIN-based engine: those keep
+exactly one (isolated) capture path.
+
 #### Mid-run data mutation: capture before the mutation
 
 The isolated `EXPLAIN` pass runs *after* the timed loop, so for a **read-only** workload it sees the
@@ -730,9 +756,9 @@ The comparison engine uses:
 
 ## Further Reading
 
-- [API Documentation](../api/query-plan-models.md) - Programmatic usage
+- [Query Plans CLI Reference](../reference/cli/query-plans.md) - Programmatic usage
 - [Platform Guide](../platforms/) - Platform-specific details
-- [TPC-H Benchmark Guide](../benchmarks/tpch.md) - Query plan analysis examples
+- [TPC-H Benchmark Guide](../benchmarks/tpc-h.md) - Query plan analysis examples
 
 ## Support
 

@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf01_datafusion_sql_20260824_082755_adcfb35e.json",
+  "bundle_hash": "b0cda7621d7ad68e4a4251088f9a64cf9cd6a0ba54d904513c2fb596958fc72d",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

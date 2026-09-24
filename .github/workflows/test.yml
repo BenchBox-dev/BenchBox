@@ -18,15 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -48,12 +48,12 @@ jobs:
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -69,27 +69,29 @@ jobs:
         # validation is covered by nightly/manual workflows.
         include:
           - os: ubuntu-latest
-            python-version: '3.10'
+            python-version: '3.11'
           - os: ubuntu-latest
             python-version: '3.13'
+          - os: ubuntu-latest
+            python-version: '3.14'
           - os: macos-latest
             python-version: '3.12'
           - os: windows-latest
             python-version: '3.12'
           - os: windows-latest
-            python-version: '3.10'
+            python-version: '3.11'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Create virtual environment
         run: uv venv
@@ -111,7 +113,7 @@ jobs:
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
   # Check for unsafe patch() string paths in test files.
   # Catches the pattern patch("benchbox.cli.commands.<module>.<attr>") where
@@ -122,10 +124,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
@@ -141,21 +143,18 @@ jobs:
     env:
       # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
       # Keep empty unless triage is documented in the TODO item.
-      # PYSEC-2026-87 (lxml): redshift-connector==2.1.13 pins lxml<=6.0.2, so
-      # the fixed lxml 6.1.0 can't be resolved until upstream relaxes that
-      # bound. See tracker item `lxml-cve-pysec-2026-87-blocked-by-redshift-connector`.
-      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-87"
+      PIP_AUDIT_IGNORE_VULNS: ""
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -185,15 +184,15 @@ jobs:
             python-version: '3.12'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -213,15 +212,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -238,15 +237,15 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'release')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -263,15 +262,15 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.base_ref == 'release')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -297,15 +296,15 @@ jobs:
             python-version: '3.12'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Build package
         run: |
@@ -333,7 +332,7 @@ jobs:
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-build-dist-${{ matrix.os }}
           path: dist/
@@ -345,15 +344,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |
@@ -379,8 +378,8 @@ jobs:
             .gemini \
             .pre-commit-config.yaml \
             todo.config.yaml \
-            skill-sync.yaml \
-            skill-sync.lock \
+            skill-sync.conf \
+            tools/skill-sync \
             .coveragerc_core \
             .dockerignore \
             .env.example \
@@ -427,7 +426,7 @@ jobs:
 
       - name: Upload dependency bounds report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: release-pr-dependency-bounds
           path: release-artifacts/dependency-bounds.md
@@ -479,7 +478,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Detect results explorer
         id: explorer
@@ -494,17 +493,17 @@ jobs:
 
       - name: Set up Python
         if: steps.explorer.outputs.present == 'true'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
         if: steps.explorer.outputs.present == 'true'
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Set up Node.js
         if: steps.explorer.outputs.present == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '20'
 
@@ -534,21 +533,21 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: |

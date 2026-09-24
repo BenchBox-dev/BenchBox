@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date, datetime, timedelta
 from typing import Any, Callable
 
 import pandas as pd
@@ -107,6 +108,65 @@ class SQLETLBackend:
         """Insert new SCD2 rows through normal table load path."""
         return {"success": True, "rows_affected": self._load_table_dataframe(table_name, dataframe)}
 
+    def load_customer_scd2_batch(self, dataframe: pd.DataFrame, *, batch_type: str) -> dict[str, Any]:
+        """Atomically expire and replace current customer rows for one source batch."""
+        self.create_schema()
+        customers = dataframe.copy()
+        # Run BEGIN, the writes and COMMIT on one handle. DuckDB's cursor() opens
+        # a separate connection whose transaction the parent's commit never covers.
+        cursor = self.connection
+        if not hasattr(cursor, "execute") and hasattr(cursor, "cursor"):
+            cursor = cursor.cursor()
+        try:
+            cursor.execute("BEGIN")
+            current_max_sk, current_max_batch, latest_effective = cursor.execute(
+                'SELECT COALESCE(MAX("SK_CustomerID"), 0), COALESCE(MAX("BatchID"), 0), MAX("EffectiveDate") '
+                'FROM "DimCustomer"'
+            ).fetchone()
+            effective_date = self._next_effective_date(latest_effective, customers["EffectiveDate"].iloc[0])
+            batch_id = int(current_max_batch) + 1
+            initial_sk = {"historical": 1, "incremental": 1_000_001, "scd": 2_000_001}.get(batch_type, 1)
+            first_sk = max(int(current_max_sk) + 1, initial_sk)
+            customers["SK_CustomerID"] = range(first_sk, first_sk + len(customers))
+            customers["BatchID"] = batch_id
+            customers["IsCurrent"] = True
+            customers["EffectiveDate"] = effective_date.isoformat()
+            customers["EndDate"] = "9999-12-31"
+
+            if batch_type in {"incremental", "scd"}:
+                business_keys = customers["CustomerID"].drop_duplicates().tolist()
+                placeholders = ", ".join("?" for _ in business_keys)
+                cursor.execute(
+                    'UPDATE "DimCustomer" SET "IsCurrent" = ?, "EndDate" = ? '
+                    f'WHERE "IsCurrent" = ? AND "CustomerID" IN ({placeholders})',
+                    (False, (effective_date - timedelta(days=1)).isoformat(), True, *business_keys),
+                )
+
+            self._insert_table_dataframe(cursor, "DimCustomer", customers)
+            if hasattr(self.connection, "commit"):
+                self.connection.commit()
+            return {"success": True, "rows_affected": len(customers)}
+        except Exception:
+            if hasattr(self.connection, "rollback"):
+                self.connection.rollback()
+            raise
+
+    @staticmethod
+    def _next_effective_date(latest_effective: Any, source_effective: Any) -> date:
+        """Return the first day after the latest durable customer version."""
+        if latest_effective is None:
+            latest_effective = source_effective
+            if isinstance(latest_effective, datetime):
+                return latest_effective.date()
+            if isinstance(latest_effective, date):
+                return latest_effective
+            return date.fromisoformat(str(latest_effective)[:10])
+        if isinstance(latest_effective, datetime):
+            latest_effective = latest_effective.date()
+        if isinstance(latest_effective, date):
+            return latest_effective + timedelta(days=1)
+        return date.fromisoformat(str(latest_effective)[:10]) + timedelta(days=1)
+
     def read_current_dimension(self, table_name: str) -> pd.DataFrame | None:
         """Read current dimension rows when IsCurrent column exists."""
         try:
@@ -128,27 +188,35 @@ class SQLETLBackend:
         headers = dataframe.columns.tolist()
         if not headers:
             return 0
-        validated_headers = [self._validate_column_name(validated_table, str(header)) for header in headers]
 
-        placeholders = ",".join(["?" for _ in validated_headers])
-        quoted_columns = ",".join(self._quote_identifier(column) for column in validated_headers)
-        insert_sql = f"INSERT INTO {self._quote_identifier(validated_table)} ({quoted_columns}) VALUES ({placeholders})"
-
-        loaded = 0
-        batch_size = 1000
-        for start_idx in range(0, len(dataframe), batch_size):
-            batch_df = dataframe.iloc[start_idx : start_idx + batch_size]
-            batch_rows = [tuple(row) for row in batch_df.values]
-            if hasattr(self.connection, "executemany"):
-                self.connection.executemany(insert_sql, batch_rows)
-            else:
-                cursor = self.connection.cursor()
-                for record in batch_rows:
-                    cursor.execute(insert_sql, record)
-            loaded += len(batch_rows)
+        cursor = self.connection
+        if not hasattr(cursor, "executemany") and hasattr(cursor, "cursor"):
+            cursor = cursor.cursor()
+        loaded = self._insert_table_dataframe(cursor, validated_table, dataframe)
 
         if hasattr(self.connection, "commit"):
             self.connection.commit()
+        return loaded
+
+    def _insert_table_dataframe(self, cursor: Any, table_name: str, dataframe: pd.DataFrame) -> int:
+        """Insert a DataFrame through an existing transaction cursor."""
+        validated_table = self._validate_table_name(table_name)
+        headers = dataframe.columns.tolist()
+        if not headers:
+            return 0
+        validated_headers = [self._validate_column_name(validated_table, str(header)) for header in headers]
+        placeholders = ",".join("?" for _ in validated_headers)
+        quoted_columns = ",".join(self._quote_identifier(column) for column in validated_headers)
+        insert_sql = f"INSERT INTO {self._quote_identifier(validated_table)} ({quoted_columns}) VALUES ({placeholders})"
+        loaded = 0
+        for start_idx in range(0, len(dataframe), 1000):
+            batch_rows = [tuple(row) for row in dataframe.iloc[start_idx : start_idx + 1000].values]
+            if hasattr(cursor, "executemany"):
+                cursor.executemany(insert_sql, batch_rows)
+            else:
+                for record in batch_rows:
+                    cursor.execute(insert_sql, record)
+            loaded += len(batch_rows)
         return loaded
 
     @staticmethod

@@ -42,7 +42,6 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | **PySpark**    | `pyspark-df`    | Available | Expression | Apache Spark DataFrame API (distributed)               | `uv add benchbox --extra pyspark`    |
 | **DataFusion** | `datafusion-df` | Available | Expression | Arrow-native query engine                              | `uv add benchbox --extra datafusion` |
 | **LakeSail**   | `lakesail-df`   | Available | Expression | Rust/DataFusion Spark replacement via Spark Connect    | `uv add benchbox --extra lakesail`   |
-| Modin          | `modin-df`      | Available | Pandas     | Distributed Pandas replacement                         | `uv add benchbox --extra modin`      |
 | Dask           | `dask-df`       | Available | Pandas     | Parallel computing DataFrames                          | `uv add benchbox --extra dask`       |
 | cuDF           | `cudf-df`       | Available | Pandas     | NVIDIA GPU-accelerated DataFrames                      | `uv add benchbox --extra cudf`       |
 
@@ -96,11 +95,11 @@ benchbox platforms status databricks
 
 **Check local provisioning readiness before a run:**
 ```bash
-benchbox platforms check clickhouse-server trino lakesail-df modin-df
+benchbox platforms check clickhouse-server trino lakesail-df dask-df
 benchbox platforms status lakesail-df
 ```
 
-The readiness check reports unreachable local service ports, LakeSail Spark Connect endpoints, and missing Modin
+The readiness check reports unreachable local service ports and LakeSail Spark Connect endpoints
 backend packages as environment readiness gaps. It does not start services, initialize Ray/Dask, or mutate benchmark
 databases.
 

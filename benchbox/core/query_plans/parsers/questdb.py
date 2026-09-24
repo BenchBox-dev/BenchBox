@@ -86,6 +86,9 @@ class QuestDBQueryPlanParser(QueryPlanParser):
     def __init__(self):
         super().__init__("questdb")
 
+    # Error-channel cleanup: EXPLAIN-failure producers now return None (capture
+    # records explain_failed), so these prefixes should no longer arrive here.
+    # Both stay rejected as defense so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")

@@ -58,6 +58,9 @@ the lowercase SHA-256 digest of its exact bearer value.
   },
   "jobs": {
     "queue_limit": 32,
+    "max_queued_per_principal": 8,
+    "max_running": 8,
+    "max_running_per_principal": 2,
     "lease_seconds": 60,
     "poll_seconds": 0.25,
     "max_attempts": 2,
@@ -195,18 +198,51 @@ to `start_benchmark`. Local stdio clients retain the complete synchronous
 
 Jobs are persisted in `state_db` and owned by the stable authenticated
 principal, never by an MCP session. Every worker uses transactional claims and
-renewable leases. An expired running lease is requeued within `max_attempts`;
-an expired publishing lease is completed only when the final response artifact
-already exists, otherwise it follows the retry policy. A repeated
-`idempotency_key` returns the original job only when its request is identical.
+renewable leases. A lease is retried only when the old attempt is proven
+quiescent: the owner reported its own failure after that attempt finished,
+the publication commit point already holds the final response artifact (an
+expired publishing lease then completes against that artifact). Cancellation
+and an exhausted attempt budget prove nothing about termination. Otherwise
+the old attempt may still be executing database work, so recovery records the
+terminal `unknown` outcome instead of requeueing: the job is never claimed
+again, and the operator must inspect the target before resubmitting with a new
+idempotency key. A repeated `idempotency_key` returns the original job only
+when its request is identical.
 
-Cancellation is immediate while queued and cooperative while running. Once a
-worker enters the publishing transition, publication is the commit point and
-cancellation is too late. The worker writes the response and result bundle to a
+Cancellation reports `accepted` while queued, `requested` while running (the
+attempt stops at the next safe boundary), and `too_late` once publication has
+committed or the job is otherwise terminal. Once a worker enters the
+publishing transition, publication is the commit point and cancellation is too
+late.
+
+Durable admission bounds queued depth and running capacity separately, across
+every worker process and restart. Submission is refused past `queue_limit`
+queued jobs globally or `max_queued_per_principal` for the caller, so one
+tenant cannot fill the queue. An owned attempt that requests a retry must pass
+the same queued limits transactionally; otherwise it terminates with
+`retry_queue_full`. Claiming is refused past `max_running`
+outstanding attempts globally or `max_running_per_principal` for the job's
+owner, where outstanding means leased attempts plus `unknown` work whose
+lease was lost without proof of termination. A lost lease therefore keeps
+holding database capacity: no replacement attempt is admitted until a fenced
+transition proves quiescence. When the displaced executor returns, its worker
+records a separate durable attestation; only then does the unknown job release
+capacity. Retention never deletes an unquiesced row, even after its result
+artifacts expire. A serialized execution result that reports outstanding
+streams is quarantined as `unknown` with `outstanding_work`; executor return is
+not treated as quiescence for that job. Claims use database-owned monotonic
+sequences to serve the least-recently-served principal with queued work first
+and the oldest queued job within each principal. Host clock rollback cannot
+change fairness or FIFO order. `get_benchmark_capacity` reports global row counts,
+the caller's own usage, and the caller's quarantined jobs with the reason each
+still holds capacity; it never exposes another tenant's jobs.
+
+The worker writes the response and result bundle to a
 tenant-owned staging directory, flushes it, atomically renames it to the final
 job directory, and only then records `completed`. This prevents a completed
 status from preceding its durable artifact. Terminal metadata and its owned
-artifact are removed after `retention_seconds`.
+artifact are removed after `retention_seconds`, except that an unquiesced
+`unknown` row is retained as a capacity fence.
 
 ## Deferred post-release deployment
 

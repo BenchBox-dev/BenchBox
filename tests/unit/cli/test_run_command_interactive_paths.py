@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from click.testing import CliRunner
+from rich.panel import Panel
 
 from benchbox.cli.commands.run import run
 from benchbox.cli.tuning_runtime import build_baseline_unified_config
@@ -99,7 +100,9 @@ def test_interactive_header_shown_for_prompted_tty_run():
     ):
         _run_module._derive_exec_type_and_banner(state)
 
-    mock_console.print.assert_called_once()
+    printed = [call.args[0] for call in mock_console.print.call_args_list]
+    assert isinstance(printed[-1], Panel)
+    assert sum(isinstance(item, Panel) for item in printed) == 1
 
 
 def test_interactive_cloud_setup_leaves_server_credentials_to_adapter():
@@ -1315,6 +1318,30 @@ class TestRunCommandValidation:
             )
         # Should NOT show scale factor error
         assert "not TPC-compliant" not in result.output
+
+    @pytest.mark.parametrize("benchmark_name", ["tpcds", "tpc-ds", "tpc_ds"])
+    def test_tpcds_official_mode_rejects_tpch_only_scale_factor(self, benchmark_name):
+        """TPC-DS must reject SF 30 before executing an unsubmittable run."""
+        runner = CliRunner()
+        with _non_interactive_base_patches():
+            result = runner.invoke(
+                run,
+                [
+                    "--official",
+                    "--scale",
+                    "30",
+                    "--platform",
+                    "duckdb",
+                    "--benchmark",
+                    benchmark_name,
+                    "--non-interactive",
+                ],
+                obj=_run_obj(),
+            )
+
+        assert result.exit_code != 0
+        assert "Scale factor 30.0 is not TPC-compliant" in result.output
+        assert "30.0" not in result.output.split("Allowed scale factors:", 1)[-1]
 
     def test_invalid_phases_rejected(self):
         runner = CliRunner()

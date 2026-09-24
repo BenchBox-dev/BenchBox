@@ -1,3 +1,4 @@
+import { RunDateChip } from "@/components/RunAge";
 import type { JSX } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { route } from "preact-router";
@@ -14,8 +15,10 @@ import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
+import { parseOverrideRules } from "@/lib/displayLabels";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
+import { formatRunAge } from "@/lib/runAge";
 import {
   EXPLORER_PERFORMANCE_MARKS,
   EXPLORER_PERFORMANCE_MEASURES,
@@ -30,6 +33,8 @@ interface MetaResultMetadata {
   trust_label: string;
   funding?: string | null;
   validation_status?: string | null;
+  /** Accepted-override rule ids (canonical JSON array string). Optional for callers predating v11. */
+  override_rules?: string | null;
   run_date?: string | null;
 }
 
@@ -50,7 +55,7 @@ type MetaLeaderboardCellState =
 const MODE_LABELS: Record<MetaLeaderboardMode, string> = {
   times: "Times",
   ranks: "Ranks",
-  speedup: "Speedup",
+  speedup: "Relative to best",
 };
 const AVG_RANK_LABEL = "Avg rank over covered rankings";
 const COVERAGE_POLICY_COPY = "Missing rankings are not scored; coverage is shown separately.";
@@ -67,7 +72,8 @@ const SORT_TITLES: Record<MetaLeaderboardSort, string> = {
   recent_activity: "Sort by the most recent visible run date.",
 };
 const MISSING_COHORT_TITLE = `No published run for this ranking. ${COVERAGE_POLICY_COPY}`;
-const PLATFORM_RENDER_LIMIT = 200;
+// Keep the initial ranking readable; further rows remain explicitly reachable.
+const PLATFORM_RENDER_LIMIT = 25;
 const PLATFORM_RENDER_INCREMENT = 200;
 
 export function MetaLeaderboard({
@@ -158,6 +164,8 @@ export function MetaLeaderboard({
   if (platforms.length === 0 || cohorts.length === 0) return null;
 
   function handleCellKey(event: KeyboardEvent, rowIdx: number, colIdx: number) {
+    // Nested links and date buttons keep their own keyboard behavior.
+    if (event.target !== event.currentTarget) return;
     let nextRow = rowIdx;
     let nextCol = colIdx;
     switch (event.key) {
@@ -222,20 +230,21 @@ export function MetaLeaderboard({
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="meta-leaderboard-title" class="text-xl font-semibold text-[var(--bb-data-fg-primary)]">
-            Cross-Benchmark Leaderboard
+            Cross-benchmark rankings
           </h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Absolute values, ranks, or speedup-vs-best across the visible rankings.
+            Compare measured values, ranks, or each result relative to the best result in its ranking.
           </p>
         </div>
         <div
           role="group"
-          class="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2"
+          class="flex min-w-0 max-w-full flex-wrap items-center gap-3 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2"
           aria-label="Leaderboard display controls"
         >
-          <div class="flex items-center gap-2">
+          <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Sort</span>
             <SegmentedControl
+              class="max-w-full flex-wrap"
               ariaLabel="Sort leaderboard"
               value={sortKey}
               onChange={setSortKey}
@@ -247,9 +256,10 @@ export function MetaLeaderboard({
               }))}
             />
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex min-w-0 max-w-full flex-wrap items-center gap-2">
             <span class="text-[11px] font-semibold uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">Mode</span>
             <SegmentedControl
+              class="max-w-full flex-wrap"
               ariaLabel="Display mode"
               value={mode}
               onChange={onModeChange}
@@ -258,10 +268,10 @@ export function MetaLeaderboard({
                 {
                   value: "times",
                   label: "Times",
-                  title: "Native metric values per ranking (lower is better for latency; higher is better for power)",
+                  title: "Measured values for each ranking. Lower latency is better; a higher power score is better.",
                 },
                 { value: "ranks", label: "Ranks", title: "Rank within each ranking (1 is best)" },
-                { value: "speedup", label: "Speedup", title: "Relative to ranking best (1.00x is best; below 1.00x is worse)" },
+                { value: "speedup", label: "Relative to best", title: "1.00× is the best result in each ranking. Lower values are worse." },
               ]}
             />
           </div>
@@ -280,13 +290,16 @@ export function MetaLeaderboard({
           {mode === "times" && "Heat: darker = worse within each ranking. "}
           {mode === "ranks" && "Heat: darker = a worse rank within each ranking. "}
           {mode === "speedup" &&
-            "Heat: darker = farther from the ranking best (1.00x). Values below 1.00x are worse than the ranking best. "}
-          <span class="italic">No run</span> = no published evidence. <span class="font-medium">Excluded</span> or{" "}
-          <span class="font-medium">Unranked</span> = published evidence that is not scored.
+            "Heat: darker = farther from the best result (1.00×). Values below 1.00× are worse. "}
+          <span class="italic">No run</span> means no result is published. <span class="font-medium">Excluded</span> or{" "}
+          <span class="font-medium">Unranked</span> means the result is published but not scored.
         </p>
       </div>
 
-      <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
+      <div
+        class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+        style="contain: paint"
+      >
         <TableScrollHint
           scrollerRef={scrollContainerRef}
           testId="meta-leaderboard-scroll-hint"
@@ -304,6 +317,7 @@ export function MetaLeaderboard({
           >
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr role="row">
+                {/* Keep row labels visible while timing columns scroll. */}
                 <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)] py-2">
                   Platform
                 </th>
@@ -326,7 +340,7 @@ export function MetaLeaderboard({
                       >
                         <span class="font-semibold text-[var(--bb-data-fg-primary)]">{cohort.label}</span>
                         <span class="text-[10px] font-normal normal-case tracking-normal text-[var(--bb-data-fg-subtle)]">
-                          {cohortMetricSublabel(cohort, mode)}
+                          {cohortMetricSublabel(cohort)}
                         </span>
                         {allExcludedReason && (
                           <span
@@ -384,12 +398,14 @@ export function MetaLeaderboard({
                     const hue = shadeMetric !== null ? colorForCell(shadeMetric, minInCol) : null;
                     const lightness = shadeMetric !== null ? lightnessForCell(shadeMetric, minInCol) : null;
                     const active = focusPos.row === rowIdx && focusPos.col === colIdx;
-                    const text = describeCell(platform, cohort, cellState, mode);
-                    const title = cellTitle(platform, cohort, cellState, mode);
                     const receiptState = cellState.kind !== "missing" ? cellState : null;
                     const metadata = receiptState?.result
                       ? resultMetadataById?.get(receiptState.result.result_id)
                       : undefined;
+                    const runAge = formatRunAge(metadata?.run_date);
+                    const runAgeLabel = runAge ?? (metadata ? "not recorded" : null);
+                    const text = describeCell(platform, cohort, cellState, mode, runAgeLabel);
+                    const title = cellTitle(platform, cohort, cellState, mode, runAgeLabel);
                     const receiptHref = receiptState?.result
                       ? `/results/r/${receiptState.result.result_id}#run-receipt`
                       : null;
@@ -434,20 +450,42 @@ export function MetaLeaderboard({
                             }
                             class="font-mono no-underline hover:text-[var(--bb-accent-hover)]"
                             onClick={(event) => event.stopPropagation()}
-                            title={receiptLinkTitle(receiptState, cohort)}
+                            title={receiptLinkTitle(receiptState, cohort, runAgeLabel)}
                           >
                             {renderCellValue(cellState, cohort, mode)}
                           </a>
                         ) : (
                           renderCellValue(cellState, cohort, mode)
                         )}
-                        {metadata && cellState.kind === "ranked" && (
+                        {metadata && cellState.kind !== "missing" && (
+                          <div class="mt-0.5 text-[10px] font-normal text-[var(--bb-data-fg-muted)]">
+                            <RunDateChip runDate={metadata.run_date} />
+                          </div>
+                        )}
+                        {metadata && cellState.kind !== "missing" && (
                           <div class="mt-0.5 flex flex-wrap justify-center gap-1">
-                            <TrustBadge trustLabel={metadata.trust_label} compact />
-                            <FundingChip funding={metadata.funding} compact />
-                            {metadata.validation_status?.trim().toLowerCase() !== "passed" && (
-                              <ValidationBadge validationStatus={metadata.validation_status} showMissing />
+                            {cellState.kind === "ranked" && (
+                              <>
+                                <TrustBadge trustLabel={metadata.trust_label} compact />
+                                <FundingChip funding={metadata.funding} compact />
+                              </>
                             )}
+                            {(() => {
+                              // An accepted override always badges — even when
+                              // the recorded status is a clean "passed", which
+                              // otherwise hides the badge on this surface.
+                              const overrideRules = parseOverrideRules(metadata.override_rules);
+                              const isCleanPass =
+                                metadata.validation_status?.trim().toLowerCase() === "passed";
+                              if (isCleanPass && overrideRules.length === 0) return null;
+                              return (
+                                <ValidationBadge
+                                  validationStatus={metadata.validation_status}
+                                  overrideRules={overrideRules}
+                                  showMissing
+                                />
+                              );
+                            })()}
                           </div>
                         )}
                       </td>
@@ -516,8 +554,7 @@ export function MetaLeaderboard({
             ranking. {COVERAGE_POLICY_COPY}
           </p>
           <p>
-            <strong>Speedup</strong> normalizes every cell to the ranking best, where 1.00x is
-            best-in-ranking and smaller values are worse.
+            <strong>Relative to best</strong> shows every result against the best result in its ranking. 1.00× is best; lower values are worse.
           </p>
         </div>
       </details>
@@ -530,7 +567,7 @@ export function MetaLeaderboard({
  * Surfaces the audit's required "every cohort must clearly state metric, unit,
  * and direction" without relying on tooltip-only disclosure.
  */
-function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): string {
+function cohortMetricSublabel(cohort: MetaCohort): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
   const metricLabel = metric === "power_score"
@@ -540,10 +577,6 @@ function cohortMetricSublabel(cohort: MetaCohort, mode: MetaLeaderboardMode): st
       : metric === "total_duration_s"
         ? "Total duration"
         : metric;
-  if (mode === "speedup") {
-    return `${cohort.phase} · Speedup vs best · 1.00x is best; lower is worse · Native: ${metricLabel}, ${direction}`;
-  }
-  if (mode === "ranks") return `${cohort.phase} · Rank · 1 is best; higher is worse · Native: ${metricLabel}`;
   return `${cohort.phase} · ${metricLabel} · ${direction}`;
 }
 
@@ -617,21 +650,34 @@ function cellTitle(
   cohort: MetaCohort,
   state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
+  runAge: string | null,
 ): string | undefined {
   if (state.kind === "missing") return MISSING_COHORT_TITLE;
   if (state.kind === "unranked") {
-    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+    return [
+      `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`,
+      runAgeText(runAge),
+    ].filter(Boolean).join(" ");
   }
   const exact = exactMetricTitle(state.rank, cohort);
-  return exact ? `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}. ${exact}` : undefined;
+  const age = runAgeText(runAge);
+  if (!exact && !age) return undefined;
+  return [`${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}.`, exact, age]
+    .filter(Boolean)
+    .join(" ");
 }
 
-function receiptLinkTitle(state: Exclude<MetaLeaderboardCellState, { kind: "missing" }>, cohort: MetaCohort): string {
+function receiptLinkTitle(
+  state: Exclude<MetaLeaderboardCellState, { kind: "missing" }>,
+  cohort: MetaCohort,
+  runAge: string | null,
+): string {
   if (state.kind === "unranked") {
-    return `Open result receipt. ${state.label}: ${state.reason}`;
+    return ["Open result receipt.", `${state.label}: ${state.reason}`, runAgeText(runAge)].filter(Boolean).join(" ");
   }
   const exact = exactMetricTitle(state.rank, cohort);
-  return exact ? `Open result receipt. ${exact}` : "Open result receipt";
+  const age = runAgeText(runAge);
+  return ["Open result receipt.", exact, age].filter(Boolean).join(" ");
 }
 
 function renderCellValue(
@@ -689,17 +735,26 @@ function describeCell(
   cohort: MetaCohort,
   state: MetaLeaderboardCellState,
   mode: MetaLeaderboardMode,
+  runAge: string | null,
 ): string {
   if (state.kind === "missing") {
     return `${platform.platform} has no published run for ${cohort.label}. ${COVERAGE_POLICY_COPY}`;
   }
   if (state.kind === "unranked") {
-    return `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`;
+    return [
+      `${platform.platform} has published evidence for ${cohort.label}, but it is ${state.label.toLowerCase()}: ${state.reason}`,
+      runAgeText(runAge),
+    ].filter(Boolean).join(" ");
   }
   const rank = state.rank;
   const text = cellText(rank, cohort, mode);
   const nativeSuffix = mode === "speedup" ? `; ${nativeMetricText(rank, cohort)}` : "";
-  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}`;
+  const age = runAgeText(runAge);
+  return `${platform.platform} ${MODE_LABELS[mode].toLowerCase()} for ${cohort.label}: ${text}${nativeSuffix}${age ? `; ${age}` : ""}`;
+}
+
+function runAgeText(runAge: string | null): string | null {
+  return runAge === null ? null : `Run age: ${runAge}.`;
 }
 
 function hasPublishedEvidence(platform: MetaPlatform, cohorts: MetaCohort[]): boolean {

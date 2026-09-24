@@ -64,7 +64,10 @@ from benchbox.platforms.base.adapter import DriverIsolationCapability
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
-from benchbox.platforms.dataframe.shared_loading import resolve_empty_string_restore_columns
+from benchbox.platforms.dataframe.shared_loading import (
+    dialect_preserves_empty_strings,
+    resolve_empty_string_restore_columns,
+)
 from benchbox.utils.file_format import (
     TRAILING_DUMMY_COLUMN,
     detect_data_format,
@@ -181,6 +184,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
 
         # Apply execution settings
         if config.execution.streaming_mode:
+            # Per-query only — not a global setting, so do not record as applied.
             self._log_verbose("Note: DataFusion streaming mode is per-query, not global")
 
         # Apply memory settings (DataFusion manages memory through Arrow)
@@ -214,6 +218,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         runtime = self._configure_runtime_environment()
 
         # Create session configuration
+        configured_context = False
         if SessionConfig is not None:
             try:
                 config = SessionConfig()
@@ -248,6 +253,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                         ctx = SessionContext(config)
                 else:
                     ctx = SessionContext(config)
+                configured_context = True
 
             except Exception as e:
                 # Fall back to default context if configuration fails
@@ -255,6 +261,13 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
                 ctx = SessionContext()
         else:
             ctx = SessionContext()
+
+        if configured_context:
+            config = self._tuning_config
+            if config.parallelism.thread_count is not None:
+                self._record_runtime_tuning(f"target_partitions={self._target_partitions}")
+            if config.memory.chunk_size is not None:
+                self._record_runtime_tuning(f"batch_size={self._batch_size}")
 
         # Log configuration
         config_parts = [
@@ -575,19 +588,21 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
             # and the empty text fields stay NULL instead of "".
             df = self._apply_tbl_column_names(df, column_names)
 
-        if null_marker is None:
-            # ``null_marker is None`` means empty fields in declared string
-            # columns must stay ``""`` (ClickBench filters ``SearchPhrase <> ''``
-            # etc.). DataFusion reads an empty CSV field as NULL, so coalesce it
-            # back to "". The shared guard (see resolve_empty_string_restore_columns)
-            # tolerates a declared column that genuinely isn't present (e.g.
-            # column_names was not supplied so the rename above could not align
-            # the schema names). Gating on ``null_marker is None`` here (rather
-            # than passing an unconditional genexpr into the shared helper)
-            # keeps ``df.schema()`` from being called when the restore isn't
-            # needed -- a genexpr's outermost iterable is evaluated eagerly at
-            # creation, so building it unconditionally would call df.schema()
-            # even when null_marker is not None.
+        if dialect_preserves_empty_strings(null_marker):
+            # The dialect keeps empty fields as ``""`` (``None`` = no NULL
+            # conversion, or a non-empty sentinel like ClickBench's ``__NULL__``
+            # where only the sentinel maps to NULL; ClickBench filters
+            # ``SearchPhrase <> ''`` etc.). DataFusion reads an empty CSV field
+            # as NULL, so coalesce it back to "". The shared guard (see
+            # resolve_empty_string_restore_columns) tolerates a declared column
+            # that genuinely isn't present (e.g. column_names was not supplied
+            # so the rename above could not align the schema names). Gating on
+            # the shared predicate here (rather than passing an unconditional
+            # genexpr into the shared helper) keeps ``df.schema()`` from being
+            # called when the restore isn't needed -- a genexpr's outermost
+            # iterable is evaluated eagerly at creation, so building it
+            # unconditionally would call df.schema() even when the dialect maps
+            # empty fields to NULL.
             present_columns = (field.name for field in df.schema())
             for name in resolve_empty_string_restore_columns(string_columns, null_marker, present_columns):
                 df = df.with_column(name, f.coalesce(col(name), lit("")))

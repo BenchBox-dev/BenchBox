@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import type { DetailResult, QueryDisplayTiming, QueryTiming, SortState } from "@/types";
 import type { ChartContext } from "@/lib/chartRegistry";
-import { getDetailResult, getPrimaryMetricForBenchmark } from "@/lib/duckdbQueries";
+import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { humanizeBenchmark, errMsg, fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
@@ -10,6 +10,9 @@ import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
+import { PassStrip, summarizeQueryPasses } from "@/components/PassStrip";
+import { resultDetailHref, withinRunCompareHref } from "@/lib/resultLinks";
+import { encodeBasis, selectComparableBasisPair } from "@/lib/measurementBasis";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { TuningBadge } from "@/components/TuningBadge";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -17,14 +20,21 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { formatTrustLabel, formatValidationStatus } from "@/lib/displayLabels";
+import { formatEnumLabel, formatTrustLabel, formatValidationStatus, parseOverrideRules } from "@/lib/displayLabels";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
-import { usePickingState } from "@/lib/pickingState";
+import { RunDateChip } from "@/components/RunAge";
+import { PageHeader } from "@/components/PageHeader";
+import { useLocalResultState } from "@/lib/localResultState";
+import { LocalResultPicker } from "@/components/LocalResultPicker";
 
 interface ResultDetailProps extends RoutableProps {
   resultId?: string;
+  source?: "public" | "local";
 }
+
+/** Per-query rows to render on a run page before the pass table truncates. */
+const PASS_STRIP_DETAIL_LIMIT = 200;
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
 type RawSortKey = "query_id" | "duration_ms" | "status";
@@ -35,11 +45,14 @@ interface DetailState {
   primaryMetric: PrimaryMetric;
 }
 
-export function ResultDetail({ resultId = "" }: ResultDetailProps) {
+export function ResultDetail({ resultId = "", source = "public" }: ResultDetailProps) {
   const timingsScrollerRef = useRef<HTMLDivElement>(null);
   const samplesScrollerRef = useRef<HTMLDivElement>(null);
   const [detailState, setDetailState] = useState<DetailState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [detailRetryToken, setDetailRetryToken] = useState(0);
   const [sort, setSort] = useState<SortState<MedianSortKey>>({
     key: "query_id",
     direction: "asc",
@@ -54,6 +67,8 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   const [tuningLoading, setTuningLoading] = useState(false);
   const [tuningError, setTuningError] = useState<string | null>(null);
   const tuningAbortRef = useRef<AbortController | null>(null);
+  const localResultState = useLocalResultState();
+  const isLocal = source === "local";
   const detail = detailState?.detail ?? null;
   const primaryMetric = detailState?.primaryMetric ?? "display_geomean_ms";
   const documentTitle = detail
@@ -75,7 +90,27 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     tuningAbortRef.current?.abort();
     tuningAbortRef.current = null;
     let cancelled = false;
-    getDetailResult(resultId)
+    if (isLocal) {
+      const preview = localResultState.preview;
+      if (preview?.detail.result_id !== resultId) {
+        setError("This local preview is no longer available. Open the result file again to restore it.");
+      } else {
+        setDetailState({ detail: preview.detail, primaryMetric: preview.primaryMetric });
+      }
+      return () => {
+        cancelled = true;
+        tuningAbortRef.current?.abort();
+        tuningAbortRef.current = null;
+      };
+    }
+    resolveShortId(resultId)
+      .then(async (resolvedId) => {
+        if (cancelled) return null;
+        if (resolvedId !== resultId && typeof window !== "undefined") {
+          history.replaceState(null, "", `${resultDetailHref(resolvedId)}${window.location.search}${window.location.hash}`);
+        }
+        return getDetailResult(resolvedId);
+      })
       .then(async (data) => {
         if (cancelled) return;
         if (data === null) {
@@ -92,7 +127,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       tuningAbortRef.current?.abort();
       tuningAbortRef.current = null;
     };
-  }, [resultId]);
+  }, [isLocal, localResultState.preview, resultId, detailRetryToken]);
 
   // Hooks must run in the same order on every render - compute memos before
   // any conditional return, guarding inside the factory for the null case.
@@ -136,29 +171,24 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
   if (error) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: "Result detail" }]} />
+        <Breadcrumb crumbs={[{ label: "Results", href: "/results/" }, { label: isLocal ? "Local preview" : "Result detail" }]} />
         <div class="mt-8">
-          <ErrorMessage message={error} />
-          <a href="/results/" class="mt-4 inline-block btn btn-secondary no-underline">
-            Back to Results
-          </a>
+          <ErrorMessage message={error} onRetry={() => setDetailRetryToken((t) => t + 1)} />
+          <div class="mt-4 flex flex-wrap gap-2">
+            {isLocal && <LocalResultPicker label="Open result file again" />}
+            <a href="/results/query" class="btn btn-primary no-underline">Find runs</a>
+            <a href="/results/benchmarks/" class="btn btn-secondary no-underline">Browse benchmarks</a>
+          </div>
         </div>
       </div>
     );
   }
   if (!detail || !chartContext) return <LoadingSpinner message="Loading result..." />;
 
-  let picking: ReturnType<typeof usePickingState> | null = null;
-  try {
-    picking = usePickingState();
-  } catch {
-    // Unit tests may not wrap with provider.
-  }
-  const isPicked = detail && picking ? picking.pickedIds.includes(detail.result_id) : false;
-  const pickingFull = picking ? picking.pickedIds.length >= 4 && !isPicked : false;
-  const resultPickingCompareHref = picking?.compareHref ?? null;
-  const resultPickingCount = picking?.pickedIds.length ?? 0;
   const benchmarkLabel = humanizeBenchmark(detail.benchmark);
+  // An accepted override is never a clean pass, even when the recorded
+  // validation status alone would hide this badge.
+  const detailOverrideRules = parseOverrideRules(detail.override_rules);
 
   function toggleSort(key: MedianSortKey) {
     setSort((prev) =>
@@ -196,10 +226,10 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
     return rawSort.direction === "asc" ? "ascending" : "descending";
   }
 
-  // Derive tuning sidecar URL from bundle download URL.
-  const tuningUrl = detail.has_tuning && detail.bundle_download_url
-    ? detail.bundle_download_url.replace(/\.json$/, ".tuning.json")
-    : null;
+  // The tuning a run requested lives in the bundle, at platform.tuning. It used
+  // to be a `.tuning.json` sidecar derived from this URL; that file is no longer
+  // published, so the bundle itself is the source.
+  const tuningUrl = detail.has_tuning ? detail.bundle_download_url : null;
 
   function handleTuningExpand() {
     const willExpand = !tuningExpanded;
@@ -210,23 +240,35 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
       tuningAbortRef.current = controller;
       fetch(tuningUrl, { signal: controller.signal })
         .then((r) => r.json() as Promise<Record<string, unknown>>)
-        .then((data) => {
+        .then((bundle) => {
           if (controller.signal.aborted) return;
-          setTuningData(data);
+          setTuningData(extractTuningBlock(bundle));
           setTuningLoading(false);
         })
         .catch((err: unknown) => {
           if (err instanceof DOMException && err.name === "AbortError") return;
-          setTuningError("Could not load tuning config.");
+          setTuningError("Could not load tuning settings.");
           setTuningLoading(false);
         });
     }
   }
 
-  const showTuningSection = detail.tuning_mode !== null || detail.has_tuning;
+  const showTuningSection = true;
+  // How many queries the pass table can actually report on. Zero means it
+  // renders nothing, and the median-latency table is the only per-query view.
+  const passSummaries = summarizeQueryPasses(detail.queries);
+  // The pass table reports the same per-query median next to the passes it was
+  // reduced from, so the three-column median table is redundant — but only for
+  // the queries the pass table can render. A query with a published median and
+  // no execution rows appears in no pass summary, so the median table stays
+  // whenever one exists rather than dropping that query from the page.
+  const passQueryIds = new Set(passSummaries.map((summary) => summary.queryId));
+  const passesCoverAllTimings =
+    passSummaries.length > 0 &&
+    detail.display_timings.every((timing) => passQueryIds.has(timing.query_id));
   const plansUrl = planDownloadUrl(detail);
-  const showSidebar = showTuningSection || (detail.has_plans && !plansUrl);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
+  const withinRunBases = selectComparableBasisPair(detail.queries, detail.display_timings);
   const hasPrimaryMetric = primaryMetric === "power_score"
     ? detail.power_score !== null && detail.power_score !== undefined
     : detail.display_geomean_ms !== null && detail.display_geomean_ms !== undefined;
@@ -239,73 +281,99 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
 
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb
-        crumbs={[
-          { label: "Results", href: "/results/" },
-          { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
-          { label: detail.platform },
-        ]}
+      {isLocal && (
+        <aside
+          role="status"
+          class="mb-6 rounded-lg border border-[var(--bb-data-border-strong)] bg-[var(--bb-tone-info-bg)] p-4 text-sm text-[var(--bb-tone-info-fg)]"
+          data-testid="local-result-banner"
+          aria-label="Local result preview"
+        >
+          <p class="font-semibold">Local preview</p>
+          <p class="mt-1">
+            Viewing <span class="font-medium">{localResultState.preview?.fileName}</span> in this browser tab. This result
+            has not been uploaded, reviewed, or added to the public rankings.
+          </p>
+        </aside>
+      )}
+
+      <PageHeader
+        crumbs={isLocal
+          ? [{ label: "Results", href: "/results/" }, { label: "Local preview" }, { label: detail.platform }]
+          : [
+              { label: "Results", href: "/results/" },
+              { label: benchmarkLabel, href: `/results/${detail.benchmark}/` },
+              { label: detail.platform },
+            ]}
+        eyebrow="Run"
+        title={`${benchmarkLabel} result: ${detail.platform}`}
+        subtitle={
+          <>
+            Scale factor {detail.scale_factor}, {detail.test_type ? formatEnumLabel(detail.test_type) : "standard"} phase.
+          </>
+        }
+        meta={
+          <>
+            <RunDateChip runDate={detail.run_date} />
+            <span class="bb-meta-chip">
+              {isLocal ? "Local preview ID" : "Public ID"} {visibleResultIdForRow(detail)}
+            </span>
+            <TrustBadge trustLabel={detail.trust_label} />
+            <FundingChip funding={detail.funding} />
+            {(!isPassingValidationStatus(detail.validation_status) || detailOverrideRules.length > 0) && (
+              <ValidationBadge
+                validationStatus={detail.validation_status}
+                overrideRules={detailOverrideRules}
+                showMissing
+              />
+            )}
+            {detail.tuning_mode && (
+              <TuningBadge
+                tuningMode={detail.tuning_mode}
+                tuningValidationStatus={detail.tuning_validation_status}
+              />
+            )}
+            {detail.visibility === "public-curated" && (
+              <StatusBadge role="visibility" tone="success">Published</StatusBadge>
+            )}
+          </>
+        }
+        actions={
+          <div class="flex flex-wrap gap-2">
+            {isLocal ? (
+              <>
+                <LocalResultPicker label="Open another result" />
+                <a
+                  href="/docs/contributing-results.html"
+                  referrerPolicy="no-referrer"
+                  class="btn btn-primary no-underline"
+                >
+                  Submit for public review
+                </a>
+              </>
+            ) : (
+              <>
+                <a href={`/results/query?pick=${encodeURIComponent(detail.result_id)}`} class="btn btn-primary" data-testid="result-detail-compare-link">
+                  Find a run to compare
+                </a>
+                <a href={detail.bundle_download_url} class="btn btn-secondary" download>
+                  Download bundle
+                </a>
+                {detail.has_plans && plansUrl && (
+                  <a href={plansUrl} class="btn btn-secondary" download>
+                    Download plans
+                  </a>
+                )}
+              </>
+            )}
+          </div>
+        }
       />
 
-      <section aria-label="Result summary" class="mt-6 mb-8 panel-elevated p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <div class="mb-3 flex flex-wrap items-center gap-3">
-              <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">
-                {benchmarkLabel} - {detail.platform}
-              </h1>
-              <TrustBadge trustLabel={detail.trust_label} />
-              <FundingChip funding={detail.funding} />
-              {!isPassingValidationStatus(detail.validation_status) && (
-                <ValidationBadge validationStatus={detail.validation_status} showMissing />
-              )}
-              {detail.tuning_mode && <TuningBadge tuningMode={detail.tuning_mode} />}
-              {detail.visibility === "public-curated" && (
-                <StatusBadge role="visibility" tone="success">curated</StatusBadge>
-              )}
-            </div>
-            <p class="text-sm text-[var(--bb-data-fg-muted)]">
-              {benchmarkLabel} · SF {detail.scale_factor} · {detail.test_type ?? "standard"} · run{" "}
-              {detail.run_date.slice(0, 10)} · Public ID{" "}
-              <code class="font-mono text-[var(--bb-data-fg-primary)]">{visibleResultIdForRow(detail)}</code>
-            </p>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <a href={`/results/compare?ids=${detail.result_id}`} class="btn btn-primary" data-testid="result-detail-compare-link">
-              Compare this result
-            </a>
-            <button
-              type="button"
-              class={`btn ${isPicked ? "btn-secondary" : "btn-secondary"}`}
-              aria-pressed={isPicked ? "true" : "false"}
-              aria-describedby={pickingFull ? "result-detail-picking-full" : undefined}
-              title={pickingFull ? "Up to 4 runs can be compared." : undefined}
-              disabled={pickingFull}
-              data-testid="result-detail-picking-toggle"
-              onClick={() => picking?.toggle(detail.result_id)}
-            >
-              {isPicked ? "Remove from comparison" : "Add to comparison"}
-            </button>
-            {pickingFull && (
-              <span id="result-detail-picking-full" class="text-xs text-[var(--bb-tone-warning-fg)]">Up to 4 runs can be compared.</span>
-            )}
-            {resultPickingCompareHref && resultPickingCount >= 2 && (
-              <a href={resultPickingCompareHref} class="btn btn-primary" data-testid="result-detail-compare-picked">
-                Compare {resultPickingCount} selected →
-              </a>
-            )}
-            <a href={detail.bundle_download_url} class="btn btn-secondary" download>
-              Download bundle
-            </a>
-            {detail.has_plans && plansUrl && (
-              <a href={plansUrl} class="btn btn-secondary" download>
-                Download plans
-              </a>
-            )}
-          </div>
-        </div>
-
-        <div class={`mt-5 grid gap-3 sm:grid-cols-2 ${hasPrimaryMetric ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+      {/* One row of cards. The tuning card used to sit in a left sidebar that
+          took a third of the page from `lg` up, so the charts got NARROWER as
+          the window got wider while the sidebar held one small card. */}
+      <section aria-label="Result summary" class="mb-8">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))]">
           {hasPrimaryMetric && (
             <ResultMetricCard
               label={`Primary metric · ${primaryMetricDirection}`}
@@ -315,9 +383,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             />
           )}
           <ResultMetricCard
-            label="Scale / phase"
+            label="Scale factor"
             value={`SF ${detail.scale_factor}`}
-            helper={detail.test_type ?? "standard"}
+            helper={`Phase: ${detail.test_type ? formatEnumLabel(detail.test_type) : "Standard"}`}
           />
           <ResultMetricCard
             label="Trust / validation"
@@ -329,34 +397,35 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             value={formatDurationSeconds(detail.total_duration_s).valueText}
             helper="Run duration"
           />
-        </div>
-      </section>
-
-      <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div class={showSidebar ? "space-y-6" : "hidden"}>
           {showTuningSection && (
             <section class="card">
-              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning Config</h2>
+              <h2 class="mb-3 text-base font-semibold text-[var(--bb-data-fg-primary)]">Tuning</h2>
               <div class="space-y-2 text-sm">
                 {detail.tuning_mode ? (
                   <div class="flex items-center gap-2">
                     <span class="text-[var(--bb-data-fg-muted)]">Mode:</span>
-                    <TuningBadge tuningMode={detail.tuning_mode} />
+                    <TuningBadge
+                      tuningMode={detail.tuning_mode}
+                      tuningValidationStatus={detail.tuning_validation_status}
+                    />
                   </div>
                 ) : (
-                  <p class="text-[var(--bb-data-fg-muted)]">Tuning mode not recorded.</p>
+                  <p class="text-[var(--bb-data-fg-muted)]">Tuning status was not recorded.</p>
                 )}
                 {tuningUrl ? (
                   <div>
                     <button
+                      type="button"
                       class="mt-1 cursor-pointer border-0 bg-transparent p-0 text-xs text-[var(--bb-accent-hover)] underline hover:text-[var(--bb-accent)]"
                       onClick={handleTuningExpand}
+                      aria-expanded={tuningExpanded}
+                      aria-controls="tuning-settings-region"
                     >
-                      {tuningExpanded ? "Hide config ↑" : "Show config ↓"}
+                      {tuningExpanded ? "Hide settings ↑" : "Show settings ↓"}
                     </button>
                     {tuningExpanded && (
-                      <div class="mt-2">
-                        {tuningLoading && <p class="text-xs text-[var(--bb-data-fg-subtle)]">Loading...</p>}
+                      <div id="tuning-settings-region" class="mt-2" role="region" aria-label="Tuning settings">
+                        {tuningLoading && <p role="status" aria-live="polite" class="text-xs text-[var(--bb-data-fg-subtle)]">Loading tuning settings...</p>}
                         {tuningError && <p role="alert" class="text-xs text-[var(--bb-tone-danger-fg)]">{tuningError}</p>}
                         {tuningData && (
                           <pre class="overflow-x-auto rounded panel-muted p-2 text-xs text-[var(--bb-data-fg-primary)]">
@@ -367,7 +436,9 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                     )}
                   </div>
                 ) : (
-                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">No tuning config recorded.</p>
+                  <p class="text-xs text-[var(--bb-data-fg-subtle)]">
+                    {detail.tuning_mode === "notuning" ? "No tuning settings were applied." : "Tuning details were not published."}
+                  </p>
                 )}
               </div>
             </section>
@@ -380,19 +451,37 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
             </section>
           )}
         </div>
+      </section>
 
-        <div class={showSidebar ? "lg:col-span-2 space-y-6" : "lg:col-span-3 space-y-6"}>
+      <div class="space-y-6">
+          {/* The same open layout the cohort and comparison pages use: a run's
+              charts are the point of the page, not something to go looking for
+              behind a row of controls. */}
           {hasTimings && (
-            <ChartPanel context={chartContext} />
+            <ChartPanel
+              context={chartContext}
+              summaryLayout="long"
+              // A single run cannot be led, ranked against, or compared: a
+              // one-bar bar chart, a one-row sparkline table, and a rank table
+              // where everything is first say nothing the summary does not.
+              // The per-query matrix is the "Query timings" table below.
+              excludeChartIds={["performance_bar", "power_bar", "sparkline_table", "rank_table", "query_heatmap"]}
+            />
           )}
 
-          <RunReceipt detail={detail} />
+          <RunReceipt
+            detail={detail}
+            isRankingEligible={isLocal ? false : null}
+            reproduceCommand={isLocal ? null : undefined}
+          />
 
           {hasTimings && (
             <section class="card">
             <h2 class="mb-4 text-base font-semibold text-[var(--bb-data-fg-primary)]">
-              Query Timings ({detail.display_timings.length})
+              Query timings ({detail.display_timings.length})
             </h2>
+            {!passesCoverAllTimings && (
+            <>
             <TableScrollHint scrollerRef={timingsScrollerRef} testId="detail-timings-scroll-hint" />
             <div ref={timingsScrollerRef} class="overflow-x-auto" data-testid="detail-timings-scroll-container">
               <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
@@ -434,7 +523,23 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                 </tbody>
               </table>
             </div>
+            </>
+            )}
             {detail.queries.length > 0 && (
+              <>
+              <PassStrip queries={detail.queries} limit={PASS_STRIP_DETAIL_LIMIT} />
+              {!isLocal && withinRunBases !== null && (
+                <p class="mb-6 text-sm">
+                  <a
+                    class="link"
+                    href={withinRunCompareHref(detail.result_id, withinRunBases.map(encodeBasis), 0)}
+                    data-testid="within-run-compare-link"
+                  >
+                    Compare measurement bases within this run
+                  </a>
+                </p>
+              )}
+
               <details class="mt-4">
                 <summary class="cursor-pointer select-none text-sm text-[var(--bb-data-fg-muted)] hover:text-[var(--bb-data-fg-primary)]">
                   Individual samples ({detail.queries.length})
@@ -485,6 +590,7 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
                   </table>
                 </div>
               </details>
+              </>
             )}
             </section>
           )}
@@ -492,10 +598,23 @@ export function ResultDetail({ resultId = "" }: ResultDetailProps) {
           <MethodologyDisclosure detail={detail} />
 
           <ProvenanceLegend />
-        </div>
       </div>
     </div>
   );
+}
+
+function extractTuningBlock(bundle: Record<string, unknown>): Record<string, unknown> {
+  // `platform.tuning` holds the requested configuration and the applied ledger.
+  // A bundle published before they were folded in has only the summary fields,
+  // which are still worth showing, so an absent block is not an error.
+  const platform = bundle?.platform;
+  if (platform && typeof platform === "object" && !Array.isArray(platform)) {
+    const tuning = (platform as Record<string, unknown>).tuning;
+    if (tuning && typeof tuning === "object" && !Array.isArray(tuning)) {
+      return tuning as Record<string, unknown>;
+    }
+  }
+  return {};
 }
 
 function ResultMetricCard({

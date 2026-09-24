@@ -3,6 +3,9 @@ import {
   formatBenchmarkLabel,
   canonicalBenchmarkSlug,
   canonicalPhase,
+  describeOverride,
+  describeValidationStatus,
+  parseOverrideRules,
   formatCostStatus,
   formatEnumLabel,
   formatFunding,
@@ -13,8 +16,8 @@ import {
 
 describe("formatTrustLabel", () => {
   it("humanizes the canonical trust labels", () => {
-    expect(formatTrustLabel("maintainer-run")).toBe("maintainer run");
-    expect(formatTrustLabel("community-submission")).toBe("community submission");
+    expect(formatTrustLabel("maintainer-run")).toBe("Maintainer run");
+    expect(formatTrustLabel("community-submission")).toBe("Community submission");
   });
 
   it("returns 'unknown' for null/empty values", () => {
@@ -36,16 +39,16 @@ describe("formatFunding", () => {
     expect(formatFunding("free-trial")).toBe("free trial");
     expect(formatFunding("vendor-sponsored")).toBe("vendor sponsored");
     expect(formatFunding("grant")).toBe("grant funded");
-    expect(formatFunding("unspecified")).toBe("unspecified");
+    expect(formatFunding("unspecified")).toBe("No funding information provided");
   });
 
   // Unlike formatTrustLabel, a missing value maps to "unspecified" rather than
   // "unknown": `unspecified` is the producer default, so absent and declared
   // carry the same meaning.
   it("returns 'unspecified' for null/empty values", () => {
-    expect(formatFunding(null)).toBe("unspecified");
-    expect(formatFunding("")).toBe("unspecified");
-    expect(formatFunding(undefined)).toBe("unspecified");
+    expect(formatFunding(null)).toBe("No funding information provided");
+    expect(formatFunding("")).toBe("No funding information provided");
+    expect(formatFunding(undefined)).toBe("No funding information provided");
   });
 
   it("falls back to underscore/dash humanization for unknown values", () => {
@@ -63,13 +66,76 @@ describe("formatValidationStatus", () => {
   it("returns 'unknown' for missing values", () => {
     expect(formatValidationStatus(null)).toBe("unknown");
   });
+
+  // Full status set from benchbox/core/results/status.py
+  // NON_CLEAN_VALIDATION_STATUSES - the raw enum used to be impossible for a
+  // reader to interpret (e.g. a bare "not_run" chip); every one of these must
+  // now render plain language.
+  it("humanizes every NON_CLEAN_VALIDATION_STATUSES value", () => {
+    expect(formatValidationStatus("failed")).toBe("failed");
+    expect(formatValidationStatus("interrupted")).toBe("interrupted");
+    expect(formatValidationStatus("partial")).toBe("partial pass");
+    expect(formatValidationStatus("error")).toBe("validation error");
+    expect(formatValidationStatus("not_run")).toBe("no validation");
+    expect(formatValidationStatus("not_validated")).toBe("not validated");
+    expect(formatValidationStatus("uncertain")).toBe("uncertain");
+    expect(formatValidationStatus("unknown")).toBe("unknown");
+  });
+});
+
+describe("describeValidationStatus", () => {
+  it("returns the raw status alongside the reader-facing label", () => {
+    const info = describeValidationStatus("not_run");
+    expect(info.status).toBe("not_run");
+    expect(info.label).toBe("no validation");
+    expect(info.description.length).toBeGreaterThan(0);
+    expect(info.isClean).toBe(false);
+  });
+
+  it("marks passed (and its aliases) as the only clean status", () => {
+    expect(describeValidationStatus("passed").isClean).toBe(true);
+    expect(describeValidationStatus("pass").isClean).toBe(true);
+    expect(describeValidationStatus("exact").isClean).toBe(true);
+    expect(describeValidationStatus("full").isClean).toBe(true);
+    expect(describeValidationStatus("not_run").isClean).toBe(false);
+    expect(describeValidationStatus("failed").isClean).toBe(false);
+  });
+
+  it("gives CLI-failure statuses a danger tone", () => {
+    for (const status of ["failed", "interrupted", "partial", "error"]) {
+      expect(describeValidationStatus(status).tone).toBe("danger");
+    }
+  });
+
+  it("gives never-validated statuses a warning tone, never neutral", () => {
+    for (const status of ["not_run", "not_validated", "uncertain", "unknown"]) {
+      const info = describeValidationStatus(status);
+      expect(info.tone).toBe("warning");
+      expect(info.tone).not.toBe("neutral");
+    }
+  });
+
+  it("normalizes case and whitespace before matching", () => {
+    expect(describeValidationStatus("  Not_Run ").label).toBe("no validation");
+  });
+
+  it("handles a missing status without throwing", () => {
+    const info = describeValidationStatus(null);
+    expect(info.status).toBeNull();
+    expect(info.isClean).toBe(false);
+    expect(info.tone).toBe("neutral");
+  });
+
+  it("never gives an unrecognised non-null status the neutral tone", () => {
+    expect(describeValidationStatus("some_future_status").tone).toBe("warning");
+  });
 });
 
 describe("formatVisibility", () => {
   it("turns internal slug into a public-readable label", () => {
-    expect(formatVisibility("public-curated")).toBe("public (curated)");
-    expect(formatVisibility("public-community")).toBe("public (community)");
-    expect(formatVisibility("internal")).toBe("internal");
+    expect(formatVisibility("public-curated")).toBe("Published, maintainer reviewed");
+    expect(formatVisibility("public-community")).toBe("Published, community submitted");
+    expect(formatVisibility("internal")).toBe("Not public");
   });
 });
 
@@ -109,5 +175,48 @@ describe("formatBenchmarkLabel", () => {
   it("falls through to humanizeBenchmark for other slugs", () => {
     expect(formatBenchmarkLabel("tpch")).toBe("TPC-H");
     expect(formatBenchmarkLabel("clickbench")).toBe("ClickBench");
+  });
+});
+
+describe("parseOverrideRules", () => {
+  it("parses the canonical JSON array string", () => {
+    expect(parseOverrideRules('["timing-plateau", "scale-invariant"]')).toEqual([
+      "timing-plateau",
+      "scale-invariant",
+    ]);
+  });
+
+  it("returns [] for absent values", () => {
+    expect(parseOverrideRules(null)).toEqual([]);
+    expect(parseOverrideRules(undefined)).toEqual([]);
+    expect(parseOverrideRules("")).toEqual([]);
+  });
+
+  it("never invents an override from unreadable values", () => {
+    expect(parseOverrideRules("not json")).toEqual([]);
+    expect(parseOverrideRules('{"rule": "timing-plateau"}')).toEqual([]);
+    expect(parseOverrideRules("[1, 2]")).toEqual([]);
+    expect(parseOverrideRules("timing-plateau")).toEqual([]);
+  });
+});
+
+describe("describeOverride", () => {
+  it("returns null when no override was accepted", () => {
+    expect(describeOverride([])).toBeNull();
+    expect(describeOverride(null)).toBeNull();
+    expect(describeOverride(undefined)).toBeNull();
+  });
+
+  it("names the covered rules and the audit trail", () => {
+    const info = describeOverride(["timing-plateau"], {
+      approver: "reviewer",
+      expires: "2099-01-01",
+    });
+    expect(info).not.toBeNull();
+    expect(info!.label).toBe("Overridden: timing-plateau");
+    expect(info!.title).toContain("timing-plateau");
+    expect(info!.title).toContain("Approved by reviewer.");
+    expect(info!.title).toContain("Override expires 2099-01-01.");
+    expect(info!.title).toContain("not a clean pass");
   });
 });

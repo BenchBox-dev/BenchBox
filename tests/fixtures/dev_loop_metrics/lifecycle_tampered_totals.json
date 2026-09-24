@@ -1,0 +1,49 @@
+{
+  "schema": "ci_lifecycle_baseline_v1",
+  "repository": "owner/repo",
+  "cohort": {
+    "window_start": "2026-08-11T00:00:00+00:00",
+    "window_end": "2026-09-08T00:00:00+00:00",
+    "candidate_prs": 1,
+    "collected_prs": 1
+  },
+  "collection_gaps": [],
+  "process_baseline": {
+    "criteria_version": "1.0.0",
+    "process_digest": "digest-of-frozen-process-baseline"
+  },
+  "prs": [
+    {
+      "number": 101,
+      "heads": [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      ],
+      "per_head": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+          "schema": "event_fanout_v1",
+          "completed_runner_minutes": 10.0,
+          "cancelled_runner_minutes": 5.0
+        },
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": {
+          "schema": "event_fanout_v1",
+          "completed_runner_minutes": 20.0,
+          "cancelled_runner_minutes": 0.0
+        }
+      },
+      "attempts": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": 2,
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": 1
+      },
+      "missing": [],
+      "totals": {
+        "head_count": 2,
+        "observed_head_count": 2,
+        "missing_head_count": 0,
+        "total_attempts": 3,
+        "completed_runner_minutes": 999.0,
+        "cancelled_runner_minutes": 5.0
+      }
+    }
+  ]
+}

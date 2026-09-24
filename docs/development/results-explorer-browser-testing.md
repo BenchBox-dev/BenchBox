@@ -96,11 +96,11 @@ short-lived and non-promotable.
 ## What CI gates
 
 [`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
-runs on **pull requests** (to `main` or `develop`) that touch `results-explorer/`,
-`_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
-`results-data/`, or the workflow file itself, and on **pushes to `main`** that
-touch those paths. Pushes to `develop` do not run it (the post-merge lane runs
-only the token/theme scans and unit/fast tests).
+runs on **pull requests** (to `release` or `develop`) across all paths (with no top-level paths
+filter so the required status check always reports; the `explorer-changes` job skips browser runs
+when no relevant files change), and on **pushes to `release` or `develop`** that touch
+`results-explorer/`, `_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
+`results-data/`, or the workflow file itself.
 
 - **Blocking:** `chromium` job - full suite must pass.
 - **Non-blocking:** `firefox-smoke` and `webkit-smoke` jobs - `@smoke`-tagged

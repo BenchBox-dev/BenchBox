@@ -40,7 +40,9 @@ from benchbox.core.constants import (
 )
 from benchbox.core.errors import PlanCaptureError
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.plan_capture_phase import propagate_plan_capture_fields
+from benchbox.core.plan_capture_phase import (
+    propagate_query_execution_metadata,
+)
 from benchbox.core.power_harnesses import (
     resolve_combined_harness,
     resolve_maintenance_harness,
@@ -49,11 +51,14 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.throughput.containment import await_quiescence, check_phase_boundary
 from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
     _make_stream_cursor,
+    open_stream_connection,
+    require_throughput_stream_capability,
 )
 from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
@@ -274,7 +279,7 @@ class TestDriversMixin:
 
     def _execute_tpcds_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Execute TPC-DS Throughput Test using production TPCDSThroughputTest implementation."""
-        from benchbox.core.expected_results.tpcds_results import set_config_validation_mode
+        from benchbox.core.expected_results.tpcds_results import parse_validation_mode, set_config_validation_mode
         from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest
 
         console = quiet_console
@@ -286,12 +291,23 @@ class TestDriversMixin:
             num_streams = _resolve_requested_stream_count(run_config)
             verbose = run_config.get("verbose", False)
 
-            # Set TPC-DS validation mode from config (takes precedence over environment variable)
+            run_validation_mode = parse_validation_mode(validation_mode)
             set_config_validation_mode(validation_mode)
 
             console.print(
                 f"[green]Running TPC-DS Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
+
+            # Fail closed before stream submission when the adapter's session
+            # model cannot serve concurrent streams (UNSUPPORTED declaration
+            # or INDEPENDENT_CONNECTION without an override) - see
+            # require_throughput_stream_capability. This runs before the
+            # factory below is ever called, so no stream work starts.
+            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            # Benchmark tuning vocabulary for per-stream session parity
+            # (equivalence dimension 4); defaults to "olap" like the tuning
+            # phase's configure_for_benchmark call.
+            benchmark_type = run_config.get("benchmark_type", "olap")
 
             # Create connection factory that wraps the platform adapter connection.
             # new_stream_connection() dispatches on stream_connection_capability:
@@ -302,8 +318,12 @@ class TestDriversMixin:
             # a brand-new connection/session per stream - see
             # PlatformAdapter.new_stream_connection() for the full contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
-                conn_wrapper = PlatformAdapterConnection(stream_connection, self)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
+                conn_wrapper = PlatformAdapterConnection(
+                    stream_connection,
+                    self,
+                    validation_mode=run_validation_mode,
+                )
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -398,7 +418,7 @@ class TestDriversMixin:
                     # fields) through to the row _attach_captured_plans sees, so a
                     # combined power+throughput run matches by exact key instead of
                     # the ambiguous public-id fallback.
-                    propagate_plan_capture_fields(query_result, platform_result)
+                    propagate_query_execution_metadata(query_result, platform_result)
                     query_results.append(platform_result)
 
             return query_results
@@ -435,10 +455,15 @@ class TestDriversMixin:
                 f"[green]Running TPC-H Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
+            # Fail closed before stream submission - see the require call in
+            # _execute_tpcds_throughput_test above for the capability contract.
+            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            benchmark_type = run_config.get("benchmark_type", "olap")
+
             # See new_stream_connection() docstring / connection_factory comment
             # in _execute_tpcds_throughput_test above for the capability contract.
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 # Configure benchmark context for query validation
                 conn_wrapper.benchmark_type = "tpch"
@@ -501,7 +526,7 @@ class TestDriversMixin:
                     # fields) through to the row _attach_captured_plans sees, so a
                     # combined power+throughput run matches by exact key instead of
                     # the ambiguous public-id fallback.
-                    propagate_plan_capture_fields(qr, platform_result)
+                    propagate_query_execution_metadata(qr, platform_result)
                     query_results.append(platform_result)
 
             return query_results
@@ -730,7 +755,9 @@ class TestDriversMixin:
             and not getattr(self, "dry_run_mode", False)
         )
         if not phase_eligible:
-            return self._dispatch_queries_by_type(benchmark, connection, run_config)
+            results = self._dispatch_queries_by_type(benchmark, connection, run_config)
+            self._contain_outstanding_throughput_work(run_config)
+            return results
 
         # Isolate capture: record executed queries during the timed run, capture after.
         # ``_captured_plans`` is the per-run accumulator keyed by capture key; it lets
@@ -745,8 +772,38 @@ class TestDriversMixin:
         finally:
             self._plan_capture_phase_active = False
 
+        if not self._contain_outstanding_throughput_work(run_config):
+            return results
         self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
         return results
+
+    def _contain_outstanding_throughput_work(self, run_config: dict[str, Any]) -> bool:
+        """Keep timed-out throughput workers away from post-workload resources.
+
+        A throughput timeout returns before a Python worker thread necessarily
+        terminates.  Shared-cursor streams still own the measurement connection,
+        so plan capture and metadata probes must not reuse it until termination is
+        observed.  The wait is deliberately bounded; the adapter records the
+        unresolved state so its cleanup path can defer connection close.
+        """
+        result = getattr(self, "_last_throughput_test_result", None)
+        if not getattr(result, "outstanding_stream_ids", None):
+            return True
+
+        try:
+            cleanup_timeout = float(run_config.get("stream_cleanup_timeout_seconds", 5.0))
+        except (TypeError, ValueError):
+            cleanup_timeout = 5.0
+        cleanup_timeout = max(0.0, cleanup_timeout)
+
+        if await_quiescence(result, timeout=cleanup_timeout):
+            return True
+
+        # PlatformAdapter owns the connection and uses this flag to skip every
+        # post-measurement operation that could touch it.  The remaining worker
+        # futures stay attached to the result for deferred cleanup.
+        self._post_measurement_contained = True
+        return False
 
     def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         """Route to the per-test-type driver (no plan-capture concerns)."""
@@ -891,6 +948,27 @@ class TestDriversMixin:
         )
         for phase_key, phase_label, method_name in phases:
             if phase_key in requested_phases:
+                if phase_key == "maintenance":
+                    # Refuse measured maintenance work while throughput streams
+                    # are still outstanding, so it can neither overlap leaked
+                    # streams nor reuse their still-owned resources.
+                    boundary = check_phase_boundary(getattr(self, "_last_throughput_test_result", None))
+                    if not boundary.proceed:
+                        refusal = f"Maintenance Test refused: {boundary.reason}"
+                        console.print(f"[red]❌ {refusal}[/red]")
+                        all_results.append(
+                            {
+                                "query_id": "maintenance_test_contained",
+                                "execution_time_seconds": 0.0,
+                                "status": "FAILED",
+                                "rows_returned": 0,
+                                "error": refusal,
+                                "test_type": "maintenance",
+                                "contained": True,
+                                "outstanding_stream_ids": list(boundary.outstanding_stream_ids),
+                            }
+                        )
+                        continue
                 console.print(f"[cyan]Phase: {phase_label}[/cyan]")
                 all_results.extend(getattr(self, method_name)(benchmark, connection, run_config))
         return all_results
@@ -1079,7 +1157,11 @@ class TestDriversMixin:
     def _execute_operation_query(self, benchmark, connection: Any, query_id: str) -> dict[str, Any]:
         """Execute a benchmark operation (INSERT/UPDATE/DELETE) and return result dict."""
         op_kwargs: dict[str, Any] = {}
-        op_kwargs["platform_key"] = self.get_target_dialect()
+        # Engines sharing a SQL dialect but differing in capability (e.g. DuckLake
+        # on the DuckDB dialect) set operation_platform_key so benchmarks resolve
+        # engine-true capability rules instead of the shared dialect's.
+        op_kwargs["platform_key"] = getattr(self, "operation_platform_key", None) or self.get_target_dialect()
+        op_kwargs["platform_fallback_key"] = getattr(self, "operation_platform_fallback_key", None)
         op_kwargs["platform_name"] = self.platform_name
 
         # Adapter SQL preprocessing (e.g. bulk-load rewrites) is threaded through as
@@ -1451,17 +1533,31 @@ class TestDriversMixin:
     # Dry-run and SQL capture helpers (extracted w9)
     # -------------------------------------------------------------------------
 
-    def enable_dry_run(self) -> None:
+    def enable_dry_run(self, connection: Any = None) -> None:
         """Enable dry-run mode for SQL capture without execution."""
+        self.dry_run = True
         self.dry_run_mode = True
         self.captured_sql = []
         self.query_counter = 0
+        if connection is not None and hasattr(connection, "_default_job_config"):
+            default_config = connection._default_job_config
+            if hasattr(default_config, "dry_run"):
+                default_config.dry_run = True
         self.logger.info("Dry-run mode enabled - SQL will be captured instead of executed")
 
-    def disable_dry_run(self) -> None:
+    def disable_dry_run(self, connection: Any = None) -> None:
         """Disable dry-run mode and return to normal execution."""
+        self.dry_run = bool(getattr(self, "_initial_dry_run", False))
         self.dry_run_mode = False
+        self._reset_cached_dry_run_state(connection)
         self.logger.info("Dry-run mode disabled - returning to normal execution")
+
+    def _reset_cached_dry_run_state(self, connection: Any = None) -> None:
+        """Reset or invalidate platform-specific configuration cached on connection objects."""
+        if connection is not None and hasattr(connection, "_default_job_config"):
+            default_config = connection._default_job_config
+            if hasattr(default_config, "dry_run"):
+                default_config.dry_run = bool(getattr(self, "dry_run", False))
 
     def capture_sql(self, sql: str, operation_type: str = "query", table_name: str | None = None) -> None:
         """Capture SQL statement for dry-run mode.

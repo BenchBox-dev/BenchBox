@@ -50,7 +50,7 @@ export function MetaLeaderboardSkeleton({
         {message}
       </p>
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="space-y-2">
+        <div class="min-w-0 max-w-full space-y-2">
           <SkeletonBlock className="h-5 w-64" />
           <SkeletonBlock className="h-3 w-80 max-w-full" />
         </div>
@@ -60,8 +60,11 @@ export function MetaLeaderboardSkeleton({
           <SkeletonBlock className="h-8 w-20" />
         </div>
       </div>
-      <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-        <table aria-hidden="true" class="min-w-full text-sm">
+      <div
+        class="min-w-0 max-w-full overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+        style="contain: paint"
+      >
+        <table aria-hidden="true" class="w-full min-w-0 table-fixed text-sm">
           <thead class="bg-[var(--bb-surface-data-muted)]">
             <tr>
               {Array.from({ length: 6 }).map((_, column) => (

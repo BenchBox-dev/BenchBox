@@ -247,5 +247,5 @@ jupyter notebook databricks_benchmarking.ipynb
 
 - [Getting Started Guide](getting-started.md) - BenchBox fundamentals
 - [Configuration Guide](configuration.md) - Platform configuration details
-- [CLI Reference](../reference/cli-reference.md) - Command-line usage
+- [CLI Reference](../reference/cli/index.md) - Command-line usage
 - [Python API Reference](../reference/api-reference.md) - Programmatic usage

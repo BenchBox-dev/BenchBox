@@ -37,6 +37,7 @@ import io
 import logging
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -651,6 +652,58 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
 
         return window
 
+    def _over_ordered_window(
+        self,
+        window_fn: Callable[[], PySparkExpr],
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> PySparkExpr:
+        """Apply a nullary ranking window function over an ordered window spec.
+
+        Shared body for the RANK()/ROW_NUMBER()/DENSE_RANK()/PERCENT_RANK()/
+        CUME_DIST() helpers, which differ only in the function applied.
+
+        Args:
+            window_fn: Nullary PySpark function (e.g. F.rank) producing the
+                window function expression
+            order_by: List of (column_name, ascending) tuples for ordering
+            partition_by: Columns to partition by (optional)
+
+        Returns:
+            PySpark Column for the windowed values
+        """
+        return window_fn().over(self._build_window_spec(order_by, partition_by))
+
+    def _offset_window(
+        self,
+        offset_fn: Callable[..., PySparkExpr],
+        column: str,
+        offset: int,
+        order_by: list[tuple[str, bool]] | None,
+        partition_by: list[str] | None = None,
+    ) -> PySparkExpr:
+        """Apply an offset window function (LAG/LEAD) over an ordered window spec.
+
+        Shared body for the LAG()/LEAD() helpers, which differ only in the
+        function applied. A missing ``order_by`` falls back to ordering by
+        the offset column itself (mirroring the Polars adapter): Spark
+        rejects unordered LAG/LEAD windows, so the documented default must
+        still produce an ordered spec.
+
+        Args:
+            offset_fn: Offset PySpark function (e.g. F.lag) applied to the
+                column and offset
+            column: Column to offset
+            offset: Number of rows back (LAG) or forward (LEAD)
+            order_by: List of (column_name, ascending) tuples for ordering
+            partition_by: Columns to partition by (optional)
+
+        Returns:
+            PySpark Column for the offset values within partitions
+        """
+        window_spec = self._build_window_spec(order_by or [(column, True)], partition_by)
+        return offset_fn(F.col(column), offset).over(window_spec)
+
     def window_rank(
         self,
         order_by: list[tuple[str, bool]],
@@ -665,8 +718,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         Returns:
             PySpark Column for rank within partitions
         """
-        window_spec = self._build_window_spec(order_by, partition_by)
-        return F.rank().over(window_spec)
+        return self._over_ordered_window(F.rank, order_by, partition_by)
 
     def window_row_number(
         self,
@@ -682,8 +734,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         Returns:
             PySpark Column for row number within partitions
         """
-        window_spec = self._build_window_spec(order_by, partition_by)
-        return F.row_number().over(window_spec)
+        return self._over_ordered_window(F.row_number, order_by, partition_by)
 
     def window_dense_rank(
         self,
@@ -699,8 +750,7 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         Returns:
             PySpark Column for dense rank within partitions
         """
-        window_spec = self._build_window_spec(order_by, partition_by)
-        return F.dense_rank().over(window_spec)
+        return self._over_ordered_window(F.dense_rank, order_by, partition_by)
 
     def window_sum(
         self,
@@ -798,6 +848,99 @@ class PySparkDataFrameAdapter(ExpressionFamilyAdapter[PySparkDF, PySparkLazyDF, 
         """
         window_spec = self._build_aggregate_window_spec(partition_by, None)
         return F.max(F.col(column)).over(window_spec)
+
+    def window_lag(
+        self,
+        column: str,
+        offset: int = 1,
+        partition_by: list[str] | None = None,
+        order_by: list[tuple[str, bool]] | None = None,
+    ) -> PySparkExpr:
+        """Create a LAG() window function expression.
+
+        Args:
+            column: Column to lag
+            offset: Number of rows back (default: 1)
+            partition_by: Columns to partition by (optional)
+            order_by: List of (column_name, ascending) tuples for ordering
+                (defaults to ordering by the lagged column itself)
+
+        Returns:
+            PySpark Column for lagged values within partitions
+        """
+        return self._offset_window(F.lag, column, offset, order_by, partition_by)
+
+    def window_lead(
+        self,
+        column: str,
+        offset: int = 1,
+        partition_by: list[str] | None = None,
+        order_by: list[tuple[str, bool]] | None = None,
+    ) -> PySparkExpr:
+        """Create a LEAD() window function expression.
+
+        Args:
+            column: Column to lead
+            offset: Number of rows forward (default: 1)
+            partition_by: Columns to partition by (optional)
+            order_by: List of (column_name, ascending) tuples for ordering
+                (defaults to ordering by the leading column itself)
+
+        Returns:
+            PySpark Column for leading values within partitions
+        """
+        return self._offset_window(F.lead, column, offset, order_by, partition_by)
+
+    def window_ntile(
+        self,
+        n: int,
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> PySparkExpr:
+        """Create an NTILE() window function expression.
+
+        Args:
+            n: Number of buckets
+            order_by: List of (column_name, ascending) tuples for ordering
+            partition_by: Columns to partition by (optional)
+
+        Returns:
+            PySpark Column for ntile bucket numbers within partitions
+        """
+        window_spec = self._build_window_spec(order_by, partition_by)
+        return F.ntile(n).over(window_spec)
+
+    def window_percent_rank(
+        self,
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> PySparkExpr:
+        """Create a PERCENT_RANK() window function expression.
+
+        Args:
+            order_by: List of (column_name, ascending) tuples for ordering
+            partition_by: Columns to partition by (optional)
+
+        Returns:
+            PySpark Column for percent rank within partitions
+        """
+        return self._over_ordered_window(F.percent_rank, order_by, partition_by)
+
+    def window_cume_dist(
+        self,
+        order_by: list[tuple[str, bool]],
+        partition_by: list[str] | None = None,
+    ) -> PySparkExpr:
+        """Create a CUME_DIST() window function expression.
+
+        Args:
+            order_by: List of (column_name, ascending) tuples for ordering
+            partition_by: Columns to partition by (optional)
+
+        Returns:
+            PySpark Column for cumulative distribution within partitions
+        """
+        return self._over_ordered_window(F.cume_dist, order_by, partition_by)
 
     # =========================================================================
     # Union and Rename Operations

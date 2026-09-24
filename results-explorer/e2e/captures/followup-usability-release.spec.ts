@@ -35,7 +35,7 @@ import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../..");
@@ -87,7 +87,7 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
   if (await duckdb.count() > 0 && await datafusion.count() > 0) {
     await duckdb.check().catch(() => {});
     await datafusion.check().catch(() => {});
-    const link = page.getByRole("link", { name: /Compare 2 selected/ });
+    const link = page.getByTestId("compare-tray-compare-link");
     if (await link.count() > 0) {
       await link.click();
       await waitForDataLoaded(page, /Comparison/i);
@@ -101,16 +101,16 @@ async function launchFirstBuilderComparison(page: Page): Promise<void> {
 }
 
 async function openFirstSparseResultDetail(page: Page): Promise<void> {
-  await page.goto("/results/");
+  await page.goto("/results/compare/");
   await waitForShell(page);
-  await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
+  await waitForDataLoaded(page, /Cross-benchmark rankings/);
   const hrefs = await page.locator('a[href^="/results/r/"]').evaluateAll((links) =>
     Array.from(new Set(links.map((link) => link.getAttribute("href")).filter((href): href is string => !!href))),
   );
   for (const href of hrefs) {
     await page.goto(href);
     await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
+    await waitForDataLoaded(page, /Query timings/);
     if ((await page.getByText(/Show missing/i).count()) > 0) return;
   }
   throw new Error("No sparse result-detail page with a Show missing disclosure was found");
@@ -122,7 +122,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Query Workbench renders the collapsible facet rail with searchable Benchmark group", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const desktopFilters = page.getByTestId("query-desktop-filters");
     await expect(desktopFilters).toBeVisible();
@@ -140,7 +140,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Query compare tray defaults to the prompt copy and offers a launch button after two picks", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const tray = page.getByTestId("query-compare-tray");
     await expect(tray).toContainText(/Select two or more rows/);
@@ -160,12 +160,12 @@ test.describe("@followup-usability release-gate route walk", () => {
   });
 
   test("Home renders the ranking selector above the matrix with a compare entrypoint", async ({ page }) => {
-    await page.goto("/results/");
+    await page.goto("/results/compare/");
     await waitForShell(page);
-    await waitForDataLoaded(page, /Cross-Benchmark Leaderboard/);
+    await waitForDataLoaded(page, /Cross-benchmark rankings/);
 
     const selector = page.getByRole("region", { name: "Leaderboard ranking selector" });
-    const matrix = page.getByRole("region", { name: "Cross-Benchmark Leaderboard" });
+    const matrix = page.getByRole("region", { name: "Cross-benchmark rankings" });
     await expect(selector).toBeVisible();
     await expect(matrix).toBeVisible();
     const selectorBox = await selector.boundingBox();
@@ -185,24 +185,25 @@ test.describe("@followup-usability release-gate route walk", () => {
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
+    await openAnalysisCard(page, "query_heatmap");
 
     const switcher = page.getByTestId("benchmark-switcher");
     await expect(switcher).toBeVisible();
     await expect(switcher.locator("option", { hasText: "SSB" })).toBeAttached();
 
-    const platformHeader = page
+    const heatmap = page.getByTestId("query-heatmap-scroll-container");
+    const platformHeader = heatmap
       .locator("thead th")
       .filter({ has: page.locator("button", { hasText: /^Platform/ }) })
       .first();
     await expect(platformHeader).toHaveCSS("position", "sticky");
 
-    const firstHeatmapRow = page.locator("tbody tr[data-testid]").first();
+    const firstHeatmapRow = heatmap.locator("tbody tr[data-testid]").first();
     await expect(firstHeatmapRow).toBeVisible();
-    // Matrix reachability now lives behind the compact per-row
-    // "Receipt and metadata" disclosure so the dense timing cells stay
-    // scannable. Open the disclosure before asserting receipt links.
-    await firstHeatmapRow.locator("summary", { hasText: /Receipt and metadata/ }).click();
-    await expect(firstHeatmapRow.getByRole("link", { name: /Receipt/ }).first()).toBeVisible();
+    // The platform name is the receipt link, so matrix reachability needs no
+    // disclosure and costs the row no extra height.
+    await expect(firstHeatmapRow.locator("summary")).toHaveCount(0);
+    await expect(firstHeatmapRow.getByRole("link", { name: /^Open receipt for / }).first()).toBeVisible();
 
     await maybeCapture(page, "benchmark-detail-switcher-and-sticky-header");
   });
@@ -225,48 +226,40 @@ test.describe("@followup-usability release-gate route walk", () => {
     await enabledCompareCheckboxes.first().uncheck();
     expect(await countDisabled(compareCheckboxes)).toBe(baselineDisabledCount);
 
-    // The filter strip only renders when allPlatformResults.length >= 25.
-    // The committed audit corpus exceeds that threshold; the small browser
-    // test fixture (10 results across 3 cohorts) does not. Assert the
-    // strip is consistent with the row count rather than hard-coding
-    // visibility — the contract is "shows when >=25, hidden otherwise".
-    const tableRows = await page.locator("tbody tr[data-testid]").count();
+    // The cohort filter panel stays mounted at every cohort size now (it
+    // used to hide below a 25-row threshold).
     const filters = page.getByTestId("platform-detail-filters");
-    if (tableRows >= 25) {
-      await expect(filters).toBeVisible();
-      await expect(filters.getByTestId("platform-filter-benchmark")).toBeVisible();
-    } else {
-      await expect(filters).toHaveCount(0);
-    }
+    await expect(filters).toBeVisible();
+    await expect(filters.getByTestId("platform-filter-benchmark")).toBeVisible();
 
     await maybeCapture(page, "platform-detail-filters");
   });
 
-  test("Compare builder renders the empty-state cohort filters and candidate list", async ({ page }) => {
+  test("Compare empty state points to Find runs", async ({ page }) => {
     await page.goto("/results/compare/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    await expect(page.getByTestId("compare-builder")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Results Explorer" }).getByRole("link", { name: "Find runs" })).toBeVisible();
 
     await maybeCapture(page, "compare-builder-empty-state");
   });
 
-  test("Compare picker hides incompatible candidates after first selection by default", async ({ page }) => {
+  test("Compare keeps run selection in Find runs", async ({ page }) => {
     await page.goto("/results/compare/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Compare/);
 
-    // rx-19: candidate table retired; picking is in Query. Verify compact builder + Query CTA.
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", "/results/query");
-    await expect(page.locator("table")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Results Explorer" }).getByRole("link", { name: "Find runs" })).toHaveAttribute("href", "/results/query");
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
   test("Query compare tray defaults compatible-only after first selection", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const checkboxes = page.locator('input[data-testid^="query-compare-checkbox-"]');
     if ((await checkboxes.count()) < 2) return;
@@ -320,7 +313,7 @@ test.describe("@followup-usability release-gate route walk", () => {
       if ((await chartPanel.locator("svg").count()) > 0) {
         await expect(chartPanel.locator("svg").first()).toBeVisible();
       } else {
-        await expect(page.getByText("No meaningful per-query speedup difference")).toBeVisible();
+        await expect(page.getByText("No meaningful per-query difference")).toBeVisible();
       }
     }
 
@@ -330,7 +323,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   test("Result Detail renders without claiming missing receipt fields", async ({ page }) => {
     await openFirstSparseResultDetail(page);
 
-    // The disclosure-based "Show missing metadata" toggle was shipped in
+    // The disclosure-based "Show missing fields" toggle was shipped in
     // PR #295 (TODO results-explorer-result-detail-metadata-density) and
     // is part of the broader follow-up effort the audit covers. Assert it
     // is present so a regression that re-adds inline empties surfaces.

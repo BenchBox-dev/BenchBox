@@ -23,7 +23,6 @@ def test_dataframe_package_availability_flags_are_booleans() -> None:
     for flag_name in (
         "POLARS_AVAILABLE",
         "PANDAS_AVAILABLE",
-        "MODIN_AVAILABLE",
         "CUDF_AVAILABLE",
         "DASK_AVAILABLE",
         "DATAFUSION_DF_AVAILABLE",

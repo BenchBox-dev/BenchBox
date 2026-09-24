@@ -15,7 +15,7 @@ test("DuckDB worker inherits the page CSP and cannot fetch a remote URL", async 
   });
   await page.goto("/results/query");
   try {
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
   } catch (error) {
     throw new Error(`${String(error)}\nBrowser errors:\n${browserErrors.join("\n")}`);
   }

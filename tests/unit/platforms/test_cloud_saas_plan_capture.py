@@ -281,12 +281,83 @@ class TestBigQueryCapture:
         adapter = _make_bigquery(monkeypatch)
         assert isinstance(adapter.get_query_plan_parser(), BigQueryQueryPlanParser)
 
-    def test_get_query_plan_unchanged_returns_cost_dict(self, monkeypatch):
-        # The plan-capture path must NOT repurpose get_query_plan; it still
-        # returns a cost/dry-run dict (or an error dict), never a DAG.
+    def test_get_query_plan_returns_dry_run_cost_estimate(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
+
+        mock_bq = MagicMock()
+        mock_bq.QueryJobConfig.return_value = MagicMock()
+        monkeypatch.setattr(bq_module, "bigquery", mock_bq)
         adapter = _make_bigquery(monkeypatch)
-        result = adapter.get_query_plan(MagicMock(), "SELECT 1")
-        assert isinstance(result, dict)
+        job = MagicMock(total_bytes_processed=1024)
+        connection = MagicMock()
+        connection.query.return_value = job
+
+        result = adapter.get_query_plan(connection, "SELECT 1")
+
+        assert result is not None
+        assert result["bytes_processed"] == 1024
+        assert "estimated_cost" in result
+        connection.query.assert_called_once()
+
+    def test_capture_query_plan_does_not_raise_attribute_error(self, monkeypatch):
+        adapter = _make_bigquery(monkeypatch)
+        plan, capture_ms = adapter.capture_query_plan(MagicMock(), "SELECT 1", "q0")
+        assert plan is None
+        assert capture_ms >= 0
+
+    def test_execute_query_attaches_normalized_fingerprint(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
+
+        monkeypatch.setattr(bq_module, "bigquery", MagicMock())
+        adapter = _make_bigquery(monkeypatch)
+        adapter.normalize_plan_literals = True
+        stages = json.loads(_load("bigquery_query_plan_sample.json"))
+
+        job = MagicMock()
+        job.result.return_value = [(1,)]
+        job.total_bytes_processed = 123
+        job.total_bytes_billed = 123
+        job.slot_millis = 1
+        job.created = None
+        job.started = None
+        job.ended = None
+        job.job_id = "job-1"
+        job.query_plan = stages
+
+        conn = MagicMock()
+        conn.query.return_value = job
+
+        result = adapter.execute_query(conn, "SELECT 1", "q1", validate_row_count=False)
+        assert result["status"] == "SUCCESS"
+        assert result["query_plan"] is not None
+        assert result["plan_fingerprint"] == result["query_plan"].plan_fingerprint
+        assert result["plan_fingerprint_normalized"] == result["query_plan"].normalized_fingerprint
+
+    def test_execute_query_omits_normalized_when_disabled(self, monkeypatch):
+        import benchbox.platforms.bigquery as bq_module
+
+        monkeypatch.setattr(bq_module, "bigquery", MagicMock())
+        adapter = _make_bigquery(monkeypatch)
+        adapter.normalize_plan_literals = False
+        stages = json.loads(_load("bigquery_query_plan_sample.json"))
+
+        job = MagicMock()
+        job.result.return_value = [(1,)]
+        job.total_bytes_processed = 123
+        job.total_bytes_billed = 123
+        job.slot_millis = 1
+        job.created = None
+        job.started = None
+        job.ended = None
+        job.job_id = "job-1"
+        job.query_plan = stages
+
+        conn = MagicMock()
+        conn.query.return_value = job
+
+        result = adapter.execute_query(conn, "SELECT 1", "q1", validate_row_count=False)
+        assert result["status"] == "SUCCESS"
+        assert "plan_fingerprint_normalized" not in result
 
     def test_capture_bq_plan_builds_dag(self, monkeypatch):
         adapter = _make_bigquery(monkeypatch)
@@ -312,3 +383,33 @@ class TestBigQueryCapture:
         # A successful query whose job exposes no plan must not raise in non-strict
         # mode; the failure is recorded for observability instead.
         assert adapter.plan_capture_failures >= 1
+
+
+# ---------------------------------------------------------------------------
+# Snowflake get_query_plan real path (fake cursor, no cloud account)
+# ---------------------------------------------------------------------------
+
+
+def _snowflake_conn_with_cell(cell):
+    """Fake Snowflake connection whose EXPLAIN cursor yields one cell."""
+    conn = MagicMock()
+    cursor = conn.cursor.return_value
+    cursor.fetchone.return_value = (cell,) if cell is not None else None
+    return conn
+
+
+class TestSnowflakeGetQueryPlanPassthrough:
+    """Pin get_query_plan's observed live behavior.
+
+    Verified live: ``EXPLAIN USING JSON`` returns its plan in a TEXT column,
+    so the cell arrives as a JSON string and is returned unchanged.
+    """
+
+    def test_str_cell_passes_through(self, monkeypatch):
+        adapter = _make_snowflake(monkeypatch)
+        raw = _load("snowflake_explain_sample.json")
+        assert adapter.get_query_plan(_snowflake_conn_with_cell(raw), "SELECT 1") == raw
+
+    def test_null_row_returns_none(self, monkeypatch):
+        adapter = _make_snowflake(monkeypatch)
+        assert adapter.get_query_plan(_snowflake_conn_with_cell(None), "SELECT 1") is None

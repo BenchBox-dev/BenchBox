@@ -120,7 +120,11 @@ def _build_comparisons(
                 _warn_if_explicit(explicit_query_id, f"Query '{qid}' missing plan in one or both runs")
             continue
         comparison = compare_query_plans(plan1, plan2)
-        if comparison.similarity.overall_similarity < threshold or (not explicit_query_id and threshold == 0.0):
+        # An explicitly requested query is always reported: --threshold filters
+        # the multi-query sweep, it must not suppress a single-query request
+        # (at the default threshold 0.0 the old condition dropped it and the
+        # command exited 0 with "No plans available for comparison").
+        if explicit_query_id or comparison.similarity.overall_similarity < threshold or threshold == 0.0:
             comparisons.append((qid, comparison))
     return comparisons
 

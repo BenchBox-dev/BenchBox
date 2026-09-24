@@ -154,21 +154,53 @@
     outline-offset: 2px;
 }
 
-.benchbox-site-header__theme {
-    min-height: 2rem;
-    padding: 0.35rem 0.65rem;
+.benchbox-site-footer-theme {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    width: max-content;
+    padding: 2px;
     border: 1px solid var(--bb-site-header-border);
     border-radius: 6px;
-    background: var(--bb-site-header-control-bg, transparent);
-    color: var(--bb-site-header-active);
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
+    background: transparent;
+}
+
+.benchbox-site-footer-theme__option {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--bb-site-header-text);
     cursor: pointer;
 }
 
-.benchbox-site-header__theme:hover {
-    background: var(--bb-site-header-control-hover-bg);
+.benchbox-site-footer-theme__option:hover {
+    color: var(--bb-site-header-active);
+}
+
+.benchbox-site-footer-theme__option:focus-visible {
+    outline: 2px solid var(--bb-site-header-focus);
+    outline-offset: 2px;
+}
+
+/* Checked state is styled two ways: the pre-JS attribute selector below
+   matches the choice the head script already stamped on <html> before
+   the footer's hard-coded `aria-checked="system"` markup is corrected by
+   `applyTheme()`, and the `aria-checked` selector keeps it in sync once
+   the runtime script has run. A border plus background keeps the
+   selected option distinguishable by more than color alone. */
+.benchbox-site-footer-theme__option[aria-checked="true"],
+html[data-bb-theme-choice="system"] .benchbox-site-footer-theme__option[data-benchbox-theme-option="system"],
+html[data-bb-theme-choice="light"] .benchbox-site-footer-theme__option[data-benchbox-theme-option="light"],
+html[data-bb-theme-choice="dark"] .benchbox-site-footer-theme__option[data-benchbox-theme-option="dark"] {
+    background: var(--bb-site-header-control-bg);
+    border-color: var(--bb-site-header-focus);
+    color: var(--bb-site-header-focus);
 }
 
 @media (max-width: 900px) {
@@ -196,8 +228,7 @@
     }
 
     .benchbox-site-header__link,
-    .benchbox-site-header__cta,
-    .benchbox-site-header__theme {
+    .benchbox-site-header__cta {
         font-size: 1rem;
     }
 }

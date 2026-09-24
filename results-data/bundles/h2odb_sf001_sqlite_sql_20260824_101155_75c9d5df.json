@@ -1,0 +1,681 @@
+{
+  "benchmark": {
+    "id": "h2odb",
+    "name": "H2O Database",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_option_sources": {
+      "check_same_thread": "saved_config",
+      "database_name": "database_f3ba6a7c0af9",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "show_query_plans": "saved_config",
+      "timeout": "saved_config",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "check_same_thread": false,
+      "database_name": "database_5d7b725135a6",
+      "force_recreate": false,
+      "force_upload": false,
+      "normalize_plan_literals": false,
+      "show_query_plans": false,
+      "timeout": 30.0,
+      "tuning_source": "baseline"
+    }
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "os": "Darwin",
+      "python": "3.12.13"
+    },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "os": "Darwin",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "local_process",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "errors": [
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "7",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "7",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "7",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "7",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "8",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "8",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "8",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"FROM\": syntax error",
+      "phase": "query",
+      "query_id": "8",
+      "type": "near \"FROM\""
+    },
+    {
+      "message": "near \"(\": syntax error",
+      "phase": "query",
+      "query_id": "9",
+      "type": "near \"(\""
+    },
+    {
+      "message": "near \"(\": syntax error",
+      "phase": "query",
+      "query_id": "9",
+      "type": "near \"(\""
+    },
+    {
+      "message": "near \"(\": syntax error",
+      "phase": "query",
+      "query_id": "9",
+      "type": "near \"(\""
+    },
+    {
+      "message": "near \"(\": syntax error",
+      "phase": "query",
+      "query_id": "9",
+      "type": "near \"(\""
+    }
+  ],
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-08-24T10:11:54.691831",
+    "translation": {
+      "attempt_count": 51,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "count": 1,
+          "normalized_source_dialect": "duckdb",
+          "normalized_target_dialect": "sqlite",
+          "source_dialect": "duckdb",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "sqlite",
+          "translator": "sqlglot"
+        },
+        {
+          "count": 50,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "sqlite",
+          "source_dialect": "netezza",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "sqlite",
+          "translator": "sqlglot"
+        }
+      ],
+      "source_dialects": [
+        "duckdb",
+        "netezza"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 51,
+      "target_dialects": [
+        "sqlite"
+      ],
+      "translators": [
+        "sqlglot"
+      ]
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-08-24T10:11:55.418610",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 236,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 373,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 12,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 50,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "builtin",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "check_same_thread": false,
+      "connection_mode": "file",
+      "driver_runtime_strategy": "current-process",
+      "execution_mode": "sql",
+      "timeout": 30.0
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "file",
+      "deployment_type": "embedded",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_runtime_strategy": "current-process",
+    "name": "SQLite",
+    "raw_config": {
+      "check_same_thread": false,
+      "force_recreate": false,
+      "timeout": 30.0,
+      "tuning_source": "baseline",
+      "type": "sqlite"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "3.53.1"
+  },
+  "queries": [
+    {
+      "id": "1",
+      "iter": 0,
+      "ms": 0.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2",
+      "iter": 0,
+      "ms": 3.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3",
+      "iter": 0,
+      "ms": 13.7,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4",
+      "iter": 0,
+      "ms": 14.1,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5",
+      "iter": 0,
+      "ms": 21.9,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6",
+      "iter": 0,
+      "ms": 22.7,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7",
+      "iter": 0,
+      "ms": 0.017083,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "8",
+      "iter": 0,
+      "ms": 0.00500004,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "9",
+      "iter": 0,
+      "ms": 0.00329199,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "10",
+      "iter": 0,
+      "ms": 18.2,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1",
+      "iter": 1,
+      "ms": 0.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2",
+      "iter": 1,
+      "ms": 3.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3",
+      "iter": 1,
+      "ms": 13.3,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4",
+      "iter": 1,
+      "ms": 14.3,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5",
+      "iter": 1,
+      "ms": 22.1,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6",
+      "iter": 1,
+      "ms": 22.6,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7",
+      "iter": 1,
+      "ms": 0.012292,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "8",
+      "iter": 1,
+      "ms": 0.00558299,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "9",
+      "iter": 1,
+      "ms": 0.00416703,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "10",
+      "iter": 1,
+      "ms": 17.3,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1",
+      "iter": 2,
+      "ms": 0.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2",
+      "iter": 2,
+      "ms": 3.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3",
+      "iter": 2,
+      "ms": 13.5,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4",
+      "iter": 2,
+      "ms": 14.2,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5",
+      "iter": 2,
+      "ms": 21.3,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6",
+      "iter": 2,
+      "ms": 22.2,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7",
+      "iter": 2,
+      "ms": 0.012416,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "8",
+      "iter": 2,
+      "ms": 0.003708,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "9",
+      "iter": 2,
+      "ms": 0.00291702,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "10",
+      "iter": 2,
+      "ms": 17.4,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1",
+      "iter": 3,
+      "ms": 0.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2",
+      "iter": 3,
+      "ms": 3.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3",
+      "iter": 3,
+      "ms": 13.4,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4",
+      "iter": 3,
+      "ms": 14.1,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5",
+      "iter": 3,
+      "ms": 21.7,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6",
+      "iter": 3,
+      "ms": 22.9,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7",
+      "iter": 3,
+      "ms": 0.010542,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "8",
+      "iter": 3,
+      "ms": 0.00433304,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "9",
+      "iter": 3,
+      "ms": 0.003375,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "10",
+      "iter": 3,
+      "ms": 17.9,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "run": {
+    "id": "75c9d5df",
+    "iterations": 3,
+    "query_time_ms": 279,
+    "streams": 4,
+    "timestamp": "2026-08-24T10:11:55.395797",
+    "total_duration_ms": 668
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 236.7,
+      "rows_loaded": 100000
+    },
+    "queries": {
+      "failed": 9,
+      "passed": 21,
+      "total": 30
+    },
+    "timing": {
+      "avg_ms": 13.3,
+      "geometric_mean_ms": 7.9,
+      "max_ms": 22.9,
+      "min_ms": 0.3,
+      "p90_ms": 22.2,
+      "p95_ms": 22.6,
+      "p99_ms": 22.9,
+      "stdev_ms": 8.1,
+      "total_ms": 279.4
+    },
+    "validation": "partial"
+  },
+  "tables": {
+    "trips": {
+      "rows": 100000
+    }
+  },
+  "version": "2.1"
+}

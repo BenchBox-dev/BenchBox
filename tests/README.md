@@ -2,7 +2,8 @@
 
 # BenchBox Test Suite
 
-This directory contains the comprehensive test suite for BenchBox, organized into multiple categories for efficient testing and development workflows.
+This directory contains the BenchBox test suite. Directories group tests by purpose;
+pytest markers select the execution lanes.
 
 **See also**: [`AGENTS.md`](../AGENTS.md) for the contributor/agent guide, and [`docs/development/`](../docs/development/) for architecture deep-dives.
 
@@ -10,30 +11,40 @@ This directory contains the comprehensive test suite for BenchBox, organized int
 
 ```
 tests/
+├── contracts/                # Shared contract fixtures
+├── databases/                # Local test database helpers
+├── docs/                     # Documentation checks and test plans
 ├── e2e/                      # End-to-end CLI workflow tests
+├── examples/                 # Example usage checks
 ├── fixtures/                 # Shared test fixtures
 ├── integration/              # Integration tests
+├── parity/                   # Parity fixtures and generators
 ├── performance/              # Performance tests
+├── system/                   # Repository and CI system checks
+├── uat/                      # User acceptance checks and support code
 ├── unit/                     # Unit tests
 ├── utilities/                # Test utilities and helpers
+├── validation/               # Data and query validation checks
+├── test_*.py                 # Root-level benchmark and runner tests
 ├── conftest.py              # Global pytest configuration
-├── pytest.ini              # Enhanced pytest configuration
 └── README.md               # This file
 ```
+
+Pytest uses the root `pytest.ini` by default (fast local runs). CI-oriented
+targets such as `make test-ci` and `make coverage-fast` explicitly select the
+root `pytest-ci.ini` profile with `pytest -c pytest-ci.ini`.
 
 ## Test Categories
 
 ### Unit Tests (`unit/`)
-Fast, isolated tests that verify individual components:
+Tests of individual components:
 - **benchmarks/**: Core benchmark functionality
 - **core/**: Base classes and utilities
 - **generators/**: Data generation components
 
-**Characteristics:**
-- Fast execution (< 1 second each)
-- No external dependencies
-- High isolation and predictability
-- Extensive code coverage
+Many are isolated and fast, but the directory does not itself guarantee a
+runtime or absence of external dependencies. Select the `fast` marker for the
+curated fast lane.
 
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
@@ -64,10 +75,11 @@ Tests that verify component interactions:
 - Cross-component data flow
 
 **Characteristics:**
-- Moderate execution time (1-10 seconds)
 - Real database connections
 - File system operations
-- Network access (when applicable)
+
+Integration tests may use local services; live network tests use the
+`live_integration` marker and are excluded from the default local lanes.
 
 ### Performance Tests (`performance/`)
 Tests focused on performance characteristics:
@@ -76,11 +88,10 @@ Tests focused on performance characteristics:
 - Memory usage analysis
 - Scalability testing
 
-**Characteristics:**
-- Longer execution time (10+ seconds)
-- Resource monitoring
-- Statistical analysis
-- Baseline comparisons
+This directory includes resource monitoring, statistical analysis, and
+baseline comparisons. Use the `fast`, `medium`, `slow`, `stress`, and
+`resource_heavy` markers to select tests by execution cost rather than by
+directory name.
 
 ## Test Execution
 
@@ -89,7 +100,8 @@ Tests focused on performance characteristics:
 The standard gates are intentionally split by the risk they are meant to catch:
 
 - `make test-fast`: quick developer and develop-PR feedback for code-impacting
-  changes. This is the coverage-bearing lane in `.github/workflows/pr.yml`.
+  changes. The matching selection in `.github/workflows/pr.yml` also collects
+  coverage.
 - `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
   DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
   load, and execute, then validates the emitted stream-0 results against the stored
@@ -155,13 +167,18 @@ The standard gates are intentionally split by the risk they are meant to catch:
   signals until their cost, credential, and flake policies are suitable for
   blocking routine PRs.
 
-Medium tests are an explicit local routing tier, not an implicit CI guarantee.
-Correctness-relevant medium tests must be promoted into `fast`, an integration
-workflow, or `test-correctness-gate` when they become product-critical.
+The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`,
+but only when the heavy tier is needed: code-routed runs where the event is
+`merge_group` or the change touches soundness paths or packaging
+(`scripts/heavy_tier_needed.py` reports `heavy-needed == 'true'`). Ordinary
+code-change PRs skip it, so do not assume medium coverage ran on a routine PR.
+Its marker selection excludes slow, stress, resource-heavy, and live
+integration tests. Product-critical tests that need a different selection
+belong in an explicit workflow or correctness gate.
 
 ### Quick Development Testing
 ```bash
-# Run fast unit tests only
+# Run the curated fast lane
 make test-fast
 # or
 uv run -- python -m pytest -m fast
@@ -171,8 +188,10 @@ uv run -- python -m pytest tests/unit/benchmarks/test_tpch_core.py
 
 # Run with coverage (fast tests only - quick feedback)
 make coverage-fast
-# or full suite
+# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
+# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
+make coverage-opt-in-all
 # or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
@@ -376,7 +395,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     steps:
     - uses: actions/checkout@v3

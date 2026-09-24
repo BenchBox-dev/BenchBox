@@ -56,10 +56,10 @@ test.describe("direct route parity", () => {
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Results$/ }));
 
     await page.goto("/results/query");
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Results Query Workbench$/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /^Find benchmark runs$/ }));
 
     await page.goto("/results/compare");
-    await waitForDataElement(page, page.getByRole("heading", { name: /^Pick runs to compare$/ }));
+    await waitForDataElement(page, page.getByRole("heading", { name: /^Compare benchmark results$/ }));
   });
 
   test("flywheel documentation CTAs use real native navigation", async ({ page }) => {
@@ -85,11 +85,14 @@ test.describe("direct route parity", () => {
   });
 
   test("direct route compare warning copy uses singular and plural labels", async ({ page }) => {
-    await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
+    // Native and tuned DuckDB runs share platform and driver versions, so
+    // tuning remains the sole comparability warning. Cross-engine comparison
+    // now also exposes the distinct platform and driver version evidence.
+    await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DUCKDB_TUNED}`);
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));
     const guardrails = page.getByRole("region", { name: "Compare guardrails" });
-    const receipt = page.getByRole("region", { name: "Comparability receipt" });
+    const receipt = page.getByRole("region", { name: "Comparison checks" });
     await expect(guardrails).toContainText("1 warning");
     await expect(guardrails).not.toContainText("1 warnings");
     await expect(receipt).toContainText("1 warning");
@@ -97,8 +100,8 @@ test.describe("direct route parity", () => {
 
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DUCKDB_TUNED},${SHORT_DATAFUSION}`);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Comparison$/ }));
-    await expect(guardrails).toContainText("2 warnings");
-    await expect(receipt).toContainText("2 warnings");
+    await expect(guardrails).toContainText("3 warnings");
+    await expect(receipt).toContainText("3 warnings");
     await expect(guardrails).not.toContainText(/coverage\.\./i);
   });
 });

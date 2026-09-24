@@ -294,3 +294,50 @@ describe("shouldRetryTransientQueryError", () => {
     expect(shouldRetryTransientQueryError(new Error("syntax error"), 1)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// duckdb-wasm's `AsyncDuckDB` bridge (`onError` in
+// `@duckdb/duckdb-wasm/dist/duckdb-browser.mjs`) responds to an uncaught
+// worker exception — e.g. the `RangeError: offset is out of bounds` this
+// module already classifies as transient — by clearing its pending-request
+// map without ever resolving or rejecting the promises in it. A `conn.query`
+// call caught by that never settles, so anything built on `await`ing it
+// (this readiness ladder included) hangs forever: no rejection ever reaches
+// the retry loop's `catch`, so the retry budget below never runs and the
+// page's loading state never clears, even across re-navigation.
+//
+// This is exactly the failure e2e/failures/compare-hard-block.spec.ts hit in
+// CI: the page stayed on its loading skeleton through three full
+// re-navigations because nothing in this module could time out a query that
+// duckdb-wasm had silently abandoned.
+// ---------------------------------------------------------------------------
+describe("a query the worker never answers (dropped-pending-request hang)", () => {
+  it("times out instead of hanging forever, and the timeout is classified as retryable", async () => {
+    vi.useFakeTimers();
+    try {
+      // Simulates duckdb-wasm's onError: the query's promise is never
+      // resolved or rejected.
+      const hungConn = { query: () => new Promise<never>(() => {}) };
+
+      let settled = false;
+      let settledError: unknown;
+      _waitForSnapshotRowsForTest(hungConn as unknown as Parameters<typeof _waitForSnapshotRowsForTest>[0]).then(
+        () => {
+          settled = true;
+        },
+        (error: unknown) => {
+          settled = true;
+          settledError = error;
+        },
+      );
+
+      // Comfortably past 8 attempts of (query timeout + backoff).
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(settled).toBe(true);
+      expect(String(settledError)).toMatch(/did not respond within \d+ms/i);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

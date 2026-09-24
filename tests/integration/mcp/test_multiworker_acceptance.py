@@ -149,6 +149,7 @@ def test_remote_contract_survives_alternating_workers(tmp_path: Path, monkeypatc
                 await wait_for(client_a, slow_id, "running")
                 cancelled = _content(await client_a.call_tool("cancel_benchmark", {"execution_id": slow_id}))
                 assert cancelled["cancel_requested"] is True
+                assert cancelled["cancel_outcome"] == "requested"
                 release_slow_job.set()
                 await wait_for(client_a, slow_id, "cancelled")
 

@@ -137,3 +137,8 @@ GitHub Pages with 200).
 
 G7b: first post-transfer `push` to `release` proves Pages publish.
 Serving-only success at G5 does not close G7b.
+
+> Historical note: this transfer predates independent publication. Current production writes use
+> the `develop`-dispatched transaction writer in `publication-deployer-soak-and-retirement.md`;
+> the `docs.yml` release-to-Pages job is a legacy fallback skipped while independent publication
+> owns Pages.

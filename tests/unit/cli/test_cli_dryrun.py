@@ -993,6 +993,26 @@ class TestDryRunDisplayConfigurationSummary:
 class TestDryRunDisplayBehavioral:
     """Behavioral coverage for branch-heavy dry-run rendering helpers."""
 
+    def test_ddl_preview_summary_shows_distribute_by(self):
+        """The Tuning summary line surfaces distribute_by (not dead keys)."""
+        from io import StringIO
+
+        from rich.console import Console
+
+        from benchbox.cli.dryrun import DryRunDisplay
+
+        buf = StringIO()
+        display = DryRunDisplay(console=Console(file=buf, force_terminal=False, width=140))
+        display._display_ddl_preview(
+            {
+                "lineitem": {
+                    "tuning_summary": {"distribute_by": "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"},
+                    "ddl_clauses": "CREATE TABLE lineitem (x INT)",
+                }
+            }
+        )
+        assert "Dist: DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in buf.getvalue()
+
     def _make_result(self, **overrides):
         from benchbox.core.schemas import DryRunResult
 
@@ -1342,6 +1362,41 @@ class TestGenerateCliCommandNewParams:
         assert "--platform-option liquid_clustering_columns=col1" in cmd
         assert "--global-cache" in cmd
         assert "--capture-plans" in cmd
+
+
+class TestGenerateCliCommandClientLink:
+    def test_client_link_options_rendered(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(
+            platform="snowflake",
+            benchmark="tpch",
+            scale=1.0,
+            client_region="us-east-1",
+            client_cloud="aws",
+        )
+        assert "--client-region us-east-1" in cmd
+        assert "--client-cloud aws" in cmd
+        assert "--no-link-probe" not in cmd
+
+    def test_no_link_probe_rendered(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=0.01,
+            no_link_probe=True,
+        )
+        assert "--no-link-probe" in cmd
+
+    def test_client_link_options_omitted_when_unset(self):
+        from benchbox.cli.dryrun import generate_cli_command
+
+        cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01)
+        assert "--client-region" not in cmd
+        assert "--client-cloud" not in cmd
+        assert "--no-link-probe" not in cmd
 
 
 class TestGenerateCliCommandCompleteness:

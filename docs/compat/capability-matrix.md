@@ -4,28 +4,29 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 452
+**Total registered rules:** 492
 
-**Platforms covered:** 34
+**Platforms covered:** 35
 
 ## Phase coverage by platform
 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | - | - | 2 | 1 | - | 3 |
+| bigquery | - | 2 | - | 2 | 1 | - | 5 |
 | clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | - | - | 2 | 1 | - | 3 |
+| databricks | - | 1 | - | 2 | 1 | - | 4 |
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
+| ducklake | - | - | - | 2 | 1 | - | 3 |
 | fabric_dw | - | - | - | - | 1 | - | 1 |
 | firebolt | - | - | - | - | 1 | - | 1 |
-| lakesail | 5 | 6 | - | - | 1 | 69 | 81 |
+| lakesail | 5 | 6 | 11 | - | 1 | 69 | 92 |
 | mysql | - | 1 | - | - | - | - | 1 |
 | pg-duckdb | 3 | - | - | - | - | 21 | 24 |
 | pg-mooncake | 6 | - | - | - | - | 17 | 23 |
@@ -36,8 +37,8 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | questdb | 1 | - | - | - | 1 | - | 2 |
 | redshift | - | - | - | 2 | 1 | - | 3 |
 | singlestore | - | - | - | - | 4 | - | 4 |
-| snowflake | - | 6 | - | 2 | 1 | - | 9 |
-| spark | - | 6 | - | 2 | 1 | - | 9 |
+| snowflake | - | 7 | - | 2 | 1 | - | 10 |
+| spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
 | synapse | - | - | - | - | 1 | - | 1 |
@@ -45,7 +46,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | timescaledb | 3 | - | - | - | - | 19 | 22 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
-| velox | - | - | - | - | 1 | - | 1 |
+| velox | - | - | 11 | - | 1 | - | 12 |
 
 ## Rules by platform
 
@@ -59,6 +60,8 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.bigquery.h2odb.q9_percentile_window_variant` |
+| query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.bigquery.tpcdi.eq7_derived_table_variant` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.bigquery.all.convert_to_bigquery_table` |
@@ -189,6 +192,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.databricks.tpcdi.eq7_derived_table_variant` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.databricks.all.convert_to_delta_table` |
@@ -267,6 +271,14 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=write_primitives, query=merge_with_cte_source | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_cte_source` |
 | execution_filter | benchmark=write_primitives, query=merge_with_join_condition | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.duckdb.write_primitives.merge_with_join_condition` |
 
+### ducklake
+
+| phase | scope | action | support | failure mode | rule_id |
+|---|---|---|---|---|---|
+| schema_emit | benchmark=transaction_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.transaction_primitives.pk_lock_table_unsupported` |
+| schema_emit | benchmark=write_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.ducklake.write_primitives.pk_lock_table_unsupported` |
+| ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.ducklake.all.strip_primary_keys` |
+
 ### fabric_dw
 
 | phase | scope | action | support | failure mode | rule_id |
@@ -294,6 +306,17 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q4_unsupported` |
 | query_source | benchmark=vector_search, query=Q5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q5_unsupported` |
 | query_source | benchmark=vector_search, query=Q6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `query_source.lakesail.vector_search.q6_unsupported` |
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.lakesail.tpchavoc.q09_scalar_group_by_first` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.lakesail.all.optimize_table_definition` |
 | execution_filter | benchmark=read_primitives, query=approx_quantiles_array | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_quantiles_array` |
 | execution_filter | benchmark=read_primitives, query=approx_top_k_lineitem | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.lakesail.read_primitives.approx_top_k_lineitem` |
@@ -556,6 +579,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.tpcdi.eq7_derived_table_variant` |
 | query_source | benchmark=vector_search, query=Q1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q1_variant` |
 | query_source | benchmark=vector_search, query=Q2 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q2_variant` |
 | query_source | benchmark=vector_search, query=Q3 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q3_variant` |
@@ -576,6 +600,17 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q4_variant` |
 | query_source | benchmark=vector_search, query=Q5 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q5_variant` |
 | query_source | benchmark=vector_search, query=Q6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.spark.vector_search.q6_variant` |
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.spark.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.spark.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.spark.all.optimize_table_definition` |
@@ -669,4 +704,15 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.velox.tpchavoc.q09_scalar_group_by_first` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.velox.all.optimize_table_definition` |

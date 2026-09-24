@@ -5,6 +5,7 @@ import {
   COMPARABILITY_WARNING_TARGET_ID,
   buildComparabilityFields,
   comparabilityWarningFields,
+  orderWarningLabelsForSummary,
   ComparabilityReceipt,
 } from "@/components/ComparabilityReceipt";
 
@@ -63,7 +64,7 @@ describe("ComparabilityReceipt", () => {
   it("renders workload matches and published cost metadata", () => {
     render(<ComparabilityReceipt results={[makeDetail(), makeDetail({ result_id: "r2", platform: "SQLite" })]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
     expect(receipt.getAttribute("id")).toBe("comparability-receipt");
     expect(within(receipt).getByText("No differences")).toBeTruthy();
     expect(receipt).toHaveTextContent("Benchmark");
@@ -71,7 +72,8 @@ describe("ComparabilityReceipt", () => {
     expect(receipt).toHaveTextContent("Query scope");
     expect(receipt).toHaveTextContent("2 queries");
     expect(receipt).toHaveTextContent("Cost model");
-    expect(receipt).toHaveTextContent("2026.05.0 (benchbox.core.cost.pricing)");
+    expect(receipt).toHaveTextContent("2026.05.0");
+    expect(receipt).not.toHaveTextContent("benchbox.core.cost.pricing");
   });
 
   it("flags normalized cost metadata differences", () => {
@@ -88,7 +90,7 @@ describe("ComparabilityReceipt", () => {
 
     expect(fields.find((field) => field.label === "Normalized cost")).toMatchObject({
       status: "diff",
-      detail: "DuckDB: $0.42; SQLite: unavailable",
+      detail: "DuckDB: $0.42; SQLite: Not recorded",
     });
   });
 
@@ -106,22 +108,29 @@ describe("ComparabilityReceipt", () => {
 
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getAllByText("4 warnings")).toHaveLength(2);
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    expect(within(receipt).getAllByText("6 warnings")).toHaveLength(1);
     const warningTarget = screen.getByTestId("comparability-warning-target");
     expect(warningTarget.getAttribute("id")).toBe(COMPARABILITY_WARNING_TARGET_ID);
     expect(warningTarget.getAttribute("tabindex")).toBe("-1");
     expect(warningTarget).toHaveTextContent("Driver version");
     expect(warningTarget).toHaveTextContent("Date window");
+    expect(warningTarget).toHaveTextContent("Architecture");
+    expect(warningTarget).toHaveTextContent("CPU count");
+    expect(warningTarget).toHaveTextContent("Memory");
     expect(receipt).toHaveTextContent("Driver version");
     expect(receipt).toHaveTextContent("DuckDB: 1.0; SQLite: 2.0");
     expect(receipt).toHaveTextContent("Date window");
-    expect(receipt).toHaveTextContent("2026-04-01 to 2026-04-03");
+    expect(receipt.querySelectorAll("[data-testid=run-date-chip]")).toHaveLength(4);
+    expect(receipt.querySelector("[data-testid=run-date-chip]")?.getAttribute("aria-label")).toMatch(/2026-04-01.*days ago/);
     expect(receipt).toHaveTextContent("Tuning");
     expect(receipt).toHaveTextContent("DuckDB: default; SQLite: manual");
-    expect(receipt).toHaveTextContent("Environment");
-    expect(receipt).toHaveTextContent("DuckDB: Linux, x64, 8 CPU");
-    expect(receipt).toHaveTextContent("SQLite: macOS, arm64, 10 CPU");
+    expect(receipt).toHaveTextContent("Architecture");
+    expect(receipt).toHaveTextContent("DuckDB: x64; SQLite: Arm64");
+    expect(receipt).toHaveTextContent("CPU count");
+    expect(receipt).toHaveTextContent("DuckDB: 8 CPU; SQLite: 10 CPU");
+    expect(receipt).toHaveTextContent("Memory");
+    expect(receipt).toHaveTextContent("DuckDB: 32 GB; SQLite: 64 GB");
   });
 
   it("builds explicit warning fields for compare-page consumers", () => {
@@ -136,9 +145,68 @@ describe("ComparabilityReceipt", () => {
       }),
     ]);
 
-    expect(fields.find((field) => field.label === "Phase")?.status).toBe("diff");
+    expect(fields.find((field) => field.label === "Test phase")?.status).toBe("diff");
     expect(fields.find((field) => field.label === "Query scope")?.status).toBe("diff");
-    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Phase", "Query scope"]);
+    expect(comparabilityWarningFields(fields).map((field) => field.label)).toEqual(["Test phase", "Query scope"]);
+  });
+
+  it("renders the receipt's Validation row with the reader-facing label, raw status kept alongside it", () => {
+    const { container } = render(
+      <ComparabilityReceipt
+        results={[
+          makeDetail({ validation_status: "passed" }),
+          makeDetail({ result_id: "r2", platform: "Pandas", platform_id: "pandas", validation_status: "not_run" }),
+        ]}
+      />,
+    );
+    const validationCard = [...container.querySelectorAll("h3")]
+      .find((el) => el.textContent === "Validation")
+      ?.closest("div")?.parentElement;
+    expect(validationCard).toBeTruthy();
+    expect(validationCard).toHaveTextContent("2 values differ");
+    expect(validationCard).toHaveTextContent("DuckDB: passed; Pandas: no validation (not_run)");
+  });
+
+  describe("orderWarningLabelsForSummary", () => {
+    it("sorts a Validation warning to the front, ahead of cosmetic environment fields", () => {
+      const fields = buildComparabilityFields([
+        makeDetail({ platform_version: "1.0", driver_version: "1.0", execution_mode: "in-memory", validation_status: "passed" }),
+        makeDetail({
+          result_id: "r2",
+          platform: "Pandas",
+          platform_id: "pandas",
+          platform_version: "2.0",
+          driver_version: "2.0",
+          execution_mode: "lazy",
+          validation_status: "not_run",
+        }),
+      ]);
+      const warnings = comparabilityWarningFields(fields);
+      // Sanity: without reordering, Validation would land after the three
+      // environment fields (build order), which is exactly the "+1 more"
+      // bug from the audit.
+      expect(warnings.map((f) => f.label).indexOf("Validation")).toBeGreaterThan(0);
+
+      const ordered = orderWarningLabelsForSummary(warnings);
+      expect(ordered[0]).toBe("Validation");
+      expect(ordered).toEqual(
+        expect.arrayContaining(["Platform version", "Driver version", "Execution mode", "Validation"]),
+      );
+    });
+
+    it("is a no-op when there is no Validation warning", () => {
+      const fields = buildComparabilityFields([
+        makeDetail(),
+        makeDetail({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          test_type: "throughput",
+        }),
+      ]);
+      const warnings = comparabilityWarningFields(fields);
+      expect(orderWarningLabelsForSummary(warnings)).toEqual(warnings.map((f) => f.label));
+    });
   });
 
   it("uses singular count copy for one warning and one query", () => {
@@ -159,8 +227,8 @@ describe("ComparabilityReceipt", () => {
 
     render(<ComparabilityReceipt results={[duckdb, sqlite]} />);
 
-    const receipt = screen.getByRole("region", { name: "Comparability receipt" });
-    expect(within(receipt).getAllByText("1 warning")).toHaveLength(2);
+    const receipt = screen.getByRole("region", { name: "Comparison checks" });
+    expect(within(receipt).getAllByText("1 warning")).toHaveLength(1);
     expect(receipt).not.toHaveTextContent("1 warnings");
     expect(receipt).toHaveTextContent("1 query");
     expect(receipt).not.toHaveTextContent("1 queries");
@@ -195,15 +263,15 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: [] }),
       ]);
 
-      const field = fields.find((f) => f.label === "Physical tuning mechanisms");
-      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs rendered different physical mechanisms" });
+      const field = fields.find((f) => f.label === "Applied tuning features");
+      expect(field).toMatchObject({ status: "diff", summary: "The selected runs applied different tuning features" });
       expect(field?.detail).toContain("DuckDB: indexes, clustering, distribution, sort, z_order, stats");
       expect(field?.detail).toContain("SQLite: none");
 
       // A warning, not a match failure: the overall receipt still stays
       // facet-matchable, it just surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
-      expect(warnings.some((f) => f.label === "Physical tuning mechanisms")).toBe(true);
+      expect(warnings.some((f) => f.label === "Applied tuning features")).toBe(true);
     });
 
     it("matches (no warning) when two tuned runs render the same mechanism set", () => {
@@ -212,9 +280,9 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: ["clustering", "indexes"] }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toMatchObject({
+      expect(fields.find((f) => f.label === "Applied tuning features")).toMatchObject({
         status: "match",
-        summary: "2 mechanisms",
+        summary: "2 features",
       });
     });
 
@@ -224,7 +292,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "notuning" }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+      expect(fields.find((f) => f.label === "Applied tuning features")).toBeUndefined();
     });
 
     it("is omitted when any tuned result predates physical_mechanisms ingest (undefined, not empty)", () => {
@@ -233,7 +301,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", physical_mechanisms: undefined }),
       ]);
 
-      expect(fields.find((f) => f.label === "Physical tuning mechanisms")).toBeUndefined();
+      expect(fields.find((f) => f.label === "Applied tuning features")).toBeUndefined();
     });
   });
 
@@ -246,15 +314,15 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
       ]);
 
-      const field = fields.find((f) => f.label === "Tuning policy generation");
-      expect(field).toMatchObject({ status: "diff", summary: "Tuned runs span different tuning-policy generations" });
+      const field = fields.find((f) => f.label === "Tuning rules version");
+      expect(field).toMatchObject({ status: "diff", summary: "The selected runs used different generations of BenchBox tuning rules" });
       expect(field?.detail).toContain("DuckDB: adr-003");
-      expect(field?.detail).toContain("SQLite: pre-seam");
+      expect(field?.detail).toContain("SQLite: Earlier rules");
 
       // A warning, not a match failure: the receipt stays facet-matchable and
       // the difference only surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
-      expect(warnings.some((f) => f.label === "Tuning policy generation")).toBe(true);
+      expect(warnings.some((f) => f.label === "Tuning rules version")).toBe(true);
     });
 
     it("matches (no warning) when two tuned runs share the same generation", () => {
@@ -263,7 +331,7 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
       ]);
 
-      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+      expect(fields.find((f) => f.label === "Tuning rules version")).toMatchObject({
         status: "match",
         summary: "adr-003",
       });
@@ -278,11 +346,11 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
       ]);
 
-      expect(fields.find((f) => f.label === "Tuning policy generation")).toMatchObject({
+      expect(fields.find((f) => f.label === "Tuning rules version")).toMatchObject({
         status: "match",
-        summary: "pre-seam",
+        summary: "Earlier rules",
       });
-      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning policy generation")).toBe(false);
+      expect(comparabilityWarningFields(fields).some((f) => f.label === "Tuning rules version")).toBe(false);
     });
 
     it("is omitted when fewer than two results are labeled tuned", () => {
@@ -345,10 +413,357 @@ describe("ComparabilityReceipt", () => {
         makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
       ]);
       const tuning = fields.find((f) => f.label === "Tuning");
-      expect(tuning?.detail).toContain("DuckDB: tuned");
+      expect(tuning?.detail).toContain("DuckDB: Tuned");
       expect(tuning?.detail).not.toContain("requested");
       expect(tuning?.detail).not.toContain("applied");
       expect(tuning?.detail).not.toContain("tuning123");
+    });
+  });
+
+  describe("hardware axes and no-flip guarantee (w4)", () => {
+    it("splits the monolithic environment row into per-axis hardware rows", () => {
+      const results = [
+        makeDetail({
+          environment: {
+            os: "macOS",
+            arch: "arm64",
+            cpu_family: "apple_silicon",
+            cpu_model: "Apple M1 Max",
+            cpu_identity_provenance: "measured",
+            cpu_count: 10,
+            memory_gb: 64,
+            python: "3.12",
+          },
+        }),
+        makeDetail({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          environment: {
+            os: "macOS",
+            arch: "arm64",
+            cpu_family: "apple_silicon",
+            cpu_model: "Apple M1 Max",
+            cpu_identity_provenance: "measured",
+            cpu_count: 10,
+            memory_gb: 64,
+            python: "3.12",
+          },
+        }),
+      ];
+
+      const fields = buildComparabilityFields(results);
+      const labels = fields.map((f) => f.label);
+      expect(labels).toContain("Architecture");
+      expect(labels).toContain("CPU family");
+      expect(labels).toContain("CPU model");
+      expect(labels).toContain("CPU evidence");
+      expect(labels).toContain("CPU count");
+      expect(labels).toContain("Memory");
+      expect(labels).not.toContain("Environment");
+
+      expect(fields.find((f) => f.label === "Architecture")).toMatchObject({
+        status: "match",
+        summary: "Arm64",
+      });
+      expect(fields.find((f) => f.label === "CPU family")).toMatchObject({
+        status: "match",
+        summary: "Apple silicon",
+      });
+      expect(fields.find((f) => f.label === "CPU model")).toMatchObject({
+        status: "match",
+        summary: "Apple M1 Max",
+      });
+      expect(fields.find((f) => f.label === "CPU evidence")).toMatchObject({
+        status: "match",
+        summary: "Measured",
+      });
+      expect(fields.find((f) => f.label === "CPU count")).toMatchObject({
+        status: "match",
+        summary: "10 CPU",
+      });
+      expect(fields.find((f) => f.label === "Memory")).toMatchObject({
+        status: "match",
+        summary: "64 GB",
+      });
+    });
+
+    it("pins the no-flip guarantee: a run without CPU metadata compared to another run reports 'not recorded' on the missing axes, not 'differs'", () => {
+      // Run 1: has recorded CPU family and model
+      const recordedRun = makeDetail({
+        result_id: "r1",
+        platform: "DuckDB",
+        environment: {
+          os: "macOS",
+          arch: "arm64",
+          cpu_family: "apple_silicon",
+          cpu_model: "Apple M1 Max",
+          cpu_count: 10,
+          memory_gb: 64,
+          python: "3.12",
+        },
+      });
+
+      // Run 2: legacy run without CPU metadata (cpu_family and cpu_model undefined)
+      const legacyRun = makeDetail({
+        result_id: "r2",
+        platform: "SQLite",
+        platform_id: "sqlite",
+        environment: {
+          os: "macOS",
+          arch: "arm64",
+          cpu_family: undefined,
+          cpu_model: undefined,
+          cpu_count: 10,
+          memory_gb: 64,
+          python: "3.12",
+        },
+      });
+
+      const fields = buildComparabilityFields([recordedRun, legacyRun]);
+      const cpuFamilyField = fields.find((f) => f.label === "CPU family")!;
+      const cpuModelField = fields.find((f) => f.label === "CPU model")!;
+
+      // Both axes MUST report status: "missing" ("Not recorded"), NEVER "diff" ("Differs")
+      expect(cpuFamilyField.status).toBe("missing");
+      expect(cpuFamilyField.summary).toBe("Not recorded");
+      expect(cpuFamilyField.detail).toBe("DuckDB: Apple silicon; SQLite: Not recorded");
+
+      expect(cpuModelField.status).toBe("missing");
+      expect(cpuModelField.summary).toBe("Not recorded");
+      expect(cpuModelField.detail).toBe("DuckDB: Apple M1 Max; SQLite: Not recorded");
+
+      // Critical check: neither axis generates a warning!
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((w) => w.label === "CPU family")).toBe(false);
+      expect(warnings.some((w) => w.label === "CPU model")).toBe(false);
+    });
+
+    it("reports diff when both runs record CPU metadata but the values differ", () => {
+      const appleRun = makeDetail({
+        result_id: "r1",
+        platform: "DuckDB",
+        environment: {
+          os: "macOS",
+          arch: "arm64",
+          cpu_family: "apple_silicon",
+          cpu_model: "Apple M1 Max",
+          cpu_count: 10,
+          memory_gb: 64,
+          python: "3.12",
+        },
+      });
+
+      const gravitonRun = makeDetail({
+        result_id: "r2",
+        platform: "ClickHouse",
+        platform_id: "clickhouse",
+        environment: {
+          os: "Linux",
+          arch: "arm64",
+          cpu_family: "graviton",
+          cpu_model: "AWS Graviton 3",
+          cpu_count: 16,
+          memory_gb: 64,
+          python: "3.12",
+        },
+      });
+
+      const fields = buildComparabilityFields([appleRun, gravitonRun]);
+      const cpuFamilyField = fields.find((f) => f.label === "CPU family")!;
+      const cpuModelField = fields.find((f) => f.label === "CPU model")!;
+
+      expect(cpuFamilyField.status).toBe("diff");
+      expect(cpuFamilyField.summary).toBe("2 values differ");
+      expect(cpuFamilyField.detail).toBe("DuckDB: Apple silicon; ClickHouse: graviton");
+
+      expect(cpuModelField.status).toBe("diff");
+      expect(cpuModelField.summary).toBe("2 values differ");
+      expect(cpuModelField.detail).toBe("DuckDB: Apple M1 Max; ClickHouse: AWS Graviton 3");
+
+      const warnings = comparabilityWarningFields(fields);
+      expect(warnings.some((w) => w.label === "CPU family")).toBe(true);
+      expect(warnings.some((w) => w.label === "CPU model")).toBe(true);
+    });
+
+    it("warns when client region != platform region or if locality is unknown for remote/cloud platforms", () => {
+      // 1. Cross-region mismatch
+      const crossRegionRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-west-2",
+        },
+      });
+      const collocatedRun = makeDetail({
+        result_id: "r2",
+        platform: "BigQuery",
+        deployment_class: "cloud",
+        cloud_provider: "gcp",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+
+      let fields = buildComparabilityFields([crossRegionRun, collocatedRun]);
+      let localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Cross-region: client in us-west-2, platform in us-east-1");
+
+      // 2. Unknown locality on cloud platform
+      const unknownLocalityRun = makeDetail({
+        result_id: "r3",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {},
+      });
+      fields = buildComparabilityFields([unknownLocalityRun]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Unknown client locality");
+
+      // 3. Matching collocated runs
+      const collocatedRun2 = makeDetail({
+        result_id: "r4",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+        },
+      });
+      fields = buildComparabilityFields([collocatedRun, collocatedRun2]);
+      localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+      expect(localityField.summary).toBe("Collocated (us-east-1)");
+    });
+
+    it("does not warn for provider-native spellings of the same region", () => {
+      // Snowflake CURRENT_REGION() yields AWS_US_EAST_1; IMDS yields us-east-1.
+      const snowflakeRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "AWS_US_EAST_1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const fields = buildComparabilityFields([snowflakeRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+      expect(localityField.summary).toBe("Collocated (us-east-1)");
+    });
+
+    it("normalizes Azure display regions before comparing", () => {
+      const azureRun = makeDetail({
+        result_id: "r1",
+        platform: "Azure SQL",
+        deployment_class: "cloud",
+        cloud_provider: "azure",
+        cloud_region: "East US 2",
+        environment: {
+          client_region: "eastus2",
+          client_cloud: "azure",
+        },
+      });
+      const fields = buildComparabilityFields([azureRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("match");
+    });
+
+    it("distinguishes same-named regions across clouds", () => {
+      const awsRun = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const gcpRun = makeDetail({
+        result_id: "r2",
+        platform: "BigQuery",
+        deployment_class: "cloud",
+        cloud_provider: "gcp",
+        cloud_region: "us-east1",
+        environment: {
+          client_region: "us-east1",
+          client_cloud: "gcp",
+        },
+      });
+      const fields = buildComparabilityFields([awsRun, gcpRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Collocated (us-east-1)");
+      expect(localityField.detail).toContain("Collocated (us-east1)");
+    });
+
+    it("warns instead of asserting collocation when the platform region is unknown", () => {
+      // Remote self-hosted platforms carry no cloud region: without
+      // platform-side evidence the row must warn, never match.
+      const remoteRun = makeDetail({
+        result_id: "r1",
+        platform: "ClickHouse Server",
+        deployment_class: "remote",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "aws",
+        },
+      });
+      const fields = buildComparabilityFields([remoteRun]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.summary).toBe("Client in us-east-1, platform locality unknown");
+    });
+
+    it("warns when client and platform clouds differ on the same region name", () => {
+      const run = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "us-east-1",
+          client_cloud: "gcp",
+        },
+      });
+      const fields = buildComparabilityFields([run]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("Cross-cloud: client in us-east-1 (gcp), platform in us-east-1 (aws)");
+    });
+
+    it("appends the measured statement floor to cross-region detail", () => {
+      const run = makeDetail({
+        result_id: "r1",
+        platform: "Snowflake",
+        deployment_class: "cloud",
+        cloud_provider: "aws",
+        cloud_region: "us-east-1",
+        environment: {
+          client_region: "eu-west-1",
+          client_cloud: "aws",
+          statement_overhead_median_ms: 88.2,
+        },
+      });
+      const fields = buildComparabilityFields([run]);
+      const localityField = fields.find((f) => f.label === "Locality")!;
+      expect(localityField.status).toBe("diff");
+      expect(localityField.detail).toContain("client statement floor 88.20 ms");
     });
   });
 });

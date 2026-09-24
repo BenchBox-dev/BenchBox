@@ -22,6 +22,33 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from benchbox.core.datavault.dataframe_queries.parameters import get_parameters
 from benchbox.core.datavault.dataframe_queries.registry import register_query
 
+# Housekeeping columns present on Hub/Link/Satellite tables but projected by no
+# query: load_dts/record_source on every table, load_end_dts and hashdiff on
+# satellites. Chained joins keep each side's copy (Polars: DuplicateError once a
+# suffixed copy collides; Pandas: MergeError on re-suffixed columns), so every
+# table is stripped right after load / the current-record filter, before any
+# join. See _strip_audit_columns.
+_AUDIT_COLUMNS = ("load_dts", "record_source", "load_end_dts", "hashdiff")
+
+
+def _strip_audit_columns(frame: Any) -> Any:
+    """Drop Data Vault housekeeping columns from an expression-family frame.
+
+    Missing columns are tolerated (hubs/links carry no load_end_dts/hashdiff).
+    """
+    drop = [c for c in _AUDIT_COLUMNS if c in frame.columns]
+    return frame.drop(*drop) if drop else frame
+
+
+def _strip_audit_columns_pandas(frame: Any) -> Any:
+    """Drop Data Vault housekeeping columns from a pandas frame.
+
+    Missing columns are tolerated (hubs/links carry no load_end_dts/hashdiff).
+    """
+    drop = [c for c in _AUDIT_COLUMNS if c in frame.columns]
+    return frame.drop(columns=drop) if drop else frame
+
+
 # =============================================================================
 # Q1: Pricing Summary Report
 # Tables: link_lineitem, sat_lineitem
@@ -34,17 +61,24 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
     col, lit = ctx.col, ctx.lit
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     df = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
     df = df.filter(col("l_shipdate") <= lit(cutoff))
 
+    # Row-level values are precomputed so the grouped aggregates stay plain
+    # column sums on every backend (arithmetic inside an aggregate is not
+    # portable).
+    df = df.with_columns(
+        (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("disc_price"),
+        (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).alias("charge"),
+    )
     result = df.group_by("l_returnflag", "l_linestatus").agg(
         col("l_quantity").sum().alias("sum_qty"),
         col("l_extendedprice").sum().alias("sum_base_price"),
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("sum_disc_price"),
-        (col("l_extendedprice") * (lit(1) - col("l_discount")) * (lit(1) + col("l_tax"))).sum().alias("sum_charge"),
+        col("disc_price").sum().alias("sum_disc_price"),
+        col("charge").sum().alias("sum_charge"),
         col("l_quantity").mean().alias("avg_qty"),
         col("l_extendedprice").mean().alias("avg_price"),
         col("l_discount").mean().alias("avg_disc"),
@@ -58,9 +92,9 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters("Q1")
     cutoff = date(1998, 12, 1) - timedelta(days=params.get("delta", 90))
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link")
     df = df[df["l_shipdate"] <= cutoff]
@@ -96,17 +130,17 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params.get("type_suffix", "BRASS")
     region = params.get("region", "EUROPE")
 
-    hp = ctx.get_table("hub_part")
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
-    lps = ctx.get_table("link_part_supplier")
-    hs = ctx.get_table("hub_supplier")
-    ss = ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null())
-    sps = ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    hn = ctx.get_table("hub_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
-    lnr = ctx.get_table("link_nation_region")
-    sr = ctx.get_table("sat_region").filter(col("load_end_dts").is_null())
+    hp = _strip_audit_columns(ctx.get_table("hub_part"))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
+    lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
+    hs = _strip_audit_columns(ctx.get_table("hub_supplier"))
+    ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
+    sps = _strip_audit_columns(ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    hn = _strip_audit_columns(ctx.get_table("hub_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    lnr = _strip_audit_columns(ctx.get_table("link_nation_region"))
+    sr = _strip_audit_columns(ctx.get_table("sat_region").filter(col("load_end_dts").is_null()))
 
     # Build supplier-in-region chain: supplier → nation → region
     supplier_region = (
@@ -150,22 +184,22 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     type_suffix = params.get("type_suffix", "BRASS")
     region = params.get("region", "EUROPE")
 
-    hp = ctx.get_table("hub_part")
+    hp = _strip_audit_columns_pandas(ctx.get_table("hub_part"))
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
-    lps = ctx.get_table("link_part_supplier")
-    hs = ctx.get_table("hub_supplier")
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
+    lps = _strip_audit_columns_pandas(ctx.get_table("link_part_supplier"))
+    hs = _strip_audit_columns_pandas(ctx.get_table("hub_supplier"))
     ss = ctx.get_table("sat_supplier")
-    ss = ss[ss["load_end_dts"].isna()]
+    ss = _strip_audit_columns_pandas(ss[ss["load_end_dts"].isna()])
     sps = ctx.get_table("sat_partsupp")
-    sps = sps[sps["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
-    hn = ctx.get_table("hub_nation")
+    sps = _strip_audit_columns_pandas(sps[sps["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
+    hn = _strip_audit_columns_pandas(ctx.get_table("hub_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
-    lnr = ctx.get_table("link_nation_region")
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
+    lnr = _strip_audit_columns_pandas(ctx.get_table("link_nation_region"))
     sr = ctx.get_table("sat_region")
-    sr = sr[sr["load_end_dts"].isna()]
+    sr = _strip_audit_columns_pandas(sr[sr["load_end_dts"].isna()])
 
     # Supplier in region
     supplier_region = hs.merge(ss, on="hk_supplier").merge(lsn, on="hk_supplier")
@@ -209,13 +243,13 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
     segment = params.get("segment", "BUILDING")
     order_date = params.get("order_date", date(1995, 3, 15))
 
-    hc = ctx.get_table("hub_customer")
-    sc = ctx.get_table("sat_customer").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
-    ho = ctx.get_table("hub_order")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    hc = _strip_audit_columns(ctx.get_table("hub_customer"))
+    sc = _strip_audit_columns(ctx.get_table("sat_customer").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    ho = _strip_audit_columns(ctx.get_table("hub_order"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     df = (
         hc.join(sc, left_on="hk_customer", right_on="hk_customer")
@@ -229,9 +263,14 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
         .filter(col("l_shipdate") > lit(order_date))
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("o_orderkey", "o_orderdate", "o_shippriority").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
+    # Column order matches the SQL surface (key, revenue, date, priority).
+    result = result.select("o_orderkey", "revenue", "o_orderdate", "o_shippriority")
     return result.sort([("revenue", "desc"), ("o_orderdate", "asc")]).limit(10)
 
 
@@ -241,16 +280,16 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     segment = params.get("segment", "BUILDING")
     order_date = params.get("order_date", date(1995, 3, 15))
 
-    hc = ctx.get_table("hub_customer")
+    hc = _strip_audit_columns_pandas(ctx.get_table("hub_customer"))
     sc = ctx.get_table("sat_customer")
-    sc = sc[sc["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
-    ho = ctx.get_table("hub_order")
+    sc = _strip_audit_columns_pandas(sc[sc["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
+    ho = _strip_audit_columns_pandas(ctx.get_table("hub_order"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     df = hc.merge(sc, on="hk_customer")
     df = df[df["c_mktsegment"] == segment]
@@ -261,6 +300,8 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     result = df.groupby(["o_orderkey", "o_orderdate", "o_shippriority"]).agg(revenue=("revenue", "sum")).reset_index()
+    # Column order matches the SQL surface (key, revenue, date, priority).
+    result = result[["o_orderkey", "revenue", "o_orderdate", "o_shippriority"]]
     return result.sort_values(["revenue", "o_orderdate"], ascending=[False, True]).head(10)
 
 
@@ -277,10 +318,10 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1993, 7, 1))
     end_date = params.get("end_date", date(1993, 10, 1))
 
-    ho = ctx.get_table("hub_order")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    ho = _strip_audit_columns(ctx.get_table("hub_order"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     # Find orders with late lineitems (EXISTS equivalent)
     late_orders = (
@@ -308,12 +349,12 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1993, 7, 1))
     end_date = params.get("end_date", date(1993, 10, 1))
 
-    ho = ctx.get_table("hub_order")
+    ho = _strip_audit_columns_pandas(ctx.get_table("hub_order"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     late = ll.merge(sl, on="hk_lineitem_link")
     late = late[late["l_commitdate"] < late["l_receiptdate"]]
@@ -343,17 +384,15 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
 
-    # Drop load_end_dts after currency filtering to prevent duplicate column names
-    # when joining multiple satellite tables (each satellite has its own load_end_dts).
-    sr = ctx.get_table("sat_region").filter(col("load_end_dts").is_null()).drop("load_end_dts")
-    lnr = ctx.get_table("link_nation_region")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()).drop("load_end_dts")
-    lcn = ctx.get_table("link_customer_nation")
-    loc = ctx.get_table("link_order_customer")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null()).drop("load_end_dts")
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()).drop("load_end_dts")
-    lsn = ctx.get_table("link_supplier_nation")
+    sr = _strip_audit_columns(ctx.get_table("sat_region").filter(col("load_end_dts").is_null()))
+    lnr = _strip_audit_columns(ctx.get_table("link_nation_region"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    lcn = _strip_audit_columns(ctx.get_table("link_customer_nation"))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
 
     # Nations in region
     nations = (
@@ -378,8 +417,11 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
         col("hk_supplier") == col("hk_supplier_lsn")
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("n_name").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
     return result.sort([("revenue", "desc")])
 
@@ -391,21 +433,19 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
 
-    # Drop load_end_dts after currency filtering to prevent duplicate column names
-    # when merging multiple satellite tables.
     sr = ctx.get_table("sat_region")
-    sr = sr[sr["load_end_dts"].isna()].drop(columns=["load_end_dts"])
-    lnr = ctx.get_table("link_nation_region")
+    sr = _strip_audit_columns_pandas(sr[sr["load_end_dts"].isna()])
+    lnr = _strip_audit_columns_pandas(ctx.get_table("link_nation_region"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()].drop(columns=["load_end_dts"])
-    lcn = ctx.get_table("link_customer_nation")
-    loc = ctx.get_table("link_order_customer")
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
+    lcn = _strip_audit_columns_pandas(ctx.get_table("link_customer_nation"))
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()].drop(columns=["load_end_dts"])
-    ll = ctx.get_table("link_lineitem")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()].drop(columns=["load_end_dts"])
-    lsn = ctx.get_table("link_supplier_nation")
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
 
     nations = sr[sr["r_name"] == region].merge(lnr, on="hk_region").merge(sn, on="hk_nation")
     df = nations.merge(lcn, on="hk_nation").merge(loc, on="hk_customer")
@@ -438,8 +478,8 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
     discount_high = params.get("discount_high", 0.07)
     quantity = params.get("quantity", 24)
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     df = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link").filter(
         (col("l_shipdate") >= lit(start_date))
@@ -448,7 +488,19 @@ def q6_expression_impl(ctx: DataFrameContext) -> Any:
         & (col("l_discount") <= lit(discount_high))
         & (col("l_quantity") < lit(quantity))
     )
-    return df.agg((col("l_extendedprice") * col("l_discount")).sum().alias("revenue"))
+    # Precompute row-level values so the global aggregate stays a plain column
+    # sum on every backend (arithmetic inside an aggregate is not portable).
+    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
+    # selecting NULL when the row count is zero so every backend yields one
+    # NULL row like the reference query.
+    return (
+        df.with_columns((col("l_extendedprice") * col("l_discount")).alias("charge"))
+        .agg(
+            col("charge").sum().alias("revenue"),
+            col("charge").count().alias("n"),
+        )
+        .select(ctx.when(col("n") > lit(0)).then(col("revenue")).otherwise(lit(None)).alias("revenue"))
+    )
 
 
 def q6_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -460,9 +512,9 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     discount_high = params.get("discount_high", 0.07)
     quantity = params.get("quantity", 24)
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link")
     df = df[
@@ -474,6 +526,11 @@ def q6_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     import pandas as pd
 
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
+    # .empty is not implemented by Dask.
+    if len(df) == 0:
+        return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(df["l_extendedprice"] * df["l_discount"]).sum()]})
 
 
@@ -492,12 +549,12 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
     nation1 = params.get("nation1", "FRANCE")
     nation2 = params.get("nation2", "GERMANY")
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
-    lcn = ctx.get_table("link_customer_nation")
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    lcn = _strip_audit_columns(ctx.get_table("link_customer_nation"))
 
     # Lineitem base
     lineitem = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link").filter(
@@ -505,13 +562,13 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Supplier nation via link_supplier_nation
-    supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename_columns(
+    supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename(
         {"n_name": "supp_nation", "hk_nation": "hk_supp_nation"}
     )
 
     # Customer nation via order → customer → customer_nation
     cust_nation_base = loc.join(lcn, left_on="hk_customer", right_on="hk_customer")
-    cust_nation = cust_nation_base.join(sn, left_on="hk_nation", right_on="hk_nation").rename_columns(
+    cust_nation = cust_nation_base.join(sn, left_on="hk_nation", right_on="hk_nation").rename(
         {"n_name": "cust_nation", "hk_nation": "hk_cust_nation"}
     )
 
@@ -524,11 +581,14 @@ def q7_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
+    # The revenue is precomputed so the grouped aggregate stays a plain column
+    # sum on every backend (arithmetic inside an aggregate is not portable).
     result = (
-        df.with_column(col("l_shipdate").dt.year().alias("l_year"))
+        df.with_columns(col("l_shipdate").dt.year().alias("l_year"))
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("supp_nation", "cust_nation", "l_year")
         .agg(
-            (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+            col("revenue").sum().alias("revenue"),
         )
     )
     return result.sort("supp_nation", "cust_nation", "l_year")
@@ -540,14 +600,14 @@ def q7_pandas_impl(ctx: DataFrameContext) -> Any:
     nation1 = params.get("nation1", "FRANCE")
     nation2 = params.get("nation2", "GERMANY")
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
-    lcn = ctx.get_table("link_customer_nation")
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
+    lcn = _strip_audit_columns_pandas(ctx.get_table("link_customer_nation"))
 
     lineitem = ll.merge(sl, on="hk_lineitem_link")
     lineitem = lineitem[(lineitem["l_shipdate"] >= date(1995, 1, 1)) & (lineitem["l_shipdate"] <= date(1996, 12, 31))]
@@ -584,16 +644,16 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     target_region = params.get("region", "AMERICA")
     part_type = params.get("part_type", "ECONOMY ANODIZED STEEL")
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
-    lcn = ctx.get_table("link_customer_nation")
-    lnr = ctx.get_table("link_nation_region")
-    sr = ctx.get_table("sat_region").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    lcn = _strip_audit_columns(ctx.get_table("link_customer_nation"))
+    lnr = _strip_audit_columns(ctx.get_table("link_nation_region"))
+    sr = _strip_audit_columns(ctx.get_table("sat_region").filter(col("load_end_dts").is_null()))
 
     # Lineitem with part filter
     lineitem = (
@@ -603,7 +663,7 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Supplier nation
-    supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename_columns({"n_name": "supp_nation"})
+    supp_nation = lsn.join(sn, left_on="hk_nation", right_on="hk_nation").rename({"n_name": "supp_nation"})
 
     # Customer in region filter via order → customer → nation → region
     cust_region = (
@@ -620,17 +680,21 @@ def q8_expression_impl(ctx: DataFrameContext) -> Any:
         .join(supp_nation, left_on="hk_supplier", right_on="hk_supplier")
     )
 
-    df = df.with_column(col("o_orderdate").dt.year().alias("o_year")).with_column(
+    # Both row-level values are precomputed so the grouped aggregates stay
+    # plain column sums on every backend (a CASE expression inside an
+    # aggregate is not portable either).
+    df = df.with_columns(col("o_orderdate").dt.year().alias("o_year")).with_columns(
         (col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("volume")
+    )
+    df = df.with_columns(
+        ctx.when(col("supp_nation") == lit(target_nation)).then(col("volume")).otherwise(lit(0)).alias("nation_vol")
     )
 
     result = df.group_by("o_year").agg(
-        (ctx.when(col("supp_nation") == lit(target_nation)).then(col("volume")).otherwise(lit(0)))
-        .sum()
-        .alias("nation_vol"),
+        col("nation_vol").sum().alias("nation_vol"),
         col("volume").sum().alias("total_vol"),
     )
-    result = result.with_column((col("nation_vol") / col("total_vol")).alias("mkt_share"))
+    result = result.with_columns((col("nation_vol") / col("total_vol")).alias("mkt_share"))
     return result.select("o_year", "mkt_share").sort("o_year")
 
 
@@ -641,21 +705,21 @@ def q8_pandas_impl(ctx: DataFrameContext) -> Any:
     target_region = params.get("region", "AMERICA")
     part_type = params.get("part_type", "ECONOMY ANODIZED STEEL")
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
-    lcn = ctx.get_table("link_customer_nation")
-    lnr = ctx.get_table("link_nation_region")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
+    lcn = _strip_audit_columns_pandas(ctx.get_table("link_customer_nation"))
+    lnr = _strip_audit_columns_pandas(ctx.get_table("link_nation_region"))
     sr = ctx.get_table("sat_region")
-    sr = sr[sr["load_end_dts"].isna()]
+    sr = _strip_audit_columns_pandas(sr[sr["load_end_dts"].isna()])
 
     lineitem = ll.merge(sl, on="hk_lineitem_link").merge(sp, on="hk_part")
     lineitem = lineitem[lineitem["p_type"] == part_type]
@@ -691,14 +755,14 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
     col, lit = ctx.col, ctx.lit
     color = params.get("color", "green")
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
-    lps = ctx.get_table("link_part_supplier")
-    sps = ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
+    lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
+    sps = _strip_audit_columns(ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
 
     df = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
@@ -711,7 +775,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
         .join(so, left_on="hk_order", right_on="hk_order")
     )
 
-    df = df.with_column(col("o_orderdate").dt.year().alias("o_year")).with_column(
+    df = df.with_columns(col("o_orderdate").dt.year().alias("o_year")).with_columns(
         (col("l_extendedprice") * (lit(1) - col("l_discount")) - col("ps_supplycost") * col("l_quantity")).alias(
             "amount"
         )
@@ -726,19 +790,19 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters("Q9")
     color = params.get("color", "green")
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
-    lps = ctx.get_table("link_part_supplier")
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
+    lps = _strip_audit_columns_pandas(ctx.get_table("link_part_supplier"))
     sps = ctx.get_table("sat_partsupp")
-    sps = sps[sps["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    sps = _strip_audit_columns_pandas(sps[sps["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link").merge(sp, on="hk_part")
     df = df[df["p_name"].str.contains(color, na=False)]
@@ -764,14 +828,14 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1993, 10, 1))
     end_date = params.get("end_date", date(1994, 1, 1))
 
-    hc = ctx.get_table("hub_customer")
-    sc = ctx.get_table("sat_customer").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    lcn = ctx.get_table("link_customer_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
+    hc = _strip_audit_columns(ctx.get_table("hub_customer"))
+    sc = _strip_audit_columns(ctx.get_table("sat_customer").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    lcn = _strip_audit_columns(ctx.get_table("link_customer_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
 
     df = (
         hc.join(sc, left_on="hk_customer", right_on="hk_customer")
@@ -785,9 +849,14 @@ def q10_expression_impl(ctx: DataFrameContext) -> Any:
         .join(sn, left_on="hk_nation", right_on="hk_nation")
     )
 
+    # Precomputed so the grouped aggregate stays a plain column sum on every
+    # backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
     result = df.group_by("c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment").agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+        col("revenue").sum().alias("revenue"),
     )
+    # Column order matches the SQL surface (revenue third).
+    result = result.select("c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment")
     return result.sort([("revenue", "desc")]).limit(20)
 
 
@@ -797,18 +866,18 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1993, 10, 1))
     end_date = params.get("end_date", date(1994, 1, 1))
 
-    hc = ctx.get_table("hub_customer")
+    hc = _strip_audit_columns_pandas(ctx.get_table("hub_customer"))
     sc = ctx.get_table("sat_customer")
-    sc = sc[sc["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
+    sc = _strip_audit_columns_pandas(sc[sc["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
-    lcn = ctx.get_table("link_customer_nation")
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
+    lcn = _strip_audit_columns_pandas(ctx.get_table("link_customer_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
 
     df = hc.merge(sc, on="hk_customer").merge(loc, on="hk_customer")
     df = df.merge(so, on="hk_order")
@@ -820,6 +889,8 @@ def q10_pandas_impl(ctx: DataFrameContext) -> Any:
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     grp = ["c_custkey", "c_name", "c_acctbal", "c_phone", "n_name", "c_address", "c_comment"]
     result = df.groupby(grp).agg(revenue=("revenue", "sum")).reset_index()
+    # Column order matches the SQL surface (revenue third).
+    result = result[["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]]
     return result.sort_values("revenue", ascending=False).head(20)
 
 
@@ -835,10 +906,11 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
     nation = params.get("nation", "GERMANY")
     fraction = params.get("fraction", 0.0001)
 
-    lps = ctx.get_table("link_part_supplier")
-    sps = ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
+    lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
+    sps = _strip_audit_columns(ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    hp = _strip_audit_columns(ctx.get_table("hub_part"))
 
     # Partsupp for suppliers in nation
     df = (
@@ -846,15 +918,20 @@ def q11_expression_impl(ctx: DataFrameContext) -> Any:
         .join(lsn, left_on="hk_supplier", right_on="hk_supplier")
         .join(sn, left_on="hk_nation", right_on="hk_nation")
         .filter(col("n_name") == lit(nation))
+        .join(hp, left_on="hk_part", right_on="hk_part")
     )
 
+    # Precompute the row-level value so both aggregates stay plain column sums
+    # on every backend (arithmetic inside an aggregate is not portable).
+    df = df.with_columns((col("ps_supplycost") * col("ps_availqty")).alias("stock_value"))
+
     # Threshold: total value * fraction
-    total = df.agg((col("ps_supplycost") * col("ps_availqty")).sum().alias("total_value"))
+    total = df.agg(col("stock_value").sum().alias("total_value"))
     threshold = ctx.scalar(total, "total_value") * fraction
 
-    # Group by part and filter
-    by_part = df.group_by("hk_part").agg(
-        (col("ps_supplycost") * col("ps_availqty")).sum().alias("value"),
+    # Group by part and filter (SQL projects the p_partkey business key, not hk_part)
+    by_part = df.group_by("p_partkey").agg(
+        col("stock_value").sum().alias("value"),
     )
     result = by_part.filter(col("value") > lit(threshold))
     return result.sort([("value", "desc")])
@@ -866,20 +943,23 @@ def q11_pandas_impl(ctx: DataFrameContext) -> Any:
     nation = params.get("nation", "GERMANY")
     fraction = params.get("fraction", 0.0001)
 
-    lps = ctx.get_table("link_part_supplier")
+    lps = _strip_audit_columns_pandas(ctx.get_table("link_part_supplier"))
     sps = ctx.get_table("sat_partsupp")
-    sps = sps[sps["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    sps = _strip_audit_columns_pandas(sps[sps["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
+    hp = _strip_audit_columns_pandas(ctx.get_table("hub_part"))
 
     df = lps.merge(sps, on="hk_part_supplier").merge(lsn, on="hk_supplier").merge(sn, on="hk_nation")
     df = df[df["n_name"] == nation]
+    df = df.merge(hp[["hk_part", "p_partkey"]], on="hk_part")
 
     df["value"] = df["ps_supplycost"] * df["ps_availqty"]
     threshold = df["value"].sum() * fraction
 
-    by_part = df.groupby("hk_part").agg(value=("value", "sum")).reset_index()
+    # SQL projects the p_partkey business key, not hk_part
+    by_part = df.groupby("p_partkey").agg(value=("value", "sum")).reset_index()
     result = by_part[by_part["value"] > threshold]
     return result.sort_values("value", ascending=False)
 
@@ -898,9 +978,9 @@ def q12_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
 
     df = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
@@ -937,11 +1017,11 @@ def q12_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1994, 1, 1))
     end_date = params.get("end_date", date(1995, 1, 1))
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link").merge(so, on="hk_order")
     df = df[
@@ -973,9 +1053,9 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     word2 = params.get("word2", "requests")
     pattern = f"{word1}.*{word2}"
 
-    hc = ctx.get_table("hub_customer")
-    loc = ctx.get_table("link_order_customer")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
+    hc = _strip_audit_columns(ctx.get_table("hub_customer"))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
 
     # Orders excluding the comment pattern
     valid_orders = so.filter(~col("o_comment").str.contains(pattern))
@@ -996,10 +1076,10 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     word2 = params.get("word2", "requests")
     pattern = f"{word1}.*{word2}"
 
-    hc = ctx.get_table("hub_customer")
-    loc = ctx.get_table("link_order_customer")
+    hc = _strip_audit_columns_pandas(ctx.get_table("hub_customer"))
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
 
     valid_orders = so[~so["o_comment"].str.contains(pattern, na=False, regex=True)]
     order_cust = loc.merge(valid_orders, on="hk_order")
@@ -1023,9 +1103,9 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1995, 9, 1))
     end_date = params.get("end_date", date(1995, 10, 1))
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
 
     df = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
@@ -1033,11 +1113,25 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
     )
 
-    revenue_expr = col("l_extendedprice") * (lit(1) - col("l_discount"))
-    promo_expr = ctx.when(col("p_type").str.starts_with("PROMO")).then(revenue_expr).otherwise(lit(0))
-
+    # Precompute row-level values so the global aggregate holds plain column
+    # sums and the ratio is ordinary column arithmetic in the select: aggregate
+    # expressions combined with arithmetic are not portable across backends.
+    df = df.with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
+    df = df.with_columns(
+        ctx.when(col("p_type").str.starts_with("PROMO")).then(col("revenue")).otherwise(lit(0)).alias("promo_revenue")
+    )
+    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): stay lazy and
+    # single-pass, selecting NULL when the row count is zero so every backend
+    # yields one NULL row like the reference query.
     return df.agg(
-        (promo_expr.sum() * lit(100.0) / revenue_expr.sum()).alias("promo_revenue"),
+        col("promo_revenue").sum().alias("promo_sum"),
+        col("revenue").sum().alias("revenue_sum"),
+        col("revenue").count().alias("n"),
+    ).select(
+        ctx.when(col("n") > lit(0))
+        .then(col("promo_sum") * lit(100.0) / col("revenue_sum"))
+        .otherwise(lit(None))
+        .alias("promo_revenue")
     )
 
 
@@ -1047,11 +1141,11 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1995, 9, 1))
     end_date = params.get("end_date", date(1995, 10, 1))
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link").merge(sp, on="hk_part")
     df = df[(df["l_shipdate"] >= start_date) & (df["l_shipdate"] < end_date)]
@@ -1061,7 +1155,19 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 
     df["revenue"] = df["l_extendedprice"] * (1 - df["l_discount"])
     df["promo_revenue"] = np.where(df["p_type"].str.startswith("PROMO"), df["revenue"], 0)
-    promo_pct = 100.0 * df["promo_revenue"].sum() / df["revenue"].sum()
+    # SQL SUM() over an empty set is NULL (not 0.0, not NaN): preserve the NULL
+    # row. len() works on every pandas-family frame; .empty is not in Dask.
+    if len(df) == 0:
+        return pd.DataFrame({"promo_revenue": [None]})
+    # float() first: DECIMAL columns arrive as Decimal objects, and float *
+    # Decimal raises TypeError.
+    revenue_sum = float(df["revenue"].sum())
+    if revenue_sum == 0:
+        # Rows exist but carry no revenue: the SQL reference and the
+        # expression surface yield NaN for the 0/0 ratio, so do the same
+        # instead of raising ZeroDivisionError.
+        return pd.DataFrame({"promo_revenue": [float("nan")]})
+    promo_pct = 100.0 * float(df["promo_revenue"].sum()) / revenue_sum
     return pd.DataFrame({"promo_revenue": [promo_pct]})
 
 
@@ -1077,25 +1183,40 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1996, 1, 1))
     end_date = params.get("end_date", date(1996, 4, 1))
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    hs = ctx.get_table("hub_supplier")
-    ss = ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    hs = _strip_audit_columns(ctx.get_table("hub_supplier"))
+    ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
 
-    # CTE: revenue per supplier
+    # CTE: revenue per supplier. The row-level revenue is precomputed so the
+    # grouped aggregate stays a plain column sum on every backend (arithmetic
+    # inside an aggregate is not portable).
     revenue = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
         .group_by("hk_supplier")
-        .agg((col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("total_revenue"))
+        .agg(col("revenue").sum().alias("total_revenue"))
     )
 
     max_rev = ctx.scalar(revenue.agg(col("total_revenue").max().alias("max_rev")), "max_rev")
 
+    suppliers = hs.join(ss, left_on="hk_supplier", right_on="hk_supplier").join(
+        revenue, left_on="hk_supplier", right_on="hk_supplier"
+    )
+    if max_rev is None:
+        # No revenue rows: SQL's `= (SELECT MAX ...)` matches nothing.
+        return (
+            suppliers.filter(lit(False))
+            .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
+            .sort("s_suppkey")
+        )
     return (
-        hs.join(ss, left_on="hk_supplier", right_on="hk_supplier")
-        .join(revenue, left_on="hk_supplier", right_on="hk_supplier")
-        .filter(col("total_revenue") == lit(max_rev))
+        suppliers
+        # Engine float sums can wobble a last bit across collects, so compare
+        # below the data's granularity (revenues carry 4 decimal places): this
+        # keeps SQL's exact-max semantics without engine rounding rules.
+        .filter((col("total_revenue") - lit(max_rev)).abs() < lit(5e-5))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
@@ -1107,12 +1228,12 @@ def q15_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params.get("start_date", date(1996, 1, 1))
     end_date = params.get("end_date", date(1996, 4, 1))
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
-    hs = ctx.get_table("hub_supplier")
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
+    hs = _strip_audit_columns_pandas(ctx.get_table("hub_supplier"))
     ss = ctx.get_table("sat_supplier")
-    ss = ss[ss["load_end_dts"].isna()]
+    ss = _strip_audit_columns_pandas(ss[ss["load_end_dts"].isna()])
 
     li = ll.merge(sl, on="hk_lineitem_link")
     li = li[(li["l_shipdate"] >= start_date) & (li["l_shipdate"] < end_date)]
@@ -1140,9 +1261,9 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
     type_prefix = params.get("type_prefix", "MEDIUM POLISHED")
     sizes = params.get("sizes", [49, 14, 23, 45, 19, 3, 36, 9])
 
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
-    lps = ctx.get_table("link_part_supplier")
-    ss = ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null())
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
+    lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
+    ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
 
     # Exclude suppliers with complaints
     bad_suppliers = ss.filter(col("s_comment").str.contains("Customer.*Complaints"))
@@ -1170,10 +1291,10 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     sizes = params.get("sizes", [49, 14, 23, 45, 19, 3, 36, 9])
 
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
-    lps = ctx.get_table("link_part_supplier")
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
+    lps = _strip_audit_columns_pandas(ctx.get_table("link_part_supplier"))
     ss = ctx.get_table("sat_supplier")
-    ss = ss[ss["load_end_dts"].isna()]
+    ss = _strip_audit_columns_pandas(ss[ss["load_end_dts"].isna()])
 
     bad = ss[ss["s_comment"].str.contains("Customer.*Complaints", na=False, regex=True)]["hk_supplier"]
     parts = sp[(sp["p_brand"] != brand) & ~sp["p_type"].str.startswith(type_prefix) & sp["p_size"].isin(sizes)]
@@ -1197,9 +1318,9 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     brand = params.get("brand", "Brand#23")
     container = params.get("container", "MED BOX")
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
 
     df = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
@@ -1207,14 +1328,24 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
         .filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
     )
 
-    # Average quantity per part
-    avg_qty = df.group_by("hk_part").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
-
-    return (
-        df.join(avg_qty, left_on="hk_part", right_on="hk_part")
-        .filter(col("l_quantity") < col("avg_qty"))
-        .agg((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+    # Average quantity per part. The mean stays a plain grouped aggregate and the
+    # scaling is ordinary column arithmetic afterwards: arithmetic inside an
+    # aggregate is not portable across backends.
+    avg_qty = (
+        df.group_by("hk_part")
+        .agg(col("l_quantity").mean().alias("mean_qty"))
+        .with_columns((col("mean_qty") * lit(0.2)).alias("avg_qty"))
+        .drop("mean_qty")
     )
+
+    # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and single-pass,
+    # selecting NULL when the row count is zero so every backend yields one
+    # NULL row like the reference query.
+    filtered = df.join(avg_qty, left_on="hk_part", right_on="hk_part").filter(col("l_quantity") < col("avg_qty"))
+    return filtered.agg(
+        col("l_extendedprice").sum().alias("total"),
+        col("l_extendedprice").count().alias("n"),
+    ).select(ctx.when(col("n") > lit(0)).then(col("total") / lit(7.0)).otherwise(lit(None)).alias("avg_yearly"))
 
 
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -1223,11 +1354,11 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     brand = params.get("brand", "Brand#23")
     container = params.get("container", "MED BOX")
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link").merge(sp, on="hk_part")
     df = df[(df["p_brand"] == brand) & (df["p_container"] == container)]
@@ -1241,6 +1372,11 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
 
     import pandas as pd
 
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    # len() works on every pandas-family frame (plain pandas, Dask, Modin);
+    # .empty is not implemented by Dask.
+    if len(df) == 0:
+        return pd.DataFrame({"avg_yearly": [None]})
     return pd.DataFrame({"avg_yearly": [df["l_extendedprice"].sum() / 7.0]})
 
 
@@ -1255,13 +1391,13 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
     col, lit = ctx.col, ctx.lit
     quantity = params.get("quantity", 300)
 
-    hc = ctx.get_table("hub_customer")
-    sc = ctx.get_table("sat_customer").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
-    ho = ctx.get_table("hub_order")
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    hc = _strip_audit_columns(ctx.get_table("hub_customer"))
+    sc = _strip_audit_columns(ctx.get_table("sat_customer").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
+    ho = _strip_audit_columns(ctx.get_table("hub_order"))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     # Orders with total quantity > threshold
     order_qty = (
@@ -1288,16 +1424,16 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters("Q18")
     quantity = params.get("quantity", 300)
 
-    hc = ctx.get_table("hub_customer")
+    hc = _strip_audit_columns_pandas(ctx.get_table("hub_customer"))
     sc = ctx.get_table("sat_customer")
-    sc = sc[sc["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
-    ho = ctx.get_table("hub_order")
+    sc = _strip_audit_columns_pandas(sc[sc["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
+    ho = _strip_audit_columns_pandas(ctx.get_table("hub_order"))
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     li = ll.merge(sl, on="hk_lineitem_link")
     order_qty = li.groupby("hk_order")["l_quantity"].sum().reset_index()
@@ -1321,9 +1457,9 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters("Q19")
     col, lit = ctx.col, ctx.lit
 
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
 
     df = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link").join(
         sp, left_on="hk_part", right_on="hk_part"
@@ -1363,8 +1499,19 @@ def q19_expression_impl(ctx: DataFrameContext) -> Any:
         & deliver
     )
 
-    return df.filter(cond1 | cond2 | cond3).agg(
-        (col("l_extendedprice") * (lit(1) - col("l_discount"))).sum().alias("revenue"),
+    # Precompute the row-level revenue so the global aggregate stays a plain
+    # column sum on every backend (arithmetic inside an aggregate is not
+    # portable). SQL SUM() over an empty set is NULL (not 0.0): stay lazy and
+    # single-pass, selecting NULL when the row count is zero so every backend
+    # yields one NULL row like the reference query.
+    return (
+        df.filter(cond1 | cond2 | cond3)
+        .with_columns((col("l_extendedprice") * (lit(1) - col("l_discount"))).alias("revenue"))
+        .agg(
+            col("revenue").sum().alias("revenue"),
+            col("revenue").count().alias("n"),
+        )
+        .select(ctx.when(col("n") > lit(0)).then(col("revenue")).otherwise(lit(None)).alias("revenue"))
     )
 
 
@@ -1372,11 +1519,11 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q19: Discounted Revenue (Pandas)."""
     params = get_parameters("Q19")
 
-    ll = ctx.get_table("link_lineitem")
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
 
     df = ll.merge(sl, on="hk_lineitem_link").merge(sp, on="hk_part")
 
@@ -1417,6 +1564,10 @@ def q19_pandas_impl(ctx: DataFrameContext) -> Any:
     filtered = df[c1 | c2 | c3]
     import pandas as pd
 
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    # len() works on every pandas-family frame; .empty is not in Dask.
+    if len(filtered) == 0:
+        return pd.DataFrame({"revenue": [None]})
     return pd.DataFrame({"revenue": [(filtered["l_extendedprice"] * (1 - filtered["l_discount"])).sum()]})
 
 
@@ -1434,24 +1585,27 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
     end_date = params.get("end_date", date(1995, 1, 1))
     nation = params.get("nation", "CANADA")
 
-    ss = ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
-    lps = ctx.get_table("link_part_supplier")
-    sps = ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null())
-    sp = ctx.get_table("sat_part").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
+    ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
+    lps = _strip_audit_columns(ctx.get_table("link_part_supplier"))
+    sps = _strip_audit_columns(ctx.get_table("sat_partsupp").filter(col("load_end_dts").is_null()))
+    sp = _strip_audit_columns(ctx.get_table("sat_part").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
 
     # Parts matching color
     color_parts = sp.filter(col("p_name").str.starts_with(color))
 
-    # Lineitem quantity by part+supplier in date range
+    # Lineitem quantity by part+supplier in date range. The aggregate stays a
+    # plain column sum and the halving folds into the downstream comparison
+    # (avail > half ⟺ avail * 2 > total): arithmetic inside an aggregate is not
+    # portable across backends.
     li_qty = (
         ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
         .filter((col("l_shipdate") >= lit(start_date)) & (col("l_shipdate") < lit(end_date)))
         .group_by("hk_part", "hk_supplier")
-        .agg((col("l_quantity").sum() * lit(0.5)).alias("half_qty"))
+        .agg(col("l_quantity").sum().alias("total_qty"))
     )
 
     # Partsupp with excess stock
@@ -1459,7 +1613,7 @@ def q20_expression_impl(ctx: DataFrameContext) -> Any:
         lps.join(sps, left_on="hk_part_supplier", right_on="hk_part_supplier")
         .join(color_parts, left_on="hk_part", right_on="hk_part")
         .join(li_qty, left_on=["hk_part", "hk_supplier"], right_on=["hk_part", "hk_supplier"])
-        .filter(col("ps_availqty") > col("half_qty"))
+        .filter(col("ps_availqty") * lit(2) > col("total_qty"))
         .select("hk_supplier")
         .unique()
     )
@@ -1484,18 +1638,18 @@ def q20_pandas_impl(ctx: DataFrameContext) -> Any:
     nation = params.get("nation", "CANADA")
 
     ss = ctx.get_table("sat_supplier")
-    ss = ss[ss["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    ss = _strip_audit_columns_pandas(ss[ss["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
-    lps = ctx.get_table("link_part_supplier")
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
+    lps = _strip_audit_columns_pandas(ctx.get_table("link_part_supplier"))
     sps = ctx.get_table("sat_partsupp")
-    sps = sps[sps["load_end_dts"].isna()]
+    sps = _strip_audit_columns_pandas(sps[sps["load_end_dts"].isna()])
     sp = ctx.get_table("sat_part")
-    sp = sp[sp["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    sp = _strip_audit_columns_pandas(sp[sp["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
 
     color_parts = sp[sp["p_name"].str.startswith(color, na=False)]
 
@@ -1525,12 +1679,12 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     col, lit = ctx.col, ctx.lit
     nation = params.get("nation", "SAUDI ARABIA")
 
-    ss = ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null())
-    ll = ctx.get_table("link_lineitem")
-    sl = ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null())
-    so = ctx.get_table("sat_order").filter(col("load_end_dts").is_null())
-    lsn = ctx.get_table("link_supplier_nation")
-    sn = ctx.get_table("sat_nation").filter(col("load_end_dts").is_null())
+    ss = _strip_audit_columns(ctx.get_table("sat_supplier").filter(col("load_end_dts").is_null()))
+    ll = _strip_audit_columns(ctx.get_table("link_lineitem"))
+    sl = _strip_audit_columns(ctx.get_table("sat_lineitem").filter(col("load_end_dts").is_null()))
+    so = _strip_audit_columns(ctx.get_table("sat_order").filter(col("load_end_dts").is_null()))
+    lsn = _strip_audit_columns(ctx.get_table("link_supplier_nation"))
+    sn = _strip_audit_columns(ctx.get_table("sat_nation").filter(col("load_end_dts").is_null()))
 
     # Supplier's late lineitems on failed orders
     li = ll.join(sl, left_on="hk_lineitem_link", right_on="hk_lineitem_link")
@@ -1572,15 +1726,15 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     nation = params.get("nation", "SAUDI ARABIA")
 
     ss = ctx.get_table("sat_supplier")
-    ss = ss[ss["load_end_dts"].isna()]
-    ll = ctx.get_table("link_lineitem")
+    ss = _strip_audit_columns_pandas(ss[ss["load_end_dts"].isna()])
+    ll = _strip_audit_columns_pandas(ctx.get_table("link_lineitem"))
     sl = ctx.get_table("sat_lineitem")
-    sl = sl[sl["load_end_dts"].isna()]
+    sl = _strip_audit_columns_pandas(sl[sl["load_end_dts"].isna()])
     so = ctx.get_table("sat_order")
-    so = so[so["load_end_dts"].isna()]
-    lsn = ctx.get_table("link_supplier_nation")
+    so = _strip_audit_columns_pandas(so[so["load_end_dts"].isna()])
+    lsn = _strip_audit_columns_pandas(ctx.get_table("link_supplier_nation"))
     sn = ctx.get_table("sat_nation")
-    sn = sn[sn["load_end_dts"].isna()]
+    sn = _strip_audit_columns_pandas(sn[sn["load_end_dts"].isna()])
 
     li = ll.merge(sl, on="hk_lineitem_link")
     late_li = li[li["l_receiptdate"] > li["l_commitdate"]]
@@ -1615,12 +1769,12 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     col, lit = ctx.col, ctx.lit
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
 
-    hc = ctx.get_table("hub_customer")
-    sc = ctx.get_table("sat_customer").filter(col("load_end_dts").is_null())
-    loc = ctx.get_table("link_order_customer")
+    hc = _strip_audit_columns(ctx.get_table("hub_customer"))
+    sc = _strip_audit_columns(ctx.get_table("sat_customer").filter(col("load_end_dts").is_null()))
+    loc = _strip_audit_columns(ctx.get_table("link_order_customer"))
 
     customers = hc.join(sc, left_on="hk_customer", right_on="hk_customer")
-    customers = customers.with_column(col("c_phone").str.slice(0, 2).alias("cntrycode"))
+    customers = customers.with_columns(col("c_phone").str.slice(0, 2).alias("cntrycode"))
     customers = customers.filter(col("cntrycode").is_in(codes))
 
     # Average balance for positive-balance customers in these codes
@@ -1649,10 +1803,10 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters("Q22")
     codes = params.get("country_codes", ["13", "31", "23", "29", "30", "18", "17"])
 
-    hc = ctx.get_table("hub_customer")
+    hc = _strip_audit_columns_pandas(ctx.get_table("hub_customer"))
     sc = ctx.get_table("sat_customer")
-    sc = sc[sc["load_end_dts"].isna()]
-    loc = ctx.get_table("link_order_customer")
+    sc = _strip_audit_columns_pandas(sc[sc["load_end_dts"].isna()])
+    loc = _strip_audit_columns_pandas(ctx.get_table("link_order_customer"))
 
     customers = hc.merge(sc, on="hk_customer")
     customers["cntrycode"] = customers["c_phone"].str[:2]

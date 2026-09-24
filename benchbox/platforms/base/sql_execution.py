@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from benchbox.core.results.models import QueryExecution
@@ -13,7 +14,65 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 logger = logging.getLogger(__name__)
 
 
-def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
+def join_explain_rows(plan_rows: Sequence[Any] | None) -> str | None:
+    """Join raw EXPLAIN rows into plan text, robust to driver row shapes.
+
+    Drivers differ in how they chunk EXPLAIN output: a single row holding the
+    full text (Trino JSON), one row per plan line (ClickHouse text), or JSON
+    fragmented across rows. Cells may also arrive as decoded ``dict``/``list``
+    objects (JSON drivers), ``bytes``, or be padded with ``None``/extra
+    columns. All of those shapes must yield the same plan text — otherwise a
+    driver upgrade silently zeroes out capture while unit tests stay green.
+
+    Args:
+        plan_rows: Raw rows from ``cursor.fetchall()`` / ``collect()``.
+
+    Returns:
+        Joined plan text, or ``None`` when there is nothing to join.
+    """
+    if not plan_rows:
+        return None
+    parts: list[str] = []
+    for row in plan_rows:
+        if row is None:
+            continue
+        if isinstance(row, dict):
+            # A single-column mapping row (e.g. RealDictCursor-style
+            # {"plan": value}): the single value is the plan text, mirroring
+            # row[0] first-column semantics. A multi-key mapping has no column
+            # order to resolve, so it falls through to defensive serialization
+            # below rather than guessing a column.
+            values = list(row.values())
+            cell = values[0] if len(values) == 1 else row
+        elif isinstance(row, (str, bytes, bytearray)):
+            cell = row
+        else:
+            try:
+                cell = row[0]
+            except IndexError:
+                # Empty sequence row: nothing to join; the ``None`` check
+                # below skips it.
+                cell = None
+            except (TypeError, KeyError):
+                cell = row
+        if cell is None:
+            continue
+        if isinstance(cell, (dict, list)):
+            parts.append(json.dumps(cell))
+        elif isinstance(cell, (bytes, bytearray)):
+            parts.append(bytes(cell).decode("utf-8", errors="replace"))
+        else:
+            parts.append(str(cell))
+    text = "\n".join(parts)
+    return text or None
+
+
+def get_query_plan_from_cursor(
+    connection: Any,
+    query: str,
+    explain_prefix: str = "EXPLAIN",
+    logger: logging.Logger | None = None,
+) -> str | None:
     """Get query execution plan via EXPLAIN on a DBAPI connection.
 
     Shared implementation for platforms that use the standard
@@ -22,9 +81,15 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     Args:
         connection: DBAPI connection.
         query: SQL query to explain.
+        explain_prefix: EXPLAIN variant, e.g. "EXPLAIN (FORMAT JSON)".
+        logger: Logger for the failure warning. Defaults to this module's
+            logger; adapters pass their own so the warning keeps its
+            platform identity in multi-platform runs.
 
     Returns:
-        Newline-joined plan rows, or ``None`` on failure.
+        Newline-joined plan rows, ``""`` when EXPLAIN returns no rows
+        (historical contract: only failures yield ``None``), or ``None``
+        on failure.
 
     On failure this returns ``None`` and logs the exception, rather than
     returning the error text AS the plan (qpc-05 / F4.2). Encoding the error in
@@ -34,13 +99,14 @@ def get_query_plan_from_cursor(connection: Any, query: str) -> str | None:
     parser as though it were EXPLAIN output. A ``None`` return is treated as a
     clean capture failure by callers and simply skips best-effort display.
     """
+    log = logger or logging.getLogger(__name__)
     cursor = connection.cursor()
     try:
-        cursor.execute(f"EXPLAIN {query}")
+        cursor.execute(f"{explain_prefix} {query}")
         plan_rows = cursor.fetchall()
-        return "\n".join([str(row[0]) for row in plan_rows])
+        return join_explain_rows(plan_rows) or ""
     except Exception as e:
-        logger.warning("Could not get query plan via EXPLAIN: %s", e)
+        log.warning("Could not get query plan via EXPLAIN: %s", e)
         return None
     finally:
         cursor.close()

@@ -115,23 +115,18 @@ class TestFromConfigProjectAutoDetect:
         assert adapter.project_id == "explicit-proj"
 
     def test_silences_default_credentials_error(self):
-        """DefaultCredentialsError during auto-detect is swallowed; no project_id set."""
+        """Missing ADC falls through to the actionable project ID validation error."""
         import benchbox.platforms.bigquery as bq_module
+        from benchbox.core.exceptions import ConfigurationError
 
         with patch("benchbox.platforms.bigquery.google") as mock_google:
             mock_google.auth.exceptions.DefaultCredentialsError = RuntimeError
             mock_google.auth.default.side_effect = RuntimeError("no credentials")
 
-            # Needs explicit project_id to construct adapter without error
-            adapter = bq_module.BigQueryAdapter.from_config(
-                {
-                    "project_id": "fallback-proj",
-                    "benchmark": "tpch",
-                    "scale_factor": 1.0,
-                }
-            )
+            with pytest.raises(ConfigurationError, match="requires project_id"):
+                bq_module.BigQueryAdapter.from_config({"benchmark": "tpch", "scale_factor": 1.0})
 
-        assert adapter.project_id == "fallback-proj"
+        mock_google.auth.default.assert_called_once_with()
 
     def test_from_config_passes_result_metadata_options(self):
         import benchbox.platforms.bigquery as bq_module
@@ -1248,33 +1243,23 @@ class TestConfigureForBenchmark:
 
 
 class TestGetQueryPlan:
-    """Test get_query_plan dry-run path."""
+    """Test get_query_plan contract (no EXPLAIN-text path)."""
 
-    def test_returns_bytes_processed(self):
+    def test_unconfigured_dry_run_job_returns_none(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
-        mock_job = Mock()
-        mock_job.total_bytes_processed = 123456
-        mock_job.job_id = "dry-run-job"
-        mock_conn.query.return_value = mock_job
 
-        result = adapter.get_query_plan(mock_conn, "SELECT 1")
+        assert adapter.get_query_plan(mock_conn, "SELECT 1") is None
+        mock_conn.query.assert_called_once()
 
-        assert result["bytes_processed"] == 123456
-        assert "estimated_cost" in result
-        assert result["query_plan"] == "Dry run completed"
-
-    def test_error_returns_error_dict(self):
+    def test_error_path_still_returns_none(self):
         adapter = _make_adapter()
 
         mock_conn = Mock()
         mock_conn.query.side_effect = RuntimeError("dry run failed")
 
-        result = adapter.get_query_plan(mock_conn, "INVALID SQL")
-
-        assert "error" in result
-        assert "dry run failed" in result["error"]
+        assert adapter.get_query_plan(mock_conn, "INVALID SQL") is None
 
 
 # ---------------------------------------------------------------------------
@@ -1460,14 +1445,18 @@ class TestApplyTableTunings:
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = False
 
-        # Should complete without error
         adapter.apply_table_tunings(mock_tuning, mock_conn)
+
+        mock_tuning.has_any_tuning.assert_called_once_with()
+        assert mock_conn.mock_calls == []
 
     def test_none_tuning_returns_early(self):
         adapter = _make_adapter()
         mock_conn = Mock()
 
         adapter.apply_table_tunings(None, mock_conn)
+
+        assert mock_conn.mock_calls == []
 
     def test_tuning_with_recreation_needed_logs_warning(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -1505,8 +1494,11 @@ class TestApplyTableTunings:
 
         mock_tuning.get_columns_by_type.side_effect = get_cols_by_type
 
-        # Should complete without raising; warning is logged internally
-        adapter.apply_table_tunings(mock_tuning, mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.apply_table_tunings(mock_tuning, mock_conn)
+
+        mock_conn.get_table.assert_called_once_with(mock_table_ref)
+        assert any("Consider recreating the table" in call.args[0] for call in mock_warning.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -1656,8 +1648,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("credential refresh failed")
 
-        # Should not raise
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_not_called()
 
     def test_auth_error_suppressed(self):
         adapter = _make_adapter()
@@ -1665,8 +1659,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("auth token expired")
 
-        # Should not raise
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_not_called()
 
     def test_non_credential_error_logged_as_warning(self):
         adapter = _make_adapter()
@@ -1674,8 +1670,10 @@ class TestCloseConnection:
         mock_conn = Mock()
         mock_conn.close.side_effect = RuntimeError("network timeout")
 
-        # Should not raise (logs warning instead)
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warning:
+            adapter.close_connection(mock_conn)
+
+        mock_warning.assert_called_once_with("Error closing connection: network timeout")
 
     def test_none_connection_handled(self):
         adapter = _make_adapter()
@@ -1853,14 +1851,22 @@ class TestApplyPlatformOptimizations:
         adapter = _make_adapter()
         mock_conn = Mock()
 
-        adapter.apply_platform_optimizations(None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(None, mock_conn)
+
+        mock_info.assert_not_called()
+        assert mock_conn.mock_calls == []
 
     def test_valid_config_logs_message(self):
         adapter = _make_adapter()
         mock_conn = Mock()
 
         mock_config = Mock()
-        adapter.apply_platform_optimizations(mock_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(mock_config, mock_conn)
+
+        mock_info.assert_called_once_with("BigQuery platform optimizations stored for query execution")
+        assert mock_conn.mock_calls == []
 
 
 # ---------------------------------------------------------------------------
@@ -1895,15 +1901,16 @@ class TestNormalizeTableNamesCase:
         # Pattern requires lowercase start, so LINEITEM won't change; result equals input
         assert "`LINEITEM`" in result
 
-    def test_mixed_case_single_word_not_matched(self):
-        """Mixed-case identifiers starting with uppercase are not matched by the pattern."""
+    def test_mixed_case_single_word_uppercased(self):
+        """Mixed-case identifiers normalize to UPPERCASE to match the schema."""
         adapter = _make_adapter()
 
         query = "SELECT * FROM `LineItem`"
         result = adapter._normalize_table_names_case(query)
 
-        # Pattern requires [a-z_] start; LineItem won't match, stays as is
-        assert "`LineItem`" in result
+        # Backtick-quoted identifiers are case-sensitive in BigQuery while
+        # tables are stored UPPERCASE, so LineItem must become LINEITEM
+        assert "`LINEITEM`" in result
 
     def test_full_path_backtick_not_matched_by_single_word_pattern(self):
         """Full paths like `proj.ds.table` are not matched - dots outside char class."""
@@ -2009,7 +2016,17 @@ class TestApplyUnifiedTuning:
         adapter = _make_adapter()
         mock_conn = Mock()
 
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraints,
+            patch.object(adapter, "apply_platform_optimizations") as mock_optimizations,
+            patch.object(adapter, "apply_table_tunings") as mock_table_tunings,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+
+        mock_constraints.assert_not_called()
+        mock_optimizations.assert_not_called()
+        mock_table_tunings.assert_not_called()
+        assert mock_conn.mock_calls == []
 
     def test_valid_config_applies_all_tunings(self):
         adapter = _make_adapter()
@@ -2137,13 +2154,17 @@ class TestLoadData:
         with (
             patch.object(adapter, "_resolve_data_files", return_value=data_files),
             patch.object(adapter, "_validate_compression_support"),
-            patch.object(adapter, "_load_tables_direct", return_value={"LINEITEM": 100}) as mock_direct,
+            patch.object(
+                adapter,
+                "_load_tables_direct",
+                return_value=({"LINEITEM": 100}, {"LINEITEM": {"total_ms": 10}}),
+            ) as mock_direct,
         ):
             stats, time_, details = adapter.load_data(mock_benchmark, mock_conn, Path("/tmp/data"))
 
         mock_direct.assert_called_once()
         assert stats == {"LINEITEM": 100}
-        assert details is None
+        assert details == {"LINEITEM": {"total_ms": 10}}
 
     def test_cloud_storage_loading_when_bucket_configured(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj", storage_bucket="my-bucket")
@@ -2159,7 +2180,11 @@ class TestLoadData:
             patch.object(adapter, "_resolve_data_files", return_value=data_files),
             patch.object(adapter, "_validate_compression_support"),
             patch.object(adapter, "_create_storage_bucket", return_value=mock_bucket),
-            patch.object(adapter, "_load_tables_via_cloud_storage", return_value={"LINEITEM": 500}) as mock_cloud,
+            patch.object(
+                adapter,
+                "_load_tables_via_cloud_storage",
+                return_value=({"LINEITEM": 500}, {"LINEITEM": {"total_ms": 20}}),
+            ) as mock_cloud,
         ):
             stats, time_, details = adapter.load_data(mock_benchmark, mock_conn, Path("/tmp/data"))
 
@@ -2169,7 +2194,7 @@ class TestLoadData:
         assert actual_bucket is mock_bucket
         assert actual_benchmark is mock_benchmark
         assert stats == {"LINEITEM": 500}
-        assert details is None
+        assert details == {"LINEITEM": {"total_ms": 20}}
 
     def test_data_loading_raises_on_error(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -2320,11 +2345,12 @@ class TestLoadTablesDirect:
 
         mock_conn = Mock()
 
-        # No valid files → table gets row count of 0
+        # No valid files → table gets row count of 0 with a zero timing entry
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
-            stats = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
+            stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [Path("/nonexistent.parquet")]})
 
         assert stats.get("LINEITEM") == 0
+        assert timings == {"LINEITEM": {"total_ms": 0}}
         mock_conn.load_table_from_file.assert_not_called()
 
     def test_failed_table_load_logged(self):
@@ -2344,9 +2370,10 @@ class TestLoadTablesDirect:
                 patch.object(adapter, "_filter_valid_files", return_value=[tmp_path]),
                 patch.object(adapter, "_load_table_direct", side_effect=RuntimeError("load failed")),
             ):
-                stats = adapter._load_tables_direct(mock_conn, {"lineitem": [tmp_path]})
+                stats, timings = adapter._load_tables_direct(mock_conn, {"lineitem": [tmp_path]})
 
             assert stats.get("LINEITEM") == 0
+            assert timings == {"LINEITEM": {"total_ms": 0}}
         finally:
             tmp_path.unlink(missing_ok=True)
 
@@ -2366,11 +2393,12 @@ class TestLoadTablesViaCloudStorage:
         mock_bucket = Mock()
 
         with patch.object(adapter, "_filter_valid_files", return_value=[]):
-            stats = adapter._load_tables_via_cloud_storage(
+            stats, timings = adapter._load_tables_via_cloud_storage(
                 mock_conn, {"lineitem": ["gs://bucket/lineitem.parquet"]}, mock_bucket
             )
 
-        assert stats.get("lineitem") == 0
+        assert stats.get("LINEITEM") == 0
+        assert timings == {"LINEITEM": {"total_ms": 0}}
 
     def test_failed_table_load_returns_zero(self):
         adapter = _make_adapter(dataset_id="test_ds", project_id="test-proj")
@@ -2382,11 +2410,12 @@ class TestLoadTablesViaCloudStorage:
             patch.object(adapter, "_filter_valid_files", return_value=["gs://bucket/lineitem.parquet"]),
             patch.object(adapter, "_load_table_via_cloud_storage", side_effect=RuntimeError("gcs error")),
         ):
-            stats = adapter._load_tables_via_cloud_storage(
+            stats, timings = adapter._load_tables_via_cloud_storage(
                 mock_conn, {"lineitem": ["gs://bucket/lineitem.parquet"]}, mock_bucket
             )
 
         assert stats.get("LINEITEM") == 0
+        assert timings == {"LINEITEM": {"total_ms": 0}}
 
 
 # ---------------------------------------------------------------------------

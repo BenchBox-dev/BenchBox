@@ -1,0 +1,9 @@
+{
+  "bundle_file": "tpch_sf10_duckdb_v1_2_2_median.json",
+  "bundle_hash": "4ccc50146eb49b95587c9db4054e4763f7259c8599edc6ea40b3025817d53fd0",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

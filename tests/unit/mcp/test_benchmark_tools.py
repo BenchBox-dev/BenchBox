@@ -17,7 +17,6 @@ import pytest
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
-    pytest.mark.skipif(sys.version_info < (3, 10), reason="MCP server requires Python 3.10+"),
 ]
 
 
@@ -176,45 +175,6 @@ class TestRunBenchmarkTool:
 
         assert response["mcp_metadata"]["status"] == "no_results"
         assert run_core.call_args.kwargs["normalized_platform_options"] == {"threads": 4}
-
-    def test_modin_engine_reaches_the_effective_backend(self, tmp_path: Path):
-        """Forwarding can succeed while the effective backend is unchanged."""
-        from benchbox.mcp.schemas import validate_platform_options
-        from benchbox.platforms.dataframe import modin_df
-
-        normalized = validate_platform_options("modin", {"engine": "dask"})
-        assert normalized == {"engine": "dask"}
-
-        with (
-            patch.object(modin_df, "MODIN_AVAILABLE", True),
-            patch.object(modin_df, "PANDAS_AVAILABLE", True),
-            patch.object(modin_df.ModinDataFrameAdapter, "_configure_engine"),
-        ):
-            adapter = modin_df.ModinDataFrameAdapter(working_dir=tmp_path, **normalized)
-
-        assert adapter.engine == "dask"
-
-    def test_modin_unsupported_engine_fails_closed_through_the_run_surface(self, tmp_path: Path):
-        """The schema rejects `pandas`; the factory must reject it too."""
-        from benchbox.mcp.schemas import MCPValidationError, validate_platform_options
-        from benchbox.mcp.tools import benchmark as benchmark_tools
-
-        with pytest.raises(MCPValidationError):
-            validate_platform_options("modin", {"engine": "pandas"})
-
-        # Even bypassing the schema, the adapter must not accept it.
-        response = benchmark_tools._run_benchmark_impl(
-            "modin-df",
-            "tpch",
-            0.01,
-            None,
-            "load,power",
-            "dataframe",
-            platform_options={"engine": "pandas"},
-            results_dir=tmp_path,
-            anonymize=False,
-        )
-        assert response["status"] == "failed"
 
     def test_oversized_dask_request_never_builds_a_cluster(self, tmp_path: Path):
         """Proving rejection by starting a 65,536-thread cluster would be the attack."""
@@ -467,7 +427,6 @@ class TestRunBenchmarkTool:
             ("velox", "driver_memory"): "driver_memory",
             ("velox", "offheap_size"): "offheap_size",
             ("velox", "shuffle_partitions"): "shuffle_partitions",
-            ("modin", "engine"): "engine",
             ("pandas", "dtype_backend"): "dtype_backend",
             ("firebolt", "disable_result_cache"): "disable_result_cache",
             ("firebolt", "strict_validation"): "strict_validation",
@@ -645,7 +604,7 @@ class TestRunBenchmarkTool:
                                     built.close()
                                 except Exception:
                                     pass
-                    elif platform in ("polars", "pandas", "modin"):
+                    elif platform in ("polars", "pandas"):
                         # Dataframe adapters - try to construct, but handle missing optional deps per case
                         try:
                             if platform == "polars":
@@ -660,21 +619,6 @@ class TestRunBenchmarkTool:
                                 built = PandasDataFrameAdapter(**prepared)
                                 _assert_effective_consumer_value(platform, option_name, built, attr, value)
                                 observed += 1
-                            elif platform == "modin":
-                                from benchbox.platforms.dataframe.modin_df import ModinDataFrameAdapter
-
-                                # Modin may need MODIN_ENGINE env; mock the engine setup to avoid Ray init
-                                with patch(
-                                    "benchbox.platforms.dataframe.modin_df.ModinDataFrameAdapter._configure_engine",
-                                    return_value=None,
-                                ):
-                                    built = ModinDataFrameAdapter(
-                                        engine=value, **{k: v for k, v in prepared.items() if k != "engine"}
-                                    )
-                                    # Modin stores engine as self.engine
-                                    observed_val = getattr(built, "engine", None)
-                                    assert observed_val == value, f"modin.engine {observed_val!r} != {value!r}"
-                                    observed += 1
                         except ImportError as ie:
                             skipped.append(f"{platform}.{option_name} optional dep missing: {ie}")
                             continue
@@ -927,12 +871,23 @@ class TestPopulateDataframeQueryDetails:
 
         assert "error" in response
 
-    def test_unsupported_benchmark_returns_error(self):
-        """Test that unsupported benchmark for DataFrame returns error."""
+    def test_benchmark_with_dataframe_registry_returns_source(self):
+        """Any benchmark with a DataFrame registry resolves, not just tpch/tpcds."""
         from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
 
         response: dict = {}
         _populate_dataframe_query_details(response, "clickbench", "1", "polars-df")
+
+        assert "error" not in response
+        assert response["source_code"]
+        assert response["has_expression_impl"] is True
+
+    def test_benchmark_without_dataframe_registry_returns_error(self):
+        """A benchmark with no DataFrame implementations still reports the gap."""
+        from benchbox.mcp.tools.benchmark import _populate_dataframe_query_details
+
+        response: dict = {}
+        _populate_dataframe_query_details(response, "tpcdi", "1", "polars-df")
         assert "error" in response
 
 

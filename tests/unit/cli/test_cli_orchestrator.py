@@ -377,6 +377,20 @@ class TestBenchmarkOrchestrator:
 
         assert "Benchmark 'unknown' not supported yet" in str(exc_info.value)
 
+    def test_get_benchmark_instance_delegates_to_shared_loader(self):
+        """Test that orchestrator delegates benchmark instance construction to shared loader."""
+        config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
+        system_profile = Mock()
+        mock_instance = Mock()
+
+        with patch("benchbox.cli.orchestrator.get_benchmark_instance", return_value=mock_instance) as mock_get:
+            result = self.orchestrator._get_benchmark_instance(config, system_profile)
+            assert result == mock_instance
+            mock_get.assert_called_once()
+            called_kwargs = mock_get.call_args.kwargs
+            assert called_kwargs["verbose"] == self.orchestrator._verbosity.level
+            assert called_kwargs["quiet"] == self.orchestrator._verbosity.quiet
+
     def test_get_platform_config(self):
         """Test platform configuration extraction."""
         database_config = Mock()

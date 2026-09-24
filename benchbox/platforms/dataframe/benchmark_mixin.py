@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import DEFAULT
 
+from benchbox.core.benchmark_loader import COMPLIANCE_GATED_BENCHMARKS
 from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS,
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
@@ -45,15 +46,16 @@ from benchbox.core.results import (
     normalize_query_result,
 )
 from benchbox.core.results.builder import RunConfigInput, normalize_benchmark_id
+from benchbox.core.results.environment import system_profile_snapshot
 from benchbox.core.results.models import (
     BenchmarkResults,
     TableLoadingStats,
 )
 from benchbox.core.results.query_plan_models import QueryPlanDAG
 from benchbox.core.results.schema import compute_plan_capture_stats
-from benchbox.core.runner.dataframe_runner import dataframe_compliance_class, no_dataframe_queries_message
 from benchbox.core.schemas import BenchmarkConfig, SystemProfile
 from benchbox.platforms.base.adapter import DriverIsolationCapability
+from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.printing import quiet_console
 
@@ -123,6 +125,76 @@ def _benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
     return benchmark_provides_dataframe_queries(benchmark)
 
 
+def dataframe_compliance_class(benchmark_instance: object | None, benchmark_config: object) -> str | None:
+    """Resolve the compliance class a DataFrame result must carry.
+
+    The SQL path gets this for free: `result_factory.build_enhanced_benchmark_result`
+    reads `benchmark.compliance_class` off the benchmark instance. Both DataFrame
+    builders construct `BenchmarkInfoInput` themselves and omitted the field, and
+    they build from the CONFIG rather than the instance, so threading `official`
+    through the config -- as PR #1770 did -- could never reach them.
+
+    The effect was not cosmetic. `benchbox submit` refuses a TPC-DS bundle whose
+    compliance class is unofficial, so no DataFrame result could ever be
+    published, however the user invoked it.
+
+    Prefer the instance, which has already run the classifier. Fall back to
+    classifying from the config so a caller that passes no instance still gets a
+    truthful value rather than silence.
+    """
+    from_instance = getattr(benchmark_instance, "compliance_class", None)
+    if from_instance is not None:
+        return _compliance_value(from_instance)
+
+    name = str(getattr(benchmark_config, "name", "") or "").lower()
+    if name not in COMPLIANCE_GATED_BENCHMARKS:
+        return None
+    if name == "tpch":
+        from benchbox.core.tpch.compliance import classify_tpch_run
+
+        classify = classify_tpch_run
+    else:
+        from benchbox.core.tpcds.compliance import classify_tpcds_run
+
+        classify = classify_tpcds_run
+
+    return _compliance_value(
+        classify(
+            float(getattr(benchmark_config, "scale_factor", 0) or 0),
+            official=bool(getattr(benchmark_config, "official", False)),
+        )
+    )
+
+
+def _compliance_value(compliance_class: object) -> str:
+    """Plain wire string for a compliance class, enum or already-a-string.
+
+    `str()` on the enum yields `TpcdsComplianceClass.UNOFFICIAL_SUBSCALE`, not
+    `unofficial_subscale`, and the submit and admission gates compare against
+    the plain value. The SQL path emits the plain value, so this must too.
+    """
+    return str(getattr(compliance_class, "value", compliance_class))
+
+
+def no_dataframe_queries_message(benchmark_id: str, query_filter: set[str] | None) -> str:
+    """Explain why zero queries were discovered, and what the user can do.
+
+    The two causes need different advice: an over-narrow `--queries` filter is
+    the user's to correct, whereas a benchmark with no DataFrame query source
+    at all is a coverage gap they cannot fix from the command line.
+    """
+    if query_filter:
+        return (
+            f"No DataFrame queries matched {sorted(query_filter)} for benchmark {benchmark_id!r}. "
+            "Check the --queries selection against the benchmark's query IDs."
+        )
+    return (
+        f"Benchmark {benchmark_id!r} has no DataFrame query source, so DataFrame mode would "
+        "execute nothing. Run it in SQL mode instead -- use the platform's plain name rather "
+        "than its -df alias -- or choose a benchmark with DataFrame support."
+    )
+
+
 @dataclass
 class DataFramePhases:
     """Phases for DataFrame benchmark execution."""
@@ -155,6 +227,51 @@ class DataLoadingError(RuntimeError):
         super().__init__(message)
         self.table_stats = table_stats or {}
         self.per_table_stats = per_table_stats or {}
+
+
+def _client_host_profile(system_profile: Any) -> dict[str, Any]:
+    """Return the client-host profile dict for a DataFrame run.
+
+    Collected the same way the SQL path collects it, so both families produce
+    the same client_host field set. A caller-supplied mapping is honoured as
+    is. A typed SystemProfile is serialized from the supplied snapshot rather
+    than replaced with a fresh observation of the current host.
+    """
+    if system_profile is not None:
+        return system_profile_snapshot(system_profile)
+    from benchbox.utils.system_info import get_system_info
+
+    return get_system_info().to_dict()
+
+
+def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[str, Any]) -> dict[str, Any] | None:
+    """Build the region-only ``client_link`` block for a DataFrame run.
+
+    Returns None when no locality is known, keeping laptop/local runs
+    free of empty blocks. Discovery must never break a benchmark run, so
+    surprise errors degrade to no block (same rule as the SQL path).
+    """
+    client_config = {
+        **options_map,
+        "client_region": getattr(benchmark_config, "client_region", None) or options_map.get("client_region"),
+        "client_cloud": getattr(benchmark_config, "client_cloud", None) or options_map.get("client_cloud"),
+    }
+    try:
+        region_info = discover_client_region(client_config)
+    except Exception as exc:  # noqa: BLE001 - discovery must never break a run
+        logger.warning("DataFrame client-link discovery failed: %r", exc)
+        return None
+    if not region_info.get("client_region") and not region_info.get("client_cloud"):
+        return None
+    return {
+        "collection_status": "partial",
+        "source": region_info.get("source", "unavailable"),
+        "client_region": region_info.get("client_region"),
+        "client_cloud": region_info.get("client_cloud"),
+        "statement_overhead_ms": None,
+        "collection_error_class": None,
+        "collection_error_message": None,
+    }
 
 
 class BenchmarkExecutionMixin:
@@ -298,6 +415,15 @@ class BenchmarkExecutionMixin:
         )
         builder.mark_started()
         builder.set_validation_status("NOT_RUN")
+        # Record the client host, exactly as the SQL adapters do in
+        # benchbox/platforms/base/adapter.py::_build_execution_metadata.
+        #
+        # The DataFrame families descend from this mixin rather than from that
+        # adapter, so without this call `result.system_profile` stays unset,
+        # `_build_environment_block` produces an empty client_host, and
+        # `_compact` drops it -- which is why every DataFrame bundle published
+        # only a `platform_runtime` block and no host at all.
+        builder.set_system_profile(_client_host_profile(system_profile))
 
         # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
         # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
@@ -319,6 +445,14 @@ class BenchmarkExecutionMixin:
                 tuning_config=options_map.get("df_tuning_config"),
             )
         )
+
+        # DataFrame engines have no SQL connection to probe, so only the
+        # region half of client_link is collected here (status partial:
+        # region known, overhead unmeasurable) rather than silently
+        # dropping the block when locality is known.
+        client_link = _client_link_block_for_dataframe(benchmark_config, options_map)
+        if client_link is not None:
+            builder.set_execution_environment({"client_link": client_link})
 
         # Initialize result tracking
         query_results: list[dict[str, Any]] = []

@@ -184,7 +184,7 @@ results = adapter.run_benchmark(benchmark)
 
 | Operation | Cost |
 |-----------|------|
-| Queries | $5 per TB scanned |
+| Queries | $6.25 per TiB scanned (US/EU/Asia multi-region; per-location rates in `benchbox/core/cost/pricing_data.yaml`) |
 | Storage | $0.02 per GB/month |
 | Streaming inserts | $0.01 per 200MB |
 

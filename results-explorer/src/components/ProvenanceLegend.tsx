@@ -17,7 +17,9 @@ import { TrustBadge, trustLabelDescription } from "@/components/TrustBadge";
 // explains - there is one source for each string.
 //
 // Rendered on every page that shows a TrustBadge or FundingChip - ResultDetail,
-// BenchmarkIndex, PlatformIndex, Compare, and Home (meta leaderboard) - per the
+// BenchmarkIndex, PlatformIndex, Compare (loaded comparison), and Leaderboard
+// (the compare landing / meta leaderboard view, so /results/compare carries
+// the legend whether or not runs are selected) - per the
 // hosted-results-contract rule that a legend explaining the labels is reachable
 // from every surface that displays them. It is collapsed by default so it costs
 // a line of chrome, not a screenful.
@@ -70,9 +72,9 @@ export function ProvenanceLegend() {
       {expanded && (
         <div class="mt-4 space-y-6 text-sm">
           <div>
-            <h3 class="mb-1 font-semibold text-[var(--bb-data-fg-primary)]">Trust label</h3>
+            <h3 class="mb-1 font-semibold text-[var(--bb-data-fg-primary)]">Result source</h3>
             <p class="mb-3 text-[var(--bb-data-fg-muted)]">
-              Who produced this result, and under what review. Every result carries exactly one.
+              Who produced the result and how BenchBox reviewed it.
             </p>
             <dl class="space-y-2">
               {LEGEND_TRUST_LABELS.map((label) => (
@@ -88,10 +90,7 @@ export function ProvenanceLegend() {
           <div>
             <h3 class="mb-1 font-semibold text-[var(--bb-data-fg-primary)]">Funding</h3>
             <p class="mb-3 text-[var(--bb-data-fg-muted)]">
-              Who paid for the run. This is a disclosure, not a trust signal, and it is independent
-              of the trust label - a vendor-supplied result can be employer-funded, and a community
-              submission can be vendor-sponsored. All funding chips share one neutral color so that
-              no funding source reads as better or worse than another.
+              Who paid for the run. Funding does not change how BenchBox reviews or ranks a result.
             </p>
             <dl class="space-y-2">
               {LEGEND_FUNDING_SOURCES.map((funding) => (

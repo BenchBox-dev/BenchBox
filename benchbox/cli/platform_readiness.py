@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import socket
 from dataclasses import dataclass
 from importlib import util
@@ -54,7 +53,6 @@ _DATAFRAME_ALIASES: dict[str, str] = {
     "pyspark-df": "pyspark",
     "datafusion-df": "datafusion",
     "dask-df": "dask",
-    "modin-df": "modin",
     "cudf-df": "cudf",
     "lakesail-df": "lakesail",
 }
@@ -191,8 +189,6 @@ def check_platform_readiness(
         return (_check_local_tcp_endpoint(_LOCAL_TCP_ENDPOINTS[canonical_platform], timeout_seconds),)
     if canonical_platform == "lakesail":
         return _check_lakesail(platform, timeout_seconds)
-    if canonical_platform == "modin":
-        return _check_modin(platform)
     return ()
 
 
@@ -316,64 +312,6 @@ def _check_lakesail(platform: str, timeout_seconds: float) -> tuple[PlatformRead
     return tuple(results)
 
 
-def _check_modin(platform: str) -> tuple[PlatformReadinessResult, ...]:
-    if not _module_available("modin"):
-        return (
-            PlatformReadinessResult(
-                platform=platform,
-                check="modin_package",
-                status="environment_skip",
-                summary="Modin is not importable.",
-                remediation="Install Modin with: uv add benchbox --extra modin",
-            ),
-        )
-
-    backend = os.environ.get("MODIN_ENGINE", "ray").strip().lower() or "ray"
-    backend_module = {"ray": "ray", "dask": "dask", "unidist": "unidist"}.get(backend)
-    results = [
-        PlatformReadinessResult(
-            platform=platform,
-            check="modin_package",
-            status="ready",
-            summary="Modin package is importable without initializing a backend.",
-        )
-    ]
-
-    if backend_module is None:
-        results.append(
-            PlatformReadinessResult(
-                platform=platform,
-                check="modin_backend",
-                status="environment_skip",
-                summary=f"MODIN_ENGINE={backend!r} is not a supported BenchBox Modin backend.",
-                remediation="Set MODIN_ENGINE to ray, dask, or unidist before running modin-df benchmarks.",
-            )
-        )
-        return tuple(results)
-
-    if _module_available(backend_module):
-        results.append(
-            PlatformReadinessResult(
-                platform=platform,
-                check="modin_backend",
-                status="ready",
-                summary=f"Modin backend dependency {backend_module!r} is importable for MODIN_ENGINE={backend}.",
-            )
-        )
-    else:
-        results.append(
-            PlatformReadinessResult(
-                platform=platform,
-                check="modin_backend",
-                status="environment_skip",
-                summary=f"Modin backend dependency {backend_module!r} is not importable for MODIN_ENGINE={backend}.",
-                detail="The readiness check does not import modin.pandas or initialize Ray/Dask.",
-                remediation=f"Install the selected backend with: uv add {_modin_backend_install_spec(backend)}",
-            )
-        )
-    return tuple(results)
-
-
 @dataclass(frozen=True)
 class LakeSailReadinessConfig:
     endpoint: str
@@ -396,14 +334,6 @@ def _configured_lakesail_config() -> LakeSailReadinessConfig:
 
 def _configured_lakesail_endpoint() -> str:
     return _configured_lakesail_config().endpoint
-
-
-def _modin_backend_install_spec(backend: str) -> str:
-    return {
-        "ray": '"modin[ray]"',
-        "dask": '"modin[dask]"',
-        "unidist": '"modin[unidist]"',
-    }.get(backend, backend)
 
 
 def _module_available(module_name: str) -> bool:

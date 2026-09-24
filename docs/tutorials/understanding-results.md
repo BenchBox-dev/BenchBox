@@ -147,5 +147,5 @@ benchbox run --dry-run ./analysis --platform duckdb --benchmark tpch
 ## Next Steps
 
 - [Comparing Platforms](comparing-platforms.md) - Run on multiple databases
-- [Result Export Documentation](../reference/results-schema.md) - Full JSON schema
-- [Performance Guide](../performance/index.md) - Optimization tips
+- [Result Export Documentation](../reference/result-formats.md) - Full JSON schema
+- [Performance Guide](../performance/dataframe-optimization.md) - Optimization tips

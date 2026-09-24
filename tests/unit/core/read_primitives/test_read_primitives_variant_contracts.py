@@ -218,3 +218,16 @@ def test_actual_catalog_static_linter_reports_no_variant_contract_issues():
         ),
     }
     assert set(issues) - allowlisted == set()
+
+
+def test_summarize_variant_comparability_is_json_serializable():
+    """Summary must survive a JSON round-trip for CLI output and artifacts."""
+    import json
+
+    from benchbox.core.read_primitives.variant_contracts import summarize_variant_comparability
+
+    summary = summarize_variant_comparability()
+    assert summary["total_queries"] > 0
+    assert summary["issue_count"] == 0
+    assert summary["comparable"] is True
+    assert json.loads(json.dumps(summary)) == summary

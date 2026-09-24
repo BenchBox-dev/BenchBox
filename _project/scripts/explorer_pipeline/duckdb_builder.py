@@ -6,6 +6,7 @@ This file is loaded by DuckDB-WASM in the browser for filtering and analysis.
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import os
@@ -27,6 +28,7 @@ from _project.scripts.explorer_pipeline.models import (
     timing_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import rank_platforms
+from _project.scripts.explorer_pipeline.transformer import normalize_cpu_family
 
 logger = logging.getLogger(__name__)
 
@@ -335,7 +337,14 @@ class DuckDBSnapshotBuilder:
                 self._create_schema(con)
                 self._create_metadata(con)
                 self._populate_supporting_tables(con, entries, details_map)
-                self._populate_results(con, entries, details_map, prefix)
+                cohort_ranking_reasons = {
+                    row.result_id: row.ranking_exclusion_reason
+                    for _, summary in summaries
+                    for row in summary.platforms
+                    if row.ranking_exclusion_reason is not None
+                }
+                self._populate_results(con, entries, details_map, prefix, cohort_ranking_reasons)
+                self._populate_result_basis_availability(con, entries, details_map)
                 self._populate_query_display_timings(con, entries, details_map)
                 self._populate_query_executions(con, entries, details_map)
                 self._populate_benchmark_matrix_cells(con, summaries)
@@ -372,12 +381,20 @@ class DuckDBSnapshotBuilder:
         """Create all canonical tables and views in one pass."""
         con.execute("""
             CREATE TABLE result_environment (
-                result_id  VARCHAR PRIMARY KEY,
-                os         VARCHAR,
-                arch       VARCHAR,
-                cpu_count  INTEGER,
-                memory_gb  DOUBLE,
-                python     VARCHAR
+                result_id   VARCHAR PRIMARY KEY,
+                os          VARCHAR,
+                arch        VARCHAR,
+                cpu_count   INTEGER,
+                memory_gb   DOUBLE,
+                python      VARCHAR,
+                cpu_model   VARCHAR,
+                cpu_family  VARCHAR,
+                cpu_identity_provenance VARCHAR,
+                client_region VARCHAR,
+                client_cloud VARCHAR,
+                statement_overhead_min_ms DOUBLE,
+                statement_overhead_median_ms DOUBLE,
+                link_status VARCHAR
             )
         """)
         con.execute("""
@@ -386,6 +403,16 @@ class DuckDBSnapshotBuilder:
                 phase      VARCHAR NOT NULL,
                 duration_s DOUBLE  NOT NULL,
                 PRIMARY KEY (result_id, phase)
+            )
+        """)
+        con.execute("""
+            CREATE TABLE result_basis_availability (
+                result_id               VARCHAR PRIMARY KEY,
+                has_warmup              BOOLEAN NOT NULL,
+                measurement_pass_count  INTEGER NOT NULL,
+                warmup_status           VARCHAR NOT NULL,
+                available_bases         VARCHAR NOT NULL,
+                varying_pass_queries    VARCHAR
             )
         """)
         con.execute("""
@@ -433,6 +460,16 @@ class DuckDBSnapshotBuilder:
                 -- published. Opaque read-only payload: never parsed, joined
                 -- on, or re-derived anywhere downstream.
                 applied_receipt      VARCHAR,
+                -- Accepted plausibility overrides ({stem}.override.json
+                -- companion), stored verbatim as display-only badge data:
+                -- override_rules holds the covered rule ids as a canonical
+                -- JSON array string; the audit fields are plain text. NULL /
+                -- empty when no override was accepted. Never parsed, joined
+                -- on, or re-derived downstream.
+                override_rules       VARCHAR,
+                override_evidence    VARCHAR,
+                override_approver    VARCHAR,
+                override_expires     VARCHAR,
                 -- ADR-3 seam: explicit tuning-policy generation marker
                 -- (display-only, never a join/dedup key). NULL for legacy
                 -- bundles, treated downstream as the "pre-seam" generation.
@@ -505,6 +542,10 @@ class DuckDBSnapshotBuilder:
                 r.applied_ledger_hash,
                 r.tuning_validation_status,
                 r.applied_receipt,
+                r.override_rules,
+                r.override_evidence,
+                r.override_approver,
+                r.override_expires,
                 r.tuning_policy_generation,
                 r.test_type,
                 r.validation_status,
@@ -537,7 +578,15 @@ class DuckDBSnapshotBuilder:
                 e.arch,
                 e.cpu_count,
                 e.memory_gb,
-                e.python
+                e.python,
+                e.cpu_model,
+                e.cpu_family,
+                e.cpu_identity_provenance,
+                e.client_region,
+                e.client_cloud,
+                e.statement_overhead_min_ms,
+                e.statement_overhead_median_ms,
+                e.link_status
             FROM results r
             LEFT JOIN result_environment e USING (result_id)
         """)
@@ -742,19 +791,25 @@ class DuckDBSnapshotBuilder:
     # Population helpers
     # ------------------------------------------------------------------
 
-    def _populate_supporting_tables(
+    def _populate_environment(
         self,
         con: Any,
         entries: list[ManifestEntry],
         details_map: dict[str, DetailResult],
     ) -> None:
         env_rows: list[tuple] = []
-        phase_rows: list[tuple] = []
         for entry in entries:
             detail = details_map.get(entry.result_id)
             if detail is None:
                 continue
             env = detail.environment or {}
+            raw_cpu_model = env.get("cpu_model")
+            if isinstance(raw_cpu_model, str):
+                raw_cpu_model = raw_cpu_model.strip() or None
+            cpu_family = env.get("cpu_family") or normalize_cpu_family(raw_cpu_model)
+            if not raw_cpu_model:
+                raw_cpu_model = None
+                cpu_family = None
             env_rows.append(
                 (
                     entry.result_id,
@@ -763,14 +818,43 @@ class DuckDBSnapshotBuilder:
                     env.get("cpu_count"),
                     env.get("memory_gb"),
                     env.get("python"),
+                    raw_cpu_model,
+                    cpu_family,
+                    env.get("cpu_identity_provenance"),
+                    env.get("client_region"),
+                    env.get("client_cloud"),
+                    env.get("statement_overhead_min_ms"),
+                    env.get("statement_overhead_median_ms"),
+                    env.get("link_status"),
                 )
             )
+
+        if env_rows:
+            con.executemany(
+                "INSERT INTO result_environment (result_id, os, arch, cpu_count, memory_gb,"
+                " python, cpu_model, cpu_family, cpu_identity_provenance,"
+                " client_region, client_cloud, statement_overhead_min_ms,"
+                " statement_overhead_median_ms, link_status)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                env_rows,
+            )
+
+    def _populate_supporting_tables(
+        self,
+        con: Any,
+        entries: list[ManifestEntry],
+        details_map: dict[str, DetailResult],
+    ) -> None:
+        self._populate_environment(con, entries, details_map)
+        phase_rows: list[tuple] = []
+        for entry in entries:
+            detail = details_map.get(entry.result_id)
+            if detail is None:
+                continue
             if detail.phase_durations:
                 for phase, duration_s in detail.phase_durations.items():
                     phase_rows.append((entry.result_id, phase, duration_s))
 
-        if env_rows:
-            con.executemany("INSERT INTO result_environment VALUES (?, ?, ?, ?, ?, ?)", env_rows)
         if phase_rows:
             con.executemany("INSERT INTO result_phase_durations VALUES (?, ?, ?)", phase_rows)
 
@@ -780,9 +864,14 @@ class DuckDBSnapshotBuilder:
         entries: list[ManifestEntry],
         details_map: dict[str, DetailResult],
         bundle_url_prefix: str,
+        cohort_ranking_reasons: dict[str, str],
     ) -> None:
         rows: list[tuple] = []
         for entry in entries:
+            effective_ranking_reason = cohort_ranking_reasons.get(
+                entry.result_id,
+                entry.ranking_exclusion_reason,
+            )
             detail = details_map.get(entry.result_id)
             has_plans = detail.has_plans if detail is not None else False
             plans_published = detail.plans_published if detail is not None else False
@@ -822,7 +911,7 @@ class DuckDBSnapshotBuilder:
                     entry.zero_timing_count,
                     entry.display_exclusion_reason,
                     entry.comparison_exclusion_reason,
-                    entry.ranking_exclusion_reason,
+                    effective_ranking_reason,
                     entry.trust_label,
                     entry.visibility,
                     entry.funding,
@@ -834,6 +923,10 @@ class DuckDBSnapshotBuilder:
                     entry.applied_ledger_hash,
                     entry.tuning_validation_status,
                     entry.applied_receipt,
+                    json.dumps(entry.override_rules) if entry.override_rules else None,
+                    entry.override_evidence,
+                    entry.override_approver,
+                    entry.override_expires,
                     entry.tuning_policy_generation,
                     entry.test_type,
                     entry.validation_status,
@@ -842,7 +935,7 @@ class DuckDBSnapshotBuilder:
                     *_environment_facet_column_values(entry),
                     *_legacy_cost_deployment_column_values(entry),
                     entry.compliance_class,
-                    is_ranking_eligible(entry),
+                    is_ranking_eligible(entry) and effective_ranking_reason is None,
                     has_plans,
                     plans_published,
                     has_tuning,
@@ -854,6 +947,41 @@ class DuckDBSnapshotBuilder:
         if rows:
             placeholders = ", ".join(["?"] * len(rows[0]))
             con.executemany(f"INSERT INTO results VALUES ({placeholders})", rows)
+
+    def _populate_result_basis_availability(
+        self,
+        con: Any,
+        entries: list[ManifestEntry],
+        details_map: dict[str, DetailResult],
+    ) -> None:
+        rows: list[tuple] = []
+        for entry in entries:
+            detail = details_map.get(entry.result_id)
+            basis_avail = detail.basis_availability if detail is not None else None
+            if basis_avail is None:
+                basis_avail = entry.basis_availability
+            if basis_avail is None:
+                from _project.scripts.explorer_pipeline.transformer import _compute_basis_availability
+
+                queries = detail.queries if detail is not None else []
+                basis_avail = _compute_basis_availability(queries)
+            varying_json = (
+                json.dumps(basis_avail.varying_pass_queries, sort_keys=True)
+                if basis_avail.varying_pass_queries
+                else None
+            )
+            rows.append(
+                (
+                    entry.result_id,
+                    basis_avail.has_warmup,
+                    basis_avail.measurement_pass_count,
+                    basis_avail.warmup_status,
+                    ",".join(basis_avail.available_bases),
+                    varying_json,
+                )
+            )
+        if rows:
+            con.executemany("INSERT INTO result_basis_availability VALUES (?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_query_display_timings(
         self,
@@ -950,8 +1078,8 @@ class DuckDBSnapshotBuilder:
                     if entry is not None
                     else _platform_row_timing_eligibility(platform_row, len(summary.query_ids))
                 )
-                ranking_reason = (
-                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason
+                ranking_reason = ranked_row.ranking_exclusion_reason or (
+                    entry.ranking_exclusion_reason if entry is not None else None
                 )
                 ps = platform_row.percentile_stats
                 rows.append(
@@ -1032,7 +1160,8 @@ class DuckDBSnapshotBuilder:
                 )
                 ranking_context_by_result[ranked_row.row.result_id] = (
                     timing_contract,
-                    entry.ranking_exclusion_reason if entry is not None else ranked_row.ranking_exclusion_reason,
+                    ranked_row.ranking_exclusion_reason
+                    or (entry.ranking_exclusion_reason if entry is not None else None),
                     ranked.total_ranked,
                     cohort_reason,
                 )

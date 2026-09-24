@@ -67,3 +67,13 @@ def test_show_system_info_wrapper() -> None:
     assert "System Information" in output_text
     assert "Linux" in output_text
     assert "test-machine" not in output_text
+
+
+def test_show_system_profile_marks_missing_cpu_as_not_recorded() -> None:
+    output = StringIO()
+    console = Console(file=output, force_terminal=False)
+    profile = _profile().model_copy(update={"cpu_model": None})
+
+    StandardDisplays(console).show_system_profile(profile)
+
+    assert "Not recorded" in output.getvalue()

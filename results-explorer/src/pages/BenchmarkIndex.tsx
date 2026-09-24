@@ -1,23 +1,24 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { RoutableProps } from "preact-router";
 import { route } from "preact-router";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
 import type { ResultRow } from "@/lib/duckdbQueries";
 import { getBenchmarkSummaryFromDuckDB, listBenchmarksWithPublicResults, listResults } from "@/lib/duckdbQueries";
 import { BENCHMARK_LABELS, humanizeBenchmark, isKnownBenchmark, fmtScore, fmtGeomean, errMsg, complianceLabel } from "@/utils";
-import { facetsToWhereClause, useFacetState, type FacetKey, type FacetState } from "@/lib/facetModel";
+import { facetsToWhereClause, useFacetState, type DateWindowFacet, type ExplorerFacetKey, type FacetState } from "@/lib/facetModel";
 import { hasActiveFacets, matchesFacetRow, singleFacetValue } from "@/lib/facetMatching";
+import { singleValueFilterReason } from "@/lib/cohortFilterReason";
+import { CohortFilterPanel, type CohortFilterFieldSpec } from "@/components/CohortFilterPanel";
+import { ResultsCardToolbar, GroupBySelect, ResultsBasisStatement } from "@/components/ResultsCard";
 import {
   buildCompareUrl,
   compareIdForRow,
-  resultDetailHref,
   resultIdentityAriaLabel,
   resultReceiptHref,
   visibleResultIdForRow,
   MAX_COMPARE_SELECTIONS,
 } from "@/lib/resultLinks";
-import { stringSerde, useUrlState } from "@/lib/useUrlState";
 import {
   formatCohortExclusion,
   formatTimingExclusion,
@@ -25,41 +26,60 @@ import {
   isTimingDisplayable,
 } from "@/lib/displayEligibility";
 import { describeCompareExclusionReason, summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
+import { compareSelectionLabel } from "@/lib/compareCohort";
 import { BenchmarkMatrixSkeleton } from "@/components/LoadingSpinner";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { Breadcrumb } from "@/components/Breadcrumb";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";
-import { QueryHeatmap } from "@/components/QueryHeatmap";
-import { RankTable } from "@/components/RankTable";
 import { ChartPanel } from "@/components/ChartPanel";
-import { SegmentedControl } from "@/components/SegmentedControl";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
-import { RankingEligibilityLegend, RunIdentityLabel } from "@/components/DataTable";
+import { RunIdentityLabel } from "@/components/DataTable";
+import { PageHeader } from "@/components/PageHeader";
 import { CompareTray } from "@/components/CompareTray";
 import { TrayAnnouncer } from "@/components/TrayAnnouncer";
+import { RunDateChip } from "@/components/RunAge";
 import { NotFound } from "@/pages/NotFound";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
+import {
+  canonicalBenchmarkSlug,
+  canonicalPhase,
+  formatArchitecture,
+  formatCpuFamily,
+  formatMemoryGb,
+  formatTrustLabel,
+  formatValidationStatus,
+  parseOverrideRules,
+} from "@/lib/displayLabels";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 import { formatSelectedCount } from "@/lib/copyFormatters";
+import { groupCohortRows, limitCohortGroups, type CohortGroupBy } from "@/lib/queryFilters";
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
+
+// Deep-link ids for the expandable analysis cards.
+const CHART_CARD_ANCHORS: Readonly<Record<string, string>> = {
+  query_heatmap: "benchmark-section-matrix",
+  rank_table: "benchmark-section-ranks",
+};
+
+const DATE_WINDOW_OPTIONS: { value: DateWindowFacet; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "365d", label: "Last 365 days" },
+];
 
 interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
 }
 
 type ViewMode = "matrix" | "ranks" | "list";
-type BenchmarkListSortKey = "platform" | "scale_factor" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
-const VIEW_MODES = new Set<ViewMode>(["matrix", "ranks", "list"]);
-function coerceViewMode(value: string): ViewMode {
-  return VIEW_MODES.has(value as ViewMode) ? (value as ViewMode) : "matrix";
-}
+type BenchmarkListSortKey = "platform" | "scale_factor" | "arch" | "cpu_family" | "memory_gb" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
-const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
+const BENCHMARK_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
   "execution_mode",
   "validation_status",
@@ -70,8 +90,12 @@ const BENCHMARK_RESULT_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
+  "arch",
+  "cpu_family",
+  "memory_gb",
 ];
-const BENCHMARK_ROW_FACET_KEYS: FacetKey[] = [
+const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "platform",
   "execution_mode",
   "tuning_mode",
@@ -84,17 +108,19 @@ const BENCHMARK_ROW_FACET_KEYS: FacetKey[] = [
   "storage_format",
   "cost_status",
   "date_window",
+  "platform_version",
+  "arch",
+  "cpu_family",
+  "memory_gb",
 ];
 
-const TRUST_LABEL_ABBREV: Record<string, string> = {
-  "maintainer-run": "Maintainer",
-  "community-submission": "Community",
-  "ci-verified": "CI",
-  "local": "Local",
-};
-
-function trustAbbrev(label: string): string {
-  return TRUST_LABEL_ABBREV[label] ?? label.split("-")[0] ?? label;
+function requestedBenchmarkSection(): ViewMode | null {
+  const hash = window.location.hash.replace("#benchmark-section-", "");
+  if (window.location.hash.startsWith("#benchmark-section-") && ["matrix", "ranks", "list"].includes(hash)) {
+    return hash as ViewMode;
+  }
+  const legacyView = new URLSearchParams(window.location.search).get("view");
+  return legacyView === "ranks" || legacyView === "list" ? legacyView : null;
 }
 
 function benchmarkContextNote(benchmark: string): string | null {
@@ -147,6 +173,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const canonicalBenchmark = canonicalBenchmarkSlug(benchmark);
   const title = humanizeBenchmark(canonicalBenchmark);
   const [results, setResults] = useState<ResultRow[] | null>(null);
+  const [platformVersionDomainResults, setPlatformVersionDomainResults] = useState<ResultRow[] | null>(null);
   const [summary, setSummary] = useState<BenchmarkSummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -182,11 +209,15 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   }, [benchmark]);
 
   // Filter state - URL-synced so views are shareable.
-  const { facets, setFacet } = useFacetState();
+  const { facets, setFacet, resetFacets } = useFacetState();
   const requestedSf = singleFacetValue(facets.scale_factor);
   const phaseFilter = singleFacetValue(facets.phase, "power") ?? "power";
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
-  const trustFilter = facets.trust_tier.length === 0 ? null : new Set(facets.trust_tier);
+  const platformVersionFilter = facets.platform_version.length === 0
+    ? "all"
+    : facets.platform_version.length === 1
+      ? facets.platform_version[0]!
+      : "__multiple__";
   const benchmarkResultWhere = useMemo(
     () =>
       facetsToWhereClause({
@@ -208,6 +239,38 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       facets.execution_mode,
       facets.instance_or_warehouse,
       facets.platform,
+      facets.platform_version,
+      facets.arch,
+      facets.cpu_family,
+      facets.memory_gb,
+      facets.storage_format,
+      facets.validation_status,
+    ],
+  );
+  const benchmarkVersionDomainWhere = useMemo(
+    () => facetsToWhereClause({
+      ...facets,
+      benchmark: canonicalBenchmark ? [canonicalBenchmark] : [],
+      scale_factor: [],
+      phase: [],
+      tuning_mode: [],
+      trust_tier: [],
+      platform_version: [],
+    }),
+    [
+      benchmark,
+      canonicalBenchmark,
+      facets.cloud_provider,
+      facets.cloud_region,
+      facets.cost_status,
+      facets.date_window,
+      facets.deployment_class,
+      facets.execution_mode,
+      facets.instance_or_warehouse,
+      facets.platform,
+      facets.arch,
+      facets.cpu_family,
+      facets.memory_gb,
       facets.storage_format,
       facets.validation_status,
     ],
@@ -218,26 +281,34 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
   const setTrustFilter = (value: Set<string> | null) => setFacet("trust_tier", value ? [...value].sort() : []);
 
-  // View: matrix (default), ranks, or list. URL-synced so matrix/list/ranks
-  // screenshots and shared links preserve the same browse state.
-  const [viewModeRaw, setViewModeRaw] = useUrlState<string>("view", "matrix", stringSerde);
-  const viewMode = coerceViewMode(viewModeRaw);
-  const setViewMode = (value: ViewMode) => setViewModeRaw(value);
-
+  const [sectionNavigation, setSectionNavigation] = useState(0);
+  const completedSectionScroll = useRef<string | null>(null);
+  const [settledSummaryKey, setSettledSummaryKey] = useState<string | null>(null);
+  const requestedSection = requestedBenchmarkSection();
   useEffect(() => {
-    if (viewModeRaw !== viewMode) setViewModeRaw(viewMode);
-  }, [setViewModeRaw, viewMode, viewModeRaw]);
-
-  // High contrast / reduced-color mode for the heatmap (explicit user toggle).
-  // Also activates automatically via CSS prefers-contrast: more media query.
-  const [highContrast, setHighContrast] = useState(false);
+    const onNavigation = () => setSectionNavigation((value) => value + 1);
+    window.addEventListener("hashchange", onNavigation);
+    window.addEventListener("popstate", onNavigation);
+    return () => {
+      window.removeEventListener("hashchange", onNavigation);
+      window.removeEventListener("popstate", onNavigation);
+    };
+  }, []);
 
   // Row selection for Compare
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Bumped by the ErrorMessage retry button so a reader can re-issue this
+  // read after a DuckDB worker fault without reloading the page.
+  const [resultsRetryToken, setResultsRetryToken] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
-    listResults(benchmarkResultWhere)
+    setError(null);
+    // The List section always renders Arch/CPU columns, independent of
+    // whether the active facets filter on hardware, so it must always ask
+    // for those columns rather than relying on listResults' filter-sniffing.
+    listResults(benchmarkResultWhere, { includeHardware: true })
       .then((r) => {
         if (!cancelled) setResults(r);
       })
@@ -247,7 +318,25 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return () => {
       cancelled = true;
     };
-  }, [benchmarkResultWhere]);
+  }, [benchmarkResultWhere, resultsRetryToken]);
+
+  useEffect(() => {
+    if (facets.platform_version.length === 0) {
+      setPlatformVersionDomainResults(null);
+      return;
+    }
+    let cancelled = false;
+    listResults(benchmarkVersionDomainWhere)
+      .then((rows) => {
+        if (!cancelled) setPlatformVersionDomainResults(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setPlatformVersionDomainResults(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [benchmarkVersionDomainWhere, facets.platform_version]);
 
   // Derive available scale factors and phases from the loaded rows.
   const benchmarkResults = results?.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmark) ?? [];
@@ -284,6 +373,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // If the stored phaseFilter isn't available for the current SF, fall back to
   // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
+  const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase]);
 
   useEffect(() => {
     if (!results || phases.length === 0 || phaseFilter === effectivePhase) return;
@@ -302,17 +392,20 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     setSummary(null);
     setSummaryError(null);
     setSummaryLoading(true);
+    setSettledSummaryKey(null);
     getBenchmarkSummaryFromDuckDB(benchmark, Number(effectiveSf), effectivePhase)
       .then((s) => {
         if (!cancelled) {
           setSummary(s);
           setSummaryLoading(false);
+          setSettledSummaryKey(summaryKey);
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setSummaryError(errMsg(err));
           setSummaryLoading(false);
+          setSettledSummaryKey(summaryKey);
         }
       });
     return () => {
@@ -325,7 +418,19 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, benchmark, effectiveSf, effectivePhase]);
 
-  if (error) return <ErrorMessage message={error} />;
+  // Native fragment navigation happens before async sections exist. Wait for
+  // the current cohort so replacing its skeleton cannot move the target away.
+  useEffect(() => {
+    if (!requestedSection || requestedSection !== "list" || summaryLoading || settledSummaryKey !== summaryKey) return;
+    const navigationKey = `${benchmark}:${requestedSection}:${sectionNavigation}`;
+    if (completedSectionScroll.current === navigationKey) return;
+    const target = document.getElementById(`benchmark-section-${requestedSection}`);
+    if (!target) return;
+    target.scrollIntoView?.({ block: "start" });
+    completedSectionScroll.current = navigationKey;
+  }, [benchmark, requestedSection, sectionNavigation, settledSummaryKey, summaryKey, summaryLoading]);
+
+  if (error) return <ErrorMessage message={error} onRetry={() => setResultsRetryToken((t) => t + 1)} />;
   if (!results) {
     return (
       <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -396,6 +501,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             ...platform,
             platform_version: platform.platform_version ?? metadata?.platform_version ?? null,
             validation_status: platform.validation_status ?? metadata?.validation_status ?? null,
+            override_rules: platform.override_rules ?? metadata?.override_rules ?? null,
+            arch: metadata?.arch ?? null,
+            cpu_family: metadata?.cpu_family ?? null,
+            memory_gb: metadata?.memory_gb ?? null,
           };
         }),
       }
@@ -408,6 +517,52 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const trustLabels = summaryWithResultMetadata
     ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.trust_label))].sort()
     : [];
+  const platformOptions = summaryWithResultMetadata
+    ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.platform))].sort((a, b) => a.localeCompare(b))
+    : [];
+  const validationOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.validation_status)
+            .filter((status): status is string => status !== null && status !== ""),
+        ),
+      ].sort()
+    : [];
+  const archOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.arch)
+            .filter((a): a is string => a !== null && a !== undefined),
+        ),
+      ].sort()
+    : [];
+  const cpuFamilyOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.cpu_family)
+            .filter((c): c is string => c !== null && c !== undefined),
+        ),
+      ].sort()
+    : [];
+  const memoryOptions = summaryWithResultMetadata
+    ? [
+        ...new Set(
+          summaryWithResultMetadata.platforms
+            .map((p) => p.memory_gb)
+            .filter((m): m is number => m !== null && m !== undefined),
+        ),
+      ].sort((a, b) => a - b)
+    : [];
+  const platformVersions = [
+    ...new Set(
+      (platformVersionDomainResults ?? benchmarkResults)
+        .map((result) => result.platform_version)
+        .filter((version): version is string => version !== null),
+    ),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
   // Apply client-side filters (tuning + trust) to the summary platforms.
   const filteredSummary: BenchmarkSummary | null = summaryWithResultMetadata
@@ -426,6 +581,11 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     : null;
   const excludedRows = filteredSummary?.platforms.filter((row) => !isTimingDisplayable(row)) ?? [];
   const rankGateReason = filteredSummary ? formatCohortExclusion(filteredSummary) : null;
+  // Compare eligibility is derived from the filtered summary so the Results
+  // table and analysis cards use the same result_id and cohort boundaries.
+  const compareEligibilityByResultId = new Map(
+    (filteredSummary?.platforms ?? []).map((row) => [row.result_id, row] as const),
+  );
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if (canonicalPhase(result.test_type) !== effectivePhase) return false;
@@ -474,23 +634,145 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     if (next.size <= MAX_COMPARE_SELECTIONS) setSelectedIds(next);
   };
 
+  const trustFilterValue =
+    facets.trust_tier.length === 0 ? "all" : facets.trust_tier.length === 1 ? facets.trust_tier[0]! : "__multiple__";
+
+  const benchmarkCohortFilterFields: CohortFilterFieldSpec[] = [
+    {
+      id: "scale-filter",
+      label: "Scale",
+      value: effectiveSf,
+      options:
+        scaleFactors.length > 0
+          ? scaleFactors.map((sf) => ({ value: sf, label: `SF ${sf}` }))
+          : [{ value: effectiveSf, label: `SF ${effectiveSf}` }],
+      onChange: (value) => setScaleFilter(value),
+      disabledReason: singleValueFilterReason(scaleFactors.length, false),
+    },
+    {
+      id: "phase-filter",
+      label: "Phase",
+      value: effectivePhase,
+      options:
+        phases.length > 0
+          ? phases.map((ph) => ({ value: ph, label: ph.charAt(0).toUpperCase() + ph.slice(1) }))
+          : [{ value: effectivePhase, label: effectivePhase }],
+      onChange: (value) => setPhaseFilter(value),
+      disabledReason: singleValueFilterReason(phases.length, false),
+    },
+    {
+      id: "tuning-filter",
+      label: "Tuning",
+      value: tuningFilter,
+      options: [{ value: "all", label: "All" }, ...tuningModes.map((m) => ({ value: m, label: tuningLabel(m) }))],
+      onChange: (value) => setTuningFilter(value),
+      disabledReason: singleValueFilterReason(tuningModes.length, tuningFilter !== "all"),
+    },
+    {
+      id: "benchmark-version-filter",
+      testId: "benchmark-version-filter",
+      label: "Platform version",
+      value: platformVersionFilter,
+      options: [{ value: "all", label: "All versions" }, ...platformVersions.map((version) => ({ value: version, label: version }))],
+      onChange: (value) => setFacet("platform_version", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(platformVersions.length, platformVersionFilter !== "all"),
+      multiValueOption:
+        platformVersionFilter === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.platform_version.length} versions selected` }
+          : undefined,
+    },
+    {
+      id: "benchmark-trust-filter",
+      testId: "benchmark-trust-filter",
+      label: "Trust tier",
+      value: trustFilterValue,
+      options: [{ value: "all", label: "All trust tiers" }, ...trustLabels.map((tier) => ({ value: tier, label: formatTrustLabel(tier) }))],
+      onChange: (value) => setTrustFilter(value === "all" ? null : new Set([value])),
+      disabledReason: singleValueFilterReason(trustLabels.length, trustFilterValue !== "all"),
+      multiValueOption:
+        trustFilterValue === "__multiple__"
+          ? { value: "__multiple__", label: `${facets.trust_tier.length} tiers selected` }
+          : undefined,
+    },
+    {
+      id: "benchmark-platform-filter",
+      testId: "benchmark-platform-filter",
+      label: "Platform",
+      value: facets.platform.length === 1 ? facets.platform[0]! : "all",
+      options: [{ value: "all", label: "All platforms" }, ...platformOptions.map((option) => ({ value: option, label: option }))],
+      onChange: (value) => setFacet("platform", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(platformOptions.length, facets.platform.length > 0),
+    },
+    {
+      id: "benchmark-validation-filter",
+      testId: "benchmark-validation-filter",
+      label: "Validation",
+      value: facets.validation_status.length === 1 ? facets.validation_status[0]! : "all",
+      options: [{ value: "all", label: "All validation" }, ...validationOptions.map((status) => ({ value: status, label: formatValidationStatus(status) }))],
+      onChange: (value) => setFacet("validation_status", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(validationOptions.length, facets.validation_status.length > 0),
+    },
+    {
+      id: "benchmark-arch-filter",
+      testId: "benchmark-arch-filter",
+      label: "Architecture",
+      value: facets.arch.length === 1 ? facets.arch[0]! : "all",
+      options: [{ value: "all", label: "All architectures" }, ...archOptions.map((option) => ({ value: option, label: formatArchitecture(option) }))],
+      onChange: (value) => setFacet("arch", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(archOptions.length, facets.arch.length > 0),
+    },
+    {
+      id: "benchmark-cpu-family-filter",
+      testId: "benchmark-cpu-family-filter",
+      label: "CPU family",
+      value: facets.cpu_family.length === 1 ? facets.cpu_family[0]! : "all",
+      options: [{ value: "all", label: "All CPU families" }, ...cpuFamilyOptions.map((option) => ({ value: option, label: formatCpuFamily(option) }))],
+      onChange: (value) => setFacet("cpu_family", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(cpuFamilyOptions.length, facets.cpu_family.length > 0),
+    },
+    {
+      id: "benchmark-memory-filter",
+      testId: "benchmark-memory-filter",
+      label: "Memory",
+      value: facets.memory_gb.length === 1 ? facets.memory_gb[0]! : "all",
+      options: [{ value: "all", label: "All memory sizes" }, ...memoryOptions.map((option) => ({ value: String(option), label: formatMemoryGb(option) }))],
+      onChange: (value) => setFacet("memory_gb", value === "all" ? [] : [value]),
+      disabledReason: singleValueFilterReason(memoryOptions.length, facets.memory_gb.length > 0),
+    },
+    {
+      id: "benchmark-date-window-filter",
+      testId: "benchmark-date-window-filter",
+      label: "Run date",
+      value: facets.date_window,
+      options: DATE_WINDOW_OPTIONS,
+      onChange: (value) => setFacet("date_window", value as DateWindowFacet),
+    },
+  ];
+
   return (
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Breadcrumb
+      <PageHeader
         crumbs={[
           { label: "Results", href: "/results/" },
           { label: title },
         ]}
-      />
-
-      <div class="mt-6 mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 class="text-3xl font-bold text-[var(--bb-data-fg-primary)]">{title} Results</h1>
-
-        <div class="flex flex-wrap items-center gap-3">
-          {/* Benchmark switcher (sibling pivot). View mode is the only piece
-              of UI state that survives the switch; scale, phase, and tuning
-              are benchmark-specific so we drop them rather than risk an
-              empty page on the destination. */}
+        eyebrow="Benchmark"
+        title={`${title} Results`}
+        meta={
+          filteredSummary && filteredSummary.platforms.length > 0 ? (
+            <>
+              <span class="bb-meta-chip" data-testid="cohort-counts">
+                {filteredSummary.platforms.length} published runs
+              </span>
+              <span class="bb-meta-chip">{filteredSummary.query_ids.length} queries</span>
+              <span class="bb-meta-chip">SF {filteredSummary.scale_factor}</span>
+              <span class="bb-meta-chip">{effectivePhase}</span>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
+          {/* Keep the section link while clearing benchmark-specific filters. */}
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-switcher">
               Benchmark:
@@ -503,10 +785,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               onChange={(event) => {
                 const next = (event.target as HTMLSelectElement).value;
                 if (next === benchmark) return;
-                const params = new URLSearchParams();
-                if (viewMode !== "matrix") params.set("view", viewMode);
-                const query = params.toString();
-                route(`/results/${next}/${query ? `?${query}` : ""}`);
+                const section = requestedBenchmarkSection();
+                resetFacets();
+                route(`/results/${next}/${section ? `#benchmark-section-${section}` : ""}`);
               }}
             >
               {benchmarkOptions.map((option) => (
@@ -519,143 +800,25 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               )}
             </select>
           </div>
+          </>
+        }
+      />
 
-          {/* Scale factor filter */}
-          {scaleFactors.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="scale-filter">
-                Scale:
-              </label>
-              <select
-                id="scale-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={effectiveSf}
-                onChange={(e) => setScaleFilter((e.target as HTMLSelectElement).value)}
-              >
-                {scaleFactors.map((sf) => (
-                  <option key={sf} value={sf}>
-                    SF {sf}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Phase filter */}
-          {phases.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="phase-filter">
-                Phase:
-              </label>
-              <select
-                id="phase-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={effectivePhase}
-                onChange={(e) => setPhaseFilter((e.target as HTMLSelectElement).value)}
-              >
-                {phases.map((ph) => (
-                  <option key={ph} value={ph}>
-                    {ph.charAt(0).toUpperCase() + ph.slice(1)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Tuning filter */}
-          {tuningModes.length > 1 && (
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="tuning-filter">
-                Tuning:
-              </label>
-              <select
-                id="tuning-filter"
-                class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-1.5 text-sm shadow-sm"
-                value={tuningFilter}
-                onChange={(e) => setTuningFilter((e.target as HTMLSelectElement).value)}
-              >
-                <option value="all">All</option>
-                {tuningModes.map((m) => (
-                  <option key={m} value={m}>
-                    {tuningLabel(m)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Trust filter chips - default "all tiers shown"; shown only when >1 tier present */}
-          {trustLabels.length > 1 && (
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-[var(--bb-data-fg-primary)]">Trust:</span>
-              <div class="flex flex-wrap gap-1">
-                {trustLabels.map((tier) => {
-                  const active = trustFilter === null || trustFilter.has(tier);
-                  return (
-                    <button
-                      key={tier}
-                      class={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                        active
-                          ? "bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                          : "bg-[var(--bb-surface-app)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-data-border)]"
-                      }`}
-                      aria-pressed={active}
-                      onClick={() => {
-                        // Toggle this tier in/out of the active set.
-                        const current = trustFilter ?? new Set(trustLabels);
-                        const next = new Set(current);
-                        if (next.has(tier)) {
-                          next.delete(tier);
-                          // Never allow empty selection - reset to "all"
-                          setTrustFilter(next.size === 0 ? null : next);
-                        } else {
-                          next.add(tier);
-                          // Full selection is equivalent to "all"
-                          setTrustFilter(next.size === trustLabels.length ? null : next);
-                        }
-                      }}
-                    >
-                      {trustAbbrev(tier)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* View toggle */}
-          <SegmentedControl
-            ariaLabel="Benchmark view"
-            value={viewMode}
-            onChange={(value) => setViewMode(value)}
-            options={[
-              { value: "matrix", label: "Matrix" },
-              { value: "ranks", label: rankGateReason ? "Rank Evidence" : "Ranks" },
-              { value: "list", label: "List" },
-            ]}
-          />
-
-          {/* Reduced-color (grayscale) toggle - only meaningful in matrix (heatmap) view.
-              Renamed from "High contrast" because the implementation is a
-              greyscale lightness palette, not a true high-contrast palette;
-              calling greyscale "high contrast" mismatched the rendered cells
-              for users who toggled it expecting WCAG-style luminance bumps. */}
-          {viewMode === "matrix" && (
-            <button
-              class={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                highContrast
-                  ? "border-[var(--bb-accent-hover)] bg-[var(--bb-tone-info-bg)] text-[var(--bb-tone-info-fg)]"
-                  : "border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data-muted)]"
-              }`}
-              onClick={() => setHighContrast((v) => !v)}
-              aria-pressed={highContrast}
-              title="Switch the heatmap palette to greyscale for color-vision accessibility"
-            >
-              Reduced color
-            </button>
-          )}
-        </div>
-      </div>
+      {/* Keep the full cohort filter set mounted so its layout and explanations
+          stay stable as other filters narrow the available choices. */}
+      <CohortFilterPanel
+        testId="benchmark-filters"
+        fields={benchmarkCohortFilterFields}
+        showClear={hasActiveFacets(facets, BENCHMARK_ROW_FACET_KEYS)}
+        clearTestId="benchmark-clear-filters"
+        onClear={() => {
+          for (const key of BENCHMARK_ROW_FACET_KEYS) {
+            if (key === "date_window") continue;
+            setFacet(key, [] as never);
+          }
+          setFacet("date_window", "all");
+        }}
+      />
 
       {contextNote && (
         <div
@@ -665,6 +828,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           {contextNote}
         </div>
       )}
+
 
       <section
         class="mb-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 shadow-sm"
@@ -690,10 +854,19 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             )}
           </div>
-          {!compareUrl && (
-            <button type="button" class="btn btn-secondary shrink-0 text-sm" disabled>
-              {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 comparable results"}
-            </button>
+          {/* One slot, whatever the state. A disabled button that looks
+              clickable and then relocates the moment it becomes clickable
+              costs the reader two mistakes; the affordance appears here only
+              when it can actually be used, and the pending state reads as
+              status text. */}
+          {compareUrl ? (
+            <a href={compareUrl} class="btn btn-primary shrink-0 text-sm no-underline" data-testid="benchmark-compare-cta">
+              Compare {selectedComparableCount} selected
+            </a>
+          ) : (
+            <p class="shrink-0 text-sm text-[var(--bb-data-fg-subtle)]" data-testid="benchmark-compare-cta-pending">
+              {selectedIds.size === 1 ? "Select 1 more result" : "Select 2 results to compare"}
+            </p>
           )}
         </div>
       </section>
@@ -722,89 +895,58 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         </section>
       )}
 
-      {/* Matrix view */}
-      {viewMode === "matrix" && (
-        <>
-          {summaryError ? (
-            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-              Could not load benchmark matrix: {summaryError}
-            </div>
-          ) : summaryLoading ? (
-            <BenchmarkMatrixSkeleton message="Loading matrix..." />
-          ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-              <p class="font-medium">
-                No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-              </p>
-            </div>
-          ) : (
-            <>
-              {(analysisSummary ?? filteredSummary).platforms.some((row) => row.ranking_exclusion_reason !== null) && (
-                <RankingEligibilityLegend />
-              )}
-              <QueryHeatmap
-                summary={analysisSummary ?? filteredSummary}
-                selectedIds={selectedIds}
-                onSelectionChange={updateSelectedIds}
-                selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
-                highContrast={highContrast}
-              />
-            </>
-          )}
-        </>
-      )}
+      <section id="benchmark-section-list" class="scroll-mt-24 overflow-x-hidden" aria-labelledby="benchmark-heading-list">
+        <h2 id="benchmark-heading-list" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+          Results
+        </h2>
+        {summaryError && (
+          <div class="mb-3 rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
+            Could not load compare eligibility for this cohort: {summaryError}
+          </div>
+        )}
+        <ListTable
+          benchmark={benchmark}
+          results={results}
+          scaleFactor={effectiveSf}
+          phase={effectivePhase}
+          facets={facets}
+          compareEligibilityByResultId={compareEligibilityByResultId}
+          compareEligibilityState={
+            summaryLoading || settledSummaryKey !== summaryKey
+              ? "loading"
+              : summaryError
+                ? "error"
+                : "ready"
+          }
+          selectedIds={selectedIds}
+          onSelectionChange={updateSelectedIds}
+          selectionAtCap={selectedIds.size >= MAX_COMPARE_SELECTIONS}
+          selectionLimitReasonId={selectionLimitCopy ? BENCHMARK_SELECTION_LIMIT_REASON_ID : undefined}
+        />
+      </section>
 
-      {/* Rank table view */}
-      {viewMode === "ranks" && (
-        <>
-          {summaryError ? (
-            <div class="rounded-lg tone-warning border border-[var(--bb-data-border)] px-4 py-3 text-sm">
-              Could not load rank data: {summaryError}
-            </div>
-          ) : summaryLoading ? (
-            <BenchmarkMatrixSkeleton message="Loading ranks..." />
-          ) : !filteredSummary ? (
-            <div class="rounded-lg border border-dashed border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] p-10 text-center text-[var(--bb-data-fg-subtle)]">
-              <p class="font-medium">
-                No benchmark data available for {humanizeBenchmark(benchmark)} SF{effectiveSf} phase {effectivePhase}.
-              </p>
-            </div>
-          ) : rankGateReason ? (
-            <RankGateNotice
-              reason={rankGateReason}
-              benchmark={title}
-              scaleFactor={effectiveSf}
-              phase={effectivePhase}
-            />
-          ) : (
-            <div class="card">
-              <RankTable summary={analysisSummary ?? filteredSummary} />
-              <BenchmarkResultLinks summary={analysisSummary ?? filteredSummary} viewMode="ranks" />
-            </div>
-          )}
-        </>
-      )}
+      <ExcludedRunsDisclosure rows={excludedRows} />
 
-      {/* List view (mobile-friendly fallback) */}
-      {viewMode === "list" && (
-        <ListTable benchmark={benchmark} results={results} scaleFactor={effectiveSf} facets={facets} />
-      )}
-
-      {viewMode === "matrix" && analysisSummary && <BenchmarkResultLinks summary={analysisSummary} viewMode="matrix" />}
-
-      {viewMode !== "list" && <ExcludedRunsDisclosure rows={excludedRows} />}
-
-      {analysisSummary && analysisSummary.platforms.length > 0 && viewMode !== "list" && (
-        <div class="mt-8">
+      {filteredSummary && filteredSummary.platforms.length > 0 && (
+        <section id="benchmark-section-analysis" class="mt-8 scroll-mt-24" aria-labelledby="benchmark-heading-analysis">
+          <h2 id="benchmark-heading-analysis" class="mb-3 text-lg font-semibold text-[var(--bb-data-fg-primary)]">
+            Analysis
+          </h2>
           <ChartPanel
             context={{
               kind: "summary",
-              summary: analysisSummary,
+              summary: filteredSummary,
               historical: historicalEntries,
             }}
-            excludeChartIds={viewMode === "matrix" ? ["query_heatmap"] : undefined}
+            summaryLayout="long"
+            cardAnchors={CHART_CARD_ANCHORS}
+            forceOpenChartId={
+              requestedSection === "matrix" ? "query_heatmap" : requestedSection === "ranks" ? "rank_table" : undefined
+            }
+            rankGateReason={rankGateReason}
+            rankGateContext={{ benchmark: title, scaleFactor: effectiveSf, phase: effectivePhase }}
           />
-        </div>
+        </section>
       )}
 
       <TrayAnnouncer count={selectedComparableCount} />
@@ -832,80 +974,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           onClear={() => setSelectedIds(new Set())}
         />
       )}
-      <ProvenanceLegend />
-</div>
-  );
-}
-
-function BenchmarkResultLinks({ summary, viewMode }: { summary: BenchmarkSummary; viewMode: "matrix" | "ranks" }) {
-  if (summary.platforms.length === 0) return null;
-  const label = viewMode === "matrix" ? "Matrix result links" : "Ranks result links";
-
-  return (
-    <section
-      class="mt-4 rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm shadow-sm"
-      aria-label={label}
-      data-testid={`${viewMode}-result-links`}
-    >
-      <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-sm font-semibold text-[var(--bb-data-fg-primary)]">Result links</h2>
-        <p class="text-xs text-[var(--bb-data-fg-muted)]">Public IDs use the canonical result identity.</p>
+      <div id="provenance-legend" class="scroll-mt-24">
+        <ProvenanceLegend />
       </div>
-      <ul class="grid gap-2 sm:grid-cols-2" role="list">
-        {summary.platforms.map((row) => (
-          <li
-            key={row.result_id}
-            class="flex flex-wrap items-center gap-2 rounded-md bg-[var(--bb-surface-data-muted)] px-2 py-1.5 text-xs"
-            data-testid={`${viewMode}-result-link-${row.result_id}`}
-          >
-            <span class="font-medium text-[var(--bb-data-fg-primary)]">{row.platform}</span>
-            <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {visibleResultIdForRow(row)}</span>
-            <a
-              href={resultDetailHref(row)}
-              aria-label={resultIdentityAriaLabel(row, "details")}
-              class="font-medium no-underline"
-            >
-              Details
-            </a>
-            <a
-              href={resultReceiptHref(row)}
-              aria-label={resultIdentityAriaLabel(row, "receipt")}
-              class="font-medium no-underline"
-            >
-              Receipt
-            </a>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function RankGateNotice({
-  reason,
-  benchmark,
-  scaleFactor,
-  phase,
-}: {
-  reason: string;
-  benchmark: string;
-  scaleFactor: string;
-  phase: string;
-}) {
-  return (
-    <section
-      class="rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-5 text-sm shadow-sm"
-      data-testid="rank-gate-notice"
-      aria-label="Rank gate"
-    >
-      <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Ranks are unavailable</h2>
-      <p class="mt-2 text-[var(--bb-data-fg-muted)]">
-        {benchmark} SF {scaleFactor} {phase} is not published as a leaderboard because {reason}
-      </p>
-      <p class="mt-2 text-xs text-[var(--bb-data-fg-subtle)]">
-        Timing evidence and receipts remain available, but BenchBox will not publish a ranking here.
-      </p>
-    </section>
+</div>
   );
 }
 
@@ -961,33 +1033,74 @@ function ListTable({
   benchmark,
   results,
   scaleFactor,
+  phase,
   facets,
+  compareEligibilityByResultId,
+  compareEligibilityState,
+  selectedIds,
+  onSelectionChange,
+  selectionAtCap,
+  selectionLimitReasonId,
 }: {
   benchmark: string;
   results: ResultRow[];
   scaleFactor: string;
+  phase?: string;
   facets: FacetState;
+  /** The matching summary PlatformRow for a result_id, scoped to the current SF/phase cohort. */
+  compareEligibilityByResultId: Map<string, PlatformRow>;
+  compareEligibilityState: "loading" | "ready" | "error";
+  selectedIds: Set<string>;
+  onSelectionChange: (next: Set<string>) => void;
+  selectionAtCap: boolean;
+  /** ID of the page-level explanation shown when the selection cap is active. */
+  selectionLimitReasonId?: string;
 }) {
   const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
     key: "display_geomean_ms",
     direction: "asc",
   });
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
-  const benchmarkResults = results.filter((r) => r.benchmark === benchmark);
+  const benchmarkResults = results.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmarkSlug(benchmark));
 
-  const byScale = benchmarkResults.filter((r) => String(r.scale_factor) === scaleFactor);
+  const byCohort = benchmarkResults.filter((r) => {
+    if (String(r.scale_factor) !== scaleFactor) return false;
+    if (phase && canonicalPhase(r.test_type) !== phase) return false;
+    return true;
+  });
 
-  const filtered = byScale
+  const filtered = byCohort
     .filter((row) => matchesFacetRow(row, facets, { keys: BENCHMARK_ROW_FACET_KEYS }))
     .sort((a, b) => compareListRows(a, b, sort));
+  const [groupBy, setGroupBy] = useState<CohortGroupBy>("none");
   const visibleRows = filtered.slice(0, visibleLimit);
+  const groupedRows = useMemo(() => {
+    return limitCohortGroups(
+      groupCohortRows(
+        filtered,
+        groupBy,
+        (row) => row.platform_version ?? null,
+      ),
+      filtered,
+      visibleLimit,
+    );
+  }, [filtered, groupBy, visibleLimit]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
+  // Skip the mount run: visibleLimit already starts at TABLE_RENDER_LIMIT,
+  // and a mount-time reset would silently eat a Show more click that lands
+  // before this effect flushes.
+  const skipVisibleLimitResetOnMount = useRef(true);
   useEffect(() => {
+    if (skipVisibleLimitResetOnMount.current) {
+      skipVisibleLimitResetOnMount.current = false;
+      return;
+    }
     setVisibleLimit(TABLE_RENDER_LIMIT);
   }, [
     benchmark,
     scaleFactor,
+    phase,
     facets.platform,
     facets.execution_mode,
     facets.tuning_mode,
@@ -1000,9 +1113,22 @@ function ListTable({
     facets.storage_format,
     facets.cost_status,
     facets.date_window,
+    facets.platform_version,
+    facets.arch,
+    facets.cpu_family,
+    facets.memory_gb,
     sort.key,
     sort.direction,
   ]);
+
+  const compareEligibilityReady = compareEligibilityState === "ready";
+  const compareEligibilityStatusId = "benchmark-compare-eligibility-status";
+  const compareEligibilityStatus =
+    compareEligibilityState === "loading"
+      ? "Compare eligibility is loading."
+      : compareEligibilityState === "error"
+        ? "Compare eligibility is unavailable for this cohort."
+        : null;
 
   function toggleSort(key: BenchmarkListSortKey) {
     setSort((prev) =>
@@ -1040,13 +1166,48 @@ function ListTable({
   }
 
   return (
-    <div class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
-      <div class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-        Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
-      </div>
-      <table class="min-w-full divide-y divide-[var(--bb-data-border)]">
+    <div
+      class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
+      style="contain: paint"
+      aria-busy={!compareEligibilityReady}
+    >
+      <ResultsCardToolbar
+        left={
+          <span>
+            Showing {visibleRows.length.toLocaleString()} of {filtered.length.toLocaleString()} results for SF {scaleFactor}
+          </span>
+        }
+        right={
+          <GroupBySelect
+            id="benchmark-list-group-by"
+            testId="benchmark-list-group-by"
+            value={groupBy}
+            onChange={setGroupBy}
+          />
+        }
+      />
+      {compareEligibilityStatus && (
+        <p
+          id={compareEligibilityStatusId}
+          class="border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-2 text-xs text-[var(--bb-data-fg-muted)]"
+          role="status"
+        >
+          {compareEligibilityStatus}
+        </p>
+      )}
+      <ResultsBasisStatement>
+        Geomean query time uses the median of each query's published measurement passes, then the
+        geometric mean across queries. Warmup passes are excluded. Dates, counts, and power scores use
+        the definitions shown in their columns and receipts.
+      </ResultsBasisStatement>
+      <div class="overflow-x-auto" data-testid="benchmark-list-scroll-container">
+      <table
+        class="min-w-full divide-y divide-[var(--bb-data-border)]"
+        aria-label={`${canonicalBenchmarkSlug(benchmark)} SF${scaleFactor}${phase ? ` ${phase}` : ""} results`}
+      >
         <thead class="bg-[var(--bb-surface-data-muted)]">
           <tr>
+            <th class="py-3 pl-4 pr-1 text-left" aria-label="Select for comparison" scope="col" />
             <ListSortHeader
               label="Platform"
               sortKey="platform"
@@ -1079,21 +1240,14 @@ function ListTable({
               sortAnnouncement={sortAnnouncement}
               onSort={toggleSort}
             />
-            <th
-              class="p-0"
-              scope="col"
-              aria-sort={ariaSort("display_geomean_ms")}
-              title="Geometric mean of per-query median execution times (measurement runs only). Lower is faster."
-            >
-              <button
-                type="button"
-                class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
-                onClick={() => toggleSort("display_geomean_ms")}
-              >
-                Geomean latency{sortArrow("display_geomean_ms")}
-                {sortAnnouncement("display_geomean_ms")}
-              </button>
-            </th>
+            <ListSortHeader
+              label="Geomean"
+              sortKey="display_geomean_ms"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
             <ListSortHeader
               label="Queries"
               sortKey="query_count"
@@ -1102,16 +1256,82 @@ function ListTable({
               sortAnnouncement={sortAnnouncement}
               onSort={toggleSort}
             />
-            <th class="table-th">Source</th>
-            <th class="table-th" />
+            <th class="table-th text-left">Badges</th>
+            <ListSortHeader
+              label="Arch"
+              sortKey="arch"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="CPU family"
+              sortKey="cpu_family"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <ListSortHeader
+              label="Memory"
+              sortKey="memory_gb"
+              ariaSort={ariaSort}
+              sortArrow={sortArrow}
+              sortAnnouncement={sortAnnouncement}
+              onSort={toggleSort}
+            />
+            <th class="table-th text-right">Receipt</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-[var(--bb-data-border)] bg-[var(--bb-surface-data)]">
-          {visibleRows.map((r, index) => (
-            <BenchmarkRow key={r.result_id} entry={r} runIdentityLabel={runIdentityLabels[index] ?? r.platform} />
-          ))}
+          {groupBy === "none"
+            ? visibleRows.map((r, index) => (
+                <BenchmarkRow
+                  key={r.result_id}
+                  entry={r}
+                  runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                  compareRow={compareEligibilityByResultId.get(r.result_id)}
+                  compareEligibilityReady={compareEligibilityReady}
+                  compareEligibilityStatusId={compareEligibilityStatusId}
+                  selectedIds={selectedIds}
+                  onSelectionChange={onSelectionChange}
+                  selectionAtCap={selectionAtCap}
+                  selectionLimitReasonId={selectionLimitReasonId}
+                />
+              ))
+            : groupedRows.map((group) => (
+                <>
+                  <tr
+                    key={`group-${group.key}`}
+                    class="bg-[var(--bb-surface-data-muted)] font-semibold text-xs text-[var(--bb-data-fg-primary)]"
+                  >
+                    <td colspan={12} class="px-4 py-2">
+                      {group.label} ({group.totalRows} {group.totalRows === 1 ? "result" : "results"})
+                    </td>
+                  </tr>
+                  {group.rows.map((r) => {
+                    const index = filtered.findIndex((row) => row.result_id === r.result_id);
+                    return (
+                      <BenchmarkRow
+                        key={r.result_id}
+                        entry={r}
+                        runIdentityLabel={runIdentityLabels[index] ?? r.platform}
+                        compareRow={compareEligibilityByResultId.get(r.result_id)}
+                        compareEligibilityReady={compareEligibilityReady}
+                        compareEligibilityStatusId={compareEligibilityStatusId}
+                        selectedIds={selectedIds}
+                        onSelectionChange={onSelectionChange}
+                        selectionAtCap={selectionAtCap}
+                        selectionLimitReasonId={selectionLimitReasonId}
+                      />
+                    );
+                  })}
+                </>
+              ))}
         </tbody>
       </table>
+      </div>
       {visibleRows.length < filtered.length && (
         <div class="border-t border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-center">
           <button
@@ -1127,17 +1347,102 @@ function ListTable({
   );
 }
 
-function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdentityLabel: string }) {
+/**
+ * Return the reason a list row's compare checkbox cannot be checked. A row is
+ * selectable only when its filtered summary row is timing-displayable and
+ * comparable.
+ */
+function listRowDisabledReasonCode(compareRow: PlatformRow | undefined): string | null {
+  if (!compareRow) return "not_in_cohort_summary";
+  if (!isTimingDisplayable(compareRow)) return compareRow.display_exclusion_reason ?? "display_timing_unavailable";
+  if (!isComparable(compareRow)) return compareRow.comparison_exclusion_reason ?? "not_comparable";
+  return null;
+}
+
+function ListCompareDisabledReason({ id, copy }: { id?: string; copy: ReturnType<typeof describeCompareExclusionReason> }) {
+  if (copy === null) return null;
   return (
-    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={entry.result_id}>
+    <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="list-row-disabled-reason">
+      <span class="font-medium text-[var(--bb-tone-warning-fg)]">Why unavailable: {copy.shortText}</span>
+      <span class="block">{copy.recoveryHint}</span>
+    </div>
+  );
+}
+
+function BenchmarkRow({
+  entry,
+  runIdentityLabel,
+  compareRow,
+  compareEligibilityReady,
+  compareEligibilityStatusId,
+  selectedIds,
+  onSelectionChange,
+  selectionAtCap,
+  selectionLimitReasonId,
+}: {
+  entry: ResultRow;
+  runIdentityLabel: string;
+  compareRow: PlatformRow | undefined;
+  compareEligibilityReady: boolean;
+  compareEligibilityStatusId: string;
+  selectedIds: Set<string>;
+  onSelectionChange: (next: Set<string>) => void;
+  selectionAtCap: boolean;
+  selectionLimitReasonId?: string;
+}) {
+  const compareId = compareRow ? compareIdForRow(compareRow) : null;
+  const isSelected = compareId !== null && selectedIds.has(compareId);
+  const disabledReasonCode = compareEligibilityReady ? listRowDisabledReasonCode(compareRow) : null;
+  const disabledCopy = describeCompareExclusionReason(disabledReasonCode);
+  const capDisabled = selectionAtCap && !isSelected;
+  const selectionDisabled = !compareEligibilityReady || disabledCopy !== null || capDisabled;
+  const reasonId = disabledCopy
+    ? `benchmark-list-compare-reason-${entry.result_id}`
+    : capDisabled
+      ? selectionLimitReasonId
+    : compareEligibilityReady
+      ? undefined
+      : compareEligibilityStatusId;
+
+  function toggle() {
+    if (!compareId || selectionDisabled) return;
+    const next = new Set(selectedIds);
+    if (next.has(compareId)) next.delete(compareId);
+    else next.add(compareId);
+    onSelectionChange(next);
+  }
+
+  return (
+    <tr class="hover:bg-[var(--bb-surface-data-muted)]" data-testid={`list-${entry.result_id}`}>
+      <td class="py-3 pl-4 pr-1">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          disabled={selectionDisabled}
+          onChange={toggle}
+          aria-describedby={reasonId}
+          title={disabledCopy?.detailText ?? undefined}
+          class="h-4 w-4 rounded border-[var(--bb-data-border-strong)] disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={compareSelectionLabel({
+            platform: entry.platform,
+            benchmark: entry.benchmark,
+            scaleFactor: entry.scale_factor,
+            phase: canonicalPhase(entry.test_type),
+            runDate: entry.run_date,
+            resultId: entry.result_id,
+          })}
+          data-testid={`benchmark-list-compare-checkbox-${entry.result_id}`}
+        />
+      </td>
       <td class="table-td">
         <RunIdentityLabel label={runIdentityLabel} href={`/results/p/${entry.platform_id}/`} />
         {entry.compliance_class && entry.compliance_class !== "official" && (
           <span class="ml-2 text-xs text-[var(--bb-data-fg-subtle)]">{complianceLabel(entry.compliance_class)}</span>
         )}
+        <ListCompareDisabledReason id={reasonId} copy={disabledCopy} />
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.run_date}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
       <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>
@@ -1145,10 +1450,22 @@ function BenchmarkRow({ entry, runIdentityLabel }: { entry: ResultRow; runIdenti
         <div class="flex flex-wrap gap-1">
           <TrustBadge trustLabel={entry.trust_label} compact />
           <FundingChip funding={entry.funding} compact />
-          <ValidationBadge validationStatus={entry.validation_status} showMissing />
-          {entry.tuning_mode && <TuningBadge tuningMode={entry.tuning_mode} />}
+          <ValidationBadge
+            validationStatus={entry.validation_status}
+            overrideRules={parseOverrideRules(entry.override_rules)}
+            showMissing
+          />
+          {entry.tuning_mode && (
+            <TuningBadge
+              tuningMode={entry.tuning_mode}
+              tuningValidationStatus={entry.tuning_validation_status}
+            />
+          )}
         </div>
       </td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.arch ? formatArchitecture(entry.arch) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.cpu_family ? formatCpuFamily(entry.cpu_family) : "—"}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.memory_gb != null ? formatMemoryGb(entry.memory_gb) : "—"}</td>
       <td class="table-td text-right">
         <a
           href={resultReceiptHref(entry)}
@@ -1181,7 +1498,7 @@ function ListSortHeader({
     <th class="p-0" scope="col" aria-sort={ariaSort(sortKey)}>
       <button
         type="button"
-        class="table-th block w-full cursor-pointer select-none border-0 bg-transparent text-left"
+        class="table-th relative block w-full cursor-pointer select-none border-0 bg-transparent text-left"
         onClick={() => onSort(sortKey)}
       >
         {label}{sortArrow(sortKey)}
@@ -1197,6 +1514,14 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
       ? a.platform.localeCompare(b.platform)
       : b.platform.localeCompare(a.platform);
   }
+  if (sort.key === "arch" || sort.key === "cpu_family") {
+    const aVal = a[sort.key] ?? "";
+    const bVal = b[sort.key] ?? "";
+    if (!aVal && !bVal) return 0;
+    if (!aVal) return 1;
+    if (!bVal) return -1;
+    return sort.direction === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+  }
   if (sort.key === "run_date") {
     if (a.run_date === b.run_date) return 0;
     const order = a.run_date < b.run_date ? -1 : 1;
@@ -1208,6 +1533,9 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
       b.display_geomean_ms ?? b.geomean_ms,
       sort.direction,
     );
+  }
+  if (sort.key === "memory_gb") {
+    return compareNullableNumber(a.memory_gb ?? null, b.memory_gb ?? null, sort.direction);
   }
   return compareNullableNumber(a[sort.key], b[sort.key], sort.direction);
 }

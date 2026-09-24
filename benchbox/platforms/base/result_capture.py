@@ -1368,8 +1368,11 @@ class ResultCaptureMixin:
                 "actual": actual_row_count,
             }
 
-            # Correct SKIP vs PASSED vs FAILED mapping
-            if validation_result.validation_mode == ValidationMode.SKIP:
+            # Correct SKIP vs PASSED vs FAILED mapping. SKIP means unevaluated
+            # and only applies to valid results: an invalid result (evaluated
+            # and failed, or failed-to-evaluate after a provider error) must
+            # surface as FAILED with its message, never as SKIPPED/SUCCESS.
+            if validation_result.validation_mode == ValidationMode.SKIP and validation_result.is_valid:
                 row_count_validation["status"] = "SKIPPED"
                 if validation_result.warning_message:
                     row_count_validation["warning"] = validation_result.warning_message
@@ -1511,6 +1514,7 @@ class ResultCaptureMixin:
         tuning_validation_status,
         tuning_metadata_saved,
         requested_config_hash=None,
+        per_table_timings=None,
     ):
         """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
@@ -1568,6 +1572,7 @@ class ResultCaptureMixin:
             data_loading_time=loading_time,
             schema_creation_time=getattr(schema_creation_phase, "duration_ms", 0) / 1000.0,
             table_statistics=table_stats,
+            per_table_timings=per_table_timings,
             tunings_applied=tunings_applied_dict,
             tuning_validation_status=tuning_validation_status,
             tuning_metadata_saved=tuning_metadata_saved,
@@ -1589,6 +1594,13 @@ class ResultCaptureMixin:
 
         streams: list[ThroughputStream] = []
         total_queries_executed = 0
+        # Persisted execution_order is the flattened global order across all
+        # streams (matching the standard path and the global ORDER BY
+        # consumer in core.results.database). The stream-local ``position``
+        # slot is operational metadata only: persisting it would store
+        # overlapping values from different streams in one INTEGER NOT NULL
+        # column. A producer-supplied ``execution_order`` still wins.
+        persisted_order = 0
 
         for stream_result in getattr(throughput_result, "stream_results", []) or []:
             start_iso = self._format_timestamp(stream_result.start_time)
@@ -1604,18 +1616,13 @@ class ResultCaptureMixin:
             duration_ms = int(duration_seconds * 1000)
 
             query_executions: list[QueryExecution] = []
-            for idx, query_result in enumerate(stream_result.query_results, start=1):
-                # ``position`` is the stream-local slot. It is deliberately
-                # distinct from the flattened result's global execution order;
-                # preserve an explicit zero instead of using truthiness.
-                position = query_result.get("position")
+            for query_result in stream_result.query_results:
+                persisted_order += 1
                 execution_order_value = query_result.get("execution_order")
-                if position is not None:
-                    execution_order = position
-                elif execution_order_value is not None:
+                if execution_order_value is not None:
                     execution_order = execution_order_value
                 else:
-                    execution_order = idx
+                    execution_order = persisted_order
                 execution_time_seconds = query_result.get("execution_time_seconds")
                 execution_time_ms = None if execution_time_seconds is None else float(execution_time_seconds) * 1000
 
@@ -1656,6 +1663,19 @@ class ResultCaptureMixin:
         duration_ms = int(float(getattr(throughput_result, "total_time", 0.0)) * 1000)
         end_time_iso = throughput_result.end_time or datetime.now().isoformat()
         phase_success = throughput_result_succeeded(throughput_result)
+        raw_outstanding_stream_ids = getattr(throughput_result, "outstanding_stream_ids", None)
+        outstanding_stream_ids = (
+            list(raw_outstanding_stream_ids) if isinstance(raw_outstanding_stream_ids, (list, tuple)) else []
+        )
+        cleanup_state = getattr(throughput_result, "cleanup_state", "complete")
+        if not isinstance(cleanup_state, str):
+            cleanup_state = "complete"
+        outstanding_work = None
+        if outstanding_stream_ids or cleanup_state != "complete":
+            outstanding_work = {
+                "stream_ids": outstanding_stream_ids,
+                "cleanup_state": cleanup_state,
+            }
 
         return ThroughputTestPhase(
             start_time=throughput_result.start_time,
@@ -1667,6 +1687,7 @@ class ResultCaptureMixin:
             throughput_at_size=(getattr(throughput_result, "throughput_at_size", None) if phase_success else None),
             success=phase_success,
             errors=list(getattr(throughput_result, "errors", []) or []),
+            outstanding_work=outstanding_work,
         )
 
     @staticmethod
@@ -1759,6 +1780,7 @@ class ResultCaptureMixin:
                         self.logger.warning(f"Could not get row count for {table_name}: {e}")
                         table_stats[table_name] = 0
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, None)
+        self._last_per_table_timings = None
         tuning_metadata_saved = False
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
@@ -1787,6 +1809,7 @@ class ResultCaptureMixin:
         _fmt_tag = f" [{self.external_format}]" if self.external_format else ""
         quiet_console.print(f"✅ External tables created in {loading_time:.2f}s{_fmt_tag}")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
+        self._last_per_table_timings = per_table_timings
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
     def _check_validation_failure(self, validation_phase) -> bool:

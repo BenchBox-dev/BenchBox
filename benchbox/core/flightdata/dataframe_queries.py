@@ -1,7 +1,7 @@
 """FlightData DataFrame queries for Expression and Pandas families.
 
 Implements all 20 FlightData OLAP queries for DataFrame execution on Polars,
-PySpark, DataFusion (expression family) and Pandas, Modin, Dask (pandas family).
+PySpark, DataFusion (expression family) and Pandas and Dask (pandas family).
 
 Queries cover 5 categories:
 - On-time performance (5 queries)
@@ -63,6 +63,32 @@ def get_flightdata_parameters() -> dict[str, Any]:
     return params
 
 
+def _round_half_away(ctx: DataFrameContext, value: Any, digits: int) -> Any:
+    """Round half away from zero, matching SQL ROUND on the reference surface.
+
+    Engine-native rounding modes disagree (Polars and numpy/pandas round half
+    to even; DataFusion and PySpark round half up), so identical values landing
+    exactly on a rounding boundary (a whole-minute total of exactly N.5, or an
+    average of exactly N.XX5) would diverge by one output unit. Scaling by an
+    exact power of ten, shifting by one half unit, and flooring reproduces the
+    SQL mode on every engine, including negatives via the sign branch. Only
+    inputs within about one ulp of a boundary can still disagree, far below
+    the coarsest output granularity (whole minutes).
+    """
+    lit = ctx.lit
+    factor = 10.0**digits
+    magnitude = ((value.abs() * lit(factor)) + lit(0.5)).floor() / lit(factor)
+    return ctx.when(value < lit(0)).then(lit(0) - magnitude).otherwise(magnitude)
+
+
+def _pandas_round_half_away(values: Any, digits: int) -> Any:
+    """Pandas counterpart of :func:`_round_half_away` (same contract)."""
+    import numpy as np
+
+    factor = 10.0**digits
+    return np.sign(values) * np.floor(np.abs(values) * factor + 0.5) / factor
+
+
 def _date_condition(col: Any, lit: Any, extra: Any = None) -> Any:
     p = get_flightdata_parameters()
     date_condition = (col("flight_date") >= lit(p["start_date"])) & (col("flight_date") < lit(p["end_date"]))
@@ -121,14 +147,29 @@ def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
         .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
+        .with_columns(
+            (col("arr_delay") <= lit(15)).cast(int).alias("_ontime"),
+            ctx.when(col("arr_delay") > lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_late_delay"),
+        )
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("arr_delay") <= lit(15)).cast(int).sum().alias("ontime_flights"),
-            col("arr_delay").filter(col("arr_delay") > lit(0)).mean().round(2).alias("avg_delay_when_late"),
+            col("_ontime").sum().alias("ontime_flights"),
+            col("_late_delay").mean().alias("_avg_late"),
         )
-        .with_columns((lit(100.0) * col("ontime_flights") / col("total_flights")).round(2).alias("ontime_pct"))
-        .sort("ontime_pct", descending=True)
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("ontime_flights") / col("total_flights"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, col("_avg_late"), 2).alias("avg_delay_when_late"),
+        )
+        .select(
+            "reporting_airline",
+            "airline_name",
+            "total_flights",
+            "ontime_flights",
+            "ontime_pct",
+            "avg_delay_when_late",
+        )
+        .sort(["ontime_pct", "reporting_airline"], descending=[True, False], nulls_last=True)
     )
 
 
@@ -151,15 +192,30 @@ def delay_by_airport_expression_impl(ctx: DataFrameContext) -> Any:
                 ctx.col, ctx.lit, lambda col, lit: (col("cancelled") == lit(0), col("dep_delay").is_not_null())
             )
         )
+        .with_columns((col("dep_delay") > lit(15)).cast(int).alias("_delayed"))
         .group_by("origin", "airport_name", "city", "state")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("dep_delay").mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").mean().round(2).alias("avg_arr_delay"),
-            (col("dep_delay") > lit(15)).cast(int).sum().alias("delayed_flights"),
+            col("dep_delay").mean().alias("_avg_dep"),
+            col("arr_delay").mean().alias("_avg_arr"),
+            col("_delayed").sum().alias("delayed_flights"),
+        )
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+        )
+        .select(
+            "origin",
+            "airport_name",
+            "city",
+            "state",
+            "total_flights",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "delayed_flights",
         )
         .filter(col("total_flights") >= lit(100))
-        .sort("avg_dep_delay", descending=True)
+        .sort(["avg_dep_delay", "origin"], descending=[True, False])
         .limit(50)
     )
 
@@ -175,15 +231,23 @@ def delay_by_hour_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     return (
-        flights.with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("dep_hour"))
+        flights.with_columns(
+            (col("crs_dep_time") / lit(100)).floor().cast(int).alias("dep_hour"),
+            (col("dep_delay") > lit(15)).cast(int).alias("_delayed"),
+        )
         .group_by("dep_hour")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("dep_delay").mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").mean().round(2).alias("avg_arr_delay"),
-            (col("dep_delay") > lit(15)).cast(int).sum().alias("delayed_count"),
+            col("dep_delay").mean().alias("_avg_dep"),
+            col("arr_delay").mean().alias("_avg_arr"),
+            col("_delayed").sum().alias("delayed_count"),
         )
-        .with_columns((lit(100.0) * col("delayed_count") / col("total_flights")).round(2).alias("delay_rate_pct"))
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("delayed_count") / col("total_flights"), 2).alias("delay_rate_pct"),
+        )
+        .select("dep_hour", "total_flights", "avg_dep_delay", "avg_arr_delay", "delayed_count", "delay_rate_pct")
         .sort("dep_hour")
     )
 
@@ -204,17 +268,31 @@ def best_routes_expression_impl(ctx: DataFrameContext) -> Any:
                 ctx.col, ctx.lit, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay").is_not_null())
             )
         )
+        .with_columns((col("arr_delay") <= lit(15)).cast(int).alias("_ontime"))
         .group_by("origin", "dest", "origin_city", "dest_city")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("arr_delay") <= lit(15)).cast(int).sum().alias("_ontime"),
-            col("arr_delay").mean().round(2).alias("avg_arr_delay"),
-            col("distance").mean().round(0).alias("avg_distance_miles"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("arr_delay").mean().alias("_avg_arr"),
+            col("distance").mean().alias("_avg_dist"),
         )
         .filter(col("total_flights") >= lit(50))
-        .with_columns((lit(100.0) * col("_ontime") / col("total_flights")).round(2).alias("ontime_pct"))
-        .drop("_ontime")
-        .sort("ontime_pct", descending=True)
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("total_flights"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_distance_miles"),
+        )
+        .select(
+            "origin",
+            "dest",
+            "origin_city",
+            "dest_city",
+            "total_flights",
+            "ontime_pct",
+            "avg_arr_delay",
+            "avg_distance_miles",
+        )
+        .sort(["ontime_pct", "origin", "dest"], descending=[True, False, False], nulls_last=True)
         .limit(25)
     )
 
@@ -223,19 +301,45 @@ def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx)
 
     return (
-        flights.group_by("year")
+        flights.with_columns(
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
+        )
+        .group_by("year")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_flights"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("ontime_flights"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
+            col("_cancelled").sum().alias("cancelled_flights"),
+            col("_ontime").sum().alias("ontime_flights"),
+            col("_operated").sum().alias("_non_cancelled"),
+            col("_arr_nc").mean().alias("_avg_arr"),
         )
         .with_columns(
-            (lit(100.0) * col("cancelled_flights") / col("total_flights")).round(2).alias("cancellation_rate_pct"),
-            (lit(100.0) * col("ontime_flights") / col("_non_cancelled")).round(2).alias("ontime_pct"),
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
         )
-        .drop("_non_cancelled")
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("cancelled_flights") / col("total_flights"), 2).alias(
+                "cancellation_rate_pct"
+            ),
+            _round_half_away(ctx, lit(100.0) * col("ontime_flights") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+        )
+        .select(
+            "year",
+            "total_flights",
+            "cancelled_flights",
+            "cancellation_rate_pct",
+            "ontime_flights",
+            "ontime_pct",
+            "avg_arr_delay",
+        )
         .sort("year")
     )
 
@@ -243,22 +347,55 @@ def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
 def delay_causes_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx, lambda col, lit: (col("cancelled") == lit(0), col("arr_delay") > lit(15)))
 
-    return flights.select(
+    prepared = flights.with_columns(
+        (col("carrier_delay") > lit(0)).cast(int).fill_null(0).alias("_carrier_flag"),
+        ctx.when(col("carrier_delay") > lit(0)).then(col("carrier_delay")).otherwise(lit(None)).alias("_carrier_pos"),
+        (col("weather_delay") > lit(0)).cast(int).fill_null(0).alias("_weather_flag"),
+        ctx.when(col("weather_delay") > lit(0)).then(col("weather_delay")).otherwise(lit(None)).alias("_weather_pos"),
+        (col("nas_delay") > lit(0)).cast(int).fill_null(0).alias("_nas_flag"),
+        ctx.when(col("nas_delay") > lit(0)).then(col("nas_delay")).otherwise(lit(None)).alias("_nas_pos"),
+        (col("security_delay") > lit(0)).cast(int).fill_null(0).alias("_security_flag"),
+        ctx.when(col("security_delay") > lit(0))
+        .then(col("security_delay"))
+        .otherwise(lit(None))
+        .alias("_security_pos"),
+        (col("late_aircraft_delay") > lit(0)).cast(int).fill_null(0).alias("_late_flag"),
+        ctx.when(col("late_aircraft_delay") > lit(0))
+        .then(col("late_aircraft_delay"))
+        .otherwise(lit(None))
+        .alias("_late_pos"),
+    )
+    totals = prepared.select(
+        col("_carrier_flag").sum().alias("carrier_delay_count"),
+        col("_carrier_pos").mean().alias("_avg_carrier"),
+        col("_weather_flag").sum().alias("weather_delay_count"),
+        col("_weather_pos").mean().alias("_avg_weather"),
+        col("_nas_flag").sum().alias("nas_delay_count"),
+        col("_nas_pos").mean().alias("_avg_nas"),
+        col("_security_flag").sum().alias("security_delay_count"),
+        col("_security_pos").mean().alias("_avg_security"),
+        col("_late_flag").sum().alias("late_aircraft_count"),
+        col("_late_pos").mean().alias("_avg_late"),
         col("flight_id").count().alias("total_delayed_flights"),
-        (col("carrier_delay") > lit(0)).cast(int).sum().alias("carrier_delay_count"),
-        col("carrier_delay").filter(col("carrier_delay") > lit(0)).mean().round(2).alias("avg_carrier_delay"),
-        (col("weather_delay") > lit(0)).cast(int).sum().alias("weather_delay_count"),
-        col("weather_delay").filter(col("weather_delay") > lit(0)).mean().round(2).alias("avg_weather_delay"),
-        (col("nas_delay") > lit(0)).cast(int).sum().alias("nas_delay_count"),
-        col("nas_delay").filter(col("nas_delay") > lit(0)).mean().round(2).alias("avg_nas_delay"),
-        (col("security_delay") > lit(0)).cast(int).sum().alias("security_delay_count"),
-        col("security_delay").filter(col("security_delay") > lit(0)).mean().round(2).alias("avg_security_delay"),
-        (col("late_aircraft_delay") > lit(0)).cast(int).sum().alias("late_aircraft_count"),
-        col("late_aircraft_delay")
-        .filter(col("late_aircraft_delay") > lit(0))
-        .mean()
-        .round(2)
-        .alias("avg_late_aircraft_delay"),
+    )
+    return totals.with_columns(
+        _round_half_away(ctx, col("_avg_carrier"), 2).alias("avg_carrier_delay"),
+        _round_half_away(ctx, col("_avg_weather"), 2).alias("avg_weather_delay"),
+        _round_half_away(ctx, col("_avg_nas"), 2).alias("avg_nas_delay"),
+        _round_half_away(ctx, col("_avg_security"), 2).alias("avg_security_delay"),
+        _round_half_away(ctx, col("_avg_late"), 2).alias("avg_late_aircraft_delay"),
+    ).select(
+        "carrier_delay_count",
+        "avg_carrier_delay",
+        "weather_delay_count",
+        "avg_weather_delay",
+        "nas_delay_count",
+        "avg_nas_delay",
+        "security_delay_count",
+        "avg_security_delay",
+        "late_aircraft_count",
+        "avg_late_aircraft_delay",
+        "total_delayed_flights",
     )
 
 
@@ -269,19 +406,44 @@ def cascade_delays_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
         .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
+        .with_columns(
+            (col("late_aircraft_delay") > lit(0)).cast(int).alias("_cascade"),
+            ctx.when(col("late_aircraft_delay") > lit(0))
+            .then(col("late_aircraft_delay"))
+            .otherwise(lit(None))
+            .alias("_cascade_pos"),
+            # Exact integer tenths matching the SQL surface: the tenth-minute
+            # sum is order-independent on every engine, unlike float summation,
+            # and NULL/negative delays contribute 0 exactly as SQL's ELSE 0.
+            ctx.when(col("late_aircraft_delay") > lit(0))
+            .then(_round_half_away(ctx, col("late_aircraft_delay") * lit(10), 0).cast(int))
+            .otherwise(lit(0))
+            .alias("_late_tenths"),
+        )
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("late_aircraft_delay") > lit(0)).cast(int).sum().alias("cascade_delayed"),
-            col("late_aircraft_delay")
-            .filter(col("late_aircraft_delay") > lit(0))
-            .mean()
-            .round(2)
-            .alias("avg_cascade_delay"),
-            col("late_aircraft_delay").fill_null(lit(0)).sum().round(0).alias("total_cascade_minutes"),
+            col("_cascade").sum().alias("cascade_delayed"),
+            col("_cascade_pos").mean().alias("_avg_cascade"),
+            col("_late_tenths").sum().alias("_total_tenths"),
         )
-        .with_columns((lit(100.0) * col("cascade_delayed") / col("total_flights")).round(2).alias("cascade_rate_pct"))
-        .sort("cascade_rate_pct", descending=True)
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("cascade_delayed") / col("total_flights"), 2).alias(
+                "cascade_rate_pct"
+            ),
+            _round_half_away(ctx, col("_avg_cascade"), 2).alias("avg_cascade_delay"),
+            ((col("_total_tenths") + lit(5)) / lit(10)).floor().alias("total_cascade_minutes"),
+        )
+        .select(
+            "reporting_airline",
+            "airline_name",
+            "total_flights",
+            "cascade_delayed",
+            "cascade_rate_pct",
+            "avg_cascade_delay",
+            "total_cascade_minutes",
+        )
+        .sort(["cascade_rate_pct", "reporting_airline"], descending=[True, False])
     )
 
 
@@ -289,15 +451,40 @@ def weather_impact_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx, lambda col, lit: col("cancelled") == lit(0))
 
     return (
-        flights.group_by("month")
+        flights.with_columns(
+            (col("weather_delay") > lit(0)).cast(int).alias("_weather"),
+            ctx.when(col("weather_delay") > lit(0))
+            .then(col("weather_delay"))
+            .otherwise(lit(None))
+            .alias("_weather_pos"),
+            # Exact integer tenths matching the SQL surface (see the
+            # cascade-delays expression impl): the tenth-minute sum is
+            # order-independent on every engine, unlike float summation.
+            _round_half_away(ctx, col("weather_delay").fill_null(lit(0)) * lit(10), 0)
+            .cast(int)
+            .alias("_weather_tenths"),
+        )
+        .group_by("month")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("weather_delay") > lit(0)).cast(int).sum().alias("weather_delayed"),
-            col("weather_delay").filter(col("weather_delay") > lit(0)).mean().round(2).alias("avg_weather_delay_min"),
-            col("weather_delay").fill_null(lit(0)).sum().round(0).alias("total_weather_minutes"),
+            col("_weather").sum().alias("weather_delayed"),
+            col("_weather_pos").mean().alias("_avg_weather"),
+            col("_weather_tenths").sum().alias("_tenths_sum"),
         )
         .with_columns(
-            (lit(100.0) * col("weather_delayed") / col("total_flights")).round(2).alias("weather_delay_rate_pct")
+            _round_half_away(ctx, lit(100.0) * col("weather_delayed") / col("total_flights"), 2).alias(
+                "weather_delay_rate_pct"
+            ),
+            _round_half_away(ctx, col("_avg_weather"), 2).alias("avg_weather_delay_min"),
+            ((col("_tenths_sum") + lit(5)) / lit(10)).floor().alias("total_weather_minutes"),
+        )
+        .select(
+            "month",
+            "total_flights",
+            "weather_delayed",
+            "weather_delay_rate_pct",
+            "avg_weather_delay_min",
+            "total_weather_minutes",
         )
         .sort("month")
     )
@@ -332,10 +519,24 @@ def recovery_time_expression_impl(ctx: DataFrameContext) -> Any:
         .group_by("delay_bucket")
         .agg(
             col("flight_id").count().alias("flight_count"),
-            col("dep_delay").mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").mean().round(2).alias("avg_arr_delay"),
-            col("minutes_recovered").mean().round(2).alias("avg_minutes_recovered"),
-            (lit(100.0) * col("recovered_flag").sum() / col("flight_id").count()).round(2).alias("pct_recovered"),
+            col("dep_delay").mean().alias("_avg_dep"),
+            col("arr_delay").mean().alias("_avg_arr"),
+            col("minutes_recovered").mean().alias("_avg_recovered"),
+            col("recovered_flag").sum().alias("_recovered_sum"),
+        )
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, col("_avg_recovered"), 2).alias("avg_minutes_recovered"),
+            _round_half_away(ctx, lit(100.0) * col("_recovered_sum") / col("flight_count"), 2).alias("pct_recovered"),
+        )
+        .select(
+            "delay_bucket",
+            "flight_count",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "avg_minutes_recovered",
+            "pct_recovered",
         )
         .sort("avg_dep_delay")
     )
@@ -361,16 +562,32 @@ def busiest_routes_expression_impl(ctx: DataFrameContext) -> Any:
         flights.join(ao, left_on="origin", right_on="ao_code", how="left")
         .join(ad, left_on="dest", right_on="ad_code", how="left")
         .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
+        .with_columns((col("arr_delay") <= lit(15)).cast(int).alias("_ontime"))
         .group_by("origin", "dest", "origin_city", "origin_state", "dest_city", "dest_state")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("distance").mean().round(0).alias("avg_distance_miles"),
-            col("actual_elapsed_time").mean().round(0).alias("avg_duration_min"),
-            (col("arr_delay") <= lit(15)).cast(int).sum().alias("_ontime"),
+            col("distance").mean().alias("_avg_dist"),
+            col("actual_elapsed_time").mean().alias("_avg_dur"),
+            col("_ontime").sum().alias("_ontime_sum"),
         )
-        .with_columns((lit(100.0) * col("_ontime") / col("total_flights")).round(2).alias("ontime_pct"))
-        .drop("_ontime")
-        .sort("total_flights", descending=True)
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_distance_miles"),
+            _round_half_away(ctx, col("_avg_dur"), 0).alias("avg_duration_min"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("total_flights"), 2).alias("ontime_pct"),
+        )
+        .select(
+            "origin",
+            "dest",
+            "origin_city",
+            "origin_state",
+            "dest_city",
+            "dest_state",
+            "total_flights",
+            "avg_distance_miles",
+            "avg_duration_min",
+            "ontime_pct",
+        )
+        .sort(["total_flights", "origin", "dest"], descending=[True, False, False])
         .limit(25)
     )
 
@@ -387,21 +604,53 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
         flights.join(ao, left_on="origin", right_on="ao_code", how="left")
         .join(ad, left_on="dest", right_on="ad_code", how="left")
         .filter(_date_condition(col, lit))
+        .with_columns(
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+        )
         .group_by("origin", "dest", "origin_city", "dest_city")
         .agg(
             col("flight_id").count().alias("total_scheduled"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_count"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("ontime_count"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
-            col("distance").mean().round(0).alias("distance_miles"),
+            col("_cancelled").sum().alias("cancelled_count"),
+            col("_ontime").sum().alias("ontime_count"),
+            col("_operated").sum().alias("_non_cancelled"),
+            col("distance").mean().alias("_avg_dist"),
         )
         .filter(col("total_scheduled") >= lit(100))
         .with_columns(
-            (lit(100.0) * col("cancelled_count") / col("total_scheduled")).round(2).alias("cancellation_rate_pct"),
-            (lit(100.0) * col("ontime_count") / col("_non_cancelled")).round(2).alias("ontime_pct"),
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
         )
-        .drop("_non_cancelled")
-        .sort(["ontime_pct", "cancellation_rate_pct"], descending=[True, False])
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("cancelled_count") / col("total_scheduled"), 2).alias(
+                "cancellation_rate_pct"
+            ),
+            _round_half_away(ctx, lit(100.0) * col("ontime_count") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("distance_miles"),
+        )
+        .select(
+            "origin",
+            "dest",
+            "origin_city",
+            "dest_city",
+            "total_scheduled",
+            "cancelled_count",
+            "cancellation_rate_pct",
+            "ontime_count",
+            "ontime_pct",
+            "distance_miles",
+        )
+        .sort(
+            ["ontime_pct", "cancellation_rate_pct", "origin", "dest"],
+            descending=[True, False, False, False],
+            nulls_last=True,
+        )
         .limit(30)
     )
 
@@ -423,16 +672,29 @@ def distance_delay_expression_impl(ctx: DataFrameContext) -> Any:
             .otherwise(lit("Ultra-long (2000+ mi)"))
             .alias("distance_bucket"),
         )
+        .with_columns((col("arr_delay") <= lit(15)).cast(int).alias("_ontime"))
         .group_by("distance_bucket")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("distance").mean().round(0).alias("avg_distance_miles"),
-            col("dep_delay").mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").mean().round(2).alias("avg_arr_delay"),
-            (col("arr_delay") <= lit(15)).cast(int).sum().alias("_ontime"),
+            col("distance").mean().alias("_avg_dist"),
+            col("dep_delay").mean().alias("_avg_dep"),
+            col("arr_delay").mean().alias("_avg_arr"),
+            col("_ontime").sum().alias("_ontime_sum"),
         )
-        .with_columns((lit(100.0) * col("_ontime") / col("total_flights")).round(2).alias("ontime_pct"))
-        .drop("_ontime")
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_distance_miles"),
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("total_flights"), 2).alias("ontime_pct"),
+        )
+        .select(
+            "distance_bucket",
+            "total_flights",
+            "avg_distance_miles",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "ontime_pct",
+        )
         .sort("avg_distance_miles")
     )
 
@@ -457,9 +719,20 @@ def hub_connectivity_expression_impl(ctx: DataFrameContext) -> Any:
             col("dest").n_unique().alias("unique_destinations"),
             col("reporting_airline").n_unique().alias("serving_carriers"),
             col("flight_id").count().alias("total_departures"),
-            col("dep_delay").mean().round(2).alias("avg_dep_delay"),
+            col("dep_delay").mean().alias("_avg_dep"),
         )
-        .sort("total_departures", descending=True)
+        .with_columns(_round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"))
+        .select(
+            "origin",
+            "airport_name",
+            "city",
+            "state",
+            "unique_destinations",
+            "serving_carriers",
+            "total_departures",
+            "avg_dep_delay",
+        )
+        .sort(["total_departures", "origin"], descending=[True, False])
         .limit(30)
     )
 
@@ -482,19 +755,45 @@ def day_of_week_expression_impl(ctx: DataFrameContext) -> Any:
             .when(col("day_of_week") == lit(6))
             .then(lit("Saturday"))
             .otherwise(lit("Sunday"))
-            .alias("day_name")
+            .alias("day_name"),
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            ctx.when(col("cancelled") == lit(0)).then(col("dep_delay")).otherwise(lit(None)).alias("_dep_nc"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
         )
         .group_by("day_of_week", "day_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_count"),
-            col("dep_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("_ontime"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
+            col("_cancelled").sum().alias("cancelled_count"),
+            col("_dep_nc").mean().alias("_avg_dep"),
+            col("_arr_nc").mean().alias("_avg_arr"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("_operated").sum().alias("_non_cancelled"),
         )
-        .with_columns((lit(100.0) * col("_ontime") / col("_non_cancelled")).round(2).alias("ontime_pct"))
-        .drop("_ontime", "_non_cancelled")
+        .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+        )
+        .select(
+            "day_of_week",
+            "day_name",
+            "total_flights",
+            "cancelled_count",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "ontime_pct",
+        )
         .sort("day_of_week")
     )
 
@@ -529,19 +828,45 @@ def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
             .otherwise(lit("December"))
             .alias("month_name")
         )
+        .with_columns(
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
+        )
         .group_by("month", "month_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_count"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("_ontime"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
+            col("_cancelled").sum().alias("cancelled_count"),
+            col("_arr_nc").mean().alias("_avg_arr"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
-            (lit(100.0) * col("cancelled_count") / col("total_flights")).round(2).alias("cancellation_rate_pct"),
-            (lit(100.0) * col("_ontime") / col("_non_cancelled")).round(2).alias("ontime_pct"),
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
         )
-        .drop("_ontime", "_non_cancelled")
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("cancelled_count") / col("total_flights"), 2).alias(
+                "cancellation_rate_pct"
+            ),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+        )
+        .select(
+            "month",
+            "month_name",
+            "total_flights",
+            "cancelled_count",
+            "cancellation_rate_pct",
+            "avg_arr_delay",
+            "ontime_pct",
+        )
         .sort("month")
     )
 
@@ -587,19 +912,38 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
             .otherwise(lit("Regular Day"))
             .alias("period"),
         )
+        .with_columns(
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
+        )
         .group_by("period")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
-            (lit(100.0) * (col("cancelled") == lit(1)).cast(int).sum() / col("flight_id").count())
-            .round(2)
-            .alias("cancellation_rate_pct"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("_ontime"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
+            col("_arr_nc").mean().alias("_avg_arr"),
+            col("_cancelled").sum().alias("_cancelled_sum"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("_operated").sum().alias("_non_cancelled"),
         )
-        .with_columns((lit(100.0) * col("_ontime") / col("_non_cancelled")).round(2).alias("ontime_pct"))
-        .drop("_ontime", "_non_cancelled")
-        .sort("avg_arr_delay", descending=True)
+        .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_cancelled_sum") / col("total_flights"), 2).alias(
+                "cancellation_rate_pct"
+            ),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+        )
+        .select("period", "total_flights", "avg_arr_delay", "cancellation_rate_pct", "ontime_pct")
+        .sort("avg_arr_delay", descending=True, nulls_last=True)
     )
 
 
@@ -607,18 +951,45 @@ def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx, lambda col, _lit: col("crs_dep_time").is_not_null())
 
     return (
-        flights.with_columns((col("crs_dep_time") / lit(100)).floor().cast(int).alias("hour_of_day"))
+        flights.with_columns(
+            (col("crs_dep_time") / lit(100)).floor().cast(int).alias("hour_of_day"),
+            (col("dep_delay") > lit(60)).cast(int).alias("_severe"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            ctx.when(col("cancelled") == lit(0)).then(col("dep_delay")).otherwise(lit(None)).alias("_dep_nc"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
+        )
         .group_by("hour_of_day")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            col("dep_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
-            (col("dep_delay") > lit(60)).cast(int).sum().alias("severely_delayed"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("_ontime"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
+            col("_dep_nc").mean().alias("_avg_dep"),
+            col("_arr_nc").mean().alias("_avg_arr"),
+            col("_severe").sum().alias("severely_delayed"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("_operated").sum().alias("_non_cancelled"),
         )
-        .with_columns((lit(100.0) * col("_ontime") / col("_non_cancelled")).round(2).alias("ontime_pct"))
-        .drop("_ontime", "_non_cancelled")
+        .with_columns(
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
+        )
+        .with_columns(
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+        )
+        .select(
+            "hour_of_day",
+            "total_flights",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "severely_delayed",
+            "ontime_pct",
+        )
         .sort("hour_of_day")
     )
 
@@ -630,24 +1001,56 @@ def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
         .filter(_date_condition(col, lit))
+        .with_columns(
+            (col("cancelled") == lit(0)).cast(int).alias("_operated"),
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).alias("_ontime"),
+            ctx.when(col("cancelled") == lit(0)).then(col("dep_delay")).otherwise(lit(None)).alias("_dep_nc"),
+            ctx.when(col("cancelled") == lit(0)).then(col("arr_delay")).otherwise(lit(None)).alias("_arr_nc"),
+        )
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_scheduled"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("operated_flights"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("cancelled_flights"),
-            col("dep_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_dep_delay"),
-            col("arr_delay").filter(col("cancelled") == lit(0)).mean().round(2).alias("avg_arr_delay"),
-            ((col("cancelled") == lit(0)) & (col("arr_delay") <= lit(15))).cast(int).sum().alias("_ontime"),
-            (col("cancelled") == lit(0)).cast(int).sum().alias("_non_cancelled"),
-            col("distance").mean().round(0).alias("avg_route_distance_miles"),
+            col("_operated").sum().alias("operated_flights"),
+            col("_cancelled").sum().alias("cancelled_flights"),
+            col("_dep_nc").mean().alias("_avg_dep"),
+            col("_arr_nc").mean().alias("_avg_arr"),
+            col("_ontime").sum().alias("_ontime_sum"),
+            col("_operated").sum().alias("_non_cancelled"),
+            col("distance").mean().alias("_avg_dist"),
         )
         .filter(col("total_scheduled") >= lit(1000))
         .with_columns(
-            (lit(100.0) * col("cancelled_flights") / col("total_scheduled")).round(2).alias("cancellation_rate_pct"),
-            (lit(100.0) * col("_ontime") / col("_non_cancelled")).round(2).alias("ontime_pct"),
+            # NULL-safe denominator: a fully-cancelled group divides by
+            # zero, where SQL yields NULL but a bare division yields NaN
+            # (which sorts first instead of last), so guard to NULL.
+            ctx.when(col("_non_cancelled") > lit(0))
+            .then(col("_non_cancelled"))
+            .otherwise(lit(None))
+            .alias("_non_cancelled_nz"),
         )
-        .drop("_ontime", "_non_cancelled")
-        .sort("ontime_pct", descending=True)
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("cancelled_flights") / col("total_scheduled"), 2).alias(
+                "cancellation_rate_pct"
+            ),
+            _round_half_away(ctx, col("_avg_dep"), 2).alias("avg_dep_delay"),
+            _round_half_away(ctx, col("_avg_arr"), 2).alias("avg_arr_delay"),
+            _round_half_away(ctx, lit(100.0) * col("_ontime_sum") / col("_non_cancelled_nz"), 2).alias("ontime_pct"),
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_route_distance_miles"),
+        )
+        .select(
+            "reporting_airline",
+            "airline_name",
+            "total_scheduled",
+            "operated_flights",
+            "cancelled_flights",
+            "cancellation_rate_pct",
+            "avg_dep_delay",
+            "avg_arr_delay",
+            "ontime_pct",
+            "avg_route_distance_miles",
+        )
+        .sort(["ontime_pct", "reporting_airline"], descending=[True, False], nulls_last=True)
     )
 
 
@@ -658,20 +1061,40 @@ def cancellation_rate_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
         .filter(_date_condition(col, lit))
+        .with_columns(
+            (col("cancelled") == lit(1)).cast(int).alias("_cancelled"),
+            (col("cancellation_code") == lit("A")).cast(int).alias("_code_a"),
+            (col("cancellation_code") == lit("B")).cast(int).alias("_code_b"),
+            (col("cancellation_code") == lit("C")).cast(int).alias("_code_c"),
+            (col("cancellation_code") == lit("D")).cast(int).alias("_code_d"),
+        )
         .group_by("reporting_airline", "airline_name")
         .agg(
             col("flight_id").count().alias("total_flights"),
-            (col("cancelled") == lit(1)).cast(int).sum().alias("total_cancelled"),
-            (col("cancellation_code") == lit("A")).cast(int).sum().alias("carrier_cancellations"),
-            (col("cancellation_code") == lit("B")).cast(int).sum().alias("weather_cancellations"),
-            (col("cancellation_code") == lit("C")).cast(int).sum().alias("nas_cancellations"),
-            (col("cancellation_code") == lit("D")).cast(int).sum().alias("security_cancellations"),
+            col("_cancelled").sum().alias("total_cancelled"),
+            col("_code_a").sum().alias("carrier_cancellations"),
+            col("_code_b").sum().alias("weather_cancellations"),
+            col("_code_c").sum().alias("nas_cancellations"),
+            col("_code_d").sum().alias("security_cancellations"),
         )
         .filter(col("total_flights") >= lit(100))
         .with_columns(
-            (lit(100.0) * col("total_cancelled") / col("total_flights")).round(3).alias("cancellation_rate_pct")
+            _round_half_away(ctx, lit(100.0) * col("total_cancelled") / col("total_flights"), 3).alias(
+                "cancellation_rate_pct"
+            )
         )
-        .sort("cancellation_rate_pct", descending=True)
+        .select(
+            "reporting_airline",
+            "airline_name",
+            "total_flights",
+            "total_cancelled",
+            "cancellation_rate_pct",
+            "carrier_cancellations",
+            "weather_cancellations",
+            "nas_cancellations",
+            "security_cancellations",
+        )
+        .sort(["cancellation_rate_pct", "reporting_airline"], descending=[True, False])
     )
 
 
@@ -688,22 +1111,32 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
         .agg(
             col("flight_id").count().alias("flight_count"),
             col("route").n_unique().alias("routes_served"),
-            col("distance").mean().round(0).alias("avg_distance_miles"),
+            col("distance").mean().alias("_avg_dist"),
         )
     )
 
     # Compute grand_total as a window sum, then derive market share
     return (
         carrier_totals.with_columns(col("flight_count").sum().alias("grand_total"))
-        .with_columns((lit(100.0) * col("flight_count") / col("grand_total")).round(2).alias("market_share_pct"))
-        .drop("grand_total")
-        .sort("flight_count", descending=True)
+        .with_columns(
+            _round_half_away(ctx, lit(100.0) * col("flight_count") / col("grand_total"), 2).alias("market_share_pct"),
+            _round_half_away(ctx, col("_avg_dist"), 0).alias("avg_distance_miles"),
+        )
+        .select(
+            "reporting_airline",
+            "airline_name",
+            "flight_count",
+            "routes_served",
+            "avg_distance_miles",
+            "market_share_pct",
+        )
+        .sort(["flight_count", "reporting_airline"], descending=[True, False])
         .limit(20)
     )
 
 
 # ===========================================================================
-# Pandas Family (Pandas, Modin, cuDF, Dask)
+# Pandas Family (Pandas, cuDF, Dask)
 # ===========================================================================
 
 
@@ -817,10 +1250,24 @@ _PANDAS_DERIVED = {
     "recovered": ("_recovered", lambda f: (f["arr_delay"] < f["dep_delay"]).astype(int)),
     "cascade": ("_cascade", lambda f: (f["late_aircraft_delay"] > 0).astype(int)),
     "cascade_val": ("_cascade_val", lambda f: f["late_aircraft_delay"].where(f["late_aircraft_delay"] > 0)),
-    "cascade_total": ("_cascade_total", lambda f: f["late_aircraft_delay"].fillna(0)),
+    # Exact integer tenths matching the SQL surface (see the cascade-delays
+    # expression impl): NULL/negative delays contribute 0 as SQL's ELSE 0.
+    "late_tenths": (
+        "_late_tenths",
+        lambda f: (
+            _pandas_round_half_away(f["late_aircraft_delay"] * 10, 0)
+            .where(f["late_aircraft_delay"] > 0, 0)
+            .astype("int64")
+        ),
+    ),
     "weather": ("_weather_flag", lambda f: (f["weather_delay"] > 0).astype(int)),
     "weather_val": ("_weather_val", lambda f: f["weather_delay"].where(f["weather_delay"] > 0)),
-    "weather_total": ("_weather_total", lambda f: f["weather_delay"].fillna(0)),
+    # Exact integer tenths matching the SQL surface (see the cascade-delays
+    # "late_tenths" derive): NULL delays contribute 0 as SQL's COALESCE.
+    "weather_tenths": (
+        "_weather_tenths",
+        lambda f: (_pandas_round_half_away(f["weather_delay"].fillna(0) * 10, 0)).astype("int64"),
+    ),
     "severe_dep": ("_severely_delayed", lambda f: (f["dep_delay"] > 60).astype(int)),
     "code_a": ("_code_a", lambda f: (f["cancellation_code"] == "A").astype(int)),
     "code_b": ("_code_b", lambda f: (f["cancellation_code"] == "B").astype(int)),
@@ -845,11 +1292,11 @@ def _parse_order(value: str) -> bool | list[bool]:
 def _apply_rates(result: Any, rates: str) -> None:
     for name, numerator, denominator, digits in (item.split(":") for item in rates.split(";") if item):
         divisor = result[numerator].sum() if denominator == "@sum" else result[denominator]
-        result[name] = (100.0 * result[numerator] / divisor).round(int(digits))
+        result[name] = _pandas_round_half_away(100.0 * result[numerator] / divisor, int(digits))
 
 
 def _make_pandas_impl(row: list[str]) -> Any:
-    stem, extra, joins, derives, group, aggs, result_filter, rounds, rates, sort, asc, head, drop = row
+    stem, extra, joins, derives, group, aggs, result_filter, rounds, rates, sort, asc, head, drop, cols, halfup = row
 
     def impl(ctx: DataFrameContext) -> Any:
         filtered = _pandas_window(ctx, copy=True, extra=_PANDAS_EXTRAS.get(extra))
@@ -858,19 +1305,29 @@ def _make_pandas_impl(row: list[str]) -> Any:
         for name in _csv(derives):
             column, derive = _PANDAS_DERIVED[name]
             filtered[column] = derive(filtered)
-        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False).agg(**_parse_aggs(aggs))
+        # SQL GROUP BY keeps NULL keys as a group; pandas drops them unless asked.
+        result = filtered.groupby(_csv(group) if "," in group else group, as_index=False, dropna=False).agg(
+            **_parse_aggs(aggs)
+        )
         if result_filter:
             column, threshold = result_filter.split(">=")
             result = result[result[column] >= int(threshold)]
         _apply_rates(result, rates)
         for column, digits in (item.split(":") for item in rounds.split(";") if item):
-            result[column] = result[column].round(int(digits))
+            result[column] = _pandas_round_half_away(result[column], int(digits))
+        # Integer half-up division for exact whole-unit totals summed in tenths
+        # (entries ``out:src:div`` compute ``(src + div // 2) // div`` exactly).
+        for out, src, div in (item.split(":") for item in halfup.split(";") if item):
+            divisor = int(div)
+            result[out] = (result[src] + divisor // 2) // divisor
         if sort:
             result = result.sort_values(_csv(sort) if "," in sort else sort, ascending=_parse_order(asc))
         if head:
             result = result.head(int(head))
         if drop:
             result = result.drop(columns=_csv(drop))
+        if cols:
+            result = result[_csv(cols)]
         return result.reset_index(drop=True)
 
     impl.__name__ = f"{stem}_pandas_impl"
@@ -879,25 +1336,25 @@ def _make_pandas_impl(row: list[str]) -> Any:
 
 
 _PANDAS_QUERY_METADATA = """\
-ontime_by_carrier|operated|airline|ontime_raw,delayed_arr_positive|reporting_airline,airline_name|total_flights:flight_id:count;ontime_flights:_ontime:sum;avg_delay_when_late:_delayed_val:mean||avg_delay_when_late:2|ontime_pct:ontime_flights:total_flights:2|ontime_pct|False||
-delay_by_airport|operated_dep|origin_airport|delayed_dep|origin,airport_name,city,state|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_flights:_delayed:sum|total_flights>=100|avg_dep_delay:2;avg_arr_delay:2||avg_dep_delay|False|50|
-delay_by_hour|operated_dep_time||dep_hour,delayed_dep|dep_hour|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_count:_delayed:sum||avg_dep_delay:2;avg_arr_delay:2|delay_rate_pct:delayed_count:total_flights:2|dep_hour|True||
-best_routes|operated_arr|route_city|ontime_raw|origin,dest,origin_city,dest_city|total_flights:flight_id:count;_ontime_sum:_ontime:sum;avg_arr_delay:arr_delay:mean;avg_distance_miles:distance:mean|total_flights>=50|avg_arr_delay:2;avg_distance_miles:0|ontime_pct:_ontime_sum:total_flights:2|ontime_pct|False|25|_ontime_sum
-improvement_trend|||cancelled,ontime,non_cancelled,arr_delay_nc|year|total_flights:flight_id:count;cancelled_flights:_cancelled:sum;ontime_flights:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean||avg_arr_delay:2|cancellation_rate_pct:cancelled_flights:total_flights:2;ontime_pct:ontime_flights:_non_cancelled:2|year|True||_non_cancelled
-cascade_delays|operated|airline|cascade,cascade_val,cascade_total|reporting_airline,airline_name|total_flights:flight_id:count;cascade_delayed:_cascade:sum;avg_cascade_delay:_cascade_val:mean;total_cascade_minutes:_cascade_total:sum||avg_cascade_delay:2;total_cascade_minutes:0|cascade_rate_pct:cascade_delayed:total_flights:2|cascade_rate_pct|False||
-weather_impact|operated||weather,weather_val,weather_total|month|total_flights:flight_id:count;weather_delayed:_weather_flag:sum;avg_weather_delay_min:_weather_val:mean;total_weather_minutes:_weather_total:sum||avg_weather_delay_min:2;total_weather_minutes:0|weather_delay_rate_pct:weather_delayed:total_flights:2|month|True||
-recovery_time|operated_dep_arr||delay_bucket,minutes_recovered,recovered|delay_bucket|flight_count:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;avg_minutes_recovered:_minutes_recovered:mean;_total:flight_id:count;_recovered_sum:_recovered:sum||avg_dep_delay:2;avg_arr_delay:2;avg_minutes_recovered:2|pct_recovered:_recovered_sum:_total:2|avg_dep_delay|True||_total,_recovered_sum
-busiest_routes|operated|route_state|ontime_raw|origin,dest,origin_city,origin_state,dest_city,dest_state|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_duration_min:actual_elapsed_time:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_duration_min:0|ontime_pct:_ontime_sum:total_flights:2|total_flights|False|25|_ontime_sum
-route_reliability||route_city|cancelled,ontime,non_cancelled|origin,dest,origin_city,dest_city|total_scheduled:flight_id:count;cancelled_count:_cancelled:sum;ontime_count:_ontime:sum;_non_cancelled:_non_cancelled:sum;distance_miles:distance:mean|total_scheduled>=100|distance_miles:0|cancellation_rate_pct:cancelled_count:total_scheduled:2;ontime_pct:ontime_count:_non_cancelled:2|ontime_pct,cancellation_rate_pct|False,True|30|_non_cancelled
-distance_delay|operated_arr||distance_bucket,ontime_raw|distance_bucket|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime_sum:total_flights:2|avg_distance_miles|True||_ontime_sum
-hub_connectivity|operated|origin_airport||origin,airport_name,city,state|unique_destinations:dest:nunique;serving_carriers:reporting_airline:nunique;total_departures:flight_id:count;avg_dep_delay:dep_delay:mean||avg_dep_delay:2||total_departures|False|30|
-day_of_week|||day_name,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|day_of_week,day_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|day_of_week|True||_ontime,_non_cancelled
-seasonal_trends|||month_name,cancelled,arr_delay_nc,ontime,non_cancelled|month,month_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:cancelled_count:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|month|True||_ontime,_non_cancelled
-holiday_impact|||period,cancelled,arr_delay_nc,ontime,non_cancelled|period|total_flights:flight_id:count;avg_arr_delay:_arr_delay_nc:mean;_cancelled_sum:_cancelled:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:_cancelled_sum:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|avg_arr_delay|False||_cancelled_sum,_ontime,_non_cancelled
-time_of_day|dep_time||hour_of_day,dep_delay_nc,arr_delay_nc,severe_dep,ontime,non_cancelled|hour_of_day|total_flights:flight_id:count;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;severely_delayed:_severely_delayed:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|hour_of_day|True||_ontime,_non_cancelled
-carrier_ranking||airline|operated,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|reporting_airline,airline_name|total_scheduled:flight_id:count;operated_flights:_operated:sum;cancelled_flights:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_route_distance_miles:distance:mean|total_scheduled>=1000|avg_dep_delay:2;avg_arr_delay:2;avg_route_distance_miles:0|cancellation_rate_pct:cancelled_flights:total_scheduled:2;ontime_pct:_ontime:_non_cancelled:2|ontime_pct|False||_ontime,_non_cancelled
-cancellation_rate||airline|cancelled,code_a,code_b,code_c,code_d|reporting_airline,airline_name|total_flights:flight_id:count;total_cancelled:_cancelled:sum;carrier_cancellations:_code_a:sum;weather_cancellations:_code_b:sum;nas_cancellations:_code_c:sum;security_cancellations:_code_d:sum|total_flights>=100||cancellation_rate_pct:total_cancelled:total_flights:3|cancellation_rate_pct|False||
-market_share|operated|airline|route|reporting_airline,airline_name|flight_count:flight_id:count;routes_served:route:nunique;avg_distance_miles:distance:mean||avg_distance_miles:0|market_share_pct:flight_count:@sum:2|flight_count|False|20|
+ontime_by_carrier|operated|airline|ontime_raw,delayed_arr_positive|reporting_airline,airline_name|total_flights:flight_id:count;ontime_flights:_ontime:sum;avg_delay_when_late:_delayed_val:mean||avg_delay_when_late:2|ontime_pct:ontime_flights:total_flights:2|ontime_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,ontime_flights,ontime_pct,avg_delay_when_late|
+delay_by_airport|operated_dep|origin_airport|delayed_dep|origin,airport_name,city,state|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_flights:_delayed:sum|total_flights>=100|avg_dep_delay:2;avg_arr_delay:2||avg_dep_delay,origin|False,True|50|||
+delay_by_hour|operated_dep_time||dep_hour,delayed_dep|dep_hour|total_flights:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;delayed_count:_delayed:sum||avg_dep_delay:2;avg_arr_delay:2|delay_rate_pct:delayed_count:total_flights:2|dep_hour|True||||
+best_routes|operated_arr|route_city|ontime_raw|origin,dest,origin_city,dest_city|total_flights:flight_id:count;_ontime_sum:_ontime:sum;avg_arr_delay:arr_delay:mean;avg_distance_miles:distance:mean|total_flights>=50|avg_arr_delay:2;avg_distance_miles:0|ontime_pct:_ontime_sum:total_flights:2|ontime_pct,origin,dest|False,True,True|25|_ontime_sum|origin,dest,origin_city,dest_city,total_flights,ontime_pct,avg_arr_delay,avg_distance_miles|
+improvement_trend|||cancelled,ontime,non_cancelled,arr_delay_nc|year|total_flights:flight_id:count;cancelled_flights:_cancelled:sum;ontime_flights:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean||avg_arr_delay:2|cancellation_rate_pct:cancelled_flights:total_flights:2;ontime_pct:ontime_flights:_non_cancelled:2|year|True||_non_cancelled|year,total_flights,cancelled_flights,cancellation_rate_pct,ontime_flights,ontime_pct,avg_arr_delay|
+cascade_delays|operated|airline|cascade,cascade_val,late_tenths|reporting_airline,airline_name|total_flights:flight_id:count;cascade_delayed:_cascade:sum;avg_cascade_delay:_cascade_val:mean;total_tenths:_late_tenths:sum||avg_cascade_delay:2|cascade_rate_pct:cascade_delayed:total_flights:2|cascade_rate_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,cascade_delayed,cascade_rate_pct,avg_cascade_delay,total_cascade_minutes|total_cascade_minutes:total_tenths:10
+weather_impact|operated||weather,weather_val,weather_tenths|month|total_flights:flight_id:count;weather_delayed:_weather_flag:sum;avg_weather_delay_min:_weather_val:mean;total_tenths:_weather_tenths:sum||avg_weather_delay_min:2|weather_delay_rate_pct:weather_delayed:total_flights:2|month|True|||month,total_flights,weather_delayed,weather_delay_rate_pct,avg_weather_delay_min,total_weather_minutes|total_weather_minutes:total_tenths:10
+recovery_time|operated_dep_arr||delay_bucket,minutes_recovered,recovered|delay_bucket|flight_count:flight_id:count;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;avg_minutes_recovered:_minutes_recovered:mean;_total:flight_id:count;_recovered_sum:_recovered:sum||avg_dep_delay:2;avg_arr_delay:2;avg_minutes_recovered:2|pct_recovered:_recovered_sum:_total:2|avg_dep_delay|True||_total,_recovered_sum||
+busiest_routes|operated|route_state|ontime_raw|origin,dest,origin_city,origin_state,dest_city,dest_state|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_duration_min:actual_elapsed_time:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_duration_min:0|ontime_pct:_ontime_sum:total_flights:2|total_flights,origin,dest|False,True,True|25|_ontime_sum||
+route_reliability||route_city|cancelled,ontime,non_cancelled|origin,dest,origin_city,dest_city|total_scheduled:flight_id:count;cancelled_count:_cancelled:sum;ontime_count:_ontime:sum;_non_cancelled:_non_cancelled:sum;distance_miles:distance:mean|total_scheduled>=100|distance_miles:0|cancellation_rate_pct:cancelled_count:total_scheduled:2;ontime_pct:ontime_count:_non_cancelled:2|ontime_pct,cancellation_rate_pct,origin,dest|False,True,True,True|30|_non_cancelled|origin,dest,origin_city,dest_city,total_scheduled,cancelled_count,cancellation_rate_pct,ontime_count,ontime_pct,distance_miles|
+distance_delay|operated_arr||distance_bucket,ontime_raw|distance_bucket|total_flights:flight_id:count;avg_distance_miles:distance:mean;avg_dep_delay:dep_delay:mean;avg_arr_delay:arr_delay:mean;_ontime_sum:_ontime:sum||avg_distance_miles:0;avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime_sum:total_flights:2|avg_distance_miles|True||_ontime_sum||
+hub_connectivity|operated|origin_airport||origin,airport_name,city,state|unique_destinations:dest:nunique;serving_carriers:reporting_airline:nunique;total_departures:flight_id:count;avg_dep_delay:dep_delay:mean||avg_dep_delay:2||total_departures,origin|False,True|30|||
+day_of_week|||day_name,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|day_of_week,day_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|day_of_week|True||_ontime,_non_cancelled||
+seasonal_trends|||month_name,cancelled,arr_delay_nc,ontime,non_cancelled|month,month_name|total_flights:flight_id:count;cancelled_count:_cancelled:sum;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:cancelled_count:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|month|True||_ontime,_non_cancelled|month,month_name,total_flights,cancelled_count,cancellation_rate_pct,avg_arr_delay,ontime_pct|
+holiday_impact|||period,cancelled,arr_delay_nc,ontime,non_cancelled|period|total_flights:flight_id:count;avg_arr_delay:_arr_delay_nc:mean;_cancelled_sum:_cancelled:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_arr_delay:2|cancellation_rate_pct:_cancelled_sum:total_flights:2;ontime_pct:_ontime:_non_cancelled:2|avg_arr_delay|False||_cancelled_sum,_ontime,_non_cancelled||
+time_of_day|dep_time||hour_of_day,dep_delay_nc,arr_delay_nc,severe_dep,ontime,non_cancelled|hour_of_day|total_flights:flight_id:count;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;severely_delayed:_severely_delayed:sum;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum||avg_dep_delay:2;avg_arr_delay:2|ontime_pct:_ontime:_non_cancelled:2|hour_of_day|True||_ontime,_non_cancelled||
+carrier_ranking||airline|operated,cancelled,dep_delay_nc,arr_delay_nc,ontime,non_cancelled|reporting_airline,airline_name|total_scheduled:flight_id:count;operated_flights:_operated:sum;cancelled_flights:_cancelled:sum;avg_dep_delay:_dep_delay_nc:mean;avg_arr_delay:_arr_delay_nc:mean;_ontime:_ontime:sum;_non_cancelled:_non_cancelled:sum;avg_route_distance_miles:distance:mean|total_scheduled>=1000|avg_dep_delay:2;avg_arr_delay:2;avg_route_distance_miles:0|cancellation_rate_pct:cancelled_flights:total_scheduled:2;ontime_pct:_ontime:_non_cancelled:2|ontime_pct,reporting_airline|False,True||_ontime,_non_cancelled|reporting_airline,airline_name,total_scheduled,operated_flights,cancelled_flights,cancellation_rate_pct,avg_dep_delay,avg_arr_delay,ontime_pct,avg_route_distance_miles|
+cancellation_rate||airline|cancelled,code_a,code_b,code_c,code_d|reporting_airline,airline_name|total_flights:flight_id:count;total_cancelled:_cancelled:sum;carrier_cancellations:_code_a:sum;weather_cancellations:_code_b:sum;nas_cancellations:_code_c:sum;security_cancellations:_code_d:sum|total_flights>=100||cancellation_rate_pct:total_cancelled:total_flights:3|cancellation_rate_pct,reporting_airline|False,True|||reporting_airline,airline_name,total_flights,total_cancelled,cancellation_rate_pct,carrier_cancellations,weather_cancellations,nas_cancellations,security_cancellations|
+market_share|operated|airline|route|reporting_airline,airline_name|flight_count:flight_id:count;routes_served:route:nunique;avg_distance_miles:distance:mean||avg_distance_miles:0|market_share_pct:flight_count:@sum:2|flight_count,reporting_airline|False,True|20|||
 """
 
 globals().update(
@@ -911,7 +1368,7 @@ globals().update(
 def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
     pd = _pandas()
     filtered = _pandas_window(ctx, extra=_PANDAS_EXTRAS["delayed_arr"])
-    row = {"total_delayed_flights": len(filtered)}
+    row: dict[str, Any] = {}
     for column, count_name, avg_name in (
         ("carrier_delay", "carrier_delay_count", "avg_carrier_delay"),
         ("weather_delay", "weather_delay_count", "avg_weather_delay"),
@@ -921,8 +1378,24 @@ def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
     ):
         positive = filtered[column] > 0
         row[count_name] = int(positive.sum())
-        row[avg_name] = round(float(filtered[column].where(positive).mean()), 2)
-    return pd.DataFrame([row])
+        row[avg_name] = float(_pandas_round_half_away(filtered[column].where(positive).mean(), 2))
+    row["total_delayed_flights"] = len(filtered)
+    return pd.DataFrame(
+        [row],
+        columns=[
+            "carrier_delay_count",
+            "avg_carrier_delay",
+            "weather_delay_count",
+            "avg_weather_delay",
+            "nas_delay_count",
+            "avg_nas_delay",
+            "security_delay_count",
+            "avg_security_delay",
+            "late_aircraft_count",
+            "avg_late_aircraft_delay",
+            "total_delayed_flights",
+        ],
+    )
 
 
 # ===========================================================================

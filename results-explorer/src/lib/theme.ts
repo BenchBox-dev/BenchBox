@@ -53,11 +53,6 @@ export function persistThemeChoice(choice: ThemeChoice) {
   }
 }
 
-export function nextThemeChoice(choice: ThemeChoice): ThemeChoice {
-  const index = THEME_CHOICES.indexOf(choice);
-  return THEME_CHOICES[(index + 1) % THEME_CHOICES.length] ?? "system";
-}
-
 export function useThemeChoice() {
   const [choice, setChoiceState] = useState<ThemeChoice>(() => {
     const documentChoice = typeof document === "undefined" ? undefined : document.documentElement.dataset.bbThemeChoice;

@@ -104,8 +104,37 @@ describe("corpus section indexes", () => {
       expect(listResults).toHaveBeenCalledTimes(2);
       expect(within(list).getAllByRole("link")).toHaveLength(expectedCount);
       expect(within(list).getByRole("link", { name: expectedLinkName })).toHaveAttribute("href", expectedHref);
+      // Each card carries its latest run date as one chip; the age rides in
+      // the title rather than lengthening the line.
+      expect(within(list).getAllByText(/^Latest$/)).toHaveLength(expectedCount);
       expect(screen.queryByText(new RegExp(`No published ${kind}`, "i"))).toBeNull();
       expect(document.title).toBe(`${title} · BenchBox Results`);
+    },
+  );
+
+  it.each(SECTION_CASES)(
+    "$title uses singular nouns on a card with exactly one run and one covered counterpart",
+    async ({ kind, listId }) => {
+      const oneRunRow = resultRow({
+        result_id: "only-run",
+        benchmark: "tpch",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-20T12:00:00Z",
+      });
+      vi.mocked(listResults).mockResolvedValue([oneRunRow]);
+
+      renderIndex(kind);
+
+      const list = await screen.findByTestId(listId);
+      // Benchmarks index cards report coverage in platforms; the platforms
+      // index reports coverage in benchmarks. Either way, one of each stays
+      // singular rather than defaulting to "1 runs · 1 benchmarks".
+      const coverageNoun = kind === "benchmarks" ? "platform" : "benchmark";
+      expect(within(list).getByText(`1 run · 1 ${coverageNoun}`)).toBeTruthy();
+      expect(within(list).queryByText(/1 runs/)).toBeNull();
+      expect(within(list).queryByText(/1 platforms/)).toBeNull();
+      expect(within(list).queryByText(/1 benchmarks/)).toBeNull();
     },
   );
 
@@ -116,7 +145,7 @@ describe("corpus section indexes", () => {
 
     expect(await screen.findByText(`No published ${kind}`)).toBeTruthy();
     expect(listResults).toHaveBeenCalledTimes(2);
-    expect(screen.getByRole("link", { name: "Back to Leaderboards" })).toHaveAttribute("href", "/results/");
+    expect(screen.getByRole("link", { name: "Back to leaderboards" })).toHaveAttribute("href", "/results/");
   });
 
   it.each(SECTION_CASES)("$title renders a load failure instead of an empty state", async ({ kind }) => {

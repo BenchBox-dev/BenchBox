@@ -1385,10 +1385,13 @@ class TestPromptPlatformOptions:
     def test_duckdb_memory_limit(self, mock_confirm, mock_prompt):
         """Test configuring DuckDB memory limit."""
         mock_confirm.return_value = True
-        # DuckDB has: memory_limit, temp_directory, threads (sorted alphabetically)
+        # DuckDB has: memory_limit, plan_capture_timeout_seconds,
+        # plan_max_depth, temp_directory, threads (sorted alphabetically)
         # Each needs a value; threads uses special handling for None
         mock_prompt.side_effect = [
             "16GB",  # memory_limit
+            "",  # plan_capture_timeout_seconds (empty = default)
+            "",  # plan_max_depth (empty = default)
             "",  # temp_directory (empty = default)
             "",  # threads (empty = auto/None)
         ]

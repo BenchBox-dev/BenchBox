@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable, Protocol, runtime_checkable
 
+from benchbox.core.dataframe.csv_dialect import (
+    dialect_preserves_empty_strings as dialect_preserves_empty_strings,
+)
 from benchbox.core.dataframe.schema_utils import (
     column_name,
     column_sql_type,
@@ -140,17 +143,17 @@ def resolve_empty_string_restore_columns(
     """Return declared string columns whose empty CSV fields must be restored to ``""``.
 
     This is the single shared decision step behind every DataFrame adapter's
-    empty-string/null CSV coercion: ``null_marker is None`` means the resolved
-    CSV dialect keeps empty fields as empty strings (e.g. ClickBench), but many
+    empty-string/null CSV coercion (see :func:`dialect_preserves_empty_strings`):
+    when the resolved CSV dialect keeps empty fields as empty strings, many
     reader libraries still surface an empty text field as null/NaN regardless
     of dialect. Declared string columns need ``""`` restored post-read so the
     DataFrame surface matches the SQL reference (e.g. DuckDB, which keeps
     ``""``).
 
-    Returns an empty list -- meaning "no coercion needed" -- when ``null_marker``
-    is not ``None`` (the dialect already treats empty as SQL NULL, e.g. the
-    TPC-style ``""`` marker / JoinOrder, so existing NULLs must be preserved) or
-    when there are no declared string columns for this table.
+    Returns an empty list -- meaning "no coercion needed" -- when the dialect
+    maps empty fields to SQL NULL (``null_marker == ""``, e.g. the TPC-style
+    ``.tbl``/``.dat`` marker / JoinOrder, so existing NULLs must be preserved)
+    or when there are no declared string columns for this table.
 
     Args:
         string_columns: Declared string/text columns for this table (from
@@ -164,7 +167,7 @@ def resolve_empty_string_restore_columns(
         The subset of ``string_columns`` that are present in
         ``available_columns`` and need empty-field restoration, or ``[]``.
     """
-    if null_marker is not None or not string_columns:
+    if not dialect_preserves_empty_strings(null_marker) or not string_columns:
         return []
     available = set(available_columns)
     return [column for column in string_columns if column in available]
@@ -179,18 +182,18 @@ def coerce_empty_string_columns(
 
     Shared coercion step for DataFrame libraries whose column objects share
     Pandas' ``.fillna()`` and per-column assignment semantics (Pandas, cuDF,
-    Dask, Modin). Delegates the empty-vs-null decision to
+    Dask). Delegates the empty-vs-null decision to
     :func:`resolve_empty_string_restore_columns` so all four adapters apply
     the identical guard and the identical restore action instead of each
     carrying its own copy.
 
     Column-by-column assignment (not a single ``df[cols] = ...`` batch
     assignment) is used because multi-column assignment support differs
-    across dask/modin/cudf/pandas; looping is the common denominator that
+    across dask/cudf/pandas; looping is the common denominator that
     behaves identically -- and produces the same final values -- on all four.
 
     Args:
-        df: The loaded DataFrame (Pandas/cuDF/Dask/Modin).
+        df: The loaded DataFrame (Pandas/cuDF/Dask).
         string_columns: Declared string/text columns for this table.
         null_marker: The resolved CSV dialect's null marker.
 

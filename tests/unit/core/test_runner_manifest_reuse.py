@@ -11,6 +11,7 @@ import pytest
 from benchbox.core.runner.runner import _ensure_data_generated
 from benchbox.core.schemas import BenchmarkConfig
 from benchbox.utils.cloud_storage import CloudStagingPath
+from benchbox.utils.datagen_version import current_datagen_stamp
 
 pytestmark = [
     pytest.mark.unit,
@@ -54,6 +55,7 @@ def _write_manifest(tmp_path: Path, *, table_names: list[str]) -> dict:
     manifest = {
         "benchmark": "tpcds",
         "scale_factor": 0.01,
+        **current_datagen_stamp("tpcds"),
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
         "created_at": "2025-01-01T00:00:00Z",
@@ -82,7 +84,7 @@ def test_manifest_reuse_populates_tables_and_logs(
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Expected False when reusing manifest"
+    assert result == (False, True), "Expected reuse (not fresh) with manifest validated"
     dummy.generate_data.assert_not_called()
     assert isinstance(dummy.tables, dict)
     assert set(dummy.tables.keys()) == {"customer", "orders"}
@@ -111,6 +113,7 @@ def test_manifest_reuse_preserves_directory_format_preference(tmp_path: Path, be
     manifest = {
         "version": 2,
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -152,7 +155,7 @@ def test_manifest_reuse_preserves_directory_format_preference(tmp_path: Path, be
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Expected False when reusing manifest"
+    assert result == (False, True), "Expected reuse (not fresh) with manifest validated"
     dummy.generate_data.assert_not_called()
     assert dummy.tables == {"lineitem": delta_dir}
 
@@ -172,7 +175,7 @@ def test_manifest_reuse_prints_when_no_logger(
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Expected False when reusing manifest"
+    assert result == (False, True), "Expected reuse (not fresh) with manifest validated"
     dummy.generate_data.assert_not_called()
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
@@ -190,7 +193,7 @@ def test_missing_manifest_triggers_generation(tmp_path: Path, benchmark_config: 
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Expected True when generating fresh data"
+    assert result == (True, False), "Expected fresh generation without manifest reuse"
     dummy.generate_data.assert_called_once()
 
 
@@ -225,7 +228,7 @@ def test_force_regenerate_ignores_manifest(tmp_path: Path, benchmark_config: Ben
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Expected True when force regenerating"
+    assert result == (True, False), "Expected fresh generation without manifest reuse"
     dummy.generate_data.assert_called_once()
 
 
@@ -244,7 +247,7 @@ def test_force_regenerate_overrides_populated_tables(tmp_path: Path, benchmark_c
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Expected True when force regenerating with pre-populated tables"
+    assert result == (True, False), "Expected fresh generation without manifest reuse"
     dummy.generate_data.assert_called_once()
 
 
@@ -261,7 +264,7 @@ def test_populated_missing_tables_trigger_regeneration(tmp_path: Path, benchmark
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True
+    assert result == (True, False)
     dummy.generate_data.assert_called_once()
 
 
@@ -281,7 +284,7 @@ def test_populated_tables_must_match_manifest_before_reuse(tmp_path: Path, bench
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True
+    assert result == (True, False)
     dummy.generate_data.assert_called_once()
 
 
@@ -299,7 +302,7 @@ def test_external_populated_tables_without_manifest_are_reused(tmp_path: Path, b
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False
+    assert result == (False, False)
     dummy.generate_data.assert_not_called()
 
 
@@ -323,7 +326,7 @@ def test_invalid_manifest_regenerates(tmp_path: Path, benchmark_config: Benchmar
 
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Expected True when regenerating due to invalid manifest"
+    assert result == (True, False), "Expected fresh generation without manifest reuse"
     dummy.generate_data.assert_called_once()
 
 
@@ -363,6 +366,7 @@ def _write_directory_manifest(tmp_path: Path, *, table_name: str = "lineitem") -
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -406,7 +410,7 @@ def test_directory_entry_validates_successfully(
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Directory entry should validate and reuse data"
+    assert result == (False, True), "Directory entry should validate and reuse data"
     dummy.generate_data.assert_not_called()
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
@@ -428,7 +432,7 @@ def test_directory_entry_size_mismatch_detected(tmp_path: Path, benchmark_config
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Size mismatch in directory should trigger regeneration"
+    assert result == (True, False), "Size mismatch in directory should trigger regeneration"
     dummy.generate_data.assert_called_once()
 
 
@@ -452,7 +456,7 @@ def test_table_name_directory_collision_invalidates_manifest(tmp_path: Path, ben
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "Table-name directory collision should trigger regeneration"
+    assert result == (True, False), "Table-name directory collision should trigger regeneration"
     dummy.generate_data.assert_called_once()
 
 
@@ -472,7 +476,7 @@ def test_cloud_staging_path_checks_local_directory_collisions(tmp_path: Path, be
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True
+    assert result == (True, False)
     dummy.generate_data.assert_called_once()
 
 
@@ -491,7 +495,7 @@ def test_tracked_directory_entry_still_validates(
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Tracked directory entry should validate and reuse"
+    assert result == (False, True), "Tracked directory entry should validate and reuse"
     dummy.generate_data.assert_not_called()
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
@@ -506,6 +510,7 @@ def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -531,7 +536,7 @@ def test_file_entry_resolving_to_directory_invalidates(tmp_path: Path, benchmark
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is True, "File entry resolving to directory should trigger regeneration"
+    assert result == (True, False), "File entry resolving to directory should trigger regeneration"
     dummy.generate_data.assert_called_once()
 
 
@@ -555,6 +560,7 @@ def test_multi_format_tracked_directory_not_flagged_as_collision(
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": True, "type": "zstd", "level": None},
         "parallel": 1,
@@ -590,7 +596,7 @@ def test_multi_format_tracked_directory_not_flagged_as_collision(
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Multi-format tracked directory should validate and reuse"
+    assert result == (False, True), "Multi-format tracked directory should validate and reuse"
     dummy.generate_data.assert_not_called()
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
@@ -607,6 +613,7 @@ def test_shards_inside_table_named_directory_not_flagged_as_collision(
 
     manifest = {
         "benchmark": "tpcds",
+        **current_datagen_stamp("tpcds"),
         "scale_factor": 0.01,
         "compression": {"enabled": False, "type": None, "level": None},
         "parallel": 1,
@@ -639,8 +646,34 @@ def test_shards_inside_table_named_directory_not_flagged_as_collision(
     dummy = DummyBenchmark()
     result = _ensure_data_generated(dummy, benchmark_config)
 
-    assert result is False, "Shards under a table directory should validate and reuse"
+    assert result == (False, True), "Shards under a table directory should validate and reuse"
     dummy.generate_data.assert_not_called()
     assert dummy.tables == {"lineitem": shard}
     out = capsys.readouterr().out
     assert "Reusing benchmark data" in out
+
+
+def test_populated_tables_matching_current_manifest_reuse_manifest(tmp_path: Path, benchmark_config: BenchmarkConfig):
+    """Caller tables identical to the validated manifest keep its provenance."""
+    _write_manifest(tmp_path, table_names=["customer", "orders"])
+
+    class DummyBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = None
+            self.generate_data = Mock()
+
+    populated = DummyBenchmark()
+    assert _ensure_data_generated(populated, benchmark_config) == (False, True)
+
+    class CallerBenchmark:
+        def __init__(self) -> None:
+            self.output_dir = tmp_path
+            self.tables = dict(populated.tables)
+            self.generate_data = Mock()
+
+    caller = CallerBenchmark()
+    result = _ensure_data_generated(caller, benchmark_config)
+
+    assert result == (False, True)
+    caller.generate_data.assert_not_called()

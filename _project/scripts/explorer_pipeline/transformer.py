@@ -7,15 +7,19 @@ ManifestEntry and DetailResult shapes consumed by the explorer frontend.
 from __future__ import annotations
 
 import copy
+import datetime as _dt
 import hashlib
 import json
 import logging
 import math
+import re
+from collections import Counter
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
+    BasisAvailability,
     DetailResult,
     ManifestEntry,
     PercentileStats,
@@ -29,12 +33,77 @@ from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata,
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
 from benchbox.core.results.canonical_json import canonical_json_bytes
-from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY
+from benchbox.core.results.schema_policy import EXPLORER_INPUT_SCHEMA_POLICY, result_schema_version_value
 from benchbox.core.results.status import bundle_failed_query_count, bundle_non_clean_reason, normalize_validation_status
 from benchbox.core.tuning.modes import is_canonical_mode
-from benchbox.validation.bundle import APPLIED_COMPANION_MAX_BYTES, APPLIED_RECEIPT_MAX_ENTRIES, COMPANION_SUFFIXES
+from benchbox.validation.bundle import (
+    APPLIED_COMPANION_MAX_BYTES,
+    APPLIED_RECEIPT_MAX_ENTRIES,
+    COMPANION_SUFFIXES,
+    OVERRIDE_SUFFIX,
+    accepted_override_rules,
+)
 
 logger = logging.getLogger(__name__)
+
+_UTC = _dt.timezone.utc
+_DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+_TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
+
+# ---------------------------------------------------------------------------
+# Closed CPU-family vocabulary and normalization rules
+# ---------------------------------------------------------------------------
+
+CLOSED_CPU_FAMILIES: frozenset[str] = frozenset(
+    {
+        "apple_silicon",
+        "graviton",
+        "intel_xeon",
+        "intel_core",
+        "amd_epyc",
+        "amd_ryzen",
+        "ampere_altra",
+        "arm_neoverse",
+        "unknown",
+    }
+)
+
+_CPU_FAMILY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Apple Silicon: Apple M1/M2/M3/M4, Apple A-series
+    (re.compile(r"\bapple\s+(?:m\d|a\d)", re.IGNORECASE), "apple_silicon"),
+    # AWS Graviton
+    (re.compile(r"\bgraviton", re.IGNORECASE), "graviton"),
+    # Intel Xeon
+    (re.compile(r"\bxeon\b", re.IGNORECASE), "intel_xeon"),
+    # Intel Core
+    (re.compile(r"\b(?:intel.*core|core\(tm\))\b", re.IGNORECASE), "intel_core"),
+    # AMD EPYC
+    (re.compile(r"\bepyc\b", re.IGNORECASE), "amd_epyc"),
+    # AMD Ryzen / Threadripper
+    (re.compile(r"\b(?:ryzen|threadripper)\b", re.IGNORECASE), "amd_ryzen"),
+    # Ampere Altra
+    (re.compile(r"\b(?:ampere|altra)\b", re.IGNORECASE), "ampere_altra"),
+    # ARM Neoverse
+    (re.compile(r"\bneoverse\b", re.IGNORECASE), "arm_neoverse"),
+)
+
+
+def normalize_cpu_family(raw_model: str | None) -> str | None:
+    """Normalize a raw CPU model string to the closed CPU family vocabulary.
+
+    Returns None if raw_model is None or empty ('not recorded').
+    Returns 'unknown' if raw_model is populated but does not match any known family.
+    Never guesses based on architecture.
+    """
+    if raw_model is None:
+        return None
+    cleaned = raw_model.strip()
+    if not cleaned:
+        return None
+    for pattern, family in _CPU_FAMILY_PATTERNS:
+        if pattern.search(cleaned):
+            return family
+    return "unknown"
 
 
 class CompanionPrivacyError(Exception):
@@ -209,6 +278,10 @@ def _public_companion_bytes(
 
 # Status values that are considered passing for the query timing status field.
 _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
+# Allowed run_type values for query execution rows ingested into query_executions.
+# Narrows the ingest filter to execution timings only (measurement + warmup),
+# explicitly excluding metadata and summary pseudo-rows.
+_ALLOWED_EXECUTION_RUN_TYPES: frozenset[str] = frozenset({"measurement", "warmup"})
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 _COST_SCOPES: frozenset[str] = frozenset({"compute_only", "compute_plus_storage"})
 _COST_STATUSES: frozenset[str] = frozenset({"normalized", "not_applicable_local", "unavailable"})
@@ -237,7 +310,7 @@ def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
 
 def _ensure_explorer_input_schema(data: dict[str, Any]) -> None:
     """Reject unsupported bundles before explorer field projection starts."""
-    decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(data.get("version"))
+    decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not decision.accepted:
         raise ValueError(decision.error_message())
 
@@ -247,19 +320,74 @@ def _sha256_prefix(raw: bytes, length: int = 8) -> str:
     return hashlib.sha256(raw).hexdigest()[:length]
 
 
-def _run_date_from_timestamp(timestamp: str) -> str:
-    """Extract YYYYMMDD from an ISO timestamp string."""
-    # Timestamp may be "2026-01-15T12:00:00" or "2026-01-15T12:00:00.123456"
-    date_part = timestamp[:10]  # "YYYY-MM-DD"
-    return date_part.replace("-", "")
+def _utc_run_date_from_timestamp(timestamp: object) -> str:
+    """Return the strict UTC calendar date for a bundle ``run.timestamp``.
+
+    ``YYYY-MM-DD`` is already an explicit UTC calendar date. Complete ISO
+    timestamps with ``Z`` or an offset are converted to UTC; complete legacy
+    timestamps without an offset are interpreted as UTC. Invalid, partial,
+    and trailing forms fail ingestion rather than being silently tokenized.
+    """
+    if not isinstance(timestamp, str):
+        raise ValueError(f"run.timestamp must be a string, got {timestamp!r}")
+    if _DATE_RE.fullmatch(timestamp):
+        try:
+            return _dt.date.fromisoformat(timestamp).isoformat()
+        except ValueError as exc:
+            raise ValueError(f"invalid run.timestamp: {timestamp!r}") from exc
+    if not _TIMESTAMP_RE.fullmatch(timestamp):
+        raise ValueError(f"invalid run.timestamp: {timestamp!r}")
+    try:
+        parsed = _dt.datetime.fromisoformat(f"{timestamp[:-1]}+00:00" if timestamp.endswith("Z") else timestamp)
+    except ValueError as exc:
+        raise ValueError(f"invalid run.timestamp: {timestamp!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=_UTC)
+    return parsed.astimezone(_UTC).date().isoformat()
+
+
+def _run_date_from_timestamp(timestamp: object) -> str:
+    """Return the stable source-date token used in public result IDs."""
+    _utc_run_date_from_timestamp(timestamp)
+    assert isinstance(timestamp, str)
+    return timestamp[:10].replace("-", "")
 
 
 def _driver_version(data: dict[str, Any]) -> str | None:
-    """Extract driver version from schema-v2 bundle, preferring actual over requested."""
+    """Extract the package version used to identify a DuckDB run.
+
+    DuckDB development wheels can report an internal engine build string from
+    ``SELECT version()`` that is unrelated to the wheel version (for example,
+    ``1.6.0.dev365`` reports ``2.0.0-alpha...``). The resolved package version
+    is the stable comparison identity; the raw bundle still retains the actual
+    engine string for auditability.
+    """
     execution = data.get("execution", {})
     if not isinstance(execution, dict):
-        return None
-    for key in ("driver_actual_version", "driver_resolved_version", "driver_requested_version"):
+        execution = {}
+    platform = data.get("platform", {})
+    is_duckdb = isinstance(platform, dict) and str(platform.get("name", "")).lower() == "duckdb"
+    if is_duckdb:
+        for key in (
+            "driver_version_resolved",
+            "driver_version_requested",
+            "driver_resolved_version",
+            "driver_requested_version",
+        ):
+            val = execution.get(key)
+            if val and isinstance(val, str):
+                return val
+        client_version = platform.get("client_version") if isinstance(platform, dict) else None
+        if client_version and isinstance(client_version, str) and client_version != "unknown":
+            return client_version
+    for key in (
+        "driver_version_actual",
+        "driver_version_resolved",
+        "driver_version_requested",
+        "driver_actual_version",
+        "driver_resolved_version",
+        "driver_requested_version",
+    ):
         val = execution.get(key)
         if val and isinstance(val, str):
             return val
@@ -506,32 +634,46 @@ def _tuning_validation_status(data: dict[str, Any]) -> str | None:
     return str(val) if val else None
 
 
-def _applied_receipt(bundle_path: Path) -> str | None:
-    """Ingest the per-statement introspection receipt from the applied companion.
+def _has_requested_tuning(bundle_data: dict[str, Any] | None) -> bool:
+    """Return True when the bundle carries a requested-tuning block of its own."""
+    if not isinstance(bundle_data, dict):
+        return False
+    platform = bundle_data.get("platform")
+    tuning = platform.get("tuning") if isinstance(platform, dict) else None
+    if not isinstance(tuning, dict):
+        return False
+    return bool(tuning.get("requested"))
 
-    The ``{stem}.applied.json`` companion sits next to the bundle (published
-    alongside it by ``benchbox.validation.bundle``). Its ``receipt`` sub-object
-    is the post-load introspection receipt that earns the ``applied_verified``
-    state: platform, corroboration verdict, summary, and one entry per applied
-    statement. It is taken **verbatim** and re-serialized canonically
-    (``sort_keys``, compact separators) so the stored string is deterministic;
-    nothing here is recomputed or derived, and the explorer renders it read-only.
 
-    ``None`` whenever the receipt is not available -- companion absent (the
-    common case: introspection did not run, or a legacy bundle), unreadable,
-    malformed JSON, not a JSON object, or carrying no ``receipt`` key. A broken
-    companion must never fail the build, so every failure degrades to ``None``.
-    Inputs beyond the public submission caps are the exception: already-published
-    legacy data is bounded defensively and stored with an explicit truncation
-    marker rather than being silently dropped.
+def _inline_applied_receipt(bundle_data: dict[str, Any] | None) -> Any:
+    """Return the receipt carried inside the bundle, or None when it has none."""
+    if not isinstance(bundle_data, dict):
+        return None
+    platform = bundle_data.get("platform")
+    tuning = platform.get("tuning") if isinstance(platform, dict) else None
+    applied = tuning.get("applied") if isinstance(tuning, dict) else None
+    if not isinstance(applied, dict):
+        return None
+    return applied.get("receipt")
+
+
+def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
+    """Return the receipt from a retired ``{stem}.applied.json`` companion.
+
+    Only bundles published before the ledger moved into ``platform.tuning``
+    still have one. Returns ``(value, already_serialized)``. The flag is what
+    distinguishes the byte-cap truncation marker, which this function serializes
+    itself so an oversized companion is never read into memory, from a receipt
+    that merely happens to be a JSON string -- an unexpected shape the caller
+    must redact rather than store verbatim.
     """
     companion = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
     try:
         companion_size = companion.stat().st_size
     except (OSError, ValueError):
-        return None
+        return None, False
     if companion_size > APPLIED_COMPANION_MAX_BYTES:
-        return json.dumps(
+        marker = json.dumps(
             {
                 "entries": [],
                 "original_byte_count": companion_size,
@@ -541,13 +683,74 @@ def _applied_receipt(bundle_path: Path) -> str | None:
             sort_keys=True,
             separators=(",", ":"),
         )
+        return marker, True
     try:
         payload = json.loads(companion.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return None
+        return None, False
     if not isinstance(payload, dict):
-        return None
-    receipt = payload.get("receipt")
+        return None, False
+    return payload.get("receipt"), False
+
+
+def _override_display(bundle_path: Path) -> dict[str, Any]:
+    """Accepted plausibility overrides for badge display.
+
+    Reads the ``{stem}.override.json`` companion and returns the accepted
+    rule ids plus the audit fields (evidence link, approver, expiry).
+    Anything invalid, expired, or unreadable yields empty values — the
+    submission validator (not the explorer) owns refusal, so display
+    never invents an override and never shows a rejected one. Empty
+    values also cover the common case: no companion, no override.
+    """
+    empty: dict[str, Any] = {
+        "override_rules": [],
+        "override_evidence": None,
+        "override_approver": None,
+        "override_expires": None,
+    }
+    accepted, _errors = accepted_override_rules(bundle_path)
+    if not accepted:
+        return empty
+    try:
+        payload = json.loads(bundle_path.with_name(f"{bundle_path.stem}{OVERRIDE_SUFFIX}").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return empty
+    if not isinstance(payload, dict):
+        return empty
+    return {
+        "override_rules": sorted(accepted),
+        "override_evidence": payload.get("evidence") if isinstance(payload.get("evidence"), str) else None,
+        "override_approver": payload.get("approver") if isinstance(payload.get("approver"), str) else None,
+        "override_expires": payload.get("expires") if isinstance(payload.get("expires"), str) else None,
+    }
+
+
+def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = None) -> str | None:
+    """Ingest the per-statement introspection receipt for a run.
+
+    The receipt is the post-load introspection record that earns the
+    ``applied_verified`` state: platform, corroboration verdict, summary, and one
+    entry per applied statement. It rides in the bundle at
+    ``platform.tuning.applied.receipt``. Bundles published before that block
+    existed carry it in a ``{stem}.applied.json`` companion instead, which is
+    still read when the bundle has none. It is taken **verbatim** and
+    re-serialized canonically (``sort_keys``, compact separators) so the stored
+    string is deterministic; nothing here is recomputed or derived, and the
+    explorer renders it read-only.
+
+    ``None`` whenever no receipt is available -- the common case, where
+    introspection did not run -- or when the source is unreadable, malformed, or
+    carries no ``receipt``. A broken input must never fail the build, so every
+    failure degrades to ``None``. Inputs beyond the public submission caps are
+    the exception: already-published legacy data is bounded defensively and
+    stored with an explicit truncation marker rather than being silently dropped.
+    """
+    receipt = _inline_applied_receipt(bundle_data)
+    if receipt is None:
+        receipt, already_serialized = _companion_applied_receipt(bundle_path)
+        if already_serialized:
+            return receipt
     if receipt is None:
         return None
     if isinstance(receipt, dict) and isinstance(receipt.get("entries"), list):
@@ -837,6 +1040,11 @@ def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
         return "local"
     if deployment_key == "embedded" or endpoint_key in {"embedded_process", "localhost_port"}:
         return "local"
+    if endpoint_key == "remote_host":
+        # Self-hosted remote server: not local, but no cloud region either.
+        # The compare view expects this vocabulary ("remote"); without it
+        # remote self-hosted runs render as "Local".
+        return "remote"
     if runtime_key == "unknown" or deployment_key == "unknown" or endpoint_key == "unknown":
         return "unavailable"
     if runtime_key or deployment_key or endpoint_key:
@@ -991,7 +1199,8 @@ def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> Per
 def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
     """Extract per-query timings from the queries list in a schema-v2 bundle.
 
-    Includes measurement-run-type queries (or those without a run_type).
+    Includes measurement and warmup execution queries (or those without a run_type).
+    Explicitly filters out non-execution pseudo-rows (metadata, summary).
     Preserves run_type, iter, and stream fields for provenance.
     """
     raw_queries: list[dict[str, Any]] = data.get("queries", [])
@@ -1000,7 +1209,11 @@ def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
         if not isinstance(q, dict):
             continue
         run_type = q.get("run_type")
-        if run_type is not None and run_type != "measurement":
+        # Ingest both measurement and warmup executions. Narrow the filter to an
+        # explicit allow-list; do not remove the check entirely, because the corpus
+        # carries "metadata" and "summary" pseudo-rows (ms=0, status=SKIPPED) that
+        # are not execution timings.
+        if run_type is not None and run_type not in _ALLOWED_EXECUTION_RUN_TYPES:
             continue
         query_id = q.get("id") or q.get("query_id", "")
         ms_raw = q.get("ms")
@@ -1036,8 +1249,9 @@ def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, i
 
     Algorithm:
       1. Filter to passing (status == "pass") rows.
-      2. Prefer run_type == "measurement" rows; fall back to all passing rows
-         when no passing row has run_type == "measurement".
+      2. Prefer run_type == "measurement" rows; fall back to unlabelled legacy rows
+         (run_type is None) when no explicit measurement rows exist. Warmup rows
+         (run_type == "warmup") are NEVER used for display_ms or sample_count.
       3. Return (median duration_ms, sample_count).
       4. Return (None, 0) when no passing rows exist.
 
@@ -1048,7 +1262,15 @@ def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, i
     if not passing:
         return None, 0
     measurement = [t for t in passing if t.run_type == "measurement"]
-    candidates = measurement if measurement else passing
+    # DECISION: Fall back to unlabelled legacy rows (run_type is None) only when
+    # no explicit measurement rows exist. Warmup rows (run_type == "warmup")
+    # must NEVER be picked up by the fallback branch; doing so would let warmup
+    # rows feed display_ms for bundles that recorded warmup without measurement
+    # or whose measurement executions failed.
+    legacy_unlabelled = [t for t in passing if t.run_type is None]
+    candidates = measurement if measurement else legacy_unlabelled
+    if not candidates:
+        return None, 0
     durations = sorted(t.duration_ms for t in candidates)
     mid = len(durations) // 2
     if len(durations) % 2 == 1:
@@ -1066,6 +1288,59 @@ def _build_display_timings(timings: list[QueryTiming]) -> list[QueryDisplayTimin
         display_ms, sample_count = _query_display_ms(qid_timings)
         result.append(QueryDisplayTiming(query_id=qid, display_ms=display_ms, sample_count=sample_count))
     return result
+
+
+def _compute_basis_availability(queries: list[QueryTiming]) -> BasisAvailability:
+    """Derive basis availability from query timings for a result bundle.
+
+    Surfaces whether warmup exists, measurement pass count, available bases,
+    and per-query pass count where it varies.
+    """
+    warmup_passing = [q for q in queries if q.run_type == "warmup" and q.status == "pass"]
+    has_warmup = len(warmup_passing) > 0
+    warmup_status = "available" if has_warmup else "no_warmup_recorded"
+
+    # Pre-initialize every attempted measurement query with 0 so completely failed queries
+    # are not silently dropped from varying_pass_queries
+    measurement_queries = [q for q in queries if q.run_type == "measurement" or q.run_type is None]
+    query_pass_counts: dict[str, int] = {q.query_id: 0 for q in measurement_queries}
+    for q in measurement_queries:
+        if q.status == "pass":
+            query_pass_counts[q.query_id] += 1
+
+    if query_pass_counts:
+        counts = list(query_pass_counts.values())
+        count_freq = Counter(counts)
+        nominal_count = sorted(count_freq.items(), key=lambda x: (x[1], x[0]), reverse=True)[0][0]
+        varying_pass_queries = {qid: cnt for qid, cnt in sorted(query_pass_counts.items()) if cnt != nominal_count}
+    else:
+        nominal_count = 0
+        varying_pass_queries = {}
+
+    available_bases: list[str] = ["default"]
+    unavailable_bases: dict[str, str] = {}
+
+    if has_warmup:
+        available_bases.append("warmup")
+    else:
+        unavailable_bases["warmup"] = "no_warmup_recorded"
+
+    if nominal_count > 0:
+        available_bases.append("all_warm")
+        for p in range(1, nominal_count + 1):
+            available_bases.append(f"warm_pass_{p}")
+    else:
+        unavailable_bases["all_warm"] = "no_measurement_executions"
+
+    return BasisAvailability(
+        has_warmup=has_warmup,
+        measurement_pass_count=nominal_count,
+        warmup_status=warmup_status,
+        available_bases=available_bases,
+        unavailable_bases=unavailable_bases,
+        query_pass_counts=query_pass_counts,
+        varying_pass_queries=varying_pass_queries,
+    )
 
 
 def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | None:
@@ -1201,7 +1476,7 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         platform = str(bundle_data.get("platform", {}).get("name", "unknown")).lower().replace(" ", "-")
         scale_factor = bundle_data.get("benchmark", {}).get("scale_factor", 0.0)
-        timestamp = bundle_data.get("run", {}).get("timestamp", "19700101T000000")
+        timestamp = bundle_data.get("run", {}).get("timestamp")
         run_date = _run_date_from_timestamp(timestamp)
         sha_prefix = _sha256_prefix(file_raw)
         return f"{benchmark}-{platform}-sf{scale_factor}-{run_date}-{sha_prefix}"
@@ -1223,8 +1498,8 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
         platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
-        run_date = timestamp[:10]
+        timestamp = bundle_data.get("run", {}).get("timestamp")
+        run_date = _utc_run_date_from_timestamp(timestamp)
         total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
         total_duration_s = float(total_duration_ms) / 1000.0
 
@@ -1243,6 +1518,7 @@ class BundleTransformer:
             bundle_data,
             normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle_data) is not None else None,
         )
+        override = _override_display(bundle_path)
         entry = ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -1273,7 +1549,11 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path),
+            applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            override_rules=override["override_rules"],
+            override_evidence=override["override_evidence"],
+            override_approver=override["override_approver"],
+            override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1286,6 +1566,7 @@ class BundleTransformer:
             instance_or_warehouse=environment_facets["instance_or_warehouse"],
             storage_format=environment_facets["storage_format"],
             compliance_class=_compliance_class(bundle_data),
+            basis_availability=_compute_basis_availability(timings),
         )
         return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
 
@@ -1306,19 +1587,65 @@ class BundleTransformer:
         benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
         scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
         platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp", "1970-01-01T00:00:00")
-        run_date = timestamp[:10]
+        timestamp = bundle_data.get("run", {}).get("timestamp")
+        run_date = _utc_run_date_from_timestamp(timestamp)
         total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
         total_duration_s = float(total_duration_ms) / 1000.0
 
         environment: dict[str, Any] = {}
         if isinstance(bundle_data.get("environment"), dict):
-            environment = bundle_data["environment"]
+            environment = dict(bundle_data["environment"])
+            raw_cpu = environment.get("cpu_model")
+            cleaned_cpu = raw_cpu.strip() if isinstance(raw_cpu, str) else None
+            if cleaned_cpu:
+                environment["cpu_model"] = cleaned_cpu
+                environment["cpu_family"] = normalize_cpu_family(cleaned_cpu)
+            else:
+                environment["cpu_model"] = None
+                environment["cpu_family"] = None
 
-        # Detect companion files relative to bundle
+        # Producer shape (benchbox/platforms/base/adapter.py): the bundle
+        # carries client_link:{collection_status, client_region,
+        # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
+        # exactly that shape: earlier flattened fallbacks matched no
+        # producer and silently projected NULLs.
+        client_link = environment.get("client_link") if isinstance(environment.get("client_link"), dict) else {}
+        overhead = client_link.get("statement_overhead_ms")
+        overhead = overhead if isinstance(overhead, dict) else {}
+        client_region = client_link.get("client_region")
+        client_cloud = client_link.get("client_cloud")
+        link_status = client_link.get("collection_status")
+        stmt_min = overhead.get("min")
+        stmt_med = overhead.get("median")
+
+        def _to_finite_float_or_none(v: Any) -> float | None:
+            if v is None:
+                return None
+            try:
+                val = float(v)
+                return val if math.isfinite(val) else None
+            except (ValueError, TypeError):
+                return None
+
+        environment["client_region"] = (
+            str(client_region).strip() if client_region is not None and str(client_region).strip() else None
+        )
+        environment["client_cloud"] = (
+            str(client_cloud).strip() if client_cloud is not None and str(client_cloud).strip() else None
+        )
+        environment["link_status"] = (
+            str(link_status).strip() if link_status is not None and str(link_status).strip() else None
+        )
+        environment["statement_overhead_min_ms"] = _to_finite_float_or_none(stmt_min)
+        environment["statement_overhead_median_ms"] = _to_finite_float_or_none(stmt_med)
+
+        # Plans are still a companion file; the requested tuning is not. It rides
+        # in `platform.tuning.requested`, with a retired `{stem}.tuning.json`
+        # companion recognized for bundles published before the move.
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
-        has_tuning = bundle_path.with_name(f"{stem}.tuning.json").exists()
+        has_tuning = _has_requested_tuning(bundle_data) or bundle_path.with_name(f"{stem}.tuning.json").exists()
+        override = _override_display(bundle_path)
 
         timings = _query_timings(bundle_data)
         display_timings = _build_display_timings(timings)
@@ -1360,7 +1687,11 @@ class BundleTransformer:
             requested_config_hash=_requested_config_hash(bundle_data),
             applied_ledger_hash=_applied_ledger_hash(bundle_data),
             tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path),
+            applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            override_rules=override["override_rules"],
+            override_evidence=override["override_evidence"],
+            override_approver=override["override_approver"],
+            override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle_data),
             test_type=_test_type(bundle_data),
             validation_status=_validation_status(bundle_data),
@@ -1371,6 +1702,7 @@ class BundleTransformer:
             phase_durations=_phase_durations(bundle_data),
             physical_mechanisms=_physical_mechanisms(bundle_data),
             physical_rendering_id=_physical_rendering_id(bundle_data),
+            basis_availability=_compute_basis_availability(timings),
         )
         manifest_peer = ManifestEntry(
             result_id=result_id,

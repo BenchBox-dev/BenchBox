@@ -19,11 +19,10 @@ describe("GroupedQueryChart", () => {
     );
 
     const rects = Array.from(container.querySelectorAll("rect"));
-    const dashed = rects.find(
-      (rect) =>
-        rect.getAttribute("stroke-dasharray") !== null ||
-        rect.getAttribute("strokeDasharray") !== null,
-    );
+    // SVG attribute names are case-sensitive, and Preact forwards an unknown
+    // camelCase prop to setAttribute verbatim: `strokeDasharray` reaches the
+    // DOM as a name the renderer ignores, so the dash never appears.
+    const dashed = rects.find((rect) => rect.getAttribute("stroke-dasharray") !== null);
     expect(dashed).toBeTruthy();
     expect(dashed?.getAttribute("fill")).toBe("none");
     expect(dashed?.getAttribute("height")).toBe("6");

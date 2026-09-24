@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, within } from "@testing-library/preact";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MetaLeaderboard } from "@/components/MetaLeaderboard";
 import type { MetaLeaderboard as MetaLeaderboardData } from "@/types";
@@ -118,10 +118,10 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText(/Heat: darker = a worse rank within each ranking/)).toBeTruthy();
 
     rerender(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
-    const legend = screen.getByText(/Heat: darker = farther from the ranking best/);
-    expect(legend.textContent).toContain("ranking best (1.00x)");
-    expect(legend.textContent).toContain("Values below 1.00x are worse than the ranking best");
-    expect(legend.textContent).not.toContain("≥1.00x");
+    const legend = screen.getByText(/Heat: darker = farther from the best result/);
+    expect(legend.textContent).toContain("best result (1.00×)");
+    expect(legend.textContent).toContain("Values below 1.00× are worse");
+    expect(legend.textContent).not.toContain("≥1.00×");
   });
 
   it("formats large power scores for scanning while preserving the exact value in titles", () => {
@@ -184,7 +184,7 @@ describe("MetaLeaderboard", () => {
     const onModeChange = vi.fn();
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={onModeChange} />);
 
-    fireEvent.click(screen.getByRole("radio", { name: "Speedup" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Relative to best" }));
     expect(onModeChange).toHaveBeenCalledWith("speedup");
   });
 
@@ -195,7 +195,7 @@ describe("MetaLeaderboard", () => {
         mode="times"
         onModeChange={vi.fn()}
         resultMetadataById={new Map([
-          ["r1", { trust_label: "maintainer-run", validation_status: "exact" }],
+          ["r1", { trust_label: "maintainer-run", validation_status: "exact", run_date: "2026-04-01" }],
           ["r2", { trust_label: "community-submission", validation_status: "loose" }],
         ])}
       />,
@@ -207,6 +207,15 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Community")).toBeTruthy();
     expect(screen.getByText("exact")).toBeTruthy();
     expect(screen.getByText("loose")).toBeTruthy();
+    expect(screen.getAllByRole("gridcell", { name: /Run age:/ })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /Run date .*ago/ })).toBeTruthy();
+    const dateControl = screen.getByRole("button", { name: /Run date .*ago/ });
+    for (const key of ["Enter", " ", "ArrowRight"]) {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      dateControl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(routeMock).not.toHaveBeenCalled();
   });
 
   it("shows coverage counts and can sort by covered ranking count", () => {
@@ -347,11 +356,9 @@ describe("MetaLeaderboard", () => {
       screen.getByRole("columnheader", { name: /ClickBench SF0\.1/ }),
       screen.getByRole("columnheader", { name: /TPC-H SF1 throughput/ }),
     ];
-    for (const header of headers) {
-      expect(header.textContent).toContain("Speedup vs best · 1.00x is best; lower is worse");
-    }
-    expect(headers[0]!.textContent).toContain("Native: Geomean latency, lower is better");
-    expect(headers[1]!.textContent).toContain("Native: Power score, higher is better");
+    expect(headers[0]!.textContent).toContain("power · Geomean latency · lower is better");
+    expect(headers[1]!.textContent).toContain("power · Power score · higher is better");
+    expect(screen.getByText(/Values below 1\.00× are worse/)).toBeTruthy();
     expect(screen.getByText("Native: 10 ms")).toBeTruthy();
     expect(screen.getByText("Native: 2,500")).toBeTruthy();
   });
@@ -367,7 +374,7 @@ describe("MetaLeaderboard", () => {
   it("speedup mode visibly explains below-1.00x values", () => {
     render(<MetaLeaderboard data={DATA} mode="speedup" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText(/Values below 1\.00x are worse than the ranking best/)).toBeTruthy();
+    expect(screen.getByText(/Values below 1\.00× are worse/)).toBeTruthy();
     expect(screen.getByText("0.50x")).toBeTruthy();
   });
 
@@ -535,8 +542,8 @@ describe("MetaLeaderboard", () => {
 
     const { container } = render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
 
-    expect(screen.getByText("Showing 200 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
-    expect(container.querySelectorAll("tbody tr")).toHaveLength(200);
+    expect(screen.getByText("Showing 25 of 205 ranked-scope platforms across 1 leaderboard ranking")).toBeTruthy();
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(25);
     expect(screen.queryByText("Platform 204")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more platforms" }));
@@ -662,7 +669,7 @@ describe("MetaLeaderboard", () => {
         mode="times"
         onModeChange={vi.fn()}
         resultMetadataById={new Map([
-          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "passed" }],
+          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "passed", run_date: "2026-04-01" }],
         ])}
       />,
     );
@@ -673,10 +680,11 @@ describe("MetaLeaderboard", () => {
       }),
     );
     const cell = screen.getByRole("gridcell", {
-      name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Trust policy excludes this result from ranking\./,
+        name: /Polars has published evidence for TPC-H SF0\.1, but it is excluded: Results from this source are not included in rankings\./,
     });
-    expect(cell.textContent).toBe("Excluded");
-    expect(cell.getAttribute("title")).toContain("Trust policy excludes this result from ranking.");
+    expect(cell.textContent).toContain("Excluded");
+    expect(within(cell).getByRole("button", { name: /Run date .*ago/ })).toBeTruthy();
+    expect(cell.getAttribute("title")).toContain("Results from this source are not included in rankings.");
     expect(cell.textContent).not.toContain("No run");
     expect((cell.querySelector("a") as HTMLAnchorElement | null)?.getAttribute("href")).toBe(
       "/results/r/polars-tpch-r1#run-receipt",
@@ -698,14 +706,79 @@ describe("MetaLeaderboard", () => {
       />,
     );
 
-    const failedCell = screen.getByRole("gridcell", { name: "DuckDB times for ClickBench SF0.1: 10 ms" });
+    const failedCell = screen.getByRole("gridcell", { name: /DuckDB times for ClickBench SF0\.1: 10 ms/ });
     const failedBadge = failedCell.querySelector('[data-role="validation"]');
     expect(failedBadge?.textContent).toBe("failed");
     expect(failedBadge?.getAttribute("data-tone")).toBe("danger");
+    expect(failedCell.textContent).toContain("Not recorded");
 
-    const passedCell = screen.getByRole("gridcell", { name: "SQLite times for ClickBench SF0.1: 20 ms" });
+    const passedCell = screen.getByRole("gridcell", { name: /SQLite times for ClickBench SF0\.1: 20 ms/ });
     expect(passedCell.querySelector('[data-role="validation"]')).toBeNull();
     expect(passedCell.textContent).toContain("Community");
+  });
+
+  it("shows a validation badge for an unranked not_run result (non-clean status excluded from ranking)", () => {
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [
+        {
+          ...DATA.cohorts[0]!,
+          key: "tpch-sf0.1-power",
+          benchmark: "tpch",
+          label: "TPC-H SF0.1",
+          href: "/results/tpch/",
+          primary_metric: "power_score",
+          primary_order: "desc" as const,
+          platforms: [
+            {
+              platform_id: "polars",
+              platform: "Polars",
+              result_id: "polars-tpch-r1",
+              rank: null,
+              metric_value: null,
+              speedup_vs_best: null,
+              primary_metric: "power_score",
+              primary_order: "desc" as const,
+              ...META_TIMING_ELIGIBLE,
+              ranking_exclusion_reason: "validation_not_clean",
+            },
+          ],
+        },
+      ],
+      platforms: [
+        {
+          platform_id: "polars",
+          platform: "Polars",
+          ranks: {},
+          avg_rank: null,
+          n_cohorts: 0,
+        },
+      ],
+    };
+    render(
+      <MetaLeaderboard
+        data={data}
+        mode="times"
+        onModeChange={vi.fn()}
+        resultMetadataById={new Map([
+          ["polars-tpch-r1", { trust_label: "community-submission", validation_status: "not_run" }],
+        ])}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "1 more platform has published results but nothing ranked — Show them",
+      }),
+    );
+    const cell = screen.getByRole("gridcell", { name: /Polars has published evidence for TPC-H SF0\.1/ });
+    // Unranked (never a "ranked" cellState), so trust/funding stay hidden here -
+    // but the validation badge, the one signal that flags a non-clean result,
+    // must still surface.
+    expect(cell.querySelector('[data-role="trust"]')).toBeNull();
+    const badge = cell.querySelector('[data-role="validation"]');
+    expect(badge?.textContent).toBe("no validation");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
   });
 
   it("explains an all-excluded ranking and preserves distinct exclusion reasons", () => {
@@ -757,7 +830,7 @@ describe("MetaLeaderboard", () => {
 
     const state = screen.getByTestId("all-excluded-ranking-clickbench-sf0.1-power");
     expect(state).toHaveTextContent("No ranked evidence");
-    expect(state).toHaveTextContent("Trust policy excludes this result from ranking.");
+    expect(state).toHaveTextContent("Results from this source are not included in rankings.");
     expect(state).toHaveTextContent("Result does not have enough valid query coverage.");
     expect(state).toHaveTextContent("Open ranking for details.");
     expect(screen.queryAllByRole("gridcell")).toHaveLength(0);
@@ -769,7 +842,7 @@ describe("MetaLeaderboard", () => {
     );
     const cells = screen.getAllByRole("gridcell");
     expect(cells).toHaveLength(2);
-    expect(cells[0]!.getAttribute("aria-label")).toContain("Trust policy excludes this result from ranking.");
+    expect(cells[0]!.getAttribute("aria-label")).toContain("Results from this source are not included in rankings.");
     expect(cells[1]!.getAttribute("aria-label")).toContain("Result does not have enough valid query coverage.");
   });
 

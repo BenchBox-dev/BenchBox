@@ -45,15 +45,11 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
-
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
 
 _UPPER_BOUND_RE = re.compile(r"<\s*(\d+(?:\.\d+)*)")
 _REPO_ROOT = Path(__file__).resolve().parent.parent

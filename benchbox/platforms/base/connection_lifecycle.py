@@ -196,7 +196,7 @@ class ConnectionLifecycleMixin:
         """
         self.log_operation_start("Database validation", "Checking existing database compatibility")
 
-        if self.dry_run:
+        if self.dry_run or getattr(self, "dry_run_mode", False):
             self.log_verbose("Database validation skipped (dry run mode)")
             return
 

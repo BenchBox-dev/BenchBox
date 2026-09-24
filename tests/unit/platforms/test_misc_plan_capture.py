@@ -396,3 +396,44 @@ class TestVeloxWiring:
         result = adapter.execute_query(_FakeSpark(), "SELECT 1", "q3", validate_row_count=False)
         assert result["status"] == "SUCCESS"
         assert "query_plan" not in result or result.get("query_plan") is None
+
+
+# ---------------------------------------------------------------------------
+# Error-channel cleanup: EXPLAIN failures return None (explain_failed)
+# ---------------------------------------------------------------------------
+
+
+class TestErrorChannelCleanup:
+    """EXPLAIN failures must surface as None so capture records explain_failed.
+
+    Returning an error string would bypass the falsy check in
+    ``capture_query_plan`` and be handed to the parser, misclassifying a
+    database EXPLAIN failure as a parse_error.
+    """
+
+    def test_questdb_failure_records_explain_failed(self):
+        adapter = _make_questdb()
+        conn = MagicMock()
+        conn.cursor.return_value.execute.side_effect = Exception("EXPLAIN boom")
+        assert adapter.get_query_plan(conn, "SELECT 1") is None
+        plan, _ = adapter.capture_query_plan(conn, "SELECT 1", "q-err-qdb")
+        assert plan is None
+        assert adapter.plan_capture_errors[-1]["reason"] == "explain_failed"
+
+    def test_doris_failure_records_explain_failed(self):
+        adapter = _make_doris()
+        conn = MagicMock()
+        conn.cursor.return_value.execute.side_effect = Exception("EXPLAIN boom")
+        assert adapter.get_query_plan(conn, "SELECT 1") is None
+        plan, _ = adapter.capture_query_plan(conn, "SELECT 1", "q-err-doris")
+        assert plan is None
+        assert adapter.plan_capture_errors[-1]["reason"] == "explain_failed"
+
+    def test_singlestore_failure_records_explain_failed(self, monkeypatch):
+        adapter = _make_singlestore(monkeypatch)
+        conn = MagicMock()
+        conn.cursor.return_value.execute.side_effect = Exception("EXPLAIN boom")
+        assert adapter.get_query_plan(conn, "SELECT 1") is None
+        plan, _ = adapter.capture_query_plan(conn, "SELECT 1", "q-err-ss")
+        assert plan is None
+        assert adapter.plan_capture_errors[-1]["reason"] == "explain_failed"

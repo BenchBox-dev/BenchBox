@@ -17,6 +17,7 @@ except ImportError:
     HAS_PSUTIL = False
 
 from benchbox.core.schemas import SystemProfile
+from benchbox.utils.environment import detect_cpu_info, is_cpu_architecture_token
 
 
 class SystemProfiler:
@@ -34,10 +35,28 @@ class SystemProfiler:
         cpu_cores_logical = os.cpu_count() or 1
         if HAS_PSUTIL:
             cpu_cores_physical = psutil.cpu_count(logical=False) or cpu_cores_logical
-            cpu_model = self._get_cpu_model()
         else:
             cpu_cores_physical = cpu_cores_logical
-            cpu_model = f"{architecture} CPU"
+
+        # Two-stage provenance mirroring benchbox/utils/system_info.get_system_info:
+        # detect_cpu_info() is "measured" (real brand string via sysctl, /proc,
+        # or Windows CIM hardware inventory);
+        # the platform.processor() fallback is "inferred" (often the architecture
+        # or a less reliable brand string). Absence stays None so downstream
+        # surfaces never mistake an architecture token for identity.
+        cpu_model = self._get_cpu_model()
+        if cpu_model:
+            cpu_identity_provenance: str | None = "measured"
+        else:
+            cpu_identity_provenance = None
+            try:
+                fallback = platform.processor() or ""
+                cleaned = fallback.strip()
+                if cleaned and not is_cpu_architecture_token(cleaned, architecture):
+                    cpu_model = cleaned
+                    cpu_identity_provenance = "inferred"
+            except Exception:
+                pass
 
         # Memory info
         if HAS_PSUTIL:
@@ -60,6 +79,7 @@ class SystemProfiler:
             os_version=os_version,
             architecture=architecture,
             cpu_model=cpu_model,
+            cpu_identity_provenance=cpu_identity_provenance,
             cpu_cores_physical=cpu_cores_physical,
             cpu_cores_logical=cpu_cores_logical,
             memory_total_gb=memory_total_gb,
@@ -70,31 +90,16 @@ class SystemProfiler:
             hostname=platform.node(),
         )
 
-    def _get_cpu_model(self) -> str:
-        """Get CPU model name."""
-        if platform.system() == "Darwin":
-            try:
-                import subprocess
-
-                result = subprocess.run(
-                    ["sysctl", "-n", "machdep.cpu.brand_string"],
-                    capture_output=True,
-                    text=True,
-                )
-                return result.stdout.strip() if result.returncode == 0 else "Unknown CPU"
-            except Exception:
-                return f"{platform.machine()} CPU"
-        elif platform.system() == "Linux":
-            try:
-                with open("/proc/cpuinfo", encoding="utf-8") as f:
-                    for line in f:
-                        if line.startswith("model name"):
-                            return line.split(":", 1)[1].strip()
-            except Exception:
-                pass
-            return f"{platform.machine()} CPU"
-        else:
-            return f"{platform.machine()} CPU"
+    def _get_cpu_model(self) -> str | None:
+        """Get a measured CPU model name, or ``None`` when detection fails."""
+        try:
+            model, _vendor = detect_cpu_info()
+        except Exception:
+            return None
+        normalized = model.strip() if model else ""
+        if not normalized or is_cpu_architecture_token(normalized, platform.machine()):
+            return None
+        return normalized
 
 
 def recommend_max_scale_factor(available_bytes: int) -> float:

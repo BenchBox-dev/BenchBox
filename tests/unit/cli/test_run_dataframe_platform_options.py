@@ -45,7 +45,6 @@ _DATAFRAME_OPTION_CASES = [
     ("datafusion-df", "target_partitions", "4", 4),
     ("polars-df", "streaming", "true", True),
     ("pandas-df", "dtype_backend", "pyarrow", "pyarrow"),
-    ("modin-df", "engine", "dask", "dask"),
     ("cudf-df", "device_id", "1", 1),
     ("dask-df", "n_workers", "8", 8),
     ("pyspark-df", "driver_memory", "8g", "8g"),

@@ -13,8 +13,10 @@
 
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
-import { formatLatencyMs, formatPowerScore } from "@/lib/metricFormatters";
+import { formatLatencyMs, formatPowerScore, formatLatencyAxisLabels } from "@/lib/metricFormatters";
+import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   resultDetailHref,
   resultIdentityAriaLabel,
@@ -22,6 +24,7 @@ import {
   visibleResultIdForRow,
 } from "@/lib/resultLinks";
 import { formatRunIdentityLabelsForCohort, type RunIdentitySource } from "@/lib/runIdentity";
+import { RunDateChip } from "@/components/RunAge";
 
 const LABEL_W = 58;
 const AXIS_H = 32;
@@ -60,7 +63,8 @@ interface Series {
 
 export function TimeSeries({ entries, primaryMetric }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize(320);
-  const w = Math.max(containerWidth, 320);
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
 
   const metric = primaryMetric ?? "display_geomean_ms";
   const higherIsBetter = metric === "power_score";
@@ -113,7 +117,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     const points: SeriesPoint[] = trendable.map((point, index) => {
       const identity = pointLabels[index]?.full ?? point.entry.platform;
       const metricValue = formatMetricValue(point.value, metric);
-      const title = `${identity}: ${point.entry.run_date} = ${metricValue}`;
+      const title = `${identity}: ${metricValue}`;
       return {
         resultId: point.entry.result_id,
         date: point.entry.run_date,
@@ -186,6 +190,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
+  const latencyLabels = formatLatencyAxisLabels(yTicks);
   const duplicateDayState =
     duplicateDayGroups.length > 0 ? (
       <DuplicateDayTrendState
@@ -202,21 +207,22 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   return (
     <div class={duplicateDayState ? "space-y-3" : undefined}>
       {duplicateDayState}
-      <div ref={containerRef} class="w-full overflow-x-auto">
+      <div ref={containerRef} class="w-full">
         <svg
           class="bb-chart-svg"
-          width={w}
+          width="100%"
           height={totalH}
+          viewBox={`0 0 ${w} ${totalH}`}
           role="img"
           aria-label={`${metricLabel} trend over time`}
         >
           {/* Y-axis grid + labels */}
-          {yTicks.map((val) => {
+          {yTicks.map((val, index) => {
             const y = yFor(val);
             const label =
               metric === "power_score"
                 ? formatPowerScore(val).valueText
-                : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
+                : latencyLabels[index];
             return (
               <g key={val}>
                 <line
@@ -225,12 +231,12 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
                   x2={w - PADDING_RIGHT}
                   y2={y}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
+                  stroke-width={1}
                 />
                 <text
                   x={LABEL_W - 4}
                   y={y + 4}
-                  textAnchor="end"
+                  text-anchor="end"
                   style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
                 >
                   {label}
@@ -249,7 +255,7 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             .join(" ");
           return (
             <g key={s.platformId}>
-              <path d={d} stroke={s.color} strokeWidth={2} fill="none" strokeLinejoin="round" />
+              <path d={d} stroke={s.color} stroke-width={2} fill="none" stroke-linejoin="round" />
               {s.points.map((p) => (
                 <circle
                   key={p.resultId}
@@ -270,18 +276,20 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
         {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
-          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" strokeWidth={1} />
+          <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {shownDates.map((date) => {
             const x = xFor(date);
             return (
               <g key={date}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
                 <text
                   x={x}
                   y={20}
-                  textAnchor="middle"
+                  text-anchor={axisLabelAnchor(x, w)}
+                  aria-label={formatRunDateWithAge(date)}
                   style={{ fontSize: "9px", fill: "var(--bb-chart-axis)" }}
                 >
+                  <title>{formatRunDateWithAge(date)}</title>
                   {date.slice(5)}
                 </text>
               </g>
@@ -358,7 +366,7 @@ function duplicateSameDayGroups(entries: ChartHistoricalEntry[], metric: Props["
           return {
             entry,
             value,
-            title: `${labels[index]?.full ?? entry.platform}: ${entry.run_date} = ${formatMetricValue(value, metric)}`,
+            title: `${labels[index]?.full ?? entry.platform}: ${formatMetricValue(value, metric)}`,
           };
         }),
       };
@@ -376,18 +384,16 @@ function DuplicateDayTrendState({
   observationCount: number;
 }) {
   const duplicateRunCount = groups.reduce((count, group) => count + group.runs.length, 0);
-  const duplicateRunLabel = duplicateRunCount === 1 ? "same-day run" : "same-day runs";
-  const observationLabel = observationCount === 1 ? "observation remains" : "observations remain";
-  const message =
-    `Trend line hidden: ${duplicateRunCount} ${duplicateRunLabel} in this ranking do not carry time-of-day ordering. ` +
-    `${observationCount} ${observationLabel} in the ranking; duplicate same-day runs are listed below.`;
   return (
-    <div
+    <details
       data-testid="time-series-duplicate-day"
       class="rounded-lg border border-dashed border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-3"
     >
-      <p class="text-sm text-[var(--bb-data-fg-muted)]">
-        {message}
+      <summary class="cursor-pointer text-sm font-medium text-[var(--bb-data-fg-primary)]">
+        {duplicateRunCount} same-day {duplicateRunCount === 1 ? "run cannot" : "runs cannot"} be ordered in this trend
+      </summary>
+      <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
+        These runs record a date but not a time, so the chart cannot place them in a reliable order. {observationCount} usable {observationCount === 1 ? "observation remains" : "observations remain"}.
       </p>
       <div class="mt-3 overflow-x-auto">
         <table class="min-w-max text-left text-xs">
@@ -405,7 +411,7 @@ function DuplicateDayTrendState({
             {groups.flatMap((group) =>
               group.runs.map(({ entry, value, title }) => (
                 <tr key={entry.result_id} data-result-id={entry.result_id} title={title}>
-                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]">{group.date}</td>
+                  <td class="pr-4 py-1 font-mono text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={group.date} /></td>
                   <td class="pr-4 py-1">{group.platform}</td>
                   <td class="pr-4 py-1 font-mono">Public ID {visibleResultIdForRow(entry)}</td>
                   <td class="pr-4 py-1 font-mono">{formatMetricValue(value, metric)}</td>
@@ -425,6 +431,6 @@ function DuplicateDayTrendState({
           </tbody>
         </table>
       </div>
-    </div>
+    </details>
   );
 }

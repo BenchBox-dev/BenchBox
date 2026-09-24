@@ -9,7 +9,7 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 operation=${1:-}
 
 usage() {
-  echo "Usage: $0 create|remove" >&2
+  echo "Usage: $0 create|remove|release|finish" >&2
   exit 1
 }
 
@@ -166,9 +166,36 @@ create_worktree() {
   [ ! -e "$worktree_path" ] && [ ! -L "$worktree_path" ] || die "Worktree path already exists: $worktree_path"
 
   git fetch origin develop --quiet
+  base_oid=$(git rev-parse origin/develop^{commit}) || die "Could not resolve fetched origin/develop"
   creation_started=yes
   git worktree add -b "$branch" "$worktree_path" origin/develop
+  # Hooks live in the common Git directory. Installation is owned by the
+  # primary clone; never rewrite the shared hook from this linked worktree.
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  set -- "$script_dir/worktree_lifecycle_metadata.py" init \
+    --worktree-path "$worktree_path" \
+    --branch "$branch" \
+    --base-ref "origin/develop" \
+    --base-oid "$base_oid"
+  if [ -n "${CONTROLLER_KIND:-}" ]; then
+    set -- "$@" --controller-kind "$CONTROLLER_KIND"
+  fi
+  if [ -n "${CONTROLLER_ID:-}" ]; then
+    set -- "$@" --controller-id "$CONTROLLER_ID"
+  fi
+
+  if command -v uv >/dev/null 2>&1; then
+    uv run --no-project -- python "$@"
+  else
+    python3 "$@"
+  fi
+
   creation_started=no
   release_creation_lock
   trap - EXIT HUP INT TERM
@@ -227,8 +254,53 @@ remove_worktree() {
   echo "Removed worktree: $target"
 }
 
+release_worktree() {
+  worktree_input=${WORKTREE_PATH:-}
+  [ -n "$worktree_input" ] || die "Usage: make worktree-release WORKTREE_PATH=<path>"
+
+  target=$(canonical_path "$worktree_input")
+  [ -d "$target" ] || die "Refusing: worktree directory does not exist: $target"
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  $py_runner "$script_dir/worktree_lifecycle_metadata.py" release --worktree-path "$target"
+}
+
+finish_worktree() {
+  worktree_input=${WORKTREE_PATH:-}
+  [ -n "$worktree_input" ] || die "Usage: make worktree-finish WORKTREE_PATH=<path> EXPECTED_HEAD_OID=<oid>"
+
+  oid_input=${EXPECTED_HEAD_OID:-}
+  [ -n "$oid_input" ] || die "Usage: make worktree-finish WORKTREE_PATH=<path> EXPECTED_HEAD_OID=<oid>"
+
+  primary_clone=$(dirname "$(git_common_dir)")
+  target=$(canonical_path "$worktree_input")
+
+  py_runner="python3"
+  if command -v uv >/dev/null 2>&1; then
+    py_runner="uv run --no-project -- python"
+  fi
+
+  format_args=""
+  if [ -n "${FORMAT:-}" ]; then
+    format_args="--format $FORMAT"
+  fi
+
+  # shellcheck disable=SC2086
+  $py_runner "$script_dir/worktree_finish.py" \
+    --repo-root "$primary_clone" \
+    --worktree-path "$target" \
+    --expected-head-oid "$oid_input" \
+    $format_args
+}
+
 case "$operation" in
   create) create_worktree ;;
   remove) remove_worktree ;;
+  release) release_worktree ;;
+  finish) finish_worktree ;;
   *) usage ;;
 esac

@@ -441,7 +441,7 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "local"
       ],
       "id": "duckdb",
-      "install_command": "uv add duckdb",
+      "install_command": "uv add 'duckdb>=1.5,<2'",
       "interfaces": [
         "sql"
       ],
@@ -641,18 +641,6 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "dataframe"
       ],
       "label": "LakeSail Sail"
-    },
-    {
-      "cost_class": "free",
-      "deployments": [
-        "local"
-      ],
-      "id": "modin",
-      "install_command": "uv add modin[ray]",
-      "interfaces": [
-        "dataframe"
-      ],
-      "label": "Modin"
     },
     {
       "cost_class": "paid_credits",

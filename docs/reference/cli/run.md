@@ -33,10 +33,11 @@ benchbox run [OPTIONS]
   - Use comma-separated list: `--phases generate,load,power`
   - **Warning:** Maintenance phase permanently modifies data; reload database before running power/throughput again
   - **Note:** the number of concurrent streams for the `throughput` phase is set
-    with `--concurrency N`, a hidden option listed by
-    `benchbox run --help-topic all`. The deprecated `run-official` command
-    spells the same setting `--streams` — see
-    [Deprecated: `run-official`](#deprecated-run-official) below.
+    with `--streams N` (an advanced option listed by
+    `benchbox run --help-topic all`; `--concurrency N` is accepted as an
+    alias). The deprecated `run-official` command also spells the setting
+    `--streams` — see [Deprecated: `run-official`](#deprecated-run-official)
+    below.
 - `--force [MODE]`: Force regeneration of data (modes: `all`, `datagen`, `upload`, or `datagen,upload`)
 - `--non-interactive`: Use defaults for all prompts (useful for automation)
 
@@ -89,6 +90,9 @@ benchbox run [OPTIONS]
   - `full`: All validation checks enabled (preflight, postgen, postload, platform check)
   - `preflight`, `postgen`, `postload`, `check-platforms`: Individual validation types
 - `--strict-translation`: Fail instead of falling back when SQL dialect translation cannot produce target SQL
+- `--client-region TEXT`: Attested client cloud region (e.g. `us-east-1`), recorded in `environment.client_link` with `source: "cli_option"`
+- `--client-cloud TEXT`: Attested client cloud provider (`aws`, `gcp`, `azure`)
+- `--no-link-probe`: Disable the post-benchmark statement overhead probe (6 metered `SELECT 1` statements on billable warehouses)
 
 **Platform-Specific Configuration:**
 - `--platform-option KEY=VALUE`: Platform-specific option (can be used multiple times)
@@ -414,10 +418,10 @@ benchbox run-official {tpch|tpcds} [OPTIONS]
 - `-v`, `--verbose`: Enable verbose logging
 - `--validate-results`: Enable result validation
 
-**Note:** plain `run` (including `run --official`) has no `--streams` flag, but
-it accepts `--concurrency N`, a hidden option that sets the same
-`BenchmarkConfig.concurrency` field. `run-official --streams N` is therefore
-equivalent to `run --concurrency N` — see the `throughput` phase note above.
+**Note:** plain `run` (including `run --official`) accepts `--streams N` (with
+`--concurrency N` as an alias), an advanced option that sets
+`BenchmarkConfig.concurrency`. `run-official --streams N` is therefore
+equivalent to `run --streams N` — see the `throughput` phase note above.
 
 ## Related
 

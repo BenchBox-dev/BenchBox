@@ -28,7 +28,27 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #     (`star_schema` -> `ssb`) and explicit `unknown` phase instead of guessing
 #     missing test_type as `power`. Existing snapshots must be rebuilt so their
 #     ranking and cohort tables cannot be queried under the new semantics.
-EXPLORER_READ_MODEL_VERSION = 7
+# v8: `query_executions` gained run_type/iter/stream and a new
+#     `result_basis_availability` table (#1947), and `result_environment` /
+#     `result_detail_metrics` gained cpu_model/cpu_family (#1948). All of them
+#     are selected unconditionally by the frontend, so a v7 snapshot would hit
+#     a DuckDB binder error -- or, for the new table, a missing-relation error
+#     -- instead of the intended rebuild message. #1947 added its columns
+#     under v7 without bumping; this bump covers both changes, so v8 means "has
+#     pass provenance AND CPU identity".
+# v9: result_environment/result_detail_metrics gained cpu_identity_provenance,
+#     which the detail receipt selects unconditionally.
+# v10: result_environment and result_detail_metrics gained client_region,
+#      client_cloud, statement_overhead_min_ms, statement_overhead_median_ms,
+#      and link_status.
+# v11: results and result_detail_metrics gained override_rules,
+#      override_evidence, override_approver, and override_expires (accepted
+#      plausibility-override badge data, stored verbatim from the
+#      {stem}.override.json companion and selected unconditionally by the
+#      detail projection). A v10 snapshot lacks the columns, so a v10
+#      snapshot would hit a DuckDB binder error instead of the intended
+#      rebuild message.
+EXPLORER_READ_MODEL_VERSION = 11
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,
     "newer_policy": "warn-and-continue",

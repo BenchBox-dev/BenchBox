@@ -179,7 +179,6 @@ Tests for DataFrame-based platforms:
 | Dask | Full TPC-H, dry-run |
 | PySpark | Full TPC-H (marked `slow`), dry-run |
 | cuDF | Full TPC-H (requires NVIDIA GPU) |
-| Modin | Full TPC-H execution |
 | DataFusion (DF) | Full TPC-H execution |
 | Cross-platform | Pandas vs Polars result comparison (Q1) |
 

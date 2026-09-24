@@ -13,6 +13,7 @@
 
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
 import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
@@ -41,7 +42,8 @@ type ScatterPoint = {
 
 export function CostScatter({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
 
   // Primary metric comes from the canonical DuckDB-persisted ranking row.
   // Fallback is safe: every result has a display_geomean_ms.
@@ -109,11 +111,12 @@ export function CostScatter({ summary }: Props) {
   const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
+    <div ref={containerRef} class="w-full">
       <svg
         class="bb-chart-svg"
-        width={w}
+        width="100%"
         height={totalH}
+        viewBox={`0 0 ${w} ${totalH}`}
         role="img"
         aria-label={`Normalized cost vs ${metricLabel} scatter plot (${modelDisclosure})`}
       >
@@ -134,12 +137,12 @@ export function CostScatter({ summary }: Props) {
                 x2={w - PADDING_RIGHT}
                 y2={y}
                 stroke="var(--bb-chart-grid-muted)"
-                strokeWidth={1}
+                stroke-width={1}
               />
               <text
                 x={AXIS_W - 4}
                 y={y + 4}
-                textAnchor="end"
+                text-anchor="end"
                 style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
               >
                 {label}
@@ -156,17 +159,19 @@ export function CostScatter({ summary }: Props) {
           const regionLabel = [p.provider, p.region].filter(Boolean).join(" ");
           return (
             <g key={p.result_id}>
-              <circle cx={cx} cy={cy} r={7} fill={p.color} fillOpacity={0.85}>
+              <circle cx={cx} cy={cy} r={7} fill={p.color} fill-opacity={0.85}>
                 <title>
                   {`${p.platform}: normalized ${formatUsd(p.cost).valueText} / ${
                     metric === "power_score" ? formatPowerScore(p.perf).valueText : formatLatencyMs(p.perf).valueText
                   } (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
                 </title>
               </circle>
+              {/* A point near either edge cannot carry a centred label: half of
+                  it would fall outside the drawing and be cropped. */}
               <text
                 x={cx}
                 y={cy - 11}
-                textAnchor="middle"
+                text-anchor={axisLabelAnchor(cx, w, 40)}
                 style={{ fontSize: "10px", fill: "var(--bb-chart-label)" }}
               >
                 {shortLabel}
@@ -182,7 +187,7 @@ export function CostScatter({ summary }: Props) {
           x2={AXIS_W}
           y2={PADDING_TOP + CHART_H}
           stroke="var(--bb-chart-grid)"
-          strokeWidth={1}
+          stroke-width={1}
         />
         <line
           x1={AXIS_W}
@@ -190,7 +195,7 @@ export function CostScatter({ summary }: Props) {
           x2={w - PADDING_RIGHT}
           y2={PADDING_TOP + CHART_H}
           stroke="var(--bb-chart-grid)"
-          strokeWidth={1}
+          stroke-width={1}
         />
 
         {/* X-axis labels */}
@@ -205,12 +210,12 @@ export function CostScatter({ summary }: Props) {
                 x2={x}
                 y2={PADDING_TOP + CHART_H + 4}
                 stroke="var(--bb-chart-label-muted)"
-                strokeWidth={1}
+                stroke-width={1}
               />
               <text
                 x={x}
                 y={PADDING_TOP + CHART_H + 16}
-                textAnchor="middle"
+                text-anchor={axisLabelAnchor(x, w)}
                 style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
                 {formatUsd(cost).valueText}
@@ -221,7 +226,7 @@ export function CostScatter({ summary }: Props) {
         <text
           x={AXIS_W + plotW / 2}
           y={PADDING_TOP + CHART_H + AXIS_H - 2}
-          textAnchor="middle"
+          text-anchor="middle"
           style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
         >
           Normalized cost (USD)
@@ -233,7 +238,7 @@ export function CostScatter({ summary }: Props) {
           y={0}
           style={{ fontSize: "9px", fill: "var(--bb-chart-label-muted)" }}
           transform={`rotate(-90) translate(${-(PADDING_TOP + CHART_H / 2)}, 11)`}
-          textAnchor="middle"
+          text-anchor="middle"
         >
           {metricLabel}
         </text>
@@ -249,10 +254,10 @@ export function CostScatter({ summary }: Props) {
 function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
   if (platforms.length === 0) return "No platforms are present in the selected ranking.";
   if (platforms.every((platform) => platform.cost_status === undefined || platform.cost_status === null)) {
-    return "These rows predate the normalized_cost contract; rebuild the DuckDB snapshot to emit cost_status and model metadata.";
+    return "These older runs do not include the cost details needed for comparison.";
   }
   if (platforms.every((platform) => platform.cost_status === "not_applicable_local")) {
-    return "Only local or self-hosted rows are present; BenchBox marks those as not_applicable_local instead of comparable cloud cost.";
+    return "Only local or self-hosted runs are shown, so cloud cost comparisons do not apply.";
   }
 
   const missing = new Set<string>();
@@ -266,7 +271,7 @@ function normalizedCostEmptyReason(platforms: PlatformRow[]): string {
     if (!platform.cost_model_version) missing.add("cost model version");
   }
   if (missing.size > 0) {
-    return `Missing normalized-cost metadata: ${[...missing].join(", ")}.`;
+    return `These runs are missing required cost details: ${[...missing].join(", ")}.`;
   }
-  return "No row has cost_status=normalized with a finite normalized_cost_usd value.";
+  return "None of these runs has a usable normalized cost.";
 }

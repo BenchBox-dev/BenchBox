@@ -63,12 +63,13 @@ CLI (run command with --platform *-df)
 | `DataFrameContext` | `core.dataframe.context` | Protocol for table access and column references |
 | `BenchmarkExecutionMixin` | `platforms.dataframe.benchmark_mixin` | Production DataFrame lifecycle implementation behind `adapter.run_benchmark()` |
 | `ExpressionFamilyAdapter` | `platforms.dataframe.expression_family` | Base for Polars, PySpark, DataFusion, LakeSail |
-| `PandasFamilyAdapter` | `platforms.dataframe.pandas_family` | Base for Pandas, Modin, cuDF, Dask |
+| `PandasFamilyAdapter` | `platforms.dataframe.pandas_family` | Base for Pandas, cuDF, Dask |
 
 The **family-based** adapter architecture means adding a new expression-style platform (e.g., Polars-like API) requires only implementing a thin adapter on top of `ExpressionFamilyAdapter`, inheriting query translation, tuning, and execution logic.
 
-`core/runner/dataframe_runner.py` is retained as a deprecated internal
-compatibility runner; it is not the production DataFrame lifecycle path.
+The deprecated internal compatibility runner `core/runner/dataframe_runner.py`
+has been deleted; the adapter mixin path (`platforms/dataframe/benchmark_mixin.py`)
+is the only production DataFrame lifecycle path.
 
 ## Benchmark Layer
 
@@ -99,7 +100,7 @@ Platforms span local engines (DuckDB, SQLite, DataFusion), cloud warehouses (Sno
 
 DataFrame adapters are organized by API family:
 - **Expression family**: Polars, PySpark, DataFusion, LakeSail
-- **Pandas family**: Pandas, Modin, cuDF, Dask
+- **Pandas family**: Pandas, cuDF, Dask
 
 ## Core Infrastructure
 

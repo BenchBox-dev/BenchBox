@@ -49,7 +49,23 @@ https://amplab\.cs\.berkeley\.edu/.*
 # HammerDB site intermittently returns 502 / connect timeouts
 https://www\.hammerdb\.com/.*
 
-# GitHub blob/issues links in blog posts intermittently return 404/429 to
-# unauthenticated CI requests once rate-limited; verified reachable (200) from
-# an authenticated/non-rate-limited client.
+# Historical links under the former owner intermittently return 404/429 to
+# unauthenticated CI after redirecting. Current BenchBox-dev links are checked
+# normally so moved or restricted first-party destinations cannot be masked.
 https://github\.com/joeharris76/BenchBox/(blob|issues).*
+
+# GitHub Pages serves Results Explorer deep links through the root SPA fallback
+# with HTTP 404. Browsers still render the comparison route, but Sphinx
+# linkcheck correctly sees the transport status. Keep this exception limited to
+# the published two-result comparison receipt links.
+https://benchbox\.dev/results/compare\?ids=[0-9a-f]{8},[0-9a-f]{8}$
+
+# Geekbench Browser serves a Cloudflare JS challenge to automated requests
+# (HTTP 403 with cf-mitigated: challenge); the link remains visible in the
+# rendered documentation.
+https://browser\.geekbench\.com/.*
+
+# Geekbench's public blog pages reject automated CI requests with HTTP 403;
+# the methodology links remain useful and visible in the rendered docs.
+https://www\.geekbench\.com/blog/2023/06/geekbench-61/.*
+https://www\.geekbench\.com/blog/2026/07/geekbench-7/.*

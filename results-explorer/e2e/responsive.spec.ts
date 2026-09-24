@@ -1,11 +1,13 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { fixtureIds, waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
+import { fixtureIds, openAnalysisCard, waitForDataElement, waitForDataLoaded, waitForShell } from "./support/fixtures";
 
 const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
 const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
 const DETAIL_ID = fixtureIds.ids.duckdb;
 
-// Desktop/wide use maxY = viewport.height (900); mobile/tablet use 1200 (1.33x).
+// Desktop/wide use maxY = viewport.height (900). Tablet uses 1200 (1.33x),
+// while mobile allows 1220 so the required engine-version facet can occupy its
+// own compact grid row without making the first leaderboard row fail by 14px.
 // PR #276 originally tightened the desktop intro spacing to fit
 // `query-results-panel.top` under 900 when `query-visible-columns` rendered
 // above the table at desktop via `lg:order-1`. PRs #277 and #291 dropped
@@ -16,7 +18,7 @@ const DETAIL_ID = fixtureIds.ids.duckdb;
 // `results-explorer-query-visible-columns-desktop-order-vs-test-name`
 // (PR #291).
 const VIEWPORTS = [
-  { name: "mobile", width: 390, height: 900, maxY: 1200 },
+  { name: "mobile", width: 390, height: 900, maxY: 1220 },
   { name: "tablet", width: 768, height: 900, maxY: 1200 },
   { name: "desktop", width: 1280, height: 900, maxY: 900 },
   { name: "wide", width: 1600, height: 900, maxY: 900 },
@@ -27,9 +29,9 @@ const AUDITED_ROUTES = [
   { path: "/results/", ready: /Recent Results/i },
   { path: "/results/tpch/", ready: /TPC-H Results/i },
   { path: "/results/p/duckdb/", ready: /DuckDB/i },
-  { path: `/results/r/${DETAIL_ID}`, ready: /Query Timings/i },
+  { path: `/results/r/${DETAIL_ID}`, ready: /Query timings/i },
   { path: `/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`, ready: /TPC-H Comparison/i },
-  { path: "/results/query", ready: /matching result bundle/ },
+  { path: "/results/query", ready: /matching run/ },
 ] as const;
 
 // Deliberately NOT serial. Every test here takes its own `page` fixture and
@@ -49,26 +51,26 @@ test.describe("responsive explorer assertions", () => {
       await waitForShell(page);
 
       const nav = page.getByTestId("results-explorer-nav");
-      for (const label of ["Leaderboards", "Benchmarks", "Platforms", "Compare", "Query"]) {
+      for (const label of ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]) {
         await expect(nav.getByRole("link", { name: label })).toBeVisible();
       }
-      await expect(nav.getByRole("link", { name: "Query" })).toHaveAttribute("aria-current", "page");
+      await expect(nav.getByRole("link", { name: "Find runs" })).toHaveAttribute("aria-current", "page");
     });
 
     test(`home keeps headline, cohort summary, and leaderboard rows high in the viewport at ${viewport.name}`, async ({
       page,
     }) => {
       await setViewport(page, viewport);
-      await page.goto("/results/");
-      await waitForDataLoaded(page, /Recent Results/i);
+      await page.goto("/results/compare/");
+      await waitForDataLoaded(page, /Compare benchmark results/i);
 
       await expectTopWithin(
-        page.getByRole("heading", { name: "BenchBox Curated Results Preview" }),
+        page.getByRole("heading", { name: "Compare benchmark results" }),
         viewport.maxY,
         "home headline",
       );
       await expectTopWithin(
-        page.getByRole("region", { name: "Active leaderboard filters" }),
+        page.getByRole("region", { name: "Leaderboard ranking selector" }),
         viewport.maxY,
         "active leaderboard summary",
       );
@@ -97,6 +99,8 @@ test.describe("responsive explorer assertions", () => {
         timeout: 20_000,
       });
 
+      // The query matrix is a collapsed Analysis card by default now.
+      await openAnalysisCard(page, "query_heatmap");
       const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
       await expect(heatmap).toBeAttached();
       const hasHorizontalOverflow = await heatmap.evaluate((element) => element.scrollWidth > element.clientWidth);
@@ -110,10 +114,10 @@ test.describe("responsive explorer assertions", () => {
     }) => {
       await setViewport(page, viewport);
       await page.goto("/results/query");
-      await waitForDataLoaded(page, /matching result bundle/);
+      await waitForDataLoaded(page, /matching run/);
 
       await expectTopWithin(
-        page.getByRole("heading", { name: "Results Query Workbench" }),
+        page.getByRole("heading", { name: "Find benchmark runs" }),
         viewport.maxY,
         "query headline",
       );
@@ -134,8 +138,8 @@ test.describe("responsive explorer assertions", () => {
       await waitForDataLoaded(page, /TPC-H Comparison/);
 
       await expectTopWithin(page.getByRole("heading", { name: /TPC-H Comparison/ }), viewport.maxY, "compare headline");
-      const decisionSummary = page.getByRole("region", { name: "Decision Summary" });
-      const queryEvidence = page.getByRole("heading", { name: "Query-Level Diff" });
+      const decisionSummary = page.getByRole("region", { name: "Comparison summary" });
+      const queryEvidence = page.getByRole("heading", { name: "Query-level differences" });
       await expect(decisionSummary).toBeVisible();
       await expect(queryEvidence).toBeVisible();
       expect(await topOf(decisionSummary)).toBeLessThan(await topOf(queryEvidence));
@@ -149,6 +153,8 @@ test.describe("responsive explorer assertions", () => {
 
     // The route heading above is shell-rendered, so wait on the heatmap
     // itself: it is data-bound and absent when the snapshot answers cold.
+    // The query matrix is a collapsed Analysis card by default now.
+    await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
     await heatmap.evaluate((container) => {
@@ -191,13 +197,15 @@ test.describe("responsive explorer assertions", () => {
 
     await page.goto("/results/tpch/?sf=0.01&phase=standard");
     await waitForDataLoaded(page, /TPC-H Results/i);
+    // The query matrix is a collapsed Analysis card by default now.
+    await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
     await expect.poll(() => heatmap.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     await expect(page.getByTestId("query-heatmap-scroll-hint")).toBeVisible();
 
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
     const queryResults = page.getByTestId("query-results-scroll-container");
     await queryResults.locator("table").evaluate((table) => {
       table.style.width = "1800px";
@@ -205,11 +213,14 @@ test.describe("responsive explorer assertions", () => {
     await expect.poll(() => queryResults.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
 
+    // A run that published passes reports them in the pass table; the
+    // three-column median table only stands in when it has nothing to show.
     await page.goto(`/results/r/${DETAIL_ID}`);
-    await waitForDataLoaded(page, /Query Timings/i);
-    const timings = page.getByTestId("detail-timings-scroll-container");
-    await expect.poll(() => timings.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
-    await expect(page.getByTestId("detail-timings-scroll-hint")).toHaveCount(0);
+    await waitForDataLoaded(page, /Query timings/i);
+    await expect(page.getByTestId("detail-timings-scroll-container")).toHaveCount(0);
+    const passes = page.getByTestId("detail-passes-scroll-container");
+    await expect.poll(() => passes.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+    await expect(page.getByTestId("detail-passes-scroll-hint")).toHaveCount(0);
   });
 
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
@@ -230,24 +241,108 @@ test.describe("responsive explorer assertions", () => {
       await expectScrollAffordance(page, "recent-results-scroll-container", "recent-results-scroll-hint");
 
       await page.goto(`/results/r/${DETAIL_ID}`);
-      await waitForDataLoaded(page, /Query Timings/i);
-      await expectScrollAffordance(page, "detail-timings-scroll-container", "detail-timings-scroll-hint");
+      await waitForDataLoaded(page, /Query timings/i);
+      await expectScrollAffordance(page, "detail-passes-scroll-container", "detail-passes-scroll-hint");
 
       await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
       await waitForDataLoaded(page, /TPC-H Comparison/i);
       await expectScrollAffordance(page, "query-diff-scroll-container", "query-diff-scroll-hint");
 
       await page.goto("/results/query");
-      await waitForDataLoaded(page, /matching result bundle/);
+      await waitForDataLoaded(page, /matching run/);
       await expectScrollAffordance(page, "query-results-scroll-container", "query-results-scroll-hint");
     });
   }
 
+  // The document-overflow audit above exempts anything inside `svg[role='img']`,
+  // so it cannot see a chart that overflows its own drawing. That exemption is
+  // why charts shipped clipping their right-hand quarter and bottom rows on a
+  // phone: the SVG box fitted the page, and the marks outside it were simply
+  // never painted.
+  for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
+    test(`chart drawings fit their own box at ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto("/results/tpch/");
+      // The matrix view renders the long summary overview instead of the
+      // tabbed chart panel, so every chart is on the page at once: the
+      // distribution section plus one collapsible card per additional view.
+      await waitForDataLoaded(page, /More views/);
+
+      // Open every preview card so each full chart (not just its thumbnail)
+      // is measured. Checking only the default view leaves most of the chart
+      // set unmeasured, and the default is the one chart least likely to be
+      // wrong.
+      const previews = page.getByTestId("summary-more-views").locator(":scope > div.grid > details");
+      const previewCount = await previews.count();
+      for (let p = 0; p < previewCount; p += 1) {
+        const details = previews.nth(p);
+        const isOpen = await details.evaluate((node) => (node as HTMLDetailsElement).open);
+        if (!isOpen) {
+          await details.locator("summary").first().click();
+          await page.waitForTimeout(150);
+        }
+      }
+
+      {
+          const offenders = await page.evaluate(() => {
+            const problems: string[] = [];
+            for (const svg of Array.from(
+              document.querySelectorAll("[data-chart-container] svg[role='img']"),
+            )) {
+              const box = svg.getBoundingClientRect();
+              if (box.width === 0) continue;
+
+              const viewBox = svg.getAttribute("viewBox");
+              if (viewBox === null) {
+                problems.push(`${svg.getAttribute("aria-label") ?? "chart"}: no viewBox`);
+                continue;
+              }
+
+              // A drawing narrower than its box is scaled UP, which magnifies
+              // every coordinate including the gaps bars were spaced by.
+              const drawWidth = Number(viewBox.split(/\s+/)[2]);
+              if (drawWidth < box.width - 1.5) {
+                problems.push(
+                  `${svg.getAttribute("aria-label") ?? "chart"}: draws ${drawWidth} into a ${box.width.toFixed(0)}px box`,
+                );
+              }
+
+              for (const mark of Array.from(svg.querySelectorAll("text, rect, circle, path"))) {
+                const markBox = mark.getBoundingClientRect();
+                if (markBox.width === 0 && markBox.height === 0) continue;
+                if (
+                  markBox.right > box.right + 1 ||
+                  markBox.left < box.left - 1 ||
+                  markBox.bottom > box.bottom + 1
+                ) {
+                  const what =
+                    mark.tagName === "text"
+                      ? `"${(mark.textContent ?? "").slice(0, 24)}"`
+                      : mark.tagName;
+                  problems.push(
+                    `${svg.getAttribute("aria-label") ?? "chart"}: ${what} falls outside the drawing`,
+                  );
+                }
+              }
+            }
+            return problems;
+          });
+
+          expect(offenders, offenders.join("\n")).toEqual([]);
+      }
+
+      const chartsVisited = await page.locator("[data-chart-container] svg[role='img']").count();
+      // If this ever reads too low the measurement above is vacuous and the
+      // test would pass without measuring anything.
+      expect(chartsVisited, "charts measured").toBeGreaterThan(5);
+    });
+  }
+
   for (const homeRoute of [
-    { name: "default", path: "/results/" },
+    { name: "default", path: "/results/compare/" },
     {
       name: "filtered deep link",
-      path: "/results/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
+      path: "/results/compare/?bm=clickbench&scale_factor=0.1&trust_tier=maintainer-run",
     },
   ]) {
     test(`home skeleton and loaded shell keep the same rendered mobile geometry for the ${homeRoute.name} route`, async ({
@@ -271,8 +366,8 @@ test.describe("responsive explorer assertions", () => {
       const skeletonGeometry = await homeSharedGeometry(page);
 
       releaseSnapshot();
-      await expect(page.getByText("Recent Results")).toBeVisible({ timeout: 30_000 });
-      await expect(page.getByRole("region", { name: "Active leaderboard filters" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveCount(0, { timeout: 30_000 });
+      await expect(page.getByRole("region", { name: "Leaderboard ranking selector" })).toBeVisible();
       const loadedGeometry = await homeSharedGeometry(page);
 
       // The skeleton deliberately uses fewer, inert children, but reserves the

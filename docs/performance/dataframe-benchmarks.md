@@ -391,4 +391,4 @@ if plan.optimization_hints:
 - [DataFrame Platforms](../platforms/dataframe.md) - Platform overview
 - [DataFrame Tuning](../platforms/dataframe.md#dataframe-tuning) - Configuration options
 - [Polars Platform](../platforms/polars.md) - Polars-specific details
-- [Result Analysis](../usage/result-analysis.md) - Analyzing benchmark results
+- [Result Analysis](../tutorials/understanding-results.md) - Analyzing benchmark results

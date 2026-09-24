@@ -68,11 +68,26 @@ wall minutes by workflow when judging savings; the next-slowest sibling can
 dominate remaining wall time after `pr.yml` jobs are skipped.
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
-that aggregates the required-lane jobs: `ci-paths`, `content-guard`,
-`code-lint`, `code-test`, `correctness-gate`, `plan-capture-gate`,
-`medium-test` (added 2026-07-11, #1139 — the medium tier now gates code
-PRs pre-merge via the same umbrella, no ruleset change needed),
-`explorer-tokens`, `audit-sha`, `package-smoke`, and `dependency-audit`.
+that aggregates the jobs in its `needs` contract: `ci-paths`,
+`tpch-binary-framing`, `content-guard`, `skill-integrity`, `code-lint`,
+`code-test`, `correctness-gate`, `plan-capture-gate`, `medium-test`
+(added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
+the same umbrella, no ruleset change needed), `explorer-tokens`,
+`site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
+`dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
+`needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
+skipped where their classifier says they are not applicable. Since the
+heavy-tier queue-only change, the heavy tier (`medium-test`,
+`correctness-gate`, `plan-capture-gate`, `tpch-binary-framing`, and the
+integration samples) additionally reports skipped on `pull_request` runs
+unless the `heavy-needed` output fires (merge queue, soundness paths, or
+packaging paths); the umbrella requires success when the tier ran and
+skipped when it was deferred, so a silent skip can never read as a pass.
+
+Slow-marked reproducer jobs remain required PR CI through this umbrella. The
+post-merge workflow has fast and medium lanes but no slow-signature lane, so
+moving those reproducers out of required PR CI would remove their only
+required execution path.
 
 `Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
 `.github/workflows/results-explorer-browser.yml`. It is required because the
@@ -106,6 +121,11 @@ repository-wide invariants are not additive per PR. Without the strict policy,
 two PRs can each pass against the same older base and exceed an invariant when
 merged in sequence. The tradeoff is deliberate: when `develop` advances, an
 otherwise-green PR must refresh its required checks before it can merge.
+
+The latest bounded, read-only wall and runner-minute remeasure is recorded in
+[`_project/analysis/ci-waste-remeasure-2026-08-31.md`](../../_project/analysis/ci-waste-remeasure-2026-08-31.md).
+It keeps `pull_request` and `merge_group` event evidence separate and does
+not authorize changing required contexts or skipping jobs.
 
 `refresh-shadow` (added with the strict-base refresh shadow rollout) is the
 observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
@@ -154,7 +174,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
     "check_response_timeout_minutes": 60,
     "grouping_strategy": "ALLGREEN",
     "max_entries_to_build": 5,
-    "max_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
     "merge_method": "SQUASH",
     "min_entries_to_merge": 1,
     "min_entries_to_merge_wait_minutes": 0
@@ -189,13 +209,16 @@ The soundness gate, as operated:
   `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
   `.github/workflows/release.yml`).
 - `make pr-open` no longer arms auto-merge at all; `make pr-ready` (or
-  `make pr-open READY=1`) does, so a PR cannot merge while a follow-up commit
-  is still being written. Arming at creation stranded three commits in one
+  `make pr-open READY=1`) runs the exact readiness transaction and then does,
+  so a PR cannot merge while a follow-up commit is still being written. Arming at creation stranded three commits in one
   session, two of them the fixes for their own review findings.
-- `make pr-open` also refuses when `origin/develop` is not an ancestor of
-  `HEAD` (open-stale). Absorb current develop with `make pr-refresh` (one
-  PR at a time). `STALE=1` is the explicit escape. `pr-open` must not merge
-  `develop` itself; that would turn `pr-fanout` into a refresh storm. See
+- `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
+  live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
+  conflict-free native queue permits publication without an author-side
+  refresh; absent, unknown, or misconfigured queue state keeps the current-base
+  gate and requires `make pr-refresh` (one PR at a time). There is no stale
+  override. `pr-open` must not merge `develop` itself; that would turn
+  `pr-fanout` into a refresh storm. See
   `_project/decisions/behind-pr-occurrence-2026-08-16.md`.
 - `.github/workflows/auto-merge-on-open.yml` is **revoke-only**: it never
   arms on any event (bare `gh pr create` does not auto-arm, and the
@@ -661,10 +684,19 @@ access and let the canary return to green.
 The `develop-post-merge.yml` auto-revert job creates these labels on
 demand if they do not exist:
 
-- `incident:develop-red` — used on the auto-revert PR.
-- `incident:develop-red-revert-conflict` — used on the manual-action
-  issue when the revert path cannot complete (revert conflict, push
-  failure, PR-creation failure).
+- `incident:develop-red` — used on an auto-revert PR or an owned
+  post-merge incident/advisory when attribution is unproven.
+- `incident:develop-red-revert-conflict` — used on the manual-action issue
+  when a proven revert path cannot complete (revert conflict, push failure,
+  PR-creation failure, or target/diff inspection failure).
+
+Attribution incidents include the immutable failing commit and PR, test/job
+identifiers, predecessor and source-input evidence, ownership match,
+classification, owner, next action, and a stable incident key. The workflow
+must not create a revert proposal from temporal adjacency, missing evidence,
+an unmappable job failure, stale target state, external-reference drift, or a
+transient rerun. Those outcomes keep develop red and update the existing
+`incident:develop-red` issue by incident key.
 
 The on-demand `gh label create … || true` in the workflow means a fresh
 clone or transfer does not need the labels pre-created. They will appear

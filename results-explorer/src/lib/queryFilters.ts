@@ -26,6 +26,9 @@ export interface QueryFilterState {
   physicalRenderingIds: string[];
   hasCost: "all" | "yes" | "no";
   dateWindow: DateWindowFacet;
+  platformVersions?: string[];
+  archs?: string[];
+  cpuFamilies?: string[];
 }
 
 export interface QuerySort {
@@ -93,6 +96,8 @@ const ALLOWED_COLUMNS = new Set([
   "plans_published",
   "has_tuning",
   "bundle_download_url",
+  "arch",
+  "cpu_family",
 ]);
 
 function expandListFilter(
@@ -147,6 +152,26 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     params,
     true,
   );
+
+  if (filters.platformVersions && filters.platformVersions.length > 0) {
+    expandListFilter("platform_version", filters.platformVersions, clauses, params);
+  }
+  if (filters.archs && filters.archs.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE arch IN (" +
+        filters.archs.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...filters.archs);
+  }
+  if (filters.cpuFamilies && filters.cpuFamilies.length > 0) {
+    clauses.push(
+      "result_id IN (SELECT result_id FROM bench.result_environment WHERE cpu_family IN (" +
+        filters.cpuFamilies.map(() => "?").join(", ") +
+        "))",
+    );
+    params.push(...filters.cpuFamilies);
+  }
 
   if (filters.hasCost === "yes") clauses.push("cost_usd IS NOT NULL");
   if (filters.hasCost === "no") clauses.push("cost_usd IS NULL");
@@ -214,6 +239,10 @@ export function buildFacetCountQuery(
       options.exclude === "physicalRenderingIds" ? [] : filters.physicalRenderingIds,
     hasCost: options.exclude === "hasCost" ? "all" : filters.hasCost,
     dateWindow: options.exclude === "dateWindow" ? "all" : filters.dateWindow,
+    platformVersions:
+      options.exclude === "platformVersions" ? [] : (filters.platformVersions ?? []),
+    archs: options.exclude === "archs" ? [] : (filters.archs ?? []),
+    cpuFamilies: options.exclude === "cpuFamilies" ? [] : (filters.cpuFamilies ?? []),
   };
   const where = buildWhereClause(effective);
 
@@ -290,4 +319,123 @@ function renderSqlLiteral(value: unknown): string {
   // Escape single quotes and backslashes for DuckDB string literals.
   const escaped = String(value).split("\\").join("\\\\").split("'").join("''");
   return `'${escaped}'`;
+}
+
+// ---------------------------------------------------------------------------
+// Presentation-only grouping for the cohort index tables
+// ---------------------------------------------------------------------------
+
+/**
+ * How to split cohort rows into labelled groups.
+ *
+ * PRESENTATION ONLY. Grouping rearranges rows; it never changes how a rank is
+ * computed or which rows are ranking-eligible. Ranking semantics are governed
+ * by a separate contract with its own release gate, and a grouping control that
+ * quietly reordered or re-filtered would become a second, hidden ranking policy.
+ */
+export type CohortGroupBy = "none" | "engine_version";
+
+export const COHORT_GROUP_BY_LABELS: Record<CohortGroupBy, string> = {
+  none: "No grouping",
+  engine_version: "Platform version",
+};
+
+export interface CohortGroup<T> {
+  key: string;
+  label: string;
+  rows: T[];
+}
+
+export interface LimitedCohortGroup<T> extends CohortGroup<T> {
+  /** Full group size before the rendering window is applied. */
+  totalRows: number;
+}
+
+/** Rows lacking the grouping value collect here rather than vanishing. */
+export const UNGROUPED_LABEL = "Not recorded";
+
+/**
+ * Split rows into labelled groups, preserving input order within each group.
+ *
+ * Stability matters: the caller has already sorted by rank, so preserving
+ * order is what makes "grouping does not change ranking" true in the rendered
+ * output and not merely in principle.
+ *
+ * A row whose grouping value is absent goes to an explicit "Not recorded"
+ * group. Dropping it would let a filter silently shrink the cohort, and the
+ * per-group counts would then not sum to the total the page states.
+ */
+export function groupCohortRows<T>(
+  rows: readonly T[],
+  groupBy: CohortGroupBy,
+  readValue: (row: T) => string | null | undefined,
+): CohortGroup<T>[] {
+  if (groupBy === "none") {
+    return [{ key: "all", label: "All runs", rows: [...rows] }];
+  }
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const raw = readValue(row);
+    const key = raw === null || raw === undefined || raw === "" ? UNGROUPED_LABEL : raw;
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(row);
+    else groups.set(key, [row]);
+  }
+  // "Not recorded" sorts last; everything else keeps a stable natural order.
+  return [...groups.entries()]
+    .sort(([a], [b]) => {
+      if (a === UNGROUPED_LABEL) return 1;
+      if (b === UNGROUPED_LABEL) return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    })
+    .map(([key, groupRows]) => ({ key, label: key, rows: groupRows }));
+}
+
+/** Total across groups, for asserting the split lost nothing. */
+export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
+  return groups.reduce((sum, group) => sum + group.rows.length, 0);
+}
+
+/**
+ * Apply the caller's global sorted rendering window after complete groups and
+ * counts are known. Group labels may rearrange those rows, but must not change
+ * which rows the ungrouped view admitted to the window.
+ *
+ * Cloned cohorts (e.g. a test that deep-copies rows) have different object
+ * identities but the same logical identity, so the window uses a stable id
+ * plus a full-row fingerprint to disambiguate colliding ids.
+ */
+export function limitCohortGroups<T>(
+  groups: readonly CohortGroup<T>[],
+  rankedRows: readonly T[],
+  limit: number,
+  keyOf: (row: T) => string = (row: any) =>
+    String((row as any).result_id ?? (row as any).id ?? (row as any).key ?? JSON.stringify(row)),
+  fingerprintOf: (row: T) => string = (row) => JSON.stringify(row),
+): LimitedCohortGroup<T>[] {
+  const window = rankedRows.slice(0, Math.max(0, Math.floor(limit)));
+  const groupedReferences = new Set(groups.flatMap((group) => group.rows));
+  const admittedReferences = new Set(window.filter((row) => groupedReferences.has(row)));
+  const admittedCloneCounts = new Map<string, Map<string, number>>();
+  for (const row of window) {
+    if (admittedReferences.has(row)) continue;
+    const key = keyOf(row);
+    const fingerprint = fingerprintOf(row);
+    const byFingerprint = admittedCloneCounts.get(key) ?? new Map<string, number>();
+    byFingerprint.set(fingerprint, (byFingerprint.get(fingerprint) ?? 0) + 1);
+    admittedCloneCounts.set(key, byFingerprint);
+  }
+  return groups.flatMap((group) => {
+    const rows = group.rows.filter((row) => {
+      if (admittedReferences.has(row)) return true;
+      const key = keyOf(row);
+      const fingerprint = fingerprintOf(row);
+      const byFingerprint = admittedCloneCounts.get(key);
+      const remaining = byFingerprint?.get(fingerprint) ?? 0;
+      if (!byFingerprint || remaining === 0) return false;
+      byFingerprint.set(fingerprint, remaining - 1);
+      return true;
+    });
+    return rows.length > 0 ? [{ ...group, rows, totalRows: group.rows.length }] : [];
+  });
 }

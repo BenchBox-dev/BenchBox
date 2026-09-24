@@ -151,6 +151,11 @@ class RunConfig(BaseModel):
     warm_up_iterations: int = GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS  # Default: 1 warmup iteration
     power_fail_fast: bool = False
 
+    # Client-link locality disclosure
+    client_region: str | None = None
+    client_cloud: str | None = None
+    link_probe: bool = True
+
     # Table format fields
     table_format: Optional[str] = None
     table_format_compression: str = "snappy"
@@ -288,6 +293,10 @@ class BenchmarkConfig(BaseModel):
     # must receive this to classify as `official`; without it a run can never
     # pass `benchbox submit`.
     official: bool = False
+    # Client-link locality disclosure
+    client_region: str | None = None
+    client_cloud: str | None = None
+    link_probe: bool = True
 
     @field_validator("scale_factor")
     @classmethod
@@ -382,7 +391,8 @@ class SystemProfile(BaseModel):
     os_name: str
     os_version: str
     architecture: str
-    cpu_model: str
+    cpu_model: Optional[str] = None
+    cpu_identity_provenance: Optional[Literal["measured", "user_attested", "inferred"]] = None
     cpu_cores_physical: int
     cpu_cores_logical: int
     memory_total_gb: float

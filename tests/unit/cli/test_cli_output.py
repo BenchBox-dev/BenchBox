@@ -537,6 +537,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
+        assert data["result_schema_version"] == "2.2"
         assert data["version"] == "2.2"
         assert data["benchmark"]["id"] == "tpch"
         assert data["benchmark"]["name"] == "TPC-H"
@@ -568,6 +569,7 @@ class TestResultExporter:
         with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
+        assert data["result_schema_version"] == "2.2"
         assert data["version"] == "2.2"
         assert data["benchmark"]["name"] == "TPC-H"
         assert data["platform"]["name"] == "duckdb"
@@ -881,14 +883,14 @@ class TestResultExporter:
 
         # Corrupt baseline to simulate unsupported non-v2 shape (remove canonical version).
         baseline_data = json.loads(baseline_path.read_text())
-        del baseline_data["version"]
+        del baseline_data["result_schema_version"]
         baseline_data["schema_version"] = "1.1"
         baseline_path.write_text(json.dumps(baseline_data))
 
         comparison = self.exporter.compare_results(baseline_path, current_path)
 
-        # Comparison proceeds but reports missing canonical version as unknown
-        assert comparison["baseline_version"] == "unknown"
+        # Comparison falls back to the legacy compatibility alias.
+        assert comparison["baseline_version"] == "2.2"
         assert comparison["current_version"] == "2.2"
 
     def test_export_comparison_report(self):

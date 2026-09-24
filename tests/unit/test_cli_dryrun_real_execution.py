@@ -131,19 +131,27 @@ class TestDryRunExecutor:
         mock_benchmark = Mock()
         mock_benchmark.get_query.return_value = "SELECT 1 as test_query"
 
-        # Test should use platform adapter approach
-        with patch.object(executor, "_execute_tpcds_test_class") as mock_execute:
-            mock_execute.return_value = {"1": "SELECT 1 as captured_query"}
-
-            result = executor._extract_queries_via_real_test_execution(mock_benchmark, benchmark_config, "power")
-
-            # Verify platform adapter was used
-            assert result == {"1": "SELECT 1 as captured_query"}
-            mock_execute.assert_called_once()
+        mock_benchmark.get_queries.return_value = {"1": "SELECT 1 as captured_query"}
+        result = executor._extract_queries_via_real_test_execution(mock_benchmark, benchmark_config, "power")
+        assert result == {"1": "SELECT 1 as captured_query"}
 
 
 class TestDryRunExecutorPlatformIntegration:
     """Test DryRunExecutor integration with platform adapters."""
+
+    @pytest.mark.parametrize("benchmark_name", ["tpch", "tpcds"])
+    def test_test_mode_query_extraction_never_opens_platform_connection(self, benchmark_name):
+        executor = DryRunExecutor()
+        benchmark = Mock()
+        benchmark.get_queries.return_value = {1: "SELECT 1"}
+        benchmark_config = Mock(name=benchmark_name, scale_factor=0.01, test_execution_type="power")
+        benchmark_config.name = benchmark_name
+        adapter = Mock()
+        adapter.create_connection.side_effect = AssertionError("query extraction opened a platform connection")
+
+        assert executor._extract_queries(benchmark, benchmark_config, adapter) == {"1": "SELECT 1"}
+        adapter.create_connection.assert_not_called()
+        adapter.enable_dry_run.assert_not_called()
 
     def test_extract_queries_with_platform_adapter(self):
         """Test query extraction with platform adapter translation."""

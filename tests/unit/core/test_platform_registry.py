@@ -292,7 +292,6 @@ class TestPlatformRegistry:
                 "presto",
                 "timescaledb",
                 "influxdb",
-                "modin",
                 "cudf",
                 "dask",
                 "fabric_dw",
@@ -410,7 +409,7 @@ class TestPlatformRegistry:
         metadata = PlatformRegistry.get_all_platform_metadata()
         valid = set(SUPPORT_STATUS_VALUES)
 
-        assert len(metadata) == 51
+        assert len(metadata) == 50
         for platform_name, platform_spec in metadata.items():
             assert set(platform_spec.keys()).intersection({"support_status"}) == {"support_status"}
             assert platform_spec["support_status"] in valid, f"{platform_name} has invalid support_status"
@@ -420,7 +419,7 @@ class TestPlatformRegistry:
         assert summary["support_status"] == {
             "stable": 5,
             "beta": 28,
-            "experimental": 17,
+            "experimental": 16,
             "repo_only": 0,
             "deprecated": 1,
             "document_only": 0,

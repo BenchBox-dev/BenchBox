@@ -1,0 +1,311 @@
+"""Tests for feature-batch branch integration."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
+
+ROOT = Path(__file__).resolve().parents[3]
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))
+
+spec = importlib.util.spec_from_file_location("batch_integration", SCRIPTS / "batch_integration.py")
+assert spec is not None and spec.loader is not None
+bi = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = bi
+spec.loader.exec_module(bi)
+
+
+def _repo(path: Path) -> Path:
+    path.mkdir(parents=True, exist_ok=True)
+    for args in (
+        ["init", "-b", "main"],
+        ["config", "user.email", "t@example.com"],
+        ["config", "user.name", "T"],
+        ["config", "commit.gpgsign", "false"],
+    ):
+        subprocess.run(["git", *args], cwd=path, check=True, capture_output=True)
+    (path / "base.txt").write_text("base")
+    subprocess.run(["git", "add", "."], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=path, check=True, capture_output=True)
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/develop", "HEAD"], cwd=path, check=True)
+    return path
+
+
+def _commit(path: Path, name: str, author: str = "T <t@example.com>") -> str:
+    (path / name).write_text(name)
+    subprocess.run(["git", "add", "."], cwd=path, check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            f"user.name={author.split(' <')[0]}",
+            "-c",
+            f"user.email={author.split('<')[1].rstrip('>')}",
+            "commit",
+            "-qm",
+            name,
+        ],
+        cwd=path,
+        check=True,
+        capture_output=True,
+    )
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _start(path: Path, members: list[str] | None = None) -> dict:
+    return bi.record_start(path, "batch-1", members or ["A", "B"])
+
+
+def test_start_records_shared_base_once(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    record = _start(repo)
+    assert record["base_ref"] == "origin/develop" and len(record["base_oid"]) == 40
+    assert bi.read_batch(repo)["members"] == ["A", "B"]
+    with pytest.raises(bi.BatchError, match="already recorded"):
+        _start(repo)
+
+
+def test_base_movement_reported_not_fixed(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    record = _start(repo)
+    assert bi.verify_base(repo, record)["moved"] is False
+    _commit(repo, "develop-advance.txt")
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/develop", "HEAD"], cwd=repo, check=True)
+    check = bi.verify_base(repo, record)
+    assert check["moved"] is True
+    assert check["recorded_oid"] == record["base_oid"]
+
+
+def test_single_integrator_enforcement(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    record = _start(repo)
+    _commit(repo, "member-a.txt", author="T <t@example.com>")
+    head = _head(repo)
+    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>", head) == []
+    _commit(repo, "rogue.txt", author="Rogue <rogue@example.com>")
+    assert bi.verify_single_integrator(repo, record["base_oid"], "T <t@example.com>", _head(repo)) == [
+        "Rogue <rogue@example.com>"
+    ]
+
+
+def test_receipt_resolves_head_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Committer, ancestry, and timestamp gates must evaluate one revision."""
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    member_head = _commit(repo, "member-a.txt")
+    head = _head(repo)
+    real_git = bi._git
+    resolutions = []
+
+    def counting_git(repo_arg: Path, *args: str) -> str:
+        if list(args)[:2] == ["rev-parse", "HEAD"]:
+            resolutions.append(True)
+        return real_git(repo_arg, *args)
+
+    monkeypatch.setattr(bi, "_git", counting_git)
+    bi.delivery_receipt(
+        repo,
+        [{"id": "A", "head": member_head}],
+        {"integration_head": head, "integrator": "T <t@example.com>", "items": {"A": "pass"}},
+    )
+    assert len(resolutions) == 1
+
+
+def test_member_ancestry_and_receipt_binding(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    member_head = _commit(repo, "member-a.txt")
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    assert bi.member_ancestry(repo, [{"id": "A", "head": member_head}], head) == {"A": True}
+    assert bi.member_ancestry(repo, [{"id": "B", "head": "0" * 40}], head) == {"B": False}
+    receipt = bi.delivery_receipt(
+        repo,
+        [{"id": "A", "head": member_head}],
+        {"integration_head": head, "integrator": "T <t@example.com>", "items": {"A": "pass"}},
+    )
+    assert receipt["integration_head"] == head
+    assert receipt["schema"] == "batch_delivery_receipt_v1"
+    assert receipt["members"] == [{"id": "A", "head": member_head}]
+    assert receipt["member_ancestry"] == {"A": True}
+    assert receipt["history"]["commit_count"] >= 1
+
+
+def test_receipt_refuses_moved_head_or_missing_member(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    acceptance = {"integrator": "T <t@example.com>", "items": {"A": "pass"}}
+    with pytest.raises(bi.BatchError, match="different integration head"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], {"integration_head": "1" * 40, **acceptance})
+    with pytest.raises(bi.BatchError, match="missing from integration head"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": "0" * 40}], {"integration_head": head, **acceptance})
+
+
+def test_receipt_refuses_moved_base(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    member_head = _commit(repo, "member-a.txt")
+    _commit(repo, "develop-advance.txt")
+    subprocess.run(["git", "update-ref", "refs/remotes/origin/develop", "HEAD"], cwd=repo, check=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    with pytest.raises(bi.BatchError, match="base moved"):
+        bi.delivery_receipt(
+            repo,
+            [{"id": "A", "head": member_head}],
+            {"integration_head": head, "integrator": "T <t@example.com>", "items": {"A": "pass"}},
+        )
+
+
+def test_cli_verify_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo)
+    member_head = _commit(repo, "member-a.txt")
+    members = tmp_path / "members.json"
+    members.write_text(json.dumps([{"id": "A", "head": member_head}]), encoding="utf-8")
+    assert (
+        bi.main(
+            ["--worktree", str(repo), "verify", "--integrator", "T <t@example.com>", "--members-json", str(members)]
+        )
+        == 0
+    )
+    assert '"A": true' in capsys.readouterr().out
+
+
+def test_member_ancestry_rejects_non_list_manifest(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    with pytest.raises(bi.BatchError, match="must be a list"):
+        bi.member_ancestry(repo, {"A": {}}, "0" * 40)
+
+
+def _head(path: Path) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=path, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def test_late_member_after_readiness_requires_revalidation(tmp_path: Path) -> None:
+    """Replay: an unregistered late member cannot join an existing binding."""
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    member_a = _commit(repo, "member-a.txt")
+    head1 = _head(repo)
+    acceptance = {"integrator": "T <t@example.com>", "items": {"A": "pass"}}
+    receipt = bi.delivery_receipt(repo, [{"id": "A", "head": member_a}], {"integration_head": head1, **acceptance})
+    assert receipt["integration_head"] == head1
+    member_b = _commit(repo, "member-b.txt")
+    assert _head(repo) != head1
+    with pytest.raises(bi.BatchError, match="late and dropped members"):
+        bi.delivery_receipt(
+            repo,
+            [{"id": "A", "head": member_a}, {"id": "B", "head": member_b}],
+            {"integration_head": _head(repo), **acceptance},
+        )
+
+
+def _acceptance(head: str, items: dict) -> dict:
+    return {"integration_head": head, "integrator": "T <t@example.com>", "items": items}
+
+
+def test_receipt_refuses_empty_manifest_and_unaccepted_member(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    with pytest.raises(bi.BatchError, match="vacuous receipt"):
+        bi.delivery_receipt(repo, [], _acceptance(head, {}))
+    with pytest.raises(bi.BatchError, match="exactly match"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {}))
+    with pytest.raises(bi.BatchError, match="no integrator"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], {"integration_head": head, "items": {"A": "pass"}})
+
+
+@pytest.mark.parametrize("value", ["fail", {"passed": False}, True])
+def test_receipt_requires_exact_pass_value(tmp_path: Path, value: object) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    with pytest.raises(bi.BatchError, match="without passing acceptance"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {"A": value}))
+
+
+def test_receipt_rejects_extra_acceptance_member(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    with pytest.raises(bi.BatchError, match="exactly match"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head, {"A": "pass", "B": "pass"}))
+
+
+def test_receipt_binds_validated_internal_dependencies(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A", "B"])
+    head = _commit(repo, "members.txt")
+    members = [{"id": "A", "head": head}, {"id": "B", "head": head}]
+    acceptance = {
+        **_acceptance(head, {"A": "pass", "B": "pass"}),
+        "internal_implementation_dependencies": [
+            {"member": "B", "depends_on": "A", "evidence": "tracker dependency B requires A"}
+        ],
+    }
+    receipt = bi.delivery_receipt(repo, members, acceptance)
+    assert receipt["internal_implementation_dependencies"] == acceptance["internal_implementation_dependencies"]
+
+    bad_acceptance = {
+        **acceptance,
+        "internal_implementation_dependencies": [
+            {"member": "B", "depends_on": "missing", "evidence": "not bound to the manifest"}
+        ],
+    }
+    with pytest.raises(bi.BatchError, match="distinct manifested members"):
+        bi.delivery_receipt(repo, members, bad_acceptance)
+
+
+def test_receipt_refuses_rogue_committer(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    head = _commit(repo, "member-a.txt")
+    _commit(repo, "rogue.txt", author="Rogue <rogue@example.com>")
+    head2 = _head(repo)
+    with pytest.raises(bi.BatchError, match="other than the integrator"):
+        bi.delivery_receipt(repo, [{"id": "A", "head": head}], _acceptance(head2, {"A": "pass"}))
+
+
+def test_member_merge_preserving_authorship_passes_integrator(tmp_path: Path) -> None:
+    """Legitimate member merges keep member authorship; committer decides."""
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    subprocess.run(["git", "checkout", "-qb", "member-a"], cwd=repo, check=True)
+    _commit(repo, "member-a.txt", author="Member <member@example.com>")
+    subprocess.run(["git", "checkout", "-q", "main"], cwd=repo, check=True)
+    subprocess.run(["git", "merge", "--no-ff", "-qm", "integrate A", "member-a"], cwd=repo, check=True)
+    head = _head(repo)
+    member_head = subprocess.run(
+        ["git", "rev-parse", "member-a"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    receipt = bi.delivery_receipt(repo, [{"id": "A", "head": member_head}], _acceptance(head, {"A": "pass"}))
+    assert receipt["integrator"] == "T <t@example.com>"
+
+
+def test_unsealed_record_fails_closed_and_reset_recovers(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    _start(repo, ["A"])
+    subprocess.run(["git", "config", "--worktree", "--unset", "benchbox.batch.sealed"], cwd=repo, check=True)
+    assert bi.read_batch(repo) is None
+    bi.reset_batch(repo)
+    record = bi.record_start(repo, "batch-2", ["A"])
+    assert bi.read_batch(repo)["batch_id"] == "batch-2"
+    assert record["members"] == ["A"]

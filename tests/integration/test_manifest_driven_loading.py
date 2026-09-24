@@ -314,3 +314,78 @@ def test_questdb_uses_manifest_delimiter(monkeypatch: Any, manifest_data_dir: Pa
     params = fake_requests.post_calls[0]["params"]
     assert params is not None, "requests.post() called without params"
     assert params.get("delimiter") == "|", f"Expected delimiter='|' from manifest; got: {params.get('delimiter')!r}"
+
+
+# ---------------------------------------------------------------------------
+# Non-TPC generator null markers (SingleStore strict LOAD DATA)
+#
+# nyctaxi and amplab must record csv_null_marker="" in the manifest they
+# write, so SingleStore emits NULL DEFINED BY '' instead of failing with
+# error 1264 on nullable ints. ClickBench keeps csv_null_marker=None: every
+# hits column is NOT NULL and its many legitimately-empty string fields must
+# not convert to NULL. These are dry-runs over the real generator manifest
+# code — no live SingleStore server.
+# ---------------------------------------------------------------------------
+
+
+def _assert_manifest_null_markers(tmp_path: Path, tables: dict[str, Path], benchmark: Any) -> None:
+    """Resolve manifest metadata for *tables* and require empty-string null markers."""
+    from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
+
+    resolver = DataSourceResolver()
+    source = resolver.resolve(benchmark, tmp_path)
+    assert source is not None, "DataSourceResolver returned None"
+    assert source.table_metadata, f"No manifest metadata resolved; tables: {list(source.tables)}"
+    for table, path in tables.items():
+        dialect = resolve_csv_dialect(source, table, Path(path), benchmark)
+        assert dialect.null_marker == "", (
+            f"table {table!r}: expected null_marker == '' for SingleStore LOAD DATA, got {dialect.null_marker!r}"
+        )
+
+
+def test_clickbench_generator_manifest_null_marker(tmp_path: Path) -> None:
+    """ClickBench dry-run manifest must resolve null_marker='__NULL__' for hits.
+
+    Every hits column is NOT NULL, so empty string fields must load as ""
+    rather than NULL on every platform. A None marker leaves the decision
+    to each loader default, and the cloud defaults (BigQuery, Snowflake,
+    Databricks/Spark) map bare empties to NULL; only the sentinel converts
+    to NULL while empty fields stay empty strings.
+    """
+    from benchbox.core.clickbench.generator import ClickBenchDataGenerator
+    from benchbox.platforms.base.data_loading import DataSourceResolver, resolve_csv_dialect
+
+    generated = ClickBenchDataGenerator(scale_factor=0.00001, output_dir=tmp_path).generate_data()
+    assert "hits" in generated
+    tables = {name: Path(path) for name, path in generated.items()}
+    benchmark = _Benchmark(tables=dict(tables))
+    source = DataSourceResolver().resolve(benchmark, tmp_path)
+    assert source is not None, "DataSourceResolver returned None"
+    for table, path in tables.items():
+        dialect = resolve_csv_dialect(source, table, Path(path), benchmark)
+        assert dialect.null_marker == "__NULL__", (
+            f"table {table!r}: expected null_marker '__NULL__' to preserve empty strings, got {dialect.null_marker!r}"
+        )
+
+
+def test_amplab_generator_manifest_null_marker(tmp_path: Path) -> None:
+    """AMPLab dry-run manifest must resolve null_marker='' for rankings."""
+    from benchbox.core.amplab.generator import AMPLabDataGenerator
+
+    generated = AMPLabDataGenerator(scale_factor=0.0001, output_dir=tmp_path).generate_data(tables=["rankings"])
+    assert "rankings" in generated
+    tables = {name: Path(path) for name, path in generated.items()}
+    _assert_manifest_null_markers(tmp_path, tables, _Benchmark(tables=dict(tables)))
+
+
+def test_nyctaxi_manifest_null_marker(tmp_path: Path) -> None:
+    """nyctaxi manifest writer must resolve null_marker='' for trips (no download)."""
+    from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
+
+    benchmark = NYCTaxiBenchmark(scale_factor=1.0, output_dir=tmp_path)
+    data_file = tmp_path / "yellow_tripdata_2019-01.csv"
+    data_file.write_text("VendorID,trip_distance\n1,2.5\n", encoding="utf-8")
+    benchmark.tables = {"trips": data_file}
+    benchmark.downloader._table_row_counts = {"trips": 1}
+    benchmark._write_manifest()
+    _assert_manifest_null_markers(tmp_path, {"trips": data_file}, benchmark)

@@ -1,24 +1,68 @@
 """Tests for the CLI setup command.
 
-Tests the credential setup CLI command functionality.
+Credential state comes from real ``~/.benchbox/credentials.yaml`` files under
+an isolated HOME, driven through the real CredentialManager. Only network
+validators, environment-dependent dependency checks, and per-platform
+interactive setup dispatch (prompt plus network) stay mocked; every config
+read/write assertion goes against the real file.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from unittest.mock import MagicMock, patch
+from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+import yaml
 from click.testing import CliRunner
 
 from benchbox.cli.main import cli
-from benchbox.security.credentials import CredentialStatus
+from benchbox.security.credentials import CredentialManager, CredentialStatus
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+@pytest.fixture()
+def isolated_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Isolate the default credential store (``~/.benchbox``) to tmp_path.
+
+    ``Path.home()`` honors USERPROFILE (not HOME) on Windows, so both must
+    point at tmp_path or the Windows lanes read/write the runner's real
+    credential store.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
+
+
+def _credentials_file(home: Path) -> Path:
+    return home / ".benchbox" / "credentials.yaml"
+
+
+def _seed_credentials(home: Path, entries: dict[str, tuple[dict, CredentialStatus]]) -> CredentialManager:
+    """Write real credential entries through the real manager.
+
+    Args:
+        home: Isolated HOME the default store resolves under.
+        entries: Mapping of platform to (credentials dict, status).
+    """
+    del home  # Store location derives from the isolated HOME, not this arg.
+    manager = CredentialManager()
+    for platform, (creds, status) in entries.items():
+        manager.set_platform_credentials(platform, creds, status)
+        manager.update_validation_status(platform, status)
+    manager.save_credentials()
+    return manager
+
+
+def _read_credentials(home: Path) -> dict:
+    with open(_credentials_file(home), encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
 
 
 class TestSetupCommand:
@@ -54,15 +98,15 @@ class TestSetupCommand:
         assert "Error: --platform is required" in result.output
         assert "Available platforms:" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    def test_setup_list_platforms(self, mock_cred_manager_class):
-        """Test setup --list-platforms."""
-        mock_manager = MagicMock()
-        mock_manager.list_platforms.return_value = {
-            "databricks": CredentialStatus.VALID,
-            "snowflake": CredentialStatus.MISSING,
-        }
-        mock_cred_manager_class.return_value = mock_manager
+    def test_setup_list_platforms(self, isolated_home: Path):
+        """Test setup --list-platforms against a real credential file."""
+        _seed_credentials(
+            isolated_home,
+            {
+                "databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID),
+                "snowflake": ({"account": "xy12345"}, CredentialStatus.MISSING),
+            },
+        )
 
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--list-platforms"])
@@ -78,33 +122,25 @@ class TestSetupCommand:
         assert "✅ Configured" in result.output
         assert "○ Not configured" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    def test_setup_status_no_credentials(self, mock_cred_manager_class):
+    def test_setup_status_no_credentials(self, isolated_home: Path):
         """Test setup --status with no credentials configured."""
-        mock_manager = MagicMock()
-        mock_manager.list_platforms.return_value = {}
-        mock_cred_manager_class.return_value = mock_manager
-
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--status"])
 
         assert result.exit_code == 0
         assert "No credentials configured yet" in result.output
         assert "benchbox setup --platform" in result.output
+        assert not _credentials_file(isolated_home).exists()
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    def test_setup_status_with_credentials(self, mock_cred_manager_class):
+    def test_setup_status_with_credentials(self, isolated_home: Path):
         """Test setup --status with configured credentials."""
-        mock_manager = MagicMock()
-        mock_manager.list_platforms.return_value = {
-            "databricks": CredentialStatus.VALID,
-            "snowflake": CredentialStatus.INVALID,
-        }
-        mock_manager.get_platform_credentials.side_effect = lambda p: {
-            "last_updated": "2025-01-15T10:00:00",
-            "last_validated": "2025-01-15T10:00:00",
-        }
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {
+                "databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID),
+                "snowflake": ({"account": "xy12345"}, CredentialStatus.INVALID),
+            },
+        )
 
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--status"])
@@ -113,61 +149,51 @@ class TestSetupCommand:
         assert "Credential Status" in result.output
         assert "✅ Valid" in result.output
         assert "❌ Invalid" in result.output
-        assert "2025-01-15" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    @patch("benchbox.cli.commands.setup.Confirm.ask")
-    def test_setup_remove_confirmed(self, mock_confirm, mock_cred_manager_class):
-        """Test setup --remove with confirmation."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
-        mock_confirm.return_value = True
+    def test_setup_remove_confirmed(self, isolated_home: Path):
+        """Test setup --remove with confirmation deletes the real entry."""
+        _seed_credentials(
+            isolated_home,
+            {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID)},
+        )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"])
+        result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"], input="y\n")
 
         assert result.exit_code == 0
         assert "Removed credentials for databricks" in result.output
-        mock_manager.remove_platform_credentials.assert_called_once_with("databricks")
-        mock_manager.save_credentials.assert_called_once()
+        assert "databricks" not in _read_credentials(isolated_home)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    @patch("benchbox.cli.commands.setup.Confirm.ask")
-    def test_setup_remove_cancelled(self, mock_confirm, mock_cred_manager_class):
-        """Test setup --remove with cancellation."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
-        mock_confirm.return_value = False
+    def test_setup_remove_cancelled(self, isolated_home: Path):
+        """Test setup --remove with cancellation keeps the real entry."""
+        _seed_credentials(
+            isolated_home,
+            {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID)},
+        )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"])
+        result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"], input="n\n")
 
         assert result.exit_code == 0
         assert "Cancelled" in result.output
-        mock_manager.remove_platform_credentials.assert_not_called()
+        assert "databricks" in _read_credentials(isolated_home)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    def test_setup_remove_no_credentials(self, mock_cred_manager_class):
+    def test_setup_remove_no_credentials(self, isolated_home: Path):
         """Test setup --remove with no existing credentials."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = False
-        mock_cred_manager_class.return_value = mock_manager
-
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"])
 
         assert result.exit_code == 0
         assert "No credentials found for databricks" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.databricks.credentials.validate_databricks_credentials")
-    def test_setup_validate_only_success(self, mock_validate, mock_cred_manager_class):
+    def test_setup_validate_only_success(self, mock_validate, isolated_home: Path):
         """Test setup --validate-only with valid credentials."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        manager = _seed_credentials(
+            isolated_home,
+            {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.NOT_VALIDATED)},
+        )
+        assert manager.get_credential_status("databricks") == CredentialStatus.NOT_VALIDATED
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -175,17 +201,21 @@ class TestSetupCommand:
 
         assert result.exit_code == 0
         assert "Databricks credentials are valid" in result.output
-        mock_validate.assert_called_once_with(mock_manager)
-        mock_manager.update_validation_status.assert_called_once_with("databricks", CredentialStatus.VALID)
-        mock_manager.save_credentials.assert_called_once()
+        mock_validate.assert_called_once()
+        assert isinstance(mock_validate.call_args[0][0], CredentialManager)
+        stored = _read_credentials(isolated_home)["databricks"]
+        assert stored["status"] == CredentialStatus.VALID.value
+        assert "last_validated" in stored
+        # A fresh manager reading the file back sees the validated status.
+        assert CredentialManager().get_credential_status("databricks") == CredentialStatus.VALID
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.databricks.credentials.validate_databricks_credentials")
-    def test_setup_validate_only_failure(self, mock_validate, mock_cred_manager_class):
+    def test_setup_validate_only_failure(self, mock_validate, isolated_home: Path):
         """Test setup --validate-only with invalid credentials."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.NOT_VALIDATED)},
+        )
         mock_validate.return_value = (False, "Authentication failed")
 
         runner = CliRunner()
@@ -194,17 +224,12 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Databricks credentials are invalid" in result.output
         assert "Authentication failed" in result.output
-        mock_manager.update_validation_status.assert_called_once_with(
-            "databricks", CredentialStatus.INVALID, "Authentication failed"
-        )
+        stored = _read_credentials(isolated_home)["databricks"]
+        assert stored["status"] == CredentialStatus.INVALID.value
+        assert stored["error_message"] == "Authentication failed"
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
-    def test_setup_validate_only_no_credentials(self, mock_cred_manager_class):
+    def test_setup_validate_only_no_credentials(self, isolated_home: Path):
         """Test setup --validate-only with no credentials."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = False
-        mock_cred_manager_class.return_value = mock_manager
-
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks", "--validate-only"])
 
@@ -212,29 +237,30 @@ class TestSetupCommand:
         assert "No credentials found for databricks" in result.output
         assert "Setup credentials: benchbox setup --platform databricks" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
-    def test_setup_missing_dependencies(self, mock_check_deps, mock_cred_manager_class):
-        """Test setup with missing platform dependencies."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
-        mock_check_deps.return_value = (False, ["databricks-sql-connector"])
+    def test_setup_missing_dependencies(self, mock_check_deps, isolated_home: Path):
+        """Test setup with missing platform dependencies (forced branch).
 
+        The missing-dependency branch is forced via mock: deriving the branch
+        from the live check would let a broken check (wrongly reporting
+        available) select the permissive branch and still pass.
+        """
+        del isolated_home
+        mock_check_deps.return_value = (False, ["databricks-sdk", "databricks-connect"])
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks"])
 
         assert result.exit_code == 0
         assert "Missing dependencies for databricks" in result.output
-        assert "databricks-sql-connector" in result.output
+        assert "databricks-sdk" in result.output
+        assert "databricks-connect" in result.output
         assert "Install with:" in result.output
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
-    def test_setup_interactive_databricks(self, mock_setup_databricks, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_databricks(self, mock_setup_databricks, mock_check_deps, isolated_home: Path):
         """Test interactive setup for Databricks."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -243,17 +269,15 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Databricks Credentials Setup" in result.output
         mock_setup_databricks.assert_called_once()
-        # Check that manager and console were passed
+        # The real manager (not a mock) is passed to the setup handler.
         call_args = mock_setup_databricks.call_args
-        assert call_args[0][0] == mock_manager
+        assert isinstance(call_args[0][0], CredentialManager)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.snowflake.setup_snowflake_credentials")
-    def test_setup_interactive_snowflake(self, mock_setup_snowflake, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_snowflake(self, mock_setup_snowflake, mock_check_deps, isolated_home: Path):
         """Test interactive setup for Snowflake."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -262,17 +286,14 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Snowflake Credentials Setup" in result.output
         mock_setup_snowflake.assert_called_once()
-        # Check that manager and console were passed
         call_args = mock_setup_snowflake.call_args
-        assert call_args[0][0] == mock_manager
+        assert isinstance(call_args[0][0], CredentialManager)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.redshift.setup_redshift_credentials")
-    def test_setup_interactive_redshift(self, mock_setup_redshift, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_redshift(self, mock_setup_redshift, mock_check_deps, isolated_home: Path):
         """Test interactive setup for Redshift."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -281,17 +302,14 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Redshift Credentials Setup" in result.output
         mock_setup_redshift.assert_called_once()
-        # Check that manager and console were passed
         call_args = mock_setup_redshift.call_args
-        assert call_args[0][0] == mock_manager
+        assert isinstance(call_args[0][0], CredentialManager)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.motherduck.setup_motherduck_credentials")
-    def test_setup_interactive_motherduck(self, mock_setup_motherduck, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_motherduck(self, mock_setup_motherduck, mock_check_deps, isolated_home: Path):
         """Test interactive setup for MotherDuck."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -301,15 +319,13 @@ class TestSetupCommand:
         assert "MotherDuck Credentials Setup" in result.output
         mock_setup_motherduck.assert_called_once()
         call_args = mock_setup_motherduck.call_args
-        assert call_args[0][0] == mock_manager
+        assert isinstance(call_args[0][0], CredentialManager)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.singlestore.setup_singlestore_credentials")
-    def test_setup_interactive_singlestore(self, mock_setup_singlestore, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_singlestore(self, mock_setup_singlestore, mock_check_deps, isolated_home: Path):
         """Test interactive setup for SingleStore."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -318,15 +334,13 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "SingleStore Credentials Setup" in result.output
         mock_setup_singlestore.assert_called_once()
-        assert mock_setup_singlestore.call_args[0][0] == mock_manager
+        assert isinstance(mock_setup_singlestore.call_args[0][0], CredentialManager)
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.bigquery.setup_bigquery_credentials")
-    def test_setup_interactive_bigquery(self, mock_setup_bigquery, mock_check_deps, mock_cred_manager_class):
+    def test_setup_interactive_bigquery(self, mock_setup_bigquery, mock_check_deps, isolated_home: Path):
         """Test interactive setup for BigQuery."""
-        mock_manager = MagicMock()
-        mock_cred_manager_class.return_value = mock_manager
+        del isolated_home
         mock_check_deps.return_value = (True, [])
 
         runner = CliRunner()
@@ -335,36 +349,33 @@ class TestSetupCommand:
         assert result.exit_code == 0
         assert "Bigquery Credentials Setup" in result.output
         mock_setup_bigquery.assert_called_once()
-        # Check that manager and console were passed
         call_args = mock_setup_bigquery.call_args
-        assert call_args[0][0] == mock_manager
+        assert isinstance(call_args[0][0], CredentialManager)
 
-    def test_setup_platform_case_insensitive(self):
+    @patch("benchbox.utils.dependencies.check_platform_dependencies")
+    @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
+    def test_setup_platform_case_insensitive(self, mock_setup_databricks, mock_check_deps, isolated_home: Path):
         """Test that platform names are case insensitive."""
-        with patch("benchbox.cli.commands.setup.CredentialManager") as mock_cred_manager_class:
-            with patch("benchbox.utils.dependencies.check_platform_dependencies") as mock_check_deps:
-                with patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials"):
-                    mock_manager = MagicMock()
-                    mock_cred_manager_class.return_value = mock_manager
-                    mock_check_deps.return_value = (True, [])
+        del isolated_home
+        mock_check_deps.return_value = (True, [])
 
-                    runner = CliRunner()
-                    result = runner.invoke(cli, ["setup", "--platform", "DATABRICKS"])
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--platform", "DATABRICKS"])
 
-                    assert result.exit_code == 0
-                    assert "Databricks Credentials Setup" in result.output
+        assert result.exit_code == 0
+        assert "Databricks Credentials Setup" in result.output
 
 
 class TestSetupValidation:
     """Test validation logic for setup command."""
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
-    def test_validate_snowflake(self, mock_validate, mock_cred_manager_class):
+    def test_validate_snowflake(self, mock_validate, isolated_home: Path):
         """Test validation for Snowflake platform."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {"snowflake": ({"account": "xy12345", "user": "tester"}, CredentialStatus.NOT_VALIDATED)},
+        )
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -372,14 +383,15 @@ class TestSetupValidation:
 
         assert result.exit_code == 0
         assert "Snowflake credentials are valid" in result.output
+        assert _read_credentials(isolated_home)["snowflake"]["status"] == CredentialStatus.VALID.value
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.credentials.bigquery.validate_bigquery_credentials")
-    def test_validate_bigquery(self, mock_validate, mock_cred_manager_class):
+    def test_validate_bigquery(self, mock_validate, isolated_home: Path):
         """Test validation for BigQuery platform."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {"bigquery": ({"project": "test-project"}, CredentialStatus.NOT_VALIDATED)},
+        )
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -387,14 +399,15 @@ class TestSetupValidation:
 
         assert result.exit_code == 0
         assert "Bigquery credentials are valid" in result.output
+        assert _read_credentials(isolated_home)["bigquery"]["status"] == CredentialStatus.VALID.value
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.credentials.redshift.validate_redshift_credentials")
-    def test_validate_redshift(self, mock_validate, mock_cred_manager_class):
+    def test_validate_redshift(self, mock_validate, isolated_home: Path):
         """Test validation for Redshift platform."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {"redshift": ({"host": "cluster.example.com"}, CredentialStatus.NOT_VALIDATED)},
+        )
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -402,14 +415,11 @@ class TestSetupValidation:
 
         assert result.exit_code == 0
         assert "Redshift credentials are valid" in result.output
+        assert _read_credentials(isolated_home)["redshift"]["status"] == CredentialStatus.VALID.value
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.credentials.motherduck.validate_motherduck_credentials")
-    def test_validate_motherduck_without_stored_credentials(self, mock_validate, mock_cred_manager_class):
+    def test_validate_motherduck_without_stored_credentials(self, mock_validate, isolated_home: Path):
         """MotherDuck validates from MOTHERDUCK_TOKEN even without stored credentials."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = False
-        mock_cred_manager_class.return_value = mock_manager
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -417,21 +427,19 @@ class TestSetupValidation:
 
         assert result.exit_code == 0
         assert "MotherDuck credentials are valid" in result.output
-        mock_validate.assert_called_once_with(mock_manager)
-        mock_manager.set_platform_credentials.assert_called_once()
-        saved_credentials = mock_manager.set_platform_credentials.call_args[0][1]
-        assert saved_credentials == {
-            "database": "benchbox",
-            "token_env_var": "MOTHERDUCK_TOKEN",
-        }
+        mock_validate.assert_called_once()
+        assert isinstance(mock_validate.call_args[0][0], CredentialManager)
+        stored = _read_credentials(isolated_home)["motherduck"]
+        assert stored["database"] == "benchbox"
+        assert stored["token_env_var"] == "MOTHERDUCK_TOKEN"
 
-    @patch("benchbox.cli.commands.setup.CredentialManager")
     @patch("benchbox.platforms.credentials.singlestore.validate_singlestore_credentials")
-    def test_validate_singlestore(self, mock_validate, mock_cred_manager_class):
+    def test_validate_singlestore(self, mock_validate, isolated_home: Path):
         """Test validate-only dispatch for SingleStore."""
-        mock_manager = MagicMock()
-        mock_manager.has_credentials.return_value = True
-        mock_cred_manager_class.return_value = mock_manager
+        _seed_credentials(
+            isolated_home,
+            {"singlestore": ({"host": "localhost"}, CredentialStatus.NOT_VALIDATED)},
+        )
         mock_validate.return_value = (True, None)
 
         runner = CliRunner()
@@ -439,13 +447,15 @@ class TestSetupValidation:
 
         assert result.exit_code == 0
         assert "SingleStore credentials are valid" in result.output
-        mock_validate.assert_called_once_with(mock_manager)
+        mock_validate.assert_called_once()
+        assert isinstance(mock_validate.call_args[0][0], CredentialManager)
+        assert _read_credentials(isolated_home)["singlestore"]["status"] == CredentialStatus.VALID.value
 
 
 class TestSetupIntegration:
     """Integration tests for setup command."""
 
-    def test_setup_real_execution_list(self):
+    def test_setup_real_execution_list(self, isolated_home: Path):
         """Test setup --list-platforms with real execution."""
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--list-platforms"])
@@ -456,25 +466,55 @@ class TestSetupIntegration:
         assert "Snowflake" in result.output
         assert "MotherDuck" in result.output
 
-    def test_setup_real_execution_status(self):
-        """Test setup --status with real execution."""
+    def test_setup_real_execution_status(self, isolated_home: Path):
+        """Test setup --status with real execution and an empty store."""
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--status"])
 
-        # Should run without errors
         assert result.exit_code == 0
-        # Will either show "No credentials" or show the status table
-        assert "No credentials configured yet" in result.output or "Credential Status" in result.output
+        assert "No credentials configured yet" in result.output
 
-    @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
-    @patch("benchbox.utils.dependencies.check_platform_dependencies")
-    def test_setup_databricks_interactive_flow(self, mock_check_deps, mock_setup):
-        """Test full interactive flow for Databricks setup."""
-        mock_check_deps.return_value = (True, [])
+    @patch("benchbox.platforms.credentials.motherduck.validate_motherduck_credentials")
+    def test_setup_motherduck_interactive_flow_writes_real_file(
+        self, mock_validate, isolated_home: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """Full MotherDuck prompt flow writes a real credential file.
+
+        Only the network validator stays mocked; dependency check, prompts,
+        manager, and YAML store are all real.
+        """
+        monkeypatch.setenv("MOTHERDUCK_TOKEN", "test-token")
+        mock_validate.return_value = (True, None)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["setup", "--platform", "databricks"])
+        result = runner.invoke(cli, ["setup", "--platform", "motherduck"], input="\n")
 
         assert result.exit_code == 0
-        assert "Databricks Credentials Setup" in result.output
-        mock_setup.assert_called_once()
+        assert "MotherDuck Credentials Setup" in result.output
+        stored = _read_credentials(isolated_home)["motherduck"]
+        assert stored["database"] == "benchbox"
+        assert stored["token_env_var"] == "MOTHERDUCK_TOKEN"
+        assert stored["status"] == CredentialStatus.VALID.value
+        # The one-time token is never persisted to the credential store.
+        assert "test-token" not in _credentials_file(isolated_home).read_text(encoding="utf-8")
+
+    def test_setup_status_reflects_previous_setup_run(self, isolated_home: Path):
+        """A file written by one CLI run is visible to the next (round-trip)."""
+        _seed_credentials(
+            isolated_home,
+            {"snowflake": ({"account": "xy12345", "user": "tester"}, CredentialStatus.VALID)},
+        )
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["setup", "--status"])
+
+        assert result.exit_code == 0
+        assert "Credential Status" in result.output
+        assert "✅ Valid" in result.output
+
+        remove = runner.invoke(cli, ["setup", "--platform", "snowflake", "--remove"], input="y\n")
+        assert remove.exit_code == 0
+
+        status = runner.invoke(cli, ["setup", "--status"])
+        assert status.exit_code == 0
+        assert "No credentials configured yet" in status.output

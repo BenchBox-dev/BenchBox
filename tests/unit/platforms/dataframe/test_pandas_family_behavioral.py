@@ -104,7 +104,7 @@ class TestTypeMappingAndDtypes:
 
         retrieved = ctx.get_table("names").native
         # Pandas can store strings as object or StringDtype
-        assert retrieved["name"].dtype in (object, pd.StringDtype())
+        assert pd.api.types.is_string_dtype(retrieved["name"].dtype)
 
     def test_datetime_column_dtype(self, adapter, ctx):
         """Registered datetime columns retain datetime64 dtype."""

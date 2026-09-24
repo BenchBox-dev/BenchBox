@@ -107,19 +107,18 @@ def _minimal_bundle() -> dict:
         },
         "summary": {
             "validation": "passed",
-            "queries": {"total": 2, "passed": 2, "failed": 0},
+            "queries": {"total": 22, "passed": 22, "failed": 0},
         },
         "phases": {"validation": {"status": "PASSED"}},
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i * 10, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
 def _normalized_cost_block(cost: str | None = "1.25", status: str = "normalized") -> dict:
     """Return a minimal valid BenchBox normalized-cost provenance block."""
-    billing_unit = "instance_hour" if status == "normalized" else "not_applicable"
+    # "node_hour" matches this block's Redshift-like deployment and is in the
+    # NORMALIZED_COST_BILLING_UNITS vocabulary the bundle validator enforces.
+    billing_unit = "node_hour" if status == "normalized" else "not_applicable"
     pricing_region = "us-east-1" if status == "normalized" else "not_applicable"
     return {
         "normalized_cost_usd": cost,
@@ -176,6 +175,48 @@ class TestValidateBundle:
         _validate_bundle(_minimal_bundle(), vr)
         assert vr.ok
         assert len(vr.errors) == 0
+
+    def _databricks_bundle(self) -> dict:
+        data = _minimal_bundle()
+        data["platform"] = {"name": "databricks"}
+        return data
+
+    def test_pre_cutoff_untuned_z_order_warns(self):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "platform",
+        [
+            {
+                "name": "databricks",
+                "config": {"databricks_clustering_strategy": "z_order"},
+                "tuning": {"tuning_source": "explicit_file"},
+            },
+            {"name": "databricks", "config": {"databricks_clustering_strategy": "none"}},
+            {"name": "duckdb", "config": {"databricks_clustering_strategy": "z_order"}},
+        ],
+    )
+    def test_cutoff_warn_only_for_untuned_pre_provenance_z_order(self, platform):
+        data = _minimal_bundle()
+        data["platform"] = platform
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
+    def test_post_cutoff_z_order_does_not_warn(self):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["export"] = {"benchbox_version": "0.5.0"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
 
     def test_valid_schema_2_2_row_count_validation_passes(self):
         data = _minimal_bundle()
@@ -250,6 +291,127 @@ class TestValidateBundle:
         assert not vr.ok
         assert any("summary.validation='passed' contradicts" in error for error in vr.errors)
 
+    def test_absent_optional_extension_blocks_pass(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_minimal_bundle(), vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "environment",
+        [
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "source": "observed",
+                    "client_region": "us-east-1",
+                    "client_cloud": "aws",
+                    "statement_overhead_ms": {"samples": 5, "min": 1.42, "median": 1.68},
+                }
+            },
+            {"client_link": {"collection_status": "unavailable"}},
+            {"other": 1},
+        ],
+    )
+    def test_well_formed_client_link_passes(self, environment):
+        data = _minimal_bundle()
+        data["environment"] = environment
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "environment",
+        [
+            "not-a-dict",
+            {"client_link": "not-a-dict"},
+            {"client_link": {}},
+            {"client_link": {"collection_status": 42}},
+            {"client_link": {"collection_status": "available", "client_region": 42}},
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "statement_overhead_ms": {"samples": "five"},
+                }
+            },
+            {
+                "client_link": {
+                    "collection_status": "available",
+                    "statement_overhead_ms": {"samples": -1, "min": -0.5},
+                }
+            },
+        ],
+    )
+    def test_malformed_client_link_is_rejected(self, environment):
+        data = _minimal_bundle()
+        data["environment"] = environment
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    def test_unknown_collection_status_warns_only(self):
+        data = _minimal_bundle()
+        data["environment"] = {"client_link": {"collection_status": "future-status"}}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("collection_status" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "tables",
+        [
+            {"orders": {"rows": 10, "load_ms": 12.5}},
+            {"orders": {"rows": 10, "load_ms": 0}},
+            {"orders": {"rows": 10}},
+        ],
+    )
+    def test_well_formed_tables_block_passes(self, tables):
+        data = _minimal_bundle()
+        data["tables"] = tables
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    @pytest.mark.parametrize(
+        "tables",
+        [
+            "not-a-dict",
+            {"orders": "not-a-dict"},
+            {"orders": {"rows": "many"}},
+            {"orders": {"rows": -1}},
+            {"orders": {"load_ms": "fast"}},
+            {"orders": {"load_ms": True}},
+            {"orders": {"load_ms": -1}},
+        ],
+    )
+    def test_malformed_tables_block_is_rejected(self, tables):
+        data = _minimal_bundle()
+        data["tables"] = tables
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    def test_unknown_clustering_strategy_warns_only(self):
+        data = _minimal_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "future-strategy"}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("databricks_clustering_strategy" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "config",
+        [
+            "not-a-dict",
+            {"databricks_clustering_strategy": 42},
+        ],
+    )
+    def test_malformed_platform_config_clustering_is_rejected(self, config):
+        data = _minimal_bundle()
+        data["platform"]["config"] = config
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
     def test_public_private_path_is_rejected_by_cli_boundary(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]):
         bundle_path = tmp_path / "tpch_result.json"
         payload = _minimal_bundle()
@@ -268,6 +430,30 @@ class TestValidateBundle:
         _validate_bundle(data, vr)
         assert not vr.ok
         assert any("Missing required top-level keys" in e for e in vr.errors)
+
+    def test_result_schema_version_accepted_without_legacy_version(self):
+        data = _minimal_bundle()
+        del data["version"]
+        data["result_schema_version"] = "2.2"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
+
+    def test_missing_result_schema_version_and_legacy_version_rejected(self):
+        data = _minimal_bundle()
+        del data["version"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("Missing required top-level keys" in e and "result_schema_version" in e for e in vr.errors)
+
+    def test_both_result_schema_version_and_legacy_version_accepted(self):
+        data = _minimal_bundle()
+        data["result_schema_version"] = "2.2"
+        data["version"] = "2.2"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok
 
     def test_bad_version(self):
         data = _minimal_bundle()
@@ -511,11 +697,10 @@ class TestValidateBundle:
 
     def test_failed_warmup_does_not_contradict_successful_measurements(self):
         data = _minimal_bundle()
-        data["summary"]["queries"] = {"total": 1, "passed": 1, "failed": 0}
+        data["summary"]["queries"] = {"total": 23, "passed": 23, "failed": 0}
         data["queries"] = [
             {"id": "Q1", "ms": 0, "status": "FAILED", "run_type": "warmup"},
-            {"id": "Q1", "ms": 100, "status": "SUCCESS", "run_type": "measurement"},
-        ]
+        ] + [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "run_type": "measurement"} for i in range(1, 23)]
         vr = ValidationResult("test")
 
         _validate_bundle(data, vr)
@@ -578,7 +763,7 @@ class TestValidateBundle:
 
     def test_positive_sub_millisecond_timing_passes(self):
         data = _minimal_bundle()
-        data["queries"] = [{"id": "Q1", "ms": 0.04, "status": "SUCCESS"}]
+        data["queries"] = [{"id": f"Q{i}", "ms": 0.04, "status": "SUCCESS"} for i in range(1, 23)]
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok
@@ -684,6 +869,801 @@ class TestValidateBundle:
 
         assert not vr.ok
         assert any("requires deployment metadata" in e for e in vr.errors)
+
+    def test_normalized_cost_accepts_tib_scanned(self):
+        """BigQuery's per-tebibyte unit is in the validator vocabulary."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "tib_scanned"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_normalized_cost_accepts_legacy_tb_scanned(self):
+        """Pre-ADR BigQuery bundles recorded as tb_scanned still validate."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "tb_scanned"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert vr.ok, vr.errors
+
+    def test_normalized_cost_rejects_unit_outside_vocabulary(self):
+        """A fictional billing_unit cannot back normalized cost."""
+        data = _minimal_bundle()
+        data["normalized_cost"] = _normalized_cost_block(cost="1.25")
+        data["normalized_cost"]["billing_unit"] = "bogus_unit"
+        data["cost"] = {"total_usd": 1.25, "model": "estimated"}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+
+        assert not vr.ok
+        assert any("concrete billing_unit" in e for e in vr.errors)
+
+
+# ---------------------------------------------------------------------------
+# cache-control receipt gate + empty result rows tripwire
+# ---------------------------------------------------------------------------
+
+
+def _bundle_with_cache_control(receipt, platform_name="Snowflake", **compute_fields):
+    data = _minimal_bundle()
+    compute = dict(compute_fields)
+    if receipt is not None:
+        compute["cache_control"] = receipt
+    data["platform"] = {"name": platform_name, "version": "9.0", "compute": compute}
+    return data
+
+
+class TestCacheControlGate:
+    def test_absent_receipt_grandfathered(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(None), vr)
+        assert vr.ok, vr.errors
+
+    def test_confirmed_disabled_passes(self):
+        receipt = {"validated": True, "cache_disabled": True, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert vr.ok, vr.errors
+
+    def test_unconfirmed_receipt_refused(self):
+        receipt = {"validated": False, "cache_disabled": False, "settings": {}, "warnings": [], "errors": ["boom"]}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("unconfirmed" in e for e in vr.errors)
+
+    def test_confirmed_enabled_refused(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
+
+    def test_malformed_receipt_refused(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control("disabled"), vr)
+        assert not vr.ok
+        assert any("must be an object" in e for e in vr.errors)
+
+    def test_mirror_lane_exempt(self):
+        receipt = {"validated": True, "cache_disabled": False, "settings": {}, "warnings": [], "errors": []}
+        data = _bundle_with_cache_control(receipt)
+        data["summary"]["validation"] = "partial"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_declared_enabled_cache_refused(self):
+        # A receipt-capable platform declaring result_cache_enabled without a
+        # receipt advertises cached timings with no disabling evidence.
+        for platform_name in ("Snowflake", "Redshift"):
+            vr = ValidationResult("test")
+            data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
+            _validate_bundle(data, vr)
+            assert not vr.ok, platform_name
+            assert any("without a cache_control receipt" in e for e in vr.errors), vr.errors
+
+    def test_absent_receipt_with_declared_disabled_cache_grandfathered(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=False)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
+        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # legacy exemption even when they declare an enabled cache.
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_receipt_with_enabled_cache_exempt_in_mirror_lane(self):
+        vr = ValidationResult("test")
+        data = _bundle_with_cache_control(None, result_cache_enabled=True)
+        data["summary"]["validation"] = "partial"
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_explicit_enabled_cache_receipt_refused(self):
+        # End to end: the receipt adapters record for disable_result_cache=False
+        # carries confirmed-enabled evidence, which cannot stand as clean.
+        from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
+
+        receipt = explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_cache_control(receipt), vr)
+        assert not vr.ok
+        assert any("cache is enabled" in e for e in vr.errors)
+
+
+def _bundle_with_rows(row_values, rows_loaded=866602):
+    data = _minimal_bundle()
+    data["queries"] = [
+        {"id": f"Q{i}", "ms": 100, "status": "SUCCESS", "rows": value} for i, value in enumerate(row_values)
+    ]
+    data["summary"]["queries"] = {"total": len(row_values), "passed": len(row_values), "failed": 0}
+    if rows_loaded is None:
+        data["summary"].pop("data", None)
+    else:
+        data["summary"]["data"] = {"rows_loaded": rows_loaded}
+    return data
+
+
+class TestEmptyResultRows:
+    def test_all_empty_against_loaded_data_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0]), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_missing_rows_with_unreported_volume_warns(self):
+        data = _bundle_with_rows([0, 0], rows_loaded=None)
+        for q in data["queries"]:
+            q.pop("rows")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w and "unreported" in w for w in vr.warnings)
+
+    def test_mixed_zero_and_nonzero_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 41]), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_zero_loaded_volume_excuses_empty_results(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_bundle_with_rows([0, 0], rows_loaded=0), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_no_success_rows_is_silent(self):
+        data = _bundle_with_rows([0, 0])
+        for q in data["queries"]:
+            q["status"] = "FAILED"
+        data["summary"]["validation"] = "failed"
+        data["summary"]["queries"] = {"total": 2, "passed": 0, "failed": 2}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("result-rows-empty" in w for w in vr.warnings)
+
+    def test_padded_run_type_still_counts_as_measurement(self):
+        data = _bundle_with_rows([0, 0])
+        for q in data["queries"]:
+            q["run_type"] = "measurement "
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert any("result-rows-empty" in w for w in vr.warnings)
+
+
+# timing plausibility warnings (C1-C4; warnings only, never refuse)
+# ---------------------------------------------------------------------------
+
+
+def _timing_bundle(
+    per_query_ms,
+    *,
+    benchmark="tpch",
+    platform="Snowflake",
+    scale_factor=0.1,
+    geomean_ms=None,
+    rows_loaded=866602,
+    validation="passed",
+):
+    """Build a bundle with explicit per-query timings.
+
+    ``per_query_ms`` maps query id to ms (single value or list of samples).
+    Archived shapes mirror the September cloud TPC-H runs that motivated
+    these gates.
+    """
+    queries = []
+    for qid, ms in per_query_ms.items():
+        for sample in ms if isinstance(ms, list) else [ms]:
+            queries.append({"id": qid, "ms": sample, "status": "SUCCESS"})
+    total = len(queries)
+    timing = {"total_ms": sum(q["ms"] for q in queries)}
+    if geomean_ms is not None:
+        timing["geometric_mean_ms"] = geomean_ms
+    summary = {"validation": validation, "queries": {"total": total, "passed": total, "failed": 0}}
+    if timing:
+        summary["timing"] = timing
+    if rows_loaded is not None:
+        summary["data"] = {"rows_loaded": rows_loaded}
+    return {
+        "version": "2.1",
+        "run": {"id": "timing-test", "timestamp": "2026-09-19T00:00:00", "total_duration_ms": 60000},
+        "benchmark": {"id": benchmark, "name": benchmark, "scale_factor": scale_factor},
+        "platform": {"name": platform, "version": "1.0"},
+        "summary": summary,
+        "phases": {"validation": {"status": "PASSED" if validation == "passed" else "PARTIAL"}},
+        "queries": queries,
+    }
+
+
+def _flat_queries(base=4500.0, spread=60.0, count=22):
+    return {f"Q{i}": base + (i % 5) * spread / 4 for i in range(1, count + 1)}
+
+
+def _varied_queries(count=22):
+    return {f"Q{i}": 200.0 * i for i in range(1, count + 1)}
+
+
+class TestTimingPlateau:
+    def test_flat_heterogeneous_run_warns_but_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries()), vr)
+        assert vr.ok, vr.errors
+        assert any("timing-plateau" in w for w in vr.warnings)
+
+    def test_varied_run_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_varied_queries()), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_fast_flat_run_is_silent(self):
+        # P2: a tight band of genuinely fast queries is fast execution, not
+        # fixed-overhead dominance. Mirrors the checked-in TPC-H SF0.01 DuckDB
+        # bundle (per-query means span 5-8ms, max/min 1.48, CV 0.09).
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle({f"Q{i}": 5.0 + (i % 4) for i in range(1, 23)}), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+        assert "timing-plateau" not in vr.override_required
+
+    def test_subsecond_peak_stays_silent(self):
+        # Peak 960ms sits below the absolute floor; the relative spread alone
+        # must not block it.
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=900.0, spread=60.0)), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_plateau_at_or_above_absolute_floor_still_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=1100.0, spread=60.0)), vr)
+        assert vr.ok, vr.errors
+        assert any("timing-plateau" in w for w in vr.warnings)
+
+    def test_uniform_benchmark_is_out_of_scope(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(), benchmark="read_primitives"), vr)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_few_distinct_queries_unevaluable(self):
+        vr = ValidationResult("test")
+        # Mirror lane: a 2-query fixture cannot satisfy canonical coverage;
+        # the plateau gate under test is orthogonal to it.
+        _validate_bundle(_timing_bundle({"Q1": 4400.0, "Q2": 4450.0}), vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_all_zero_timings_have_no_plateau_warning(self):
+        data = _timing_bundle({f"Q{i}": 0.0 for i in range(1, 23)})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok  # owned by the queries-section gate
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_sub_millisecond_rows_are_timer_noise_not_evidence(self):
+        data = _timing_bundle({f"Q{i}": 0.5 for i in range(1, 23)})
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not any("timing-plateau" in w for w in vr.warnings)
+
+    def test_case_variant_benchmark_id_still_gated(self):
+        data = _timing_bundle({f"Q{i}": 4510.0 + (i % 5) * 7.0 for i in range(1, 23)}, benchmark="TPCH")
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert any("timing-plateau" in w for w in vr.warnings)
+
+
+class TestSmallScaleFloor:
+    def test_slow_floor_on_tiny_data_warns(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0)), vr)
+        assert vr.ok, vr.errors
+        assert any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_fast_floor_is_silent(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_varied_queries(), rows_loaded=866602), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_large_scale_is_out_of_scope(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), scale_factor=1.0), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_large_row_counts_excuse_a_slow_floor(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=60_000_000), vr)
+        assert vr.ok, vr.errors
+        assert not any("small-scale-floor" in w for w in vr.warnings)
+
+    def test_missing_rows_never_silently_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=None), vr)
+        assert vr.ok, vr.errors
+        assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
+
+    def test_nonfinite_rows_loaded_is_unreported_not_fatal(self):
+        # A JSON number like 1e309 parses to inf; int() would raise
+        # OverflowError. The validator must treat it as unreported.
+        for bad_rows in (float("inf"), float("-inf"), float("nan")):
+            vr = ValidationResult("test")
+            _validate_bundle(_timing_bundle(_flat_queries(base=4400.0), rows_loaded=bad_rows), vr)
+            assert vr.ok, vr.errors
+            assert any("small-scale-floor" in w and "unreported" in w for w in vr.warnings)
+
+    def test_json_overflow_rows_loaded_does_not_abort_multibundle(self, tmp_path):
+        good = _write_timing_bundle(tmp_path, "good.json", _varied_queries(), platform="Snowflake")
+        bad_bundle = _timing_bundle(_flat_queries(base=4400.0), platform="Snowflake", rows_loaded=866602)
+        text = json.dumps(bad_bundle).replace('"rows_loaded": 866602', '"rows_loaded": 1e309')
+        assert "1e309" in text
+        bad = tmp_path / "bad.json"
+        bad.write_text(text, encoding="utf-8")
+        results = validate_bundles([bad, good])
+        assert len(results) == 2
+        assert all(vr.ok for vr in results)
+
+
+def _write_timing_bundle(tmp_path, name, per_query_ms, **kwargs):
+    path = tmp_path / name
+    path.write_text(json.dumps(_timing_bundle(per_query_ms, **kwargs)), encoding="utf-8")
+    return path
+
+
+class TestScaleInvariance:
+    def test_flat_scales_warn_on_both_bundles(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert all(any("scale-invariant" in w for w in vr.warnings) for vr in results)
+
+    def test_warning_reports_actual_scale_span(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        # The 0.1 -> 10 span is 100x, not the 0.1x lower endpoint.
+        assert all("grows 100x in scale" in w for w in warned)
+
+    def test_single_scale_is_silent(self, tmp_path):
+        (ofar,) = validate_bundles([_write_timing_bundle(tmp_path, "only.json", _flat_queries(), platform="Snowflake")])
+        assert ofar.ok, ofar.errors
+        assert not any("scale-invariant" in w for w in ofar.warnings)
+
+    def test_growing_timings_are_silent(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=400.0),
+            scale_factor=0.1,
+            geomean_ms=400.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4000.0),
+            scale_factor=10.0,
+            geomean_ms=4000.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_micro_benchmark_flat_scales_are_expected_not_suspicious(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            benchmark="read_primitives",
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            benchmark="read_primitives",
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+    def test_missing_geomean_is_disclosed_not_silently_averaged(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=None,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+        )
+        results = validate_bundles([lo, hi])
+        assert all(vr.ok for vr in results)
+        # The per-query leg still evaluates, but the message must admit the
+        # geomean leg could not run — never a silent arithmetic-mean fallback.
+        warned = [w for vr in results for w in vr.warnings if "scale-invariant" in w]
+        assert warned
+        assert all("geomean unevaluable" in w for w in warned)
+
+    def test_partial_bundles_do_not_distort(self, tmp_path):
+        lo = _write_timing_bundle(
+            tmp_path,
+            "lo.json",
+            _flat_queries(base=4500.0),
+            scale_factor=0.1,
+            geomean_ms=4531.0,
+            platform="Snowflake",
+        )
+        hi = _write_timing_bundle(
+            tmp_path,
+            "hi.json",
+            _flat_queries(base=4900.0),
+            scale_factor=10.0,
+            geomean_ms=4967.0,
+            platform="Snowflake",
+            rows_loaded=86_586_082,
+            validation="partial",
+        )
+        results = validate_bundles([lo, hi], allow_partial_validation=True)
+        assert all(vr.ok for vr in results)
+        assert not any("scale-invariant" in w for vr in results for w in vr.warnings)
+
+
+class TestFloorOutlier:
+    def _peer_set(self, tmp_path, floors, platforms=None):
+        paths = []
+        for i, floor in enumerate(floors):
+            paths.append(
+                _write_timing_bundle(
+                    tmp_path,
+                    f"p{i}.json",
+                    {"Q1": floor, "Q2": floor + 500, "Q3": floor + 1000},
+                    scale_factor=1.0,
+                    geomean_ms=floor + 500,
+                    platform=f"Engine{i}" if platforms is None else platforms[i],
+                    rows_loaded=8_661_245,
+                )
+            )
+        # Mirror lane: these peer fixtures are deliberately short-coverage
+        # synthetic bundles; the coverage gate is orthogonal to peer logic.
+        return validate_bundles(paths, allow_partial_validation=True)
+
+    def test_slow_peer_warns_informationally(self, tmp_path):
+        slow, mid, fast = self._peer_set(tmp_path, [4500.0, 350.0, 300.0])
+        assert slow.ok and mid.ok and fast.ok
+        assert any("floor-outlier" in w for w in slow.warnings)
+        assert not any("floor-outlier" in w for w in mid.warnings)
+        assert not any("floor-outlier" in w for w in fast.warnings)
+
+    def test_pair_without_peers_is_silent(self, tmp_path):
+        first, second = self._peer_set(tmp_path, [4500.0, 300.0])
+        assert first.ok and second.ok
+        assert not any("floor-outlier" in w for vr in (first, second) for w in vr.warnings)
+
+    def test_same_platform_reruns_are_not_peers(self, tmp_path):
+        # Three reruns of one engine satisfy the bundle-count quorum but
+        # offer zero cross-platform evidence: no outlier may be declared.
+        results = self._peer_set(tmp_path, [4500.0, 350.0, 300.0], platforms=["SameEngine"] * 3)
+        assert all(vr.ok for vr in results)
+        assert not any("floor-outlier" in w for vr in results for w in vr.warnings)
+
+    def test_own_platform_rerun_does_not_dilute_peers(self, tmp_path):
+        # A fast rerun of the slow engine shares its platform key, so it is
+        # consolidated away; the two genuinely distinct peers still convict.
+        slow, _mid, _fast, rerun = self._peer_set(
+            tmp_path,
+            [4500.0, 350.0, 300.0, 360.0],
+            platforms=["SlowEngine", "EngineB", "EngineC", "SlowEngine"],
+        )
+        assert all(vr.ok for vr in (slow, rerun))
+        assert any("floor-outlier" in w for w in slow.warnings)
+        assert not any("floor-outlier" in w for w in rerun.warnings)
+
+
+# compliance_class + canonical query-set coverage gates
+# ---------------------------------------------------------------------------
+
+
+class TestSubmissionDeterministicGates:
+    def test_unofficial_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial_nonstandard", "unofficial_subscale"):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("compliance_class" in e for e in vr.errors)
+
+    def test_official_compliance_passes(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "official"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_absent_compliance_class_grandfathered(self):
+        data = _minimal_bundle()
+        assert "compliance_class" not in data["benchmark"]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_unofficial_compliance_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["benchmark"]["compliance_class"] = "unofficial_subscale"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_short_query_coverage_refused_in_community_mode(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("canonical queries" in e for e in vr.errors)
+
+    def test_full_query_coverage_passes(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_minimal_bundle(), vr)
+        assert vr.ok, vr.errors
+
+    def test_short_coverage_allowed_on_mirror_lane(self):
+        data = _minimal_bundle()
+        data["summary"]["validation"] = "partial"
+        data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+        data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr, allow_partial_validation=True)
+        assert vr.ok, vr.errors
+
+    def test_unknown_benchmark_skips_coverage(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "some_new_benchmark"
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_case_variant_benchmark_id_still_gated(self):
+        for bm_id in ("TPCH", "tpch ", " Tpch"):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = bm_id
+            data["queries"] = [{"id": f"Q{i}", "ms": 100, "status": "SUCCESS"} for i in range(1, 6)]
+            data["summary"]["queries"] = {"total": 5, "passed": 5, "failed": 0}
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any("canonical queries" in e for e in vr.errors)
+
+    def test_non_string_query_ids_do_not_count_toward_coverage(self):
+        data = _minimal_bundle()
+        data["queries"] = [{"id": i, "ms": 100, "status": "SUCCESS"} for i in range(1, 23)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("non-string or blank id" in e for e in vr.errors)
+
+    def test_non_official_compliance_refused_in_community_mode(self):
+        for compliance in ("unofficial", "Official", "official ", 123, True):
+            data = _minimal_bundle()
+            data["benchmark"]["compliance_class"] = compliance
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok, compliance
+            assert any("compliance_class" in e for e in vr.errors)
+
+    def test_canonical_counts_match_explorer_transformer(self):
+        from _project.scripts.explorer_pipeline.transformer import (
+            _KNOWN_LOGICAL_QUERY_COUNTS,
+        )
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_COUNTS
+
+        assert CANONICAL_LOGICAL_QUERY_COUNTS == _KNOWN_LOGICAL_QUERY_COUNTS
+
+    def test_matching_cardinality_with_wrong_ids_is_refused(self):
+        # 22 distinct labels, none of them canonical: cardinality alone
+        # must not pass the gate.
+        data = _minimal_bundle()
+        data["queries"] = [{"id": f"FAKE{i}", "ms": 100, "status": "SUCCESS"} for i in range(22)]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any("covers 0 of 22 canonical queries" in e for e in vr.errors)
+        assert any("missing:" in e for e in vr.errors)
+
+    def test_canonical_membership_accepts_producer_id_variants(self):
+        # Q-prefix, bare, padded, and query_-prefixed spellings all name
+        # the same canonical queries once normalized.
+        variants = [f"Q{i}" for i in range(1, 8)] + [str(i) for i in range(8, 15)]
+        variants += [f"query_{i}" for i in range(15, 20)] + [f"  q{i} " for i in range(20, 23)]
+        data = _minimal_bundle()
+        data["queries"] = [{"id": v, "ms": 100, "status": "SUCCESS"} for v in variants]
+        data["summary"]["queries"] = {"total": 22, "passed": 22, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_canonical_membership_allows_extra_ids(self):
+        data = _minimal_bundle()
+        data["queries"] = data["queries"] + [{"id": "EXTRA", "ms": 100, "status": "SUCCESS"}]
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+    def test_tpcds_paired_variants_cover_all_99_logical_queries(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpcds"
+        variants = {14, 23, 24, 39}
+        ids = [f"Q{i}" for i in range(1, 100) if i not in variants]
+        ids += [f"Q{i}{part}" for i in sorted(variants) for part in ("a", "b")]
+        data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+        data["summary"]["queries"] = {"total": 103, "passed": 103, "failed": 0}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+        data["queries"] = [query for query in data["queries"] if query["id"] != "Q14b"]
+        data["summary"]["queries"] = {"total": 102, "passed": 102, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    def test_tpcds_bare_ids_cannot_replace_required_variant_pairs(self):
+        variants = {14, 23, 24, 39}
+        for missing_variant, expected_coverage, expected_missing in (
+            (None, 95, "14, 23, 24, 39"),
+            ("Q14b", 98, "14"),
+        ):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = "tpcds"
+            ids = [f"Q{i}" for i in range(1, 100)]
+            if missing_variant is not None:
+                ids += [f"Q{i}a" for i in sorted(variants)]
+                ids += [f"Q{i}b" for i in sorted(variants) if f"Q{i}b" != missing_variant]
+            data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+            data["summary"]["queries"] = {"total": len(ids), "passed": len(ids), "failed": 0}
+
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any(
+                f"covers {expected_coverage} of 99 canonical queries" in error
+                and f"missing: {expected_missing}" in error
+                for error in vr.errors
+            )
+
+    def test_canonical_id_sets_agree_with_counts(self):
+        from benchbox.validation.bundle import (
+            CANONICAL_LOGICAL_QUERY_COUNTS,
+            CANONICAL_LOGICAL_QUERY_IDS,
+        )
+
+        assert set(CANONICAL_LOGICAL_QUERY_IDS) == set(CANONICAL_LOGICAL_QUERY_COUNTS)
+        for family, ids in CANONICAL_LOGICAL_QUERY_IDS.items():
+            assert len(ids) == CANONICAL_LOGICAL_QUERY_COUNTS[family], family
+
+    def test_ssb_and_clickbench_membership(self):
+        from benchbox.validation.bundle import CANONICAL_LOGICAL_QUERY_IDS
+
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["ssb"]) == 13
+        assert "1.1" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert "4.3" in CANONICAL_LOGICAL_QUERY_IDS["ssb"]
+        assert len(CANONICAL_LOGICAL_QUERY_IDS["clickbench"]) == 43
+        # SSB flight IDs in producer Q-prefixed form validate.
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "ssb"
+        data["queries"] = [
+            {"id": qid, "ms": 100, "status": "SUCCESS"}
+            for qid in (
+                "Q1.1",
+                "Q1.2",
+                "Q1.3",
+                "Q2.1",
+                "Q2.2",
+                "Q2.3",
+                "Q3.1",
+                "Q3.2",
+                "Q3.3",
+                "Q3.4",
+                "Q4.1",
+                "Q4.2",
+                "Q4.3",
+            )
+        ]
+        data["summary"]["queries"] = {"total": 13, "passed": 13, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
 
 
 # ---------------------------------------------------------------------------
@@ -961,6 +1941,19 @@ class TestValidateBundles:
         assert not results[0].ok
         assert any("Invalid JSON" in e for e in results[0].errors)
 
+    def test_conflicting_schema_aliases_are_reported_per_bundle(self, tmp_path: Path):
+        bundle = tmp_path / "conflicting.json"
+        payload = _minimal_bundle()
+        payload["result_schema_version"] = "2.2"
+        payload["version"] = "2.1"
+        bundle.write_text(json.dumps(payload), encoding="utf-8")
+
+        results = validate_bundles([bundle])
+
+        assert len(results) == 1
+        assert not results[0].ok
+        assert any("must match" in error for error in results[0].errors)
+
     def test_nonexistent_file(self, tmp_path: Path):
         missing = tmp_path / "nope.json"
         results = validate_bundles([missing])
@@ -1165,3 +2158,241 @@ class TestMain:
         output = capsys.readouterr().out
         assert "PLANS.JSON" in output
         assert "private absolute paths" in output
+
+
+# ---------------------------------------------------------------------------
+# warn-require-override contract (model, exit code, version, rendering)
+# ---------------------------------------------------------------------------
+
+
+class TestOverrideContract:
+    def test_require_override_dual_records_and_keeps_ok(self):
+        from benchbox.validation.bundle import RULES, RULES_VERSION
+
+        vr = ValidationResult("test")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        vr.require_override("timing-plateau", "span 4400-4500ms")
+        assert vr.ok
+        assert vr.override_required == ["timing-plateau"]
+        assert vr.warnings.count("span 4400-4500ms") == 2
+        assert RULES_VERSION == "1"
+        assert {r[0]: r[2] for r in RULES} == {
+            "timing-plateau": "warn-require-override",
+            "scale-invariant": "warn-require-override",
+            "floor-outlier": "info",
+            "small-scale-floor": "warn-require-override",
+        }
+
+    def test_require_override_rejects_unknown_rule_id(self):
+        vr = ValidationResult("test")
+        with pytest.raises(ValueError, match="unknown rubric rule"):
+            vr.require_override("not-a-rule", "phantom")
+
+    def test_plateau_and_floor_promoted_to_overrides(self):
+        vr = ValidationResult("test")
+        _validate_bundle(_timing_bundle(_flat_queries(base=4400.0)), vr)
+        assert vr.ok, vr.errors
+        assert sorted(vr.override_required) == ["small-scale-floor", "timing-plateau"]
+
+    def test_floor_outlier_stays_informational(self, tmp_path):
+        slow, _, _ = TestFloorOutlier()._peer_set(tmp_path, [4500.0, 350.0, 300.0])
+        assert slow.ok
+        assert "floor-outlier" not in slow.override_required
+        assert any("floor-outlier" in w for w in slow.warnings)
+
+    def test_unsatisfied_mapping(self):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        vr = ValidationResult("b.json")
+        vr.require_override("timing-plateau", "flat")
+        assert unsatisfied_override_rules([vr]) == {"b.json": ["timing-plateau"]}
+        assert unsatisfied_override_rules([ValidationResult("clean.json")]) == {}
+
+    def test_validation_failed_contract(self):
+        from benchbox.validation.bundle import validation_failed
+
+        assert not validation_failed([ValidationResult("clean.json")])
+        finding = ValidationResult("flat.json")
+        finding.require_override("timing-plateau", "flat")
+        assert validation_failed([finding])
+        assert not validation_failed([finding], strict_overrides=False)
+        errored = ValidationResult("bad.json")
+        errored.error("boom")
+        assert validation_failed([errored])
+        assert validation_failed([errored], strict_overrides=False)
+
+    def test_pr_comment_strict_fails_header_with_overrides(self):
+        from benchbox.validation.bundle import format_pr_comment
+
+        vr = ValidationResult("flat.json")
+        vr.require_override("timing-plateau", "flat")
+        strict = format_pr_comment([vr])
+        assert "## Submission Validation: FAILED" in strict
+        assert "### Overrides required (rules v1)" in strict
+        assert "`timing-plateau`" in strict
+        mirror = format_pr_comment([vr], strict_overrides=False)
+        assert "## Submission Validation: PASSED" in mirror
+        assert "advisory only" in mirror
+
+    def test_exit_contract_community_vs_mirror(self, tmp_path):
+        bundle = tmp_path / "flat.json"
+        bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+        assert main([str(bundle)]) == 1
+        assert main([str(bundle), "--allow-partial-validation"]) == 0
+
+    def test_rules_version_flag(self, capsys):
+        assert main(["--rules-version"]) == 0
+        out = capsys.readouterr().out
+        assert "rules version: 1" in out
+        assert "timing-plateau" in out
+
+    def test_unknown_flag_fails_closed(self, tmp_path, capsys):
+        bundle = tmp_path / "b.json"
+        bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
+        assert main([str(bundle), "--bogus-flag"]) == 2
+        assert "unrecognized flag" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------------------
+# committed override artifacts (<stem>.override.json)
+# ---------------------------------------------------------------------------
+
+
+def _override_doc(*rules, **kw):
+    doc = {
+        "rules": [{"rule": rule, "rule_version": "1"} for rule in rules or ("timing-plateau",)],
+        "reason": "verified against profiler trace",
+        "evidence": "https://example.com/trace",
+        "expires": "single-batch",
+        "approver": "reviewer2",
+    }
+    doc.update(kw)
+    return doc
+
+
+def _write_plateau_bundle(tmp_path, name="flat.json"):
+    bundle = tmp_path / name
+    bundle.write_text(json.dumps(_timing_bundle(_flat_queries(base=4400.0))), encoding="utf-8")
+    return bundle
+
+
+class TestOverrideDocument:
+    def test_valid_document_accepts(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(), bundle_stem="flat") == []
+
+    def test_expiry_matrix(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(_override_doc(expires="2999-01-01"), bundle_stem="flat") == []
+        expired = validate_override_document(_override_doc(expires="2000-01-01"), bundle_stem="flat")
+        assert any("expired" in e for e in expired)
+        bad = validate_override_document(_override_doc(expires="next Friday"), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in bad)
+        nonstr = validate_override_document(_override_doc(expires=20260101), bundle_stem="flat")
+        assert any("YYYY-MM-DD" in e for e in nonstr)
+
+    def test_unknown_rule_and_wrong_severity_refused(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        unknown = validate_override_document(_override_doc("nope"), bundle_stem="flat")
+        assert any("not a known rubric rule" in e for e in unknown)
+        info = validate_override_document(_override_doc("floor-outlier"), bundle_stem="flat")
+        assert any("only warn-require-override rules are overridable" in e for e in info)
+
+    def test_version_pin_required_and_exact(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        doc = _override_doc()
+        del doc["rules"][0]["rule_version"]
+        assert any("exactly rule and rule_version" in e for e in validate_override_document(doc, bundle_stem="flat"))
+        stale_doc = _override_doc()
+        stale_doc["rules"][0]["rule_version"] = "0"
+        stale = validate_override_document(stale_doc, bundle_stem="flat")
+        assert any("does not match registry version" in e for e in stale)
+
+    def test_shape_and_content_guards(self):
+        from benchbox.validation.bundle import validate_override_document
+
+        assert validate_override_document(["x"], bundle_stem="flat") != []
+        assert any(
+            "unknown fields" in e for e in validate_override_document(_override_doc(aprover="x"), bundle_stem="flat")
+        )
+        assert any(
+            "missing fields" in e for e in validate_override_document({"rule": "timing-plateau"}, bundle_stem="flat")
+        )
+        assert any(
+            "non-empty string" in e for e in validate_override_document(_override_doc(reason="  "), bundle_stem="flat")
+        )
+        assert any(
+            "non-empty list" in e for e in validate_override_document(_override_doc(bundles=[]), bundle_stem="flat")
+        )
+        assert any(
+            "own stem" in e for e in validate_override_document(_override_doc(bundles=["other"]), bundle_stem="flat")
+        )
+        assert validate_override_document(_override_doc(bundles=["flat", "flat2"]), bundle_stem="flat") == []
+
+
+class TestOverrideSatisfaction:
+    def test_valid_artifact_satisfies_finding(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert vr.override_required == ["timing-plateau", "small-scale-floor"]
+        assert unsatisfied_override_rules([vr]) == {}
+
+    def test_satisfaction_narrows_unsatisfied_map(self, tmp_path):
+        from benchbox.validation.bundle import unsatisfied_override_rules
+
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(json.dumps(_override_doc("timing-plateau")), encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert vr.ok, vr.errors
+        assert unsatisfied_override_rules([vr]) == {str(bundle): ["small-scale-floor"]}
+
+    def test_malformed_artifact_errors_in_both_lanes(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text("{not json", encoding="utf-8")
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok
+        assert any("override artifact" in e for e in vr.errors)
+        (mirror,) = validate_bundles([bundle], allow_partial_validation=True)
+        assert not mirror.ok
+
+    def test_expired_artifact_satisfies_nothing(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc(expires="2000-01-01")), encoding="utf-8"
+        )
+        (vr,) = validate_bundles([bundle])
+        assert not vr.ok  # malformed-audit artifact is an error, not silent
+        assert main([str(bundle)]) == 1
+
+    def test_main_passes_with_valid_artifact(self, tmp_path, capsys):
+        bundle = _write_plateau_bundle(tmp_path)
+        bundle.with_name("flat.override.json").write_text(
+            json.dumps(_override_doc("timing-plateau", "small-scale-floor")), encoding="utf-8"
+        )
+        assert main([str(bundle)]) == 0
+        out = capsys.readouterr().out
+        assert "override(s) required" in out
+
+    def test_override_companion_excluded_from_discovery(self, tmp_path):
+        from benchbox.validation.bundle import is_primary_bundle_file
+
+        bundle = _write_plateau_bundle(tmp_path)
+        artifact = bundle.with_name("flat.override.json")
+        artifact.write_text(json.dumps(_override_doc()), encoding="utf-8")
+        assert not is_primary_bundle_file(artifact)
+
+    def test_override_companion_privacy_scanned(self, tmp_path):
+        bundle = _write_plateau_bundle(tmp_path)
+        doc = _override_doc(reason="see /Users/alice/private notes")
+        bundle.with_name("flat.override.json").write_text(json.dumps(doc), encoding="utf-8")
+        assert main([str(bundle)]) == 1

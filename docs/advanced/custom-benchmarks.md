@@ -7,6 +7,13 @@
 
 Complete guide to creating, implementing, and integrating custom benchmarks with the BenchBox framework.
 
+This is the canonical home for benchmark-extension examples that previously
+appeared in the root README. Before writing a new benchmark, check the
+[benchmark catalog](../benchmarks/index.md) for an existing workload with the
+same data and query shape. Reuse an existing family when it meets the need;
+new families must define their data, queries, validation rules, and supported
+execution paths explicitly.
+
 ---
 
 ##  Creating Custom Benchmarks

@@ -22,7 +22,6 @@ from mcp.types import ToolAnnotations
 
 from benchbox.core.benchmark_registry import (
     get_all_benchmarks,
-    get_benchmark_default_scale,
     get_benchmark_surface,
     get_public_benchmark_class,
 )
@@ -125,6 +124,7 @@ def register_benchmark_tools(
         capture_plans: bool = False,
         dry_run: bool = False,
         validate_only: bool = False,
+        link_probe: bool = True,
         platform_options: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         """Run a benchmark on a database platform.
@@ -139,6 +139,7 @@ def register_benchmark_tools(
             capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.
             dry_run: Preview execution plan without running
             validate_only: Validate configuration without running
+            link_probe: Measure post-benchmark statement overhead (6 metered SELECT 1 statements on billable warehouses). Set false to skip; equivalent to the CLI --no-link-probe flag.
             platform_options: Bounded, non-secret platform settings approved for the selected platform.
 
         Returns:
@@ -195,6 +196,7 @@ def register_benchmark_tools(
             phases,
             mode,
             capture_plans,
+            link_probe=link_probe,
             platform_options=normalized_platform_options,
             results_dir=resolve_path_provider(results_dir),
             anonymize=anonymize_results,
@@ -349,6 +351,7 @@ def _execute_mcp_run_via_core(
     phases: list[str],
     resolved_mode: str,
     capture_plans: bool,
+    link_probe: bool = True,
     normalized_platform_options: Mapping[str, object],
     results_dir: Path,
     execution_id: str,
@@ -408,6 +411,7 @@ def _execute_mcp_run_via_core(
         scale_factor=scale_factor,
         queries=query_subset,
         capture_plans=capture_plans,
+        link_probe=link_probe,
     )
     benchmark_config.test_execution_type = map_phases_to_execution_type(phases)
     if "statistics" in phases:
@@ -532,6 +536,7 @@ def _run_benchmark_impl(
     phases: str | None,
     mode: str | None,
     capture_plans: bool = False,
+    link_probe: bool = True,
     *,
     platform_options: Mapping[str, object] | None = None,
     results_dir: Path,
@@ -596,6 +601,7 @@ def _run_benchmark_impl(
             phases=phases_list,
             resolved_mode=resolved_mode,
             capture_plans=capture_plans,
+            link_probe=link_probe,
             normalized_platform_options=normalized_platform_options,
             results_dir=results_dir,
             execution_id=execution_id,
@@ -772,24 +778,15 @@ def _populate_dataframe_query_details(
     """Populate response dict with DataFrame query details."""
     import inspect
 
+    from benchbox.core.query_catalog import get_dataframe_query
+
     family = _get_dataframe_family_for_platform(platform)
     if family:
         response["dataframe_family"] = family
 
-    registry_id = f"Q{normalized_id}"
-    df_query = None
-
-    if benchmark == "tpch":
-        from benchbox import TPCH_DATAFRAME_QUERIES
-
-        df_query = TPCH_DATAFRAME_QUERIES.get(registry_id)
-    elif benchmark == "tpcds":
-        from benchbox import TPCDS_DATAFRAME_QUERIES
-
-        df_query = TPCDS_DATAFRAME_QUERIES.get(registry_id)
-
+    df_query = get_dataframe_query(benchmark, normalized_id)
     if df_query is None:
-        response["error"] = f"No DataFrame query found for {benchmark} {registry_id}"
+        response["error"] = f"No DataFrame query found for {benchmark} Q{normalized_id}"
         return
 
     response["query_name"] = df_query.query_name
@@ -822,12 +819,11 @@ def _populate_sql_query_details(
     platform: str | None,
 ) -> None:
     """Populate response dict with SQL query details."""
-    benchmark_class = get_public_benchmark_class(benchmark)
-    if benchmark_class is None:
+    from benchbox.core.query_catalog import get_sql_render
+
+    if get_public_benchmark_class(benchmark) is None:
         response["error"] = f"Benchmark '{benchmark}' requires additional dependencies"
         return
-
-    bm = benchmark_class(scale_factor=get_benchmark_default_scale(benchmark))
 
     dialect = None
     if platform is not None:
@@ -839,25 +835,13 @@ def _populate_sql_query_details(
         except Exception:
             pass
 
-    query_sql = None
-    try:
-        kwargs: dict[str, Any] = {}
-        if dialect:
-            kwargs["dialect"] = dialect
-        try:
-            query_sql = bm.get_query(int(normalized_id), **kwargs)
-        except (ValueError, TypeError):
-            query_sql = bm.get_query(normalized_id, **kwargs)
-    except (KeyError, ValueError, TypeError):
-        import contextlib
+    render = get_sql_render(benchmark, normalized_id, dialect=dialect)
+    if render is None:
+        return
 
-        with contextlib.suppress(KeyError, ValueError):
-            query_sql = bm.get_query(normalized_id)
-
-    if query_sql:
-        if len(query_sql) > 2000:
-            response["sql"] = query_sql[:2000]
-            response["sql_truncated"] = True
-        else:
-            response["sql"] = query_sql
-            response["sql_truncated"] = False
+    if len(render.sql) > 2000:
+        response["sql"] = render.sql[:2000]
+        response["sql_truncated"] = True
+    else:
+        response["sql"] = render.sql
+        response["sql_truncated"] = False

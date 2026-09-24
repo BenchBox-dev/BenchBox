@@ -50,6 +50,7 @@ def test_apply_platform_optimizations_noop_with_nondefault_fields_set() -> None:
     connection = Mock()
     platform_config = PlatformOptimizationConfiguration(
         z_ordering_enabled=True,
+        databricks_clustering_strategy="z_order",
         bloom_filters_enabled=True,
     )
 

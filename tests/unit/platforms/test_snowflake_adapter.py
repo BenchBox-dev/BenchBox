@@ -496,7 +496,8 @@ benchbox-fixture-key-material
             [(True, 100, 0, 0, "LOADED", None)],  # Copy results
             [(100,)],  # Row count
         ]
-        mock_cursor.fetchone.return_value = (100,)  # Row count query
+        # The final row-count query reports the loaded rows.
+        mock_cursor.fetchone.return_value = (100,)
 
         mock_benchmark = Mock()
 
@@ -532,6 +533,65 @@ benchbox-fixture-key-material
 
         finally:
             temp_path.unlink()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_load_data_returns_per_table_timings(self, mock_snowflake):
+        """load_data should report per-table wall-clock timings keyed by table."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        mock_cursor.fetchall.side_effect = [
+            [(True, 100, 0, 0, "LOADED", None)],  # Copy results
+            [(100,)],  # Row count
+        ]
+        mock_cursor.fetchone.return_value = (100,)
+
+        mock_benchmark = Mock()
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".tbl", delete=False, encoding="utf-8") as f:
+            f.write("1|test1|\n2|test2|\n")
+            temp_path = Path(f.name)
+
+        try:
+            mock_benchmark.tables = {"test_table": str(temp_path)}
+
+            adapter = SnowflakeAdapter(
+                account="test_account",
+                username="test_user",
+                password="test_pass",
+                warehouse="TEST_WH",
+                database="TEST_DB",
+            )
+
+            table_stats, _, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+
+            assert set(per_table_timings) == set(table_stats)
+            assert per_table_timings["TEST_TABLE"]["total_ms"] >= 0
+        finally:
+            temp_path.unlink()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_load_data_skip_uses_uppercase_keys_with_zero_timings(self, mock_snowflake):
+        """Skipped tables should use the same key casing with a zero timing entry."""
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = Mock()
+
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"ghost_table": "/nonexistent/path/ghost.tbl"}
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        table_stats, _, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, Path("/tmp"))
+
+        assert table_stats == {"GHOST_TABLE": 0}
+        assert per_table_timings == {"GHOST_TABLE": {"total_ms": 0}}
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_validate_external_table_requirements_requires_staging_root(self, mock_snowflake):
@@ -808,6 +868,132 @@ benchbox-fixture-key-material
         assert adapter._get_file_format_for_table("orders", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
 
     @patch("benchbox.platforms.snowflake.snowflake")
+    def test_get_file_format_for_table_manifest_csv_with_empty_null_marker_picks_csv_format(self, mock_snowflake):
+        """Manifest comma dialect with empty (not null) marker must select BENCHBOX_CSV_FORMAT."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        file_path = Path("trips.csv.gz")
+        ds = resolver_data_source("trips", file_path, {"csv_delimiter": ",", "csv_null_marker": ""})
+
+        assert adapter._get_file_format_for_table("trips", file_path, ds, NO_BENCHMARK) == "PUBLIC.BENCHBOX_CSV_FORMAT"
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_returns_none_without_sentinel(self, mock_snowflake):
+        """Falsy null markers keep the static CSV/TBL format choice (no new format)."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("lineitem.tbl.1")
+        ds = resolver_data_source("lineitem", file_path, {"csv_delimiter": "|", "csv_null_marker": ""})
+
+        assert adapter._ensure_preserve_file_format(mock_cursor, "lineitem", file_path, ds, NO_BENCHMARK) is None
+        mock_cursor.execute.assert_not_called()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_creates_per_dialect_format_for_sentinel(self, mock_snowflake):
+        """A truthy null-marker sentinel gets a format preserving empty strings."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("hits.csv.gz")
+        ds = resolver_data_source("hits", file_path, {"csv_delimiter": "|", "csv_null_marker": "__NULL__"})
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "hits", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "CREATE FILE FORMAT IF NOT EXISTS" in create_sql
+        assert "FIELD_DELIMITER = '|'" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = FALSE" in create_sql
+        assert "NULL_IF = ('__NULL__')" in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_creates_header_aware_format_without_sentinel(self, mock_snowflake):
+        """Header CSVs get SKIP_HEADER even when empty fields retain default NULL handling."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("trips.csv.gz")
+        ds = resolver_data_source(
+            "trips",
+            file_path,
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""},
+        )
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "trips", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "SKIP_HEADER = 1" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = TRUE" in create_sql
+        assert "NULL_IF" not in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_ensure_preserve_file_format_header_with_none_null_marker_skips(self, mock_snowflake):
+        """A headered CSV declaring csv_null_marker=None must not raise on .replace().
+
+        TSBS DevOps declares csv_has_header=True with csv_null_marker=None: the
+        format still needs SKIP_HEADER but keeps default NULL handling.
+        """
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+        mock_cursor = Mock()
+        file_path = Path("devops.csv.gz")
+        ds = resolver_data_source(
+            "devops",
+            file_path,
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": None},
+        )
+
+        format_name = adapter._ensure_preserve_file_format(mock_cursor, "devops", file_path, ds, NO_BENCHMARK)
+
+        assert format_name.startswith("PUBLIC.BENCHBOX_DYN_")
+        create_sql = mock_cursor.execute.call_args_list[0].args[0]
+        assert "SKIP_HEADER = 1" in create_sql
+        assert "EMPTY_FIELD_AS_NULL = TRUE" in create_sql
+        assert "NULL_IF" not in create_sql
+
+    @patch("benchbox.platforms.snowflake.snowflake")
     def test_parse_copy_results_logs_failed_and_unparseable_rows(self, mock_snowflake, caplog):
         """COPY INTO parsing should warn on failed files and malformed row counts."""
         adapter = SnowflakeAdapter(
@@ -868,6 +1054,44 @@ benchbox-fixture-key-material
         assert any("FORMAT_NAME = 'PUBLIC.BENCHBOX_TBL_FORMAT'" in sql for sql in execute_calls)
         assert any("PURGE = TRUE" in sql for sql in execute_calls)
         assert execute_calls[-1] == "SELECT COUNT(*) FROM LINEITEM"
+
+    def test_load_table_from_stage_fallback_to_quoted_stage_when_not_authorized(self):
+        """Fallback to lowercase quoted stage and table name when uppercase stage reports does not exist."""
+        mock_cursor = Mock()
+        mock_cursor.fetchall.return_value = [["lineitem.tbl.1", "LOADED", None, 2, None, None]]
+        mock_cursor.fetchone.return_value = (10,)
+
+        # First PUT on @%LINEITEM raises, subsequent calls succeed
+        def mock_execute(sql):
+            if "@%LINEITEM" in sql:
+                raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
+
+        mock_cursor.execute.side_effect = mock_execute
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            schema="PUBLIC",
+        )
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".tbl", delete=False) as f:
+            f.write(b"1|one|\n")
+            path = Path(f.name)
+
+        try:
+            row_count = adapter._load_table_from_stage(mock_cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert row_count == 10
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        # Should have tried @%LINEITEM first, then fallback to @"lineitem"
+        assert any(f"PUT file://{path.absolute()} @%LINEITEM" in sql for sql in execute_calls)
+        assert any(f'PUT file://{path.absolute()} @%"lineitem"' in sql for sql in execute_calls)
+        assert any('COPY INTO "lineitem"' in sql for sql in execute_calls)
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_configure_for_benchmark_olap(self, mock_snowflake):
@@ -980,10 +1204,35 @@ benchbox-fixture-key-material
         assert result["first_row"] == (1, "test")
         assert isinstance(result["execution_time_seconds"], float)
         assert result["query_statistics"] == {"snowflake_query_id": "test_query_id"}
+        # resource_usage carries the wall time for warehouse-credit estimation
+        # even when query history is delayed or unavailable.
+        assert result["resource_usage"]["execution_time_seconds"] == result["execution_time_seconds"]
 
         mock_cursor.execute.assert_any_call("ALTER SESSION SET QUERY_TAG = 'BenchBox_q1'")
         mock_cursor.execute.assert_any_call("SELECT * FROM test")
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_execute_query_accepts_stream_cursor(self, mock_snowflake):
+        """TPC power harness passes a per-stream cursor without cursor()."""
+        mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
+        mock_cursor.fetchall.return_value = [(1,)]
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        with patch.object(adapter, "_get_query_statistics") as mock_stats:
+            mock_stats.return_value = {}
+            result = adapter.execute_query(mock_cursor, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        mock_cursor.execute.assert_any_call("SELECT 1")
+        mock_cursor.close.assert_not_called()
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_failure(self, mock_snowflake):
@@ -1055,8 +1304,34 @@ benchbox-fixture-key-material
         assert stats["bytes_scanned"] == 1024000
         assert stats["rows_produced"] == 10
         assert stats["warehouse_size"] == "MEDIUM"
+        # QUERY_HISTORY exposes cloud-services credits only; reporting them
+        # as warehouse credits_used once priced warehouse compute near $0.
+        assert stats["credits_used_cloud_services"] == 5.5
+        assert "credits_used" not in stats
 
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_edition_flows_to_platform_info_for_cost_model(self, mock_snowflake):
+        """The edition is operator-supplied and must reach platform_info."""
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+            edition="enterprise",
+        )
+        assert adapter.edition == "enterprise"
+        assert adapter.get_platform_info(None)["configuration"]["edition"] == "enterprise"
+
+        defaulted = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+        )
+        assert defaulted.edition is None
+        assert defaulted.get_platform_info(None)["configuration"]["edition"] is None
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_get_platform_metadata(self, mock_snowflake):
@@ -1406,6 +1681,22 @@ class TestSnowflakeOptimizeTableDefinition:
         # The method checks upper() for the starts-with, but replaces literal "CREATE TABLE"
         assert result == stmt
 
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_quoted_identifiers_uppercased_single_quotes_untouched(self, mock_snowflake):
+        """Quoted source-case names must fold to the uppercase convention.
+
+        DDL translation quotes identifiers, so without normalization a table
+        would be created as quoted lowercase while loads and validation
+        address the folded uppercase name.
+        """
+        adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
+        result = adapter._optimize_table_definition(
+            'CREATE TABLE "hits" ("WatchID" BIGINT NOT NULL, "note" VARCHAR DEFAULT \'keep "me" lower\')'
+        )
+        assert result == (
+            'CREATE OR REPLACE TABLE "HITS" ("WATCHID" BIGINT NOT NULL, "NOTE" VARCHAR DEFAULT \'keep "me" lower\')'
+        )
+
 
 class TestSnowflakeBuildCtasSortSql:
     """Test _build_ctas_sort_sql CTAS generation."""
@@ -1577,7 +1868,11 @@ class TestSnowflakeValidateDataIntegrity:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # Each fetchone succeeds (table accessible)
+        # SHOW TABLES reports uppercase names; each fetchone succeeds
+        mock_cursor.fetchall.return_value = [
+            ("2024-01-01", "LINEITEM", "DB", "PUBLIC"),
+            ("2024-01-01", "ORDERS", "DB", "PUBLIC"),
+        ]
         mock_cursor.fetchone.return_value = (1,)
 
         status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"LINEITEM": 1000, "ORDERS": 500})
@@ -1587,10 +1882,28 @@ class TestSnowflakeValidateDataIntegrity:
         assert "ORDERS" in details["accessible_tables"]
         assert details["constraints_enabled"] is True
 
-        # Verify the SQL used
+        # Verify the SQL used (quoted stored names first)
         execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
-        assert "SELECT 1 FROM LINEITEM LIMIT 1" in execute_calls
-        assert "SELECT 1 FROM ORDERS LIMIT 1" in execute_calls
+        assert 'SELECT 1 FROM "lineitem" LIMIT 1' in execute_calls
+        assert 'SELECT 1 FROM "orders" LIMIT 1' in execute_calls
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_quoted_lowercase_tables_accessible(self, mock_snowflake):
+        """Quoted lowercase TPC-DS tables probe by stored name, not folded uppercase."""
+        adapter = SnowflakeAdapter(account="a", username="u", password="p", warehouse="WH", database="DB")
+
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [("2024-01-01", "call_center", "DB", "PUBLIC")]
+        mock_cursor.fetchone.return_value = (1,)
+
+        status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"CALL_CENTER": 100})
+
+        assert status == "PASSED"
+        assert "CALL_CENTER" in details["accessible_tables"]
+        execute_calls = [str(call.args[0]) for call in mock_cursor.execute.call_args_list]
+        assert 'SELECT 1 FROM "call_center" LIMIT 1' in execute_calls
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_failed_when_table_inaccessible(self, mock_snowflake):
@@ -1600,8 +1913,9 @@ class TestSnowflakeValidateDataIntegrity:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # First table succeeds, second fails
-        mock_cursor.execute.side_effect = [None, Exception("Table not found")]
+        mock_cursor.fetchall.return_value = []
+        # Every probe fails
+        mock_cursor.execute.side_effect = Exception("Table not found")
         mock_cursor.fetchone.return_value = (1,)
 
         status, details = adapter._validate_data_integrity(Mock(), mock_connection, {"LINEITEM": 1000, "ORDERS": 500})
@@ -1639,8 +1953,8 @@ class TestSnowflakeValidateSessionCacheControl:
         assert result["validated"] is True
         assert result["cache_disabled"] is True
 
-        # Verify the call args
         call_kwargs = mock_validate.call_args[1]
+        assert call_kwargs["query"] == "SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION"
         assert call_kwargs["setting_key"] == "USE_CACHED_RESULT"
         assert call_kwargs["disabled_value"] == "FALSE"
         assert call_kwargs["enabled_value"] == "TRUE"
@@ -1648,6 +1962,7 @@ class TestSnowflakeValidateSessionCacheControl:
         assert call_kwargs["platform_name"] == "Snowflake"
         assert call_kwargs["disable_result_cache"] is True
         assert call_kwargs["strict_validation"] is False
+        assert call_kwargs["value_column_index"] == 1
 
 
 class TestSnowflakeGetPlatformInfo:
@@ -1695,20 +2010,24 @@ class TestSnowflakeGetPlatformInfo:
         mock_connection.cursor.return_value = mock_cursor
 
         # First call: SELECT current_version()
-        # Second call: SELECT current_region(), current_cloud()
+        # Second call: SELECT CURRENT_REGION() (single column; the cloud
+        # prefix is embedded, e.g. AWS_US_EAST_1). There is no
+        # CURRENT_CLOUD() function, so no query may reference it.
         # Third call: SHOW WAREHOUSES (raise to skip)
         # Fourth call: SELECT current_account_name() (raise to skip)
         mock_cursor.execute.return_value = mock_cursor
         mock_cursor.fetchone.side_effect = [
             ("8.12.3",),  # current_version()
-            ("AWS_US_EAST_1", "AWS"),  # current_region(), current_cloud()
+            ("AWS_US_EAST_1",),  # CURRENT_REGION()
             Exception("skip"),  # will be caught
         ]
 
         call_count = [0]
+        executed_statements = []
 
         def side_effect_execute(sql):
             call_count[0] += 1
+            executed_statements.append(sql)
             if "SHOW WAREHOUSES" in sql:
                 raise Exception("skip warehouses")
             if "current_account_name" in sql:
@@ -1724,6 +2043,8 @@ class TestSnowflakeGetPlatformInfo:
         assert result["engine_version_source"] == "sql_query"
         assert result["cloud_region"] == "AWS_US_EAST_1"
         assert result["cloud_provider"] == "AWS"
+        assert executed_statements, "expected the adapter to issue SQL queries"
+        assert all("current_cloud" not in sql.lower() for sql in executed_statements)
 
 
 class TestSnowflakeConfigValidation:
@@ -2433,3 +2754,318 @@ class TestSnowflakeParseResultsEdgeCases:
         with patch.object(adapter.logger, "warning") as mock_warn:
             adapter._parse_copy_results([["orders.csv.gz", "LOADED", None, 100, None, None]])
         mock_warn.assert_not_called()
+
+
+class _StatefulSnowflakeCursor:
+    """Minimal stateful fake of a Snowflake cursor for reload tests.
+
+    Models table rows, staged files, and COPY load history across statements:
+    REMOVE clears the stage, PUT stages files (same names replace, modelling
+    OVERWRITE), TRUNCATE clears the target, COPY appends staged rows only when
+    FORCE is set or the files are unseen (then purges the stage and records
+    history), SELECT COUNT returns the live row count.
+    """
+
+    ROWS_PER_FILE = 2
+
+    def __init__(self, existing_rows=25):
+        self.tables = {"LINEITEM": [1] * existing_rows}
+        self.staged: dict[str, list[int]] = {}
+        self.load_history: set[str] = set()
+        self.statements: list[str] = []
+        self._last_count = 0
+        self._last_copy_rows: list[tuple[str, int]] = []
+
+    @staticmethod
+    def _file_key(statement):
+        token = str(statement).split()[1]
+        return token.split("file://", 1)[1].split()[0].rsplit("/", 1)[-1]
+
+    def execute(self, sql):
+        statement = str(sql)
+        self.statements.append(statement)
+        upper = statement.strip().upper()
+        if upper.startswith("REMOVE "):
+            self.staged = {}
+            return
+        if upper.startswith("PUT "):
+            self.staged[self._file_key(statement)] = [1] * self.ROWS_PER_FILE
+            return
+        if upper.startswith("TRUNCATE TABLE"):
+            target = statement.strip().split()[-1].strip().strip('"')
+            self.tables[target.upper()] = []
+            return
+        if "COPY INTO" in upper:
+            idx = upper.index("COPY INTO") + len("COPY INTO")
+            target = upper[idx:].strip().split()[0].strip().strip('"')
+            force = "FORCE = TRUE" in upper or "FORCE=TRUE" in upper
+            fresh = [name for name in self.staged if force or name not in self.load_history]
+            self.tables.setdefault(target.upper(), []).extend([1] * (len(fresh) * self.ROWS_PER_FILE))
+            self._last_copy_rows = [(name, self.ROWS_PER_FILE if name in fresh else 0) for name in self.staged]
+            self.load_history.update(self.staged)
+            self.staged = {}
+            return
+        if upper.startswith("SELECT COUNT"):
+            target = statement.strip().split()[-1].strip().strip('"').strip(";")
+            self._last_count = len(self.tables.get(target.upper(), []))
+            return
+        if upper.startswith("SHOW TABLES LIKE"):
+            return
+
+    def fetchall(self):
+        return [[name, "LOADED", None, rows, None, None] for name, rows in self._last_copy_rows]
+
+    def fetchone(self):
+        return (self._last_count,)
+
+
+class TestSnowflakeIdempotentLoad:
+    """Snowflake loads must be idempotent full refreshes (no append duplicates)."""
+
+    def _adapter(self, **kwargs):
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            return SnowflakeAdapter(
+                account="test_account",
+                username="test_user",
+                password="test_pass",
+                warehouse="TEST_WH",
+                database="TEST_DB",
+                schema="PUBLIC",
+                **kwargs,
+            )
+
+    def _tbl_files(self, tmp_path):
+        paths = []
+        for i in (1, 2):
+            path = tmp_path / f"lineitem.tbl.{i}"
+            path.write_bytes(b"1|one|\n")
+            paths.append(path)
+        return paths
+
+    def test_double_load_stable_count_with_truncate_before_copy(self, tmp_path):
+        """With force_recreate, a second load must not change the row count."""
+        adapter = self._adapter(force_recreate=True)
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        files = self._tbl_files(tmp_path)
+        try:
+            first = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+            second = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert first == 2 * len(files)
+        assert second == first
+        truncates = [s for s in cursor.statements if s.strip().upper().startswith("TRUNCATE TABLE")]
+        assert len(truncates) == 2  # once per table load, not once per chunk file
+        first_truncate = cursor.statements.index(truncates[0])
+        first_copy = next(i for i, s in enumerate(cursor.statements) if "COPY INTO" in s.upper())
+        assert first_truncate < first_copy
+        assert "TRUNCATE TABLE LINEITEM" in truncates[0]
+
+    def test_default_load_is_full_refresh_not_append(self, tmp_path):
+        """Default loads are full refreshes: reruns report 1x with no flag."""
+        adapter = self._adapter()
+        assert adapter.force_recreate is False
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        files = self._tbl_files(tmp_path)
+        try:
+            first = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+            second = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert first == 2 * len(files)
+        assert second == first
+        uppers = [s.strip().upper() for s in cursor.statements]
+        assert any(s.startswith("REMOVE ") for s in uppers)
+        assert any(s.startswith("PUT ") and "OVERWRITE = TRUE" in s for s in uppers)
+        assert any("COPY INTO" in s and "FORCE = TRUE" in s for s in uppers)
+        assert sum(s.startswith("TRUNCATE TABLE") for s in uppers) == 2
+
+    def test_truncate_uses_quoted_fallback_target(self, tmp_path):
+        """TRUNCATE must target the PUT-fallback-resolved (quoted) table."""
+        adapter = self._adapter(force_recreate=True)
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+
+        def _execute(sql):
+            if "@%LINEITEM" in str(sql):
+                raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
+            _StatefulSnowflakeCursor.execute(cursor, sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert any('TRUNCATE TABLE "lineitem"' in s for s in cursor.statements)
+        truncate_idx = next(i for i, s in enumerate(cursor.statements) if "TRUNCATE TABLE" in s)
+        copy_idx = next(i for i, s in enumerate(cursor.statements) if "COPY INTO" in s.upper())
+        assert truncate_idx < copy_idx
+
+    def test_should_skip_schema_creation_returns_false_when_forced(self):
+        """Forced runs must not skip DDL even when tables exist with data."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [(None, "LINEITEM"), (25,)]
+
+        adapter = self._adapter(force_recreate=True)
+        with patch.object(adapter, "_get_expected_tables", return_value=["lineitem"]):
+            assert adapter._should_skip_schema_creation(Mock(), mock_connection) is False
+        mock_cursor.execute.assert_not_called()
+
+    def test_should_skip_schema_creation_unchanged_when_not_forced(self):
+        """Default runs still skip DDL when tables exist with data."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.side_effect = [(None, "LINEITEM"), (25,)]
+
+        adapter = self._adapter()
+        with patch.object(adapter, "_get_expected_tables", return_value=["lineitem"]):
+            assert adapter._should_skip_schema_creation(Mock(), mock_connection) is True
+
+    def test_from_config_forwards_force_recreate(self):
+        """Production construction via from_config must preserve the flag."""
+        from benchbox.platforms.snowflake import SnowflakeAdapter
+
+        base = {
+            "account": "a",
+            "username": "u",
+            "password": "p",
+            "warehouse": "WH",
+            "database": "DB",
+            "schema": "PUBLIC",
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+        }
+        with patch("benchbox.platforms.snowflake.snowflake"):
+            assert SnowflakeAdapter.from_config({**base, "force_recreate": True}).force_recreate is True
+            assert SnowflakeAdapter.from_config({**base, "force": True}).force_recreate is True
+            assert SnowflakeAdapter.from_config(dict(base)).force_recreate is False
+
+    def test_dirty_stage_leftovers_not_reloaded(self, tmp_path):
+        """Files left in the stage by an interrupted run are not re-ingested."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+        cursor.staged = {"stale.tbl": [1] * 99}
+        files = self._tbl_files(tmp_path)
+        try:
+            count = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", files)
+        finally:
+            for path in files:
+                path.unlink()
+
+        assert count == 2 * len(files)
+        assert "stale.tbl" not in cursor.staged
+
+    def test_load_history_skips_seen_files_without_force(self):
+        """Prove the trap FORCE closes: unseen-history COPY of seen files loads 0."""
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+        cursor.staged = {"lineitem.tbl.1": [1, 1]}
+        cursor.load_history = {"lineitem.tbl.1"}
+        cursor.execute(
+            "COPY INTO LINEITEM FROM @%LINEITEM FILE_FORMAT = (FORMAT_NAME = 'X') ON_ERROR = 'CONTINUE' PURGE = TRUE"
+        )
+        cursor.execute("SELECT COUNT(*) FROM LINEITEM")
+        assert cursor.fetchone() == (0,)
+
+        cursor.staged = {"lineitem.tbl.1": [1, 1]}
+        cursor.execute(
+            "COPY INTO LINEITEM FROM @%LINEITEM FILE_FORMAT = (FORMAT_NAME = 'X')"
+            " ON_ERROR = 'CONTINUE' PURGE = TRUE FORCE = TRUE"
+        )
+        cursor.execute("SELECT COUNT(*) FROM LINEITEM")
+        assert cursor.fetchone() == (2,)
+
+    def test_failed_put_leaves_previous_data_and_raises(self, tmp_path):
+        """A failed upload aborts before TRUNCATE, leaving previous rows intact."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if str(sql).strip().upper().startswith("PUT "):
+                raise RuntimeError("network down")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            with pytest.raises(RuntimeError, match="network down"):
+                adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert cursor.tables["LINEITEM"] == [1] * 25
+        assert not any(s.strip().upper().startswith("TRUNCATE TABLE") for s in cursor.statements)
+
+    def test_failed_copy_raises(self, tmp_path):
+        """A failed COPY aborts the load instead of reporting a wiped table."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=25)
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if "COPY INTO" in str(sql).upper():
+                raise RuntimeError("warehouse suspended")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            with pytest.raises(RuntimeError, match="warehouse suspended"):
+                adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+    def test_truncate_missing_table_tolerated(self, tmp_path):
+        """TRUNCATE on a fresh schema (no table yet) does not fail the load."""
+        adapter = self._adapter()
+        cursor = _StatefulSnowflakeCursor(existing_rows=0)
+        del cursor.tables["LINEITEM"]
+
+        real_execute = cursor.execute
+
+        def _execute(sql):
+            if str(sql).strip().upper().startswith("TRUNCATE TABLE"):
+                raise Exception("Table 'LINEITEM' does not exist or not authorized")
+            real_execute(sql)
+
+        cursor.execute = _execute  # type: ignore[method-assign]
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        try:
+            count = adapter._load_table_from_stage(cursor, "lineitem", "LINEITEM", [path])
+        finally:
+            path.unlink()
+
+        assert count == 2
+
+    def test_load_data_fails_fast_on_table_error(self, tmp_path):
+        """load_data must raise instead of recording 0 rows for a wiped table."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+
+        path = tmp_path / "lineitem.tbl"
+        path.write_bytes(b"1|one|\n")
+        mock_benchmark = Mock()
+        mock_benchmark.tables = {"lineitem": str(path)}
+
+        adapter = self._adapter()
+        with patch.object(adapter, "_load_table_from_stage", side_effect=RuntimeError("boom")):
+            with pytest.raises(RuntimeError, match="boom"):
+                adapter.load_data(mock_benchmark, mock_connection, tmp_path)

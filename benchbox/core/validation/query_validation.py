@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 # Import expected_results to trigger provider registration
 # This ensures TPC-H and TPC-DS providers are available when QueryValidator is instantiated
 import benchbox.core.expected_results  # noqa: F401
 from benchbox.core.expected_results.models import ValidationMode, ValidationResult
-from benchbox.core.expected_results.registry import get_registry
+from benchbox.core.expected_results.registry import LoadOutcome, get_registry
 from benchbox.core.expected_results.tpch_results import (
     PARAMETER_SENSITIVE_QUERY_IDS as _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
 )
@@ -59,6 +61,11 @@ def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
 _reference_seed_state = threading.local()
 
 
+def _set_thread_context(state: threading.local, attribute: str, value: object) -> None:
+    """Set one named value on a thread-local context container."""
+    setattr(state, attribute, value)
+
+
 def set_reference_seed_context(is_reference_seed: bool | None) -> None:
     """Record, for the CURRENT THREAD, whether the query about to run through
     QueryValidator is using the pinned TPC reference seed's substitution
@@ -85,7 +92,7 @@ def set_reference_seed_context(is_reference_seed: bool | None) -> None:
             QueryValidator caller) are therefore completely unaffected by the
             relaxation below.
     """
-    _reference_seed_state.is_reference_seed = is_reference_seed
+    _set_thread_context(_reference_seed_state, "is_reference_seed", is_reference_seed)
 
 
 def get_reference_seed_context() -> bool | None:
@@ -96,6 +103,45 @@ def get_reference_seed_context() -> bool | None:
 def clear_reference_seed_context() -> None:
     """Reset the current thread's reference-seed context to unset (None)."""
     _reference_seed_state.is_reference_seed = None
+
+
+# Thread-local TPC-DS validation-mode run context. Set by the requesting run
+# (per thread when runs execute concurrently against the shared registry
+# cache) and read here at validation time, so one run's policy can never leak
+# into another run through module globals or cached answer objects. Mirrors
+# the reference-seed context above -- throughput streams validate
+# concurrently, one thread per stream, and cached answer data is
+# policy-independent.
+_validation_mode_state = threading.local()
+
+
+def set_validation_mode_context(mode: ValidationMode | None) -> None:
+    """Set the current thread's TPC-DS validation mode for this run."""
+    _validation_mode_state.validation_mode = mode
+
+
+def get_validation_mode_context() -> ValidationMode | None:
+    """Return the current thread's validation-mode run context, if set."""
+    return getattr(_validation_mode_state, "validation_mode", None)
+
+
+def clear_validation_mode_context() -> None:
+    """Reset the current thread's validation-mode run context to unset (None)."""
+    _validation_mode_state.validation_mode = None
+
+
+@contextmanager
+def validation_mode_context(mode: ValidationMode | None) -> Iterator[None]:
+    """Apply a TPC-DS validation policy for one operation and restore its caller."""
+    if mode is None:
+        yield
+        return
+    previous = get_validation_mode_context()
+    set_validation_mode_context(mode)
+    try:
+        yield
+    finally:
+        set_validation_mode_context(previous)
 
 
 class QueryValidator:
@@ -122,6 +168,23 @@ class QueryValidator:
         register_all_providers()
 
         self.registry = get_registry()
+
+    @staticmethod
+    def _resolve_tpcds_run_mode(benchmark_type: str) -> ValidationMode | None:
+        """Resolve the requesting run's TPC-DS validation policy.
+
+        Per-thread run context wins; otherwise the run-shared configuration
+        (benchmark-runner config, then BENCHBOX_QUERY_VALIDATION_MODE).
+        Returns None for non-TPC-DS benchmarks (their cached modes apply).
+        """
+        if benchmark_type.lower() != "tpcds":
+            return None
+        context_mode = get_validation_mode_context()
+        if context_mode is not None:
+            return context_mode
+        from benchbox.core.expected_results.tpcds_results import get_query_validation_mode
+
+        return get_query_validation_mode()
 
     def _normalize_query_id(self, benchmark_type: str, query_id: str | int) -> str:
         """Normalize query ID to string format for consistent lookups.
@@ -208,10 +271,48 @@ class QueryValidator:
         # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
 
-        # Get expected result from registry
-        expected_result = self.registry.get_expected_result(
+        # Get expected result from registry with the classified load outcome.
+        # A provider failure or timeout is never reported as a normal skip.
+        expected_result, load_outcome = self.registry.get_expected_result_detailed(
             benchmark_type, query_id_normalized, scale_factor, stream_id
         )
+
+        if load_outcome in (LoadOutcome.PROVIDER_FAILED, LoadOutcome.PROVIDER_TIMEOUT):
+            requested_mode = self._resolve_tpcds_run_mode(benchmark_type)
+            if load_outcome is LoadOutcome.PROVIDER_FAILED:
+                error_msg = (
+                    f"Expected-results provider failed for query '{query_id}' in benchmark "
+                    f"'{benchmark_type}' at scale factor {scale_factor or 1.0}. "
+                    f"The outcome is unknown; it is not treated as a validation skip. "
+                    f"Actual rows returned: {actual_row_count}"
+                )
+            else:
+                error_msg = (
+                    f"Timed out waiting for expected results for query '{query_id}' in benchmark "
+                    f"'{benchmark_type}' at scale factor {scale_factor or 1.0}. "
+                    f"The load continues in the background; the outcome is unknown and is not "
+                    f"treated as a validation skip. Actual rows returned: {actual_row_count}"
+                )
+            return ValidationResult(
+                is_valid=False,
+                query_id=query_id_str,
+                expected_row_count=None,
+                actual_row_count=actual_row_count,
+                validation_mode=requested_mode or ValidationMode.SKIP,
+                error_message=error_msg,
+            )
+
+        # Apply the requesting run's TPC-DS validation policy at the run
+        # boundary. Cached answer data is policy-independent, so the effective
+        # mode is resolved per validation (per-thread run context, then
+        # run-shared config/env) on a copy -- the cached object is never
+        # mutated, and one run's policy can never leak into another run.
+        if expected_result is not None and benchmark_type.lower() == "tpcds":
+            run_mode = self._resolve_tpcds_run_mode(benchmark_type)
+            if run_mode is not None and run_mode != expected_result.validation_mode:
+                import dataclasses
+
+                expected_result = dataclasses.replace(expected_result, validation_mode=run_mode)
 
         # If no expected result found, skip validation with warning
         if expected_result is None:

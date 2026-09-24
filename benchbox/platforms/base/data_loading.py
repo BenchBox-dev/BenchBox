@@ -2471,6 +2471,21 @@ class InMemoryDataHandler:
         return len(rows)
 
 
+def is_delta_table_dir(path: Path | str) -> bool:
+    """True when *path* is a Delta Lake table directory (contains ``_delta_log``).
+
+    Directory-based table formats must dispatch as one table unit: expanding
+    them with the ``*.parquet*`` shard glob would shred the table into raw
+    part-files, silently dropping Delta semantics (deletion vectors, schema
+    mapping, versioning).
+    """
+    candidate = Path(path)
+    try:
+        return candidate.is_dir() and (candidate / "_delta_log").is_dir()
+    except OSError:
+        return False
+
+
 class FileFormatRegistry:
     """Registry for file format and compression handlers."""
 
@@ -2524,8 +2539,7 @@ class FileFormatRegistry:
                 return DuckLakeFileHandler()
 
             # Check for Delta Lake (_delta_log directory)
-            delta_log_dir = file_path / "_delta_log"
-            if delta_log_dir.exists() and delta_log_dir.is_dir():
+            if is_delta_table_dir(file_path):
                 return DeltaFileHandler()
 
             # Check for Iceberg (metadata directory)
@@ -2787,6 +2801,12 @@ class DataLoader:
             if pp.is_file():
                 shard_paths.append(pp)
             elif pp.is_dir():
+                if is_delta_table_dir(pp):
+                    # A Delta Lake table directory loads as one table unit
+                    # (platform Delta handler or DeltaFileHandler), never
+                    # shredded into raw part-files by the shard glob below.
+                    shard_paths.append(pp)
+                    continue
                 # dbgen at SF>=1 creates a directory of chunk files per table
                 data_globs = ["*.tbl*", "*.csv*", "*.parquet*", "*.tsv*", "*.dat*"]
                 dir_files: list[Path] = []
@@ -2977,12 +2997,13 @@ class SchemaHelpersMixin:
         config_str = str(sorted(sanitized_config.items()))
         return hashlib.md5(config_str.encode()).hexdigest()[:16]
 
-    def _create_schema_with_tuning(self, benchmark, source_dialect: str = "duckdb") -> str:
+    def _create_schema_with_tuning(self, benchmark, source_dialect: str = "standard") -> str:
         """Common schema creation logic with tuning support.
 
         Args:
             benchmark: Benchmark instance to get schema from
-            source_dialect: Source SQL dialect to translate from (default: "duckdb")
+            source_dialect: Source SQL dialect to translate from (default: "standard",
+                since benchmark schema generators emit ANSI standard SQL)
 
         Returns:
             SQL schema string ready for execution

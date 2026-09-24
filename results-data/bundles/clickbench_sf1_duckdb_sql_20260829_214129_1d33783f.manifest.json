@@ -1,0 +1,9 @@
+{
+  "bundle_file": "clickbench_sf1_duckdb_sql_20260829_214129_1d33783f.json",
+  "bundle_hash": "11e7624a23dcba8f3c2ae1d69f40b82655b51a7c4630b108e6470aaf8c8791e6",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

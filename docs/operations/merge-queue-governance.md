@@ -19,7 +19,7 @@ The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queu
 
 | Required Context | Workflow Path | Trigger Events | Contract on `merge_group` |
 |---|---|---|---|
-| `ci-required-result` | `.github/workflows/pr.yml` | `pull_request`, `push`, `merge_group` | Aggregates fast/medium tests, lint, type checks, and parity gates for the speculative tree. |
+| `ci-required-result` | `.github/workflows/pr.yml` | `pull_request`, `push`, `merge_group` | Aggregates fast/medium tests, lint, type checks, and parity gates for the speculative tree. The heavy tier (medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, integration samples) runs on `merge_group` for every code-routed tree; `pull_request` runs skip it unless a carve-out applies (soundness paths, packaging paths), and the umbrella models the skip explicitly (success when required, skipped when deferred). |
 | `Results Explorer browser gate` | `.github/workflows/results-explorer-browser.yml` | `pull_request`, `push`, `merge_group` | Always-reporting contract. Runs Chromium on explorer changes; posts success on unaffected paths. |
 | `ruleset-drift` | `.github/workflows/develop-ruleset-drift.yml` | `pull_request`, `push`, `merge_group`, `schedule` | Executes trusted base check to ensure no ruleset mutation occurs. |
 
@@ -34,18 +34,25 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
   "type": "merge_queue",
   "parameters": {
     "merge_method": "SQUASH",
-    "min_bdr": 1,
-    "max_bdr": 5,
-    "grouping_strategy": "ONLY_NON_FAILING",
-    "check_response_timeout_minutes": 45,
-    "max_entries_to_build": 5
+    "min_entries_to_merge": 1,
+    "max_entries_to_merge": 5,
+    "grouping_strategy": "ALLGREEN",
+    "check_response_timeout_minutes": 60,
+    "max_entries_to_build": 5,
+    "min_entries_to_merge_wait_minutes": 0
   }
 }
 ```
 
 - **`merge_method: SQUASH`**: Guarantees atomic, single-commit integration.
-- **`grouping_strategy: ONLY_NON_FAILING`**: Speculatively groups non-failing PRs. If a PR fails in a group, GitHub isolates the failure and retries remaining PRs independently.
-- **`check_response_timeout_minutes: 45`**: Accommodates the `medium-test` wall (~20–31 min) while preventing hung runners from stalling the queue.
+- **`grouping_strategy: ALLGREEN`**: Groups only entries whose required checks are green.
+- **`check_response_timeout_minutes: 60`**: Provides the live queue timeout while preventing hung runners from stalling the queue.
+- **`max_entries_to_build: 5`** and **`max_entries_to_merge: 5`**: Bound speculative builds and queue merges at five entries each.
+- **`min_entries_to_merge: 1`** and **`min_entries_to_merge_wait_minutes: 0`**: Permit immediate single-entry merges without an artificial wait.
+
+Slow-marked reproducer jobs remain required PR CI through `ci-required-result`.
+Post-merge provides fast and medium lanes but no slow-signature lane, so these
+reproducers must remain in the required PR lane.
 
 ---
 
@@ -59,12 +66,19 @@ Developers submit and arm PRs through repository standard Makefile targets:
 # Open PR against develop with currency check
 make pr-open
 
-# When PR is ready for merge, arm auto-enqueue
-make pr-ready
+# When PR is ready for merge, run the exact readiness transaction and arm
+make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` enforces that `origin/develop` is an ancestor of `HEAD` (fails fast on stale branches).
-- `make pr-ready` verifies the PR does not touch soundness paths before arming `gh pr merge --auto --squash`.
+- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first. For a
+  conflict-free stale branch it requires a live, complete
+  `ruleset_drift_check.py --queue-policy` result covering the queue
+  parameters, required checks, strict current-base policy, review enforcement,
+  and bypass-actor visibility. Only that verified queue permits publication
+  without a local refresh; absent, unknown, or drifted queue state keeps the
+  current-base gate and requires `make pr-refresh`.
+- `make pr-ready` verifies the exact checkout, live PR identity, review state,
+  required checks, holds, and readiness evidence before arming the queue.
 - Once approved and green on initial `pull_request` checks, GitHub automatically adds the PR to the merge queue.
 
 ### B. Soundness Path Withholding

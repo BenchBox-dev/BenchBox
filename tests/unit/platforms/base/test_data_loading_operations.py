@@ -81,6 +81,49 @@ class TestDataLoaderClickHouseFailurePropagation:
         assert exc_info.value is failure
 
 
+class TestDeltaTableDirDispatch:
+    """Delta Lake table directories must load as one unit, never shredded into part-files."""
+
+    @staticmethod
+    def _loader(tmp_path: Path, seen: list) -> DataLoader:
+        loader = DataLoader.__new__(DataLoader)
+        handler = MagicMock()
+        handler.load_table_bulk = MagicMock(return_value=3)
+
+        def factory(file_path, adapter, benchmark, table_name=None, data_source=None):
+            seen.append(Path(file_path))
+            return handler
+
+        loader.handler_factory = factory
+        loader.connection = MagicMock()
+        loader.benchmark = MagicMock()
+        loader.adapter = MagicMock()
+        loader.adapter.logger = MagicMock()
+        return loader
+
+    def test_delta_dir_reaches_handler_whole(self, tmp_path):
+        table_dir = tmp_path / "orders"
+        table_dir.mkdir()
+        (table_dir / "_delta_log").mkdir()
+        (table_dir / "part-00000.parquet").write_bytes(b"PAR1")
+        seen: list = []
+        loader = self._loader(tmp_path, seen)
+
+        assert loader._load_sharded_table("orders", [table_dir]) == 3
+        # The factory saw the table directory itself, not the part-file shard.
+        assert seen == [table_dir]
+
+    def test_plain_dir_still_expands_to_shards(self, tmp_path):
+        table_dir = tmp_path / "events"
+        table_dir.mkdir()
+        (table_dir / "part-0.tbl").write_text("1|alpha\n", encoding="utf-8")
+        seen: list = []
+        loader = self._loader(tmp_path, seen)
+
+        assert loader._load_sharded_table("events", [table_dir]) == 3
+        assert seen == [table_dir / "part-0.tbl"]
+
+
 class _ServerConnection:
     def __init__(self) -> None:
         self.rows: list[tuple] = []

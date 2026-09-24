@@ -261,3 +261,15 @@ def propagate_plan_capture_fields(source: Mapping[str, Any], target: dict[str, A
         value = source.get(key)
         if value is not None:
             target[key] = value
+
+
+def propagate_query_execution_metadata(source: Mapping[str, Any], target: dict[str, Any]) -> None:
+    """Copy plan-capture and resource-usage metadata from ``source`` into ``target``.
+
+    Delegates to :func:`propagate_plan_capture_fields` and forwards ``resource_usage``
+    when present in ``source``.
+    """
+    propagate_plan_capture_fields(source, target)
+    resource_usage = source.get("resource_usage")
+    if resource_usage is not None:
+        target["resource_usage"] = resource_usage

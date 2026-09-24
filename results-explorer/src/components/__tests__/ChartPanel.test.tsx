@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/preact";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { ChartPanel } from "@/components/ChartPanel";
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
@@ -188,6 +188,24 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
 }
 
 describe("ChartPanel", () => {
+  it("shows the latest run age in summary-only history", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: null,
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    expect(screen.getByText("Latest run").parentElement?.querySelector("button")?.getAttribute("aria-label")).toMatch(/2026-04-18.*days ago/);
+  });
+
   it("groups summary charts by analytical question", () => {
     render(
       <ChartPanel
@@ -223,6 +241,90 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Sparkline Table" })).toBeNull();
   });
 
+  it("moves through chart question tabs with arrows, Home, and End", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [makeHistoricalEntry(), makeHistoricalEntry({ result_id: "hist-2" })],
+        }}
+      />,
+    );
+
+    const overview = screen.getByRole("tab", { name: "Overview" });
+    overview.focus();
+    fireEvent.keyDown(overview, { key: "ArrowRight" });
+    const perQuery = screen.getByRole("tab", { name: "Per-query" });
+    expect(perQuery).toHaveAttribute("aria-selected", "true");
+    expect(perQuery).toHaveAttribute("tabindex", "0");
+    expect(document.activeElement).toBe(perQuery);
+
+    fireEvent.keyDown(perQuery, { key: "End" });
+    const rank = screen.getByRole("tab", { name: "Rank" });
+    expect(document.activeElement).toBe(rank);
+    expect(rank).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(rank, { key: "Home" });
+    expect(document.activeElement).toBe(overview);
+    expect(overview).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("opens a summary cohort on a chart rather than on the sparkline table", () => {
+    // A section headed "Charts" used to open on an HTML metrics table, so a
+    // reader who never touched the controls saw no chart at all.
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    expect(screen.getByRole("img", { name: /performance comparison/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Performance Bar" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("records the open chart in the URL so the view can be shared", () => {
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sparkline Table" }));
+
+    expect(new URLSearchParams(window.location.search).get("chart")).toBe("sparkline_table");
+  });
+
+  it("restores the chart named in the URL", () => {
+    window.history.replaceState(null, "", "/?chart=stacked_phase");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    expect(screen.getByRole("button", { name: "Stacked Phase Breakdown" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  it("canonicalises a chart id that does not apply to this cohort", async () => {
+    window.history.replaceState(null, "", "/?chart=comparison_bar");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+
+    // comparison_bar needs two results; a summary cohort cannot show it.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Performance Bar" }).getAttribute("aria-pressed")).toBe(
+        "true",
+      );
+    });
+    expect(new URLSearchParams(window.location.search).get("chart")).toBeNull();
+  });
+
+  it("leaves the route's own parameters alone", () => {
+    window.history.replaceState(null, "", "/results/tpch/?sf=1&phase=power");
+
+    render(<ChartPanel context={{ kind: "summary", summary: makeSummary() }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sparkline Table" }));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get("sf")).toBe("1");
+    expect(params.get("phase")).toBe("power");
+    expect(params.get("chart")).toBe("sparkline_table");
+  });
+
   it("hides charts whose ids are listed in excludeChartIds", () => {
     render(
       <ChartPanel
@@ -242,7 +344,7 @@ describe("ChartPanel", () => {
     expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
     expect(screen.queryByRole("button", { name: "Query Heatmap" })).toBeNull();
-    expect(screen.getByRole("tabpanel", { name: "Per-query chart" })).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "Per-query" })).toBeTruthy();
   });
 
   it("threads cohort-aware labels into Compare per-query charts", () => {
@@ -272,13 +374,19 @@ describe("ChartPanel", () => {
       <ChartPanel context={{ kind: "compare", results: details, primaryMetric: "display_geomean_ms" }} />,
     );
 
-    expect(screen.getByText("DataFusion v44")).toBeTruthy();
-    expect(screen.getByText("DataFusion v45")).toBeTruthy();
+    expect(screen.getAllByText("DataFusion v44").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("DataFusion v45").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Comparison Bar" }));
     const tooltips = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent ?? "");
     expect(tooltips.some((text) => text.includes("DataFusion v44"))).toBe(true);
     expect(tooltips.some((text) => text.includes("DataFusion v45"))).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Diverging Bar" }));
+    const chart = screen.getByRole("img", { name: "Diverging bar chart" });
+    expect(chart.getAttribute("aria-describedby")).toBe("diverging-bar-description");
+    expect(screen.getByText(/An accessible table follows the chart/)).toBeTruthy();
+    expect(screen.getByRole("table", { name: /Per-query percentage changes relative to DataFusion v44/ })).toBeTruthy();
   });
 
   it("uses responsive segmented chart controls with short visible labels", () => {
@@ -428,7 +536,7 @@ describe("ChartPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "Comparison Bar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Normalized Speedup" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Relative to selected baseline" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Query Heatmap" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Per-query" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
@@ -459,7 +567,7 @@ describe("ChartPanel", () => {
       />,
     );
 
-    expect(screen.queryByLabelText(/Baseline/i)).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "Baseline" })).toBeNull();
     expect(screen.getByText("Baseline:")).toBeTruthy();
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
   });
@@ -506,7 +614,7 @@ describe("ChartPanel", () => {
     expect(screen.getByRole("button", { name: "Query Histogram" })).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Rank" }));
     expect(screen.getByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Normalized Speedup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Relative to selected baseline" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Performance Trend" })).toBeNull();
   });
 
@@ -560,8 +668,8 @@ describe("ChartPanel", () => {
 
     expect(screen.getByRole("status", { name: "Rank Table unavailable" })).toBeTruthy();
     expect(screen.queryByRole("table", { name: "Per-query platform rankings (1st = fastest)" })).toBeNull();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -638,8 +746,8 @@ describe("ChartPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Power@Size Bar" }));
 
     expect(screen.getByRole("status", { name: "Power@Size Bar unavailable" })).toBeTruthy();
-    expect(screen.getByText("No rankable rows")).toBeTruthy();
-    expect(screen.getByText(/Trust policy excludes this result from ranking/)).toBeTruthy();
+    expect(screen.getByText("No ranked runs")).toBeTruthy();
+    expect(screen.getByText(/Results from this source are not included in rankings/)).toBeTruthy();
     expect(screen.getByText(/Validation status excludes this result from ranking/)).toBeTruthy();
   });
 
@@ -672,7 +780,7 @@ describe("ChartPanel", () => {
 
     expect(screen.getByText("Rankable Low")).toBeTruthy();
     expect(screen.queryByText("Community High")).toBeNull();
-    expect(screen.getByText(/1 row excluded from this chart's rankable rows dataset/)).toBeTruthy();
+    expect(screen.getByText(/1 row excluded from this chart's ranked runs dataset/)).toBeTruthy();
   });
 
   it("uses winner language by default in the summary box", () => {
@@ -705,5 +813,409 @@ describe("ChartPanel", () => {
     expect(screen.queryByText("Best geomean")).toBeNull();
     expect(screen.getByText("Lowest geomean in ranking")).toBeTruthy();
     expect(screen.getByText(/ranking mismatch — not comparable/)).toBeTruthy();
+  });
+
+  it("filters chartSummary queries and preserves queryFilter ranking order", () => {
+    const summary = makeSummary({
+      query_ids: ["Q1", "Q2", "Q3"],
+      platforms: [makePlatformRow({ timings: { Q1: 10, Q2: 20, Q3: 30 } })],
+    });
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q3", "Q1"]}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Per-query" }));
+    expect(screen.getByText("Q3")).toBeTruthy();
+    expect(screen.getByText("Q1")).toBeTruthy();
+    expect(screen.queryByText("Q2")).toBeNull();
+  });
+
+  it("recomputes multi-run comparison-bar geomeans over the shared query filter", () => {
+    const details = [
+      makeDetail({
+        result_id: "a",
+        platform: "A",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 10, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      makeDetail({
+        result_id: "b",
+        platform: "B",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 20, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+      makeDetail({
+        result_id: "c",
+        platform: "C",
+        display_geomean_ms: 999,
+        display_timings: [
+          { query_id: "Q1", display_ms: 40, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          { query_id: "Q2", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+        ],
+      }),
+    ];
+    const { container } = render(
+      <ChartPanel
+        context={{ kind: "compare", results: details, primaryMetric: "display_geomean_ms" }}
+        queryFilter={["Q1"]}
+      />,
+    );
+
+    const titles = Array.from(container.querySelectorAll("rect title")).map((title) => title.textContent ?? "");
+    expect(titles.some((title) => title.includes("A") && title.includes("10 ms"))).toBe(true);
+    expect(titles.some((title) => title.includes("B") && title.includes("20 ms"))).toBe(true);
+    expect(titles.some((title) => title.includes("C") && title.includes("40 ms"))).toBe(true);
+    expect(titles.every((title) => !title.includes("999 ms"))).toBe(true);
+    // Compare summaries intentionally carry no persisted percentile statistics,
+    // so the global basis selector cannot expose a stale percentile ladder.
+    expect(screen.queryByRole("button", { name: "Percentile Ladder" })).toBeNull();
+  });
+
+  it("renders an explicit no-matching-queries message when queryFilter has no matches", () => {
+    const summary = makeSummary();
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q999"]}
+      />,
+    );
+    expect(screen.getByText("No queries match the selected filter.")).toBeTruthy();
+  });
+
+  it("clears power_score and switches power ranking to geomean latency under active queryFilter", () => {
+    const summary = makeSummary({
+      ranking: {
+        primary_metric: "power_score",
+        secondary_metric: "display_geomean_ms",
+        primary_order: "desc",
+      },
+      platforms: [
+        makePlatformRow({
+          result_id: "p1",
+          platform: "Platform 1",
+          power_score: 5000,
+          display_geomean_ms: 100,
+          timings: { Q1: 10, Q2: 20 },
+        }),
+        makePlatformRow({
+          result_id: "p2",
+          platform: "Platform 2",
+          power_score: 1000,
+          display_geomean_ms: 20,
+          timings: { Q1: 5, Q2: 10 },
+        }),
+      ],
+      query_ids: ["Q1", "Q2"],
+    });
+
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary,
+        }}
+        queryFilter={["Q1"]}
+      />,
+    );
+
+    expect(screen.queryByText(/5,000/)).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Power" })).toBeNull();
+  });
+
+  it("hides whole-run normalized cost charts under an active queryFilter", () => {
+    render(
+      <ChartPanel
+        context={{ kind: "summary", summary: makeSummary() }}
+        queryFilter={["Q1"]}
+      />,
+    );
+    expect(screen.queryByRole("tab", { name: "Cost" })).toBeNull();
+  });
+
+  it("uses the long summary layout without duplicating the page-owned heatmap", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary(),
+          historical: [
+            makeHistoricalEntry(),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z" }),
+          ],
+        }}
+        summaryLayout="long"
+        excludeChartIds={["query_heatmap"]}
+      />,
+    );
+
+    expect(screen.getByTestId("summary-chart-overview")).toBeTruthy();
+    const metricTable = screen.getByRole("table", { name: "Speed and throughput by platform" });
+    expect(metricTable).toBeTruthy();
+    expect(within(metricTable).getByText("DuckDB")).toBeTruthy();
+    expect(screen.getByTestId("summary-chart-preview-cdf_chart")).toBeTruthy();
+    expect(screen.queryByTestId("summary-chart-preview-query_heatmap")).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "Chart question groups" })).toBeNull();
+    expect(screen.queryByRole("img", { name: "Cumulative distribution of per-query latency" })).toBeNull();
+
+    const cdfCard = screen.getByTestId("summary-chart-preview-cdf_chart");
+    fireEvent.click(within(cdfCard).getByText("Open full chart ↗", { selector: "span" }));
+    fireEvent(cdfCard, new Event("toggle"));
+
+    expect(screen.getByRole("img", { name: "Cumulative distribution of per-query latency" })).toBeTruthy();
+  });
+
+  it("hides power scores for rows excluded from ranking in the long summary", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({ result_id: "rankable", platform: "Rankable", power_score: 1000 }),
+              makePlatformRow({
+                result_id: "excluded",
+                platform: "Excluded",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+            ],
+          }),
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: "Speed and throughput by platform" });
+    expect(within(table).getByText("1,000")).toBeTruthy();
+    expect(within(table).queryByText("9,000")).toBeNull();
+  });
+
+  it("uses only eligible rows in long-layout thumbnails", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            platforms: [
+              makePlatformRow({ result_id: "rankable", platform: "Rankable", power_score: 1000 }),
+              makePlatformRow({
+                result_id: "excluded",
+                platform: "Excluded",
+                power_score: 9000,
+                ranking_exclusion_reason: "trust_not_rankable",
+              }),
+            ],
+          }),
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const ranks = screen.getByTestId("summary-chart-preview-rank_table");
+    const grid = within(ranks).getByLabelText("Rank table thumbnail");
+    expect(grid).toHaveStyle({ gridTemplateColumns: "repeat(1, minmax(0, 1fr))" });
+  });
+
+  it("keeps long-layout cost and trend thumbnails aligned with the ranking metric", () => {
+    render(
+      <ChartPanel
+        context={{
+          kind: "summary",
+          summary: makeSummary({
+            ranking: { primary_metric: "power_score", secondary_metric: "display_geomean_ms", primary_order: "desc" },
+            platforms: [
+              makePlatformRow({
+                result_id: "high-power",
+                platform: "High power",
+                power_score: 9000,
+                display_geomean_ms: 100,
+                normalized_cost_usd: 1,
+              }),
+              makePlatformRow({
+                result_id: "low-power",
+                platform: "Low power",
+                power_score: 1000,
+                display_geomean_ms: 10,
+                normalized_cost_usd: 2,
+              }),
+            ],
+          }),
+          historical: [
+            makeHistoricalEntry({ result_id: "hist-1", run_date: "2026-04-17T12:00:00Z", power_score: 1000 }),
+            makeHistoricalEntry({ result_id: "hist-2", run_date: "2026-04-18T12:00:00Z", power_score: 2000 }),
+          ],
+        }}
+        summaryLayout="long"
+      />,
+    );
+
+    const cost = screen.getByTestId("summary-chart-preview-cost_scatter");
+    const highPowerDot = within(cost).getByTitle("High power") as HTMLElement;
+    const lowPowerDot = within(cost).getByTitle("Low power") as HTMLElement;
+    expect(Number.parseFloat(highPowerDot.style.top)).toBeLessThan(Number.parseFloat(lowPowerDot.style.top));
+
+    const trend = within(screen.getByTestId("summary-chart-preview-time_series")).getByRole("img", {
+      name: "Trend thumbnail",
+    });
+    expect(trend.querySelector("path")?.getAttribute("d")).toContain("M12.0,72.0 L228.0,10.0");
+  });
+
+  it("renders every compare chart openly with no tab gating in the long layout", () => {
+    const { container } = render(
+      <ChartPanel
+        summaryLayout="long"
+        context={{
+          kind: "compare",
+          results: [
+            makeDetail(),
+            makeDetail({
+              result_id: "detail-2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              display_geomean_ms: 18,
+              geomean_ms: 18,
+              display_timings: [
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryAllByRole("tab")).toHaveLength(0);
+    expect(screen.queryByRole("heading", { name: "What does this comparison show?" })).toBeNull();
+    expect(screen.queryByText("Headline metrics")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).not.toHaveTextContent(
+      "How does each query compare with the baseline?",
+    );
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).not.toHaveTextContent(
+      "Which queries drive the difference?",
+    );
+    expect(screen.queryByText("Top-line metric summaries and phase composition")).toBeNull();
+    expect(
+      screen.queryByText("Paired side-by-side bars comparing two runs per query with % change annotations"),
+    ).toBeNull();
+    expect(container.querySelector("h3.sr-only")).toBeNull();
+    expect(screen.getByTestId("chart-panel-group-overview")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-group-per_query")).toBeTruthy();
+    // Charts from several groups are on the page at once.
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-query_heatmap")).toBeTruthy();
+    expect(container.querySelectorAll("[data-chart-container]").length).toBeGreaterThan(1);
+    // Comparison content that used to hide behind the Overview/Per-query tabs
+    // renders immediately.
+    expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
+  });
+
+  it("renders summary_box and sparkline_table with no caption, since their own labels already say what they show", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    // Neither chart gets a title/description above it: summary_box's stat
+    // tiles are labeled Platforms/Queries/Best.../Phase, and sparkline_table's
+    // columns are labeled Platform/Geomean/Power@Size/etc - a caption above
+    // either only restated those labels (the user's "weird title-bullet
+    // slugs" complaint).
+    const summaryBox = screen.getByTestId("chart-panel-chart-summary_box");
+    expect(summaryBox.querySelector("h4")).toBeNull();
+    expect(summaryBox.querySelector("p")).toBeNull();
+
+    const sparklineTable = screen.getByTestId("chart-panel-chart-sparkline_table");
+    expect(sparklineTable.querySelector("h4")).toBeNull();
+    expect(sparklineTable.querySelector("p")).toBeNull();
+  });
+
+  it("honors excludeChartIds in the long layout", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        excludeChartIds={["performance_bar", "power_bar"]}
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByTestId("chart-panel-chart-performance_bar")).toBeNull();
+    expect(screen.queryByTestId("chart-panel-chart-power_bar")).toBeNull();
+    expect(screen.getByTestId("chart-panel-chart-sparkline_table")).toBeTruthy();
+    expect(screen.getByTestId("chart-panel-chart-comparison_bar")).toBeTruthy();
+  });
+
+  it("suppresses winner language across openly rendered compare charts when suppressWinnerClaims is on", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        suppressWinnerClaims
+        suppressionReason="benchmarks differ across results"
+        context={{
+          kind: "compare",
+          results: [makeDetail(), makeDetail({ result_id: "detail-2" })],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("Best geomean")).toBeNull();
+    expect(screen.getByText("Lowest geomean in ranking")).toBeTruthy();
+    expect(screen.getByText(/ranking mismatch — not comparable/)).toBeTruthy();
+  });
+
+  it("uses a controlled compare baseline without rendering a second selector in the long layout", () => {
+    render(
+      <ChartPanel
+        summaryLayout="long"
+        baselineIndex={1}
+        onBaselineIndexChange={() => undefined}
+        context={{
+          kind: "compare",
+          results: [
+            makeDetail(),
+            makeDetail({
+              result_id: "detail-2",
+              platform: "SQLite",
+              platform_id: "sqlite",
+              display_geomean_ms: 18,
+              geomean_ms: 18,
+              display_timings: [
+                { query_id: "Q1", display_ms: 18, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+                { query_id: "Q2", display_ms: 22, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+              ],
+            }),
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Baseline" })).toBeNull();
+    expect(screen.queryByRole("tablist")).toBeNull();
   });
 });

@@ -55,7 +55,7 @@ describe("compareSelectionLabel", () => {
       runDate: "2026-05-02T18:11:00Z",
       resultId: "tpch-polars-sf0.1-20260502-0093bb7a",
     });
-    expect(label).toBe("Select Polars TPC-H SF 0.1 power 2026-05-02 (0093bb7a) for comparison");
+    expect(label).toMatch(/^Select Polars TPC-H SF 0\.1 power 2026-05-02 \(.*days ago\) \(0093bb7a\) for comparison$/);
   });
 
   it("disambiguates two rows with the same platform via short id and date", () => {
@@ -89,13 +89,13 @@ describe("compareSelectionLabel", () => {
     expect(compareSelectionLabel({})).toBe("Select run for comparison");
   });
 
-  it("truncates ISO-timestamp run dates to YYYY-MM-DD", () => {
+  it("uses the shared run date and age label for ISO timestamps", () => {
     const label = compareSelectionLabel({
       platform: "Polars",
       runDate: "2026-05-02T18:11:00Z",
       resultId: "abc-1234",
     });
-    expect(label).toBe("Select Polars 2026-05-02 (1234) for comparison");
+    expect(label).toMatch(/^Select Polars 2026-05-02 \(.*days ago\) \(1234\) for comparison$/);
   });
 });
 

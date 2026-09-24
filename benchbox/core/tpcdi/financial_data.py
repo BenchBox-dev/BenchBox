@@ -71,10 +71,14 @@ class FinancialDataPatterns:
     def __init__(self, seed: int = 42):
         """Initialize with consistent random seed for reproducible data.
 
+        The seed feeds a private random.Random instance owned by this
+        object; the process-global random generator is never seeded or
+        otherwise mutated here.
+
         Args:
             seed: Random seed for reproducible generation
         """
-        random.seed(seed)
+        self._rng = random.Random(seed)
         self.constants = FinancialConstants()
 
         # Pre-define realistic industry classifications
@@ -215,7 +219,7 @@ class FinancialDataPatterns:
         Returns:
             Customer tier (1=highest, 3=standard)
         """
-        rand = random.random()
+        rand = self._rng.random()
         if rand < self.constants.TIER_1_PERCENTAGE:
             return 1
         elif rand < self.constants.TIER_1_PERCENTAGE + self.constants.TIER_2_PERCENTAGE:
@@ -234,17 +238,17 @@ class FinancialDataPatterns:
         """
         if tier == 1:
             # High net worth - log-normal distribution
-            base = random.uniform(
+            base = self._rng.uniform(
                 math.log(self.constants.TIER_1_MIN_NET_WORTH),
                 math.log(self.constants.TIER_1_MAX_NET_WORTH),
             )
             return int(math.exp(base))
         elif tier == 2:
             # Medium net worth - more uniform distribution
-            return random.randint(self.constants.TIER_2_MIN_NET_WORTH, self.constants.TIER_2_MAX_NET_WORTH)
+            return self._rng.randint(self.constants.TIER_2_MIN_NET_WORTH, self.constants.TIER_2_MAX_NET_WORTH)
         else:
             # Standard customers - lower range
-            return random.randint(self.constants.TIER_3_MIN_NET_WORTH, self.constants.TIER_3_MAX_NET_WORTH)
+            return self._rng.randint(self.constants.TIER_3_MIN_NET_WORTH, self.constants.TIER_3_MAX_NET_WORTH)
 
     def generate_credit_rating(self, tier: int, net_worth: int) -> int:
         """Generate realistic credit rating correlated with tier and net worth.
@@ -258,11 +262,11 @@ class FinancialDataPatterns:
         """
         # Higher tier customers tend to have better credit
         if tier == 1:
-            base_score = random.randint(750, 850)
+            base_score = self._rng.randint(750, 850)
         elif tier == 2:
-            base_score = random.randint(680, 780)
+            base_score = self._rng.randint(680, 780)
         else:
-            base_score = random.randint(550, 720)
+            base_score = self._rng.randint(550, 720)
 
         # Add some correlation with net worth
         net_worth_factor = min(net_worth / 100000, 1.0) * 50  # Up to 50 point bonus
@@ -284,7 +288,7 @@ class FinancialDataPatterns:
             Tax status (0=Taxable, 1=Tax Deferred, 2=Tax Free)
         """
         # Higher tier customers more likely to have tax-advantaged accounts
-        rand = random.random()
+        rand = self._rng.random()
 
         if customer_tier == 1:
             # High net worth - more tax-advantaged accounts
@@ -323,12 +327,12 @@ class FinancialDataPatterns:
         if base_price is None:
             # Initial price - log-normal distribution
             # Most stocks between $10-200, some outliers
-            log_price = random.normalvariate(math.log(50), 0.8)
+            log_price = self._rng.normalvariate(math.log(50), 0.8)
             price = math.exp(log_price)
             return max(1.0, min(price, 1000.0))  # Clamp to reasonable range
         else:
             # Price evolution - small random walk
-            change_pct = random.normalvariate(0, 0.02)  # 2% daily volatility
+            change_pct = self._rng.normalvariate(0, 0.02)  # 2% daily volatility
             new_price = base_price * (1 + change_pct)
             return max(0.01, new_price)  # Minimum $0.01
 
@@ -343,16 +347,16 @@ class FinancialDataPatterns:
         """
         if market_cap_tier == 1:
             # Large cap - high volume
-            base_volume = random.randint(1000000, 50000000)
+            base_volume = self._rng.randint(1000000, 50000000)
         elif market_cap_tier == 2:
             # Mid cap - medium volume
-            base_volume = random.randint(100000, 5000000)
+            base_volume = self._rng.randint(100000, 5000000)
         else:
             # Small cap - lower volume
-            base_volume = random.randint(10000, 500000)
+            base_volume = self._rng.randint(10000, 500000)
 
         # Add some daily variation
-        variation = random.uniform(0.5, 2.0)
+        variation = self._rng.uniform(0.5, 2.0)
         return int(base_volume * variation)
 
     def generate_trade_quantity(self, customer_tier: int, security_price: float) -> int:
@@ -370,13 +374,13 @@ class FinancialDataPatterns:
 
         if customer_tier == 1:
             # High net worth - larger trades
-            typical_trade_value = random.randint(50000, 500000)
+            typical_trade_value = self._rng.randint(50000, 500000)
         elif customer_tier == 2:
             # Medium net worth - medium trades
-            typical_trade_value = random.randint(10000, 100000)
+            typical_trade_value = self._rng.randint(10000, 100000)
         else:
             # Standard customers - smaller trades
-            typical_trade_value = random.randint(1000, 25000)
+            typical_trade_value = self._rng.randint(1000, 25000)
 
         # Calculate shares based on typical dollar amount
         base_quantity = int(typical_trade_value / security_price)
@@ -416,7 +420,7 @@ class FinancialDataPatterns:
         Returns:
             Trade status
         """
-        rand = random.random()
+        rand = self._rng.random()
         if rand < 0.85:
             return "Completed"  # 85% complete
         elif rand < 0.95:
@@ -451,7 +455,7 @@ class FinancialDataPatterns:
         total_weight = sum(weights)
         weights = [w / total_weight for w in weights]
 
-        return random.choices(ratings, weights=weights)[0]
+        return self._rng.choices(ratings, weights=weights)[0]
 
     def generate_realistic_dates(self, start_date: date, end_date: date, num_dates: int) -> list[date]:
         """Generate realistic business dates with proper weighting.
@@ -469,7 +473,7 @@ class FinancialDataPatterns:
 
         for _ in range(num_dates):
             # Generate random offset
-            offset = random.randint(0, date_range)
+            offset = self._rng.randint(0, date_range)
             candidate_date = start_date + timedelta(days=offset)
 
             # Bias against weekends (less trading activity)
@@ -478,7 +482,7 @@ class FinancialDataPatterns:
             else:
                 weight = 0.1  # Much less weekend activity
 
-            if random.random() < weight:
+            if self._rng.random() < weight:
                 dates.append(candidate_date)
 
         # Remove duplicates and sort
@@ -486,7 +490,7 @@ class FinancialDataPatterns:
 
         # If we don't have enough dates, fill in more weekdays
         while len(dates) < num_dates:
-            offset = random.randint(0, date_range)
+            offset = self._rng.randint(0, date_range)
             candidate_date = start_date + timedelta(days=offset)
             if candidate_date.weekday() < 5 and candidate_date not in dates:
                 dates.append(candidate_date)

@@ -654,3 +654,11 @@ table.docutils code.literal {
 [data-theme="dark"] .ablog-sidebar-item a:hover {
     color: var(--color-sidebar-link-text--top-level);
 }
+
+/* Furo's footer is a column flex container, which otherwise stretches the
+   shared theme radiogroup (appended by docs/_templates/page.html) to the
+   full content width. Center it as its own row instead. */
+footer > .benchbox-site-footer-theme {
+    align-self: center;
+    margin-bottom: 1rem;
+}

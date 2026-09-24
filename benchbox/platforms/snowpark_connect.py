@@ -341,7 +341,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
         table_stats: dict[str, int] = {}
-        per_table_timings: dict[str, float] = {}
+        per_table_timings: dict[str, Any] = {}
 
         for table in self._resolve_table_names(benchmark):
             table_start = mono_time()
@@ -370,14 +370,28 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
             else:
-                # For CSV/TBL files, use COPY INTO
+                # For CSV/TBL files, use COPY INTO as a full refresh: clear
+                # leftover stage files, re-upload, truncate the target, and
+                # COPY with FORCE so load history cannot skip the reload
+                # (parquet branch already overwrites via save_as_table).
+                try:
+                    session.sql(f"REMOVE @~/{table}/").collect()
+                except Exception as e:
+                    if "does not exist or not authorized" not in str(e):
+                        raise
                 for file_path in table_files:
                     stage_name = f"@~/{table}"
-                    session.sql(f"PUT file://{file_path} {stage_name}").collect()
+                    session.sql(f"PUT file://{file_path} {stage_name} OVERWRITE = TRUE").collect()
+
+                try:
+                    session.sql(f"TRUNCATE TABLE {table}").collect()
+                except Exception as e:
+                    if "does not exist or not authorized" not in str(e):
+                        raise
 
                 # Create file format and COPY INTO
                 session.sql(
-                    f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|')"
+                    f"COPY INTO {table} FROM @~/{table}/ FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|') FORCE = TRUE"
                 ).collect()
 
                 count_result = session.sql(f"SELECT COUNT(*) FROM {table}").collect()
@@ -385,7 +399,7 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
                 table_stats[table] = row_count
                 logger.info(f"Loaded {row_count:,} rows into {table}")
 
-            per_table_timings[table] = elapsed_seconds(table_start)
+            per_table_timings[table] = {"total_ms": elapsed_seconds(table_start) * 1000}
 
         return table_stats, elapsed_seconds(start_time), per_table_timings
 
@@ -658,6 +672,13 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         ]:
             if key in config:
                 params[key] = config[key]
+
+        # Forward the recreate flag so forced runs stay idempotent instead of
+        # silently falling back to the base default (False).
+        if "force_recreate" in config:
+            params["force_recreate"] = config["force_recreate"]
+        elif config.get("force", False):
+            params["force_recreate"] = True
 
         return cls(**params)
 

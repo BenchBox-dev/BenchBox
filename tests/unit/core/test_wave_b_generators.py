@@ -24,6 +24,12 @@ def test_clickbench_generator_record_and_local_generation(tmp_path):
     assert gen._table_row_counts["hits"] == 2
 
 
+def test_clickbench_generator_scales_record_count() -> None:
+    gen = ClickBenchDataGenerator(scale_factor=10.0)
+
+    assert gen.base_records == 10_000_000
+
+
 def test_h2odb_generator_trips_and_manifest_tracking(tmp_path):
     gen = H2ODataGenerator(scale_factor=1.0, output_dir=tmp_path, compression_enabled=False)
     gen.base_trips = 3

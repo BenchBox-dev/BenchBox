@@ -40,6 +40,31 @@ class _Conn:
         return _Cursor(self.rows, self.columns)
 
 
+def test_detect_scd_changes_trims_padded_strings_on_every_string_dtype() -> None:
+    """Whitespace-only differences are not SCD changes on any string dtype.
+
+    Pandas 3 stores text as StringDtype/str rather than object; the trim step
+    must key off string-ness, not ``dtype == object``, or padded values
+    create spurious dimension versions.
+    """
+    scd = EnhancedSCDType2Processor(connection=_Conn())
+    for dtype in ("str", object):
+        merged = pd.DataFrame(
+            {
+                "name_new": pd.Series([" Alice "], dtype=dtype),
+                "name_current": pd.Series(["Alice"], dtype=dtype),
+            }
+        )
+        assert scd._detect_scd_changes(merged, ["name"]).tolist() == [False], dtype
+    genuinely_changed = pd.DataFrame(
+        {
+            "name_new": pd.Series(["Bob"], dtype="str"),
+            "name_current": pd.Series(["Alice"], dtype="str"),
+        }
+    )
+    assert scd._detect_scd_changes(genuinely_changed, ["name"]).tolist() == [True]
+
+
 def test_scd_module_core_paths(tmp_path: Path):
     conn = _Conn(rows=[(1, "A", 100, 1)], columns=["CustomerID", "Status", "SK_CustomerID", "IsCurrent"])
     scd = EnhancedSCDType2Processor(connection=conn)

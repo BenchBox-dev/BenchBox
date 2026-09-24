@@ -10,7 +10,7 @@
  */
 
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BenchmarkSummary } from "@/types";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
 
@@ -30,35 +30,14 @@ vi.mock("preact-router", async () => {
   };
 });
 
-vi.mock("@/components/QueryHeatmap", async () => {
-  const actual = await vi.importActual<typeof import("@/components/QueryHeatmap")>("@/components/QueryHeatmap");
-  type QueryHeatmapProps = Parameters<typeof actual.QueryHeatmap>[0];
-
-  return {
-    ...actual,
-    QueryHeatmap: (props: QueryHeatmapProps) => {
-      const testWindow = window as Window & { __benchboxCompareSelectionTest?: boolean };
-      if (!testWindow.__benchboxCompareSelectionTest) {
-        return <actual.QueryHeatmap {...props} />;
-      }
-      return (
-        <div>
-          <actual.QueryHeatmap {...props} />
-          <button
-            type="button"
-            onClick={() => props.onSelectionChange?.(new Set(["aaaaaaaa", "bbbbbbbb"]))}
-          >
-            Select fixture compare rows
-          </button>
-        </div>
-      );
-    },
-  };
-});
-
 import { queryRows } from "@/db";
 import { clearDuckdbQueryCachesForTests } from "@/lib/duckdbQueries";
 import { BenchmarkIndex } from "@/pages/BenchmarkIndex";
+
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+afterEach(() => {
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 // ---------------------------------------------------------------------------
 // Fixtures - raw DuckDB row shapes
@@ -129,6 +108,9 @@ const RESULT_ROWS = [
     has_plans: false,
     has_tuning: false,
     bundle_download_url: "",
+    arch: "arm64",
+    cpu_family: "apple_silicon",
+    memory_gb: 64,
   },
   {
     result_id: "r2",
@@ -170,6 +152,9 @@ const RESULT_ROWS = [
     has_plans: false,
     has_tuning: false,
     bundle_download_url: "",
+    arch: "x86_64",
+    cpu_family: "amd_epyc",
+    memory_gb: 128,
   },
 ];
 
@@ -378,7 +363,6 @@ function defaultImpl(
 beforeEach(() => {
   vi.clearAllMocks();
   clearDuckdbQueryCachesForTests();
-  delete (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest;
   window.history.replaceState(null, "", "/results/tpch/");
   vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS));
 });
@@ -387,6 +371,37 @@ function getRenderedResultOrder(container: ParentNode): string[] {
   return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
     (row) => row.getAttribute("data-testid") ?? "",
   ).filter((id) => !id.startsWith("excluded-run-"));
+}
+
+// The Query matrix card and the Results (List) table both key their rows by
+// the same result-id testids - so row-order assertions need to scope to the
+// one section under test rather than the whole page.
+function matrixRoot(container: ParentNode): ParentNode {
+  const root = container.querySelector('[data-testid="summary-chart-preview-query_heatmap"]');
+  if (!root) throw new Error("expected the query_heatmap Analysis card to be rendered");
+  return root;
+}
+function listRoot(container: ParentNode): ParentNode {
+  const root = container.querySelector("#benchmark-section-list");
+  if (!root) throw new Error("expected #benchmark-section-list to be rendered");
+  return root;
+}
+
+// The query matrix and query ranks cards are collapsed <details> by default;
+// tests that need their content open them the same way a reader's click
+// would (jsdom fires no click-driven native toggle in this codebase's
+// version, so the assignment + explicit `toggle` event mirrors the pattern
+// used throughout SummaryChartOverview.test.tsx).
+function openMatrixCard(container: ParentNode): void {
+  const details = matrixRoot(container) as HTMLDetailsElement;
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
+}
+function openRanksCard(container: ParentNode): void {
+  const details = container.querySelector('[data-testid="summary-chart-preview-rank_table"]') as HTMLDetailsElement | null;
+  if (!details) throw new Error("expected the rank_table Analysis card to be rendered");
+  details.open = true;
+  fireEvent(details, new Event("toggle"));
 }
 
 // ---------------------------------------------------------------------------
@@ -402,27 +417,50 @@ describe("BenchmarkIndex", () => {
 
   it("sets the not-found title for unknown benchmark slugs", async () => {
     render(<BenchmarkIndex benchmark="does-not-exist" />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "404" })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Page not found" })).toBeTruthy());
     await waitFor(() => expect(document.title).toBe("Not found · BenchBox Results"));
   });
 
-  it("shows QueryHeatmap (query column headers) by default", async () => {
-    render(<BenchmarkIndex benchmark="tpch" />);
+  it("shows the query matrix card's query column headers once opened", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy();
       expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
     });
   });
 
+  it("states the cohort scope in the page header and renders the query matrix as the first Analysis card", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
+    const meta = screen.getByTestId("page-header-meta");
+    expect(meta.textContent).toContain("2 published runs");
+    expect(meta.textContent).toContain("2 queries");
+    // The hero's prose and its "Jump to matrix" link are gone: the link moved
+    // the reader a quarter of a page, and the matrix follows immediately.
+    expect(screen.queryByText(/Jump to matrix/)).toBeNull();
+    expect(container.querySelector("#benchmark-section-analysis")).not.toBeNull();
+    expect(container.querySelector("#provenance-legend")).not.toBeNull();
+    // The matrix is now embedded as the first Analysis card, titled "Query
+    // matrix", not a standalone page section.
+    const cards = container.querySelectorAll("[data-testid^='summary-chart-preview-']");
+    expect(cards.length).toBeGreaterThan(0);
+    expect(cards[0]?.getAttribute("data-testid")).toBe("summary-chart-preview-query_heatmap");
+    expect(within(cards[0] as HTMLElement).getByText("Query matrix")).toBeTruthy();
+  });
+
   it("matrix view sorts rows from query headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
 
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
     fireEvent.click(screen.getByRole("button", { name: /^Q1/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r2", "r1"]);
   });
 
   it("shows platform names from the summary", async () => {
@@ -439,46 +477,26 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    for (const details of screen.getAllByText("Receipt and metadata")) {
-      fireEvent.click(details);
-    }
-    const receiptLinks = screen.getAllByRole("link", { name: "Receipt →" }) as HTMLAnchorElement[];
+    // The platform name is the receipt link, and the labels column carries
+    // validation status; neither is behind a disclosure any more.
+    expect(screen.queryByText("Run details")).toBeNull();
+    const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
     expect(screen.getAllByText("exact").length).toBeGreaterThan(0);
     expect(screen.getAllByText("loose").length).toBeGreaterThan(0);
   });
 
-  it("matrix and ranks views expose canonical public detail and receipt links", async () => {
+  it("reaches each run's receipt from its row, without a separate link list", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getByTestId("matrix-result-links")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    const matrixLinks = screen.getByTestId("matrix-result-links");
-    expect(within(matrixLinks).getByText("Public ID r1")).toBeTruthy();
+    // The "Result links" sections repeated one link per row that the rows
+    // already carried.
+    expect(screen.queryByTestId("matrix-result-links")).toBeNull();
+    expect(screen.queryByTestId("ranks-result-links")).toBeNull();
     expect(
-      within(matrixLinks).getByRole("link", {
-        name: "Open details for DuckDB public ID r1 from 2026-04-01",
-      }),
-    ).toHaveAttribute("href", "/results/r/r1");
-    expect(
-      within(matrixLinks).getByRole("link", {
-        name: "Open receipt for DuckDB public ID r1 from 2026-04-01",
-      }),
+      screen.getAllByRole("link", { name: /Open receipt for DuckDB/ })[0],
     ).toHaveAttribute("href", "/results/r/r1#run-receipt");
-
-    fireEvent.click(screen.getByText("Ranks"));
-    await waitFor(() => expect(screen.getByTestId("ranks-result-links")).toBeTruthy());
-
-    const rankLinks = screen.getByTestId("ranks-result-links");
-    expect(
-      within(rankLinks).getByRole("link", {
-        name: "Open details for SQLite public ID r2 from 2026-04-01",
-      }),
-    ).toHaveAttribute("href", "/results/r/r2");
-    expect(
-      within(rankLinks).getByRole("link", {
-        name: "Open receipt for SQLite public ID r2 from 2026-04-01",
-      }),
-    ).toHaveAttribute("href", "/results/r/r2#run-receipt");
   });
 
   it("shows persistent compare guidance before any rows are selected", async () => {
@@ -490,8 +508,12 @@ describe("BenchmarkIndex", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more platforms");
-    const disabledAction = screen.getByRole("button", { name: "Select 2 comparable results" }) as HTMLButtonElement;
-    expect(disabledAction.disabled).toBe(true);
+    // No dead button: the pending state is status text, and the real
+    // affordance appears in the same slot once it can be used.
+    expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
+    expect(screen.getByTestId("benchmark-compare-cta-pending").textContent).toBe(
+      "Select 2 results to compare",
+    );
   });
 
   it("renders a Benchmark switcher that routes to a sibling and clears benchmark-specific params", async () => {
@@ -516,7 +538,24 @@ describe("BenchmarkIndex", () => {
 
     fireEvent.change(switcher, { target: { value: "clickbench" } });
     expect(routeMock).toHaveBeenCalledTimes(1);
-    expect(routeMock).toHaveBeenCalledWith("/results/clickbench/?view=ranks");
+    expect(routeMock).toHaveBeenCalledWith("/results/clickbench/#benchmark-section-ranks");
+  });
+
+  it("preserves the clicked section over a stale legacy view when switching benchmarks", async () => {
+    const { route } = await import("preact-router");
+    window.history.replaceState(null, "", "/results/tpch/?view=ranks#benchmark-section-list");
+    vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS, ["tpch", "ssb"]));
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await screen.findByRole("option", { name: "SSB" });
+    fireEvent.change(screen.getByTestId("benchmark-switcher"), { target: { value: "ssb" } });
+    expect(route).toHaveBeenCalledWith("/results/ssb/#benchmark-section-list");
+  });
+
+  it.each(["ssb", "star_schema"])("includes raw alias rows in the List section on /%s/", async (benchmark) => {
+    const rows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "star_schema" }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(rows, [], [], ["ssb"]));
+    render(<BenchmarkIndex benchmark={benchmark} />);
+    expect(await screen.findByTestId("list-r1")).toBeTruthy();
   });
 
   it("hides no-result benchmarks from the switcher once the public corpus list resolves", async () => {
@@ -632,10 +671,17 @@ describe("BenchmarkIndex", () => {
   });
 
   it("compare tray shows selected metadata and public IDs while compare URLs keep short aliases", async () => {
-    (window as Window & { __benchboxCompareSelectionTest?: boolean }).__benchboxCompareSelectionTest = true;
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Select fixture compare rows" })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: "Select fixture compare rows" }));
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    const list = () => listRoot(container) as HTMLElement;
+    // Selection now happens from the Results table's own checkboxes, so wait
+    // for the per-cohort summary to make both rows comparable before clicking.
+    await waitFor(() => {
+      const boxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
+      expect(boxes.filter((box) => !box.disabled)).toHaveLength(2);
+    });
+    const checkboxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
+    fireEvent.click(checkboxes[0]!);
+    fireEvent.click(checkboxes[1]!);
 
     await waitFor(() => expect(screen.getByTestId("compare-tray-row-aaaaaaaa")).toBeTruthy());
 
@@ -649,7 +695,7 @@ describe("BenchmarkIndex", () => {
     expect(duckRow.textContent).toContain("Public ID r1");
     expect(sqliteRow.textContent).toContain("SQLite");
 
-    const compareLink = screen.getByRole("link", { name: /Compare 2 selected/ }) as HTMLAnchorElement;
+    const compareLink = screen.getAllByRole("link", { name: /Compare 2 selected/ })[0] as HTMLAnchorElement;
     expect(compareLink.getAttribute("href")).toBe("/results/compare?ids=aaaaaaaa,bbbbbbbb");
   });
 
@@ -691,13 +737,19 @@ describe("BenchmarkIndex", () => {
     ]);
     vi.mocked(queryRows).mockImplementation(defaultImpl(resultRows, rankingRows, cellRows));
 
-    render(<BenchmarkIndex benchmark="tpch" />);
-    const grid = await screen.findByRole("grid", { name: /tpch SF0\.1 power results/ });
-    const checkboxes = within(grid).getAllByRole("checkbox") as HTMLInputElement[];
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // The Results table's checkboxes start disabled until the per-cohort
+    // summary resolves and confirms each row is comparable.
+    await waitFor(() => {
+      const boxes = within(listRoot(container) as HTMLElement).getAllByRole("checkbox") as HTMLInputElement[];
+      expect(boxes.filter((box) => !box.disabled)).toHaveLength(5);
+    });
+    const list = listRoot(container) as HTMLElement;
+    const checkboxes = within(list).getAllByRole("checkbox") as HTMLInputElement[];
     expect(checkboxes).toHaveLength(5);
     for (const checkbox of checkboxes.slice(0, 4)) fireEvent.click(checkbox);
 
-    const fifth = within(grid).getAllByRole("checkbox")[4] as HTMLInputElement;
+    const fifth = within(list).getAllByRole("checkbox")[4] as HTMLInputElement;
     await waitFor(() => expect(fifth.disabled).toBe(true));
     expect(fifth.checked).toBe(false);
     expect(fifth.getAttribute("aria-label")).not.toContain("Selection limit");
@@ -710,7 +762,7 @@ describe("BenchmarkIndex", () => {
       "4 results selected (maximum)",
     );
     expect(screen.queryByText("Use sticky tray to compare")).toBeNull();
-    expect(screen.getByRole("link", { name: /Compare 4 selected/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Compare 4 selected/ }).length).toBeGreaterThan(0);
   });
 
   it("excludes no-timing rows from analysis and keeps receipt provenance in Excluded runs", async () => {
@@ -743,9 +795,11 @@ describe("BenchmarkIndex", () => {
     );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
     await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
 
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(matrixRoot(container))).toEqual(["r1", "r2"]);
 
     const excluded = screen.getByTestId("excluded-runs");
     expect(excluded.textContent).toContain("Excluded runs (1)");
@@ -753,7 +807,7 @@ describe("BenchmarkIndex", () => {
     expect(within(excluded).getByTestId("excluded-run-r3")).toHaveTextContent("No valid display timing is available");
     expect(
       within(excluded).getByRole("link", {
-        name: "Open receipt for NoTimingDB public ID r3 from 2026-04-01",
+        name: /Open receipt for NoTimingDB public ID r3 from 2026-04-01 \(.*days ago\)/,
       }),
     ).toHaveAttribute("href", "/results/r/r3#run-receipt");
   });
@@ -772,12 +826,25 @@ describe("BenchmarkIndex", () => {
 
     render(<BenchmarkIndex benchmark="tpch" />);
 
+    // `?view=ranks` opens the Query ranks Analysis card automatically.
     await waitFor(() => expect(screen.getByTestId("rank-gate-notice")).toBeTruthy());
-    expect(screen.getByRole("radio", { name: "Rank Evidence" })).toBeTruthy();
+    // The card title stays "Query ranks" regardless of gate state now that
+    // ranks live in the shared card grid; only the expanded content swaps
+    // to the gate notice.
+    expect(screen.getByRole("heading", { name: "Query ranks" })).toBeTruthy();
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("Ranks are unavailable");
-    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No rankable results are available");
+    expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No results meet the requirements for ranking");
     expect(new URL(window.location.href).searchParams.get("view")).toBe("ranks");
     expect(screen.queryByRole("table", { name: /Rank/i })).toBeNull();
+  });
+
+  it("shows the rank table in the Query ranks card when the cohort is not rank-gated", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-rank_table")).toBeTruthy());
+    openRanksCard(container);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-full-rank_table").textContent).not.toBe(""));
+    expect(screen.queryByTestId("rank-gate-notice")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Query ranks" })).toBeTruthy();
   });
 
   it("disables compare selection for benchmark rows excluded from comparison", async () => {
@@ -792,18 +859,25 @@ describe("BenchmarkIndex", () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, rows, CELL_ROWS));
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0));
-
+    // The compare checkbox lives in the Results table's rows. List's rows
+    // render as soon as the raw result rows resolve, ahead of the async
+    // per-cohort summary that determines eligibility, so the checkbox
+    // starts disabled ("not part of the current cohort summary") and only
+    // becomes enabled/disabled-for-cause once the summary settles.
+    await waitFor(() => {
+      const boxes = screen.getAllByLabelText(/Select SQLite/) as HTMLInputElement[];
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const box of boxes) {
+        const describedBy = box.getAttribute("aria-describedby");
+        expect(describedBy).toBeTruthy();
+        expect(document.getElementById(describedBy!)?.textContent).toContain(
+          "Why unavailable: Insufficient valid timings",
+        );
+      }
+    });
     const sqliteCheckboxes = screen.getAllByLabelText(/Select SQLite/) as HTMLInputElement[];
-    expect(sqliteCheckboxes.length).toBeGreaterThan(0);
     for (const sqliteCheckbox of sqliteCheckboxes) {
       expect(sqliteCheckbox.disabled).toBe(true);
-      expect(sqliteCheckbox.title).toContain("Result does not have enough valid query timings");
-      const describedBy = sqliteCheckbox.getAttribute("aria-describedby");
-      expect(describedBy).toBeTruthy();
-      expect(document.getElementById(describedBy!)?.textContent).toContain(
-        "Disabled reason: Insufficient valid timings",
-      );
     }
   });
 
@@ -824,8 +898,10 @@ describe("BenchmarkIndex", () => {
       "href",
       "/results/compare",
     );
-    expect(screen.getAllByTestId("query-heatmap-disabled-reason")[0]?.textContent).toContain(
-      "Disabled reason: Insufficient query coverage",
+    await waitFor(() =>
+      expect(screen.getAllByTestId("list-row-disabled-reason")[0]?.textContent).toContain(
+        "Why unavailable: Insufficient query coverage",
+      ),
     );
   });
 
@@ -836,15 +912,22 @@ describe("BenchmarkIndex", () => {
       "/results/tpch/?sf=0.1&phase=power&platform=duckdb&deployment=cloud&cost_status=normalized",
     );
 
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // List's rows render as soon as the (unfiltered by cohort ranking) result
+    // rows resolve, ahead of the async per-cohort summary this assertion
+    // also depends on (via the ranking-query call history) - wait for both.
+    await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
 
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
-    expect(screen.queryByText("SQLite")).toBeNull();
+    expect(within(listRoot(container) as HTMLElement).queryByText("SQLite")).toBeNull();
 
     const resultCall = vi
       .mocked(queryRows)
-      .mock.calls.find(([sql]) => String(sql).replace(/\s+/g, " ").trim().includes("FROM bench.results WHERE"));
+      .mock.calls.find(([sql]) => {
+        const s = String(sql).replace(/\s+/g, " ").trim();
+        return s.includes("bench.results") && s.includes("WHERE");
+      });
     const resultSql = String(resultCall?.[0]);
     expect(resultSql).toContain("CASE WHEN benchmark = 'star_schema' THEN 'ssb'");
     expect(resultSql).toContain("(platform IN (?) OR platform_id IN (?))");
@@ -860,43 +943,158 @@ describe("BenchmarkIndex", () => {
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
   });
 
+  it("keeps a filter with no real choice visible but disabled, with an explanation", async () => {
+    // Regression: filters used to unmount entirely once their option count
+    // dropped to <=1, which made the filter bar's contents shift for
+    // reasons the reader could not see. Every fixture row here has a null
+    // platform_version, so the filter should stay mounted, disabled, and
+    // explain why rather than disappear.
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
+
+    const versionFilter = screen.getByTestId("benchmark-version-filter") as HTMLSelectElement;
+    expect(versionFilter).toBeDisabled();
+    expect(versionFilter.title).toBe("No data recorded for this filter in the current results.");
+  });
+
+  it("filters the cohort by architecture", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
+    // The architecture filter's options come from the per-cohort summary,
+    // not the raw result rows List renders from - wait for it or the
+    // filter is still showing its single-option disabled placeholder.
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
+    const list = () => listRoot(container) as HTMLElement;
+    expect(within(list()).getByText("SQLite")).toBeTruthy();
+
+    const archFilter = screen.getByTestId("benchmark-arch-filter") as HTMLSelectElement;
+    expect(archFilter).not.toBeDisabled();
+    fireEvent.change(archFilter, { target: { value: "arm64" } });
+    await waitFor(() => expect(within(list()).queryByText("SQLite")).toBeNull());
+    expect(within(list()).getByText("DuckDB")).toBeTruthy();
+  });
+
+  it("filters the cohort by CPU family", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
+    const list = () => listRoot(container) as HTMLElement;
+    expect(within(list()).getByText("DuckDB")).toBeTruthy();
+
+    const cpuFamilyFilter = screen.getByTestId("benchmark-cpu-family-filter") as HTMLSelectElement;
+    fireEvent.change(cpuFamilyFilter, { target: { value: "amd_epyc" } });
+    await waitFor(() => expect(within(list()).queryByText("DuckDB")).toBeNull());
+    expect(within(list()).getByText("SQLite")).toBeTruthy();
+  });
+
+  it("filters the cohort by memory", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
+    const list = () => listRoot(container) as HTMLElement;
+    expect(within(list()).getByText("SQLite")).toBeTruthy();
+
+    const memoryFilter = screen.getByTestId("benchmark-memory-filter") as HTMLSelectElement;
+    fireEvent.change(memoryFilter, { target: { value: "64" } });
+    await waitFor(() => expect(within(list()).queryByText("SQLite")).toBeNull());
+    expect(within(list()).getByText("DuckDB")).toBeTruthy();
+  });
+
   // -----------------------------------------------------------------------
   // (c) List view toggle
   // -----------------------------------------------------------------------
 
-  it("list-view toggle hides query columns and shows geomean column", async () => {
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-
-    // Switch to list view
-    const listBtn = screen.getByText("List");
-    fireEvent.click(listBtn);
-
-    // List view shows a table with Geomean column but no query columns
+  it("list section renders its own Geomean column, and opening the query matrix card exposes its own query columns", async () => {
+    // The Results (List) table and the Query matrix card each own their
+    // column set now: List's Geomean column is always visible, while the
+    // matrix's per-query Q1/Q2 columns only render once that card is open.
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(new URL(window.location.href).searchParams.get("view")).toBe("list");
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Q2/ })).toBeNull();
+
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+
+    expect(screen.getByRole("button", { name: /^Q2/ })).toBeTruthy();
+    expect(screen.getAllByLabelText(/^Run date .* days ago\)\./).length).toBeGreaterThan(0);
   });
 
-  it("restores benchmark view mode from the URL", async () => {
+  it("scrolls to the Results section for a `?view=list` deep link, leaving the Analysis cards intact", async () => {
     window.history.replaceState(null, "", "/results/tpch/?view=list");
+    // jsdom does not implement scrollIntoView; stub it so the page's
+    // mount-time deep-link scroll has something to call.
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
 
-    render(<BenchmarkIndex benchmark="tpch" />);
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
+    // The query matrix Analysis card is still rendered (collapsed) - `view=list`
+    // scrolls to Results without removing it from the page.
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: "start" })));
+    const listSection = container.querySelector("#benchmark-section-list");
+    expect(scrollIntoView.mock.instances[0]).toBe(listSection);
+  });
+
+  it("waits for the matrix before honoring a section hash and prefers it to legacy view", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?view=ranks#benchmark-section-list");
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    let finishRanking!: (rows: unknown[]) => void;
+    const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
+    const fallback = defaultImpl(RESULT_ROWS, RANKING_ROWS, CELL_ROWS);
+    vi.mocked(queryRows).mockImplementation((sql, params) =>
+      sql.includes("FROM bench.benchmark_rankings") ? ranking : fallback(sql, params),
+    );
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await screen.findByTestId("list-r1");
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    finishRanking([...RANKING_ROWS]);
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+    expect(scrollIntoView.mock.instances[0]).toBe(container.querySelector("#benchmark-section-list"));
+
+    window.history.pushState(null, "", "/results/tpch/#benchmark-section-ranks");
+    fireEvent(window, new Event("hashchange"));
+    const rankCard = container.querySelector("#benchmark-section-ranks");
+    expect(rankCard).not.toBeNull();
+    await waitFor(() => expect(scrollIntoView.mock.instances).toContain(rankCard));
   });
 
   it("list view sorts rows from table headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-    fireEvent.click(screen.getByText("List"));
-
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    expect(getRenderedResultOrder(container)).toEqual(["r1", "r2"]);
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
     fireEvent.click(screen.getByRole("button", { name: /Geomean/ }));
-    expect(getRenderedResultOrder(container)).toEqual(["r2", "r1"]);
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+  });
+
+  it("list view renders Arch and CPU headers and sorts by them", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
+
+    const list = listRoot(container) as HTMLElement;
+    expect(within(list).getByText("Arm64")).toBeTruthy();
+    expect(within(list).getByText("Apple silicon")).toBeTruthy();
+    expect(within(list).getByText("x86-64")).toBeTruthy();
+    expect(within(list).getByText("AMD EPYC")).toBeTruthy();
+
+    // Arch sort asc (arm64, x86_64)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
+
+    // Arch sort desc (x86_64, arm64)
+    fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+
+    // CPU sort asc (amd_epyc, apple_silicon)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
+
+    // CPU sort desc (apple_silicon, amd_epyc)
+    fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
   });
 
   it("list view caps rendered rows and expands them with Show more", async () => {
@@ -908,60 +1106,116 @@ describe("BenchmarkIndex", () => {
       display_geomean_ms: index + 1,
       geomean_ms: index + 1,
     }));
-    vi.mocked(queryRows).mockImplementation(defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS));
+    // Keep summary eligibility pending while the list paginates. The list
+    // remains usable, but compare checkboxes must expose one shared pending
+    // status rather than row-level reasons based on incomplete data.
+    let finishRanking!: (rows: unknown[]) => void;
+    const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
+    const fallback = defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS);
+    vi.mocked(queryRows).mockImplementation((sql, params) =>
+      sql.includes("FROM bench.benchmark_rankings") ? ranking : fallback(sql, params),
+    );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
-    fireEvent.click(screen.getByText("List"));
-
+    // List's own readiness signal - independent of the Matrix summary.
     await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
-    expect(getRenderedResultOrder(container)).toHaveLength(200);
+    expect(getRenderedResultOrder(listRoot(container))).toHaveLength(200);
+    const list = listRoot(container) as HTMLElement;
+    expect(within(list).getByRole("status")).toHaveTextContent("Compare eligibility is loading.");
+    const pendingCheckbox = within(list).getAllByRole("checkbox")[0]!;
+    expect(pendingCheckbox).toBeDisabled();
+    expect(pendingCheckbox).toHaveAttribute("aria-describedby", "benchmark-compare-eligibility-status");
+    expect(within(list).queryByTestId("list-row-disabled-reason")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more results" }));
 
-    expect(getRenderedResultOrder(container)).toHaveLength(205);
+    await waitFor(() => expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205));
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
+
+    // A late summary resolution re-renders the page but must leave the
+    // expanded List alone. The trailing query-matrix-card assertion proves
+    // the summary actually resolved, so the stability check above it is
+    // non-vacuous.
+    finishRanking([...RANKING_ROWS]);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Q1/ })).toBeTruthy());
+    expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205);
+    expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
+  });
+
+  it("supports grouping rows by engine version in list view", async () => {
+    const listRows = [
+      { ...RESULT_ROWS[0]!, result_id: "r1", driver_version: "9.9.9", platform_version: "1.4.0", display_geomean_ms: 10 },
+      { ...RESULT_ROWS[1]!, result_id: "r2", driver_version: "9.9.9", platform_version: "1.3.2", display_geomean_ms: 20 },
+      { ...RESULT_ROWS[0]!, result_id: "r3", driver_version: "8.8.8", platform_version: "1.4.0", display_geomean_ms: 15 },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-list-group-by")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("benchmark-list-group-by"), { target: { value: "engine_version" } });
+    expect(screen.getByText(/1.4.0 \(2 results\)/)).toBeTruthy();
+    expect(screen.getByText(/1.3.2 \(1 result\)/)).toBeTruthy();
+  });
+
+  it("honors a version facet carried into the benchmark drill-down", async () => {
+    window.history.replaceState(null, "", "/results/tpch/?version=1.4.0&view=list");
+    const listRows = [
+      { ...RESULT_ROWS[0]!, result_id: "r1", platform_version: "1.4.0" },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(listRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1"]);
+    expect(vi.mocked(queryRows).mock.calls.some(([sql]) => String(sql).includes("platform_version IN (?)"))).toBe(true);
   });
 
   // -----------------------------------------------------------------------
   // (b) Trust filter hides rows without refetching
   // -----------------------------------------------------------------------
 
-  it("trust filter chips appear when multiple trust tiers are present", async () => {
+  it("trust tier select offers every trust tier present in the cohort", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /maintainer/i })).toBeTruthy();
-      expect(screen.getByRole("button", { name: /community/i })).toBeTruthy();
-    });
-    expect(screen.getByRole("button", { name: /maintainer/i }).className).toContain("--bb-tone-info-bg");
-    expect(screen.getByRole("button", { name: /maintainer/i }).className).not.toContain("--bb-bg-elevated");
+    await waitFor(() => expect(screen.getByTestId("benchmark-trust-filter")).not.toBeDisabled());
+    const trustFilter = screen.getByTestId("benchmark-trust-filter") as HTMLSelectElement;
+    const optionLabels = Array.from(trustFilter.options).map((option) => option.text);
+    expect(optionLabels).toContain("Maintainer run");
+    expect(optionLabels).toContain("Community submission");
   });
 
   it("keeps active matrix controls on the data surface theme contract", async () => {
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("DuckDB"));
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
+    openMatrixCard(container);
 
-    const reducedColor = screen.getByRole("button", { name: "Reduced color" });
+    const reducedColor = await screen.findByRole("button", { name: "Reduced color" });
     fireEvent.click(reducedColor);
 
     expect(reducedColor.className).toContain("--bb-tone-info-bg");
     expect(reducedColor.className).not.toContain("--bb-bg-elevated");
   });
 
-  it("deselecting community chip hides community rows without extra fetch", async () => {
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() => screen.getAllByText("SQLite"));
+  it("selecting a trust tier hides other tiers' rows without extra fetch", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // The trust select's options come from the same async summary query as
+    // the Results table's compare eligibility, which can resolve after
+    // List's (sync) "SQLite" text does.
+    await waitFor(() => expect(screen.getByTestId("benchmark-trust-filter")).not.toBeDisabled());
+    const trustFilter = screen.getByTestId("benchmark-trust-filter") as HTMLSelectElement;
+    const list = () => listRoot(container) as HTMLElement;
 
     const callsBefore = vi.mocked(queryRows).mock.calls.length;
 
-    // Click the community chip to deselect it
-    const communityBtn = screen.getByRole("button", { name: /community/i });
-    fireEvent.click(communityBtn);
+    // Select only the maintainer-run tier.
+    fireEvent.change(trustFilter, { target: { value: "maintainer-run" } });
 
     // SQLite (community-submission) should now be gone
-    await waitFor(() => expect(screen.queryByText("SQLite")).toBeNull());
+    await waitFor(() => expect(within(list()).queryByText("SQLite")).toBeNull());
 
     // DuckDB (maintainer-run) should still be visible
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
@@ -971,31 +1225,41 @@ describe("BenchmarkIndex", () => {
   });
 
   it("keeps filtered-out selections in the status and compare tray", async () => {
-    render(<BenchmarkIndex benchmark="tpch" />);
-    const grid = await screen.findByRole("grid", { name: /tpch SF0\.1 power results/ });
-    const checkboxes = within(grid).getAllByRole("checkbox") as HTMLInputElement[];
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    const list = () => listRoot(container) as HTMLElement;
+    // Wait for the Results table's checkboxes to become comparable (the
+    // per-cohort summary must resolve before selection is possible).
+    await waitFor(() => {
+      const boxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
+      expect(boxes.filter((box) => !box.disabled)).toHaveLength(2);
+    });
+    const checkboxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
     fireEvent.click(checkboxes[0]!);
     fireEvent.click(checkboxes[1]!);
 
-    await waitFor(() => expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy());
-    fireEvent.click(screen.getByRole("button", { name: /community/i }));
+    await waitFor(() => expect(screen.getAllByRole("link", { name: /Compare 2 selected/ }).length).toBeGreaterThan(0));
+    fireEvent.change(screen.getByTestId("benchmark-trust-filter"), { target: { value: "maintainer-run" } });
 
-    await waitFor(() => expect(within(grid).queryByText("SQLite")).toBeNull());
+    await waitFor(() => expect(within(list()).queryByText("SQLite")).toBeNull());
     expect(screen.getByTestId("benchmark-compare-guidance").textContent).toContain("2 results selected");
     expect(screen.getByTestId("compare-tray-row-bbbbbbbb").textContent).toContain("SQLite");
-    expect(screen.getByRole("link", { name: /Compare 2 selected/ })).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /Compare 2 selected/ }).length).toBeGreaterThan(0);
   });
 
   // -----------------------------------------------------------------------
   // (d) Empty ranking cohort shows the informational empty state
   // -----------------------------------------------------------------------
 
-  it("empty cohort shows empty-state message", async () => {
+  it("empty cohort omits the Analysis section (and its matrix/ranks cards) entirely", async () => {
+    // Matrix and Ranks are now cards inside the Analysis section, which only
+    // renders when the per-cohort summary has at least one platform. An
+    // empty cohort has no analysis to show, so the whole section - not a
+    // per-card placeholder - is omitted.
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, [], []));
-    render(<BenchmarkIndex benchmark="tpch" />);
-    await waitFor(() =>
-      expect(screen.getByText(/No benchmark data available/)).toBeTruthy(),
-    );
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => expect(screen.getByTestId("benchmark-compare-guidance")).toBeTruthy());
+    expect(container.querySelector("#benchmark-section-analysis")).toBeNull();
+    expect(container.querySelector("[data-testid^='summary-chart-preview-']")).toBeNull();
   });
 
   // -----------------------------------------------------------------------
@@ -1071,5 +1335,27 @@ describe("BenchmarkIndex", () => {
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
     expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "power"]);
+  });
+
+  it("filters list view rows by the selected phase when multiple phases exist at the same scale", async () => {
+    const mixedRows = [
+      ...RESULT_ROWS,
+      {
+        ...RESULT_ROWS[0],
+        result_id: "standard-r1",
+        test_type: "standard",
+        platform: "ClickHouse",
+        platform_id: "clickhouse",
+      },
+    ];
+    vi.mocked(queryRows).mockImplementation(defaultImpl(mixedRows, RANKING_ROWS, CELL_ROWS));
+
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    await waitFor(() => screen.getAllByText("DuckDB"));
+
+    const listSection = container.querySelector("#benchmark-section-list");
+    expect(listSection).toBeTruthy();
+    expect(within(listSection as HTMLElement).getByText("Showing 2 of 2 results for SF 0.1")).toBeTruthy();
+    expect(within(listSection as HTMLElement).queryByText("ClickHouse")).toBeNull();
   });
 });

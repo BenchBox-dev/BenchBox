@@ -10,9 +10,12 @@ PR_REVIEW_BASE ?= develop
 PR_REVIEW_PR_LIMIT ?= 1000
 PR_REVIEW_MAX_COMMENTS ?= 0
 PR_REVIEW_INCLUDE_RESOLVED ?= 0
+PR_REVIEW_INCLUDE_POST_MERGE ?= 0
 PR_REVIEW_FAIL_ON_PENDING ?= 0
 PR_REVIEW_EXECUTOR_SANDBOX ?= workspace-write
 PR_REVIEW_EXECUTOR_APPROVAL ?= never
+PR_STATUS_LIMIT ?= 20
+PR_STATUS_ALL_OPEN_LIMIT ?= 1000
 DEV_LOOP_METRICS_DAYS ?= 30
 DEV_LOOP_METRICS_LIMIT ?= 100
 AUDIT_SHA_TARGET_REF ?= origin/develop
@@ -39,9 +42,9 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
 	pr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \
 	platform-manifest-check test-docker-parity blind-spots-list blind-spots-report \
-	soundness-drain-report soundness-drain-self-test
+	soundness-drain-report soundness-drain-self-test worktree-audit worktree-finish
 
-.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check platform-manifest platform-manifest-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list
+.PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path
 
 # Primary test commands using pytest marker system
 test: test-fast
@@ -56,11 +59,20 @@ $(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required
 		exit 2; \
 	fi
 
+.PHONY: publication-help
+publication-help:
+	@echo "Publication flow:"
+	@echo "  1. gh workflow run publication-deploy.yml --ref develop -f candidate_only=true"
+	@echo "  2. Select the numeric artifact ID from that run."
+	@echo "  3. gh workflow run publication-transaction.yml --ref develop -f kind=promotion -f candidate_artifact_id=<id>"
+	@echo "  4. Approve the github-pages environment once; the workflow validates and records the result."
+	@echo "  Retry with a new transaction run against the same artifact after a pre-write failure."
+
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
-	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)"
+	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
-	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0
+	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
 test-unit:
 	uv run -- python -m pytest -m "unit" --tb=short
@@ -73,7 +85,7 @@ test-tpch:
 
 # Curated lightweight smoke lane
 test-quick:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5
+	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
 # Verbose test output for all tests
 test-verbose:
@@ -85,7 +97,7 @@ test-pytest:
 
 # Speed-based testing
 test-fast:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short
+	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
@@ -94,22 +106,20 @@ test-unlock:
 		"~/"*) LOCK_DIR="$$HOME/$${LOCK_DIR#\~/}" ;; \
 	esac; \
 	LOCK_PATH="$$LOCK_DIR/test.lock"; \
-	echo "Removing stale BenchBox test lock at $$LOCK_PATH..."; \
-	rm -f "$$LOCK_PATH"
-	@echo "Lock cleared."
+	python3 scripts/local_validation.py clear-test-lock "$$LOCK_PATH"
 
 test-medium:
 	uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
 test-slow:
-	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v
+	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
 test-stress:
-	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v
+	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
 # Development cycle testing using the curated fast unit subset
 test-dev:
-	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3
+	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
@@ -232,14 +242,14 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate (pr.yml);
+# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
-# cell. In GATES (STAGED_GATES is empty) and run in the blocking correctness-gate
+# cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
 # (pr.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
@@ -263,13 +273,29 @@ h2odb-cross-surface-equivalence-report:
 read-primitives-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
 
+# Enforced gate: FlightData DataFrame surface vs its own SQL surface on a bounded
+# one-synthetic-month DuckDB cell (SF=0.01 stays offline; SF>=0.1 attempts a BTS
+# download). 20 SQL and 20 DataFrame ids overlap verbatim;
+# every compared cell matches with an empty baseline. Exits non-zero on any
+# unclassified divergence.
+flightdata-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata
+
+# Enforced gate: Data Vault DataFrame surface vs its own SQL surface on a bounded
+# DuckDB cell (SF=0.01). 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by a
+# mechanical Q prefix ("Q1".."Q22"); every compared cell matches with an empty
+# baseline. The builder forces regeneration on every build, so probes can never
+# pass on a stale manifest. Exits non-zero on any unclassified divergence.
+datavault-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully
 # clean, and is idempotent on a second run. Usage:
 #   make cross-surface-update-baseline BENCHMARK=h2odb
 cross-surface-update-baseline:
-	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives>"; exit 1; }
+	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>"; exit 1; }
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
 
 # Scheduled-maintenance glue (cross-surface-baseline-stale-entry-autodetect):
@@ -344,7 +370,7 @@ test-window:
 # CI/CD testing
 # Maintained broad local CI profile (literal root-text compatibility contract).
 test-ci:
-	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300
 
 # Fast CI feedback (excludes cloud platform tests for speed)
 test-no-cloud:
@@ -359,24 +385,28 @@ test-parallel:
 	uv run -- python -m pytest -n auto --tb=short
 
 test-parallel-fast:
-	uv run -- python -m pytest -n auto -m "fast" --tb=short
+	uv run -- python -m pytest -n auto -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
 # Coverage commands using pytest
 coverage-fast:
-	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered
+	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120
 
 coverage-all:
-	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
+
+# Full opt-in coverage requires the services and credentials used by live tests.
+coverage-opt-in-all:
+	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
 
 coverage: coverage-all
 
 coverage-html:
-	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=html:htmlcov
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=html:htmlcov --cov-fail-under=0
 
 coverage-report:
-	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing
+	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=0
 
 
 # Cyclomatic complexity checks
@@ -445,6 +475,7 @@ audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
 	uv run --no-project -- python _project/scripts/audit_sha_check.py \
 		--target-ref "$(AUDIT_SHA_TARGET_REF)" \
+		--ancestry-ref "$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)" \
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
@@ -510,67 +541,94 @@ agent-commit-range-check:
 	@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)
 
-# skill-sync — materialize project-local skills from ~/.skill-sync/skills.
-# Manifest is tracked (skill-sync.yaml/skill-sync.lock). The `claude` target
-# (.claude/skills) is a TRACKED snapshot committed for cloud/CI parity —
-# integrity comes from PR review of the mirror diff, plus the untracked-mirror
-# drift guard (`scripts/check_untracked_skill_mirrors.sh`). The
-# codex/gemini/antigravity mirrors stay gitignored and are regenerated locally
-# per developer. Override SKILL_SYNC to point at a different install (e.g. an
-# npm-installed copy).
-SKILL_SYNC ?= /Users/joe/Developer/skill-sync/dist/cli/index.js
+# skill-sync — materialize project-local skills with the vendored rsync
+# wrapper (tools/skill-sync, pinned at product v1.0.0-rc1). Selection is
+# tracked (skill-sync.conf); per-target provenance and hashes land next to
+# the payload (skill-sync.receipt / skill-sync.manifest). The `.claude/skills`
+# target is a TRACKED snapshot committed for cloud/CI parity — integrity
+# comes from PR review of the mirror diff, plus `skill-sync-check` and the
+# untracked-mirror drift guard
+# (`scripts/check_untracked_skill_mirrors.sh`). The `.agents/skills` mirror
+# (Codex/Gemini/Antigravity) stays gitignored and is regenerated locally per
+# developer. Override SKILL_SYNC to point at a different wrapper copy.
+SKILL_SYNC ?= tools/skill-sync
 
 skill-sync:
-	@# This recipe contains $$(MAKE), so make runs it even under `-n` (recursive
-	@# dry-run passthrough). Without the guard below, `make -n skill-sync` and
-	@# `make -n guards-fix` really execute `node ... sync` and mutate the skill
-	@# mirrors, so a documented "preview" was not read-only.
-	@case "$(firstword -$(MAKEFLAGS))" in \
-		*n*) echo "dry-run (-n): skipping skill-sync"; exit 0 ;; \
-	esac; \
-	if [ -f "$(SKILL_SYNC)" ]; then \
-		$(MAKE) -s agent-write-preflight; \
-		node "$(SKILL_SYNC)" sync; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
-	fi
+	@# This recipe contains $$(MAKE), so make executes this whole logical line
+	@# even under `-n` (recursive dry-run passthrough). The guard below must
+	@# therefore stay in the SAME logical line: its `exit 0` is what stops
+	@# `make -n skill-sync` and `make -n guards-fix` from really executing
+	@# the apply and mutating the skill mirrors. Short flags arrive grouped
+	@# and sorted in MAKEFLAGS (`make -nw` becomes `wn`), so a bare-word
+	@# match misses them: scan every word for a bare `n` or a letter-only
+	@# cluster containing `n` instead. For a real read-only preview, run
+	@# `tools/skill-sync preview` directly.
+	@dry_run=""; \
+	for flag_word in $(MAKEFLAGS); do \
+		case "$$flag_word" in \
+			n|-n|--dry-run|--just-print) dry_run=1; break ;; \
+			-*) ;; \
+			*n*) case "$$flag_word" in *[!a-zA-Z]*) ;; *) dry_run=1; break ;; esac ;; \
+		esac; \
+	done; \
+	if [ -n "$$dry_run" ]; then echo "dry-run (-n): skipping skill-sync"; exit 0; fi; \
+	if [ ! -x "$(SKILL_SYNC)" ]; then \
+		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); refusing to report success without syncing (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
+		exit 1; \
+	fi; \
+	$(MAKE) -s agent-write-preflight && \
+	"$(SKILL_SYNC)" apply && \
+	cp .claude/skills/skill-sync.config.yaml .agents/skills/skill-sync.config.yaml
+	@# The project-owned settings file lives at the path the skills read
+	@# (`.claude/skills/skill-sync.config.yaml`, tracked). The wrapper owns
+	@# only skill directories plus receipt/manifest, so the recipe mirrors the
+	@# same file into the untracked agents workspace for local parity.
 
-# Fresh worktrees lack the gitignored codex/gemini/antigravity mirrors, so
-# doctor reports materialization/drift there until `make skill-sync` runs in
-# THIS worktree. Judge those rows only after that; a clean primary-clone check
-# does not certify a worktree that changed skill-sync.yaml or tracked Claude
-# mirrors. The tracked `.claude/skills` rows are the durable signal.
+# Check covers the tracked mirror only: the gitignored selections (the whole
+# `.agents/skills` mirror and `.claude/skills/blog/`) are per-machine local
+# state regenerated via `make skill-sync` — fresh worktrees lack them entirely
+# and every catalog bump re-dirties them until a local sync runs, so gating on
+# them fails checkouts for reasons unrelated to the committed tree. Rows under
+# those two roots are therefore skipped; any pending add/modify/delete
+# elsewhere still fails, including a tracked path that merely matches some
+# unrelated repository-wide ignore pattern. Ignored-mirror self-consistency
+# stays covered by `skill-sync verify` inside `skill-integrity-check`.
+# A missing wrapper is a hard failure, never a skip-and-succeed.
 skill-sync-check:
-	@if [ -f "$(SKILL_SYNC)" ]; then \
-		node "$(SKILL_SYNC)" doctor; \
-	else \
-		echo "skill-sync not installed at $(SKILL_SYNC); skipping (override with SKILL_SYNC=path/to/dist/cli/index.js)"; \
+	@if [ ! -x "$(SKILL_SYNC)" ]; then \
+		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
+		exit 1; \
 	fi
+	@tmp=$$(mktemp); \
+	"$(SKILL_SYNC)" preview >"$$tmp" || { rc=$$?; rm -f "$$tmp"; exit $$rc; }; \
+	drift=""; \
+	while IFS= read -r row; do \
+		case "$$row" in "A "*|"M "*|"D "*|"R "*) ;; *) continue ;; esac; \
+		path="$${row#? }"; \
+		case "$$path" in ./*) path="$${path#./}";; esac; \
+		case "$$path" in .agents/skills/*|.claude/skills/blog/*) continue;; esac; \
+		drift="$$drift$$row\n"; \
+	done <"$$tmp"; \
+	rm -f "$$tmp"; \
+	if [ -n "$$drift" ]; then \
+		echo "skill-sync-check: tracked mirror drifts from skill-sync.conf:" >&2; \
+		printf '%b' "$$drift" >&2; \
+		exit 3; \
+	fi; \
+	echo "skill-sync-check: tracked mirror up to date."
 
 # Fail-closed local counterpart of pr.yml's required skill-integrity job. The
-# verifier revision comes from the same policy module as CI, is built in an
-# isolated temporary directory on every run, and uses an empty HOME so a
-# developer's global skill-sync configuration cannot make verification pass.
-# Missing git/npm/node or an unavailable trusted revision is a hard failure.
+# tool pin comes from the same policy module as CI; the vendored wrapper
+# needs no network, no Node, and no build, so verification runs directly
+# against the committed payload. A missing wrapper is a hard failure.
 skill-integrity-check:
 	@set -eu; \
-	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.yaml; \
-	VERIFIER=$$(uv run -- python -c 'from scripts.skill_sync_ci_policy import VERIFIER_REF, VERIFIER_REPOSITORY; print(VERIFIER_REF, VERIFIER_REPOSITORY)'); \
-	set -- $$VERIFIER; VERIFIER_REF=$$1; VERIFIER_REPOSITORY=$$2; \
-	VERIFIER_DIR=$$(mktemp -d "$${TMPDIR:-/tmp}/benchbox-skill-sync-verifier.XXXXXX"); \
-	trap 'rm -rf "$$VERIFIER_DIR"' EXIT; \
-	mkdir -p "$$VERIFIER_DIR/home"; \
-	git clone --quiet "$$VERIFIER_REPOSITORY" "$$VERIFIER_DIR/tool"; \
-	git -C "$$VERIFIER_DIR/tool" checkout --detach --quiet "$$VERIFIER_REF"; \
-	test "$$(git -C "$$VERIFIER_DIR/tool" rev-parse HEAD)" = "$$VERIFIER_REF"; \
-	(cd "$$VERIFIER_DIR/tool" && npm ci --ignore-scripts && npm run build); \
-	test -f "$$VERIFIER_DIR/tool/dist/cli/index.js"; \
-	env HOME="$$VERIFIER_DIR/home" node "$$VERIFIER_DIR/tool/dist/cli/index.js" verify --project "$(CURDIR)"; \
+	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf; \
+	"$(SKILL_SYNC)" verify; \
 	sh scripts/check_untracked_skill_mirrors.sh; \
 	$(MAKE) agent-instructions-check; \
 	$(MAKE) agent-identity-check; \
 	$(MAKE) agent-commit-range-check; \
-	uv run -- python -m pytest tests/unit/scripts/test_todo_wrapper.py::TestSkillThinness -q; \
 	$(MAKE) artifact-hygiene
 
 # Duplicate code detection (AST structural clone detection)
@@ -628,8 +686,9 @@ guards-fix:
 	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
 	@# Enforce the linked-worktree write rule BEFORE the first regen rewrites a
 	@# checked-in artifact. skill-sync runs this guard too, but only after
-	@# several earlier write steps -- and not at all when the skill-sync CLI is
-	@# absent, which would leave this whole write target unguarded.
+	@# several earlier write steps -- and `make skill-sync` itself fails
+	@# closed when the wrapper is absent, so this whole write target stays
+	@# guarded either way.
 	@$(MAKE) -s agent-write-preflight
 	@echo "-- dependency inventory (audit-raw) --"
 	@$(MAKE) -s audit-raw
@@ -639,13 +698,18 @@ guards-fix:
 	@$(MAKE) -s parity-fixtures
 	@echo "-- sql_compat capability matrix / skip-reference docs --"
 	@$(MAKE) -s compat-docs
-	@echo "-- skill-sync (no-ops with a notice if the skill-sync CLI is not installed) --"
-	@# Last regen step, contained: a failing skill-sync CLI (e.g. "unable to
-	@# read tree <sha>" in a fresh worktree) used to abort guards-fix here,
-	@# AFTER every other artifact had already been rewritten -- the summary and
-	@# the reviewable diff below never printed. Surface the failure loudly and
-	@# still finish the report; direct `make skill-sync` keeps its hard failure,
-	@# and genuine mirror drift is still enforced by skill-sync-check in CI.
+	@echo "-- vendor-derived pricing tables (offline, from checked-in evidence) --"
+	@$(MAKE) -s pricing-data
+	@echo "-- Makefile public contract inventory --"
+	@uv run -- python make/check_makefile_inventory.py --write
+	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
+	@# Last regen step, contained: a failing skill-sync apply (e.g. an
+	@# unresolvable source rev in a fresh worktree) used to abort guards-fix
+	@# here, AFTER every other artifact had already been rewritten -- the
+	@# summary and the reviewable diff below never printed. Surface the failure
+	@# loudly and still finish the report; direct `make skill-sync` keeps its
+	@# hard failure, and genuine mirror drift is still enforced by
+	@# skill-sync-check in CI.
 	@status=0; $(MAKE) -s skill-sync || status=$$?; \
 	if [ "$$status" -ne 0 ]; then \
 		echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."; \
@@ -704,6 +768,7 @@ guards-fix:
 # tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
 # a vacuous pass inside the change whose whole purpose is removing vacuous
 # passes. That test now pins the gating instead.
+# The Make contract check is read-only here; guards-fix owns regeneration.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -754,6 +819,10 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed platform-manifest-check"; \
 	$(MAKE) oracle-coverage-map-check; \
 	[ $$? -eq 0 ] || failed="$$failed oracle-coverage-map-check"; \
+	$(MAKE) pricing-data-check; \
+	[ $$? -eq 0 ] || failed="$$failed pricing-data-check"; \
+	$(MAKE) makefile-inventory-check; \
+	[ $$? -eq 0 ] || failed="$$failed makefile-inventory-check"; \
 	uv run -- python scripts/check_public_contract_drift.py; \
 	[ $$? -eq 0 ] || failed="$$failed public-contract-drift"; \
 	$(MAKE) audit-deps; \
@@ -783,7 +852,7 @@ ci-lint:
 # non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
-	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
+	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
 # CI docs build - exact match for docs.yml workflow
@@ -1007,8 +1076,8 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 		fi; \
 	fi
 
-# Cut a release branch from develop in one shot:
-#   1. Create v$(VERSION) branch off develop (develop is not modified).
+# Cut a release branch from fetched origin/develop in one shot:
+#   1. Verify a clean linked worktree at origin/develop and create v$(VERSION).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
 #   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
 #   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
@@ -1018,8 +1087,8 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 #   8. Merge origin/release with `-s ours` so the PR is mergeable and CI can run.
 #   9. Push, open PR vs release.
 #  10. Sweep stale v* branches on origin (option-c lifecycle).
-# Pre-conditions: on develop with a clean tree (new cut), or on v$(VERSION)
-# with no release commit yet (resume).
+# Pre-conditions: on a clean linked worktree branch at fetched origin/develop
+# (new cut), or on v$(VERSION) with no release commit yet (resume).
 #
 # Steps 1-5 are idempotent, so an interrupted cut is resumed by re-running the
 # same command: the branch is reused, the bump and `uv lock` re-apply to the
@@ -1029,36 +1098,7 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # Usage: make release-cut VERSION=X.Y.Z
 release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
-	@# Resume guard. --first-parent matters: the `-s ours` alignment merge below
-	@# puts origin/release's whole release ledger -- which contains commits literally
-	@# titled "Release vX.Y.Z" -- on the merge's second parent. Walking first-parent
-	@# only sees this branch's own commits, so the guard fires for both post-commit
-	@# states: release commit at HEAD, and release commit beneath the alignment merge.
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
-		if git log --first-parent --format=%s develop..HEAD 2>/dev/null | grep -Fxq "Release v$(VERSION)"; then \
-			echo "Error: v$(VERSION) already carries its release commit; nothing left to resume." >&2; \
-			echo "       Finish it by hand (git push -u origin v$(VERSION) && gh pr create --base release ...)," >&2; \
-			echo "       remembering the -s ours alignment merge if it has not run yet, or start over:" >&2; \
-			echo "         make release-cut-abort VERSION=$(VERSION)" >&2; \
-			exit 1; \
-		fi; \
-		echo "==> Resuming interrupted cut on v$(VERSION)"; \
-	elif [ "$$BRANCH" = "develop" ]; then \
-		[ -z "$$(git status --porcelain)" ] || { echo "Error: working tree must be clean" >&2; exit 1; }; \
-		if git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null; then \
-			echo "Error: branch v$(VERSION) already exists but HEAD is develop." >&2; \
-			echo "       Resume it (git checkout v$(VERSION) && make release-cut VERSION=$(VERSION))" >&2; \
-			echo "       or discard it (make release-cut-abort VERSION=$(VERSION))." >&2; \
-			exit 1; \
-		fi; \
-	else \
-		echo "Error: must be on develop (new cut) or v$(VERSION) (resume), not $$BRANCH" >&2; exit 1; \
-	fi
-	git fetch origin
-	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
-		&& git checkout v$(VERSION) \
-		|| git checkout -b v$(VERSION) develop
+	sh scripts/release_cut_start.sh "$(VERSION)"
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
 	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
@@ -1090,15 +1130,20 @@ release-cut: .release-cut-tree-required
 	@# curation on that line (v0.3.1 shipped uncurated because of this). With
 	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
 	@# is real, so no `-` prefix: real failures must abort the cut.
-	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini
-	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
+	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini tools
+	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
-	@# Tests that import _project/dev-only tooling or test curated-out surfaces
-	@# cannot collect on the release tree (found by the v0.3.1 release PR CI).
+	@# Tests that import _project/dev-only tooling, depend on development-only
+	@# fixtures, or enforce contracts for curated-out development surfaces cannot
+	@# collect or run on the release tree. The v0.4.0 release PR exposed the
+	@# additional paths below after the original v0.3.1 curation list had passed.
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
 	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
+	git rm -f --ignore-unmatch tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py
+	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
+	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.yaml skill-sync.lock .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
@@ -1152,7 +1197,7 @@ release-cut: .release-cut-tree-required
 		echo "ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)" >&2; \
 		exit 1; \
 	fi
-	git push -u origin v$(VERSION)
+	PRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v$(VERSION)
 	gh pr create --base release --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
 	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
 	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
@@ -1162,7 +1207,7 @@ release-cut: .release-cut-tree-required
 	@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.
 	@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\/heads\/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
 		echo "==> Deleting prior release branch on origin: $$br"; \
-		git push origin --delete "$$br" || true; \
+		PRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin --delete "$$br" || true; \
 	done
 	@echo
 	@echo "Release PR opened. Next steps:"
@@ -1170,73 +1215,26 @@ release-cut: .release-cut-tree-required
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# Discard a local, unpushed release cut: reset the working tree, return to
-# develop, delete the v$(VERSION) branch. Use when a cut died partway through
+# Discard a local, unpushed release cut: return to the creating worktree branch
+# and delete v$(VERSION). Use when a cut died partway through
 # (bumped versions, rewritten uv.lock, curated-away paths, no commit) and you
 # want to start over rather than resume with `make release-cut VERSION=X.Y.Z`.
-# Refuses once the branch exists on origin — deleting a pushed release branch
-# is release-finalize's or the option-c sweep's job, not this target's.
+# Refuses after a commit, a pushed branch or tag, or untracked work. Published
+# release refs need explicit disposition; this target never moves them.
 # Usage: make release-cut-abort VERSION=X.Y.Z
 release-cut-abort:
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
-	@git rev-parse --verify --quiet refs/heads/v$(VERSION) >/dev/null \
-		|| (echo "Nothing to abort: no local v$(VERSION) branch" >&2 && exit 1)
-	@if git ls-remote --exit-code --heads origin "v$(VERSION)" >/dev/null 2>&1; then \
-		echo "Error: v$(VERSION) exists on origin; aborting would discard a pushed branch." >&2; \
-		echo "       Close its release PR and delete the remote branch first." >&2; \
-		exit 1; \
-	fi
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" = "v$(VERSION)" ]; then \
-		echo "==> Discarding uncommitted cut state on v$(VERSION)"; \
-		git reset --hard HEAD; \
-		git checkout develop; \
-	elif [ "$$BRANCH" != "develop" ]; then \
-		echo "Error: expected to be on v$(VERSION) or develop, not $$BRANCH" >&2; exit 1; \
-	fi; \
-	git branch -D v$(VERSION)
-	@echo "==> Aborted: v$(VERSION) deleted; develop untouched."
+	sh scripts/release_cut_abort.sh "$(VERSION)"
 
-# After release-cut's PR is approved and all required release contexts are
-# green: squash-merge it, tag release, push the tag (fires release.yml), and
-# leave develop alone.
+# After release-cut's PR has the required contexts green: merge its exact
+# checked head, tag the confirmed merge commit, and push the tag. A rerun after
+# merge or tag creation resumes from hosted PR and tag state.
 # Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
-	@PR=$$(gh pr list --base release --head v$(VERSION) --state open --json number --jq '.[0].number'); \
-	test -n "$$PR" || (echo "Error: no open PR found for v$(VERSION) → release" && exit 1); \
-	echo "==> Verifying required release contexts '$(RELEASE_REQUIRED_CONTEXTS)' for PR #$$PR"; \
-	for context in $(RELEASE_REQUIRED_CONTEXTS); do \
-		CHECK_BUCKET=$$(gh pr checks "$$PR" --required --json name,bucket,state --jq "map(select(.name == \"$$context\")) | if length == 1 then .[0].bucket elif length == 0 then \"missing\" else \"duplicate\" end"); \
-		CHECK_RC=$$?; \
-		if [ "$$CHECK_RC" = "8" ]; then \
-			echo "Error: required PR checks are pending. Wait for GitHub Actions, then rerun." >&2; \
-			exit 1; \
-		elif [ "$$CHECK_RC" != "0" ]; then \
-			echo "Error: gh pr checks failed while verifying $$context (exit $$CHECK_RC)" >&2; \
-			exit "$$CHECK_RC"; \
-		fi; \
-		case "$$CHECK_BUCKET" in \
-			pass) echo "==> $$context is green";; \
-			missing) echo "Error: required release context '$$context' is missing. Check release-only and release workflows." >&2; exit 1;; \
-			pending) echo "Error: required release context '$$context' is pending. Wait for GitHub Actions, then rerun." >&2; exit 1;; \
-			fail|cancel|skipping) echo "Error: required release context '$$context' is $$CHECK_BUCKET. Fix the release PR before finalizing." >&2; exit 1;; \
-			duplicate) echo "Error: multiple required contexts named '$$context' were returned. Fix workflow/ruleset drift." >&2; exit 1;; \
-			*) echo "Error: unexpected $$context status '$$CHECK_BUCKET'." >&2; exit 1;; \
-		esac; \
-	done; \
-	echo "==> Squash-merging PR #$$PR (required release contexts are green)"; \
-	gh pr merge --squash "$$PR"
-	git fetch origin --tags
-	git checkout release
-	git pull --ff-only origin release
-	git tag v$(VERSION)
-	@# release-cut intentionally leaves the local v$(VERSION) branch in place.
-	@# Name both sides of the tag refspec so Git cannot resolve the short name to
-	@# both refs/heads/v$(VERSION) and refs/tags/v$(VERSION).
-	git push origin refs/tags/v$(VERSION):refs/tags/v$(VERSION)
+	uv run -- python scripts/release_finalize.py --version "$(VERSION)" --required-contexts "$(RELEASE_REQUIRED_CONTEXTS)"
 	@echo
-	@echo "Tag v$(VERSION) pushed; release.yml will publish to PyPI."
+	@echo "Check the matching release.yml run before reporting publication."
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
@@ -1247,7 +1245,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight .pr-preflight-route pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1257,15 +1255,28 @@ agent-write-preflight:
 # structurally unsafe skill diffs retain the full historical ci-lint + content
 # guard + fast-test contract; only an approved pure skill-integrity diff uses
 # the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
-pr-preflight:
+# The uncached implementation is called by the receipt-bound wrapper below.
+pr-preflight-uncached:
 	@set -eu; \
 	DECISION=$$(mktemp); \
 	LISTS=$$(mktemp -d); \
 	trap 'rm -f "$$DECISION"; rm -rf "$$LISTS"' EXIT; \
 	git fetch origin develop --quiet; \
 	uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
-	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS"; \
+	$(MAKE) -s .pr-preflight-route PATH_DECISION="$$DECISION" PATH_LISTS="$$LISTS" SKIP_FAST_TESTS="$(SKIP_FAST_TESTS)"; \
+	$(MAKE) -s pr-preflight-medium-tests PATH_DECISION="$$DECISION"; \
 	$(MAKE) -s uat-artifact-hygiene
+
+# Canonical local preflight: the focused lane runs once, then the remaining
+# required lanes each classify the revalidated transaction input. The ordered
+# wrapper rejects drift between stages, and each stage gets its own
+# content-bound receipt; hosted required checks remain separate.
+pr-preflight:
+	@git fetch origin develop --quiet
+	uv run -- python scripts/local_validation.py ordered \
+		--focused-gate "local-focused-check" --focused-cmd 'make pr-preflight-focused-tests' \
+		--preflight-gate "required-pr-preflight" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \
+		$(BATCH_ARGS)
 
 # Consume the classifier decision only; never reimplement path globs here.
 # Mixed skill/product diffs run both lanes. Skill plus safe content stays on
@@ -1289,15 +1300,22 @@ pr-preflight:
 		echo "Selected preflight lanes: $$LANES"; \
 		$(MAKE) ci-lint; \
 		if [ "$$SKILL" = true ]; then $(MAKE) -s skill-integrity-check; fi; \
-		$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+		if [ "$(SKIP_FAST_TESTS)" = "1" ]; then \
+			echo "Focused local gate already completed; skipping duplicate fast tests."; \
+			$(MAKE) -s pr-content-guard PATH_LISTS="$(PATH_LISTS)"; \
+		else \
+			$(MAKE) -s pr-preflight-fast-tests PATH_DECISION="$(PATH_DECISION)" PATH_LISTS="$(PATH_LISTS)"; \
+		fi; \
 	fi
 
-# Always runs pr-content-guard for the historical full-preflight path. The
-# needs-code-ci decision gates only the fast-test run below. Pure approved
-# skill-integrity diffs do not enter this target; their focused lane carries
-# its own artifact, provenance, mirror, instruction, and identity controls.
-# Direct invocation (the opt-in pre-push hook) creates classifier artifacts
-# when the parent preflight did not already supply them.
+# The historical full-preflight target runs pr-content-guard unless the
+# receipt-bound focused wrapper explicitly defers it to the required stage.
+# The needs-code-ci decision gates only the fast-test run below. Direct
+# invocation creates classifier artifacts when the parent preflight did not
+# already supply them.
+pr-preflight-focused-tests:
+	@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1
+
 pr-preflight-fast-tests:
 	@set -eu; \
 	if [ -n "$(PATH_DECISION)" ] || [ -n "$(PATH_LISTS)" ]; then \
@@ -1312,16 +1330,133 @@ pr-preflight-fast-tests:
 		git fetch origin develop --quiet; \
 		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" --lists-dir "$$LISTS" >/dev/null; \
 	fi; \
-	$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+	if [ "$(SKIP_CONTENT_GUARD)" = "1" ]; then \
+		echo "Focused checks defer content guard to required preflight."; \
+	else \
+		$(MAKE) -s pr-content-guard PATH_LISTS="$$LISTS"; \
+	fi; \
 	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
 		echo "==> fast tests (CI marker selection; coverage remains CI-only)"; \
-		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q; \
+		uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -q; \
 	else \
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
+# Medium tier as its own receipt-bound preflight stage. Runs the exact CI
+# selection (`make test-medium`, no local-only subset) through
+# local_validation's medium-tier gate only when the classifier says the diff
+# needs code CI, so content-only and skill-integrity-only diffs skip it.
+# Identical trees reuse the receipt across worktrees without colliding on
+# the shared test lock. The stage fails pr-preflight on failure; there is
+# no skip flag. The gate invocation scrubs the preflight control variables
+# (PATH_DECISION, PATH_LISTS, SKIP_FAST_TESTS) from the environment and
+# blanks MAKEFLAGS: make exports command-line variables and smuggles their
+# assignments inside MAKEFLAGS, so a leak would make test-spawned makes take
+# the caller-supplied branch with no lists dir ("PATH_LISTS is required") or
+# flip the route into its skip branch (stale "already completed" line inside
+# the suite). BATCH_ARGS is deliberately not scrubbed so batch mode still
+# binds receipts.
+pr-preflight-medium-tests:
+	@set -eu; \
+	if [ -n "$(PATH_DECISION)" ]; then \
+		[ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
+		DECISION="$(PATH_DECISION)"; \
+	else \
+		DECISION=$$(mktemp); \
+		trap 'rm -f "$$DECISION"' EXIT; \
+		git fetch origin develop --quiet; \
+		uv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out "$$DECISION" >/dev/null; \
+	fi; \
+	if uv run -- python scripts/path_filter_decision.py --json-in "$$DECISION" --check needs-code-ci >/dev/null; then \
+		echo "==> medium tier (same marker selection as CI)"; \
+		env -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD="make test-medium"; \
+	else \
+		echo "No code changes detected; skipping medium tier."; \
+	fi
+
+# Publication lane isolation is a diff-vs-base guard. The path classifier has
+# already produced the changed-path list for the PR, so this target consumes
+# that exact artifact instead of reimplementing path classification or asking
+# the working tree to infer a base. Keep it in the content guard, where
+# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
+lane-isolation-check:
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
+	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
+	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
+	[ -s "$$CHANGED_PATHS" ] || { echo "non-empty changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
+	status=0; \
+	for lane in site explorer corpus; do \
+		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
+	done; \
+	exit "$$status"
+
+# Local validation singleflight. Runs CMD once per identical validated input
+# across worktrees; identical repeats reuse the recorded receipt instead of
+# re-executing and colliding on the shared test lock. Receipts never certify
+# hosted checks and never cross changed trees. Usage:
+#   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
+local-validation:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py run --gate "$(GATE)" $(BATCH_ARGS) -- $(CMD)
+
+local-validation-show:
+	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
+
+# Ordered local delivery path. The focused check and required preflight have
+# distinct receipt namespaces and the focused gate must finish first. A hook
+# that is not active prints SKIPPED at its boundary instead of looking like a
+# successful test invocation.
+FOCUSED_CMD ?= uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q
+PREFLIGHT_CMD ?= make pr-preflight
+local-validation-path:
+	@echo "Running receipt-bound canonical preflight path (focused then required lanes)."
+	$(MAKE) -s pr-preflight $(BATCH_ARGS)
+
+# Revision/readiness transactions behind one helper (scripts/pr_landing.py).
+# The live PR targets below use the same exact-checkout arming path: start
+# records identity, withdraw disarms auto-merge before a revision, and ready
+# verifies the exact head and enqueues only after the helper re-reads the PR.
+pr-landing-start:
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) start
+
+pr-landing-withdraw:
+	@[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) withdraw --pr "$(PR)" \
+		$(if $(HEAD),--expected-head "$(HEAD)",)
+
+pr-landing-ready:
+	@set -eu; \
+	[ -n "$(PR)" ] || { echo "PR is required" >&2; exit 2; }; \
+	[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
+		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
+		$(if $(WORKTREE_ID),--worktree-id "$(WORKTREE_ID)",) \
+		$(if $(PR_NODE_ID),--pr-node-id "$(PR_NODE_ID)",) ready --pr "$(PR)" \
+		--expected-head "$(HEAD)" --evidence-json "$(EVIDENCE)" \
+		$(if $(ARM),--arm,) $(if $(BATCH),--require-batch,)
+
+pr-followup-record:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	@[ -n "$(STATE)" ] || { echo "STATE is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-record --key "$(KEY)" --state-json "$(STATE)"
+
+pr-followup-resume:
+	@[ -n "$(KEY)" ] || { echo "KEY is required" >&2; exit 2; }; \
+	uv run -- python scripts/pr_landing.py --worktree . followup-resume --key "$(KEY)"
+
 pr-content-guard:
-	@[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	@set -eu; \
+	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
+	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \
@@ -1351,27 +1486,32 @@ pr-content-guard:
 
 # Push current branch and open a PR against develop. Auto-merge is WITHHELD by
 # default so a follow-up commit cannot race a merge. Arm only when the branch
-# is final: `make pr-ready`, or `make pr-open READY=1` to open and arm in one
-# step. When a merge queue is enabled on develop, arming auto-merge enqueues
-# the PR for speculative integration once checks pass. Soundness-path diffs are
-# never armed or auto-enqueued (see pr-arm-auto-merge).
+# is final: `make pr-ready`, or `make pr-open READY=1` when reusing an already
+# open, reviewed PR. A newly created PR always remains held so it can receive
+# review before readiness is evaluated. When a merge queue is enabled on
+# develop, arming auto-merge enqueues the PR for speculative integration once
+# checks pass. Soundness-path diffs are never armed or auto-enqueued (see
+# pr-arm-auto-merge).
 # Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
 # Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
-# when the branch is final (or READY=1 here to arm after open/reuse).
+# when the branch is final. READY=1 arms only after reusing an already-open
+# PR; a newly created PR prints the exact pr-ready action and stays held.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 #
-# Currency: after fetching origin/develop, refuse unless that tip is an
-# ancestor of HEAD. Run `make pr-refresh` (one stale PR at a time) to absorb
-# develop. Do not merge develop here — pr-fanout would otherwise refresh
-# every worktree at once. STALE=1 is the explicit escape hatch.
+# Currency: after fetching origin/develop, an ancestor-only branch is accepted
+# by the native queue only after the live ruleset checker proves the queue and
+# its required protections. The merge-tree probe still blocks genuine base
+# conflicts. If the queue is absent, unknown, or misconfigured, the existing
+# current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
-	@$(MAKE) -s agent-write-preflight
-	@CURRENT=$$(git branch --show-current); \
+	@set -eu; \
+	$(MAKE) -s agent-write-preflight; \
+	CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
 		develop|main|release) echo "Refusing to open PR from $$CURRENT — switch to a feature branch."; exit 1 ;; \
 	esac; \
@@ -1379,62 +1519,115 @@ pr-open:
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
 	fi; \
+	if [ "$(READY)" = "1" ] && [ -z "$(EVIDENCE)" ]; then \
+		echo "EVIDENCE is required when READY=1; use make pr-open without READY=1 to publish a held PR." >&2; \
+		exit 2; \
+	fi; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	case "$$REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+		*/*) ;; \
+		*) echo "REPO must be a GitHub owner/name identity" >&2; exit 2 ;; \
+	esac; \
+	ORIGIN_URL=$$(git remote get-url --push origin) || { echo "Could not resolve the origin remote" >&2; exit 1; }; \
+	case "$$ORIGIN_URL" in \
+		git@github.com:*) ORIGIN_REPOSITORY="$${ORIGIN_URL#git@github.com:}" ;; \
+		ssh://git@github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#ssh://git@github.com/}" ;; \
+		https://github.com/*) ORIGIN_REPOSITORY="$${ORIGIN_URL#https://github.com/}" ;; \
+		*) echo "origin remote is not a supported GitHub URL or SSH form" >&2; exit 1 ;; \
+	esac; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%.git}"; \
+	ORIGIN_REPOSITORY="$${ORIGIN_REPOSITORY%/}"; \
+	ORIGIN_OWNER="$${ORIGIN_REPOSITORY%%/*}"; \
+	case "$$ORIGIN_REPOSITORY" in \
+		*/*/*|/*|*/|"") echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+		*/*) ;; \
+		*) echo "origin remote is not a GitHub owner/name identity" >&2; exit 1 ;; \
+	esac; \
+	HEAD_SPEC="$$CURRENT"; \
+	ORIGIN_REPOSITORY_KEY=$$(printf '%s' "$$ORIGIN_REPOSITORY" | tr 'A-Z' 'a-z'); \
+	TARGET_REPOSITORY_KEY=$$(printf '%s' "$$REPOSITORY" | tr 'A-Z' 'a-z'); \
+	if [ "$$ORIGIN_REPOSITORY_KEY" != "$$TARGET_REPOSITORY_KEY" ]; then \
+		HEAD_SPEC="$$ORIGIN_OWNER:$$CURRENT"; \
+	fi; \
+	PR_HEAD_OWNER="$$ORIGIN_OWNER"; \
+	PR_HEAD_NAME="$$CURRENT"; \
+	export PR_HEAD_OWNER PR_HEAD_NAME; \
 	git fetch origin develop --quiet; \
-	if [ "$(STALE)" != "1" ]; then \
-		git merge-base --is-ancestor origin/develop HEAD || { \
-			echo "Refusing to open PR: HEAD is behind origin/develop. Run 'make pr-refresh' (one PR at a time) or retry with STALE=1." >&2; \
+	if ! git merge-base --is-ancestor origin/develop HEAD; then \
+		if ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \
+			echo "Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted." >&2; \
 			exit 1; \
-		}; \
+		fi; \
+		QUEUE_REPORT=$$(mktemp); \
+		trap 'rm -f "$$QUEUE_REPORT"' EXIT; \
+		if ! gh auth token 2>/dev/null | uv run -- python scripts/ruleset_drift_check.py --queue-policy \
+			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token-stdin \
+			--output "$$QUEUE_REPORT"; then \
+			echo "Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate." >&2; \
+			exit 1; \
+		fi; \
+		if ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report "$$QUEUE_REPORT"); then \
+			echo "Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'." >&2; \
+			exit 1; \
+		fi; \
+		[ "$$DECISION" = "publish-without-refresh" ] || { echo "Refusing to open PR: unexpected stale-base decision $$DECISION." >&2; exit 1; }; \
+		echo "Verified native merge queue: publishing without an author-side base refresh."; \
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
-	URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	REUSED_PR=0; \
+	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --state open \
+		--json url,headRepositoryOwner,headRefName \
+		--jq '.[] | select((.headRepositoryOwner.login | ascii_downcase) == (env.PR_HEAD_OWNER | ascii_downcase) and .headRefName == env.PR_HEAD_NAME) | .url' \
+		2>/dev/null | sed -n '1p'); \
 	if [ -z "$$URL" ]; then \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT" --body-file "$(PR_BODY_FILE)"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC" --body-file "$(PR_BODY_FILE)"); \
 		else \
-			URL=$$(gh pr create --base develop --fill --head "$$CURRENT"); \
+			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC"); \
 		fi; \
 	else \
+		REUSED_PR=1; \
 		echo "Reusing existing PR: $$URL"; \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
-			gh pr edit "$$URL" --body-file "$(PR_BODY_FILE)"; \
+			gh pr edit --repo "$$REPOSITORY" "$$URL" --body-file "$(PR_BODY_FILE)"; \
 		fi; \
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
-		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or 'make pr-open READY=1' to open and arm in one step."; \
+		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or rerun 'make pr-open READY=1' to arm a reused reviewed PR."; \
+	elif [ "$$REUSED_PR" != "1" ]; then \
+		echo "PR created and held; READY=1 does not arm a newly created PR."; \
+		echo "Next action after review: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
 	else \
-		$(MAKE) -s pr-arm-auto-merge URL="$$URL"; \
+		$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
 	fi
 
-# Arms squash auto-merge / queue enrollment for an already-open PR. Split out of
-# pr-open so the soundness check has exactly one implementation and both entry
-# points get it. When a merge queue is active on develop, auto-merge enqueues
-# the PR for speculative combined-tree validation.
+# Runs the readiness transaction for an already-open PR. This compatibility
+# target retains the historical name, but cannot arm without caller-supplied
+# evidence for the exact checkout.
 # Honours the durable `no-auto-merge` hold label: before this check, the label
 # was only durable against paths that never arm (workflow + sweep) while the
 # one live arm path ignored it — #1626 was armed 52s after being labeled. See
 # _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
-	@URL="$(URL)"; \
-	if [ -z "$$URL" ]; then \
-		CURRENT=$$(git branch --show-current); \
-		URL=$$(gh pr list --base develop --head "$$CURRENT" --state open --json url --jq '.[0].url' 2>/dev/null); \
+	@set -eu; \
+	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
+	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+	CURRENT=$$(git branch --show-current); \
+	PR_NUMBER="$(PR)"; \
+	if [ -n "$(URL)" ]; then \
+		if [ -n "$$PR_NUMBER" ]; then echo "PR and URL are mutually exclusive" >&2; exit 2; fi; \
+		PR_NUMBER=$$(gh pr view --repo "$$REPOSITORY" "$(URL)" --json number --jq '.number') || { echo "Could not resolve URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
 	fi; \
-	if [ -z "$$URL" ]; then echo "No open PR found for this branch." >&2; exit 1; fi; \
-	LABELS=$$(gh pr view "$$URL" --json labels --jq '.labels[].name') || { echo "Cannot read PR labels — refusing to arm (fail closed)." >&2; exit 1; }; \
-	if printf '%s\n' "$$LABELS" | grep -qxF 'no-auto-merge'; then \
-		echo "PR carries the durable no-auto-merge hold label; leaving auto-merge disabled. Remove the label first if arming is intended."; \
-		exit 0; \
-	fi; \
-	git fetch origin develop --quiet; \
-	SOUNDNESS_PATH=$$(git diff --name-only --no-renames origin/develop...HEAD | uv run --project _project/scripts -- python _project/scripts/auto_merge_soundness_paths.py --stdin); \
-	if [ "$$SOUNDNESS_PATH" = "true" ]; then \
-		echo "Soundness-critical paths changed; leaving auto-merge disabled pending review."; \
-	else \
-		gh pr merge --auto --squash "$$URL"; \
-	fi
+	case "$$PR_NUMBER" in *[!0-9]*) echo "PR must resolve to a positive number" >&2; exit 2 ;; esac; \
+	if [ -n "$$PR_NUMBER" ] && [ "$$PR_NUMBER" -le 0 ]; then echo "PR must resolve to a positive number" >&2; exit 2; fi; \
+	[ -n "$$PR_NUMBER" ] || { echo "PR or URL is required" >&2; exit 2; }; \
+	EXPECTED_HEAD="$(HEAD)"; \
+	if [ -z "$$EXPECTED_HEAD" ]; then EXPECTED_HEAD=$$(git rev-parse HEAD); fi; \
+	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
+		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
@@ -1447,7 +1640,10 @@ pr-arm-auto-merge:
 # (#1503, #1521, #1531); the last two stranded the very commits that addressed
 # their own review findings.
 pr-ready:
-	@$(MAKE) -s pr-arm-auto-merge
+	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
+	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
+	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }
+	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"
 
 shrink-rollup:
 	@git fetch origin develop --quiet
@@ -1477,7 +1673,8 @@ pr-fanout:
 # This is the stale-PR escape hatch when required checks must be current with
 # develop: GitHub can show a PR as CLEAN even though merge is waiting for a
 # branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
-# withholds unless READY=1); run `make pr-ready` when the branch is final.
+# withholds unless READY=1 reuses an already-open reviewed PR); run
+# `make pr-ready` when the branch is final.
 # Run this one stale PR at a time; updating several branches at once can let
 # the first merge stale the others again under strict checks.
 pr-refresh:
@@ -1517,7 +1714,13 @@ pr-conflict-scan:
 
 # Show open PRs against develop and their CI + auto-merge state.
 pr-status:
-	@gh pr list --base develop --state open --limit 20 --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
+	@if [ "$(ALL_OPEN)" = "1" ] || [ "$(ALL_OPEN)" = "true" ] || [ "$(ALL_OPEN)" = "yes" ]; then \
+		echo "All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):"; \
+		LIMIT="$(PR_STATUS_ALL_OPEN_LIMIT)"; \
+	else \
+		LIMIT="$(PR_STATUS_LIMIT)"; \
+	fi; \
+	gh pr list --base develop --state open --limit "$$LIMIT" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
 # Discover candidate bot/agent review comments on merged PRs without making changes.
@@ -1531,6 +1734,7 @@ pr-review-followups-list:
 		--limit-prs "$(PR_REVIEW_PR_LIMIT)" \
 		--max-comments "$(PR_REVIEW_MAX_COMMENTS)" \
 		$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \
+		$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \
 		$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \
 		$(if $(PR_REVIEW_REPO),--repo "$(PR_REVIEW_REPO)") \
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
@@ -1576,6 +1780,7 @@ pr-review-followups:
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
 		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)") \
 		$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model "$(PR_REVIEW_EXECUTOR_MODEL)") \
+		$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \
 		$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \
 		$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \
 		$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)
@@ -1629,6 +1834,29 @@ dev-loop-metrics:
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
+
+## branch-prune-merged: delete local branches whose PR already merged into
+## develop but that have no worktree attached. worktree-remove removes only
+## the exact worktree registration and deliberately leaves its local branch,
+## while plain `git checkout -b` branches have no worktree to remove.
+##
+## Requires `gh`. PRs squash-merge, so source-tip ancestry cannot prove
+## integration. The helper instead verifies the historical PR head from the
+## PR timeline plus commit list and requires the PR merge commit to be
+## reachable from a freshly fetched origin/develop (§7 in the evidence
+## contract).
+##
+## Deletes only when the local tip equals the historically proven PR head at
+## merge time. A branch re-created under an old merged branch's name, or
+## carrying commits pushed after the merge, is reported and kept rather
+## than force-deleted -- name alone is not proof the local work merged.
+## A local branch left behind that historical head is likewise kept.
+##
+## Run with DRY_RUN=1 to preview without deleting anything.
+branch-prune-merged:
+	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
+	@DRY_RUN='$(if $(filter 1,$(DRY_RUN)),1,$(if $(strip $(DRY_RUN)),invalid,))' \
+		uv run -- python scripts/branch_prune_merged.py
 
 # ----------------------------------------------------------------------
 # UAT framework (tests/uat/) — see _project/specs/uat-framework.md.

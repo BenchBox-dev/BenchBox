@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
+  "bundle_hash": "3e59911b7cd0598f62424d4e4f4a52dc90a79cf33f2d745a7a567abc3665b443",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

@@ -173,16 +173,15 @@ class TestDaskValidation:
         assert any(i.level == ValidationLevel.INFO for i in issues)
 
 
-class TestModinValidation:
-    """Tests for Modin-specific validation."""
-
-    def test_invalid_engine_affinity_error(self):
-        """Test that invalid engine_affinity generates error."""
+class TestDataFusionValidation:
+    def test_session_settings_are_supported(self):
         config = DataFrameTuningConfiguration(
-            execution=ExecutionConfiguration(engine_affinity="invalid_engine"),
+            parallelism=ParallelismConfiguration(thread_count=4),
+            memory=MemoryConfiguration(chunk_size=4096),
         )
-        issues = validate_dataframe_tuning(config, "modin")
-        assert any(i.level == ValidationLevel.ERROR for i in issues)
+        issues = validate_dataframe_tuning(config, "datafusion-df")
+
+        assert not any(i.level == ValidationLevel.WARNING for i in issues)
 
 
 class TestCuDFValidation:

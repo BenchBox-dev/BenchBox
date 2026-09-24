@@ -873,6 +873,6 @@ For additional support:
 ## References
 
 - [TPC-DS Specification](http://www.tpc.org/tpcds/)
-- [BenchBox Documentation](README.md)
-- [TPC-DS Benchmark Overview](benchmarks/tpc-ds.md)
+- [BenchBox Documentation](../../index.rst)
+- [TPC-DS Benchmark Overview](../../benchmarks/tpc-ds.md)
 - [API Reference](../../reference/api-reference.md)

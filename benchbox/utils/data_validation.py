@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Union
 
+from benchbox.utils.datagen_version import describe_datagen_staleness, manifest_datagen_is_current
 from benchbox.utils.file_format import detect_compression, strip_compression_suffix
 from benchbox.utils.printing import emit
 
@@ -176,6 +177,20 @@ class BenchmarkDataValidator:
         # If a manifest exists and is valid for this benchmark/scale, use it for validation
         manifest = self._read_manifest(data_path)
         if manifest and self._manifest_matches_config(manifest):
+            # A stale datagen stamp fails validation even when the files are
+            # complete: the generator reuse boundary must regenerate rather
+            # than silently reuse data from an older generation.
+            if not manifest_datagen_is_current(manifest):
+                reason = describe_datagen_staleness(manifest)
+                return DataValidationResult(
+                    valid=False,
+                    tables_validated={},
+                    missing_tables=[],
+                    row_count_mismatches={},
+                    file_size_info={},
+                    validation_timestamp=datetime.now(),
+                    issues=[f"Datagen manifest is stale ({reason}); regenerating benchmark data"],
+                )
             return self._validate_with_manifest(data_path, manifest)
 
         # Otherwise, check for expected tables/files by scanning and rebuild manifest
@@ -608,6 +623,11 @@ class BenchmarkDataValidator:
                     table = parts[0]
             tables.setdefault(table, []).append(fp)
 
+        # A scan establishes file presence, not which generator inputs
+        # produced the files, so a rebuilt manifest deliberately carries no
+        # datagen stamp. Stamping it current would launder unknown-vintage
+        # data into apparently current provenance; leaving it unstamped means
+        # the next run honestly regenerates to establish provenance.
         manifest = {
             "benchmark": self.benchmark_name,
             "scale_factor": self.scale_factor,

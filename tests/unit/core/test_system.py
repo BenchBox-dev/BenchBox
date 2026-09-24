@@ -1,8 +1,4 @@
-"""Unit tests for platform-dependent code paths in benchbox/core/system.py.
-
-Verifies that SystemProfiler._get_cpu_model() returns a sensible string on
-Darwin, Linux, and Windows by mocking platform.system() so these paths are
-exercised on any CI runner.
+"""Unit tests for CPU identity handling in benchbox/core/system.py.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -11,7 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -23,88 +19,84 @@ pytestmark = [
 ]
 
 
-class TestGetCpuModelDarwin:
-    """_get_cpu_model() on macOS (Darwin)."""
-
-    def test_sysctl_success(self):
-        result = MagicMock(returncode=0, stdout="Apple M2 Pro\n")
-        with (
-            patch("benchbox.core.system.platform.system", return_value="Darwin"),
-            patch("benchbox.core.system.platform.machine", return_value="arm64"),
-            patch("subprocess.run", return_value=result),
-        ):
+class TestGetCpuModel:
+    def test_returns_detected_model(self):
+        with patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M2 Pro", "Apple")):
             model = SystemProfiler()._get_cpu_model()
         assert model == "Apple M2 Pro"
 
-    def test_sysctl_nonzero_returncode_falls_back(self):
-        # Non-zero returncode: code returns "Unknown CPU" (not the machine string)
-        result = MagicMock(returncode=1, stdout="")
-        with (
-            patch("benchbox.core.system.platform.system", return_value="Darwin"),
-            patch("benchbox.core.system.platform.machine", return_value="x86_64"),
-            patch("subprocess.run", return_value=result),
-        ):
+    @pytest.mark.parametrize("detected", [(None, None), ("", None), ("   ", None)])
+    def test_returns_none_when_model_is_not_detected(self, detected):
+        with patch("benchbox.core.system.detect_cpu_info", return_value=detected):
             model = SystemProfiler()._get_cpu_model()
-        assert model == "Unknown CPU"
+        assert model is None
 
-    def test_sysctl_exception_falls_back(self):
+    def test_returns_none_when_detection_raises(self):
+        with patch("benchbox.core.system.detect_cpu_info", side_effect=OSError("unavailable")):
+            model = SystemProfiler()._get_cpu_model()
+        assert model is None
+
+    @pytest.mark.parametrize("placeholder", ["arm", "arm64", "arm64 CPU", "Unknown CPU"])
+    def test_returns_none_for_architecture_like_placeholders(self, placeholder):
         with (
-            patch("benchbox.core.system.platform.system", return_value="Darwin"),
+            patch("benchbox.core.system.detect_cpu_info", return_value=(placeholder, None)),
             patch("benchbox.core.system.platform.machine", return_value="arm64"),
-            patch("subprocess.run", side_effect=FileNotFoundError("sysctl not found")),
         ):
             model = SystemProfiler()._get_cpu_model()
-        assert model == "arm64 CPU"
+        assert model is None
 
-
-class TestGetCpuModelLinux:
-    """_get_cpu_model() on Linux."""
-
-    def test_proc_cpuinfo_success(self):
-        cpuinfo = "processor\t: 0\nmodel name\t: Intel(R) Core(TM) i7-9750H\nflags\t: fpu vme\n"
+    def test_profile_never_turns_architecture_into_cpu_model_without_psutil(self):
         with (
-            patch("benchbox.core.system.platform.system", return_value="Linux"),
+            patch("benchbox.core.system.HAS_PSUTIL", False),
+            patch("benchbox.core.system.platform.machine", return_value="arm64"),
+            # platform.processor() is the fallback path exercised right after
+            # detect_cpu_info() fails; on a real machine it returns a genuine
+            # (platform-dependent) CPU string, not an empty value, so it must
+            # be patched too or this test only passes by accident on
+            # platforms where the real processor() happens to be "".
+            patch("benchbox.core.system.platform.processor", return_value=""),
+            patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model is None
+        assert profile.cpu_identity_provenance is None
+
+    def test_profile_marks_fallback_model_as_inferred(self):
+        with (
+            patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
             patch("benchbox.core.system.platform.machine", return_value="x86_64"),
-            patch("builtins.open", mock_open(read_data=cpuinfo)),
+            patch("benchbox.core.system.platform.processor", return_value="Intel(R) Core(TM) i7-9750H"),
         ):
-            model = SystemProfiler()._get_cpu_model()
-        assert model == "Intel(R) Core(TM) i7-9750H"
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Intel(R) Core(TM) i7-9750H"
+        assert profile.cpu_identity_provenance == "inferred"
 
-    def test_proc_cpuinfo_no_model_name_falls_back(self):
-        cpuinfo = "processor\t: 0\nflags\t: fpu\n"
-        with (
-            patch("benchbox.core.system.platform.system", return_value="Linux"),
-            patch("benchbox.core.system.platform.machine", return_value="x86_64"),
-            patch("builtins.open", mock_open(read_data=cpuinfo)),
-        ):
-            model = SystemProfiler()._get_cpu_model()
-        assert model == "x86_64 CPU"
-
-    def test_proc_cpuinfo_oserror_falls_back(self):
-        with (
-            patch("benchbox.core.system.platform.system", return_value="Linux"),
-            patch("benchbox.core.system.platform.machine", return_value="aarch64"),
-            patch("builtins.open", side_effect=OSError("no /proc")),
-        ):
-            model = SystemProfiler()._get_cpu_model()
-        assert model == "aarch64 CPU"
-
-
-class TestGetCpuModelWindows:
-    """_get_cpu_model() on Windows falls through to the else branch."""
-
-    def test_returns_machine_cpu_string(self):
+    def test_windows_platform_processor_fallback_is_inferred(self):
         with (
             patch("benchbox.core.system.platform.system", return_value="Windows"),
             patch("benchbox.core.system.platform.machine", return_value="AMD64"),
+            patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
+            patch("benchbox.core.system.platform.processor", return_value="Intel(R) Core(TM) i7-9750H"),
         ):
-            model = SystemProfiler()._get_cpu_model()
-        assert model == "AMD64 CPU"
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Intel(R) Core(TM) i7-9750H"
+        assert profile.cpu_identity_provenance == "inferred"
 
-    def test_returns_machine_cpu_string_arm(self):
+    def test_profile_still_marks_detected_model_as_measured(self):
         with (
-            patch("benchbox.core.system.platform.system", return_value="Windows"),
-            patch("benchbox.core.system.platform.machine", return_value="ARM64"),
+            patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M4", "Apple")),
+            patch("benchbox.core.system.platform.machine", return_value="arm64"),
         ):
-            model = SystemProfiler()._get_cpu_model()
-        assert model == "ARM64 CPU"
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Apple M4"
+        assert profile.cpu_identity_provenance == "measured"
+
+    def test_profile_prefers_measured_over_inferred_when_both_available(self):
+        with (
+            patch("benchbox.core.system.detect_cpu_info", return_value=("Apple M4", "Apple")),
+            patch("benchbox.core.system.platform.machine", return_value="arm64"),
+            patch("benchbox.core.system.platform.processor", return_value="Intel fallback should be ignored"),
+        ):
+            profile = SystemProfiler().get_system_profile()
+        assert profile.cpu_model == "Apple M4"
+        assert profile.cpu_identity_provenance == "measured"

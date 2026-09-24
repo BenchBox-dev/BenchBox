@@ -10,6 +10,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -72,6 +73,10 @@ class SnowflakeAdapter(PlatformAdapter):
         self.username = config.get("username")
         self.password = config.get("password")
         self.role = config.get("role")
+        # Account edition (standard, enterprise, business_critical, vps).
+        # The edition is not queryable from the service, so it stays unset
+        # unless the operator supplies it; normalized cost requires it.
+        self.edition = config.get("edition")
 
         # Authentication options
         self.authenticator = config.get("authenticator") or "snowflake"  # snowflake, oauth, etc.
@@ -92,6 +97,11 @@ class SnowflakeAdapter(PlatformAdapter):
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
+
+        # Last session cache-control receipt (sanitized). Recorded when
+        # session cache validation runs and persisted into platform_compute
+        # as deterministic cache-state evidence. None until validated.
+        self._cache_control_receipt: dict[str, Any] | None = None
 
         # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
@@ -208,39 +218,45 @@ class SnowflakeAdapter(PlatformAdapter):
         """Create Snowflake adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
-        return cls(
-            **build_adapter_config(
-                config,
-                platform="snowflake",
-                fields=[
-                    "account",
-                    "warehouse",
-                    "schema",
-                    "username",
-                    "password",
-                    "role",
-                    "authenticator",
-                    "private_key_path",
-                    "private_key_passphrase",
-                    "warehouse_size",
-                    "auto_suspend",
-                    "auto_resume",
-                    "multi_cluster_warehouse",
-                    "query_tag",
-                    "timezone",
-                    "file_format",
-                    "compression",
-                    "staging_root",
-                    "iceberg_external_volume",
-                    "iceberg_catalog",
-                    "delta_table_format",
-                    "disable_result_cache",
-                    "strict_validation",
-                    "suppress_nondeterministic_errors",
-                    "modify_warehouse_settings",
-                ],
-            )
+        adapter_config = build_adapter_config(
+            config,
+            platform="snowflake",
+            fields=[
+                "account",
+                "warehouse",
+                "schema",
+                "username",
+                "password",
+                "role",
+                "edition",
+                "authenticator",
+                "private_key_path",
+                "private_key_passphrase",
+                "warehouse_size",
+                "auto_suspend",
+                "auto_resume",
+                "multi_cluster_warehouse",
+                "query_tag",
+                "timezone",
+                "file_format",
+                "compression",
+                "staging_root",
+                "iceberg_external_volume",
+                "iceberg_catalog",
+                "delta_table_format",
+                "disable_result_cache",
+                "strict_validation",
+                "suppress_nondeterministic_errors",
+                "modify_warehouse_settings",
+                "force_recreate",
+            ],
         )
+        # build_adapter_config only forwards listed fields: map the canonical
+        # --force flag through so forced runs actually reach the adapter instead
+        # of silently falling back to the base default (False).
+        if "force_recreate" not in adapter_config and config.get("force", False):
+            adapter_config["force_recreate"] = True
+        return cls(**adapter_config)
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Snowflake platform information.
@@ -264,6 +280,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 "database": self.database,
                 "schema": self.schema,
                 "role": self.role,
+                "edition": getattr(self, "edition", None),
                 "warehouse_size": getattr(self, "warehouse_size", None),
                 "auto_suspend": self.auto_suspend,
                 "auto_resume": self.auto_resume,
@@ -295,14 +312,18 @@ class SnowflakeAdapter(PlatformAdapter):
                 platform_info["engine_version"] = platform_info["platform_version"]
                 platform_info["engine_version_source"] = "sql_query"
 
-                # Get current region and cloud provider
+                # Get current region. CURRENT_REGION() embeds the cloud prefix
+                # (e.g. AWS_US_EAST_2); there is no CURRENT_CLOUD() function.
                 try:
-                    result = cursor.execute("SELECT current_region(), current_cloud()").fetchone()
-                    if result:
-                        platform_info["cloud_region"] = result[0]
-                        platform_info["cloud_provider"] = result[1]
+                    result = cursor.execute("SELECT CURRENT_REGION()").fetchone()
+                    if result and result[0]:
+                        region = str(result[0])
+                        platform_info["cloud_region"] = region
+                        provider = region.split("_", 1)[0].upper()
+                        if provider in ("AWS", "AZURE", "GCP"):
+                            platform_info["cloud_provider"] = provider
                 except Exception as e:
-                    self.logger.debug(f"Could not query Snowflake region/cloud: {e}")
+                    self.logger.debug(f"Could not query Snowflake region: {e}")
 
                 # Try to get warehouse metadata (requires appropriate permissions)
                 if self.warehouse:
@@ -379,7 +400,9 @@ class SnowflakeAdapter(PlatformAdapter):
 
         metadata["platform_deployment"] = self._snowflake_deployment_metadata(config)
         metadata["platform_cloud"] = self._snowflake_cloud_metadata(info, config)
-        metadata["platform_compute"] = self._snowflake_compute_metadata(config, compute)
+        metadata["platform_compute"] = self._snowflake_compute_metadata(
+            config, compute, cache_control=getattr(self, "_cache_control_receipt", None)
+        )
         metadata["platform_storage"] = self._snowflake_storage_metadata(config)
         return metadata
 
@@ -422,7 +445,11 @@ class SnowflakeAdapter(PlatformAdapter):
         return _compact_metadata(payload)
 
     @staticmethod
-    def _snowflake_compute_metadata(config: Mapping[str, Any], compute: Mapping[str, Any]) -> dict[str, Any]:
+    def _snowflake_compute_metadata(
+        config: Mapping[str, Any],
+        compute: Mapping[str, Any],
+        cache_control: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         observed = any(
             compute.get(key) is not None
             for key in (
@@ -456,6 +483,7 @@ class SnowflakeAdapter(PlatformAdapter):
             "query_acceleration_max_scale_factor": compute.get("query_acceleration_max_scale_factor"),
             "scaling_policy": compute.get("scaling_policy"),
             "result_cache_enabled": config.get("result_cache_enabled"),
+            "cache_control": dict(cache_control) if isinstance(cache_control, Mapping) else None,
             "source": "observed" if observed else "requested",
             "collection_status": collection_status,
             "collection_error_class": collection_error,
@@ -664,6 +692,9 @@ class SnowflakeAdapter(PlatformAdapter):
         2. Delete uploaded files
         3. Force expensive re-uploads
 
+        The gate saves DDL only: every load is still a full refresh
+        (truncate + COPY), so skipped DDL never means stale data.
+
         Args:
             benchmark: Benchmark instance
             connection: Snowflake connection
@@ -671,6 +702,9 @@ class SnowflakeAdapter(PlatformAdapter):
         Returns:
             True if all expected tables exist with data, False otherwise
         """
+        if self.force_recreate:
+            self.log_verbose("Force recreate enabled - schema creation required")
+            return False
         try:
             cursor = connection.cursor()
 
@@ -685,12 +719,18 @@ class SnowflakeAdapter(PlatformAdapter):
 
                 # Check if table exists
                 cursor.execute(f"SHOW TABLES LIKE '{table_upper}'")
-                if not cursor.fetchone():
+                row = cursor.fetchone()
+                if not row:
                     self.log_verbose(f"Table {table_upper} missing - schema creation required")
                     return False
 
+                catalog_name = row[1] if len(row) > 1 and row[1] else table_upper
+
                 # Check if table has data
-                cursor.execute(f"SELECT COUNT(*) FROM {table_upper}")
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM {table_upper}")
+                except Exception:
+                    cursor.execute(f'SELECT COUNT(*) FROM "{catalog_name}"')
                 row_count = cursor.fetchone()[0]
                 if row_count == 0:
                     self.log_verbose(f"Table {table_upper} empty - schema creation required")
@@ -737,7 +777,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
             # Use common schema creation helper
             self.log_very_verbose("Retrieving schema SQL from benchmark")
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
@@ -773,6 +813,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
         start_time = mono_time()
         table_stats = {}
+        per_table_timings: dict[str, Any] = {}
         total_time = 0.0
 
         cursor = connection.cursor()
@@ -791,7 +832,8 @@ class SnowflakeAdapter(PlatformAdapter):
 
                 if not valid_files:
                     self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name] = 0
+                    table_stats[table_name.upper()] = 0
+                    per_table_timings[table_name.upper()] = {"total_ms": 0}
                     continue
 
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
@@ -810,6 +852,7 @@ class SnowflakeAdapter(PlatformAdapter):
                         self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
 
                     load_time = elapsed_seconds(load_start)
+                    per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                     self.log_verbose(
                         f"✅ Loaded {actual_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                     )
@@ -817,6 +860,10 @@ class SnowflakeAdapter(PlatformAdapter):
                 except Exception as e:
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                     table_stats[table_name.upper()] = 0
+                    per_table_timings[table_name.upper()] = {"total_ms": 0}
+                    # Fail fast: loads are full refreshes, so a failed table
+                    # must abort the run instead of benchmarking a wiped table.
+                    raise
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -831,8 +878,7 @@ class SnowflakeAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-        # Snowflake doesn't provide detailed per-table timings yet
-        return table_stats, total_time, None
+        return table_stats, total_time, per_table_timings
 
     def validate_external_table_requirements(self) -> None:
         """Validate required cloud staging configuration for external table mode."""
@@ -932,6 +978,7 @@ class SnowflakeAdapter(PlatformAdapter):
             ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
             REPLACE_INVALID_CHARACTERS = TRUE
             EMPTY_FIELD_AS_NULL = TRUE
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             COMPRESSION = '{self.compression}'
         """)
         cursor.execute(f"""
@@ -943,6 +990,7 @@ class SnowflakeAdapter(PlatformAdapter):
             ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
             REPLACE_INVALID_CHARACTERS = TRUE
             EMPTY_FIELD_AS_NULL = TRUE
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
             COMPRESSION = '{self.compression}'
         """)
 
@@ -961,11 +1009,58 @@ class SnowflakeAdapter(PlatformAdapter):
     ) -> str:
         """Select Snowflake file format object based on resolved CSV dialect."""
         dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
-        if dialect.null_marker is not None:
+        if dialect.delimiter == "|":
             self.log_very_verbose(f"Using TBL file format for {table_name}")
             return f"{self.schema}.BENCHBOX_TBL_FORMAT"
         self.log_very_verbose(f"Using CSV file format for {table_name}")
         return f"{self.schema}.BENCHBOX_CSV_FORMAT"
+
+    def _ensure_preserve_file_format(
+        self,
+        cursor: Any,
+        table_name: str,
+        first_file: Path,
+        data_source: DataSource,
+        benchmark: Any,
+    ) -> str | None:
+        """Create and return a per-dialect file format for non-static CSV semantics.
+
+        Header-aware inputs need their own SKIP_HEADER setting. A truthy
+        null-marker sentinel also needs a format where only that literal loads
+        as NULL while empty fields stay empty strings (required by NOT NULL
+        schemas such as ClickBench). A headered CSV with no null marker
+        (null_marker None, e.g. TSBS DevOps) still needs SKIP_HEADER but keeps
+        default NULL handling. Returns None when the static CSV/TBL
+        formats already match the resolved dialect.
+        """
+        dialect = resolve_csv_dialect(data_source, table_name, first_file, benchmark)
+        if not dialect.null_marker and not dialect.has_header:
+            return None
+        # Normalize an absent null marker to "" before escaping: header-only
+        # dialects declare csv_null_marker=None and must not reach .replace().
+        marker = (dialect.null_marker or "").replace("'", "''")
+        key = f"{dialect.delimiter}\x1f{marker}\x1f{int(dialect.has_header)}\x1f{self.compression}"
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12].upper()
+        format_name = f"{self.schema}.BENCHBOX_DYN_{digest}"
+        delimiter = dialect.delimiter.replace("'", "''")
+        skip_header = 1 if dialect.has_header else 0
+        empty_field_as_null = "FALSE" if marker else "TRUE"
+        null_if = f"NULL_IF = ('{marker}')" if marker else ""
+        self.log_very_verbose(f"Ensuring per-dialect file format {format_name} for {table_name}")
+        cursor.execute(f"""
+            CREATE FILE FORMAT IF NOT EXISTS {format_name}
+            TYPE = 'CSV'
+            FIELD_DELIMITER = '{delimiter}'
+            RECORD_DELIMITER = '\\n'
+            SKIP_HEADER = {skip_header}
+            ERROR_ON_COLUMN_COUNT_MISMATCH = FALSE
+            REPLACE_INVALID_CHARACTERS = TRUE
+            EMPTY_FIELD_AS_NULL = {empty_field_as_null}
+            {null_if}
+            FIELD_OPTIONALLY_ENCLOSED_BY = '"'
+            COMPRESSION = '{self.compression}'
+        """)
+        return format_name
 
     def _parse_copy_results(self, copy_results: list[Any]) -> None:
         """Log per-file COPY INTO warnings while tolerating parse failures."""
@@ -996,30 +1091,95 @@ class SnowflakeAdapter(PlatformAdapter):
         data_source: DataSource | None = None,
         benchmark: Any = None,
     ) -> int:
-        """Upload table files to stage, COPY INTO target table, and return actual row count."""
+        """Upload table files to stage, COPY INTO target table, and return actual row count.
+
+        Every load is a full refresh: leftover stage files are removed, fresh
+        files uploaded, the resolved target truncated once per table, and COPY
+        runs with FORCE so Snowflake load history cannot silently skip the
+        reload. Reruns therefore report 1x row counts instead of appending.
+        """
         stage_name = f"@%{table_name_upper}"
+        target_table = table_name_upper
         self.log_very_verbose(f"Using stage: {stage_name}")
+
+        # Stage hygiene: drop leftovers from interrupted runs so COPY loads
+        # exactly this invocation's files. Tolerate a missing stage.
+        try:
+            cursor.execute(f"REMOVE {stage_name}")
+        except Exception as e:
+            if "does not exist or not authorized" not in str(e):
+                raise
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_msg = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
             self.log_very_verbose(f"Uploading file{chunk_msg} with PUT: {file_path.name}")
-            cursor.execute(f"PUT file://{file_path.absolute()} {stage_name}")
+            try:
+                cursor.execute(f"PUT file://{file_path.absolute()} {stage_name} OVERWRITE = TRUE")
+            except Exception as e:
+                if "does not exist or not authorized" in str(e):
+                    stage_name = f'@%"{table_name}"'
+                    target_table = f'"{table_name}"'
+                    cursor.execute(f"PUT file://{file_path.absolute()} {stage_name} OVERWRITE = TRUE")
+                else:
+                    raise
 
         ds = data_source or DataSource(source_type="snowflake_stage", tables={})
         bm = benchmark if benchmark is not None else NO_BENCHMARK
-        file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+        # Parquet-only sources (e.g. JoinOrder's IMDb data) cannot use the
+        # CSV named formats: load with an inline Parquet format. Column
+        # matching is a COPY-level parameter (MATCH_BY_COLUMN_NAME), not a
+        # FILE_FORMAT option; case-insensitive matching bridges UPPERCASE
+        # tables and lowercase Parquet fields.
+        is_parquet = str(valid_files[0]).lower().endswith(".parquet")
+        if is_parquet:
+            file_format_clause = "FILE_FORMAT = (TYPE = 'PARQUET') MATCH_BY_COLUMN_NAME = 'CASE_INSENSITIVE'"
+        else:
+            file_format = self._ensure_preserve_file_format(cursor, table_name, valid_files[0], ds, bm)
+            if file_format is None:
+                file_format = self._get_file_format_for_table(table_name, valid_files[0], ds, bm)
+            file_format_clause = f"FILE_FORMAT = (FORMAT_NAME = '{file_format}')"
+
+        # Full-refresh load: clear the PUT-fallback-resolved target once per
+        # table before COPY so reruns stay idempotent instead of appending.
+        # Tolerate a missing table on fresh schemas. TRUNCATE runs after PUT so
+        # a failed upload leaves the previous data intact.
+        try:
+            self.log_very_verbose(f"Truncating {target_table} before COPY INTO")
+            cursor.execute(f"TRUNCATE TABLE {target_table}")
+        except Exception as e:
+            if "does not exist or not authorized" not in str(e):
+                raise
         copy_command = f"""
-            COPY INTO {table_name_upper}
+            COPY INTO {target_table}
             FROM {stage_name}
-            FILE_FORMAT = (FORMAT_NAME = '{file_format}')
+            {file_format_clause}
             ON_ERROR = 'CONTINUE'
             PURGE = TRUE
+            FORCE = TRUE
         """
-        self.log_very_verbose(f"Executing COPY INTO for {table_name_upper}")
-        cursor.execute(copy_command)
+        self.log_very_verbose(f"Executing COPY INTO for {target_table}")
+        try:
+            cursor.execute(copy_command)
+        except Exception as e:
+            if target_table != f'"{table_name}"' and "does not exist or not authorized" in str(e):
+                target_table = f'"{table_name}"'
+                copy_command = f"""
+                    COPY INTO {target_table}
+                    FROM {stage_name}
+                    {file_format_clause}
+                    ON_ERROR = 'CONTINUE'
+                    PURGE = TRUE
+                    FORCE = TRUE
+                """
+                cursor.execute(copy_command)
+            else:
+                raise
         self._parse_copy_results(cursor.fetchall())
 
-        cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
+        try:
+            cursor.execute(f"SELECT COUNT(*) FROM {target_table}")
+        except Exception:
+            cursor.execute(f'SELECT COUNT(*) FROM "{table_name}"')
         return cursor.fetchone()[0]
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
@@ -1100,6 +1260,9 @@ class SnowflakeAdapter(PlatformAdapter):
             if self.disable_result_cache or critical_failures:
                 self.logger.debug("Validating cache control settings...")
                 validation_result = self.validate_session_cache_control(connection)
+                from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(validation_result)
 
                 if not validation_result["validated"]:
                     self.logger.warning(f"Cache control validation failed: {validation_result.get('errors', [])}")
@@ -1107,6 +1270,19 @@ class SnowflakeAdapter(PlatformAdapter):
                     self.logger.info(
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
+            else:
+                # The result cache was explicitly left enabled, so there is no
+                # disabled state to probe. Record the configured enabled state
+                # so the bundle carries enabled-cache evidence instead of an
+                # absent receipt that the submission gate would grandfather.
+                from benchbox.platforms.cloud_shared import (
+                    explicit_cache_enabled_receipt,
+                    sanitize_cache_control_receipt,
+                )
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(
+                    explicit_cache_enabled_receipt("USE_CACHED_RESULT", "TRUE")
+                )
 
         finally:
             cursor.close()
@@ -1132,7 +1308,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
         return validate_session_cache_control(
             connection=connection,
-            query="SELECT SYSTEM$GET_SESSION_PARAMETER('USE_CACHED_RESULT') as value",
+            query="SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION",
             setting_key="USE_CACHED_RESULT",
             disabled_value="FALSE",
             enabled_value="TRUE",
@@ -1141,6 +1317,7 @@ class SnowflakeAdapter(PlatformAdapter):
             disable_result_cache=self.disable_result_cache,
             strict_validation=self.strict_validation,
             adapter_logger=self.logger,
+            value_column_index=1,
         )
 
     def execute_query(
@@ -1153,13 +1330,25 @@ class SnowflakeAdapter(PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query with detailed timing and performance tracking."""
+        """Execute query with detailed timing and performance tracking.
+
+        Accepts either a connection or an already-open cursor: the TPC power
+        harness passes a per-stream cursor through the facade, which has no
+        ``cursor()`` method of its own.
+        """
         self.log_operation_start("Snowflake query execution", query_id)
         self.log_very_verbose(f"Executing query {query_id}: {query[:100]}...")
 
         start_time = mono_time()
 
-        cursor = connection.cursor()
+        own_cursor = False
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            own_cursor = True
+            stats_connection = connection
+        else:
+            cursor = connection
+            stats_connection = getattr(connection, "connection", connection)
 
         try:
             # Set query tag for tracking
@@ -1167,7 +1356,9 @@ class SnowflakeAdapter(PlatformAdapter):
             cursor.execute(f"ALTER SESSION SET QUERY_TAG = '{self.query_tag}_{query_id}'")
 
             # Execute the query
-            # Note: Query dialect translation is now handled automatically by the base adapter
+            # Note: Query dialect translation is now handled automatically by the base adapter.
+            # Zero-divisor guard is a no-op unless the query divides.
+            query = self._safeguard_snowflake_division(query)
             self.log_verbose(f"Executing query {query_id} on Snowflake")
             cursor.execute(query)
             result = cursor.fetchall()
@@ -1176,7 +1367,7 @@ class SnowflakeAdapter(PlatformAdapter):
             actual_row_count = len(result) if result else 0
 
             # Get query history for performance metrics
-            query_stats = self._get_query_statistics(connection, query_id)
+            query_stats = self._get_query_statistics(stats_connection, query_id)
 
             # Validate row count if enabled and benchmark type is provided
             validation_result = None
@@ -1216,7 +1407,12 @@ class SnowflakeAdapter(PlatformAdapter):
             # Include Snowflake-specific fields
             result_dict["translated_query"] = None  # Translation handled by base adapter
             result_dict["query_statistics"] = query_stats
-            # Map query_statistics to resource_usage for cost calculation
+            # Map query_statistics to resource_usage for cost calculation.
+            # The adapter-measured wall time is added alongside the
+            # server-side timings so the cost model can estimate warehouse
+            # credits even when query history is delayed or unavailable.
+            if isinstance(query_stats, dict):
+                query_stats = {**query_stats, "execution_time_seconds": execution_time}
             result_dict["resource_usage"] = query_stats
 
             # Log completion based on final status
@@ -1240,7 +1436,8 @@ class SnowflakeAdapter(PlatformAdapter):
                 "error_type": type(e).__name__,
             }
         finally:
-            cursor.close()
+            if own_cursor:
+                cursor.close()
 
         # Capture and merge the structured query plan (SUCCESS-guarded in the
         # helper). Deliberately outside the try: with strict_plan_capture=True a
@@ -1255,8 +1452,14 @@ class SnowflakeAdapter(PlatformAdapter):
 
         Snowflake has no plain ``EXPLAIN`` that yields a parseable tree; the
         JSON form returns a single VARIANT cell describing the operator graph.
+        Accepts a connection or an already-open cursor.
         """
-        cursor = connection.cursor()
+        own_cursor = False
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            own_cursor = True
+        else:
+            cursor = connection
         try:
             cursor.execute(f"EXPLAIN USING JSON {query}")
             row = cursor.fetchone()
@@ -1267,7 +1470,8 @@ class SnowflakeAdapter(PlatformAdapter):
             self.logger.debug(f"Could not get query plan: {e}")
             return None
         finally:
-            cursor.close()
+            if own_cursor:
+                cursor.close()
 
     def get_query_plan_parser(self):
         """Get Snowflake query plan parser."""
@@ -1278,23 +1482,70 @@ class SnowflakeAdapter(PlatformAdapter):
     def _optimize_table_definition(self, statement: str) -> str:
         """Optimize table definition for Snowflake.
 
-        Makes tables idempotent by using CREATE OR REPLACE TABLE.
+        Makes tables idempotent by using CREATE OR REPLACE TABLE, and
+        uppercases quoted identifiers. DDL translation quotes source-case
+        names, so tables would otherwise be created as quoted lowercase
+        ("hits", "store_sales") while queries, COPY targets, and validation
+        probes reference the folded uppercase name (HITS, STORE_SALES).
+        Uppercasing quoted identifiers keeps both spellings resolving to the
+        same table. Single-quoted string literals are left untouched.
         """
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE (defense-in-depth)
+        # Ensure idempotency with OR REPLACE (defense-in-depth), unless the
+        # statement already has IF NOT EXISTS (OR REPLACE + IF NOT EXISTS
+        # is a Snowflake syntax error).
         if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            if "IF NOT EXISTS" not in statement.upper():
+                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
 
-        # Snowflake automatically optimizes most aspects, but we can add clustering keys
-        # This is a simplified heuristic - in production would be more sophisticated
-        if "CLUSTER BY" not in statement.upper():
-            # Include clustering on first column (simple heuristic)
-            # Snowflake will auto-cluster in most cases anyway
-            pass
+        import re
+
+        # Uppercase double-quoted identifiers outside single-quoted string
+        # literals (DEFAULT '...', COMMENT '...'), which may themselves
+        # contain double quotes that must be preserved verbatim.
+        parts = re.split(r"('(?:[^']|'')*')", statement)
+        for index in range(0, len(parts), 2):
+            parts[index] = re.sub(r'"([^"]+)"', lambda m: m.group(0).upper(), parts[index])
+        statement = "".join(parts)
 
         return statement
+
+    def _safeguard_snowflake_division(self, query: str) -> str:
+        """Route ``/`` divisors through ``NULLIF(divisor, 0)`` (NULL on zero divisor).
+
+        Snowflake raises division-by-zero instead of yielding NULL,
+        which turns degenerate subscale ratios (e.g. TPC-DS Q90 at SF 0.1,
+        0/0) into hard query failures. NULLIF is a no-op for non-zero
+        divisors, and queries without a division are returned unchanged.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="snowflake")
+        except Exception as e:
+            self.log_very_verbose(f"Division safeguard skipped (unparseable Snowflake SQL): {e}")
+            return query
+        if not any(isinstance(node, exp.Div) for node in tree.walk()):
+            return query
+
+        def to_nullif_divisor(node: exp.Expression) -> exp.Expression:
+            if isinstance(node, exp.Div):
+                return exp.Div(
+                    this=node.this.copy(),
+                    expression=exp.Anonymous(
+                        this="NULLIF",
+                        expressions=[node.expression.copy(), exp.Literal.number(0)],
+                    ),
+                )
+            return node
+
+        return tree.transform(to_nullif_divisor).sql(dialect="snowflake")
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
         """Get list of existing tables using Snowflake SHOW TABLES command.
@@ -1341,15 +1592,29 @@ class SnowflakeAdapter(PlatformAdapter):
             accessible_tables = []
             inaccessible_tables = []
 
+            # Resolve each table to its stored identifier: DDL translation
+            # quotes source-case names, so TPC-DS tables live as
+            # quoted lowercase ("call_center") while table_stats keys are
+            # uppercase. Probe the quoted stored name; fall back to the
+            # unquoted key (which Snowflake folds to uppercase).
+            actual_names = {name.lower(): name for name in self._get_existing_tables(connection)}
+
             cursor = connection.cursor()
             for table_name in table_stats:
-                try:
-                    # Try a simple SELECT to verify table is accessible
-                    # table_stats has uppercase keys from Snowflake
-                    cursor.execute(f"SELECT 1 FROM {table_name} LIMIT 1")
-                    cursor.fetchone()  # Consume the result to prevent resource leaks
-                    accessible_tables.append(table_name)
-                except Exception:
+                stored = actual_names.get(table_name.lower())
+                candidates = [f'"{stored}"'] if stored else []
+                candidates.append(table_name)
+                probed = False
+                for candidate in candidates:
+                    try:
+                        cursor.execute(f"SELECT 1 FROM {candidate} LIMIT 1")
+                        cursor.fetchone()  # Consume the result to prevent resource leaks
+                        accessible_tables.append(table_name)
+                        probed = True
+                        break
+                    except Exception:
+                        continue
+                if not probed:
                     inaccessible_tables.append(table_name)
 
             if inaccessible_tables:
@@ -1433,7 +1698,11 @@ class SnowflakeAdapter(PlatformAdapter):
                         "bytes_spilled_remote": result[8],
                         "rows_produced": result[9],
                         "rows_examined": result[10],
-                        "credits_used": result[11],
+                        # CREDITS_USED_CLOUD_SERVICES covers the cloud-services
+                        # layer only, not warehouse compute. It is reported
+                        # under a truthful key and never priced; warehouse cost
+                        # is estimated from execution time and warehouse size.
+                        "credits_used_cloud_services": result[11],
                         "warehouse_size": result[12],
                         "cluster_number": result[13],
                         "retrieval_attempts": attempt + 1,
@@ -1850,6 +2119,7 @@ _build_snowflake_config = make_registered_platform_config_builder(
         "username",
         "password",
         "role",
+        "edition",
         "authenticator",
         "private_key_path",
         "private_key_passphrase",

@@ -527,7 +527,9 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
-            ddl = translate_sql_query(ddl, target_dialect=target, source_dialect="postgres", identify=True)
+            ddl = translate_sql_query(
+                ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
+            )
         return ddl
 
     def __enter__(self) -> TPCDSOBTBenchmark:
@@ -583,4 +585,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
+    benchmark_class=TPCDSOBTBenchmark,
 )

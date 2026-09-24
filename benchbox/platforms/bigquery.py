@@ -11,8 +11,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import logging
+import tempfile
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -32,6 +34,7 @@ if TYPE_CHECKING:
 
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.file_format import detect_compression, detect_data_format
+from benchbox.utils.iceberg_layout import relocate_iceberg_table, resolve_iceberg_metadata_file
 from benchbox.utils.printing import emit
 
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
@@ -44,7 +47,6 @@ try:
 
     google_auth = google.auth  # Store reference for _load_credentials
     from google.cloud import bigquery, storage
-    from google.cloud.exceptions import NotFound
     from google.oauth2 import service_account
 except ImportError:
     google_auth = None
@@ -52,9 +54,32 @@ except ImportError:
     storage = None
     service_account = None
 
+# google-api-core/google-cloud-core (and thus NotFound/TooManyRequests) can be
+# present even when the heavier google-cloud-bigquery/google-cloud-storage
+# clients above are not (e.g. pulled in transitively by an unrelated
+# dependency), and vice versa. Resolve them independently so a table-casing
+# probe's `except NotFound`/`except TooManyRequests` clause always has a real
+# exception class to bind to, rather than depending on the combined import
+# above having fully succeeded.
+try:
+    from google.api_core.exceptions import TooManyRequests
+    from google.cloud.exceptions import NotFound
+except ImportError:
+
+    class NotFound(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
+
+    class TooManyRequests(Exception):  # type: ignore[no-redef]
+        """Placeholder used when google-api-core is not installed."""
+
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+def _lazy_query_parser(module_name: str, class_name: str) -> Any:
+    """Import and instantiate a parser class without a top-level import cycle."""
+    return getattr(importlib.import_module(module_name), class_name)()
 
 
 class BigQueryAdapter(PlatformAdapter):
@@ -945,11 +970,10 @@ class BigQueryAdapter(PlatformAdapter):
 
             for table_name in table_stats:
                 try:
-                    # BigQuery stores tables in uppercase for TPC benchmarks
-                    table_upper = table_name.upper()
+                    resolved_name, _ = self._resolve_target_table(connection, table_name)
 
                     # Use BigQuery's query API instead of cursor pattern
-                    query = f"SELECT 1 FROM `{self.project_id}.{self.dataset_id}.{table_upper}` LIMIT 1"
+                    query = f"SELECT 1 FROM `{self.project_id}.{self.dataset_id}.{resolved_name}` LIMIT 1"
                     query_job = connection.query(query)
                     list(query_job.result())  # Execute query to verify table is accessible
 
@@ -986,11 +1010,10 @@ class BigQueryAdapter(PlatformAdapter):
             Row count as integer, or 0 if unable to determine
         """
         try:
-            # BigQuery stores tables in uppercase for TPC benchmarks
-            table_upper = table.upper()
+            resolved_name, _ = self._resolve_target_table(connection, table)
 
             # Use BigQuery's query API instead of cursor pattern
-            query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{table_upper}`"
+            query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{resolved_name}`"
             query_job = connection.query(query)
             result = list(query_job.result())
             return result[0][0] if result else 0
@@ -1020,13 +1043,14 @@ class BigQueryAdapter(PlatformAdapter):
                 self.logger.info(f"Created dataset {self.dataset_id}")
 
             # Use common schema creation helper
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
-                # Convert to BigQuery table definition
+                # Convert to BigQuery table definition (normalizing table name to uppercase
+                # per BigQuery TPC schema conventions and adapter query expectations)
                 bq_statement = self._convert_to_bigquery_table(statement)
 
                 # Execute via query job
@@ -1059,6 +1083,7 @@ class BigQueryAdapter(PlatformAdapter):
 
         start_time = mono_time()
         table_stats = {}
+        per_table_timings: dict[str, Any] = {}
         total_time = 0.0
 
         try:
@@ -1069,10 +1094,12 @@ class BigQueryAdapter(PlatformAdapter):
 
             if self.storage_bucket:
                 bucket = self._create_storage_bucket()
-                table_stats = self._load_tables_via_cloud_storage(connection, data_source, bucket, benchmark)
+                table_stats, per_table_timings = self._load_tables_via_cloud_storage(
+                    connection, data_source, bucket, benchmark
+                )
             else:
                 self.logger.warning("No Cloud Storage bucket configured, using direct loading")
-                table_stats = self._load_tables_direct(connection, data_source, benchmark)
+                table_stats, per_table_timings = self._load_tables_direct(connection, data_source, benchmark)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -1082,8 +1109,7 @@ class BigQueryAdapter(PlatformAdapter):
             self.logger.error(f"Data loading failed: {e}")
             raise
 
-        # BigQuery doesn't provide detailed per-table timings yet
-        return table_stats, total_time, None
+        return table_stats, total_time, per_table_timings
 
     def validate_external_table_requirements(self) -> None:
         """Validate required GCS configuration for external table mode."""
@@ -1111,14 +1137,14 @@ class BigQueryAdapter(PlatformAdapter):
             source_format, uris = self._prepare_external_table_uris(bucket, table_name, file_paths)
             if not uris:
                 raise ValueError(
-                    f"BigQuery external mode requires Parquet files or Delta directories for table "
-                    f"'{table_name_upper}'. No supported sources were found."
+                    f"BigQuery external mode requires Parquet files, Delta directories, or Iceberg "
+                    f"directories for table '{table_name_upper}'. No supported sources were found."
                 )
 
             uris_sql = ", ".join(f"'{uri}'" for uri in uris)
             connection_clause = (
                 f"\n                WITH CONNECTION `{self.biglake_connection}`"
-                if source_format == "DELTA_LAKE"
+                if source_format in ("DELTA_LAKE", "ICEBERG")
                 else ""
             )
             ddl = f"""
@@ -1166,19 +1192,20 @@ class BigQueryAdapter(PlatformAdapter):
 
                 benchmark_name = getattr(benchmark, "name", "unknown")
                 scale_factor = getattr(benchmark, "scale_factor", "unknown")
+                data_dir = getattr(benchmark, "data_dir", getattr(benchmark, "output_dir", "<data_dir>"))
                 raise ValueError(
                     f"\n❌ Incompatible data compression detected\n\n"
                     f"BigQuery does not support Zstd (.zst) compression for CSV file loading.\n"
                     f"Found Zstd file: {Path(file_path).name}\n\n"
                     f"To fix this, regenerate the data with gzip compression:\n\n"
                     f"  # Remove existing incompatible data\n"
-                    f"  rm -rf {benchmark.data_dir}\n\n"
+                    f"  rm -rf {data_dir}\n\n"
                     f"  # Regenerate with gzip compression\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
-                    f"--scale {scale_factor} --compression-type gzip\n\n"
+                    f"--scale {scale_factor} --compression gzip\n\n"
                     f"Or use uncompressed data (larger files, slower uploads):\n\n"
                     f"  benchbox run --platform bigquery --benchmark {benchmark_name} "
-                    f"--scale {scale_factor} --no-compression\n"
+                    f"--scale {scale_factor} --compression none\n"
                 )
 
     def _create_storage_bucket(self) -> Any:
@@ -1188,9 +1215,27 @@ class BigQueryAdapter(PlatformAdapter):
         storage_client = storage.Client(project=self.project_id, credentials=credentials)
         return storage_client.bucket(self.storage_bucket)
 
+    def _resolve_target_table(self, connection: Any, table_name: str) -> tuple[str, Any]:
+        """Resolve target table reference, checking uppercase first with fallback to exact name."""
+        table_name_upper = table_name.upper()
+        dataset_ref = connection.dataset(self.dataset_id)
+        # Try uppercase table first (default for TPC benchmarks in BigQuery)
+        try:
+            connection.get_table(dataset_ref.table(table_name_upper))
+            return table_name_upper, dataset_ref.table(table_name_upper)
+        except NotFound:
+            # Fallback to exact case if table was created with lowercase or mixed case
+            try:
+                connection.get_table(dataset_ref.table(table_name))
+                return table_name, dataset_ref.table(table_name)
+            except NotFound:
+                # If neither exists yet, default to uppercase
+                return table_name_upper, dataset_ref.table(table_name_upper)
+
     def _get_table_row_count(self, connection: Any, table_name_upper: str) -> int:
         """Return current row count for a BigQuery table."""
-        query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{table_name_upper}`"
+        resolved_name, _ = self._resolve_target_table(connection, table_name_upper)
+        query = f"SELECT COUNT(*) FROM `{self.project_id}.{self.dataset_id}.{resolved_name}`"
         query_job = connection.query(query)
         result = list(query_job.result())
         return result[0][0] if result else 0
@@ -1205,8 +1250,7 @@ class BigQueryAdapter(PlatformAdapter):
         benchmark: Any | None = None,
     ) -> int:
         """Load one table through GCS staging."""
-        table_name_upper = table_name.upper()
-        table_ref = connection.dataset(self.dataset_id).table(table_name_upper)
+        resolved_name, table_ref = self._resolve_target_table(connection, table_name)
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1227,11 +1271,35 @@ class BigQueryAdapter(PlatformAdapter):
                 data_source=data_source,
                 benchmark=benchmark,
             )
-            uri = f"gs://{self.storage_bucket}/{blob_name}"
-            load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
-            load_job.result()
+            if file_idx > 0:
+                # BigQuery limits table update operations to 5 per 10s per table.
+                # Small throttle between chunks prevents hitting rate limits on small multi-file tables.
+                time.sleep(1.0)
 
-        return self._get_table_row_count(connection, table_name_upper)
+            uri = f"gs://{self.storage_bucket}/{blob_name}"
+            max_retries = 5
+            load_job = None
+            for attempt in range(max_retries):
+                try:
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
+                    load_job.result()
+                    break
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
+                        raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
+
+        return self._get_table_row_count(connection, resolved_name)
 
     def _load_table_direct(
         self,
@@ -1242,8 +1310,7 @@ class BigQueryAdapter(PlatformAdapter):
         benchmark: Any | None = None,
     ) -> int:
         """Load one table directly from local files."""
-        table_name_upper = table_name.upper()
-        table_ref = connection.dataset(self.dataset_id).table(table_name_upper)
+        resolved_name, table_ref = self._resolve_target_table(connection, table_name)
 
         for file_idx, file_path in enumerate(valid_files):
             chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
@@ -1258,11 +1325,34 @@ class BigQueryAdapter(PlatformAdapter):
                 data_source=data_source,
                 benchmark=benchmark,
             )
-            with open(file_path, "rb") as source_file:
-                load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
-            load_job.result()
 
-        return self._get_table_row_count(connection, table_name_upper)
+            if file_idx > 0:
+                time.sleep(1.0)
+
+            max_retries = 5
+            load_job = None
+            for attempt in range(max_retries):
+                try:
+                    if load_job is None:
+                        # A submission 429 means BigQuery rejected the
+                        # request, so resubmitting is safe.
+                        with open(file_path, "rb") as source_file:
+                            load_job = connection.load_table_from_file(source_file, table_ref, job_config=job_config)
+                    # A polling 429 means the accepted job may already be
+                    # running or done server-side: re-poll the same job
+                    # instead of submitting a duplicate append.
+                    load_job.result()
+                    break
+                except TooManyRequests as e:
+                    if attempt >= max_retries - 1:
+                        raise
+                    sleep_seconds = 2.5 * (2**attempt)
+                    self.logger.warning(
+                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
+                    )
+                    time.sleep(sleep_seconds)
+
+        return self._get_table_row_count(connection, resolved_name)
 
     def _build_load_job_config(
         self,
@@ -1319,10 +1409,11 @@ class BigQueryAdapter(PlatformAdapter):
         data_source: Any,
         bucket: Any,
         benchmark: Any | None = None,
-    ) -> dict[str, int]:
+    ) -> tuple[dict[str, int], dict[str, Any]]:
         """Load all tables using GCS staging."""
         logger = logging.getLogger(__name__)
         table_stats: dict[str, int] = {}
+        per_table_timings: dict[str, Any] = {}
 
         if not isinstance(data_source, DataSource):
             data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
@@ -1331,7 +1422,8 @@ class BigQueryAdapter(PlatformAdapter):
             valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
             if not valid_files:
                 self.logger.warning(f"Skipping {table_name} - no valid data files")
-                table_stats[table_name] = 0
+                table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
                 continue
 
             logger.debug(f"Loading {table_name} from {len(valid_files)} file(s)")
@@ -1343,20 +1435,25 @@ class BigQueryAdapter(PlatformAdapter):
                 )
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
+                load_time = elapsed_seconds(load_start)
+                per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
                 self.logger.info(
-                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in "
-                    f"{elapsed_seconds(load_start):.2f}s"
+                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                 )
             except Exception as e:
                 self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
 
-        return table_stats
+        return table_stats, per_table_timings
 
-    def _load_tables_direct(self, connection: Any, data_source: Any, benchmark: Any | None = None) -> dict[str, int]:
+    def _load_tables_direct(
+        self, connection: Any, data_source: Any, benchmark: Any | None = None
+    ) -> tuple[dict[str, int], dict[str, Any]]:
         """Load all tables directly from local files."""
         table_stats: dict[str, int] = {}
+        per_table_timings: dict[str, Any] = {}
 
         if not isinstance(data_source, DataSource):
             data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
@@ -1367,6 +1464,7 @@ class BigQueryAdapter(PlatformAdapter):
             if not valid_files:
                 self.logger.warning(f"Skipping {table_name} - no valid data files")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
                 continue
 
             try:
@@ -1375,19 +1473,21 @@ class BigQueryAdapter(PlatformAdapter):
                 row_count = self._load_table_direct(connection, table_name, valid_files, data_source, benchmark)
                 table_name_upper = table_name.upper()
                 table_stats[table_name_upper] = row_count
+                load_time = elapsed_seconds(load_start)
+                per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
                 chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
                 self.logger.info(
-                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in "
-                    f"{elapsed_seconds(load_start):.2f}s"
+                    f"✅ Loaded {row_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
                 )
             except Exception as e:
                 self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                 table_stats[table_name.upper()] = 0
+                per_table_timings[table_name.upper()] = {"total_ms": 0}
 
-        return table_stats
+        return table_stats, per_table_timings
 
     def _prepare_external_table_uris(self, bucket: Any, table_name: str, file_paths: Any) -> tuple[str, list[str]]:
-        """Prepare BigQuery external-table sources for parquet files or delta directories."""
+        """Prepare BigQuery external-table sources for parquet, delta, or iceberg directories."""
         valid_files = self._filter_valid_files(file_paths, allow_cloud=True)
         delta_uris = self._prepare_external_delta_uris(bucket, table_name, valid_files)
         if delta_uris:
@@ -1396,6 +1496,13 @@ class BigQueryAdapter(PlatformAdapter):
                     "BigQuery Delta external mode requires --platform-option biglake_connection=<project.region.name>."
                 )
             return "DELTA_LAKE", delta_uris
+        iceberg_uris = self._prepare_external_iceberg_uris(bucket, table_name, valid_files)
+        if iceberg_uris:
+            if not self.biglake_connection:
+                raise ValueError(
+                    "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+                )
+            return "ICEBERG", iceberg_uris
         return "PARQUET", self._prepare_external_parquet_uris(bucket, table_name, valid_files)
 
     def _prepare_external_parquet_uris(self, bucket: Any, table_name: str, file_paths: Any) -> list[str]:
@@ -1447,6 +1554,60 @@ class BigQueryAdapter(PlatformAdapter):
 
         return uris
 
+    def _prepare_external_iceberg_uris(self, bucket: Any, table_name: str, file_paths: list[Path]) -> list[str]:
+        """Prepare BigQuery Iceberg metadata-file URIs from local or cloud inputs.
+
+        BigLake ``format = 'ICEBERG'`` external tables require ``uris`` to point
+        at the table's current JSON metadata file, not the table root. Local
+        table directories are relocated to GCS — a byte copy would leave
+        ``file://`` references throughout the metadata graph — and the
+        relocated metadata file is returned; cloud inputs must already
+        reference a ``*.metadata.json`` file.
+        """
+        uris: list[str] = []
+        local_dirs: list[Path] = []
+        seen_iceberg_shape = False
+
+        for file_path in file_paths:
+            file_path_str = str(file_path)
+            if is_cloud_path(file_path_str):
+                if file_path_str.lower().endswith(".metadata.json"):
+                    uris.append(file_path_str)
+                elif "/metadata/" in file_path_str:
+                    seen_iceberg_shape = True
+                continue
+
+            path = Path(file_path)
+            if resolve_iceberg_metadata_file(path) is None:
+                continue
+            local_dirs.append(path)
+
+        if seen_iceberg_shape and not uris and not local_dirs:
+            raise ValueError(
+                f"BigQuery Iceberg external mode found Iceberg-shaped cloud input for table '{table_name.lower()}' "
+                "but no *.metadata.json file URI: pass the table's current gs://.../metadata/*.metadata.json URI."
+            )
+
+        if (uris or local_dirs) and not self.biglake_connection:
+            raise ValueError(
+                "BigQuery Iceberg external mode requires --platform-option biglake_connection=<project.region.name>."
+            )
+
+        for path in local_dirs:
+            table_prefix = f"{self.storage_prefix}/{table_name.lower()}/"
+            dest_uri = f"gs://{self.storage_bucket}/{table_prefix.rstrip('/')}"
+            with tempfile.TemporaryDirectory(prefix="benchbox-iceberg-reloc-") as staging:
+                relocated = relocate_iceberg_table(path, dest_uri, staging)
+                for rel in relocated.data_files:
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(path / rel))
+                for rel, staged in relocated.graph_files.items():
+                    blob = bucket.blob(f"{table_prefix}{rel}")
+                    blob.upload_from_filename(str(staged))
+            uris.append(relocated.metadata_location)
+
+        return uris
+
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
         """Apply BigQuery-specific optimizations based on benchmark type."""
 
@@ -1474,7 +1635,34 @@ class BigQueryAdapter(PlatformAdapter):
             job_config.flatten_results = False  # Keep nested/repeated fields
 
         # Store job config for use in execute_query
+        job_config.dry_run = self.dry_run
         connection._default_job_config = job_config
+        self._track_configured_connection(connection)
+
+    def _track_configured_connection(self, connection: Any) -> None:
+        """Track connection object for lifecycle updates (e.g. dry-run resets)."""
+        if not hasattr(self, "_configured_connections"):
+            import weakref
+
+            self._configured_connections = weakref.WeakSet()
+        try:
+            self._configured_connections.add(connection)
+        except TypeError:
+            pass
+
+    def _reset_cached_dry_run_state(self, connection: Any = None) -> None:
+        """Reset cached BigQuery QueryJobConfig dry_run state to match adapter."""
+        target_connections = set()
+        if connection is not None:
+            target_connections.add(connection)
+        if hasattr(self, "_configured_connections"):
+            for conn in list(self._configured_connections):
+                target_connections.add(conn)
+
+        for conn in target_connections:
+            default_config = getattr(conn, "_default_job_config", None)
+            if default_config is not None and hasattr(default_config, "dry_run"):
+                default_config.dry_run = bool(getattr(self, "dry_run", False))
 
     def execute_query(
         self,
@@ -1503,8 +1691,30 @@ class BigQueryAdapter(PlatformAdapter):
                 # Non-translated queries (e.g., raw TPC-H) need explicit qualification
                 translated_query = self._qualify_table_names(query)
 
+            # TPC-DI uses SQL Server/SQLite idioms (BIT flag literals,
+            # JULIANDAY, DATE('now')) that BigQuery rejects. Config names
+            # vary ("TPC-DI", "tpcdi"), so compare alphanumerics only.
+            import re
+
+            if re.sub(r"[^a-z0-9]", "", (benchmark_type or "").lower()).startswith("tpcdi"):
+                translated_query = self._apply_tpcdi_bigquery_rewrites(translated_query)
+
+            # Normalize division-by-zero semantics: BigQuery raises on a zero
+            # divisor instead of yielding NULL, so route divisions
+            # through SAFE_DIVIDE (no-op unless the divisor is zero).
+            translated_query = self._safeguard_division_by_zero(translated_query)
+
+            # Re-normalize identifier case: the safeguard re-renders through
+            # sqlglot, which can (re)introduce quoted source-case identifiers
+            # (e.g. variant SQL that skipped base translation). Normalization
+            # is idempotent, so already-uppercase queries are unaffected.
+            if "`" in translated_query:
+                translated_query = self._normalize_table_names_case(translated_query)
+
             # Use default job config if available
             job_config = getattr(connection, "_default_job_config", bigquery.QueryJobConfig())
+            if hasattr(job_config, "dry_run") and job_config.dry_run != self.dry_run:
+                job_config.dry_run = self.dry_run
 
             # Execute the query
             query_job = connection.query(translated_query, job_config=job_config)
@@ -1573,6 +1783,8 @@ class BigQueryAdapter(PlatformAdapter):
                 if query_plan:
                     result_dict["query_plan"] = query_plan
                     result_dict["plan_fingerprint"] = query_plan.plan_fingerprint
+                    if getattr(self, "normalize_plan_literals", False):
+                        result_dict["plan_fingerprint_normalized"] = query_plan.normalized_fingerprint
                 if plan_capture_time_ms is not None:
                     result_dict["plan_capture_time_ms"] = plan_capture_time_ms
 
@@ -1599,20 +1811,104 @@ class BigQueryAdapter(PlatformAdapter):
         """Convert CREATE TABLE statement to BigQuery format.
 
         Makes tables idempotent by using CREATE OR REPLACE TABLE.
+        Table names are normalized to UPPERCASE to match the adapter-wide
+        convention used by loads, validation, row counts, and query
+        normalization (TPC-DS DDL sources use lowercase names).
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        import re
+
+        if not statement.strip().upper().startswith("CREATE"):
             return statement
 
-        # Ensure idempotency with OR REPLACE (defense-in-depth)
-        if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        pattern = re.compile(
+            r"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_.]+)`?\s*(\(.*)",
+            re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.match(statement)
+        if match:
+            # Uppercase only the table segment; a qualified name keeps its
+            # project/dataset case (BigQuery table identifiers are
+            # case-sensitive while the adapter convention is UPPERCASE tables).
+            table_name = match.group(1)
+            if "." in table_name:
+                *qualifier, bare = table_name.split(".")
+                table_name = ".".join([*qualifier, bare.upper()])
+            else:
+                table_name = table_name.upper()
+            rest = match.group(2)
+            # BigQuery table identifiers are case-sensitive: normalize the
+            # table segment to UPPERCASE to match the adapter-wide convention
+            # used by loads, validation, row counts, and query qualification.
+            # Project and dataset segments keep their configured case.
+            if f"{self.dataset_id}." not in table_name:
+                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name.upper()}`"
+            elif not table_name.startswith("`"):
+                *qualifier, bare = table_name.split(".")
+                qualified_table = "`" + ".".join([*qualifier, bare.upper()]) + "`"
+            else:
+                qualified_table = table_name
+            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+        else:
+            if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
+                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
 
-        # Include dataset qualification
-        if f"{self.dataset_id}." not in statement:
-            statement = statement.replace(
-                "CREATE OR REPLACE TABLE ", f"CREATE OR REPLACE TABLE `{self.project_id}.{self.dataset_id}."
+        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
+        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
+        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
+        # NUMERIC and inherits its limits.
+        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
+            precision, scale = int(match.group(2)), int(match.group(3))
+            if scale > 9 or precision > 38:
+                return f"BIGNUMERIC({precision},{scale})"
+            return match.group(0)
+
+        statement = re.sub(
+            r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            _decimal_to_bignumeric,
+            statement,
+            flags=re.IGNORECASE,
+        )
+
+        # BigQuery rejects enforced PRIMARY KEY; it only supports informational
+        # NOT ENFORCED table constraints. Convert inline column PRIMARY KEYs
+        # (e.g. JoinOrder's `id INTEGER PRIMARY KEY`) to a table constraint.
+        _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
+        pk_cols = [
+            name
+            for name in re.findall(
+                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
+                r"PRIMARY\s+KEY(?!\s*\()",
+                rest if match else statement,
+                flags=re.IGNORECASE | re.MULTILINE,
             )
-            statement = statement.replace(" (", "` (")
+            if name.upper() not in _pk_keywords
+        ]
+        if match:
+            rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
+            has_table_pk = re.search(r"PRIMARY\s+KEY\s*\(", rest, flags=re.IGNORECASE) is not None
+            if pk_cols and not has_table_pk:
+                depth = 0
+                for i, ch in enumerate(rest):
+                    if ch == "(":
+                        depth += 1
+                    elif ch == ")":
+                        depth -= 1
+                        if depth == 0:
+                            rest = rest[:i] + f", PRIMARY KEY ({', '.join(pk_cols)}) NOT ENFORCED" + rest[i:]
+                            break
+            statement = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+        else:
+            statement = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", statement, flags=re.IGNORECASE)
+
+        # BigQuery rejects enforced PRIMARY KEY table constraints too (e.g.
+        # nyctaxi's `PRIMARY KEY (cols)`). Mark surviving table-level keys
+        # NOT ENFORCED; already-marked constraints are left untouched.
+        statement = re.sub(
+            r"PRIMARY\s+KEY\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+            r"PRIMARY KEY (\1) NOT ENFORCED",
+            statement,
+            flags=re.IGNORECASE,
+        )
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in statement.upper() and self.partitioning_field:
@@ -1624,6 +1920,48 @@ class BigQueryAdapter(PlatformAdapter):
 
         return statement
 
+    # Fallback table list when query parsing is unavailable. Covers TPC-H;
+    # parser-extracted names handle every other benchmark.
+    _FALLBACK_QUALIFY_TABLES = (
+        "REGION",
+        "NATION",
+        "CUSTOMER",
+        "SUPPLIER",
+        "PART",
+        "PARTSUPP",
+        "ORDERS",
+        "LINEITEM",
+    )
+
+    def _extract_unqualified_tables(self, query: str) -> list[str] | None:
+        """Return UPPERCASE names of unqualified tables referenced by the query.
+
+        Returns None when the query cannot be parsed, so the caller can fall
+        back to the static table list. CTE names and already-qualified
+        references are excluded.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return None
+        try:
+            tree = sqlglot.parse_one(query)
+        except Exception:
+            return None
+        if tree is None:
+            return None
+        cte_names = {cte.alias_or_name.upper() for cte in tree.find_all(exp.CTE)}
+        tables: list[str] = []
+        for table in tree.find_all(exp.Table):
+            if table.db or table.catalog:
+                continue
+            name = (table.name or "").upper()
+            if not name or name in cte_names or name in tables:
+                continue
+            tables.append(name)
+        return tables
+
     def _qualify_table_names(self, query: str) -> str:
         """Add full qualification to table names in query.
 
@@ -1631,37 +1969,59 @@ class BigQueryAdapter(PlatformAdapter):
         Queries processed by sqlglot with identify=True should skip this method to avoid
         conflicts with backtick-quoted identifiers. When default_dataset is configured,
         BigQuery automatically resolves unqualified table names.
+
+        Table names are extracted with a SQL parser so benchmarks beyond TPC-H
+        resolve; BigQuery table identifiers are case-sensitive, so every name
+        is normalized to UPPERCASE to match created tables. Falls back to the
+        static TPC-H list when parsing is unavailable.
+
+        Only occurrences in table position (after FROM / JOIN or a
+        comma-separated FROM item) are rewritten: string literals and comments
+        are masked first, so same-named columns, aliases, and literal text are
+        left alone.
         """
-        # Simple table name qualification - could be with proper SQL parsing
-        table_names = [
-            "REGION",
-            "NATION",
-            "CUSTOMER",
-            "SUPPLIER",
-            "PART",
-            "PARTSUPP",
-            "ORDERS",
-            "LINEITEM",
-        ]
+        import re
+
+        table_names = self._extract_unqualified_tables(query)
+        if table_names is None:
+            table_names = list(self._FALLBACK_QUALIFY_TABLES)
+
+        # Blank string literals and comments length-preservingly so matches
+        # found in the masked copy align with the original query.
+        literal_pattern = r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/"
+
+        def _mask(text: str) -> str:
+            return re.sub(literal_pattern, lambda match: " " * len(match.group(0)), text, flags=re.DOTALL)
+
+        masked = _mask(query)
 
         for table_name in table_names:
             # Replace unqualified table names
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
 
-            # Simple replacement - in production would use proper SQL parser
-            import re
-
-            pattern = rf"\b{table_name}\b"
-            query = re.sub(pattern, qualified_name, query, flags=re.IGNORECASE)
+            pattern = rf"(\bFROM\s+|\bJOIN\s+|,\s*)({re.escape(table_name)})\b"
+            segments: list[str] = []
+            last = 0
+            for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
+                name_start, name_end = match.span(2)
+                segments.append(query[last:name_start])
+                segments.append(qualified_name)
+                last = name_end
+            segments.append(query[last:])
+            query = "".join(segments)
+            masked = _mask(query)
 
         return query
 
     def _normalize_table_names_case(self, query: str) -> str:
         """Normalize backtick-quoted table names to UPPERCASE for case-sensitive matching.
 
-        BigQuery stores TPC-DS tables in UPPERCASE (per schema), but sqlglot generates
-        lowercase table names with backticks. Since backtick-quoted identifiers are
-        case-sensitive in BigQuery, we need to normalize to UPPERCASE to match the schema.
+        BigQuery stores benchmark tables in UPPERCASE (per schema), but sqlglot
+        generates quoted identifiers in source case (lowercase TPC-DS names,
+        mixed-case TPC-DI names such as DimCustomer). Since backtick-quoted
+        table identifiers are case-sensitive in BigQuery, normalize them to
+        UPPERCASE to match the schema. Column identifiers are case-insensitive
+        in BigQuery, so uppercasing them as well is harmless.
 
         Only processes backtick-quoted identifiers to avoid affecting string literals.
 
@@ -1669,18 +2029,59 @@ class BigQueryAdapter(PlatformAdapter):
             query: SQL query with backtick-quoted identifiers
 
         Returns:
-            Query with lowercase table names normalized to UPPERCASE
+            Query with quoted identifiers normalized to UPPERCASE
         """
         import re
 
-        # Pattern: backtick, lowercase word characters (table names), backtick
-        # This safely matches table identifiers without affecting string literals
-        pattern = r"`([a-z_][a-z0-9_]*)`"
+        # Pattern: backtick, simple identifier, backtick. Already-uppercase
+        # identifiers are unaffected by upper(). Dotted (qualified)
+        # references are handled segment-wise by the caller pipeline and
+        # left alone here.
+        pattern = r"`([A-Za-z_][A-Za-z0-9_]*)`"
 
         def uppercase_table(match: re.Match[str]) -> str:
             return f"`{match.group(1).upper()}`"
 
         return re.sub(pattern, uppercase_table, query)
+
+    def _apply_tpcdi_bigquery_rewrites(self, query: str) -> str:
+        """BigQuery TPC-DI idioms via the shared cloud rewrite core."""
+        from benchbox.platforms.cloud_shared import rewrite_tpcdi_for_bigquery
+
+        return rewrite_tpcdi_for_bigquery(query)
+
+    def _safeguard_division_by_zero(self, query: str) -> str:
+        """Route `/` divisions through BigQuery's SAFE_DIVIDE.
+
+        BigQuery raises on a zero divisor instead of yielding NULL,
+        which turns degenerate subscale ratios (e.g. TPC-DS Q90 at SF 0.1,
+        0/0) into hard query failures. SAFE_DIVIDE returns NULL instead and
+        is a no-op for non-zero divisors. Queries without a division are
+        returned unchanged.
+        """
+        try:
+            import sqlglot
+            from sqlglot import exp
+        except ImportError:
+            return query
+
+        try:
+            tree = sqlglot.parse_one(query, read="bigquery")
+        except Exception as e:
+            self.log_very_verbose(f"Division safeguard skipped (unparseable BigQuery SQL): {e}")
+            return query
+        if not any(isinstance(node, exp.Div) for node in tree.walk()):
+            return query
+
+        def to_safe_divide(node: exp.Expression) -> exp.Expression:
+            if isinstance(node, exp.Div):
+                return exp.Anonymous(
+                    this="SAFE_DIVIDE",
+                    expressions=[node.this.copy(), node.expression.copy()],
+                )
+            return node
+
+        return tree.transform(to_safe_divide).sql(dialect="bigquery", identify=True)
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
         """Get BigQuery-specific metadata and system information."""
@@ -1740,36 +2141,46 @@ class BigQueryAdapter(PlatformAdapter):
 
         return metadata
 
-    def get_query_plan(self, connection: Any, query: str) -> dict[str, Any]:
-        """Get query execution plan for analysis."""
+    def get_query_plan(self, connection: Any, query: str) -> dict[str, Any] | None:
+        """Return BigQuery's dry-run bytes and estimated on-demand cost.
+
+        BigQuery exposes bytes processed through a dry-run job rather than an
+        EXPLAIN text result. Structured execution stages remain available from
+        the completed job through ``_capture_bq_plan``.
+        """
+        if bigquery is None:
+            return None
         try:
-            # Use dry run to get query plan without execution
-            job_config = bigquery.QueryJobConfig(dry_run=True)
-            # Note: Query dialect translation is now handled automatically by the base adapter
-            qualified_query = self._qualify_table_names(query)
+            translated_query = (
+                self._normalize_table_names_case(query) if "`" in query else self._qualify_table_names(query)
+            )
+            job_config = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False, use_legacy_sql=False)
+            if self.project_id and self.dataset_id:
+                job_config.default_dataset = f"{self.project_id}.{self.dataset_id}"
+            if self.maximum_bytes_billed:
+                job_config.maximum_bytes_billed = self.maximum_bytes_billed
+            query_job = connection.query(translated_query, job_config=job_config)
+            try:
+                bytes_processed = int(query_job.total_bytes_processed or 0)
+            except (TypeError, ValueError):
+                return None
+            from benchbox.core.cost.pricing import resolve_bigquery_price_per_tb
 
-            query_job = connection.query(qualified_query, job_config=job_config)
-
+            resolution = resolve_bigquery_price_per_tb(self.location)
+            estimated_cost = None
+            if resolution.value is not None:
+                estimated_cost = bytes_processed / (1024**4) * float(resolution.value)
             return {
-                "bytes_processed": query_job.total_bytes_processed,
-                "estimated_cost": query_job.total_bytes_processed / (1024**4) * 5,  # Rough cost estimate
-                "query_plan": "Dry run completed",
-                "job_id": query_job.job_id,
+                "bytes_processed": bytes_processed,
+                "estimated_cost": estimated_cost,
+                "pricing_fallback": resolution.fallback_used,
             }
-
-        except Exception as e:
-            return {"error": str(e)}
+        except Exception:
+            return None
 
     def get_query_plan_parser(self):
-        """Get BigQuery query plan parser.
-
-        BigQuery captures plans from job statistics via ``_capture_bq_plan``
-        rather than the EXPLAIN-output path, but the parser is exposed here for
-        symmetry with the other adapters and for direct use.
-        """
-        from benchbox.core.query_plans.parsers.bigquery import BigQueryQueryPlanParser
-
-        return BigQueryQueryPlanParser()
+        """Expose the BigQuery plan parser for symmetry with other adapters."""
+        return _lazy_query_parser("benchbox.core.query_plans.parsers.bigquery", "BigQueryQueryPlanParser")
 
     def _capture_bq_plan(self, job: Any, query_id: str) -> tuple[Any, float]:
         """Capture the structured plan from a completed BigQuery ``QueryJob``.

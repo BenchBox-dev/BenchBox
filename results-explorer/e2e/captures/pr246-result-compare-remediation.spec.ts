@@ -40,7 +40,7 @@ const ROUTES: CaptureRoute[] = [
     filename: `result-detail-duckdb-${width}.png`,
     url: `/results/r/${DUCKDB_ID}`,
     width,
-    readyText: /TPC-H\s+-\s+DuckDB/,
+    readyText: /TPC-H result:\s+DuckDB/,
   })),
   ...WIDTHS.map((width) => ({
     filename: `compare-duckdb-aws-${width}.png`,

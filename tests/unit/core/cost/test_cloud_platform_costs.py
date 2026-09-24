@@ -5,12 +5,13 @@ import pytest
 from benchbox.core.cost.calculator import RESOURCE_USAGE_SCHEMA, CostCalculator, validate_resource_usage
 from benchbox.core.cost.models import QueryCost
 from benchbox.core.cost.pricing import (
-    get_fabric_cu_price,
-    get_fabric_sku_cu_count,
-    get_firebolt_fbu_price,
-    get_firebolt_fbu_rate,
-    get_synapse_dedicated_price,
-    get_synapse_serverless_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_fabric_cu_price,
+    resolve_fabric_sku_cu_count,
+    resolve_firebolt_fbu_price,
+    resolve_firebolt_fbu_rate,
+    resolve_synapse_dedicated_price,
+    resolve_synapse_serverless_price_per_tb,
 )
 
 pytestmark = [
@@ -26,32 +27,33 @@ class TestSynapseCostCalculation:
         """Test Synapse Serverless cost calculation with bytes_processed."""
         calculator = CostCalculator()
 
-        # 1 TB = 1024^4 bytes
-        bytes_per_tb = 1024**4
+        # 1 decimal TB = 10^12 bytes (Synapse "TB" reads as decimal per the billing-unit ADR)
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb}  # Exactly 1 TB
         platform_config = {"mode": "serverless", "region": "eastus"}
 
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
+        price_per_tb = resolve_synapse_serverless_price_per_tb().value
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 5.0  # 1 TB * $5.00 per TB
+        assert cost.compute_cost == price_per_tb  # 1 TB * table rate
         assert cost.currency == "USD"
         assert cost.pricing_details["mode"] == "serverless"
-        assert cost.pricing_details["price_per_tb"] == 5.0
+        assert cost.pricing_details["price_per_tb"] == price_per_tb
         assert cost.pricing_details["tb_processed"] == 1.0
 
     def test_synapse_serverless_fractional_tb(self):
         """Test Synapse Serverless with fractional TB."""
         calculator = CostCalculator()
 
-        bytes_per_tb = 1024**4
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb // 2}  # 0.5 TB
         platform_config = {"mode": "serverless", "region": "westus"}
 
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 2.5  # 0.5 TB * $5.00 per TB
+        assert cost.compute_cost == 0.5 * resolve_synapse_serverless_price_per_tb().value
 
     def test_synapse_dedicated_cost(self):
         """Test Synapse Dedicated SQL Pool cost calculation."""
@@ -66,11 +68,12 @@ class TestSynapseCostCalculation:
 
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
+        price_per_hour = resolve_synapse_dedicated_price("dw1000c", "eastus").value
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 12.0  # 1 hour * $12.00/hour for DW1000c US
+        assert cost.compute_cost == price_per_hour  # 1 hour * table rate
         assert cost.pricing_details["mode"] == "dedicated"
         assert cost.pricing_details["dwu_level"] == "dw1000c"
-        assert cost.pricing_details["price_per_hour"] == 12.0
+        assert cost.pricing_details["price_per_hour"] == price_per_hour
 
     def test_synapse_dedicated_minute_billing(self):
         """Test Synapse Dedicated with partial hour."""
@@ -86,15 +89,15 @@ class TestSynapseCostCalculation:
         cost = calculator.calculate_query_cost("synapse", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 1/60 hour * $1.20/hour for DW100c US
-        expected = 60 / 3600 * 1.20
+        # 1/60 hour * DW100c US table rate
+        expected = 60 / 3600 * resolve_synapse_dedicated_price("dw100c", "eastus").value
         assert abs(cost.compute_cost - expected) < 0.001
 
     def test_synapse_defaults_to_serverless(self):
         """Test that Synapse defaults to serverless mode."""
         calculator = CostCalculator()
 
-        bytes_per_tb = 1024**4
+        bytes_per_tb = 10**12
         resource_usage = {"bytes_processed": bytes_per_tb}
         platform_config = {}  # No mode specified
 
@@ -130,7 +133,7 @@ class TestFabricCostCalculation:
         cost = calculator.calculate_query_cost("fabric_dw", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 0.18  # 1 CU-hour * $0.18/CU-hour (US)
+        assert cost.compute_cost == resolve_fabric_cu_price("eastus").value  # 1 CU-hour * US table rate
         assert cost.pricing_details["cu_hours"] == 1.0
         assert cost.pricing_details["is_estimated"] is False
 
@@ -144,11 +147,10 @@ class TestFabricCostCalculation:
         cost = calculator.calculate_query_cost("fabric_dw", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 60 seconds * 64 CUs = 3840 CU-seconds = 1.0667 CU-hours
-        # 1.0667 * $0.18 = $0.192
+        # 60 seconds * 64 CUs = 3840 CU-seconds = 1.0667 CU-hours * US table rate
         expected_cu_seconds = 60 * 64
         expected_cu_hours = expected_cu_seconds / 3600
-        expected_cost = expected_cu_hours * 0.18
+        expected_cost = expected_cu_hours * resolve_fabric_cu_price("eastus").value
         assert abs(cost.compute_cost - expected_cost) < 0.001
         assert cost.pricing_details["is_estimated"] is True
         assert "estimated" in cost.pricing_details.get("note", "").lower()
@@ -182,9 +184,9 @@ class TestFabricCostCalculation:
         assert isinstance(cost_eu, QueryCost)
         assert isinstance(cost_ap, QueryCost)
 
-        # EU should be higher than US, AP higher than EU
+        # EU should be higher than US; EU and AP share the vendor rate ($0.22)
         assert cost_us.compute_cost < cost_eu.compute_cost
-        assert cost_eu.compute_cost < cost_ap.compute_cost
+        assert cost_eu.compute_cost <= cost_ap.compute_cost
 
     def test_fabric_missing_data_returns_none(self):
         """Test that missing required data returns None."""
@@ -207,8 +209,8 @@ class TestFireboltCostCalculation:
         cost = calculator.calculate_query_cost("firebolt", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 10 FBUs * $0.0833/FBU = $0.833
-        expected = 10.0 * 0.0833
+        # 10 FBUs * table rate = cost (rate golden-pinned in test_pricing_provenance.py)
+        expected = 10.0 * resolve_firebolt_fbu_price().value
         assert abs(cost.compute_cost - expected) < 0.001
         assert cost.pricing_details["is_estimated"] is False
 
@@ -222,9 +224,9 @@ class TestFireboltCostCalculation:
         cost = calculator.calculate_query_cost("firebolt", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        # 1 hour * 16 FBU/hour (M node) * 1 node * $0.0833/FBU = $1.3328
-        expected_fbu = 16.0  # M node = 16 FBU/hour
-        expected_cost = expected_fbu * 0.0833
+        # 1 hour * M-node FBU rate * 1 node * table rate
+        expected_fbu = resolve_firebolt_fbu_rate("m").value
+        expected_cost = expected_fbu * resolve_firebolt_fbu_price().value
         assert abs(cost.compute_cost - expected_cost) < 0.001
         assert cost.pricing_details["is_estimated"] is True
 
@@ -281,8 +283,9 @@ class TestDatabricksDFAlias:
         cost = calculator.calculate_query_cost("databricks-df", resource_usage, platform_config)
 
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 0.22  # $0.22/DBU for premium SQL warehouse
-        assert cost.pricing_details["price_per_dbu"] == 0.22
+        expected_price = resolve_databricks_dbu_price("aws", "premium", "sql_warehouse").value
+        assert cost.compute_cost == expected_price  # 1 DBU * table rate
+        assert cost.pricing_details["price_per_dbu"] == expected_price
 
     def test_databricks_df_schema_exists(self):
         """Test that databricks-df has a resource usage schema."""
@@ -333,54 +336,54 @@ class TestResourceUsageValidation:
 
 
 class TestPricingHelperFunctions:
-    """Tests for pricing helper functions."""
+    """Structural tests for pricing helper functions.
 
-    def test_synapse_serverless_price(self):
-        """Test Synapse Serverless pricing helper."""
-        price = get_synapse_serverless_price_per_tb()
-        assert price == 5.00
+    Exact vendor prices are pinned only by the cited goldens in
+    test_pricing_provenance.py; these tests check lookup shape instead.
+    """
 
     def test_synapse_dedicated_price_by_dwu(self):
-        """Test Synapse Dedicated pricing for different DWU levels."""
-        price_100 = get_synapse_dedicated_price("dw100c", "eastus")
-        price_1000 = get_synapse_dedicated_price("dw1000c", "eastus")
-        price_30000 = get_synapse_dedicated_price("dw30000c", "eastus")
+        """Test Synapse Dedicated pricing scales linearly with DWU level."""
+        price_100 = resolve_synapse_dedicated_price("dw100c", "eastus").value
+        price_1000 = resolve_synapse_dedicated_price("dw1000c", "eastus").value
+        price_30000 = resolve_synapse_dedicated_price("dw30000c", "eastus").value
 
         assert price_100 < price_1000 < price_30000
-        assert price_100 == 1.20  # DW100c US pricing
-        assert price_1000 == 12.00  # DW1000c US pricing
+        # Vendor-confirmed linear scaling from the DW100c base rate.
+        assert price_1000 == pytest.approx(10 * price_100)
+        assert price_30000 == pytest.approx(300 * price_100)
 
     def test_fabric_cu_price_by_region(self):
         """Test Fabric CU pricing varies by region."""
-        price_us = get_fabric_cu_price("eastus")
-        price_eu = get_fabric_cu_price("westeurope")
-        price_ap = get_fabric_cu_price("japaneast")
+        price_us = resolve_fabric_cu_price("eastus").value
+        price_eu = resolve_fabric_cu_price("westeurope").value
+        price_ap = resolve_fabric_cu_price("japaneast").value
 
-        assert price_us == 0.18
-        assert price_eu == 0.20
-        assert price_ap == 0.22
+        # EU and AP share the vendor rate; both exceed the US rate.
+        assert price_us < price_eu
+        assert price_eu == price_ap
 
     def test_fabric_sku_cu_count(self):
         """Test Fabric SKU to CU mapping."""
-        assert get_fabric_sku_cu_count("f2") == 2
-        assert get_fabric_sku_cu_count("f64") == 64
-        assert get_fabric_sku_cu_count("f2048") == 2048
-        # Unknown SKU defaults to F2
-        assert get_fabric_sku_cu_count("unknown") == 2
+        assert resolve_fabric_sku_cu_count("f2").value == 2
+        assert resolve_fabric_sku_cu_count("f64").value == 64
+        assert resolve_fabric_sku_cu_count("f2048").value == 2048
+        # Unknown SKU keeps the F2 estimate but flags the fallback
+        unknown_sku = resolve_fabric_sku_cu_count("unknown")
+        assert unknown_sku.value == 2
+        assert unknown_sku.fallback_used is True
 
     def test_firebolt_fbu_rate_by_node_type(self):
-        """Test Firebolt FBU rates for different node types."""
-        assert get_firebolt_fbu_rate("s") == 8.0
-        assert get_firebolt_fbu_rate("m") == 16.0
-        assert get_firebolt_fbu_rate("l") == 32.0
-        assert get_firebolt_fbu_rate("xl") == 64.0
-        # Unknown defaults to M
-        assert get_firebolt_fbu_rate("unknown") == 16.0
-
-    def test_firebolt_fbu_price(self):
-        """Test Firebolt FBU price."""
-        price = get_firebolt_fbu_price()
-        assert price == 0.0833
+        """Test Firebolt FBU rates double with each node size."""
+        rate_s = resolve_firebolt_fbu_rate("s").value
+        assert rate_s > 0
+        assert resolve_firebolt_fbu_rate("m").value == 2 * rate_s
+        assert resolve_firebolt_fbu_rate("l").value == 2 * resolve_firebolt_fbu_rate("m").value
+        assert resolve_firebolt_fbu_rate("xl").value == 2 * resolve_firebolt_fbu_rate("l").value
+        # Unknown defaults to M but flags the fallback
+        unknown_node = resolve_firebolt_fbu_rate("unknown")
+        assert unknown_node.value == resolve_firebolt_fbu_rate("m").value
+        assert unknown_node.fallback_used is True
 
 
 class TestEdgeCases:
@@ -425,8 +428,8 @@ class TestEdgeCases:
         """Test handling of very large byte values (petabyte scale)."""
         calculator = CostCalculator()
 
-        # 1 PB = 1024^5 bytes
-        petabyte = 1024**5
+        # 1 decimal PB = 10^15 bytes (Synapse "TB" reads as decimal per the billing-unit ADR)
+        petabyte = 10**15
 
         # Synapse serverless with 1 PB
         cost = calculator.calculate_query_cost(
@@ -435,8 +438,8 @@ class TestEdgeCases:
             {"mode": "serverless", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 1 PB = 1024 TB, so cost should be 1024 * $5 = $5120
-        expected = 1024 * 5.0
+        # 1 PB = 1000 TB, so cost is 1000 * the table rate
+        expected = 1000 * resolve_synapse_serverless_price_per_tb().value
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_fractional_byte_values(self):
@@ -450,7 +453,7 @@ class TestEdgeCases:
             {"mode": "serverless", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 1 byte should have minimal cost (1 / 1024^4 * 5)
+        # 1 byte should have minimal cost (1 / 10^12 * 5)
         assert cost.compute_cost < 0.00001
 
     def test_very_large_execution_time(self):
@@ -467,8 +470,8 @@ class TestEdgeCases:
             {"mode": "dedicated", "dwu_level": "dw100c", "region": "eastus"},
         )
         assert isinstance(cost, QueryCost)
-        # 30 days * 24 hours/day * $1.20/hour
-        expected = 30 * 24 * 1.20
+        # 30 days * 24 hours/day * DW100c US table rate
+        expected = 30 * 24 * resolve_synapse_dedicated_price("dw100c", "eastus").value
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_negative_execution_time_returns_none(self):
@@ -497,8 +500,8 @@ class TestEdgeCases:
             {"node_type": "m", "node_count": 1000},
         )
         assert isinstance(cost, QueryCost)
-        # 1 hour * 16 FBU/hour * 1000 nodes * $0.0833/FBU
-        expected = 16.0 * 1000 * 0.0833
+        # 1 hour * M-node FBU rate * 1000 nodes * table rate
+        expected = resolve_firebolt_fbu_rate("m").value * 1000 * resolve_firebolt_fbu_price().value
         assert abs(cost.compute_cost - expected) < 0.01
 
     def test_case_insensitive_platform_names(self):

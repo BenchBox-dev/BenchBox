@@ -269,6 +269,7 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 9030
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     connection_operation_name = "Doris connection"
@@ -1496,9 +1497,9 @@ def _build_doris_config(
             "port": lambda m: int(m.get("port") or os.environ.get("DORIS_PORT", "9030")),
             "http_port": lambda m: int(m.get("http_port") or os.environ.get("DORIS_HTTP_PORT", "8030")),
             "be_http_port": lambda m: int(m.get("be_http_port") or os.environ.get("DORIS_BE_HTTP_PORT", "8040")),
-            "username": lambda m: m.get("username")
-            or os.environ.get("DORIS_USER")
-            or os.environ.get("DORIS_USERNAME", "root"),
+            "username": lambda m: (
+                m.get("username") or os.environ.get("DORIS_USER") or os.environ.get("DORIS_USERNAME", "root")
+            ),
             "password": lambda m: m.get("password") or os.environ.get("DORIS_PASSWORD", ""),
             "database": lambda m: m.get("database") or os.environ.get("DORIS_DATABASE"),
         },

@@ -452,5 +452,5 @@ class TestFamilyProperty:
 
     def test_platform_property(self):
         """platform property returns the platform name."""
-        ctx = StubContext(platform="modin", family="pandas")
-        assert ctx.platform == "modin"
+        ctx = StubContext(platform="dask", family="pandas")
+        assert ctx.platform == "dask"

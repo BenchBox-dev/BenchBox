@@ -27,10 +27,11 @@ Dry run mode is essential for:
 benchbox run --dry-run ./benchmark_runs/dryrun_previews --platform duckdb --benchmark tpch --scale 0.1
 
 # Preview with tuning configurations
-benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --scale 0.01 --tuning
+benchbox run --dry-run ./tuned_preview --platform duckdb --benchmark tpcds --scale 0.01 --tuning tuned
 
 # Preview multiple output formats
 benchbox run --dry-run ./systematic_preview --platform duckdb --benchmark primitives --scale 0.001
+```
 
 ### Seed Control in Dry Run
 
@@ -48,7 +49,6 @@ benchbox run --dry-run ./preview_tpch_seed5 --platform duckdb --benchmark tpch -
 ```
 
 If a specific seed cannot generate all queries at a tiny scale, the CLI preflight validation will fail fast and report example failures. Try a different seed or a slightly larger scale.
-```
 
 ### Programmatic Usage
 
@@ -97,20 +97,26 @@ When you run a dry run, BenchBox creates an output directory:
 
 ```
 dry_run_output/
-├── summary.json              # Complete configuration summary
-├── summary.yaml              # Human-readable configuration
-├── system_profile.json       # System information
-├── queries/                  # Individual SQL query files
+├── <prefix>_<timestamp>.json                    # Complete configuration summary
+├── <prefix>_<timestamp>.yaml                    # Human-readable configuration
+├── <prefix>_queries_<timestamp>/                # Individual SQL query files
 │   ├── query_1.sql
 │   ├── query_2.sql
 │   └── ...
-├── schema.sql                # Database schema definition
-└── resource_estimates.json   # Memory and performance estimates
+├── <prefix>_ddl_<timestamp>.sql                 # DDL preview, when present
+├── <prefix>_post_load_<timestamp>.sql           # Post-load statements, when present
+└── <prefix>_schema_<timestamp>.sql              # Database schema definition
 ```
+
+Timestamps use `%Y%m%d_%H%M%S`. The CLI derives `<prefix>` from the benchmark
+and platform (for example `tpch_duckdb`); programmatic use defaults to
+`dryrun`. DataFrame mode writes `<prefix>_dataframe_queries_<timestamp>/` and
+a `.py` schema file instead. System profile and resource estimates are fields
+inside the JSON/YAML output, not separate files.
 
 ### Summary Files
 
-**summary.json** - Complete structured output:
+**`<prefix>_<timestamp>.json`** - Complete structured output (for example `tpch_duckdb_20250115_143022.json`):
 ```json
 {
   "timestamp": "2025-01-15T14:30:22.123456",
@@ -148,7 +154,7 @@ dry_run_output/
 }
 ```
 
-**summary.yaml** - Human-readable format:
+**`<prefix>_<timestamp>.yaml`** - Human-readable format:
 ```yaml
 timestamp: 2025-01-15T14:30:22.123456
 benchmark_config:
@@ -165,9 +171,9 @@ system_profile:
 
 ### Query Files
 
-Individual SQL files are saved in the `queries/` directory:
+Individual SQL files are saved in the `<prefix>_queries_<timestamp>/` directory:
 
-**queries/query_1.sql:**
+**`<prefix>_queries_<timestamp>/query_1.sql`:**
 ```sql
 -- TPC-H Query 1: Pricing Summary Report
 -- This query reports the amount of business that was billed, shipped, and returned.
@@ -288,11 +294,10 @@ Output Directory: ./preview
   • Complex Queries: 8/22
 
  Saved complete preview to: ./preview/
-  ├── summary.json (configuration details)
-  ├── summary.yaml (human-readable config)
-  ├── queries/ (22 SQL files)
-  ├── schema.sql (table definitions)
-  └── resource_estimates.json
+  ├── <prefix>_<timestamp>.json (configuration details, resource estimates embedded)
+  ├── <prefix>_<timestamp>.yaml (human-readable config)
+  ├── <prefix>_queries_<timestamp>/ (22 SQL files)
+  └── <prefix>_schema_<timestamp>.sql (table definitions)
 ```
 
 ## Features
@@ -306,7 +311,7 @@ benchbox run --dry-run ./tuned_preview \
   --platform duckdb \
   --benchmark tpcds \
   --scale 0.1 \
-  --tuning
+  --tuning tuned
 ```
 
 Additional output includes:
@@ -344,8 +349,8 @@ for platform in duckdb clickhouse-local databricks; do
     --scale 0.01
 done
 
-# Compare extracted queries
-diff ./preview_duckdb/queries/query_1.sql ./preview_clickhouse-local/queries/query_1.sql
+# Compare extracted queries (resolve the timestamped queries directory first)
+diff ./preview_duckdb/*_queries_*/query_1.sql ./preview_clickhouse-local/*_queries_*/query_1.sql
 ```
 
 ### Resource Scaling Analysis
@@ -360,8 +365,8 @@ for scale in 0.001 0.01 0.1 1.0; do
     --benchmark tpch \
     --scale ${scale}
 
-  # Extract memory estimates
-  cat ./scale_${scale}/resource_estimates.json | jq '.estimated_memory_mb'
+  # Extract memory estimates (embedded in the timestamped summary)
+  cat ./scale_${scale}/*.json | jq '.resource_estimates.estimated_memory_mb'
 done
 ```
 
@@ -531,7 +536,7 @@ benchbox run --dry-run ./debug \
   --scale 1.0
 
 # Check the output files for issues
-cat ./debug/summary.json | jq '.errors // "No errors"'
+cat ./debug/*.json | jq '.errors // "No errors"'
 ```
 
 **Query Issues:**
@@ -542,7 +547,7 @@ benchbox run --dry-run ./query_check \
   --benchmark tpch
 
 # Validate SQL syntax externally
-for query in ./query_check/queries/*.sql; do
+for query in ./query_check/*_queries_*/*.sql; do
   echo "Validating $query..."
   # Use your preferred SQL validator
   sqlfluff lint "$query" --dialect duckdb
@@ -558,7 +563,7 @@ benchbox run --dry-run ./platform_test \
   --scale 0.01
 
 # Check for platform-specific SQL differences
-diff ./platform_test/queries/query_1.sql ./reference/duckdb_query_1.sql
+diff ./platform_test/*_queries_*/query_1.sql ./reference/duckdb_query_1.sql
 ```
 
 ## Best Practices

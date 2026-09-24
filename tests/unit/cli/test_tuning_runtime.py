@@ -47,3 +47,11 @@ def test_infer_runtime_tuning_mode_reports_platform_optimization_as_tuned() -> N
 
     assert enabled is True
     assert mode == "tuned"
+
+
+def test_build_baseline_unified_config_reports_no_clustering_strategy() -> None:
+    config = build_baseline_unified_config()
+
+    assert config.platform_optimizations.databricks_clustering_strategy == "none"
+    assert config.platform_optimizations.z_ordering_enabled is False
+    assert config.platform_optimizations.liquid_clustering_enabled is False

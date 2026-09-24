@@ -19,11 +19,14 @@ if _SCRIPTS_DIR not in sys.path:
 from post_merge_signature import (  # noqa: E402
     SignatureError,
     attribution_action,
+    build_incident_artifact,
     build_signature_from_job_failure,
     build_signature_from_junit,
+    classify_attribution,
     diff_signatures,
     failure_id_test_paths,
     imported_module_paths,
+    incident_key,
     load_signature,
     main,
 )
@@ -65,6 +68,20 @@ JUNIT_NO_FILE_ATTR = """<?xml version="1.0" encoding="utf-8"?>
   </testsuite>
 </testsuites>
 """
+
+# Named replay fixtures for the two historical incidents required by the
+# post-merge attribution contract. The first exercises dotted JUnit
+# normalization plus unrelated ownership; the second exercises external
+# source-ref movement.
+BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS = [
+    "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials"
+]
+LEDGER_2073_EXTERNAL_REF_EVIDENCE = {
+    "failure_ids": ["tests/unit/test_ledger.py::test_seed"],
+    "source_inputs": {"published-results": "source-new"},
+    "predecessor_source_inputs": {"published-results": "source-old"},
+    "ownership_match": False,
+}
 
 
 # ---------------------------------------------------------------------------
@@ -464,11 +481,23 @@ def test_failure_id_test_paths_extracts_junit_paths_only() -> None:
     paths = failure_id_test_paths(
         [
             "tests/unit/test_query_generation_preflight.py::test_tpcds_throughput_preflight_detects_generation_failures",
+            "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials",
             "lint:Run CI lint mirror",
             12,
         ]
     )
-    assert paths == ["tests/unit/test_query_generation_preflight.py"]
+    assert paths == [
+        "tests/unit/test_query_generation_preflight.py",
+        "tests/unit/platforms/credentials/test_bigquery_defaults.py",
+    ]
+
+
+def test_attribution_advisory_for_unrelated_dotted_junit_classname() -> None:
+    failure_ids = [
+        "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials"
+    ]
+    changed = ["results-data/README.md", ".github/workflows/seed-corpus.yml"]
+    assert attribution_action(failure_ids, changed) == "advisory"
 
 
 def test_attribution_advisory_when_blamed_sha_misses_failing_test() -> None:
@@ -487,8 +516,186 @@ def test_attribution_reverts_when_blamed_sha_touches_code_under_test() -> None:
     assert attribution_action(failure_ids, changed) == "revert"
 
 
-def test_attribution_reverts_job_level_failures() -> None:
-    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "revert"
+def test_attribution_keeps_unmappable_job_failures_as_advisory() -> None:
+    assert attribution_action(["lint:Run CI lint mirror"], ["README.md"]) == "advisory"
+
+
+def _complete_attribution_evidence(**overrides: object) -> dict[str, object]:
+    evidence: dict[str, object] = {
+        "failing_sha": "failing-sha",
+        "current_target_sha": "failing-sha",
+        "failure_ids": ["tests/unit/test_ledger.py::test_seed"],
+        "predecessor_evidence": {"run_url": "https://example.test/runs/previous", "sha": "parent-sha"},
+        "source_inputs": {"published-results": "source-new"},
+        "predecessor_source_inputs": {"published-results": "source-old"},
+        "ownership_match": False,
+        "owner": "maintainer",
+    }
+    evidence.update(overrides)
+    return evidence
+
+
+def test_external_ref_drift_does_not_propose_unrelated_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence())
+
+    assert result["classification"] == "external-ref-drift"
+    assert result["action"] == "advisory"
+    assert "reconcile" in str(result["next_action"]).lower()
+
+
+def test_missing_predecessor_source_identity_is_unknown_not_external_drift() -> None:
+    result = classify_attribution(_complete_attribution_evidence(predecessor_source_inputs={}))
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+
+
+def test_owned_same_subsystem_regression_still_proposes_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence(ownership_match=True))
+
+    assert result["classification"] == "code-regression"
+    assert result["action"] == "revert"
+
+
+def test_missing_evidence_is_unknown_and_keeps_develop_red() -> None:
+    result = classify_attribution({"failure_ids": ["lint:Run CI lint mirror"], "ownership_match": True})
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+    assert "keep develop red" in result["next_action"]
+
+
+def test_exact_commit_rerun_that_passes_is_transient() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(rerun={"conclusion": "success", "run_url": "https://example.test/rerun"})
+    )
+
+    assert result["classification"] == "environment/transient-failure"
+    assert result["action"] == "advisory"
+
+
+def test_target_moved_since_failure_is_stale_not_a_revert() -> None:
+    result = classify_attribution(_complete_attribution_evidence(current_target_sha="later-sha", ownership_match=True))
+
+    assert result["classification"] == "stale-run"
+    assert result["action"] == "advisory"
+
+
+def test_revert_that_introduces_another_failure_is_not_approved() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(ownership_match=True, proposed_revert={"introduced_failure": True})
+    )
+
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+
+
+def test_incident_artifact_captures_immutable_and_ownership_evidence() -> None:
+    evidence = _complete_attribution_evidence(
+        run_url="https://example.test/runs/current",
+        failing_pr={"number": 2073, "url": "https://example.test/pr/2073"},
+        jobs=[{"job": "fast-test", "failure_ids": ["tests/unit/test_ledger.py::test_seed"]}],
+    )
+    attribution = classify_attribution(evidence)
+    artifact = build_incident_artifact(evidence, attribution)
+
+    assert artifact["failing_commit"] == {"sha": "failing-sha", "run_url": "https://example.test/runs/current"}
+    assert artifact["failing_pr"]["number"] == 2073
+    assert artifact["jobs"][0]["job"] == "fast-test"
+    assert artifact["source_input_identities"] == {
+        "current": {"published-results": "source-new"},
+        "predecessor": {"published-results": "source-old"},
+    }
+    assert artifact["predecessor_evidence"]["sha"] == "parent-sha"
+    assert artifact["owner"] == "maintainer"
+
+
+def test_missing_current_signature_reaches_owned_incident_without_revert() -> None:
+    evidence = _complete_attribution_evidence(
+        failure_ids=[],
+        source_inputs={},
+        predecessor_source_inputs={"published-results": "source-previous"},
+        comparison_state="unknown",
+        comparison_failure="Missing current-run signature artifact(s) for: fast-test",
+    )
+
+    artifact = build_incident_artifact(evidence, classify_attribution(evidence))
+
+    assert artifact["classification"] == "unknown"
+    assert artifact["action"] == "advisory"
+    assert artifact["owner"] == "maintainer"
+    assert artifact["comparison_state"] == "unknown"
+    assert "Missing current-run signature" in artifact["comparison_failure"]
+    assert artifact["incident_key"] == incident_key([])
+
+
+def test_replay_2068_bigquery_dotted_junit_incident_never_reverts() -> None:
+    # Replay of the historical #2068 shape: a dotted JUnit classname is
+    # extractable, but the changed subsystem is unrelated to BigQuery tests.
+    evidence = _complete_attribution_evidence(
+        failure_ids=BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS,
+        changed_paths=["results-data/README.md", ".github/workflows/seed-corpus.yml"],
+        source_inputs={"published-results": "source"},
+        predecessor_source_inputs={"published-results": "source"},
+    )
+
+    result = classify_attribution(evidence)
+
+    assert failure_id_test_paths(BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS) == [
+        "tests/unit/platforms/credentials/test_bigquery_defaults.py"
+    ]
+    assert (
+        attribution_action(
+            BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS,
+            ["results-data/README.md", ".github/workflows/seed-corpus.yml"],
+        )
+        == "advisory"
+    )
+    assert result["classification"] == "unknown"
+    assert result["action"] == "advisory"
+    assert result["incident_key"] == incident_key(evidence["failure_ids"])
+
+
+def test_replay_2073_ledger_external_ref_incident_never_reverts() -> None:
+    # Replay of the historical #2073 shape: source identity drift is evidence
+    # of an external-input incident, not ownership by the merged code.
+    evidence = _complete_attribution_evidence(
+        **LEDGER_2073_EXTERNAL_REF_EVIDENCE,
+    )
+
+    result = classify_attribution(evidence)
+
+    assert result["classification"] == "external-ref-drift"
+    assert result["action"] == "advisory"
+
+
+def test_owned_regression_is_not_suppressed() -> None:
+    result = classify_attribution(
+        _complete_attribution_evidence(
+            source_inputs={"published-results": "source"},
+            predecessor_source_inputs={"published-results": "source"},
+            ownership_match=True,
+        )
+    )
+
+    assert result["classification"] == "code-regression"
+    assert result["action"] == "revert"
+
+
+def test_incident_key_is_stable_for_reordered_duplicate_failure_ids() -> None:
+    first = classify_attribution(_complete_attribution_evidence(failure_ids=["b", "a", "a"]))
+    second = classify_attribution(_complete_attribution_evidence(failure_ids=["a", "b"]))
+
+    assert first["incident_key"] == second["incident_key"]
+
+
+def test_incident_key_reuses_repeated_signature_and_separates_distinct_signature() -> None:
+    first = incident_key(["tests/unit/test_ledger.py::test_seed"])
+    repeated = incident_key(["tests/unit/test_ledger.py::test_seed"])
+    distinct = incident_key(["tests/unit/test_ledger.py::test_other"])
+
+    assert first == repeated
+    assert first != distinct
 
 
 # ---------------------------------------------------------------------------

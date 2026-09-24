@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import Any
+from pathlib import Path
+from typing import Any, Union
 
 from benchbox.core.benchmark_registry import (
     get_core_benchmark_class_name,
@@ -29,7 +30,8 @@ BENCHMARK_LOADER_API_SURFACE = "internal"
 # Benchmarks whose result carries a compliance classification. Only these accept
 # `official`; passing it wholesale is unsafe because constructor_accepts_argument()
 # is satisfied by a bare **kwargs, so any benchmark with one would swallow it.
-COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds"})
+# TPC-DI is not gated: it has no official-scale methodology to classify against.
+COMPLIANCE_GATED_BENCHMARKS = frozenset({"tpcds", "tpch"})
 
 
 def compliance_mode_kwargs(config: BenchmarkConfig) -> dict[str, Any]:
@@ -45,34 +47,66 @@ def compliance_mode_kwargs(config: BenchmarkConfig) -> dict[str, Any]:
     return {"official": bool(getattr(config, "official", False))}
 
 
-def get_benchmark_instance(config: BenchmarkConfig, system_profile: SystemProfile | None) -> Any:
+def get_benchmark_instance(
+    config: BenchmarkConfig,
+    system_profile: SystemProfile | None = None,
+    *,
+    benchmark_class: type[Any] | None = None,
+    output_dir: Union[str, Path] | None = None,
+    verbose: Union[int, bool] | None = None,
+    quiet: bool | None = None,
+    benchmark_options: dict[str, Any] | None = None,
+    extra_kwargs: dict[str, Any] | None = None,
+    instantiate_fn: Any | None = None,
+) -> Any:
     """Get benchmark instance based on configuration."""
-    validate_scale_factor(config.name, config.scale_factor)
-    plugin = get_family_plugin(config.name)
-    if plugin is not None:
-        return plugin.create(config, system_profile)
-    benchmark_class = get_core_benchmark_class(config.name)
+    if benchmark_class is None:
+        validate_scale_factor(config.name, config.scale_factor)
+        plugin = get_family_plugin(config.name)
+        if plugin is not None:
+            return plugin.create(config, system_profile)
+        benchmark_class = get_core_benchmark_class(config.name)
 
     cpu_cores = 1
     if system_profile:
         cpu_cores = getattr(system_profile, "cpu_cores_logical", 1)
 
-    benchmark_kwargs = {
-        "scale_factor": config.scale_factor,
-        "compress_data": config.compress_data,
-        "compression_type": config.compression_type,
-        "compression_level": config.compression_level,
+    benchmark_kwargs: dict[str, Any] = {
+        "scale_factor": getattr(config, "scale_factor", 1.0),
+        "compress_data": getattr(config, "compress_data", False),
+        "compression_type": getattr(config, "compression_type", None),
+        "compression_level": getattr(config, "compression_level", None),
     }
 
-    options = getattr(config, "options", {}) or {}
-    force_regenerate = bool(options.get("force_regenerate"))
+    opts = getattr(config, "options", {}) or {}
+    optional_kwargs: dict[str, Any] = {"parallel": cpu_cores}
+
+    if output_dir is not None:
+        optional_kwargs["output_dir"] = output_dir
+
+    if verbose is not None:
+        optional_kwargs["verbose"] = verbose
+    if quiet is not None:
+        optional_kwargs["quiet"] = quiet
+
+    force_regenerate = bool(opts.get("force_regenerate"))
     benchmark_id = config.name.lower()
-    optional_kwargs = {"parallel": cpu_cores}
     if benchmark_id in {"tpcds", "joinorder", "joinorder_synthetic"}:
         optional_kwargs["force_regenerate"] = force_regenerate
+
+    # Forward benchmark-specific options
+    options_to_forward = (
+        dict(benchmark_options) if benchmark_options is not None else dict(opts.get("benchmark_options", {}))
+    )
+    optional_kwargs.update(options_to_forward)
+
+    if extra_kwargs:
+        optional_kwargs.update(extra_kwargs)
+
     optional_kwargs.update(compliance_mode_kwargs(config))
 
-    return instantiate_benchmark_class(benchmark_class, benchmark_kwargs, optional_kwargs)
+    instantiate = instantiate_fn or instantiate_benchmark_class
+    return instantiate(benchmark_class, benchmark_kwargs, optional_kwargs)
 
 
 def instantiate_benchmark_class(
@@ -89,7 +123,16 @@ def instantiate_benchmark_class(
 
 
 def constructor_accepts_argument(benchmark_class: type[Any], argument_name: str) -> bool:
-    """Return whether a benchmark constructor accepts a named argument."""
+    """Return whether a benchmark constructor accepts a named argument.
+
+    A bare ``**kwargs`` counts as acceptance: several concrete
+    benchmarks intentionally consume documented options (``quiet``,
+    ``parallel``) through ``**kwargs``, so filtering those out would
+    silently drop live CLI options. Spec-level safety belongs to
+    registration-time validation
+    (:meth:`BenchmarkHookRegistry.register_option_specs`), which fails
+    fast on mismatches without changing runtime forwarding.
+    """
     try:
         parameters = inspect.signature(benchmark_class).parameters
     except (TypeError, ValueError):

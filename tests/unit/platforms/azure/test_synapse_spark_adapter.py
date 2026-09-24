@@ -531,6 +531,31 @@ class TestSynapseSparkAdapterCLI:
             assert adapter.tenant_id == "config-tenant"
             assert adapter.timeout_minutes == 90
 
+    def test_from_config_reads_nested_options_toggle(self):
+        """CLI --platform-option values nest under options without a builder."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            base = {
+                "workspace_name": "config-workspace",
+                "spark_pool_name": "config-pool",
+                "storage_account": "configstorage",
+                "storage_container": "configcontainer",
+            }
+
+            adapter = SynapseSparkAdapter.from_config({**base, "options": {"adaptive_enabled": False}})
+            assert adapter.adaptive_enabled is False
+
+            adapter = SynapseSparkAdapter.from_config(dict(base))
+            assert adapter.adaptive_enabled is True
+
 
 class TestSynapseSparkAdapterRegistry:
     """Test platform registry integration."""
@@ -634,6 +659,38 @@ class TestSynapseLivyStateConstants:
                 }
             )
             assert adapter.table_format == "iceberg"
+
+    def test_adaptive_enabled_from_config(self):
+        """Test adaptive_enabled is forwarded through from_config."""
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter.from_config(
+                {
+                    "workspace_name": "ws",
+                    "spark_pool_name": "pool",
+                    "storage_account": "sa",
+                    "storage_container": "c",
+                    "adaptive_enabled": False,
+                }
+            )
+            assert adapter.adaptive_enabled is False
+
+            defaulted = SynapseSparkAdapter.from_config(
+                {
+                    "workspace_name": "ws",
+                    "spark_pool_name": "pool",
+                    "storage_account": "sa",
+                    "storage_container": "c",
+                }
+            )
+            assert defaulted.adaptive_enabled is True
 
     def test_session_config_delta_extensions(self):
         """Test Delta Lake extensions are added to session config."""
@@ -739,3 +796,117 @@ class TestSynapseLivyStateConstants:
         assert LivyStatementState.AVAILABLE == "available"
         assert LivyStatementState.ERROR == "error"
         assert LivyStatementState.CANCELLED == "cancelled"
+
+    def test_user_spark_config_wins_over_benchmark_config(self):
+        """Explicit user spark_config must survive benchmark config merge.
+
+        Benchmark-specific configuration (e.g. the optimizer's AQE enablement)
+        is merged first so an explicit user override is not clobbered.
+        """
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+            patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": 1}
+            mock_requests.post.return_value = mock_response
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                spark_config={"spark.sql.adaptive.enabled": "false"},
+            )
+            adapter._spark_config = {"spark.sql.adaptive.enabled": "true"}
+            adapter._wait_for_session_state = MagicMock()
+            adapter._create_session()
+
+            call_kwargs = mock_requests.post.call_args
+            session_conf = call_kwargs.kwargs["json"]["conf"]
+            assert session_conf["spark.sql.adaptive.enabled"] == "false"
+
+
+def _create_synapse_session_conf(**adapter_kwargs):
+    """Build a Synapse adapter with mocked Livy transport and return the session conf."""
+    with (
+        patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.REQUESTS_AVAILABLE", True),
+        patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests,
+    ):
+        mock_staging.from_uri.return_value = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"id": 1}
+        mock_requests.post.return_value = mock_response
+
+        from benchbox.platforms.azure import SynapseSparkAdapter
+
+        adapter = SynapseSparkAdapter(
+            workspace_name="ws",
+            spark_pool_name="pool",
+            storage_account="sa",
+            storage_container="c",
+            **adapter_kwargs,
+        )
+        adapter._wait_for_session_state = MagicMock()
+        adapter._create_session()
+
+        return mock_requests.post.call_args.kwargs["json"]["conf"]
+
+
+class TestSynapseAdaptiveToggle:
+    """Livy session build renders adaptive_enabled explicitly in both directions."""
+
+    AQE_KEYS = (
+        "spark.sql.adaptive.enabled",
+        "spark.sql.adaptive.coalescePartitions.enabled",
+        "spark.sql.adaptive.skewJoin.enabled",
+    )
+
+    def test_toggle_off_renders_all_false(self):
+        conf = _create_synapse_session_conf(adaptive_enabled=False)
+        assert [conf[key] for key in self.AQE_KEYS] == ["false"] * 3
+
+    def test_default_renders_all_true(self):
+        conf = _create_synapse_session_conf()
+        assert [conf[key] for key in self.AQE_KEYS] == ["true"] * 3
+
+    def test_user_override_beats_toggle_off(self):
+        conf = _create_synapse_session_conf(
+            adaptive_enabled=False,
+            spark_config={"spark.sql.adaptive.enabled": "true"},
+        )
+        assert conf["spark.sql.adaptive.enabled"] == "true"
+        assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
+
+    def test_toggle_flows_into_optimizer_config(self):
+        with (
+            patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
+            patch("benchbox.platforms.azure.synapse_spark_adapter.CloudSparkStaging") as mock_staging,
+        ):
+            mock_staging.from_uri.return_value = MagicMock()
+
+            from benchbox.platforms.azure import SynapseSparkAdapter
+
+            adapter = SynapseSparkAdapter(
+                workspace_name="ws",
+                spark_pool_name="pool",
+                storage_account="sa",
+                storage_container="c",
+                adaptive_enabled=False,
+            )
+            adapter.configure_for_benchmark("tpch")
+
+            assert adapter._spark_config["spark.sql.adaptive.enabled"] == "false"
+            assert adapter._spark_config["spark.sql.adaptive.skewJoin.enabled"] == "false"

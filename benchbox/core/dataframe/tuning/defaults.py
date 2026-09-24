@@ -188,18 +188,24 @@ def get_smart_defaults(
     _apply_memory_recommendations(config, system_profile)
 
     # Apply platform-specific recommendations
-    if platform_lower == "polars":
+    if platform_lower == "datafusion":
+        _configure_datafusion(config, system_profile)
+    elif platform_lower == "polars":
         _configure_polars(config, system_profile)
     elif platform_lower == "pandas":
         _configure_pandas(config, system_profile)
     elif platform_lower == "dask":
         _configure_dask(config, system_profile)
-    elif platform_lower == "modin":
-        _configure_modin(config, system_profile)
     elif platform_lower == "cudf":
         _configure_cudf(config, system_profile)
 
     return config
+
+
+def _configure_datafusion(config: DataFrameTuningConfiguration, profile: SystemProfile) -> None:
+    """Configure only the tuning controls supported by DataFusion."""
+    config.execution.streaming_mode = False
+    config.parallelism.thread_count = profile.cpu_cores
 
 
 def _apply_memory_recommendations(
@@ -327,26 +333,6 @@ def _configure_dask(config: DataFrameTuningConfiguration, profile: SystemProfile
 
     # Use PyArrow for better integration
     config.data_types.dtype_backend = "pyarrow"
-
-
-def _configure_modin(config: DataFrameTuningConfiguration, profile: SystemProfile) -> None:
-    """Configure Modin-specific settings.
-
-    Args:
-        config: Configuration to modify
-        profile: System profile
-    """
-    # Default to Ray backend (more mature)
-    config.execution.engine_affinity = "ray"
-
-    # Worker count based on CPU
-    if profile.cpu_cores >= 8:
-        config.parallelism.worker_count = profile.cpu_cores
-    else:
-        config.parallelism.worker_count = max(2, profile.cpu_cores)
-
-    # Use nullable dtypes for compatibility
-    config.data_types.dtype_backend = "numpy_nullable"
 
 
 def _configure_cudf(config: DataFrameTuningConfiguration, profile: SystemProfile) -> None:

@@ -15,14 +15,10 @@ first runnable command was most of the way down the page.
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
-
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python 3.10: stdlib tomllib is 3.11+
-    import tomli as tomllib  # type: ignore[no-redef]
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -86,3 +82,32 @@ def test_quickstart_comes_before_the_installation_deep_dive() -> None:
     text = README.read_text(encoding="utf-8")
 
     assert text.index("## Quick Start") < text.index("\n## Installation")
+
+
+def test_quickstart_commands_work_after_the_pip_install() -> None:
+    """The pip path installs ``benchbox`` but does not install the uv command."""
+    quickstart = _quickstart()
+    execution_lines = [
+        line.strip()
+        for block in FENCE.findall(quickstart)
+        for line in block.splitlines()
+        if "benchbox" in line and not line.strip().startswith(("uv add", "python -m pip"))
+    ]
+
+    assert execution_lines
+    assert all(not line.startswith("uv run") for line in execution_lines)
+    assert "prefix each command with `uv run --`" in re.sub(r"\s+", " ", quickstart)
+
+
+def test_quickstart_does_not_document_ignored_results_limit() -> None:
+    """The summary view currently ignores ``--limit`` and always caps at ten."""
+    assert "benchbox results --limit" not in _quickstart()
+
+
+def test_quickstart_describes_the_rendered_result_columns() -> None:
+    quickstart = _quickstart()
+
+    for column in ("benchmark", "platform", "timestamp", "duration", "query count", "BenchBox version"):
+        assert column in quickstart
+    assert "validation outcome" not in quickstart
+    assert "query timings" not in quickstart

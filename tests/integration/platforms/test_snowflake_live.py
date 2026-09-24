@@ -22,6 +22,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import json
 import os
 
 import pytest
@@ -269,3 +270,83 @@ class TestLiveSnowflakeSpecificFeatures:
 
         finally:
             live_snowflake_adapter.close_connection(connection)
+
+
+@pytest.fixture
+def live_snowflake_adapter_with_capture(snowflake_credentials):
+    """Create a Snowflake adapter with query plan capture enabled."""
+    from benchbox.platforms.snowflake import SnowflakeAdapter
+
+    adapter = SnowflakeAdapter(**{**snowflake_credentials, "capture_plans": True})
+    yield adapter
+    # No cleanup needed - adapter manages its own connections
+
+
+class TestLiveSnowflakeQueryPlanCapture:
+    """Test query plan capture against a live Snowflake instance.
+
+    Queries stay trivial (SELECT 1): warehouse compute bills per second and
+    auto-resume on first query is expected, so an XS warehouse with
+    auto-suspend is the assumed floor.
+    """
+
+    def test_get_query_plan_returns_json(self, live_snowflake_adapter):
+        """get_query_plan should return a non-empty JSON string via EXPLAIN USING JSON."""
+        connection = live_snowflake_adapter.create_connection()
+        try:
+            plan = live_snowflake_adapter.get_query_plan(connection, "SELECT 1")
+            assert plan is not None
+            assert len(plan) > 0
+            parsed = json.loads(plan)
+            assert parsed is not None
+        finally:
+            live_snowflake_adapter.close_connection(connection)
+
+    def test_capture_query_plan_returns_dag(self, live_snowflake_adapter_with_capture):
+        """capture_query_plan should return a QueryPlanDAG for a simple SELECT."""
+        adapter = live_snowflake_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_test")
+            assert plan is not None, "Expected a QueryPlanDAG but got None"
+            assert plan.logical_root is not None
+        finally:
+            adapter.close_connection(connection)
+
+    def test_capture_query_plan_has_fingerprint(self, live_snowflake_adapter_with_capture):
+        """Captured plan must have a non-empty fingerprint."""
+        adapter = live_snowflake_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp")
+            assert plan is not None
+            assert plan.plan_fingerprint
+            assert len(plan.plan_fingerprint) == 64  # SHA256 hex
+        finally:
+            adapter.close_connection(connection)
+
+    def test_capture_query_plan_fingerprint_stable(self, live_snowflake_adapter_with_capture):
+        """Same query executed twice must produce identical fingerprints."""
+        adapter = live_snowflake_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            plan1, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp_a")
+            plan2, _ = adapter.capture_query_plan(connection, "SELECT 1", "q_fp_b")
+            assert plan1 is not None
+            assert plan2 is not None
+            assert plan1.plan_fingerprint == plan2.plan_fingerprint
+        finally:
+            adapter.close_connection(connection)
+
+    def test_execute_query_attaches_plan(self, live_snowflake_adapter_with_capture):
+        """execute_query must attach the captured plan and fingerprint to result_dict."""
+        adapter = live_snowflake_adapter_with_capture
+        connection = adapter.create_connection()
+        try:
+            result = adapter.execute_query(connection, "SELECT 1", "q_exec", validate_row_count=False)
+            assert result["status"] == "SUCCESS"
+            assert result["query_plan"] is not None
+            assert result["plan_fingerprint"] == result["query_plan"].plan_fingerprint
+            assert result["plan_capture_time_ms"] is not None
+        finally:
+            adapter.close_connection(connection)

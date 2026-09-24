@@ -108,11 +108,6 @@ a blocker to the local MCP MVP.
 
 ## Current MVP evidence
 
-> **Evidence scope:** The package-execution proof below is historical pre-release evidence from
-> source revision `b8ba98f6d72702fdd31ceeea260ebad68e37cba1` and used the then-current v0.3.1
-> wheel. It validates the local MCP MVP at that revision; it does not replace the v0.4.0 release
-> workflow's exact-wheel installation checks or certify deferred shared-endpoint publication.
-
 Both MVP checks passed on source revision
 `b8ba98f6d72702fdd31ceeea260ebad68e37cba1` on 2026-08-23 UTC.
 
@@ -135,8 +130,10 @@ registry or runtime-policy defect.
 
 PR #1716 merged into `develop` as
 `3ffa5ba0265e065805e28aab6f092682d3039f2a`. It adds the repository's
-supported `duckdb>=1.0.0,<2.0.0` dependency to the MCP extra and synchronous and
-durable surface regression tests. The implementation defect is corrected, and
+then-supported DuckDB dependency to the MCP extra and synchronous and
+durable surface regression tests. The package floor is now `duckdb>=1.3.0,<2.0.0`
+because constrained sorted ingestion depends on transaction/index behavior first
+available in DuckDB 1.3. The implementation defect is corrected, and
 the current release-artifact proof is recorded above. No external
 image-publication exercise was required.
 

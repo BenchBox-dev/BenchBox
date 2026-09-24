@@ -4,13 +4,24 @@ import type { DetailResult } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import {
+  formatArchitecture,
+  formatCpuFamily,
+  formatEnumLabel,
+  formatExecutionMode,
   formatFunding,
+  formatMemoryGb,
+  formatTuningMode,
   formatTrustLabel,
-  formatValidationStatus,
   formatVisibility,
+  parseOverrideRules,
 } from "@/lib/displayLabels";
+import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { StatusBadge } from "@/components/StatusBadge";
+import { OverrideBadge, ValidationBadge } from "@/components/TrustBadge";
 import { TuningVerificationBadge } from "@/components/TuningVerificationBadge";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
+import { RunDateChip } from "@/components/RunAge";
+import { VersionLabel } from "@/components/VersionLabel";
 
 interface RunReceiptProps {
   detail: DetailResult;
@@ -23,7 +34,7 @@ interface ReceiptRow {
   label: string;
   value: ComponentChildren;
   // Marked when the row's value is the "Not recorded" placeholder rather than
-  // real data. Missing rows move behind the "Show missing metadata"
+  // real data. Missing rows move behind the "Show missing fields"
   // disclosure so the default view is dense with what is actually known.
   isMissing?: boolean;
 }
@@ -53,6 +64,42 @@ function rowFromSummary(label: string, value: string): ReceiptRow {
 }
 
 /**
+ * Integrity rows for the validation / override pair. The Validation cell
+ * always renders (as a badge, so an overridden run can never read as a clean
+ * pass), while the Override audit row appears only when the pipeline recorded
+ * an accepted override.
+ */
+function overrideRows(detail: DetailResult): ReceiptRow[] {
+  const rules = parseOverrideRules(detail.override_rules);
+  const status = detail.validation_status;
+  if (rules.length === 0) {
+    // No override: keep the long-standing missing-row contract (a null
+    // status hides behind the disclosure) and badge recorded statuses.
+    if (status === null || status === undefined || status === "") return [missingRow("Validation")];
+    return [recordedRow("Validation", <ValidationBadge validationStatus={status} showMissing />)];
+  }
+  const validation = <ValidationBadge validationStatus={status} overrideRules={rules} showMissing />;
+  return [
+    recordedRow("Validation", validation),
+    recordedRow(
+      "Override",
+      <OverrideBadge
+        rules={rules}
+        approver={detail.override_approver}
+        evidence={detail.override_evidence}
+        expires={detail.override_expires}
+      />,
+    ),
+  ];
+}
+
+function formattedRow(label: string, raw: string | null | undefined, format: (raw: string) => string): ReceiptRow {
+  if (raw === null || raw === undefined || raw === "") return missingRow(label);
+  const value = format(raw);
+  return recordedRow(label, value === raw ? value : <span title={`Recorded value: ${raw}`}>{value}</span>);
+}
+
+/**
  * Row for a full-length identity hash (ADR-1 requested-config / applied-ledger
  * SHA-256). Renders a monospace prefix for readability while the full value
  * stays available in the `title` tooltip, keeping the receipt compact without
@@ -78,6 +125,7 @@ export function RunReceipt({
   const queryCount = detail.display_timings.length || new Set(detail.queries.map((query) => query.query_id)).size;
   const sampleCount =
     detail.display_timings.reduce((sum, timing) => sum + timing.sample_count, 0) || detail.queries.length;
+  const clientLocalityRow = buildClientLocalityRow(detail);
 
   const sections = [
     {
@@ -85,7 +133,8 @@ export function RunReceipt({
       rows: [
         recordedRow("Benchmark", humanizeBenchmark(detail.benchmark)),
         recordedRow("Scale factor", `SF ${detail.scale_factor}`),
-        rowFromString("Phase", detail.test_type),
+        recordedRow("Run date", <RunDateChip runDate={detail.run_date} />),
+        formattedRow("Test phase", detail.test_type, formatEnumLabel),
         recordedRow("Query count", String(queryCount)),
         recordedRow("Measurement samples", String(sampleCount)),
       ],
@@ -94,10 +143,10 @@ export function RunReceipt({
       title: "Platform",
       rows: [
         recordedRow("Platform", detail.platform),
-        rowFromString("Platform version", detail.platform_version),
-        rowFromString("Driver version", detail.driver_version),
-        rowFromString("Execution mode", detail.execution_mode),
-        rowFromString("Tuning mode", detail.tuning_mode),
+        detail.platform_version ? recordedRow("Platform version", <VersionLabel version={detail.platform_version} />) : missingRow("Platform version"),
+        detail.driver_version ? recordedRow("Driver version", <VersionLabel version={detail.driver_version} />) : missingRow("Driver version"),
+        formattedRow("Execution mode", detail.execution_mode, formatExecutionMode),
+        formattedRow("Tuning mode", detail.tuning_mode, formatTuningMode),
         rowFromString("Tuning hash", detail.tuning_hash),
         // ADR-1 bundle-emitted tuning identities, shown as distinct labeled
         // kinds: the canonical requested-config hash and the physical
@@ -129,10 +178,14 @@ export function RunReceipt({
       title: "Environment",
       rows: [
         rowFromString("OS", detail.environment.os),
-        rowFromString("Arch", detail.environment.arch),
+        formattedRow("Architecture", detail.environment.arch, formatArchitecture),
+        formattedRow("CPU family", detail.environment.cpu_family, formatCpuFamily),
+        rowFromString("CPU model", detail.environment.cpu_model),
+        rowFromString("CPU evidence", detail.environment.cpu_identity_provenance, formatCpuIdentityProvenance),
         rowFromString("CPU count", detail.environment.cpu_count),
         memoryRow(detail.environment.memory_gb),
         rowFromString("Python", detail.environment.python),
+        ...(clientLocalityRow ? [clientLocalityRow] : []),
       ],
     },
     {
@@ -144,7 +197,12 @@ export function RunReceipt({
         // should record that no disclosure was made rather than omit the row.
         rowFromString("Funding", detail.funding, formatFunding),
         rowFromString("Visibility", detail.visibility, formatVisibility),
-        rowFromString("Validation", detail.validation_status, formatValidationStatus),
+        // An accepted plausibility override is never a clean pass: the
+        // validation cell badges overridden (warning tone) whenever the
+        // pipeline recorded covered rule ids, and a dedicated Override row
+        // names the rules plus the audit fields. No override means no row —
+        // absence is the normal case, not missing data.
+        ...overrideRows(detail),
         rowFromString("Compliance", detail.compliance_class),
         rankingEligibilityRow(isRankingEligible),
       ],
@@ -182,10 +240,10 @@ export function RunReceipt({
     <section id="run-receipt" aria-label="Run receipt" class="panel-elevated p-4">
       <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Run Receipt</h2>
-          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Reproducibility, platform, and integrity metadata for this result.</p>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Run receipt</h2>
+          <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">Recorded details for checking and reproducing this run.</p>
         </div>
-        <StatusBadge role="generic" tone="neutral">{detail.result_id.slice(0, 8)}</StatusBadge>
+        <StatusBadge role="generic" tone="neutral">Public ID {shortId ?? visibleResultIdForRow(detail)}</StatusBadge>
       </div>
       {totalMissing > 0 && (
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--bb-data-fg-muted)]">
@@ -197,7 +255,7 @@ export function RunReceipt({
             aria-expanded={showMissing}
             aria-controls="run-receipt-missing-fields-region"
           >
-            {showMissing ? "Hide missing metadata" : "Show missing metadata"}
+            {showMissing ? "Hide missing fields" : "Show missing fields"}
           </button>
         </div>
       )}
@@ -263,7 +321,7 @@ function ReceiptSection({
 // ADR-1 applied-tuning receipt drill-down
 //
 // `detail.applied_receipt` is the `receipt` sub-object of the run's
-// `{stem}.applied.json` companion, carried through the pipeline as an opaque
+// bundle's `platform.tuning.applied`, carried through the pipeline as an opaque
 // JSON string (see explorer_pipeline/transformer.py::_applied_receipt). It is
 // parsed here for display only: every verdict shown is the one the platform
 // recorded at introspection time. Nothing is recomputed, and no corroboration
@@ -450,7 +508,45 @@ function reproduceRow(reproduceCommand: string | null): ReceiptRow {
 
 function memoryRow(value: number | null | undefined): ReceiptRow {
   if (value === null || value === undefined) return missingRow("Memory");
-  return recordedRow("Memory", `${value} GB`);
+  const formatted = formatMemoryGb(value);
+  return recordedRow("Memory", <span title={`Recorded value: ${value} GB`}>{formatted}</span>);
+}
+
+function buildClientLocalityRow(detail: DetailResult): ReceiptRow | null {
+  const env = detail.environment ?? {};
+  const region = env.client_region ?? detail.client_region;
+  const cloud = env.client_cloud ?? detail.client_cloud;
+  const minMs = env.statement_overhead_min_ms ?? detail.statement_overhead_min_ms;
+  const medMs = env.statement_overhead_median_ms ?? detail.statement_overhead_median_ms;
+  const status = env.link_status ?? detail.link_status;
+
+  const localityParts = [region, cloud].filter((p): p is string => Boolean(p && String(p).trim()));
+  const overheadParts: string[] = [];
+  if (minMs != null && Number.isFinite(Number(minMs))) {
+    overheadParts.push(`${Number(minMs).toFixed(2)} ms min`);
+  }
+  if (medMs != null && Number.isFinite(Number(medMs))) {
+    overheadParts.push(`${Number(medMs).toFixed(2)} ms median`);
+  }
+
+  if (localityParts.length === 0 && overheadParts.length === 0 && !status) {
+    return null;
+  }
+
+  const localityStr = localityParts.length > 0 ? localityParts.join(" / ") : "";
+  const overheadStr = overheadParts.length > 0 ? `overhead: ${overheadParts.join(", ")}` : "";
+
+  const displayParts: string[] = [];
+  if (localityStr && overheadStr) {
+    displayParts.push(`${localityStr} (${overheadStr})`);
+  } else if (localityStr || overheadStr) {
+    displayParts.push(localityStr || overheadStr);
+  }
+  if (status && String(status).trim()) {
+    displayParts.push(`[${String(status).trim()}]`);
+  }
+
+  return recordedRow("Client locality", displayParts.join(" "));
 }
 
 function rankingEligibilityRow(value: boolean | null | undefined): ReceiptRow {

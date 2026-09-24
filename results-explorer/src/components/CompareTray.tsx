@@ -1,7 +1,9 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { FundingChip } from "@/components/FundingChip";
+import { RunDateWithAge } from "@/components/RunAge";
 import { TrustBadge } from "@/components/TrustBadge";
+import { useIsNarrowViewport } from "@/lib/useIsNarrowViewport";
 
 export interface CompareTrayItem {
   id: string;
@@ -28,16 +30,7 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
   const trayRef = useRef<HTMLDivElement>(null);
   const [trayHeight, setTrayHeight] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const mql = window.matchMedia("(max-width: 639px)");
-    const update = () => setIsMobile(mql.matches);
-    update();
-    mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
-  }, []);
+  const isMobile = useIsNarrowViewport("(max-width: 639px)");
 
   const collapsed = isMobile && !expanded;
 
@@ -142,7 +135,7 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
                   <span>{item.benchmarkLabel}</span>
                   <span>SF {item.scaleFactor}</span>
                   <span>{item.phase}</span>
-                  <span>{item.runDate}</span>
+                  <RunDateWithAge runDate={item.runDate} />
                   <TrustBadge trustLabel={item.trustLabel} compact />
                   <FundingChip funding={item.funding} compact />
                   <span class="font-mono text-[var(--bb-data-fg-muted)]">Public ID {item.visibleResultId}</span>

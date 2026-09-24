@@ -84,7 +84,7 @@ BenchBox Primitives are organized into three categories:
 DataFrame Support
 ~~~~~~~~~~~~~~~~~
 
-Read and Write Primitives include full DataFrame implementations supporting both expression-based platforms (Polars, PySpark, DataFusion) and pandas-compatible platforms (Pandas, Modin, Dask, cuDF). This enables direct comparison between SQL and DataFrame performance on identical operations.
+Read and Write Primitives include full DataFrame implementations supporting both expression-based platforms (Polars, PySpark, DataFusion) and pandas-compatible platforms (Pandas, Dask, cuDF). This enables direct comparison between SQL and DataFrame performance on identical operations.
 
 Included Benchmarks
 -------------------

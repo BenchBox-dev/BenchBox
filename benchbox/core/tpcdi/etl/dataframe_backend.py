@@ -2,19 +2,139 @@
 
 from __future__ import annotations
 
+import logging
+import math
+import re
+from datetime import date, datetime
+from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from benchbox.core.dataframe.maintenance_interface import DataFrameMaintenanceOperations
 
+logger = logging.getLogger(__name__)
+
+# Statement-terminating or comment tokens are never valid inside a predicate
+# (mirrors SQLETLBackend._validate_sql_where_clause).
+_UNSAFE_CONDITION_TOKENS = (";", "--", "/*", "*/")
+_FORBIDDEN_CONDITION_KEYWORDS = frozenset(
+    {
+        "DROP",
+        "DELETE",
+        "INSERT",
+        "UPDATE",
+        "ALTER",
+        "CREATE",
+        "ATTACH",
+        "DETACH",
+        "PRAGMA",
+    }
+)
+_COLUMN_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _validate_condition_column(column: str) -> str:
+    """Validate a dict-condition column name, mirroring the SQL backend."""
+    if not _COLUMN_NAME_PATTERN.fullmatch(column):
+        raise ValueError(f"Unsafe column name in SCD2 expire condition: {column!r}")
+    return column
+
+
+def _check_condition_text(normalized: str) -> str:
+    """Reject unsafe tokens/keywords in a raw SQL predicate string."""
+    if any(token in normalized for token in _UNSAFE_CONDITION_TOKENS):
+        raise ValueError("Unsafe SQL tokens are not allowed in SCD2 expire condition")
+    if any(re.search(rf"\b{keyword}\b", normalized.upper()) for keyword in _FORBIDDEN_CONDITION_KEYWORDS):
+        raise ValueError("DML/DDL keywords are not allowed in SCD2 expire condition")
+    return normalized
+
+
+def _render_literal(value: Any) -> str:
+    """Render a Python scalar as a SQL literal for maintenance predicates."""
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    # SCD2 conditions are built from pandas frames, so numpy scalars are the
+    # norm (business keys arrive as np.int64, flags as np.bool_): normalize
+    # them to Python scalars before dispatch.
+    try:
+        import numpy as np
+
+        if isinstance(value, np.generic):
+            value = value.item()
+    except ImportError:
+        pass
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            raise ValueError(f"Non-finite float cannot be rendered as a SQL literal: {value!r}")
+        return repr(value)
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, datetime):
+        return f"'{value.isoformat(sep=' ')}'"
+    if isinstance(value, date):
+        return f"'{value.strftime('%Y-%m-%d')}'"
+    if isinstance(value, str):
+        return "'" + value.replace("'", "''") + "'"
+    raise TypeError(f"Unsupported literal value for SCD2 operation: {value!r}")
+
+
+def _condition_to_sql(condition: str | Any) -> str:
+    """Normalize an SCD2 expire condition to a SQL predicate string.
+
+    String conditions are interpolated verbatim into the maintenance SQL
+    after the same unsafe-token/keyword screening the SQL backend applies
+    (column names are the caller's responsibility); dict conditions are
+    rendered to ``"col" = <literal>`` equality clauses with validated column
+    names.
+    """
+    if isinstance(condition, str):
+        if not condition.strip():
+            raise ValueError("SCD2 expire condition cannot be empty")
+        return _check_condition_text(condition.strip())
+    if isinstance(condition, dict):
+        if not condition:
+            raise ValueError("SCD2 expire condition dictionary cannot be empty")
+        clauses: list[str] = []
+        for raw_column, value in condition.items():
+            column = _validate_condition_column(str(raw_column))
+            if value is None:
+                clauses.append(f'"{column}" IS NULL')
+            else:
+                clauses.append(f'"{column}" = {_render_literal(value)}')
+        return " AND ".join(clauses)
+    raise TypeError("SCD2 expire condition must be a SQL expression string or dict[str, Any]")
+
 
 class DataFrameETLBackend:
     """TPC-DI ETL backend delegating writes to maintenance operations."""
 
-    def __init__(self, *, maintenance_ops: DataFrameMaintenanceOperations, platform_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        maintenance_ops: DataFrameMaintenanceOperations,
+        platform_name: str,
+        table_root: Path | str | None = None,
+    ) -> None:
         self.maintenance_ops = maintenance_ops
         self.platform_name = platform_name
+        self.table_root = Path(table_root) if table_root is not None else None
+
+    def _resolve_table_path(self, table_name: str) -> Path | str:
+        """Resolve a logical table name to a maintenance-ops table path.
+
+        Without a configured root the bare table name is passed through,
+        preserving historical behavior. With a root, tables stay under it
+        instead of scattering relative directories into the caller CWD.
+        """
+        if self.table_root is None:
+            return table_name
+        return self.table_root / table_name
 
     def create_schema(self) -> None:
         """No-op for DataFrame platforms where table paths are materialized lazily."""
@@ -31,7 +151,7 @@ class DataFrameETLBackend:
         for table_name, dataframe in staged_data.items():
             if dataframe is None or dataframe.empty:
                 continue
-            result = self.maintenance_ops.insert_rows(table_name, dataframe, mode="append")
+            result = self.maintenance_ops.insert_rows(self._resolve_table_path(table_name), dataframe, mode="append")
             if not result.success:
                 raise RuntimeError(result.error_message or f"Failed to insert rows for table {table_name}")
             load_results["records_loaded"] += int(result.rows_affected)
@@ -56,16 +176,48 @@ class DataFrameETLBackend:
             "notes": f"Validation executed in DataFrame mode for platform '{self.platform_name}'",
         }
 
+    def _adapter_accepts_sql_predicates(self) -> bool:
+        """Whether the maintenance adapter consumes SQL predicate text.
+
+        Adapters declaring ``accepts_sql_predicates=False`` (e.g. Iceberg,
+        whose parser handles single unquoted comparisons only) receive native
+        dict conditions and native update values instead. Unknown adapters
+        default to the SQL path, preserving current behavior.
+        """
+        get_capabilities = getattr(self.maintenance_ops, "get_capabilities", None)
+        if get_capabilities is None:
+            return True
+        try:
+            return bool(get_capabilities().accepts_sql_predicates)
+        except AttributeError:
+            logger.warning("Maintenance adapter capabilities lack accepts_sql_predicates; assuming SQL predicates")
+            return True
+
     def execute_scd2_expire(self, table_name: str, condition: str | Any, updates: dict[str, Any]) -> dict[str, Any]:
         """Expire current rows using UPDATE maintenance operation."""
-        result = self.maintenance_ops.update_rows(table_name, condition, updates)
+        if not updates:
+            return {"success": True, "rows_affected": 0}
+        if not self._adapter_accepts_sql_predicates():
+            if not isinstance(condition, dict):
+                raise TypeError(
+                    "This maintenance adapter does not accept SQL predicate text; "
+                    "pass the SCD2 expire condition as dict[str, Any]"
+                )
+            for raw_column in condition:
+                _validate_condition_column(str(raw_column))
+            predicate: str | Any = condition
+            rendered_updates = {str(column): value for column, value in updates.items()}
+        else:
+            predicate = _condition_to_sql(condition)
+            rendered_updates = {str(column): _render_literal(value) for column, value in updates.items()}
+        result = self.maintenance_ops.update_rows(self._resolve_table_path(table_name), predicate, rendered_updates)
         if not result.success:
             raise RuntimeError(result.error_message or f"Failed to expire rows for table {table_name}")
         return {"success": True, "rows_affected": int(result.rows_affected)}
 
     def execute_scd2_insert(self, table_name: str, dataframe: pd.DataFrame) -> dict[str, Any]:
         """Insert new SCD2 rows using INSERT maintenance operation."""
-        result = self.maintenance_ops.insert_rows(table_name, dataframe, mode="append")
+        result = self.maintenance_ops.insert_rows(self._resolve_table_path(table_name), dataframe, mode="append")
         if not result.success:
             raise RuntimeError(result.error_message or f"Failed to insert SCD2 rows for table {table_name}")
         return {"success": True, "rows_affected": int(result.rows_affected)}

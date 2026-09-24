@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import sqlglot
@@ -209,8 +210,68 @@ def _requires_result_contract(entry: PrimitiveQuery) -> bool:
     return bool(entry.variants) or entry.category in _HIGH_RISK_CATEGORIES or entry.id in _HIGH_RISK_QUERY_IDS
 
 
+def summarize_variant_comparability(catalog=None) -> dict:
+    """Return a JSON-serializable comparability summary for the catalog.
+
+    Loads the default primitives catalog when none is supplied. The summary
+    names per-query variant dialects and the static contract issues from
+    :func:`collect_variant_contract_issues`, so CLI output and persisted
+    result artifacts can report what was compared without re-running the
+    lint.
+
+    ``comparable`` reports static contract status only (no contract issues
+    found in the catalog lint) — it is not runtime evidence that two
+    executions were like-for-like. Best-effort: callers treat an empty
+    issue list as comparable.
+    """
+    if catalog is None:
+        import copy as _copy
+
+        return _copy.deepcopy(_default_comparability_summary())
+    return _summarize_catalog(catalog)
+
+
+@lru_cache(maxsize=1)
+def _default_comparability_summary() -> dict:
+    """Cached summary for the default catalog (stable per process)."""
+    from benchbox.core.read_primitives.catalog.loader import load_primitives_catalog
+
+    return _summarize_catalog(load_primitives_catalog())
+
+
+def _summarize_catalog(catalog) -> dict:
+    issues = collect_variant_contract_issues(catalog)
+    queries = getattr(catalog, "queries", {}) or {}
+    per_query: dict[str, dict] = {}
+    for query_id, entry in queries.items():
+        variants = getattr(entry, "variants", None) or {}
+        per_query[str(query_id)] = {
+            "variant_dialects": sorted(str(d) for d in variants),
+            "has_variants": bool(variants),
+        }
+    issues_by_query: dict[str, list] = {}
+    for issue in issues:
+        issues_by_query.setdefault(str(issue.query_id), []).append(
+            {
+                "dialect": issue.dialect,
+                "kind": issue.kind,
+                "detail": issue.detail,
+            }
+        )
+    for query_id, entries in issues_by_query.items():
+        per_query.setdefault(str(query_id), {}).update({"issue_count": len(entries), "issues": entries})
+    return {
+        "total_queries": len(queries),
+        "queries_with_variants": sum(1 for v in per_query.values() if v.get("has_variants")),
+        "issue_count": len(issues),
+        "comparable": not issues,
+        "per_query": per_query,
+    }
+
+
 __all__ = [
     "VariantContractIssue",
     "collect_variant_contract_issues",
     "extract_projection_names",
+    "summarize_variant_comparability",
 ]

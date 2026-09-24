@@ -81,7 +81,6 @@ Infrastructure is in place for these platforms:
 
 | Platform | CLI Name | Family | Status | Notes |
 |----------|----------|--------|--------|-------|
-| Modin | `modin-df` | Pandas | Infrastructure ready | Ray/Dask backends |
 | Dask | `dask-df` | Pandas | Infrastructure ready | Parallel computing |
 | cuDF | `cudf-df` | Pandas | Infrastructure ready | NVIDIA GPU acceleration |
 
@@ -147,7 +146,7 @@ result = df.groupby(['l_returnflag', 'l_linestatus']).agg({
 })
 ```
 
-**Members:** Pandas, Modin, cuDF, Dask, Vaex
+**Members:** Pandas, cuDF, Dask, Vaex
 
 #### Expression Family
 
@@ -171,7 +170,7 @@ result = (
 
 Libraries within each family are intentionally API-compatible:
 
-- **Modin, cuDF, Dask** - designed as Pandas drop-in replacements
+- **cuDF and Dask** - designed around pandas-compatible APIs
 - **PySpark, DataFusion** - share expression-based conceptual model with Polars
 
 Result: Write query **once per family**, run on **multiple platforms**.
@@ -228,7 +227,6 @@ DataFrame platforms have memory constraints. Recommended scale factors:
 |----------|-------------------|------------------------|-------|
 | Pandas | 10 | ~6 GB | Eager evaluation, high memory |
 | Polars | 100 | ~4 GB | Lazy evaluation, efficient |
-| Modin | 10 | ~6 GB + overhead | Distributed overhead |
 | Dask | 100+ | Configurable | Disk spillover supported |
 | cuDF | 1-10 | GPU VRAM | Limited by GPU memory |
 | PySpark | 1000+ | Cluster memory | Distributed processing |
@@ -244,7 +242,7 @@ All 22 TPC-H queries have DataFrame implementations for both expression and pand
 The Read Primitives benchmark provides comprehensive DataFrame support:
 
 - **Expression Family**: 149 query implementations (Polars, PySpark, DataFusion)
-- **Pandas Family**: 149 query implementations (Pandas, Modin, Dask, cuDF)
+- **Pandas Family**: 149 query implementations (Pandas, Dask, cuDF)
 - **Categories**: aggregation, filter, groupby, orderby, window, qualify, broadcast, string, and more
 
 ```bash
@@ -371,9 +369,8 @@ DataFrame Platform Status
 ============================================================
 Platform        Family       Available  Version
 ------------------------------------------------------------
-Pandas          pandas       ✓          2.1.4
+Pandas          pandas       ✓          3.0.5
 Polars          expression   ✓          1.15.0
-Modin           pandas       ✗          N/A
 Dask            pandas       ✗          N/A
 PySpark         expression   ✗          N/A
 DataFusion      expression   ✓          43.0.0
@@ -419,8 +416,8 @@ DataFrame tuning is organized into configuration categories:
 
 | Setting | Type | Default | Applicable Platforms | Description |
 |---------|------|---------|---------------------|-------------|
-| `thread_count` | int | auto | Polars, Modin | Number of threads (Polars: `POLARS_MAX_THREADS`, Modin: `MODIN_CPUS`) |
-| `worker_count` | int | auto | Dask, Modin | Number of worker processes |
+| `thread_count` | int | auto | Polars | Number of threads (`POLARS_MAX_THREADS`) |
+| `worker_count` | int | auto | Dask | Number of worker processes |
 | `threads_per_worker` | int | auto | Dask | Threads per worker process |
 
 #### Memory Settings
@@ -438,7 +435,7 @@ DataFrame tuning is organized into configuration categories:
 | Setting | Type | Default | Applicable Platforms | Description |
 |---------|------|---------|---------------------|-------------|
 | `streaming_mode` | bool | false | Polars | Enable streaming execution for memory efficiency |
-| `engine_affinity` | str | None | Polars, Modin | Preferred execution engine. Polars: `"streaming"` or `"in-memory"`. Modin: `"ray"` or `"dask"` |
+| `engine_affinity` | str | None | Polars | Preferred execution engine: `"streaming"` or `"in-memory"` |
 | `lazy_evaluation` | bool | true | Polars, Dask | Enable lazy evaluation where supported |
 | `collect_timeout` | int | None | All lazy platforms | Maximum seconds for collect/compute operations |
 
@@ -446,17 +443,17 @@ DataFrame tuning is organized into configuration categories:
 
 | Setting | Type | Default | Applicable Platforms | Description |
 |---------|------|---------|---------------------|-------------|
-| `dtype_backend` | str | `"numpy_nullable"` | Pandas, Dask, Modin | Backend for nullable dtypes: `"numpy"`, `"numpy_nullable"`, or `"pyarrow"` |
+| `dtype_backend` | str | `"numpy_nullable"` | Pandas and Dask | Backend for nullable dtypes: `"numpy"`, `"numpy_nullable"`, or `"pyarrow"` |
 | `enable_string_cache` | bool | false | Polars, Pandas | Enable global string caching for categoricals |
-| `auto_categorize_strings` | bool | false | Pandas, Modin | Auto-convert low-cardinality strings to categoricals |
-| `categorical_threshold` | float | 0.5 | Pandas, Modin | Unique ratio threshold for auto-categorization (0.0-1.0) |
+| `auto_categorize_strings` | bool | false | Pandas | Auto-convert low-cardinality strings to categoricals |
+| `categorical_threshold` | float | 0.5 | Pandas | Unique ratio threshold for auto-categorization (0.0-1.0) |
 
 #### I/O Settings
 
 | Setting | Type | Default | Applicable Platforms | Description |
 |---------|------|---------|---------------------|-------------|
 | `memory_pool` | str | `"default"` | All | Memory allocator for Arrow: `"default"`, `"jemalloc"`, `"mimalloc"`, `"system"` |
-| `memory_map` | bool | false | Pandas, Dask, Modin | Use memory-mapped files for reading |
+| `memory_map` | bool | false | Pandas and Dask | Use memory-mapped files for reading |
 | `pre_buffer` | bool | true | Pandas, Dask | Pre-buffer data during file reads |
 | `row_group_size` | int | None | Polars, Pandas, cuDF | Row group size for Parquet writing |
 

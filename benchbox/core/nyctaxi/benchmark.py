@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
@@ -28,6 +29,7 @@ from benchbox.core.nyctaxi.schema import (
     TaxiType,
     get_create_tables_sql,
 )
+from benchbox.core.query_catalog_base import TranslatableQueryMixin
 from benchbox.utils.compression_mixin import extract_compression_kwargs
 from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -36,7 +38,41 @@ if TYPE_CHECKING:
     from benchbox.core.connection import DatabaseConnection
 
 
-class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
+# Source-form SQLite/Postgres date idioms needing per-engine rendering before
+# SQLGlot translation (SQLGlot passes DOW/EPOCH through untouched).
+_NYCTAXI_DOW_RE = re.compile(r"EXTRACT\s*\(\s*DOW\s+FROM\s+([^()]+)\)", re.IGNORECASE)
+_NYCTAXI_EPOCH_DIFF_RE = re.compile(
+    r"EXTRACT\s*\(\s*EPOCH\s+FROM\s+\(\s*([^()]+?)\s*-\s*([^()]+?)\s*\)\s*\)",
+    re.IGNORECASE,
+)
+# Snowflake renders EPOCH via DATE_PART; rewrite that post-translation form.
+_NYCTAXI_SF_EPOCH_RE = re.compile(
+    r"DATE_PART\s*\(\s*EPOCH\s*,\s*\(\s*([^()]+?)\s*-\s*([^()]+?)\s*\)\s*\)",
+    re.IGNORECASE,
+)
+
+# Cloud dialects whose date-part syntax differs from the Postgres source.
+# Other dialects (duckdb, postgres, clickhouse, starrocks, …) keep the
+# established raw/variant behavior.
+_NYCTAXI_TRANSLATED_DIALECTS = ("bigquery", "snowflake", "databricks", "spark")
+
+# Every dialect get_queries() can actually render: the native Postgres source,
+# DuckDB (executes the raw source; covered by test_nyctaxi_duckdb.py), the
+# SQLGlot-translated cloud dialects, and the registry-backed variants.
+# Anything else (e.g. mysql, datafusion) receives untranslated Postgres SQL,
+# so it must NOT be advertised as supported -- query_catalog falls back to the
+# default render instead of mislabeling the source SQL as that dialect.
+_NYCTAXI_SUPPORTED_DIALECTS = (
+    "postgres",
+    "postgresql",
+    "duckdb",
+    *_NYCTAXI_TRANSLATED_DIALECTS,
+    "clickhouse",
+    "starrocks",
+)
+
+
+class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenchmark):
     """NYC Taxi OLAP benchmark implementation.
 
     Uses real NYC TLC trip data for OLAP analytics workloads. Supports three
@@ -280,10 +316,6 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if self.hvfhv_downloader is not None:
             row_counts.update(self.hvfhv_downloader.get_download_stats().get("row_counts", {}))
 
-        # Skip manifest when all downloaders reused cached data (no row counts collected)
-        if not row_counts:
-            return
-
         manifest = DataGenerationManifest(
             output_dir=self.output_dir,
             benchmark="nyctaxi",
@@ -291,6 +323,21 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             compression=resolve_compression_metadata(self.downloader),
             parallel=1,
             seed=self.seed,
+            extra_metadata={
+                "source_provenance": {
+                    "trips": self.downloader.source_provenance(),
+                    **(
+                        {"green_trips": self.green_downloader.source_provenance()}
+                        if self.green_downloader is not None
+                        else {}
+                    ),
+                    **(
+                        {"hvfhv_trips": self.hvfhv_downloader.source_provenance()}
+                        if self.hvfhv_downloader is not None
+                        else {}
+                    ),
+                }
+            },
         )
 
         for table, path in self.tables.items():
@@ -301,12 +348,41 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 metadata={
                     "csv_delimiter": ",",
                     "csv_has_header": True,
-                    "csv_null_marker": None,
+                    "csv_null_marker": "",
                     "csv_normalize_booleans": False,
                 },
             )
 
         manifest.write()
+
+    def supported_dialects(self) -> list[str]:
+        """Return dialects whose query rendering get_queries() actually provides."""
+        return list(_NYCTAXI_SUPPORTED_DIALECTS)
+
+    def translate_query_text(self, query_text: str, target_dialect: str) -> str:
+        """Translate a query to a cloud dialect, rendering date-part idioms.
+
+        Postgres ``DATE_TRUNC('day'|'month', …)`` is handled by SQLGlot.
+        ``EXTRACT(DOW …)`` and ``EXTRACT(EPOCH FROM (b - a))`` pass through
+        SQLGlot untouched, so they are rendered per engine here. DOW keeps
+        Postgres numbering (Sunday=0 … Saturday=6): BigQuery and Spark
+        number Sunday=1, hence the ``- 1``; Snowflake already numbers
+        Sunday=0.
+        """
+        d = target_dialect.lower()
+        if "bigquery" in d:
+            query_text = _NYCTAXI_DOW_RE.sub(r"(EXTRACT(DAYOFWEEK FROM \1) - 1)", query_text)
+            # Trip timestamps load as DATETIME; UNIX_SECONDS needs TIMESTAMP.
+            query_text = _NYCTAXI_EPOCH_DIFF_RE.sub(
+                r"(UNIX_SECONDS(TIMESTAMP(\1)) - UNIX_SECONDS(TIMESTAMP(\2)))", query_text
+            )
+        elif "databricks" in d or "spark" in d:
+            query_text = _NYCTAXI_DOW_RE.sub(r"(DAYOFWEEK(\1) - 1)", query_text)
+            query_text = _NYCTAXI_EPOCH_DIFF_RE.sub(r"(UNIX_TIMESTAMP(\1) - UNIX_TIMESTAMP(\2))", query_text)
+        query_text = super().translate_query_text(query_text, target_dialect)
+        if "snowflake" in d:
+            query_text = _NYCTAXI_SF_EPOCH_RE.sub(r"(DATEDIFF(second, \2, \1))", query_text)
+        return query_text
 
     def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all benchmark queries.
@@ -314,6 +390,8 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Args:
             dialect: Target SQL dialect. When 'clickhouse' or 'starrocks', replaces queries that
                 use EXTRACT(DOW/EPOCH …) with platform-native equivalents.
+                Cloud dialects (bigquery, snowflake, databricks/spark) are
+                SQLGlot-translated with per-engine date-part rendering.
 
         Returns:
             Dictionary mapping query IDs to query strings
@@ -338,6 +416,8 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             return queries
 
         d = dialect.lower()
+        if any(platform in d for platform in _NYCTAXI_TRANSLATED_DIALECTS):
+            queries = {qid: self.translate_query_text(sql, dialect) for qid, sql in queries.items()}
         qm = self.query_manager
         _variants: dict[str, dict[str, str]] = {
             "starrocks": {
@@ -685,4 +765,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
+    benchmark_class=NYCTaxiBenchmark,
 )

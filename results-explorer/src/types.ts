@@ -9,6 +9,14 @@ export interface Environment {
   cpu_count?: number;
   memory_gb?: number;
   python?: string;
+  cpu_model?: string;
+  cpu_family?: string;
+  cpu_identity_provenance?: "measured" | "user_attested" | "inferred";
+  client_region?: string | null;
+  client_cloud?: string | null;
+  statement_overhead_min_ms?: number | null;
+  statement_overhead_median_ms?: number | null;
+  link_status?: string | null;
   [key: string]: string | number | boolean | null | undefined;
 }
 
@@ -110,12 +118,23 @@ export interface DetailResult extends CostDeploymentFields {
   // ledger (treated as "unknown"). Distinct from validation_status (run/query).
   tuning_validation_status?: string | null;
   // ADR-1 per-statement introspection receipt, carried verbatim from the
-  // {stem}.applied.json companion's "receipt" sub-object as an opaque JSON
+  // bundle's platform.tuning.applied.receipt sub-object as an opaque JSON
   // string (see explorer_pipeline/transformer.py::_applied_receipt). The
   // explorer parses it only to display the recorded verdicts and NEVER
   // recomputes a verdict or a corroboration decision from it. Null/undefined
   // when no receipt was published (introspection did not run, legacy bundle).
   applied_receipt?: string | null;
+  // Accepted plausibility-override badge data, ingested verbatim from the
+  // {stem}.override.json companion (see explorer_pipeline/transformer.py::
+  // _override_display): the covered rule ids as a canonical JSON array string
+  // plus the audit fields (evidence link, approver, expiry). The explorer
+  // parses the rule list only to display the badge and NEVER recomputes an
+  // acceptance decision. Null/undefined when no override was accepted (no
+  // companion, invalid, or expired). Display-only; never a join/dedup key.
+  override_rules?: string | null;
+  override_evidence?: string | null;
+  override_approver?: string | null;
+  override_expires?: string | null;
   // ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
   // from platform.tuning (see explorer_pipeline/transformer.py); never derived
   // from benchbox_version. Null/undefined for legacy bundles predating the
@@ -133,6 +152,11 @@ export interface DetailResult extends CostDeploymentFields {
   // field don't need updating.
   physical_mechanisms?: string[];
   physical_rendering_id?: string | null;
+  client_region?: string | null;
+  client_cloud?: string | null;
+  statement_overhead_min_ms?: number | null;
+  statement_overhead_median_ms?: number | null;
+  link_status?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -169,6 +193,13 @@ export interface PlatformRow extends CostDeploymentFields {
   /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   validation_status?: string | null;
+  /**
+   * Accepted plausibility-override rule ids (canonical JSON array string).
+   * Attached client-side from the results-table join, like validation_status
+   * above — never part of the summary artifact. Optional so pre-v11 snapshots
+   * default to undefined (no badge). Display-only.
+   */
+  override_rules?: string | null;
   run_date: string;
   is_ranking_eligible: boolean;
   has_display_timing: boolean;
@@ -190,6 +221,9 @@ export interface PlatformRow extends CostDeploymentFields {
   phase_durations: Record<string, number> | null;
   timings: Record<string, number | null>;
   timing_eligibility: Record<string, Pick<QueryDisplayTiming, "is_valid_display_timing" | "timing_exclusion_reason">>;
+  arch?: string | null;
+  cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface BenchmarkSummary {

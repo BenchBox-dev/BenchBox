@@ -181,8 +181,11 @@ def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
 
 
 def _rule_by_type(ruleset: dict[str, Any], rule_type: str) -> dict[str, Any] | None:
-    for rule in ruleset.get("rules", []):
-        if rule.get("type") == rule_type:
+    rules = ruleset.get("rules", [])
+    if not isinstance(rules, list):
+        return None
+    for rule in rules:
+        if isinstance(rule, dict) and rule.get("type") == rule_type:
             return rule
     return None
 
@@ -335,6 +338,87 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
     return _api_json(f"https://api.github.com/repos/{repo}/environments/{name}", token)
 
 
+# Approved native merge-queue parameters for refs/heads/develop, per
+# _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
+# amendment: ALLGREEN, 60-minute timeout, max 5 build / 5 merge). One
+# expected-policy source; protected-setting changes are reported for
+# operator action, never silently repaired.
+APPROVED_MERGE_QUEUE: dict[str, object] = {
+    "merge_method": "SQUASH",
+    "grouping_strategy": "ALLGREEN",
+    "min_entries_to_merge": 1,
+    "max_entries_to_build": 5,
+    "max_entries_to_merge": 5,
+    "check_response_timeout_minutes": 60,
+    "min_entries_to_merge_wait_minutes": 0,
+}
+APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
+    "ci-required-result",
+    "Results Explorer browser gate",
+    "ruleset-drift",
+)
+
+
+def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
+    """Validate the live merge_queue rule against the approved parameters.
+
+    A missing rule is blocking when the payload is otherwise well-formed
+    (other rules visible proves the API is not redacting): an absent queue
+    rule invalidates queue-aware publication policy. Only an empty or
+    unreadable payload stays a non-blocking warning; present-but-different
+    parameters are blocking findings for operator action.
+    """
+    findings: list[str] = []
+    rule = _rule_by_type(live, "merge_queue")
+    if rule is None:
+        if live.get("rules"):
+            return [
+                f"{name}: ruleset payload lists rules but no merge_queue rule; "
+                "queue-aware publication is unverified, verify queue parameters "
+                "(SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"
+            ]
+        return [
+            f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
+            "verify queue parameters (SQUASH/ALLGREEN/1/5/5/60m/0) in repository settings"
+        ]
+    raw_params = rule.get("parameters")
+    if raw_params is None:
+        params: dict[str, Any] = {}
+    elif not isinstance(raw_params, dict):
+        return [f"{name}: merge_queue parameters are malformed; queue-aware publication is unverified"]
+    else:
+        params = raw_params
+    for key, approved in APPROVED_MERGE_QUEUE.items():
+        live_value = params.get(key)
+        if live_value != approved:
+            findings.append(f"{name}: merge_queue {key} is {live_value!r}, expected {approved!r}")
+    return findings
+
+
+def queue_policy_findings(expected: ExpectedRuleset, live: dict[str, Any] | None) -> list[str]:
+    """Return every finding that prevents queue-aware stale publication.
+
+    The local landing path needs more than the queue parameter object: required
+    checks, strict current-base enforcement, and the no-bypass/review
+    protections must still be visible on the same develop ruleset. A warning
+    or an unreadable payload is therefore never a verified queue.
+    """
+    if live is None:
+        return [f"{expected.name}: live ruleset is missing; queue-aware publication is unverified"]
+    findings = compare_ruleset(
+        expected,
+        live,
+        require_bypass_actor_visibility=True,
+    )
+    findings.extend(merge_queue_findings(live, expected.name))
+    return findings
+
+
+def queue_policy_verified(expected: ExpectedRuleset, live: dict[str, Any] | None) -> bool:
+    """Return true only for a complete, visible, approved queue configuration."""
+    return not queue_policy_findings(expected, live)
+
+
 def blocking_findings(findings: list[str]) -> list[str]:
     """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
@@ -360,7 +444,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))
+    parser.add_argument(
+        "--token-stdin",
+        action="store_true",
+        help="read the GitHub token from stdin so it is never exposed in process arguments",
+    )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--queue-policy",
+        action="store_true",
+        help="Check only the develop queue and its required protections for local stale-base publication.",
+    )
     parser.add_argument(
         "--require-bypass-actor-visibility",
         action="store_true",
@@ -375,22 +469,63 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: failed to parse ruleset runbook: {exc}", file=sys.stderr)
         return 1
     if override:
-        payload = {"status": "override", "reason": reason, "rulesets": sorted(expected)}
+        payload = {
+            "status": "override",
+            "queue_verified": False,
+            "reason": reason,
+            "rulesets": sorted(expected),
+        }
         if args.output:
             args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"Ruleset drift override active: {reason}")
-        return 0
-    if not args.token:
-        print("ERROR: ruleset drift check requires RULESET_DRIFT_TOKEN or --token.", file=sys.stderr)
+        return 1 if args.queue_policy else 0
+    token = args.token
+    if args.token_stdin:
+        token = sys.stdin.read().strip()
+    if not token:
+        if args.queue_policy and args.output:
+            args.output.write_text(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "queue_verified": False,
+                        "error": "ruleset drift check requires RULESET_DRIFT_TOKEN, --token, or --token-stdin",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+        print("ERROR: ruleset drift check requires RULESET_DRIFT_TOKEN, --token, or --token-stdin.", file=sys.stderr)
         return 1
 
     try:
-        live_by_name = _fetch_live_rulesets(args.repo, args.token)
-        live_pypi_environment = _fetch_environment(args.repo, args.token)
+        live_by_name = _fetch_live_rulesets(args.repo, token)
+        if args.queue_policy:
+            queue_findings = queue_policy_findings(
+                expected["develop-squash-only"], live_by_name.get("develop-squash-only")
+            )
+            verified = not queue_findings
+            payload = {
+                "status": "ok" if verified else "failed",
+                "queue_verified": verified,
+                "findings": queue_findings,
+                "blocking_findings": blocking_findings(queue_findings),
+            }
+            if args.output:
+                args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            if verified:
+                print("# Native merge queue - VERIFIED")
+                return 0
+            print("# Native merge queue - UNVERIFIED", file=sys.stderr)
+            for finding in queue_findings:
+                print(f"- {finding}", file=sys.stderr)
+            return 1
+        live_pypi_environment = _fetch_environment(args.repo, token)
     except Exception as exc:
         if args.output:
             args.output.write_text(
-                json.dumps({"status": "error", "error": str(exc)}, indent=2) + "\n",
+                json.dumps({"status": "error", "queue_verified": False, "error": str(exc)}, indent=2) + "\n",
                 encoding="utf-8",
             )
         print(f"ERROR: governance drift check failed while querying GitHub: {exc}", file=sys.stderr)
@@ -409,6 +544,9 @@ def main(argv: list[str] | None = None) -> int:
                 require_bypass_actor_visibility=args.require_bypass_actor_visibility,
             )
         )
+    develop_live = live_by_name.get("develop-squash-only")
+    if develop_live is not None:
+        findings.extend(merge_queue_findings(develop_live, "develop-squash-only"))
     findings.extend(
         tag_creation_findings(
             list(live_by_name.values()),
@@ -419,10 +557,16 @@ def main(argv: list[str] | None = None) -> int:
 
     blocking = blocking_findings(findings)
     summary = render_summary(findings, expected)
+    queue_verified = queue_policy_verified(expected["develop-squash-only"], develop_live)
     if args.output:
         args.output.write_text(
             json.dumps(
-                {"status": "failed" if blocking else "ok", "findings": findings, "blocking_findings": blocking},
+                {
+                    "status": "failed" if blocking else "ok",
+                    "queue_verified": queue_verified,
+                    "findings": findings,
+                    "blocking_findings": blocking,
+                },
                 indent=2,
             )
             + "\n",

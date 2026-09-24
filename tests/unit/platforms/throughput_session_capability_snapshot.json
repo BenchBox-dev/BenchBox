@@ -1,0 +1,416 @@
+{
+  "athena": {
+    "adapter": "benchbox.platforms.athena.AthenaAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "athena",
+    "status": "resolved"
+  },
+  "athena-spark": {
+    "adapter": "benchbox.platforms.aws.athena_spark_adapter.AthenaSparkAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "athena-spark",
+    "status": "resolved"
+  },
+  "bigquery": {
+    "adapter": "benchbox.platforms.bigquery.BigQueryAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "bigquery",
+    "status": "resolved"
+  },
+  "cedardb": {
+    "adapter": "benchbox.platforms.cedardb.CedarDBAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "cedardb",
+    "status": "resolved"
+  },
+  "clickhouse": {
+    "adapter": "benchbox.platforms.clickhouse.adapter.ClickHouseAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "clickhouse",
+    "status": "resolved"
+  },
+  "clickhouse-cloud": {
+    "adapter": "benchbox.platforms.clickhouse_cloud.ClickHouseCloudAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "clickhouse-cloud",
+    "status": "resolved"
+  },
+  "clickhouse-local": {
+    "adapter": "benchbox.platforms.clickhouse_local.ClickHouseLocalAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "clickhouse-local",
+    "status": "resolved"
+  },
+  "clickhouse-server": {
+    "adapter": "benchbox.platforms.clickhouse_server.ClickHouseServerAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "clickhouse-server",
+    "status": "resolved"
+  },
+  "databend": {
+    "adapter": "benchbox.platforms.databend.adapter.DatabendAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "databend",
+    "status": "resolved"
+  },
+  "databricks": {
+    "adapter": "benchbox.platforms.databricks.adapter.DatabricksAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "databricks",
+    "status": "resolved"
+  },
+  "databricks-df": {
+    "adapter": "benchbox.platforms.databricks.dataframe_adapter.DatabricksDataFrameAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "databricks-df",
+    "status": "resolved"
+  },
+  "datafusion": {
+    "adapter": "benchbox.platforms.datafusion.DataFusionAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "datafusion",
+    "status": "resolved"
+  },
+  "dataproc": {
+    "adapter": "benchbox.platforms.gcp.dataproc_adapter.DataprocAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "dataproc",
+    "status": "resolved"
+  },
+  "dataproc-serverless": {
+    "adapter": "benchbox.platforms.gcp.dataproc_serverless_adapter.DataprocServerlessAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "dataproc-serverless",
+    "status": "resolved"
+  },
+  "doris": {
+    "adapter": "benchbox.platforms.doris.DorisAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "doris",
+    "status": "resolved"
+  },
+  "duckdb": {
+    "adapter": "benchbox.platforms.duckdb.DuckDBAdapter",
+    "capability": "shared_cursor",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "duckdb",
+    "status": "resolved"
+  },
+  "ducklake": {
+    "adapter": "benchbox.platforms.ducklake.DuckLakeAdapter",
+    "capability": "shared_cursor",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "ducklake",
+    "status": "resolved"
+  },
+  "emr-serverless": {
+    "adapter": "benchbox.platforms.aws.emr_serverless_adapter.EMRServerlessAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "emr-serverless",
+    "status": "resolved"
+  },
+  "fabric-lakehouse": {
+    "adapter": "benchbox.platforms.fabric_lakehouse.FabricLakehouseAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "fabric-lakehouse",
+    "status": "resolved"
+  },
+  "fabric-spark": {
+    "adapter": "benchbox.platforms.azure.fabric_spark_adapter.FabricSparkAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "fabric-spark",
+    "status": "resolved"
+  },
+  "fabric_dw": {
+    "adapter": "benchbox.platforms.fabric_warehouse.FabricWarehouseAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "fabric_dw",
+    "status": "resolved"
+  },
+  "firebolt": {
+    "adapter": "benchbox.platforms.firebolt.FireboltAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "firebolt",
+    "status": "resolved"
+  },
+  "glue": {
+    "adapter": "benchbox.platforms.aws.glue_adapter.AWSGlueAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "glue",
+    "status": "resolved"
+  },
+  "influxdb": {
+    "adapter": "benchbox.platforms.influxdb.adapter.InfluxDBAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "influxdb",
+    "status": "resolved"
+  },
+  "lakesail": {
+    "adapter": "benchbox.platforms.lakesail.LakeSailAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "lakesail",
+    "status": "resolved"
+  },
+  "motherduck": {
+    "adapter": "benchbox.platforms.motherduck.MotherDuckAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "motherduck",
+    "status": "resolved"
+  },
+  "pg-duckdb": {
+    "adapter": "benchbox.platforms.pg_duckdb.PgDuckDBAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "pg-duckdb",
+    "status": "resolved"
+  },
+  "pg-mooncake": {
+    "adapter": "benchbox.platforms.pg_mooncake.PgMooncakeAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "pg-mooncake",
+    "status": "resolved"
+  },
+  "postgresql": {
+    "adapter": "benchbox.platforms.postgresql.PostgreSQLAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "postgresql",
+    "status": "resolved"
+  },
+  "presto": {
+    "adapter": "benchbox.platforms.presto.PrestoAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "presto",
+    "status": "resolved"
+  },
+  "pyspark": {
+    "adapter": "benchbox.platforms.pyspark.sql_adapter.PySparkSQLAdapter",
+    "capability": "shared_cursor",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "pyspark",
+    "status": "resolved"
+  },
+  "quanton": {
+    "adapter": "benchbox.platforms.onehouse.quanton_adapter.QuantonAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "quanton",
+    "status": "resolved"
+  },
+  "questdb": {
+    "adapter": "benchbox.platforms.questdb.QuestDBAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "questdb",
+    "status": "resolved"
+  },
+  "redshift": {
+    "adapter": "benchbox.platforms.redshift.RedshiftAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "redshift",
+    "status": "resolved"
+  },
+  "singlestore": {
+    "adapter": "benchbox.platforms.singlestore.SingleStoreAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "singlestore",
+    "status": "resolved"
+  },
+  "snowflake": {
+    "adapter": "benchbox.platforms.snowflake.SnowflakeAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "snowflake",
+    "status": "resolved"
+  },
+  "snowpark-connect": {
+    "adapter": "benchbox.platforms.snowpark_connect.SnowparkConnectAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "snowpark-connect",
+    "status": "resolved"
+  },
+  "spark": {
+    "adapter": "benchbox.platforms.spark.SparkAdapter",
+    "capability": "shared_cursor",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "spark",
+    "status": "resolved"
+  },
+  "sqlite": {
+    "adapter": "benchbox.platforms.sqlite.SQLiteAdapter",
+    "capability": "shared_cursor",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "sqlite",
+    "status": "resolved"
+  },
+  "starburst": {
+    "adapter": "benchbox.platforms.starburst.StarburstAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "starburst",
+    "status": "resolved"
+  },
+  "starrocks": {
+    "adapter": "benchbox.platforms.starrocks.adapter.StarRocksAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "starrocks",
+    "status": "resolved"
+  },
+  "synapse": {
+    "adapter": "benchbox.platforms.azure_synapse.AzureSynapseAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "synapse",
+    "status": "resolved"
+  },
+  "synapse-spark": {
+    "adapter": "benchbox.platforms.azure.synapse_spark_adapter.SynapseSparkAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "synapse-spark",
+    "status": "resolved"
+  },
+  "timescaledb": {
+    "adapter": "benchbox.platforms.timescaledb.TimescaleDBAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "timescaledb",
+    "status": "resolved"
+  },
+  "trino": {
+    "adapter": "benchbox.platforms.trino.TrinoAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "trino",
+    "status": "resolved"
+  },
+  "velox": {
+    "adapter": "benchbox.platforms.velox.VeloxAdapter",
+    "capability": "unsupported",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "reject",
+    "key": "velox",
+    "status": "resolved"
+  }
+}

@@ -9,12 +9,12 @@ test.describe("Query workbench", () => {
     // Same webkit cold-start DuckDB-WASM latency noted in
     // benchmark-index.spec.ts (webkit-smoke-fix-or-demote-2): wait for the
     // data-bound heading text before asserting its role.
-    await waitForDataLoaded(page, /Results Query Workbench/i);
-    await expect(page.getByRole("heading", { name: /Results Query Workbench/i })).toBeVisible();
+    await waitForDataLoaded(page, /Find benchmark runs/i);
+    await expect(page.getByRole("heading", { name: /Find benchmark runs/i })).toBeVisible();
 
     // Match count text is the stable landmark that renders once both the
     // facet queries and the main SELECT resolve.
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const main = page.getByRole("main");
     // The default table leads with public column labels rather than raw schema names.
@@ -31,10 +31,10 @@ test.describe("Query workbench", () => {
   test("@smoke filters environment facet fixture rows", async ({ page }) => {
     await page.goto("/results/query");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const summary = page.getByTestId("query-result-summary");
-    await expect(summary).toContainText(/matching result bundle/);
+    await expect(summary).toContainText(/matching run/);
 
     for (const label of ["Deployment", "Cloud provider", "Cloud region", "Instance / warehouse", "Storage"]) {
       await expandFacetGroup(page, label);
@@ -56,7 +56,7 @@ test.describe("Query workbench", () => {
     await expectQueryParam(page, "cloud_provider", "aws");
     await expectQueryParam(page, "cloud_region", "us-east-1");
     await expectQueryParam(page, "shape", "m6i.large");
-    await expect(summary).toContainText("1 matching result bundle");
+    await expect(summary).toContainText("1 matching run");
     await expect(page.getByRole("cell", { name: "Fixture AWS SQL", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Fixture GCP Serverless" })).toHaveCount(0);
 
@@ -66,7 +66,7 @@ test.describe("Query workbench", () => {
     await facetCheckbox(page, "Deployment", "cloud").uncheck();
 
     await expectQueryParam(page, "deployment", null);
-    await expect(summary).toContainText(/matching result bundle/);
+    await expect(summary).toContainText(/matching run/);
 
     await facetCheckbox(page, "Deployment", "local").check();
     await facetCheckbox(page, "Instance / warehouse", "container-cpu-10").check();
@@ -75,7 +75,7 @@ test.describe("Query workbench", () => {
     await expectQueryParam(page, "deployment", "local");
     await expectQueryParam(page, "shape", "container-cpu-10");
     await expectQueryParam(page, "storage_format", "duckdb_native");
-    await expect(summary).toContainText("1 matching result bundle");
+    await expect(summary).toContainText("1 matching run");
     await expect(page.getByRole("cell", { name: "Fixture Container SQL", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Fixture AWS SQL" })).toHaveCount(0);
   });
@@ -95,21 +95,21 @@ test.describe("Query workbench", () => {
 
     await emptyState.getByRole("button", { name: "Clear all filters" }).click();
     await expect.poll(() => new URL(page.url()).search).toBe("");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
   });
 
   test("the explicit trailing-slash query route resolves the same workbench", async ({ page }) => {
     await page.goto("/results/query/");
     await waitForShell(page);
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     await expect(page).toHaveURL(/\/results\/query\/$/);
-    await expect(page.getByRole("heading", { name: /Results Query Workbench/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Find benchmark runs/i })).toBeVisible();
   });
 
   test("clicking a column header toggles its sort indicator", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     // Pick `benchmark` - not the default sort column (run_date desc) so
     // the first click asserts the arrow appears rather than flips. Scope
@@ -127,18 +127,18 @@ test.describe("Query workbench", () => {
 
   test("row-limit toggle updates the URL and keeps one reconciled count", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     await page.getByRole("button", { name: /^All$/ }).click();
     await expect
       .poll(() => new URL(page.url()).searchParams.get("limit"))
       .toBe("all");
     await expect(page.getByTestId("query-result-summary")).toContainText(
-      /Showing \d+–\d+ of \d+ matching result bundle/,
+      /Showing \d+–\d+ of \d+ matching run/,
     );
     await expect(page.getByText(/Query limit:/)).toHaveCount(0);
 
-    await page.getByRole("button", { name: /^Default$/ }).click();
+    await page.getByRole("button", { name: /^Up to 10,000$/ }).click();
     await expect
       .poll(() => new URL(page.url()).searchParams.get("limit"))
       .toBeNull();
@@ -146,7 +146,7 @@ test.describe("Query workbench", () => {
 
   test("toggling a column off removes it from the rendered table", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     // `trust_label` is in the default visible set; untoggle it and the
     // matching columnheader must disappear.
@@ -159,7 +159,7 @@ test.describe("Query workbench", () => {
 
   test("loading a starter query populates the SQL textarea", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     // Advanced SQL is a <details> element collapsed by default; click
     // the summary to expand it before the textarea and starter-query
@@ -176,7 +176,7 @@ test.describe("Query workbench", () => {
 
   test("a read-only write against the attached snapshot surfaces a user-visible error", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     await page.locator("summary", { hasText: "Advanced SQL" }).click();
     const textarea = page.locator("textarea");
@@ -194,7 +194,7 @@ test.describe("Query workbench", () => {
 
   test("Download JSON emits a file with the current query rows", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     // The button triggers an anchor.click() with a blob URL - Playwright's
     // `page.waitForEvent('download')` captures it deterministically.
@@ -214,7 +214,7 @@ test.describe("Query workbench", () => {
 
   test("Download CSV emits a file while DuckDB external access is disabled", async ({ page }) => {
     await page.goto("/results/query");
-    await waitForDataLoaded(page, /matching result bundle/);
+    await waitForDataLoaded(page, /matching run/);
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: /Download CSV/ }).click();

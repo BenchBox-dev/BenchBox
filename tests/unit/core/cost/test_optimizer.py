@@ -494,20 +494,18 @@ class TestCostOptimizer:
         region_recs = report.get_by_category(OptimizationCategory.REGION)
         assert len(region_recs) >= 1
 
-    def test_analyze_redshift_ds2_to_ra3(self, optimizer):
-        """Test Redshift DS2 to RA3 node type recommendation."""
-        # Create scenario where RA3 is cheaper
-        # Note: RA3 nodes are often more expensive per hour but may be
-        # more cost-effective due to managed storage - this is a complex
-        # optimization that depends on storage usage patterns
+    def test_analyze_redshift_retired_node_no_sizing_rec(self, optimizer):
+        """Test Redshift retired node types yield no sizing recommendation."""
+        # DS2 nodes were retired and removed from the pricing table, so a
+        # config naming one resolves to the $1.00 unknown-node fallback.
+        # The optimizer must not build a migration recommendation on a
+        # fallback price.
         redshift_cost = BenchmarkCost(
             total_cost=100.0,
             currency="USD",
             platform_details={"platform": "redshift"},
         )
 
-        # DS2.8xlarge is $6.80/hr, RA3.xlplus is $1.086/hr
-        # This would only recommend RA3 if it's actually cheaper
         redshift_config = {
             "platform": "redshift",
             "node_type": "ds2.8xlarge",
@@ -521,10 +519,8 @@ class TestCostOptimizer:
             annual_runs=12,
         )
 
-        # DS2 -> RA3 recommendation only appears when RA3 is cheaper
-        # In this case, RA3.xlplus ($1.086) < DS2.8xlarge ($6.80)
         sizing_recs = report.get_by_category(OptimizationCategory.RESOURCE_SIZING)
-        assert len(sizing_recs) >= 1
+        assert len(sizing_recs) == 0
 
     def test_analyze_databricks(self, optimizer):
         """Test Databricks optimization analysis."""

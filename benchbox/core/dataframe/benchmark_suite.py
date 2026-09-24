@@ -57,6 +57,7 @@ from typing import TYPE_CHECKING, Any
 
 from benchbox.core.dataframe.profiling import (
     MemoryTracker,
+    capture_query_plan,
 )
 from benchbox.core.tpch.dataframe_queries import get_tpch_dataframe_queries
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
@@ -65,6 +66,52 @@ if TYPE_CHECKING:
     from benchbox.core.dataframe.context import DataFrameContext
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_table_paths(parquet_dir: Path, table: str) -> list[Path]:
+    """Resolve the parquet files backing one TPC-H table.
+
+    Datagen writes small tables as a single ``{table}.parquet`` file and
+    shards large tables as ``{table}.<shard>.parquet`` (e.g.
+    ``lineitem.2.parquet``). Prefer the single file when present; otherwise
+    return the numeric shards in shard order so multi-file adapters load the
+    same rows the ``run`` path stages from ``benchmark.tables``.
+
+    Args:
+        parquet_dir: Directory containing parquet data (or versioned
+            ``parquet/v8``-style layout resolved by the caller).
+        table: Table name (e.g., ``"lineitem"``).
+
+    Returns:
+        Ordered list of parquet paths, empty when no single file and no
+        numerically-suffixed shards are found. Non-numeric suffixes such as
+        ``lineitem.bak.parquet`` are ignored.
+
+    Shard-suffix parsing mirrors the generator convention
+    (``benchbox/core/tpch/generator.py``): the suffix must satisfy
+    ``str.isdigit``.
+    """
+    single = parquet_dir / f"{table}.parquet"
+    shards: list[tuple[int, Path]] = []
+    for candidate in parquet_dir.glob(f"{table}.*.parquet"):
+        try:
+            suffix = candidate.stem.rsplit(".", 1)[1]
+        except IndexError:
+            continue
+        if not suffix.isdigit():
+            continue
+        shards.append((int(suffix), candidate))
+    if single.exists():
+        if shards:
+            logger.warning(
+                "Both %s and %d numerically-suffixed shard(s) exist; using the single file",
+                single,
+                len(shards),
+            )
+        return [single]
+    if not shards:
+        logger.warning("No parquet files found for table %s under %s", table, parquet_dir)
+    return [path for _, path in sorted(shards)]
 
 
 class PlatformCategory(Enum):
@@ -133,13 +180,6 @@ PLATFORM_CAPABILITIES: dict[str, PlatformCapability] = {
         supports_lazy=True,
         supports_distributed=True,
         memory_notes="Distributed execution, configurable memory management",
-    ),
-    "modin-df": PlatformCapability(
-        platform_name="modin-df",
-        family="pandas",
-        category=PlatformCategory.DISTRIBUTED,
-        supports_distributed=True,
-        memory_notes="Pandas API with Ray/Dask backend for multi-core execution",
     ),
     "cudf-df": PlatformCapability(
         platform_name="cudf-df",
@@ -574,9 +614,9 @@ class DataFrameBenchmarkSuite:
 
         # Load tables using the adapter's load_table method
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                adapter.load_table(ctx, table, [table_path])
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                adapter.load_table(ctx, table, table_paths)
 
         return ctx
 
@@ -659,6 +699,24 @@ class DataFrameBenchmarkSuite:
                         rows_returned = 0
 
                 del result
+
+            # Capture after the measured loop so explain/materialization work
+            # cannot warm or inflate the reported query timings. Only the
+            # profiling module's supported families can produce a plan;
+            # capability.supports_lazy is broader than that set (for example,
+            # Dask is lazy but has no capture implementation here).
+            supported_plan_platforms = {"polars", "datafusion", "pyspark"}
+            if self.config.capture_plans and platform_name.lower().replace("-df", "") in supported_plan_platforms:
+                plan_frame = None
+                try:
+                    plan_frame = query.execute(context, family)
+                    plan = capture_query_plan(plan_frame, platform_name)
+                    if plan is not None and plan.plan_type != "error":
+                        query_plan = plan.plan_text
+                except Exception as e:
+                    logger.debug(f"Could not capture DataFrame plan for {query_id}: {e}")
+                finally:
+                    del plan_frame
 
             return QueryBenchmarkResult(
                 query_id=query_id,
@@ -1140,9 +1198,12 @@ class SQLVsDataFrameBenchmark:
         conn = duckdb.connect()
         tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                conn.execute(f"CREATE TABLE {table} AS SELECT * FROM read_parquet('{table_path}')")
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                conn.execute(
+                    f"CREATE TABLE {table} AS SELECT * FROM read_parquet(?)",
+                    [[str(path) for path in table_paths]],
+                )
         return conn
 
     @staticmethod
@@ -1155,10 +1216,11 @@ class SQLVsDataFrameBenchmark:
         conn = sqlite3.connect(":memory:")
         tables = ["lineitem", "orders", "customer", "supplier", "part", "partsupp", "nation", "region"]
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                df = pd.read_parquet(str(table_path))
-                df.to_sql(table, conn, index=False)
+            table_paths = resolve_table_paths(parquet_dir, table)
+            for index, path in enumerate(table_paths):
+                pd.read_parquet(str(path)).to_sql(
+                    table, conn, index=False, if_exists="replace" if index == 0 else "append"
+                )
         return conn
 
     def _warmup_and_benchmark(self, conn: Any, sql: str) -> tuple[float, int]:
@@ -1208,9 +1270,9 @@ class SQLVsDataFrameBenchmark:
 
         # Load tables
         for table in tables:
-            table_path = parquet_dir / f"{table}.parquet"
-            if table_path.exists():
-                adapter.load_table(ctx, table, [table_path])
+            table_paths = resolve_table_paths(parquet_dir, table)
+            if table_paths:
+                adapter.load_table(ctx, table, table_paths)
 
         # Get query and capability info
         query = self._query_registry.get(query_id)

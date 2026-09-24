@@ -41,6 +41,7 @@ from benchbox.cli.exceptions import (
     create_error_handler,
 )
 from benchbox.cli.help import BenchBoxCommand, advanced_option
+from benchbox.cli.logo import rich_logo
 from benchbox.cli.orchestrator import BenchmarkOrchestrator, resolved_deployment_mode
 from benchbox.cli.output import ResultExporter
 from benchbox.cli.platform import get_platform_alias_mode, get_platform_manager, normalize_platform_name
@@ -84,6 +85,7 @@ from benchbox.core.results.status import result_cli_failure_reason, result_non_c
 from benchbox.core.schemas import ExecutionContext
 from benchbox.core.tuning import modes as tuning_modes
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
+from benchbox.platforms.adapter_factory import _reject_removed_platform
 from benchbox.utils.cloud_storage import is_cloud_path
 from benchbox.utils.compression import CompressionManager
 from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
@@ -522,26 +524,102 @@ class BenchmarkOptionParamType(click.ParamType):
             self.fail("Benchmark option key cannot be empty", param, ctx)
         return key, raw.strip()
 
+    def shell_complete(self, ctx, param, incomplete: str):
+        """Complete registered benchmark-option keys and choice values.
+
+        KEYs come from the BenchmarkHookRegistry specs for the selected
+        --benchmark (so it must precede --benchmark-option on the command
+        line); after KEY=, specs declaring choices complete allowed values.
+        Keys already given on the command line are omitted.
+        """
+        from click.shell_completion import CompletionItem
+
+        specs = _benchmark_specs_for_completion(ctx)
+        if "=" in incomplete:
+            key, _, value_prefix = incomplete.partition("=")
+            return _complete_benchmark_option_value(specs, key.strip(), value_prefix)
+        used = _used_benchmark_option_keys(ctx, specs)
+        return [
+            CompletionItem(f"{name}=", help=spec.help or "")
+            for name, spec in sorted(specs.items())
+            if name.startswith(incomplete.strip().lower()) and name not in used
+        ]
+
+
+def _benchmark_specs_for_completion(ctx) -> dict[str, Any]:
+    """Return registry specs for the --benchmark already on the command line."""
+    from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
+
+    params = getattr(ctx, "params", None) or {}
+    benchmark = params.get("benchmark") or ""
+    benchmark = str(benchmark).strip().lower()
+    if not benchmark:
+        return {}
+    _ensure_benchmark_specs(benchmark)
+    return BenchmarkHookRegistry.list_option_specs(benchmark)
+
+
+def _ensure_benchmark_specs(benchmark: str) -> None:
+    """Import the selected benchmark module so its option specs register.
+
+    Benchmark modules load lazily, so in a fresh CLI process only
+    incidentally-imported benchmarks have specs; without this, completion
+    offers nothing for benchmarks like nyctaxi. Mirrors the
+    `--help-topic benchmarks` eager-import path for one id. Unknown ids stay
+    silent — completion simply offers nothing.
+    """
+    try:
+        from benchbox.core.benchmark_loader import get_core_benchmark_class
+
+        get_core_benchmark_class(benchmark)
+    except (ValueError, ImportError):
+        pass
+
+
+def _find_benchmark_spec(specs: dict[str, Any], key: str):
+    """Return the spec for a key or alias, or None when unknown."""
+    lowered = str(key).strip().lower()
+    for name, spec in specs.items():
+        if lowered == name or lowered in {str(a).lower() for a in spec.aliases}:
+            return spec
+    return None
+
+
+def _used_benchmark_option_keys(ctx, specs: dict[str, Any]) -> set[str]:
+    """Canonical benchmark-option keys already present on the command line."""
+    params = getattr(ctx, "params", None) or {}
+    used: set = set()
+    for key, _raw in params.get("benchmark_option_pairs") or ():
+        spec = _find_benchmark_spec(specs, key)
+        if spec is not None:
+            used.add(spec.name.lower())
+    return used
+
+
+def _complete_benchmark_option_value(specs: dict[str, Any], key: str, value_prefix: str):
+    """Complete allowed values after KEY= for specs declaring choices."""
+    from click.shell_completion import CompletionItem
+
+    target = _find_benchmark_spec(specs, key)
+    if target is None or not target.choices:
+        return []
+    if "," in value_prefix:
+        stem, _, tail = value_prefix.rpartition(",")
+        stem += ","
+    else:
+        stem, tail = "", value_prefix
+    return [
+        CompletionItem(f"{stem}{choice}", help=target.help or "")
+        for choice in (str(choice) for choice in target.choices)
+        if choice.startswith(tail)
+    ]
+
 
 def _derive_execution_type(phases: list[str]) -> str:
     """Derive benchmark execution type through the shared core service."""
     from benchbox.core.run_service import map_phases_to_execution_type
 
     return map_phases_to_execution_type(phases)
-
-
-def _describe_platform_options(platform_names: Iterable[str]) -> None:
-    for name in platform_names:
-        platform_key = name.lower()
-        lines = PlatformHookRegistry.describe_options(platform_key)
-        header = f"[bold cyan]{platform_key} platform options[/bold cyan]"
-        if not lines:
-            console.print(f"{header}: (no platform-specific options registered)")
-            continue
-        console.print(header)
-        for line in lines:
-            console.print(f"  • {line}")
-        console.print()
 
 
 from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging  # noqa: E402
@@ -588,22 +666,23 @@ def _apply_cli_adapter(s: types.SimpleNamespace) -> None:
     s.enable_postgen_manifest_validation = val_config.postgen
     s.enable_postload_validation = val_config.postload
 
-    s.describe_platforms = ()
     s.plan_queries = s.plan_queries_str
 
 
 def _validate_initial_flags(s: types.SimpleNamespace) -> None:
-    """Validate describe_platforms, quiet+verbose, official mode."""
-    if s.describe_platforms:
-        _describe_platform_options(s.describe_platforms)
-        s.ctx.exit(0)
-
+    """Validate quiet+verbose, official mode."""
     if s.quiet and s.verbose:
         console.print("[red]❌ --quiet cannot be used with -v/-vv flags[/red]")
         s.ctx.exit(2)
 
     if s.official:
-        tpc_allowed = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
+        benchmark = normalize_benchmark_name(s.benchmark) if s.benchmark else None
+        if benchmark == "tpch":
+            from benchbox.core.tpch.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
+        elif benchmark == "tpcds":
+            from benchbox.core.tpcds.compliance import OFFICIAL_SCALE_POINTS as tpc_allowed
+        else:
+            tpc_allowed = frozenset({1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000})
         if s.scale not in tpc_allowed:
             console.print(f"[red]❌ Scale factor {s.scale} is not TPC-compliant[/red]")
             console.print(f"Allowed scale factors: {sorted(tpc_allowed)}")
@@ -921,6 +1000,8 @@ def _derive_exec_type_and_banner(s: types.SimpleNamespace) -> None:
     # to a log) misrepresents the run as interactive.
     is_interactive = sys.stdin.isatty() and not (s.platform and s.benchmark)
     if not s.quiet and is_interactive:
+        if (logo := rich_logo()) is not None:
+            console.print(logo, end="\n\n")
         console.print(
             Panel.fit(
                 Text("BenchBox Interactive Benchmark Runner", style="bold blue"),
@@ -957,9 +1038,30 @@ def _check_platforms_status(s: types.SimpleNamespace) -> None:
         console.print("[green]All enabled platforms are ready![/green]")
 
 
+def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
+    """Reject selectors for platforms removed from BenchBox."""
+    raw_platform = getattr(s, "platform", None)
+    for candidate in (raw_platform, getattr(s, "platform_key", None)):
+        if not candidate:
+            continue
+        try:
+            _reject_removed_platform(candidate)
+        except ValueError as exc:
+            console.print(f"[red]❌ {exc}[/red]")
+            if s.logger:
+                s.logger.error(str(exc))
+            if hasattr(s, "ctx") and s.ctx is not None and hasattr(s.ctx, "exit"):
+                s.ctx.exit(1)
+                return False
+            raise
+    return True
+
+
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
     """Validate platform, resolve execution mode, and check availability."""
     s.resolved_mode = None
+    if not _validate_not_removed_platform(s):
+        return
     if not s.platform_key:
         return
 
@@ -1004,7 +1106,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
                 is_available = s.platform_manager.is_platform_available(s.platform_key)
         else:
             is_available = caps.supports_dataframe
-            if is_available and s.platform_key in ["polars", "pandas", "modin", "cudf", "dask"]:
+            if is_available and s.platform_key in ["polars", "pandas", "cudf", "dask"]:
                 df_platforms = list_available_dataframe_platforms()
                 legacy_key = f"{s.platform_key}-df"
                 is_available = df_platforms.get(legacy_key, df_platforms.get(s.platform_key, False))
@@ -1026,9 +1128,7 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
     if not s.platform_key or not s.benchmark:
         return
 
-    caps = PlatformRegistry.get_platform_capabilities(s.platform_key)
-    unsupported_benchmarks = getattr(caps, "unsupported_benchmarks", None) if caps else None
-    block_reason: str | None = unsupported_benchmarks.get(s.benchmark) if unsupported_benchmarks else None
+    block_reason = PlatformRegistry.get_benchmark_block_reason(s.platform_key, s.benchmark)
 
     if block_reason is None:
         return
@@ -1351,6 +1451,9 @@ def _build_benchmark_config(
         **_strict_translation_config_entry(s),
         **_platform_option_config_entries(s),
         **({"benchmark_options": s.parsed_benchmark_options} if s.parsed_benchmark_options else {}),
+        **({"client_region": s.client_region} if getattr(s, "client_region", None) is not None else {}),
+        **({"client_cloud": s.client_cloud} if getattr(s, "client_cloud", None) is not None else {}),
+        **({"link_probe": not s.no_link_probe} if getattr(s, "no_link_probe", None) is not None else {}),
     }
     return BenchmarkConfig(
         name=plan.benchmark,
@@ -1368,6 +1471,9 @@ def _build_benchmark_config(
         stats_reset=s.stats_reset,
         stats_per_table_timing=s.stats_per_table_timing,
         official=s.official,
+        client_region=getattr(s, "client_region", None),
+        client_cloud=getattr(s, "client_cloud", None),
+        link_probe=not getattr(s, "no_link_probe", False),
         options=options,
     )
 
@@ -1438,6 +1544,23 @@ def _warn_tpcds_subscale(s: types.SimpleNamespace) -> None:
         )
 
 
+def _warn_tpch_subscale(s: types.SimpleNamespace) -> None:
+    if s.benchmark == "tpch" and s.scale < 1.0 and not s.quiet:
+        console.print(
+            "[yellow]⚠  TPC-H UNOFFICIAL SUBSCALE RUN[/yellow]\n"
+            f"   Scale factor: [bold]{s.scale}[/bold] (< 1.0 - not TPC-H compliant)\n"
+            "   Results are for development use only and must not be published or\n"
+            "   submitted as official TPC-H results. Official TPC metrics\n"
+            "   (QphH, power@size, throughput@size) will not be computed."
+        )
+
+
+def _warn_unofficial_subscale(s: types.SimpleNamespace) -> None:
+    """Warn on subscale runs for every compliance-gated TPC benchmark."""
+    _warn_tpcds_subscale(s)
+    _warn_tpch_subscale(s)
+
+
 def _run_dry_run(s: types.SimpleNamespace) -> None:
     """Execute the --dry-run path."""
     ctx = s.ctx
@@ -1479,7 +1602,7 @@ def _run_dry_run(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -1621,7 +1744,7 @@ def _run_direct(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -1817,7 +1940,7 @@ def _run_data_or_load_only(s: types.SimpleNamespace) -> None:
             logger.error(f"Scale factor validation failed: {e}")
         s.ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     benchmark_config = _build_benchmark_config(s, benchmark_info)
 
@@ -2081,7 +2204,7 @@ def _interactive_try_quick_restart(s: types.SimpleNamespace) -> bool:
             s.logger.error(f"Scale factor validation failed: {e}")
         s.ctx.exit(1)
 
-    _warn_tpcds_subscale(s)
+    _warn_unofficial_subscale(s)
 
     s.benchmark_config = _build_benchmark_config(s, benchmark_info)
     console.print()
@@ -2507,6 +2630,9 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
     s.benchmark_config.test_execution_type = plan.test_execution_type
     s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
     s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+    s.benchmark_config.client_region = getattr(s, "client_region", None)
+    s.benchmark_config.client_cloud = getattr(s, "client_cloud", None)
+    s.benchmark_config.link_probe = not getattr(s, "no_link_probe", False)
     s.benchmark_config.options.update(
         {
             "table_mode": plan.table_mode,
@@ -2514,6 +2640,12 @@ def _finalize_normal_interactive_plan(s: types.SimpleNamespace) -> None:
             "unified_tuning_configuration": plan.loaded_unified_config,
         }
     )
+    if getattr(s, "client_region", None) is not None:
+        s.benchmark_config.options["client_region"] = s.client_region
+    if getattr(s, "client_cloud", None) is not None:
+        s.benchmark_config.options["client_cloud"] = s.client_cloud
+    if getattr(s, "no_link_probe", None) is not None:
+        s.benchmark_config.options["link_probe"] = not s.no_link_probe
     if plan.seed is None:
         s.benchmark_config.options.pop("seed", None)
     else:
@@ -2540,6 +2672,9 @@ def _interactive_preflight_and_execute(s: types.SimpleNamespace, system_profile:
         # Quick restart already finalized both configs from the atomic plan.
         s.benchmark_config.stats_reset = getattr(s, "stats_reset", None)
         s.benchmark_config.stats_per_table_timing = bool(getattr(s, "stats_per_table_timing", False))
+        s.benchmark_config.client_region = getattr(s, "client_region", None)
+        s.benchmark_config.client_cloud = getattr(s, "client_cloud", None)
+        s.benchmark_config.link_probe = not getattr(s, "no_link_probe", False)
         # Quick restart already finalized concurrency in its resolved plan.
         if getattr(s, "concurrency", None) is not None:
             s.benchmark_config.concurrency = s.concurrency
@@ -2947,11 +3082,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 )
 @advanced_option("--seed", type=int, help="RNG seed for query parameter generation")
 @advanced_option(
+    "--streams",
     "--concurrency",
+    "concurrency",
     type=click.IntRange(min=1),
     default=None,
     hidden=True,
-    help="Concurrent streams (hidden; for run-official)",
+    help="Concurrent streams for throughput (canonical; --concurrency accepted as alias for run-official forwarding)",
 )
 @advanced_option(
     "--iterations",
@@ -3008,6 +3145,24 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
         "vendor label is assigned downstream under maintainer control."
     ),
 )
+@click.option(
+    "--client-region",
+    type=str,
+    default=None,
+    help="Attested client cloud region (e.g. us-east-1).",
+)
+@click.option(
+    "--client-cloud",
+    type=str,
+    default=None,
+    help="Attested client cloud provider (e.g. aws, gcp, azure).",
+)
+@click.option(
+    "--no-link-probe",
+    is_flag=True,
+    default=False,
+    help="Disable post-benchmark statement overhead probe.",
+)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -3054,6 +3209,9 @@ def run(
     publish_label: str,
     funding: str | None,
     result_source: str | None,
+    client_region: str | None = None,
+    client_cloud: str | None = None,
+    no_link_probe: bool = False,
 ) -> None:
     """Run benchmarks.
 
@@ -3119,6 +3277,9 @@ def run(
         publish_label=publish_label,
         funding=funding,
         result_source=result_source,
+        client_region=client_region,
+        client_cloud=client_cloud,
+        no_link_probe=no_link_probe,
     )
     _prepare_run_state(s)
 

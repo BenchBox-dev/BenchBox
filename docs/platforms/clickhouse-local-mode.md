@@ -38,7 +38,7 @@ cell. Non-ACL catalog queries remain supported in local mode.
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Supported platforms: macOS and Linux (x86_64 and ARM64)
 
 ### Install chDB
@@ -181,7 +181,7 @@ Error: chDB installation failed or not compatible with your platform
 **Solution:**
 - Ensure you're on macOS or Linux (x86_64/ARM64)
 - Ensure your environment is synced with `uv sync --group dev`
-- Check Python version: `uv run -- python --version` (3.10+ required)
+- Check Python version: `uv run -- python --version` (3.11+ required)
 
 #### 3. Memory Issues with Large Datasets
 ```
@@ -328,4 +328,4 @@ To contribute to ClickHouse local mode support:
 - [chDB Official Repository](https://github.com/chdb-io/chdb)
 - [ClickHouse Documentation](https://clickhouse.com/docs)
 - [BenchBox Platform Documentation](index.md)
-- [TPC-H Benchmark Guide](../benchmarks/tpch.md)
+- [TPC-H Benchmark Guide](../benchmarks/tpc-h.md)

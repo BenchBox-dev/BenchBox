@@ -61,12 +61,6 @@ class TestDataFrameInit:
         assert isinstance(POLARS_AVAILABLE, bool)
         assert isinstance(PANDAS_AVAILABLE, bool)
 
-    def test_optional_modin_export(self):
-        from benchbox.platforms.dataframe import MODIN_AVAILABLE, ModinDataFrameAdapter
-
-        assert isinstance(MODIN_AVAILABLE, bool)
-        assert ModinDataFrameAdapter is None or callable(ModinDataFrameAdapter)
-
     def test_optional_cudf_export(self):
         from benchbox.platforms.dataframe import CUDF_AVAILABLE, CuDFDataFrameAdapter
 
@@ -106,7 +100,6 @@ class TestDataFrameInit:
     @pytest.mark.parametrize(
         "module_name,flag_name,adapter_name",
         [
-            ("benchbox.platforms.dataframe.modin_df", "MODIN_AVAILABLE", "ModinDataFrameAdapter"),
             ("benchbox.platforms.dataframe.cudf_df", "CUDF_AVAILABLE", "CuDFDataFrameAdapter"),
             ("benchbox.platforms.dataframe.dask_df", "DASK_AVAILABLE", "DaskDataFrameAdapter"),
             ("benchbox.platforms.dataframe.datafusion_df", "DATAFUSION_DF_AVAILABLE", "DataFusionDataFrameAdapter"),
@@ -1115,8 +1108,10 @@ class TestAthenaAdditionalCoverage:
         adapter._query_count = 4
 
         summary = adapter.get_cost_summary()
-        assert summary["total_cost_usd"] == 10.0
-        assert summary["average_cost_per_query_usd"] == 2.5
+        # Decimal TB per the unit contract: 2 * 2^40 bytes at $5.00/TB.
+        expected_total = (2 * (1024**4)) / (10**12) * 5.0
+        assert summary["total_cost_usd"] == pytest.approx(expected_total)
+        assert summary["average_cost_per_query_usd"] == pytest.approx(expected_total / 4)
 
         assert adapter._extract_table_name("CREATE TABLE MixedName (id INT)") == "mixedname"
         assert adapter._extract_table_name("SELECT 1") is None
@@ -1128,7 +1123,7 @@ class TestAthenaAdditionalCoverage:
         conn.cursor.return_value = cur
         assert "line1" in adapter.get_query_plan(conn, "SELECT 1")
         cur.execute.side_effect = RuntimeError("bad explain")
-        assert "Could not get query plan" in adapter.get_query_plan(conn, "SELECT 1")
+        assert adapter.get_query_plan(conn, "SELECT 1") is None
 
     def test_connection_tuning_and_table_helpers(self):
         from benchbox.core.tuning.interface import TuningType

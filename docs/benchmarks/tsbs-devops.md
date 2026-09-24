@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `tsbs_devops` - use `benchbox run --benchmark tsbs_devops`
+>
+> **Query templates:** [every TSBS DevOps query](queries/tsbs_devops/index.md)
 
 ## Overview
 

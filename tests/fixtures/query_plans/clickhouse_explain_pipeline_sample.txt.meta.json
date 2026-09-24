@@ -1,0 +1,5 @@
+{
+  "provenance": "synthetic",
+  "models": "ClickHouse EXPLAIN PIPELINE documented text shape",
+  "validated_against_live": false
+}

@@ -17,63 +17,89 @@ baseline that provides that depth before Phase 2 community submissions or any fu
 Phase 3 hosted service.
 
 The hard requirement today is still the validator gate in `results-data/validate_corpus.py`:
-every committed cohort must have at least 3 platforms. Any workflow target that lands
-below that threshold is provisional until a third platform exists or the validation policy
-is intentionally changed.
+every committed cohort must have at least 3 distinct comparison identities. Ordinary
+cohorts count platform names, preserving the historical three-platform floor. Bundles in
+the explicitly segregated `duckdb-version-matrix/` corpus count platform plus version;
+repeated runs of one platform/version do not pad that matrix.
 
 ## Generation Contract
 
 | Item | Value |
 |------|-------|
 | Workflow | `.github/workflows/seed-corpus.yml` |
-| Trigger | Manual `workflow_dispatch` only |
+| Trigger | Monthly cron `0 7 1 * *` (07:00 UTC on the 1st) plus manual `workflow_dispatch` |
 | Producer identity | `benchbox-bot` via GitHub Actions |
 | Benchmark phases | `generate,load,power` |
 | Trust label | `maintainer-run` |
 | Visibility | `public-curated` |
-| Optional entry | `clickhouse-cloud` at TPC-H SF 1.0, skipped when cloud secrets are absent |
+| Supported identities | DuckDB, DataFusion, Polars DataFrame, and ClickHouse Local; no cloud credentials |
 
-There is no scheduled quarterly refresh in the current workflow. Refreshes are run on
-demand by maintainers.
+The monthly schedule keeps published-results from stalling until someone remembers
+to dispatch. Maintainers can still run a full or single-benchmark refresh via
+`workflow_dispatch`.
 
 ## Workflow Target Matrix
 
-This is the matrix encoded in `.github/workflows/seed-corpus.yml`.
+The authoritative cell list lives in `.github/workflows/seed-corpus.yml`
+(`strategy.matrix.include`). Do not treat a frozen table in this document as the
+source of truth; the workflow drifts as admitted coverage changes.
 
-| Benchmark | Scale Factor | Platforms | Expected Bundles |
-|-----------|--------------|-----------|------------------|
-| TPC-H | 0.01 | duckdb, datafusion, polars-df | 3 |
-| TPC-H | 0.1 | duckdb, datafusion, polars-df | 3 |
-| TPC-H | 1.0 | duckdb, datafusion, clickhouse-cloud* | 2-3 |
-| TPC-DS | 1 | duckdb, datafusion | 2 |
-| SSB | 0.01 | duckdb, datafusion, polars-df | 3 |
-| SSB | 0.1 | duckdb, datafusion, polars-df | 3 |
+The supported matrix contains six local, merge-ready cohorts. TPC-H SF 0.01
+and SF 0.1 plus SSB use DuckDB, DataFusion, and Polars DataFrame. TPC-H SF 1
+and TPC-DS SF 1 use DuckDB, DataFusion, and ClickHouse Local. Every cohort has
+three local comparison identities and no cloud dependency.
 
-\* `clickhouse-cloud` is conditional on `CLICKHOUSE_CLOUD_HOST` and
-`CLICKHOUSE_CLOUD_PASSWORD`.
+| Benchmark | Scale factors |
+|-----------|---------------|
+| TPC-H | 0.01, 0.1, 1 |
+| TPC-DS | 1 |
+| SSB | 0.01, 0.1 |
+
+Other checked-in cohorts are historical or operator-restored coverage, not a
+promise of monthly regeneration. They remain subject to the same admission
+gate when changed.
 
 ## Merge Gate Caveats
 
-Two important caveats apply to the target matrix above:
+1. The corpus validator fails any cohort with fewer than 3 comparison identities.
+   Each supported workflow cohort has all three local identities, so it remains
+   publishable without a cloud secret.
+2. Checked-in coverage and the workflow target can diverge briefly after a
+   restore or schedule change. Prefer `results-data/corpus-inventory.json` and
+   `results-data/README.md` for what is currently committed.
 
-1. The current corpus validator fails any cohort with fewer than 3 platforms.
-   That means the TPC-DS SF 1 target row is not merge-ready as-is, and the TPC-H
-   SF 1.0 row also becomes non-mergeable if ClickHouse Cloud is unavailable.
-2. The current checked-in corpus is smaller than the full workflow target. Do not
-   read this spec as a statement that all target bundles already exist in `main`.
+### Version-over-version cohorts
+
+Operator-run version matrices may repeat a platform name at several versions. The admitted
+DuckDB matrix is segregated under `results-data/bundles/duckdb-version-matrix/`, which is
+the only corpus location where the depth gate counts versions as distinct identities.
+Results Explorer disambiguates their rows by engine and resolved driver versions. The runner is
+`scripts/run_duckdb_version_matrix.py`, and its median analyzer is
+`scripts/analyze_duckdb_version_matrix.py`. The analyzer emits one median bundle per
+version/benchmark cell for promotion; raw repetitions stay outside the checkout. The
+current DuckDB matrix is documented in `results-data/CORPUS_NOTES.md` when its bundles
+are promoted.
 
 ## Benchmark Notes
 
-### TPC-DS scale factors
+### Local identity coverage
 
-TPC-DS generation uses integer-only scale factors. The workflow therefore uses
-SF 1 and does not attempt fractional scales such as 0.01 or 0.1.
+The workflow includes `polars-df` for TPC-H SF 0.01/0.1 and SSB. TPC-H SF 1
+and TPC-DS use `clickhouse-local` as their local third identity because the
+admitted matrix does not rely on Polars DataFrame support there.
 
-### DataFrame coverage
+TPC-DS SF 1 jobs also run with `--official --seed 42`. This benchmark-specific
+command is required for the scheduled output to be compliance-admissible; all
+other matrix entries retain the generic local command.
 
-The workflow includes `polars-df` for TPC-H and SSB. It intentionally does not
-include `polars-df` for TPC-DS because BenchBox does not currently ship a TPC-DS
-DataFrame adapter.
+### Timestamp contract
+
+Run age uses `run.timestamp`. A plain `YYYY-MM-DD` is an explicit UTC calendar
+date. A complete ISO timestamp with `Z` or an offset is converted to its UTC
+calendar date. Legacy complete timestamps without an offset are interpreted as
+UTC. Prefixes, malformed times, and trailing text are not age values. Age is
+informational only and does not change ranking, filtering, comparison, or
+admission behavior.
 
 ### Execution phases
 
@@ -110,7 +136,6 @@ results-data/
         sf{scale_factor}/
           {run_id}.json
           {run_id}.plans.json
-          {run_id}.tuning.json
 ```
 
 Scale-factor directory naming follows the raw CLI `--scale` value:

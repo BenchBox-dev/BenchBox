@@ -8,6 +8,21 @@ This document is the canonical process and registry for tracking backward-compat
 
 BenchBox is currently in **beta**.
 
+BenchBox uses `MAJOR.MINOR.PATCH` release numbers as a practical guide rather
+than a promise of strict semantic versioning before 1.0:
+
+- A **major** release can change compatibility or significantly change the
+  project's scope.
+- A **minor** release can add compatible features or substantially expand
+  existing capabilities.
+- A **patch** release contains fixes or documentation changes. Before 1.0, a
+  fix can still require a migration when preserving the old behavior would be
+  misleading or unsafe.
+
+The release notes and migration guidance remain the authority for a specific
+version. The policy below defines the compatibility expectations for each
+development stage.
+
 - Alpha:
   - Prioritize canonical API cleanup over compatibility.
   - Breaking changes are allowed with direct migration in the same PR.
@@ -78,7 +93,6 @@ Maintain live rows below. Do not leave compatibility changes untracked.
 | --- | --- | --- | --- | --- | --- |
 | `benchbox/base.py` | `BaseBenchmark.create_enhanced_benchmark_result()` continues accepting legacy kwargs (`table_statistics`, `data_loading_time`, `phases`, `execution_metadata`) while delegating to shared result factory | active | Beta compatibility review | Preserve stable result-shape behavior for adapters and wrapper benchmarks while runtime internals are unified | core-runtime |
 | `benchbox/core/base_benchmark.py` | Deprecated internal base class retained after `datavault` and `tpcds_obt` migrated to `benchbox.base.BaseBenchmark`; no remaining production implementation imports it | deprecate | Deletion-only compatibility item after the beta review window and any remaining internal imports are migrated | Keep the old internal import path observable until its explicit removal gate; it is not a public extension path for new benchmark families | core-runtime |
-| `benchbox/core/runner/dataframe_runner.py` | `DATAFRAME_RUNNER_LIFECYCLE = "deprecated-internal-compatibility-runner"`; standalone `run_dataframe_benchmark()` remains for legacy tests/helpers while production DataFrame execution uses `adapter.run_benchmark()` plus `BenchmarkExecutionMixin`; mode detection now lives in `benchbox.core.run_service` | deprecate | Deletion-only compatibility item after legacy helper imports/tests migrate or receive explicit replacement rows | Avoid breaking older internal tests and helper callers while making the adapter-mixin path the only production DataFrame lifecycle promise | dataframe-runtime |
 | `benchbox/cli/benchmark_hooks.py`, `benchbox/cli/platform_hooks.py` | Thin re-export shims for the benchmark/platform CLI-option hook registries relocated to `benchbox.core.hooks.benchmark_hooks` / `benchbox.core.hooks.platform_hooks` (fixes a `core`/`platforms` -> `cli` layering inversion) | active | Beta compatibility review; these paths are internal-only (not listed in `public-contracts.md`), so the shim is a courtesy rather than a guaranteed compatibility window | Avoid breaking any internal or external caller still importing the old `benchbox.cli.*` path while `benchbox.core`/`benchbox.platforms` are updated to import the registries directly | core-runtime |
 
 ## Runtime Harmonization Notes (2026-02-26)

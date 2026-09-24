@@ -40,7 +40,7 @@ class TestBigQueryConvertToBigQueryTable:
     def test_three_part_name_in_output(self):
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
         result = adapter._convert_to_bigquery_table("CREATE TABLE orders (id INT64)")
-        assert "my-proj.my_dataset.orders" in result
+        assert "my-proj.my_dataset.ORDERS" in result
 
     def test_partition_by_added_when_configured(self):
         adapter = _make_adapter(partitioning_field="order_date")
@@ -63,6 +63,56 @@ class TestBigQueryConvertToBigQueryTable:
         adapter = _make_adapter()
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64)")
         assert "CLUSTER BY" not in result
+
+    def test_lowercase_table_normalized_to_uppercase(self):
+        """Lowercase DDL tables must match the adapter's uppercase load targets.
+
+        BigQuery table identifiers are case-sensitive while loads, validation,
+        row counts, and query qualification all address UPPERCASE tables.
+        """
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE hits (WatchID INT64)")
+        assert result == "CREATE OR REPLACE TABLE `my-proj.my_dataset.HITS` (WatchID INT64)"
+
+
+class TestBigQueryQualifyTableNames:
+    def test_parser_qualifies_non_tpch_tables(self):
+        """Benchmarks beyond TPC-H resolve via parser-extracted table names."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT COUNT(*) FROM hits")
+        assert result == "SELECT COUNT(*) FROM `my-proj.my_dataset.HITS`"
+
+    def test_cte_names_are_not_qualified(self):
+        """WITH aliases must not be mistaken for tables."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("WITH recent AS (SELECT * FROM hits) SELECT COUNT(*) FROM recent")
+        assert "`my-proj.my_dataset.HITS`" in result
+        assert "FROM recent" in result
+
+    def test_unparseable_query_falls_back_to_tpch_list(self):
+        """Parser failure must preserve the legacy TPC-H qualification."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        with patch("sqlglot.parse_one", side_effect=ValueError("no parse")):
+            result = adapter._qualify_table_names("SELECT * FROM lineitem")
+        assert result == "SELECT * FROM `my-proj.my_dataset.LINEITEM`"
+
+    def test_string_literal_matching_table_is_not_qualified(self):
+        """Quoted literal text must survive qualification unchanged."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT * FROM hits WHERE note = 'hits'")
+        assert result == "SELECT * FROM `my-proj.my_dataset.HITS` WHERE note = 'hits'"
+
+    def test_select_column_matching_table_is_not_qualified(self):
+        """A selected column sharing the table name is not a table reference."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT orders FROM orders")
+        assert result == "SELECT orders FROM `my-proj.my_dataset.ORDERS`"
+
+    def test_comma_separated_from_items_are_qualified(self):
+        """Legacy comma joins qualify every table item."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_dataset")
+        result = adapter._qualify_table_names("SELECT * FROM customer, orders")
+        assert result == "SELECT * FROM `my-proj.my_dataset.CUSTOMER`, `my-proj.my_dataset.ORDERS`"
 
 
 class TestBigQueryGenerateTuningClause:

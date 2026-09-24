@@ -34,12 +34,14 @@ from _project.scripts.explorer_pipeline.models import (
     canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
+    ranking_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
 from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     CompanionPrivacyError,
     _applied_receipt,
+    _override_display,
     _platform_percentile_stats,
     _public_companion_bytes,
     _sanitize_applied_receipt,
@@ -51,6 +53,13 @@ from benchbox.core.results.provenance import SOURCE_TO_TRUST_LABEL
 from benchbox.validation.bundle import COMPANION_SUFFIXES, discover_bundles
 
 logger = logging.getLogger(__name__)
+
+# Companions the explorer republishes alongside a public bundle. Plans are the
+# only one left: the requested tuning and the applied ledger travel inside the
+# bundle's own `platform.tuning` block. `COMPANION_SUFFIXES` stays wider because
+# discovery and the content digest must still recognize the retired files on
+# bundles published before the move.
+PUBLISHED_COMPANION_SUFFIXES = (".plans.json",)
 
 
 class DuplicateResultIdError(Exception):
@@ -277,9 +286,19 @@ def _manifest_trust_label(bundle_path: Path, default: str) -> str:
     return COMMUNITY_TRUST_LABEL
 
 
-def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager) -> str | None:
-    """Return the bounded applied receipt after public-path sanitization."""
-    receipt_json = _applied_receipt(bundle_path)
+def _public_applied_receipt(
+    bundle_path: Path,
+    bundle_data: dict[str, Any] | None,
+    anonymizer: AnonymizationManager,
+) -> str | None:
+    """Return the bounded applied receipt after public-path sanitization.
+
+    The receipt is read from the bundle's own ``platform.tuning.applied`` block,
+    falling back to a retired ``{stem}.applied.json`` companion for bundles
+    published before the move. Sanitization is unchanged either way: the public
+    path re-scrubs whatever it finds.
+    """
+    receipt_json = _applied_receipt(bundle_path, bundle_data)
     if receipt_json is None:
         return None
     try:
@@ -294,13 +313,64 @@ def _public_applied_receipt(bundle_path: Path, anonymizer: AnonymizationManager)
     return canonical_json_bytes(public_receipt).decode("utf-8")
 
 
+def _public_override_display(
+    bundle_path: Path,
+) -> dict[str, Any]:
+    """Return the accepted-override badge data after the public-path privacy check.
+
+    The transformer reads the ``{stem}.override.json`` companion from disk
+    next to the *source* bundle even when the row is built from the
+    anonymized public bundle, so the raw evidence/approver strings would
+    otherwise bypass anonymization. These are human-authored audit strings
+    (evidence link, approver handle, expiry), public by design -- unlike the
+    applied receipt there is nothing to redact, only a leak to refuse. A
+    private local path in any free-text field fails the build rather than
+    publishing it.
+    """
+    display = _override_display(bundle_path)
+    leaks = find_public_path_leaks(display)
+    if leaks:
+        raise PrivacyRejectionError(
+            f"{bundle_path}: public override display privacy check failed for fields: " + ", ".join(sorted(set(leaks)))
+        )
+    return display
+
+
 def _public_bundle_data(
     bundle_path: Path,
     bundle_data: dict[str, Any],
     anonymizer: AnonymizationManager,
 ) -> tuple[dict[str, Any], str | None]:
-    """Sanitize a bundle and its companion before creating public read-model rows."""
+    """Sanitize a bundle and its applied receipt before creating public rows.
+
+    The accepted-override badge data travels separately via
+    ``_public_override_display`` (leak-checked, never redacted): it is read
+    from the source-side companion even on this lane.
+    """
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
+    public_platform = public_bundle.get("platform")
+    if isinstance(public_platform, dict):
+        public_tuning = public_platform.get("tuning")
+        if isinstance(public_tuning, dict):
+            requested = public_tuning.get("requested")
+            if requested is None:
+                # Older bundles kept the requested configuration in a tuning
+                # sidecar. Inline its sanitized content so the public bundle
+                # remains self-contained after sidecars were retired.
+                legacy_bytes = _public_companion_bytes(bundle_path, ".tuning.json", anonymizer)
+                if legacy_bytes is not None:
+                    legacy = json.loads(legacy_bytes)
+                    if isinstance(legacy, dict) and isinstance(legacy.get("requested"), dict):
+                        requested = legacy["requested"]
+            if requested is not None:
+                sanitized_tuning = anonymizer.anonymize_tuning_payload({"requested": requested})
+                public_tuning["requested"] = sanitized_tuning.get("requested", {})
+        else:
+            legacy_bytes = _public_companion_bytes(bundle_path, ".tuning.json", anonymizer)
+            if legacy_bytes is not None:
+                legacy = json.loads(legacy_bytes)
+                if isinstance(legacy, dict) and isinstance(legacy.get("requested"), dict):
+                    public_platform["tuning"] = anonymizer.anonymize_tuning_payload({"requested": legacy["requested"]})
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
         # The path is part of the message, not just the log line: this exception
@@ -310,7 +380,7 @@ def _public_bundle_data(
         raise PrivacyRejectionError(
             f"{bundle_path}: public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
         )
-    return public_bundle, _public_applied_receipt(bundle_path, anonymizer)
+    return public_bundle, _public_applied_receipt(bundle_path, bundle_data, anonymizer)
 
 
 # Type alias for the summary accumulator: (benchmark, scale_factor, phase) → rows
@@ -388,6 +458,23 @@ def _build_benchmark_summaries(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
+        # A deliberately partial or otherwise outlier run must not poison the
+        # complete cohort.  Use a query set only when it has a strict majority
+        # among rows that are otherwise eligible for ranking; otherwise fail
+        # closed and mark every row as mismatched.  This preserves the old
+        # all-different behavior while allowing a single partial fixture to be
+        # shown as evidence without suppressing valid peer rankings.
+        query_set_counts: dict[frozenset[str], int] = {}
+        for entry, detail in pairs:
+            if ranking_exclusion_reason(entry) is None:
+                query_set = frozenset(dt.query_id for dt in detail.display_timings)
+                query_set_counts[query_set] = query_set_counts.get(query_set, 0) + 1
+        canonical_query_set: frozenset[str] | None = None
+        if query_set_counts:
+            candidate, candidate_count = max(query_set_counts.items(), key=lambda item: item[1])
+            eligible_count = sum(query_set_counts.values())
+            if candidate_count > eligible_count - candidate_count:
+                canonical_query_set = candidate
 
         platform_rows: list[PlatformRow] = []
         for entry, detail in pairs:
@@ -395,6 +482,10 @@ def _build_benchmark_summaries(
             for dt in detail.display_timings:
                 timings[dt.query_id] = dt.display_ms
 
+            row_ranking_reason = entry.ranking_exclusion_reason
+            row_query_set = frozenset(dt.query_id for dt in detail.display_timings)
+            if row_ranking_reason is None and (canonical_query_set is None or row_query_set != canonical_query_set):
+                row_ranking_reason = "mismatched_query_set"
             row = PlatformRow(
                 result_id=entry.result_id,
                 short_id=full_to_short.get(entry.result_id, ""),
@@ -406,7 +497,8 @@ def _build_benchmark_summaries(
                 execution_mode=entry.execution_mode,
                 trust_label=entry.trust_label,
                 run_date=entry.run_date,
-                is_ranking_eligible=is_ranking_eligible(entry),
+                is_ranking_eligible=is_ranking_eligible(entry) and row_ranking_reason is None,
+                ranking_exclusion_reason=row_ranking_reason,
                 power_score=entry.power_score,
                 display_geomean_ms=entry.display_geomean_ms,
                 sample_geomean_ms=entry.geomean_ms,
@@ -746,6 +838,15 @@ class ExplorerPipeline:
                         data=public_bundle,
                     )
                     entry = entry.model_copy(update={"applied_receipt": public_receipt})
+                    public_override = _public_override_display(bundle_path)
+                    entry = entry.model_copy(
+                        update={
+                            "override_rules": public_override["override_rules"],
+                            "override_evidence": public_override["override_evidence"],
+                            "override_approver": public_override["override_approver"],
+                            "override_expires": public_override["override_expires"],
+                        }
+                    )
 
                     detail = self._transformer.to_detail_result(
                         bundle_path,
@@ -756,6 +857,14 @@ class ExplorerPipeline:
                         data=public_bundle,
                     )
                     detail = detail.model_copy(update={"applied_receipt": public_receipt})
+                    detail = detail.model_copy(
+                        update={
+                            "override_rules": public_override["override_rules"],
+                            "override_evidence": public_override["override_evidence"],
+                            "override_approver": public_override["override_approver"],
+                            "override_expires": public_override["override_expires"],
+                        }
+                    )
 
                     dest_bundle = (out_bundles_dir / f"{result_id}.json").resolve()
                     if not dest_bundle.is_relative_to(out_bundles_dir.resolve()):
@@ -803,12 +912,16 @@ class ExplorerPipeline:
                     dest_bundle.write_bytes(public_raw)
 
                     # Publish only the validated, anonymized companions that
-                    # actually exist. Source-side ``has_tuning`` is not enough:
-                    # the browser derives the tuning URL from that flag, so it
-                    # must be set only after the public sidecar is committed.
-                    detail.has_tuning = False
+                    # actually exist. Plans are the only companion still
+                    # published; the requested tuning travels inside the public
+                    # bundle, so ``has_tuning`` is preserved from the source-side
+                    # read rather than being gated on a sidecar that no longer
+                    # gets written. The retired ``.tuning.json`` /
+                    # ``.applied.json`` are deliberately not republished: their
+                    # content is in the bundle, and copying them forward would
+                    # recreate the split this retired.
                     detail.plans_published = False
-                    for suffix in COMPANION_SUFFIXES:
+                    for suffix in PUBLISHED_COMPANION_SUFFIXES:
                         try:
                             public_companion = _public_companion_bytes(bundle_path, suffix, public_anonymizer)
                         except CompanionPrivacyError as exc:
@@ -824,8 +937,6 @@ class ExplorerPipeline:
                         companion_dest.write_bytes(public_companion)
                         if suffix == ".plans.json":
                             detail.plans_published = True
-                        elif suffix == ".tuning.json":
-                            detail.has_tuning = True
 
                     # Add the entry only after the public bundle has been copied
                     # successfully.  A privacy rejection must not leave a

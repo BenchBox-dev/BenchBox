@@ -30,6 +30,8 @@ pytestmark = [
 
 
 def _minimal_result(platform: str) -> BenchmarkResults:
+    # Full canonical TPC-H coverage: the submission validator refuses
+    # short query sets, so admission-check fixtures must carry all 22.
     return BenchmarkResults(
         benchmark_name="TPCH",
         platform=platform,
@@ -37,10 +39,12 @@ def _minimal_result(platform: str) -> BenchmarkResults:
         execution_id=f"cost-{platform}",
         timestamp=datetime(2026, 5, 3),
         duration_seconds=1.0,
-        total_queries=1,
-        successful_queries=1,
+        total_queries=22,
+        successful_queries=22,
         failed_queries=0,
-        query_results=[{"query_id": "Q1", "execution_time_ms": 1, "rows_returned": 1, "status": "SUCCESS"}],
+        query_results=[
+            {"query_id": f"Q{i}", "execution_time_ms": 1, "rows_returned": 1, "status": "SUCCESS"} for i in range(1, 23)
+        ],
     )
 
 
@@ -106,6 +110,24 @@ def test_write_file_preserves_existing_permissions(tmp_path):
 
     assert destination.read_text(encoding="utf-8") == "new\n"
     assert stat.S_IMODE(destination.stat().st_mode) == 0o640
+
+
+def test_write_file_skips_permission_preservation_without_fchmod(monkeypatch, tmp_path):
+    """Simulates Windows, where ``os.fchmod`` does not exist.
+
+    ``_write_file`` must not raise ``AttributeError`` when the platform has no
+    ``os.fchmod`` (e.g. Windows); it should simply skip permission
+    preservation and still complete the write.
+    """
+    destination = tmp_path / "result.json"
+    destination.write_text("old\n", encoding="utf-8")
+    destination.chmod(0o640)
+
+    monkeypatch.delattr(exporter_module.os, "fchmod", raising=False)
+
+    ResultExporter(output_dir=tmp_path, anonymize=False)._write_file(destination, "new\n")
+
+    assert destination.read_text(encoding="utf-8") == "new\n"
 
 
 def test_write_file_prefers_canonical_cloud_bytes(tmp_path):
@@ -201,8 +223,12 @@ def test_exporter_serializes_execution_phases(tmp_path):
     with open(json_path, encoding="utf-8") as f:
         payload = json.load(f)
 
-    # v2.0 schema has version, run, benchmark, platform, summary, queries
+    # Result bundle schema version is result_schema_version
+    import benchbox
+
+    assert payload["result_schema_version"] == "2.2"
     assert payload["version"] == "2.2"
+    assert payload["export"]["benchbox_version"] == benchbox.__version__
     assert payload["run"]["id"] == "test-run"
     assert payload["benchmark"]["id"] == "tpch"
     assert payload["platform"]["name"] == "duckdb"
@@ -256,7 +282,8 @@ def test_exporter_omits_statistics_phase_when_not_run(tmp_path):
     assert "statistics" not in payload["phases"]
 
 
-def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, tmp_path):
+def test_canonical_bundle_export_serializes_primary_and_plans(monkeypatch, tmp_path):
+    """Plans are the only companion still written; tuning rides in the bundle."""
     monkeypatch.setattr(
         exporter_module,
         "build_plans_payload",
@@ -276,12 +303,14 @@ def test_canonical_bundle_export_serializes_primary_and_companions(monkeypatch, 
 
     _assert_canonical_json_file(primary_path)
     _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.plans.json")
-    _assert_canonical_json_file(tmp_path / f"{primary_path.stem}.tuning.json")
+    for retired in (".tuning.json", ".applied.json"):
+        assert not (tmp_path / f"{primary_path.stem}{retired}").exists()
 
 
 def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monkeypatch, tmp_path):
-    """Anonymized .tuning.json must pseudonymize list-of-dicts FK companions and
-    slash-delimited local_table scalars while preserving enabled/action flags.
+    """The anonymized bundle's requested-tuning block must pseudonymize
+    list-of-dicts FK shapes and slash-delimited local_table scalars while
+    preserving enabled/action flags.
     """
     nested_constraints = {
         "version": "2.1",
@@ -314,12 +343,10 @@ def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monk
         _minimal_result("duckdb"),
         formats=["json"],
     )
-    tuning_path = tmp_path / f"{exported['json'].stem}.tuning.json"
-    raw = tuning_path.read_text(encoding="utf-8")
+    raw = exported["json"].read_text(encoding="utf-8")
     assert all(identifier not in raw for identifier in ("orders", "o_orderkey", "customers"))
 
-    payload = json.loads(raw)
-    constraints = payload["requested"]["constraints"]
+    constraints = json.loads(raw)["platform"]["tuning"]["requested"]["constraints"]
     fk = constraints["foreign_keys"]
     assert fk["enabled"] is True
     assert fk["on_delete_action"] == "CASCADE"
@@ -332,7 +359,7 @@ def test_canonical_bundle_export_anonymizes_nested_tuning_constraint_shapes(monk
     assert table_key.startswith("table_")
     assert pk_tables[table_key][0].startswith("column_")
     assert constraints["primary_keys"]["enabled"] is True
-    _assert_canonical_json_file(tuning_path)
+    _assert_canonical_json_file(exported["json"])
 
 
 def test_canonical_bundle_export_anonymizes_plans_raw_explain_output(monkeypatch, tmp_path):

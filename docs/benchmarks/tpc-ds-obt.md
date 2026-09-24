@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `tpcds_obt` - use `benchbox run --benchmark tpcds_obt`
+>
+> **Query templates:** [every TPC-DS-OBT query](queries/tpcds_obt/index.md)
 
 ## Overview
 

@@ -18,7 +18,6 @@ results-data/
   bundles/
     {run_id}.json            # primary result bundle (schema-v2)
     {run_id}.plans.json      # query plans (if captured)
-    {run_id}.tuning.json     # tuning config applied (if any)
   corpus-inventory.json      # generated inventory index
 ```
 
@@ -68,20 +67,37 @@ document already described in prose.
 
 ## Seed Corpus
 
-The current checked-in corpus covers 18 benchmarks across 44 cohorts. The
-maintainer-run seed lane (`seed-corpus.yml` workflow, manual
-`workflow_dispatch`) covers TPC-H and SSB at SF 0.01 / 0.1; UAT-sourced
-community-submission bundles extend coverage to amplab, clickbench,
-coffeeshop, datavault, flightdata, h2odb, metadata_primitives, nyctaxi,
-read_primitives, ssb, tpcdi, tpcds_obt, tpch_skew, tpchavoc, tsbs_devops,
-and write_primitives across SF 0.01 / 0.1 / 1.0 where platforms reached the
-≥3-platform cohort gate.
+After the 2026-08-28 trust boundary, the checked-in
+corpus holds **244** maintainer-run bundles across **16** benchmarks and **42**
+cohorts, all at the >=3-identity validator floor. Covered families include the
+local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
+ssb, tpcds, tpch, tpch_skew) and the admitted datavault, flightdata, nyctaxi,
+tpcdi, tpcds_obt, and tpchavoc cohorts.
+`metadata_primitives` and `write_primitives` remain uncovered until each can
+form a validation-passed three-identity cohort; `star_schema` is an alias of
+`ssb` and is not admitted separately. See `REGENERATION.md` for deferral detail.
+
+The DuckDB version-matrix cells (ClickBench / SSB / TPC-H / TPC-DS at SF 10)
+use three independent power repetitions per cell and promote one median bundle
+per version/benchmark cell; raw repetitions stay outside the checkout. See
+`CORPUS_NOTES.md` for operator-run details.
+
+Everything older than 2026-08-23 was withdrawn on 2026-08-28 as a trust
+decision; see `CORPUS_NOTES.md`. The maintainer-run seed lane
+(`.github/workflows/seed-corpus.yml`) runs at 07:00 UTC on the first day of
+each month (`0 7 1 * *`) and remains callable via `workflow_dispatch`. Its
+supported local matrix maintains TPC-H at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame; TPC-H SF 1 and TPC-DS SF 1 with DuckDB,
+DataFusion, and ClickHouse Local; and SSB at SF 0.01 and SF 0.1 with DuckDB,
+DataFusion, and Polars DataFrame. It does not claim to regenerate every
+checked-in cohort; the authoritative cell list is the workflow file and is
+summarized in `SEED_CORPUS_SPEC.md`.
 
 For the up-to-date per-cohort breakdown, see
 `results-data/corpus-inventory.json` (regenerate via
 `uv run -- python scripts/generate_corpus_inventory.py --write`).
-`results-data/SEED_CORPUS_SPEC.md` documents the seed-lane workflow target
-matrix and the validator gate.
+`results-data/SEED_CORPUS_SPEC.md` documents the seed-lane contract and the
+validator gate.
 
 ### Tuned bundles dropped (2026-07-16)
 
@@ -97,17 +113,37 @@ regeneration procedure once the tuned path is fixed and verified
 
 ## Contributing via Pull Request (Phase 2)
 
-Community contributions are not yet open. When Phase 2 launches:
+Community contributions use a pull request against the slim
+`published-results` branch. That branch intentionally does not contain the full
+documentation tree, so the complete runnable flow is included here:
 
-1. Run your benchmark: `benchbox run --platform <platform> --benchmark <benchmark> --scale <sf>`
-2. Package the result: `benchbox submit --output ./submission/`
-3. Open a PR against this repository touching `results-data/bundles/`
-4. Regenerate the inventory: `uv run -- python scripts/generate_corpus_inventory.py --write`
-5. CI validates schema conformance, bundle integrity, cohort compatibility, and inventory drift
-6. A maintainer reviews and merges
+1. Install BenchBox with the extra for your platform, then run a complete suite:
+   `uv run -- benchbox run --platform <platform> --benchmark <benchmark> --scale <sf>`.
+2. Set a stable, private `BENCHBOX_MACHINE_ID_SALT` for public submission. Store
+   and reuse it through a secret manager or protected local environment config.
+3. Package the latest result: `uv run -- benchbox submit --last --output ./submission`.
+4. Fork [`BenchBox-dev/BenchBox`](https://github.com/BenchBox-dev/BenchBox), check out its
+   `published-results` branch, and copy `submission/bundle/` plus the generated
+   `submission/<result>.manifest.json` into `results-data/bundles/`.
+5. Regenerate the inventory:
+   `uv run -- python scripts/generate_corpus_inventory.py --write`.
+6. Commit the bundle, manifest, and inventory, then open a PR against
+   `BenchBox-dev/BenchBox:published-results` titled
+   `results: <benchmark> <platform> sf<scale>`.
+7. CI validates schema conformance, hashes, bundle integrity, cohort
+   compatibility, and inventory drift before maintainer review.
 
-See `docs/development/benchbox-results-platform-strategy.md` for the full Phase 2
-design.
+The full maintained guide is published at
+<https://benchbox.dev/docs/contributing-results.html>.
+
+### Maintainer archive path (not community)
+
+Community add PRs above are the supported submission path. Separately,
+maintainers handling seed or curated archive changes must follow the
+[published-results deletion and mirror procedure](https://github.com/BenchBox-dev/BenchBox/blob/develop/docs/operations/results-phase-2-runbook.md#public-deletion--privacy-takedown-intentional-path-removal):
+hand-opened *maintainer* PRs against `published-results` are deletion-only;
+maintainer and seed additions go through the `auto/results-mirror-*` sync,
+not a hand-opened add PR.
 
 ## Reproducibility
 

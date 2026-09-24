@@ -36,8 +36,10 @@ def test_get_create_tables_sql_translation():
     ddl = benchmark.get_create_tables_sql(dialect="snowflake")
 
     assert ddl.count("CREATE TABLE") == 21
-    # Snowflake translation should quote identifiers
-    assert '"' in ddl
+    # Snowflake folds unquoted identifiers to UPPERCASE: DDL identifiers must
+    # stay unquoted so created tables resolve against translated queries.
+    assert '"hub_region"' not in ddl
+    assert "hub_region" in ddl
 
 
 def test_query_translation_via_base():

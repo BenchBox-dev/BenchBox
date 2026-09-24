@@ -14,9 +14,7 @@ test.describe("compare tray clearance and print suppression", () => {
       await page.setViewportSize(viewport);
       await openBenchmarkTray(page);
       const lastResult =
-        viewport.name === "mobile"
-          ? page.getByTestId("query-heatmap-mobile-cards").locator(":scope > [role='listitem']").last()
-          : page.getByRole("grid").getByRole("row").last();
+        page.locator("#benchmark-section-list tbody tr[data-testid]").last();
       await expectTrayClearance(page, lastResult);
     });
 
@@ -42,8 +40,8 @@ async function openBenchmarkTray(page: Page): Promise<void> {
   await page.goto("/results/tpch/");
   await waitForShell(page);
   await waitForDataLoaded(page, /TPC-H Results/);
-  await checkFixtureRow(page, fixtureIds.ids.duckdb);
-  await checkFixtureRow(page, fixtureIds.ids.datafusion);
+  await checkBenchmarkFixtureRow(page, fixtureIds.ids.duckdb);
+  await checkBenchmarkFixtureRow(page, fixtureIds.ids.datafusion);
   await expect(page.getByTestId("compare-tray")).toBeVisible();
 }
 
@@ -51,15 +49,20 @@ async function openPlatformTray(page: Page): Promise<void> {
   await page.goto("/results/p/duckdb/");
   await waitForShell(page);
   await waitForDataLoaded(page, /DuckDB Results/);
-  await checkFixtureRow(page, fixtureIds.ids.duckdb);
-  await checkFixtureRow(page, fixtureIds.ids.duckdbTuned);
+  await checkPlatformFixtureRow(page, fixtureIds.ids.duckdb);
+  await checkPlatformFixtureRow(page, fixtureIds.ids.duckdbTuned);
   await expect(page.getByTestId("compare-tray")).toBeVisible();
 }
 
-async function checkFixtureRow(page: Page, id: string): Promise<void> {
-  const row = page
-    .locator(`[data-testid="${id}"]:visible, [data-testid="query-heatmap-mobile-card-${id}"]:visible`)
-    .first();
+async function checkBenchmarkFixtureRow(page: Page, id: string): Promise<void> {
+  const row = page.locator(`[data-testid="list-${id}"]:visible`).first();
+  await waitForDataElement(page, row);
+  await row.scrollIntoViewIfNeeded();
+  await row.getByRole("checkbox").check();
+}
+
+async function checkPlatformFixtureRow(page: Page, id: string): Promise<void> {
+  const row = page.locator(`[data-testid="${id}"]:visible`).first();
   await waitForDataElement(page, row);
   await row.scrollIntoViewIfNeeded();
   await row.getByRole("checkbox").check();

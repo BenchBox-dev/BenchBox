@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { waitForDataLoaded, waitForShell } from "../support/fixtures";
+import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
 test.describe("PlatformIndex", () => {
   test("@smoke loads directly at /results/p/duckdb/ and renders the platform heading", async ({ page }) => {
@@ -17,6 +17,9 @@ test.describe("PlatformIndex", () => {
     await waitForShell(page);
     // The fixture corpus includes TPC-H SF 0.01 on DuckDB - the page
     // must surface at least one result that mentions the benchmark.
-    await expect(page.getByText(/TPC-H/i).first()).toBeVisible({ timeout: 20_000 });
+    await waitForDataLoaded(page, /DuckDB Results/i);
+    const table = page.getByRole("table", { name: "DuckDB results" });
+    await waitForDataElement(page, table.locator("tbody tr").first());
+    await expect(table.getByText("TPC-H", { exact: true }).first()).toBeVisible();
   });
 });

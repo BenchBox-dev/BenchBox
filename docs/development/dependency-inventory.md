@@ -133,7 +133,7 @@ or declaration appears unused.
 | `rich` | CL | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**` | 146 | KEEP |
 | `sqlglot` | C | `benchbox/base.py`, `benchbox/core/**`, `benchbox/platforms/**`, `benchbox/utils/**`, tests | 16 | KEEP |
 | `textcharts` | C | `benchbox/core/visualization/ascii/**`, `benchbox/monitoring/**` | 20 | KEEP — retained by ADR follow-up; removing it would break supported ASCII shims and monitoring imports |
-| `tomli` | C | `benchbox/utils/dependency_validation.py`, `benchbox/utils/version.py`, `scripts/`, tests | 9 | KEEP - guarded by `python_version < '3.11'`; stdlib `tomllib` covers 3.11+ |
+| `tomli` | — | — | 0 | REMOVED - Python 3.11's standard-library `tomllib` is now the minimum runtime |
 | `zstandard` | C | `benchbox/core/primitives/**`, `benchbox/utils/**`, tests | 9 | KEEP |
 | `azure-identity` | CSP | `benchbox/platforms/azure/**` | 9 | KEEP |
 | `azure-storage-file-datalake` | CSP | `benchbox/platforms/azure/**`, `benchbox/platforms/base/cloud_spark/staging.py` | 3 | KEEP |
@@ -157,8 +157,7 @@ or declaration appears unused.
 | `google-cloud-storage` | CS | `benchbox/platforms/base/cloud_spark/staging.py`, `benchbox/platforms/bigquery.py` | 7 | KEEP |
 | `influxdb3-python` | SQL | `benchbox/platforms/influxdb/_dependencies.py` | 1 | KEEP |
 | `mcp` | MCP | `benchbox/mcp/**`, tests | 18 | KEEP |
-| `modin` | DF | `benchbox/platforms/dataframe/modin_df.py` | 2 | KEEP |
-| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP (extras only) - removed from core deps; supplied by `extras:{pandas,dataframe-pandas,tpcdi,modin,dask}` and transitively by `chdb`. See finding F7. |
+| `pandas` | DF/BM | `benchbox/core/**`, `benchbox/experimental/**`, `benchbox/platforms/**`, tests | 182 | KEEP (extras only) - removed from core deps; supplied by `extras:{pandas,dataframe-pandas,tpcdi,dask}` and transitively by `chdb`. See finding F7. |
 | `polars` | DF | `benchbox/cli/**`, `benchbox/core/**`, `benchbox/platforms/**`, tests | 60 | KEEP |
 | `presto-python-client` | SQL | `benchbox/platforms/presto.py` | 2 | KEEP |
 | `psycopg2-binary` | SQL | `benchbox/platforms/pg_*.py`, `scripts/`, tests | 18 | KEEP |
@@ -179,7 +178,7 @@ or declaration appears unused.
 | `pytest-cov` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - `--cov` option used by `make coverage*` and CI |
 | `pytest-timeout` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - pytest plugin (timeout config in `pytest.ini` markers) |
 | `pytest-xdist` | DEV | (CLI plugin via `pytest`) | 0 | KEEP - `-n auto` baked into `pytest.ini` addopts |
-| `ruff` | DEV | (CLI tool) | 0 | KEEP - `ruff check`/`ruff format`; pinned `==0.11.13` |
+| `ruff` | DEV | (CLI tool) | 0 | KEEP - `ruff check`/`ruff format`; pinned `==0.16.7` |
 | `ty` | DEV | (CLI tool) | 0 | KEEP - `uv run ty check`; configured under `[tool.ty]` |
 | `tox` | DEV | (CLI tool) | 0 | KEEP - `tox.ini` is present and used |
 | `mutmut` | DEV | (CLI tool) | 0 | KEEP - `[tool.mutmut]` config block targets specific files |
@@ -189,7 +188,7 @@ or declaration appears unused.
 | `clickhouse-connect` | DEV | (also in dev for tests) | covered above | KEEP |
 | `cloudpathlib[s3,gs,azure]` | DEV | tests use `cloudpathlib` core | covered above | KEEP - extras pin S3/GCS/Azure providers for live tests |
 | `pyiceberg[sql-sqlite,pyarrow]` | DEV | tests use `pyiceberg` core | covered above | KEEP - extras pin SQL-SQLite catalog for tests |
-| `ruamel-yaml` | DEV | `_project/scripts/todo_cli.py` | 0 (runtime); 1 (tooling) | KEEP - used by TODO tooling. (Distinct from `jsonschema` because `ruamel-yaml` is dev-only, not declared as a *core* runtime dep.) |
+| `ruamel-yaml` | DEV | (none) | 0 | **REMOVAL CANDIDATE** - its only consumer was `_project/scripts/todo_cli.py`, removed in the 0.6.x MCP cutover. todo-db now handles YAML import through `pyyaml` (`_project/scripts/pyproject.toml`). No current declaration or import; confirm before dropping. |
 | `sphinx` | DOC | `tests/conftest.py`, `tests/unit/docs/test_docs_build.py` | 2 | KEEP - drives docs build via `make docs-build` |
 | `sphinx-tags` | DOC | (config in `docs/conf.py:66`) | 0 | KEEP - registered in `extensions` list |
 | `sphinx-design` | DOC | (config in `docs/conf.py:68`) | 0 | KEEP |
@@ -314,7 +313,7 @@ or declaration appears unused.
     converted latent top-level pandas imports in `joinorder`, `ssb`, and
     `joinorder_synthetic` dataframe_queries to in-function imports.
   - Removed `pandas>=2.0.0` from core deps. It remains in
-    `extras:{pandas,dataframe-pandas,tpcdi,modin,dask,all}` and is pulled
+    `extras:{pandas,dataframe-pandas,tpcdi,dask,all}` and is pulled
     transitively by `chdb`, so DataFrame mode, TPC-DI, and ClickHouse-local
     runs are unaffected.
 - **Import-surface audit (post-fix):** heavy modules still eagerly imported on
@@ -349,7 +348,6 @@ declaration exists. Each is classified below.
 | `importlib_metadata` | first-party alias | Not a third-party package - `benchbox/utils/format_converters/vortex_converter.py:11` and `benchbox/utils/runtime_env.py:24` use `from importlib import metadata as importlib_metadata` (stdlib aliased). False positive. |
 | `influxdb3` | guarded optional | Alternate InfluxDB client; guarded fallback in `benchbox/platforms/influxdb/_dependencies.py`. |
 | `pysail` | guarded optional | LakeSail Spark distribution; guarded import in `benchbox/platforms/lakesail.py`. |
-| `ray` | extras-included | Pulled in via `modin[ray]`; explicit `import ray` in modin paths is fine. |
 | `sentence_transformers`, `spacy`, `textblob`, `torch` | declared (extras) | NLP / ML stacks for `benchbox/core/ai_primitives/`. All guarded behind `try/except`. Now declared in `extras:ai-primitives` as `sentence-transformers>=2.0.0`, `torch>=2.0.0`, `textblob>=0.17.0`, `spacy>=3.0.0`. |
 | `urllib3` | transitive-reach | Pulled in by `requests`. Safe. |
 | `pygments_cobalt2` | first-party | Lives at `docs/_static/pygments_cobalt2.py`. Not a third-party package. |
@@ -366,7 +364,7 @@ declaration exists. Each is classified below.
 ## Consolidation proposals (no action required by this audit)
 
 1. **`dataframe-*` aliases.** The plain-name extras (`pandas`, `polars`,
-   `modin`, `dask`, `pyspark`, `cudf`) duplicate the `dataframe-*` extras
+   `dask`, `pyspark`, `cudf`) duplicate the `dataframe-*` extras
    one-to-one. Cleanup is a breaking rename and is explicitly *deferred*
    per this TODO's `deferred[]`. Surfacing here for traceability.
 2. **`databricks-connect` extras alias.** Marked deprecated in

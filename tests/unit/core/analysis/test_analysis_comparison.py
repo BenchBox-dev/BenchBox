@@ -15,6 +15,7 @@ from benchbox.core.analysis.comparison import (
     PlatformComparison,
     _extract_query_times,
     _get_query_times_for_query,
+    _is_comparable,
     _normalize_execution_time_ms,
 )
 from benchbox.core.results.models import BenchmarkResults
@@ -539,6 +540,22 @@ class TestComparisonWithCost:
 
         assert cost_analysis is not None
         assert cost_analysis.cost_per_query == {"snowflake": 1.0}
+
+
+class TestIsComparableHelper:
+    """The hoisted comparability predicate preserves the closure contract verbatim."""
+
+    def test_success_and_unknown_are_comparable(self):
+        from types import SimpleNamespace
+
+        assert _is_comparable(SimpleNamespace(status="SUCCESS")) is True
+        assert _is_comparable(SimpleNamespace(status="UNKNOWN")) is True
+
+    def test_failed_and_skipped_are_not_comparable(self):
+        from types import SimpleNamespace
+
+        assert _is_comparable(SimpleNamespace(status="FAILED")) is False
+        assert _is_comparable(SimpleNamespace(status="SKIPPED")) is False
 
 
 class TestComparisonReportSerialization:

@@ -3,11 +3,12 @@ import { waitForDataElement, waitForDataLoaded, waitForShell } from "../support/
 
 test.describe("cross-benchmark leaderboard disclosure", () => {
   test("leaderboard keyboard traversal reaches a revealed unranked row", async ({ page }) => {
-    await page.goto("/results/");
+    await page.goto("/results/compare/");
     await waitForShell(page);
-    await waitForDataLoaded(page, /Recent Results/i);
+    await waitForDataLoaded(page, /Compare benchmark results/i);
 
     const grid = page.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    await waitForDataElement(page, grid.locator("tbody tr").first());
     const rankedRowCount = await grid.locator("tbody tr").count();
     expect(rankedRowCount).toBeGreaterThan(0);
     const expander = page.getByRole("button", {
@@ -25,13 +26,13 @@ test.describe("cross-benchmark leaderboard disclosure", () => {
   });
 
   test("all excluded ranking states why no evidence is ranked and offers the detail route", async ({ page }) => {
-    await page.goto("/results/?platform=fixture-aws-sql");
+    await page.goto("/results/compare/?platform=fixture-aws-sql");
     await waitForShell(page);
     const state = page.getByTestId("all-excluded-ranking-tpch-sf0.01-standard");
     await waitForDataElement(page, state);
 
     await expect(state).toContainText("No ranked evidence");
-    await expect(state).toContainText("Trust policy excludes this result from ranking.");
+    await expect(state).toContainText("Results from this source are not included in rankings.");
     await expect(state).toContainText("Open ranking for details.");
     const grid = page.getByRole("grid", { name: "Cross-benchmark leaderboard" });
     await expect(grid.getByRole("gridcell")).toHaveCount(0);
@@ -41,7 +42,7 @@ test.describe("cross-benchmark leaderboard disclosure", () => {
     }).click();
     await expect(
       grid.getByRole("gridcell", {
-        name: /Fixture AWS SQL has published evidence.*Trust policy excludes this result from ranking/,
+        name: /Fixture AWS SQL has published evidence.*Results from this source are not included in rankings/,
       }),
     ).toBeVisible();
   });

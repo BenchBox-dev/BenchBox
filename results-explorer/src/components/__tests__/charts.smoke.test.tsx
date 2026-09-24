@@ -152,6 +152,30 @@ describe("PercentileLadder", () => {
     expect(ids).toEqual(["r-duckdb-tuned", "r-duckdb-notuning"]);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  it("keeps date-qualified labels distinct after truncation", () => {
+    const { container } = render(
+      <PercentileLadder
+        rows={[
+          {
+            result_id: "r-date-1",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-01 (127 days ago)",
+            percentile_stats: { p50: 10, p90: 25, p95: 40, p99: 90 },
+          },
+          {
+            result_id: "r-date-2",
+            platform: "DataFusion",
+            displayLabel: "DataFusion 2026-05-02 (126 days ago)",
+            percentile_stats: { p50: 12, p90: 28, p95: 45, p99: 100 },
+          },
+        ]}
+      />,
+    );
+
+    const labels = Array.from(container.querySelectorAll("[data-result-id] text")).map((node) => node.textContent);
+    expect(labels[0]).not.toBe(labels[1]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -292,9 +316,27 @@ describe("RankTable", () => {
 
     expect(container.querySelector("table")).toBeNull();
     expect(container.textContent).toContain("Rank chart unavailable");
-    expect(container.textContent).toContain("Submitted evidence is Excluded");
-    expect(container.textContent).toContain("Trust policy excludes this result from ranking.");
+    expect(container.textContent).toContain("The published runs are excluded");
+    expect(container.textContent).toContain("Results from this source are not included in rankings.");
     expect(container.textContent).toContain("Validation status excludes this result from ranking.");
+  });
+
+  it("makes a ranking-exclusion marker keyboard focusable and self-describing", () => {
+    const summary = makeSummary({
+      platforms: [
+        makePlatform({ result_id: "r1", platform: "DuckDB" }),
+        makePlatform({
+          result_id: "r2",
+          platform: "SQLite",
+          ranking_exclusion_reason: "validation_not_clean",
+        }),
+      ],
+    });
+    const { container } = render(<RankTable summary={summary} />);
+    const marker = container.querySelector("span[tabindex='0'][aria-label]");
+
+    expect(marker).not.toBeNull();
+    expect(marker?.getAttribute("title")).toContain("Validation status excludes this result");
   });
 });
 
@@ -346,7 +388,7 @@ describe("QueryHistogram", () => {
 
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelectorAll("rect")).toHaveLength(0);
-    expect(container.textContent).toContain("Exact zero timing is excluded from display evidence.");
+    expect(container.textContent).toContain("A zero timing cannot be used in this ranking.");
   });
 
   it("uses a mobile-safe responsive width instead of forcing horizontal overflow", () => {
@@ -354,6 +396,57 @@ describe("QueryHistogram", () => {
     const svg = container.querySelector("svg");
     expect(svg?.getAttribute("width")).toBe("100%");
     expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
+    // Height floor follows the shared chartFrame layout (196 for this
+    // fixture); the old floor belonged to the retired isNarrowChart sizing.
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
+  });
+
+  it("splits panels on cohort width, not query count alone", () => {
+    // A query group holds one bar per platform. Splitting on query count alone
+    // let a wide cohort clamp each bar to a minimum wider than the group it sat
+    // in, so consecutive groups painted over one another. Reproduced at the
+    // narrow width where the clamp actually bites.
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get: () => 300,
+    });
+    try {
+      const query_ids = Array.from({ length: 22 }, (_, i) => `Q${i + 1}`);
+      const timings = Object.fromEntries(query_ids.map((qid) => [qid, 10]));
+      const platforms = Array.from({ length: 12 }, (_, i) =>
+        makePlatform({ result_id: `r${i}`, platform_id: `p${i}`, platform: `Platform ${i}`, timings }),
+      );
+      const { container } = render(<QueryHistogram summary={makeSummary({ query_ids, platforms })} />);
+
+      for (const svg of Array.from(container.querySelectorAll("svg"))) {
+        const extents = Array.from(svg.querySelectorAll("g"))
+          .filter((group) => group.querySelector("[data-query-label]"))
+          .map((group) => {
+            const marks = Array.from(group.querySelectorAll("rect, line"));
+            const starts = marks.map((mark) =>
+              Number(mark.getAttribute("y") ?? mark.getAttribute("y1") ?? NaN),
+            );
+            const ends = marks.map((mark) =>
+              mark.tagName === "rect"
+                ? Number(mark.getAttribute("y") ?? 0) + Number(mark.getAttribute("height") ?? 0)
+                : Number(mark.getAttribute("y2") ?? 0),
+            );
+            return { left: Math.min(...starts), right: Math.max(...ends) };
+          })
+          .filter((extent) => Number.isFinite(extent.left) && Number.isFinite(extent.right))
+          .sort((a, b) => a.left - b.left);
+
+        expect(extents.length).toBeGreaterThan(1);
+        for (let i = 1; i < extents.length; i += 1) {
+          expect(extents[i - 1]!.right).toBeLessThanOrEqual(extents[i]!.left);
+        }
+      }
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+        configurable: true,
+        get: () => 0,
+      });
+    }
   });
 
   it("auto-splits into multiple panels when query count > 33", () => {
@@ -474,6 +567,20 @@ function makeEntry(
 }
 
 describe("TimeSeries", () => {
+  it("keeps narrow-range latency axis labels distinct", () => {
+    const entries = Array.from({ length: 7 }, (_, index) => makeEntry({
+      result_id: `narrow-${index}`,
+      run_date: `2026-04-0${index + 1}`,
+      display_geomean_ms: 11.1 + index * 0.01,
+    }));
+    const { container } = render(<TimeSeries entries={entries} />);
+    const labels = [...container.querySelectorAll("svg text")]
+      .map((node) => node.textContent ?? "")
+      .filter((label) => label.endsWith(" ms"));
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
   it("shows an insufficient-data message when fewer than 2 runs per platform", () => {
     const { container } = render(
       <TimeSeries entries={[makeEntry({ result_id: "r1" })]} />,
@@ -487,7 +594,11 @@ describe("TimeSeries", () => {
       makeEntry({ result_id: "r2", run_date: "2026-04-01", display_geomean_ms: 10 }),
     ];
     const { container } = render(<TimeSeries entries={entries} />);
-    expect(container.querySelector("svg")).not.toBeNull();
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
+    // Height floor follows the shared chartFrame layout (208 for this
+    // fixture); the old floor belonged to the retired isNarrowChart sizing.
+    expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
     expect(container.querySelector("path")).not.toBeNull();
   });
 
@@ -502,6 +613,9 @@ describe("TimeSeries", () => {
     expect(points).toHaveLength(2);
     expect(points[0]?.querySelector("title")?.textContent).toContain("1111aaaa");
     expect(points[0]?.getAttribute("aria-label")).toContain("1111aaaa");
+    expect(points[0]?.querySelector("title")?.textContent).toMatch(/2026-04-01.*days ago/);
+    expect(points[0]?.getAttribute("aria-label")).toMatch(/2026-04-01.*days ago/);
+    expect(container.querySelector('text[aria-label*="days ago"]')).not.toBeNull();
     expect(points[0]?.querySelector("title")?.textContent).not.toContain("2222bbbb");
     expect(points[1]?.querySelector("title")?.textContent).toContain("2222bbbb");
     expect(points[1]?.getAttribute("aria-label")).toContain("2222bbbb");
@@ -518,8 +632,9 @@ describe("TimeSeries", () => {
     const state = container.querySelector('[data-testid="time-series-duplicate-day"]');
 
     expect(container.querySelector("svg")).toBeNull();
-    expect(state?.textContent).toContain("Trend line hidden");
+    expect(state?.textContent).toContain("cannot be ordered in this trend");
     expect(state?.textContent).toContain("same-day runs");
+    expect(state?.textContent).toMatch(/2026-04-03/);
     expect(state?.querySelectorAll("[data-result-id]")).toHaveLength(2);
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-1111aaaa"]')).toBeTruthy();
     expect(state?.querySelector('a[href="/results/r/tpch-duckdb-sf0.01-20260403-2222bbbb#run-receipt"]')).toBeTruthy();
@@ -640,7 +755,7 @@ describe("CostScatter", () => {
 
   it("shows a legacy-schema message when normalized cost fields are absent", () => {
     const { container } = render(<CostScatter summary={makeSummary()} />);
-    expect(container.textContent).toContain("predate the normalized_cost contract");
+    expect(container.textContent).toContain("older runs do not include the cost details needed for comparison");
   });
 
   it("renders points when normalized cost is populated", () => {
@@ -710,6 +825,6 @@ describe("SparklineTable", () => {
     });
     const { container } = render(<SparklineTable summary={summary} />);
     expect(container.textContent).toContain("Normalized cost");
-    expect(container.textContent).toContain("unavailable");
+    expect(container.textContent).toContain("Not recorded");
   });
 });

@@ -84,11 +84,13 @@ def _run_ci_required_result(**env_overrides: str) -> subprocess.CompletedProcess
         "PACKAGE_SMOKE_RESULT": "skipped",
         "DEPENDENCY_AUDIT_RESULT": "skipped",
         "PARITY_CHECK_RESULT": "skipped",
+        "PUBLICATION_RECONCILIATION_RESULT": "success",
         "EXPLORER_VITEST_RESULT": "skipped",
         "CONTENT_GUARD_NEEDED": "false",
         "SKILL_INTEGRITY_NEEDED": "false",
         "NEEDS_CODE_CI": "false",
         "SAFE_CONTENT_ONLY": "true",
+        "HEAVY_NEEDED": "false",
         **env_overrides,
     }
     return run_posix_shell(
@@ -106,7 +108,7 @@ def test_pr_path_classifier_fetches_base_history_for_merge_base() -> None:
 
     # The classifier uses `git diff origin/develop...HEAD`; a depth-1 base fetch
     # on GitHub's synthetic PR merge ref can leave no merge base available.
-    # Three consumers of the full base history today:
+    # Consumers of the full base history today:
     #   - ci-paths (path classifier)
     #   - content-guard (recreates path lists for content validators)
     #   - explorer-tokens and site-theme-tokens (each greps the diff for its
@@ -133,6 +135,7 @@ def test_ci_required_result_fails_on_explorer_tokens_failure() -> None:
     # regressing the blind-spot remediation.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -173,6 +176,7 @@ def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
         SKILL_INTEGRITY_NEEDED="true",
         SKILL_INTEGRITY_RESULT="failure",
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -189,6 +193,7 @@ def test_ci_required_result_requires_skill_and_product_for_mixed_diff() -> None:
 def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         TPCH_BINARY_FRAMING_RESULT="failure",
         LINT_RESULT="success",
@@ -206,6 +211,7 @@ def test_ci_required_result_fails_on_tpch_binary_framing_failure() -> None:
 def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         TPCH_BINARY_FRAMING_RESULT="success",
         LINT_RESULT="success",
@@ -222,6 +228,7 @@ def test_ci_required_result_accepts_tpch_binary_framing_success() -> None:
 def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -239,6 +246,7 @@ def test_ci_required_result_fails_on_explorer_vitest_failure() -> None:
 def test_ci_required_result_treats_explorer_vitest_skipped_as_success() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -267,6 +275,7 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     # it so a future cleanup that drops the clause is a deliberate choice.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -277,9 +286,7 @@ def test_ci_required_result_treats_explorer_tokens_skipped_as_success() -> None:
     )
 
     assert result.returncode == 0
-    assert (
-        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
-    )
+    assert "Code/infra PR; lint, fast tests, and the required heavy tier passed." in result.stdout
 
 
 def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
@@ -287,6 +294,7 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     # success, the aggregator returns success.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -297,14 +305,13 @@ def test_ci_required_result_passes_on_explorer_tokens_success() -> None:
     )
 
     assert result.returncode == 0
-    assert (
-        "Code/infra PR; lint, fast tests, correctness gate, plan-capture gate, and medium tier passed." in result.stdout
-    )
+    assert "Code/infra PR; lint, fast tests, and the required heavy tier passed." in result.stdout
 
 
 def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -320,6 +327,7 @@ def test_ci_required_result_fails_on_plan_capture_gate_failure() -> None:
 def test_ci_required_result_fails_on_medium_test_failure() -> None:
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -356,15 +364,23 @@ def test_skill_integrity_job_is_required_read_only_and_pinned() -> None:
     workflow_text = (REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8")
     workflow = yaml.safe_load(workflow_text)
     job = workflow["jobs"]["skill-integrity"]
+    job_text = yaml.safe_dump(job)
 
     assert job["needs"] == "ci-paths"
     assert job["if"] == "${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}"
     assert job["timeout-minutes"] == 10
     assert "permissions" not in job  # inherits workflow-level contents: read
-    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" in workflow_text
-    assert "scripts/skill_sync_ci_policy.py validate" in workflow_text
-    assert 'verify --project "$GITHUB_WORKSPACE"' in workflow_text
-    assert "test_todo_wrapper.py::TestSkillThinness" in workflow_text
+    assert "scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf" in workflow_text
+    # The vendored shell wrapper runs the full cycle with no Node build.
+    assert "sh tools/skill-sync preview" in workflow_text
+    assert "sh tools/skill-sync apply" in workflow_text
+    assert "sh tools/skill-sync verify" in workflow_text
+    assert "sh tools/skill-sync check" in workflow_text
+    # The retired TypeScript verifier must not come back: no npm build of a
+    # verifier checkout and no node dist CLI inside this job.
+    assert "npm ci" not in job_text
+    assert "dist/cli/index.js" not in job_text
+    assert "6d09682dabe2ff0d68f400d60f8ba8b87f8c02aa" not in workflow_text
     assert '--check-commit-range "$BASE_SHA"' in workflow_text
 
 
@@ -436,11 +452,15 @@ def test_explorer_vitest_job_declares_clean_runner_python_and_uv_setup() -> None
     steps = job["steps"]
 
     setup_python = next(step for step in steps if step.get("name") == "Set up Python")
-    assert setup_python["uses"] == "actions/setup-python@v5"
+    assert re.fullmatch(r"actions/setup-python@[0-9a-f]{40}", setup_python["uses"]), (
+        "explorer-vitest setup-python must pin to an immutable SHA"
+    )
     assert setup_python["with"]["python-version"] == "3.12"
 
     setup_uv = next(step for step in steps if step.get("name") == "Install uv")
-    assert setup_uv["uses"] == "astral-sh/setup-uv@v4"
+    assert re.fullmatch(r"astral-sh/setup-uv@[0-9a-f]{40}", setup_uv["uses"]), (
+        "explorer-vitest setup-uv must pin to an immutable SHA"
+    )
 
     install_python = next(step for step in steps if step.get("name") == "Install Python dependencies")
     assert install_python["run"] == "uv sync --group dev"
@@ -494,13 +514,23 @@ def test_ci_paths_job_outputs_declare_every_path_filter_group() -> None:
     expected_needed = {f"{group.replace('_', '-')}-needed" for group in groups}
     expected_needed.add("content-guard-needed")
     declared_needed = {key for key in declared_outputs if key.endswith("-needed")}
-    assert declared_needed == expected_needed, (
+    # `heavy-needed` is deliberately not a path-filter group emission: the
+    # heavy-tier decision combines the classifier outputs with the event
+    # name and the soundness carve-out in the dedicated heavy step, so it
+    # cannot come from write_github_output. It keeps its own mapping pin
+    # below instead of joining this lockstep.
+    assert declared_needed == expected_needed | {"heavy-needed"}, (
         "jobs.ci-paths.outputs `*-needed` keys must stay in lockstep with "
-        "path-filters.yml groups (plus core content-guard-needed). "
+        "path-filters.yml groups (plus core content-guard-needed and the "
+        "dedicated heavy-needed emission). "
         f"Missing declarations: {sorted(expected_needed - declared_needed)}; "
-        f"stale declarations (no classify emission behind them): "
+        f"stale declarations (no emission behind them): "
         f"{sorted(declared_needed - expected_needed)}. Either way the gated "
         "job's `if:` sees an empty string and silently skips (PR #952)."
+    )
+    heavy_actual = re.sub(r"\s+", "", str(declared_outputs["heavy-needed"]))
+    assert heavy_actual == "${{steps.heavy.outputs.heavy-needed}}", (
+        "jobs.ci-paths.outputs.heavy-needed must map steps.heavy.outputs.heavy-needed"
     )
 
     for key in sorted(expected_needed):
@@ -601,6 +631,7 @@ def test_ci_required_result_passes_when_packaging_jobs_skip() -> None:
     # and must still pass (matches the audit-sha pattern).
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -617,6 +648,7 @@ def test_ci_required_result_fails_on_parity_check_failure() -> None:
     # job fails must now fail the required gate (was non-blocking before).
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",
@@ -634,6 +666,7 @@ def test_ci_required_result_passes_when_parity_check_skips() -> None:
     # the skipped-counts-as-pass contract the promotion preserves.
     result = _run_ci_required_result(
         NEEDS_CODE_CI="true",
+        HEAVY_NEEDED="true",
         SAFE_CONTENT_ONLY="false",
         LINT_RESULT="success",
         TEST_RESULT="success",

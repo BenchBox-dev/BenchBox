@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.cost.models import cost_status_of, published_total_cost
 from benchbox.core.results.environment import build_platform_metadata_payload
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.platform_options import sanitize_platform_options
@@ -358,10 +359,14 @@ class ResultDatabase:
         if result.platform_info:
             platform_version = result.platform_info.get("platform_version")
 
-        # Extract cost
-        total_cost = None
-        if result.cost_summary:
-            total_cost = result.cost_summary.get("total_cost")
+        # Extract cost. An unavailable-status run persists no total: a cost
+        # that is not fit to publish is not fit to persist.
+        total_cost = published_total_cost(result.cost_summary)
+        # Per-query execution costs predate the per-query stamp point (they
+        # are fixed when the result is built), so gate them here on the
+        # run-level status. Summaries with no status signal keep the legacy
+        # behavior and persist as-is.
+        persist_per_query_costs = cost_status_of(result.cost_summary) != "unavailable"
 
         # Build metadata
         metadata: dict[str, Any] = {
@@ -474,7 +479,7 @@ class ResultDatabase:
                             execution.execution_time_ms,
                             execution.status,
                             execution.rows_returned,
-                            execution.cost,
+                            execution.cost if persist_per_query_costs else None,
                             execution.iteration,
                         ),
                     )

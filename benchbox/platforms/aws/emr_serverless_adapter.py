@@ -49,6 +49,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkConfigMixin,
     CloudSparkStaging,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -84,7 +85,7 @@ class EMRServerlessJobState:
     CANCELLED = "CANCELLED"
 
 
-class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """Amazon EMR Serverless managed Spark platform adapter.
 
     EMR Serverless provides serverless Spark execution with automatic scaling
@@ -447,7 +448,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                 logger.debug(f"Table {table} already exists in Glue catalog")
             except ClientError as e:
                 if e.response.get("Error", {}).get("Code") == "EntityNotFoundException":
-                    if self.table_format == "parquet":
+                    if file_format == "parquet":
                         glue_client.create_table(
                             DatabaseName=self.database,
                             TableInput={
@@ -466,7 +467,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                     else:
                         create_sql = (
                             f"CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table} "
-                            f"USING {self.table_format.upper()} LOCATION '{table_uri}'"
+                            f"USING {file_format.upper()} LOCATION '{table_uri}'"
                         )
                         self._submit_job_run(create_sql)
                     logger.info(f"Created table {self.database}.{table}")
@@ -474,6 +475,25 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
                     raise
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table over staged files via a Spark SQL job run.
+
+        Uses DDL for every format (rather than the Glue catalog API used by
+        native parquet loads) so registration shares the single job-run path
+        that external-mode row counts require anyway.
+        """
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
+        safe_location = self._escape_external_location(location)
+        create_sql = (
+            f"CREATE OR REPLACE TABLE {self.database}.{table_name} "
+            f"USING {file_format.upper()} LOCATION '{safe_location}'"
+        )
+        self._ensure_application_started()
+        job_run_id = self._submit_job_run(create_sql)
+        self._wait_for_job_run(job_run_id)
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def _submit_job_run(self, query: str) -> str:
         """Submit a Spark SQL job run.
@@ -490,6 +510,7 @@ class EMRServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdap
         results_path = f"{self.s3_staging_dir}/results/{job_run_id}"
 
         # Create PySpark job script
+        query_literal = json.dumps(query)
         job_script = f'''
 from pyspark.sql import SparkSession
 
@@ -502,7 +523,7 @@ spark = SparkSession.builder \\
 
 spark.sql("USE {self.database}")
 
-result = spark.sql("""{query}""")
+result = spark.sql({query_literal})
 result.write.mode("overwrite").json("{results_path}")
 
 spark.stop()

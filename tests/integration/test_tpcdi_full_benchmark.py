@@ -88,13 +88,18 @@ class TestTPCDIFullBenchmarkIntegration:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
             enable_error_recovery=True,
         )
 
         assert etl_results["success"] is True, f"ETL pipeline failed: {etl_results.get('error', 'Unknown error')}"
-        assert etl_results["total_records_processed"] >= 0, "Invalid total records processed count"
+        incremental = etl_results["phases"]["incremental_loading"]
+        assert incremental["success"] is True
+        assert incremental["records_loaded"] > 0
+        assert test_database.execute(
+            "SELECT SK_CustomerID, CustomerID, FirstName FROM DimCustomer WHERE SK_CustomerID = 1000001"
+        ).fetchone() == (1000001, 100000000, "FirstName0")
+        assert etl_results["total_records_processed"] >= incremental["records_loaded"]
         assert etl_results["quality_score"] >= 0, "Invalid quality score"
 
         # Phase 4: Data Validation
@@ -145,7 +150,6 @@ class TestTPCDIFullBenchmarkIntegration:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=False,  # Skip for speed
             )
 
@@ -257,7 +261,6 @@ class TestTPCDIFullBenchmarkIntegration:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
         )
         performance_metrics["etl_pipeline_time"] = time.time() - start_time
@@ -393,7 +396,7 @@ class TestTPCDIFullBenchmarkIntegration:
         memory_measurements["after_data_gen"] = process.memory_info().rss / 1024 / 1024
 
         # ETL pipeline
-        benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite", enable_parallel_processing=True)
+        benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite")
         memory_measurements["after_etl"] = process.memory_info().rss / 1024 / 1024
 
         # Calculate growth metrics
@@ -416,9 +419,17 @@ class TestTPCDIFullBenchmarkIntegration:
             f"(baseline={baseline_memory:.1f}MB, max_allowed={max_allowed_peak:.1f}MB)"
         )
 
-    def test_parallel_processing_scalability(self, temp_dir, test_database):
-        """Test parallel processing scalability with different worker counts."""
-        worker_counts = [1, 2, 4]
+    def test_parallel_processing_scalability(self, temp_dir):
+        """Enhanced ETL results must not vary with worker count.
+
+        The removed synthetic batch scheduler was the only enhanced-pipeline
+        consumer of ``max_workers``. Parallel TPC-DI ETL lives on the
+        canonical ``run_etl_pipeline`` path via ``enable_parallel`` (covered
+        by the canonical equivalence tests), so varying the worker count
+        here must change neither the results nor the phase set: this guards
+        against reintroducing worker-gated synthetic phases.
+        """
+        worker_counts = [1, 4]
         results = {}
 
         for workers in worker_counts:
@@ -432,38 +443,25 @@ class TestTPCDIFullBenchmarkIntegration:
 
             benchmark = TPCDIBenchmark(config=config)
 
-            # Measure parallel processing performance
-            start_time = time.time()
-
-            benchmark.create_schema(test_database, "sqlite")
-            benchmark.generate_data()
-
-            etl_results = benchmark.run_enhanced_etl_pipeline(
-                test_database, dialect="sqlite", enable_parallel_processing=True
-            )
-
-            execution_time = time.time() - start_time
+            # Each worker count runs the same source batch against a fresh
+            # warehouse so primary keys from the first run do not collide.
+            with sqlite3.connect(":memory:") as connection:
+                benchmark.create_schema(connection, "sqlite")
+                benchmark.generate_data()
+                etl_results = benchmark.run_enhanced_etl_pipeline(connection, dialect="sqlite")
 
             results[workers] = {
-                "execution_time_seconds": execution_time,
                 "etl_success": etl_results["success"],
-                "parallel_batches": etl_results["phases"]
-                .get("parallel_batch_processing", {})
-                .get("batches_processed", 0),
+                "records_processed": etl_results["total_records_processed"],
+                "phases": sorted(etl_results["phases"]),
             }
 
-        # Verify parallel processing works
         for workers, result in results.items():
             assert result["etl_success"], f"ETL failed with {workers} workers"
+            assert "parallel_batch_processing" not in result["phases"]
 
-        # With more workers, parallel batches should be processed
-        if results[max(worker_counts)]["parallel_batches"] > 0:
-            # More workers should not significantly increase execution time (within reason)
-            single_worker_time = results[1]["execution_time_seconds"]
-            multi_worker_time = results[max(worker_counts)]["execution_time_seconds"]
-
-            # Allow some overhead but expect parallel processing benefits or at least no major regression
-            assert multi_worker_time <= single_worker_time * 1.5, "Parallel processing shows significant regression"
+        assert results[1]["records_processed"] == results[4]["records_processed"]
+        assert results[1]["phases"] == results[4]["phases"]
 
     def test_benchmark_reproducibility(self, small_scale_config, test_database):
         """Test benchmark reproducibility - same inputs should produce same outputs."""
@@ -479,7 +477,6 @@ class TestTPCDIFullBenchmarkIntegration:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=False,  # Disable for reproducibility
             )
 
             runs.append(
@@ -624,109 +621,15 @@ class TestTPCDISpecificationValidation:
 
     def test_etl_processing_compliance_validation(self, spec_config, test_database):
         """Test ETL processing compliance with TPC-DI transformation rules."""
-        from unittest.mock import MagicMock, patch
-
         benchmark = TPCDIBenchmark(config=spec_config)
-
-        # Set up benchmark
         benchmark.create_schema(test_database, "sqlite")
         benchmark.generate_data()
-
-        # Initialize connection-dependent systems to prepare ETL components
-        benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
-
-        # Build list of patches to apply
-        patches = []
-
-        # Mock FinWire processor to avoid file processing errors
-        if benchmark.finwire_processor:
-            patches.append(
-                patch.object(
-                    benchmark.finwire_processor,
-                    "process_finwire_file",
-                    return_value={"success": True, "records_processed": 100, "errors": []},
-                )
-            )
-
-        # Mock Customer Management processor to avoid file processing errors
-        if benchmark.customer_mgmt_processor:
-            patches.append(
-                patch.object(
-                    benchmark.customer_mgmt_processor,
-                    "process_customer_management_file",
-                    return_value={"success": True, "records_processed": 50, "errors": []},
-                )
-            )
-            patches.append(
-                patch.object(
-                    benchmark.customer_mgmt_processor,
-                    "process_prospect_file",
-                    return_value={"success": True, "records_processed": 25, "errors": []},
-                )
-            )
-
-        # Mock incremental loading to avoid LastModified column requirement
-        # Return some mock changes so that batches get loaded
-        mock_change = MagicMock()
-        mock_change.record_id = 1
-        patches.append(patch.object(benchmark.incremental_loader, "detect_changes", return_value=[mock_change]))
-        patches.append(
-            patch.object(
-                benchmark.incremental_loader,
-                "load_incremental_batch",
-                return_value={"records_loaded": 10, "batches_processed": 1, "success": True},
-            )
+        etl_results = benchmark.run_enhanced_etl_pipeline(
+            test_database,
+            dialect="sqlite",
+            enable_data_quality_monitoring=True,
+            enable_error_recovery=True,
         )
-        # Mock get_watermark to return a timestamp
-        patches.append(
-            patch.object(
-                benchmark.incremental_loader,
-                "get_watermark",
-                return_value=None,  # Return None for no previous watermark
-            )
-        )
-
-        # Mock SCD processor to avoid database table requirements
-        if benchmark.scd_processor:
-            patches.append(
-                patch.object(
-                    benchmark.scd_processor,
-                    "process_dimension",
-                    return_value={"success": True, "records_processed": 50, "changes_detected": 10},
-                )
-            )
-
-        # Mock data quality monitoring to avoid NoneType division errors
-        patches.append(
-            patch.object(
-                benchmark.data_quality_monitor,
-                "execute_quality_checks",
-                return_value={
-                    "checks_passed": 5,
-                    "checks_failed": 0,
-                    "total_checks": 5,
-                    "pass_rate": 100.0,
-                    "quality_score": 100.0,
-                    "success": True,
-                },
-            )
-        )
-
-        # Apply all patches and run ETL
-        from contextlib import ExitStack
-
-        with ExitStack() as stack:
-            for p in patches:
-                stack.enter_context(p)
-
-            # Run ETL with detailed tracking
-            etl_results = benchmark.run_enhanced_etl_pipeline(
-                test_database,
-                dialect="sqlite",
-                enable_parallel_processing=True,
-                enable_data_quality_monitoring=True,
-                enable_error_recovery=True,
-            )
 
         assert etl_results["success"], "ETL pipeline must succeed for compliance testing"
 
@@ -752,7 +655,9 @@ class TestTPCDISpecificationValidation:
 
         # Validate incremental loading compliance
         incremental_phase = etl_results["phases"]["incremental_loading"]
-        assert incremental_phase["incremental_batches"] >= 0, "Incremental loading should process batches"
+        assert incremental_phase["incremental_batches"] == 1
+        assert incremental_phase["records_loaded"] > 0
+        assert test_database.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0] > 0
 
     def test_data_quality_business_rules_validation(self, spec_config, test_database):
         """Test data quality validation against TPC-DI business rules."""
@@ -919,7 +824,6 @@ class TestTPCDIPerformanceAndScalability:
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
                 dialect="sqlite",
-                enable_parallel_processing=True,
                 enable_data_quality_monitoring=True,
             )
             etl_time = time.time() - start_time
@@ -1058,7 +962,6 @@ class TestTPCDIPerformanceAndScalability:
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_parallel_processing=True,
             enable_data_quality_monitoring=True,
         )
         record_resources("etl_completed")

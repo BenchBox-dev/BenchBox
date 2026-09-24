@@ -10,7 +10,7 @@ This document provides guidelines and instructions for contributing.
 
 ### Prerequisites
 
-- Python 3.10+
+- Python 3.11+
 - Git
 - [uv](https://docs.astral.sh/uv/) (fast Python package manager)
 - [GitHub CLI](https://cli.github.com/) (`gh`) — required for the one-shot PR flow below
@@ -48,7 +48,7 @@ Required CI on `develop` reports through `ci-required-result`. The umbrella uses
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready` (or open already-final work with `make pr-open READY=1`); then walk away — don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready`; `make pr-open READY=1` may arm only when it reuses an already-open, reviewed PR. A newly created PR remains held until review; then walk away — don't poll.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -87,20 +87,28 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
 
    `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
 
-5. **When the branch is final, arm auto-merge** (hands-free finish path):
+5. **When the branch is final, run the readiness transaction** (hands-free finish path):
 
    ```bash
-   make pr-ready          # arm squash auto-merge on the open PR
-   # Or open and arm in one step when you already know the branch is done:
-   # make pr-open READY=1
+   make pr-ready PR=123 HEAD=$(git rev-parse HEAD) EVIDENCE=/tmp/readiness.json
+   # Or reuse an already-open, reviewed PR and arm it in one step:
+   # make pr-open READY=1 EVIDENCE=/tmp/readiness.json
    ```
 
-   `make pr-ready` (or `READY=1`) is the only arm path: `auto-merge-on-open.yml` is revoke-only and never arms — not on `opened` / `reopened` / `synchronize`, and not on draft → ready (`ready_for_review` is not even a trigger; the historical workflow arm point never fired once and was deleted). Once armed, the PR squash-merges when required checks turn green — don't poll. Soundness-critical paths and the `no-auto-merge` hold label stay withheld pending review (see `docs/operations/repo-admin-settings.md`).
+   The evidence file must declare `delivery_mode` (`serial` or `batch`); batch
+   mode must include the complete prepared-batch binding. `make pr-ready` (or
+   `READY=1` while reusing an already-open, reviewed PR) is the only arm path:
+   `auto-merge-on-open.yml` is revoke-only and never arms. Once the exact readiness transaction passes, the PR
+   squash-merges when required checks turn green — don't poll.
+   Soundness-critical paths and the `no-auto-merge` hold label stay withheld
+   pending review (see `docs/operations/repo-admin-settings.md`).
 
-6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; clean local branches separately:
+6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
    ```bash
-   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"
+   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"   # removes the linked worktree
+   make branch-prune-merged DRY_RUN=1                      # preview branches with complete historical merge evidence (requires gh)
+   make branch-prune-merged                                # delete only exact, merge-reachable historical heads
    ```
 
    Inspect open PRs at any time with `make pr-status`.
@@ -138,6 +146,11 @@ Or run any of those individually. Additional one-offs: `make security-audit`, `m
 Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
 
 ## Testing
+
+This section is the canonical starting point for contributor test commands.
+The root README covers product use and links here instead of duplicating the
+test matrix. See [tests/README.md](tests/README.md) for test categories,
+markers, parallel-run rules, and troubleshooting.
 
 We use pytest for testing. Common testing commands:
 
@@ -186,7 +199,7 @@ To add a new benchmark, create a new file in the `benchbox` directory and implem
 
 BenchBox uses a family-based architecture for DataFrame platforms. To add a new platform:
 
-1. **Determine the family**: Expression (Polars, PySpark) or Pandas (Pandas, Modin, cuDF)
+1. **Determine the family**: Expression (Polars, PySpark) or Pandas (Pandas and cuDF)
 2. **Implement DataFrameContext**: Provides table access and family-specific helpers
 3. **Implement platform adapter**: Handles data loading and query execution
 4. **Register the platform**: Add to `DATAFRAME_ADAPTERS` registry

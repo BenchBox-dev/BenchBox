@@ -1,0 +1,9 @@
+{
+  "bundle_file": "clickbench_sf10_duckdb_v1_5_5_median.json",
+  "bundle_hash": "b48a8a7af79159159fe8484260a9e3f9fd949a2e7321f5dfa86a662089467cd7",
+  "companion_hashes": {},
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

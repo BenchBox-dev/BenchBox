@@ -1210,3 +1210,38 @@ class TestTuningProvenanceLoaderFidelity:
         assert re_exported["platform"]["tuning"]["counts"]["tuning_types"] == ["foreign_keys", "primary_keys"]
         assert canonical_json_text(exported) == canonical_json_text(re_exported)
         assert canonical_json_text(tuning_companion) == canonical_json_text(build_tuning_payload(reimported))
+
+
+class TestResultSchemaVersionLoading:
+    """Tests for result_schema_version and backwards-compatible version loading."""
+
+    def test_load_result_file_with_result_schema_version_and_no_version(self, tmp_path: Path):
+        data = make_v2_result_dict(version="2.2")
+        del data["version"]
+        data["result_schema_version"] = "2.2"
+        file_path = tmp_path / "result.json"
+        file_path.write_text(json.dumps(data), encoding="utf-8")
+
+        result, _raw_data = load_result_file(file_path)
+        assert result.benchmark_id == data["benchmark"]["id"]
+        assert result.platform == data["platform"]["name"]
+
+    def test_load_result_file_with_legacy_version(self, tmp_path: Path):
+        data = make_v2_result_dict(version="2.0")
+        assert "result_schema_version" not in data
+        assert data["version"] == "2.0"
+        file_path = tmp_path / "result.json"
+        file_path.write_text(json.dumps(data), encoding="utf-8")
+
+        result, _raw_data = load_result_file(file_path)
+        assert result.benchmark_id == data["benchmark"]["id"]
+
+    def test_load_result_file_missing_both_versions_raises(self, tmp_path: Path):
+        data = make_v2_result_dict(version="2.2")
+        del data["version"]
+        assert "result_schema_version" not in data
+        file_path = tmp_path / "result.json"
+        file_path.write_text(json.dumps(data), encoding="utf-8")
+
+        with pytest.raises(UnsupportedSchemaError):
+            load_result_file(file_path)

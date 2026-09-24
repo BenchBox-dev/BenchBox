@@ -44,6 +44,7 @@ from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (
     ExpressionFamilyAdapter,
 )
+from benchbox.platforms.dataframe.shared_loading import dialect_preserves_empty_strings
 
 logger = logging.getLogger(__name__)
 
@@ -272,9 +273,11 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             delimiter: Field delimiter
             has_header: Whether file has header row
             column_names: Optional column names (overrides header)
-            null_marker: The SQL dialect's null marker. ``None`` means empty fields
-                stay '' in string columns (match DuckDB/pandas); ``""`` means empty
-                fields are NULL. (Trailing delimiters are handled natively by
+            null_marker: The SQL dialect's null marker. ``None`` (no NULL
+                conversion) or a non-empty sentinel (only the sentinel is NULL,
+                e.g. ClickBench's ``__NULL__``) means empty fields stay '' in
+                string columns (match DuckDB/pandas); ``""`` means empty fields
+                are NULL. (Trailing delimiters are handled natively by
                 truncate_ragged_lines.)
             string_columns: Accepted for expression-family parity; Polars applies
                 this via ``missing_utf8_is_empty_string`` for UTF-8 columns.
@@ -300,12 +303,12 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             # empty->null. Without this, a prefer_parquet=False load reintroduces the
             # empty-string->null divergence (the cross-surface Q6/Q17/Q18 bug) on the
             # Polars surface. Numeric columns always treat an empty field as null.
-            # This is the same null_marker-is-None decision that
+            # This is the same decision that
             # shared_loading.resolve_empty_string_restore_columns makes for every
             # other adapter; Polars applies it natively as a single scan_csv flag
             # (over all UTF-8 columns) instead of a per-column post-read restore, so
             # there is no post-hoc coercion step here to consolidate.
-            "missing_utf8_is_empty_string": null_marker is None,
+            "missing_utf8_is_empty_string": dialect_preserves_empty_strings(null_marker),
         }
 
         # Add row limit if specified
@@ -752,6 +755,24 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
             return max_expr.over(partition_by)
         return max_expr
 
+    @staticmethod
+    def _window_order_columns(order_by: list[tuple[str, bool]] | None, column: str) -> tuple[list[str], bool]:
+        """Normalize a window ORDER BY to a (columns, ascending) pair.
+
+        Multi-column keys (e.g. a deterministic ``(date, key)`` tie-break) are
+        passed through to Polars' ``over(..., order_by=[...])``. Polars takes a
+        single ``descending`` flag, so every key must share one direction;
+        mixed ASC/DESC keys raise until a per-column encoding lands.
+        """
+        order_by = order_by or [(column, True)]
+        directions = {ascending for _, ascending in order_by}
+        if len(directions) > 1:
+            raise ValueError(
+                "Polars window helpers require a uniform ORDER BY direction, "
+                f"got {order_by!r}; encode mixed directions per column first."
+            )
+        return [name for name, _ in order_by], order_by[0][1]
+
     def window_lag(
         self,
         column: str,
@@ -766,9 +787,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         original row order) rather than shifting in the frame's current order and
         then re-sorting the shifted values.
         """
-        order_col, ascending = order_by[0] if order_by else (column, True)
+        order_cols, ascending = self._window_order_columns(order_by, column)
         parts = partition_by if partition_by else [pl.lit(1)]
-        return pl.col(column).shift(offset).over(parts, order_by=order_col, descending=not ascending)
+        return pl.col(column).shift(offset).over(parts, order_by=order_cols, descending=not ascending)
 
     def window_lead(
         self,
@@ -778,9 +799,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         order_by: list[tuple[str, bool]] | None = None,
     ) -> PolarsExpr:
         """Create a LEAD() window function expression (see window_lag)."""
-        order_col, ascending = order_by[0] if order_by else (column, True)
+        order_cols, ascending = self._window_order_columns(order_by, column)
         parts = partition_by if partition_by else [pl.lit(1)]
-        return pl.col(column).shift(-offset).over(parts, order_by=order_col, descending=not ascending)
+        return pl.col(column).shift(-offset).over(parts, order_by=order_cols, descending=not ascending)
 
     def window_ntile(
         self,
@@ -794,11 +815,13 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         the first ``count % n`` buckets get ``ceil(count/n)`` rows, the rest get
         ``floor(count/n)``. The naive ``ceil(rank*n/count)`` formula does not match
         that distribution (e.g. n=3 over 5 rows), so compute the buckets piecewise
-        from the 0-indexed position.
+        from the 0-indexed position. Multi-column ORDER BY tie-breaks rank over
+        the struct of the key columns (lexicographic order).
         """
-        order_col, ascending = order_by[0]
-        r0 = pl.col(order_col).rank(method="ordinal", descending=not ascending) - pl.lit(1)
-        count_expr = pl.col(order_col).count()
+        order_cols, ascending = self._window_order_columns(order_by, order_by[0][0])
+        rank_col: PolarsExpr = pl.struct(order_cols) if len(order_cols) > 1 else pl.col(order_cols[0])
+        r0 = rank_col.rank(method="ordinal", descending=not ascending) - pl.lit(1)
+        count_expr = pl.col(order_cols[0]).count()
         base = count_expr // n  # floor bucket size
         rem = count_expr % n  # number of larger (base+1) buckets
         big = rem * (base + pl.lit(1))  # rows covered by the larger buckets

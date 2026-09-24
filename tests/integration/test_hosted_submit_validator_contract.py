@@ -1,35 +1,10 @@
-"""Hosted-submit -> develop-validator contract test.
+"""Check the hosted-submit bundle against the published-results validator.
 
-Background: `benchbox submit --service` (Phase 3 hosted path) sends bytes
-to the hosted ingest service WITHOUT first running
-`scripts/validate_submission.py` against the bundle. The trade-off is
-documented in `_dispatch_service_mode` (benchbox/cli/commands/submit.py)
-and captured in blind-spot
-`_project/blind-spots/2026-05-01-103000-hosted-submit-no-local-validate-preflight.md`:
-
-    The hosted ingest service validates server-side; running the
-    develop-tip validator here would couple the Python CLI release
-    cadence to the hosted API's accepted-schema set and create false
-    rejections on legacy clients. The trade-off: contributors pay full
-    upload latency before the service tells them what's wrong. We
-    accept that trade-off until we have a hosted-vs-validator contract
-    test that proves the two accept the same bundles; once that
-    exists, fail-fast preflight is the obvious next move.
-
-This test is that contract test. It exercises the exact bundle layout
-that the hosted service would mirror onto `published-results` and
-asserts that `scripts/validate_submission.py` accepts/rejects it
-consistently with what the manifest contract requires. If the develop
-validator's accepted-schema set drifts from what the hosted submit
-path emits, this test fails fast on develop instead of producing
-silently-divergent bundles in the corpus.
-
-Scope: this asserts the *develop-side* contract for hosted-submit
-output. The hosted ingest service's own validator is a black box from
-this repo; that side of the contract is owned by the hosted
-deployment. What this test guarantees is that drift on the develop
-side (manifest shape, hash format, required keys) cannot land
-silently.
+The CLI validates submissions before upload, then sends canonical bundle
+bytes and a manifest to the hosted service. These tests build that manifest
+with the same code and check the develop-side validator's acceptance, hash,
+and schema rules. The hosted service performs its own final validation;
+its deployment is outside this repository.
 """
 
 from __future__ import annotations
@@ -74,7 +49,7 @@ def _minimal_schema_v2_bundle() -> dict:
         "benchmark": {"id": "tpch", "scale_factor": 0.01},
         "platform": {"name": "duckdb"},
         "summary": {"validation": "passed", "queries": {"total": 22, "passed": 22, "failed": 0}},
-        "queries": [{"id": "Q1", "ms": 100.0}],
+        "queries": [{"id": f"Q{i}", "ms": 100.0, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -95,6 +70,7 @@ def _hosted_bundle_layout(tmp_path: Path) -> tuple[Path, Path, dict]:
     bundle_dir.mkdir()
     source_path = bundle_dir / "tpch_duckdb.json"
     source_path.write_text(json.dumps(_minimal_schema_v2_bundle()), encoding="utf-8")
+    source_path.write_bytes(sub._canonical_submission_file_bytes(source_path))
 
     # Build manifest with submission_path="hosted-service" — the exact
     # call _dispatch_service_mode makes at submit.py:222.
@@ -154,6 +130,34 @@ def test_hosted_bundle_with_corrupted_hash_is_rejected(tmp_path: Path) -> None:
     assert "hash" in output.lower(), f"expected hash error, got:\n{output}"
 
 
+def test_hosted_partial_bundle_is_rejected_even_with_a_valid_manifest(tmp_path: Path) -> None:
+    """A valid hosted hash cannot make incomplete query evidence publishable."""
+    sub = importlib.import_module("benchbox.cli.commands.submit")
+    bundle_dir = tmp_path / "bundle"
+    bundle_dir.mkdir()
+    source_path = bundle_dir / "tpch_duckdb.json"
+    payload = _minimal_schema_v2_bundle()
+    payload["queries"].pop()
+    payload["summary"]["queries"] = {"total": 21, "passed": 21, "failed": 0}
+    source_path.write_text(json.dumps(payload), encoding="utf-8")
+    source_path.write_bytes(sub._canonical_submission_file_bytes(source_path))
+    result = _fake_result()
+    result.total_queries = 21
+    manifest = sub._build_submission_manifest(
+        source_path=source_path,
+        companions=[],
+        result=result,
+        submitted_by="contract-test@example.invalid",
+        submission_path="hosted-service",
+    )
+    (bundle_dir / f"{source_path.stem}.manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    rc, output = _run_validator(source_path, cwd=tmp_path)
+
+    assert rc != 0
+    assert "covers 21 of 22 canonical queries" in output
+
+
 def test_hosted_bundle_missing_required_schema_key_is_rejected(tmp_path: Path) -> None:
     """Schema drift detection: if the source file is missing a top-level
     schema-v2 key (`queries`, `summary`, etc.), the develop validator
@@ -168,6 +172,7 @@ def test_hosted_bundle_missing_required_schema_key_is_rejected(tmp_path: Path) -
     bad = _minimal_schema_v2_bundle()
     del bad["queries"]
     source_path.write_text(json.dumps(bad), encoding="utf-8")
+    source_path.write_bytes(sub._canonical_submission_file_bytes(source_path))
 
     manifest = sub._build_submission_manifest(
         source_path=source_path,

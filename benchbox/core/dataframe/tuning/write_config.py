@@ -18,7 +18,6 @@ Platform Compatibility:
 | Dask     | Yes       | No   | Yes         | Yes        |
 | PySpark  | Yes       | Yes  | Yes         | Yes        |
 | cuDF     | No        | Yes  | No          | Yes        |
-| Modin    | No        | Yes  | No          | Yes        |
 
 Example:
     >>> from benchbox.core.dataframe.tuning.write_config import (
@@ -380,14 +379,6 @@ PLATFORM_WRITE_CAPABILITIES: dict[str, dict[str, bool]] = {
         "partition_by": False,
         "sort_by": True,
         "row_group_size": True,
-        "repartition_count": False,
-        "compression": True,
-        "dictionary_encoding": True,
-    },
-    "modin": {
-        "partition_by": False,
-        "sort_by": True,
-        "row_group_size": True,  # Via Pandas backend
         "repartition_count": False,
         "compression": True,
         "dictionary_encoding": True,

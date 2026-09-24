@@ -272,6 +272,12 @@ class _BigQueryClient:
             raise NotFound(f"Dataset {dataset_id} not found")
         return self._state.datasets[dataset_id]
 
+    def get_table(self, table_ref: str) -> dict[str, Any]:
+        table_name = str(table_ref).split(".")[-1].upper()
+        if table_name not in self._state.row_counts:
+            raise NotFound(f"Table {table_ref} not found")
+        return {"table_id": table_name}
+
     def create_dataset(self, dataset: Any) -> dict[str, Any]:
         self._state.datasets[dataset.dataset_id] = {
             "location": getattr(dataset, "location", self._state.location),
@@ -411,12 +417,12 @@ def install_google_cloud_stubs(
     try:
         import benchbox.platforms.bigquery as adapter_module
 
-        adapter_module.bigquery = bigquery_module
-        adapter_module.storage = storage_module
-        adapter_module.NotFound = NotFound
-        adapter_module.Conflict = Conflict
+        monkeypatch.setattr(adapter_module, "bigquery", bigquery_module)
+        monkeypatch.setattr(adapter_module, "storage", storage_module)
+        monkeypatch.setattr(adapter_module, "NotFound", NotFound)
+        monkeypatch.setattr(adapter_module, "Conflict", Conflict, raising=False)
         # Patch google_auth reference so _load_credentials works with stubs
-        adapter_module.google_auth = auth_module
+        monkeypatch.setattr(adapter_module, "google_auth", auth_module)
     except ImportError:  # pragma: no cover - defensive
         pass
 
@@ -566,7 +572,10 @@ class SnowflakeStubState:
     statements: list[str] = field(default_factory=list)
     put_commands: list[str] = field(default_factory=list)
     copy_commands: list[str] = field(default_factory=list)
-    row_counts: dict[str, int] = field(default_factory=lambda: {"LINEITEM": 2})
+    # Tables start empty so the smoke exercises the upload path; a successful
+    # COPY fills the table (mirroring the adapter's idempotent-rerun skip,
+    # which bypasses the load when the target already holds rows).
+    row_counts: dict[str, int] = field(default_factory=dict)
 
 
 class _SnowflakeCursor:
@@ -582,6 +591,7 @@ class _SnowflakeCursor:
             self._results = [("local_file", 2, 2, "SKIPPED", "", "")]
         elif lowered.startswith("copy into"):
             self._state.copy_commands.append(sql)
+            self._state.row_counts["LINEITEM"] = 2
             self._results = [("lineitem", 2, 2, "loaded", "", "")]
         elif "select count(*)" in lowered:
             from_index = lowered.find("from")

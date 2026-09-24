@@ -15,24 +15,106 @@ from benchbox.core.cost.models import BenchmarkCost, DeploymentMetadata, Normali
 from benchbox.core.cost.pricing import (
     CURRENCY,
     PRICING_VERSION,
-    get_athena_price_per_tb,
-    get_bigquery_price_per_tb,
-    get_databricks_dbu_price,
-    get_fabric_cu_price,
-    get_fabric_sku_cu_count,
-    get_firebolt_fbu_price,
-    get_firebolt_fbu_rate,
-    get_redshift_node_price,
-    get_snowflake_credit_price,
-    get_synapse_dedicated_price,
-    get_synapse_serverless_price_per_tb,
+    PriceResolution,
+    get_pricing_age_days,
+    get_table_unit,
+    resolve_athena_price_per_tb,
+    resolve_bigquery_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_fabric_cu_price,
+    resolve_fabric_sku_cu_count,
+    resolve_firebolt_fbu_price,
+    resolve_firebolt_fbu_rate,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
+    resolve_snowflake_warehouse_credits_per_hour,
+    resolve_synapse_dedicated_price,
+    resolve_synapse_serverless_price_per_tb,
 )
 
 logger = logging.getLogger(__name__)
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
-# Conversion constants
-BYTES_PER_TB = 1024**4
+# Bytes per billed data unit, keyed by the per-table unit declared in
+# pricing_data.yaml. BigQuery bills per tebibyte (vendor-confirmed: its pricing
+# page works an example as billed-bytes / 1099511627776). Athena and Synapse
+# serverless print a bare "TB" and neither vendor publishes the divisor, so
+# terabyte resolves to the SI decimal 10^12. See
+# docs/development/adr/adr-billing-unit-tb-tib-contract.md: the 2^40 reading
+# understated Athena/Synapse costs by ~9.95%, and the residual exposure if a
+# vendor means 2^40 is a ~9.95% overstatement, disclosed there.
+BYTES_PER_UNIT: dict[str, int] = {
+    "tebibyte": 1024**4,
+    "terabyte": 10**12,
+}
+
+
+def _byte_unit_for_table(table: str) -> tuple[str, int]:
+    """Return the declared (unit, divisor) pair for a byte-priced table."""
+    unit = get_table_unit(table)
+    if unit is None:
+        raise KeyError(f"No unit declared for price table {table!r} in pricing_data.yaml")
+    return unit, BYTES_PER_UNIT[unit]
+
+
+def _stamp_price_unavailable(details: dict[str, Any], resolution: PriceResolution) -> None:
+    """Stamp a fallback lookup so the cost can never read as trustworthy.
+
+    The calculator still returns a QueryCost built on the fallback value:
+    returning None would make calculate_phase_cost sum the run to 0.0, which
+    reads as free and is worse than a flagged estimate.
+    """
+    if resolution.fallback_used or resolution.value is None:
+        details["price_unavailable"] = {
+            "table": resolution.table,
+            "resolved_key": list(resolution.resolved_key),
+            "reason": resolution.reason,
+        }
+
+
+def _fallback_price_tables(benchmark_cost: BenchmarkCost) -> dict[str, str | None]:
+    """Collect price tables whose queries were priced from a fallback lookup.
+
+    Scans ``phase_costs[*].query_costs[*].pricing_details`` for the
+    ``price_unavailable`` marker stamped by :func:`_stamp_price_unavailable`.
+    Returns one entry per table (the first recorded reason) so a multi-query
+    phase emits one warning per table, not one per query. This is the
+    calculator-level guard for unverified regions: Athena and Synapse
+    serverless resolve out-of-provenance regions as flagged fallbacks, so
+    their markers arrive here with no pricing.py change.
+    """
+    markers: dict[str, str | None] = {}
+    for phase in benchmark_cost.phase_costs or []:
+        for query_cost in phase.query_costs or []:
+            marker = query_cost.pricing_details.get("price_unavailable")
+            if not isinstance(marker, dict):
+                continue
+            table = marker.get("table")
+            if not isinstance(table, str) or not table or table in markers:
+                continue
+            reason = marker.get("reason")
+            markers[table] = reason if isinstance(reason, str) and reason else None
+    return markers
+
+
+def _execution_seconds_from_resource_usage(resource_usage: dict[str, Any]) -> float | None:
+    """Return measured query runtime in seconds, or None when absent.
+
+    Prefer server-side ``execution_time_ms`` when available because the
+    adapter timer can include session setup and result transfer. Fall back to
+    the adapter duration, then ``total_elapsed_time_ms`` (which includes
+    queueing and compilation). Non-numeric values fail closed to None.
+    """
+    milliseconds = resource_usage.get("execution_time_ms")
+    if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
+        return float(milliseconds) / 1000.0
+    seconds = resource_usage.get("execution_time_seconds")
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool):
+        return float(seconds)
+    milliseconds = resource_usage.get("total_elapsed_time_ms")
+    if isinstance(milliseconds, (int, float)) and not isinstance(milliseconds, bool):
+        return float(milliseconds) / 1000.0
+    return None
 
 
 def _load_cost_specs() -> dict[str, Any]:
@@ -130,8 +212,6 @@ class CostCalculator:
             "pandas-df",
             "cudf",
             "cudf-df",
-            "modin",
-            "modin-df",
             "dask",
             "dask-df",
             "pyspark-df",
@@ -207,9 +287,15 @@ class CostCalculator:
         )
 
     def _billing_unit(self, platform_lower: str, platform_config: dict[str, Any]) -> str:
+        # Scan-priced platforms report the unit actually billed: BigQuery is
+        # priced per tebibyte ("tib_scanned"); Athena and Synapse serverless
+        # print "TB", read as decimal terabytes ("tb_scanned"). See
+        # docs/development/adr/adr-billing-unit-tb-tib-contract.md.
         if platform_lower == "snowflake":
             return "credit"
-        if platform_lower in {"bigquery", "athena"}:
+        if platform_lower == "bigquery":
+            return "tib_scanned"
+        if platform_lower == "athena":
             return "tb_scanned"
         if platform_lower == "redshift":
             return "node_hour"
@@ -276,6 +362,13 @@ class CostCalculator:
             warnings.append(f"normalized cost unavailable: pricing region metadata missing for {platform_lower}")
         if platform_lower == "snowflake" and not deployment.warehouse_size:
             warnings.append("normalized cost unavailable: Snowflake warehouse_size metadata missing")
+        estimated_concurrent = platform_lower == "snowflake" and any(
+            (phase.concurrent_streams or 1) > 1
+            and any(query.pricing_details.get("credits_used_estimated") for query in phase.query_costs or [])
+            for phase in benchmark_cost.phase_costs or []
+        )
+        if estimated_concurrent:
+            warnings.append("normalized cost unavailable: runtime-estimated Snowflake costs overlap concurrent streams")
         if platform_lower == "redshift":
             if not deployment.instance_type:
                 warnings.append("normalized cost unavailable: Redshift node_type metadata missing")
@@ -285,6 +378,34 @@ class CostCalculator:
             deployment.warehouse_size or deployment.cluster_size
         ):
             warnings.append("normalized cost unavailable: Databricks warehouse or cluster size metadata missing")
+        for table, reason in sorted(_fallback_price_tables(benchmark_cost).items()):
+            if reason:
+                warnings.append(f"normalized cost unavailable: fallback pricing used for {table} ({reason})")
+            else:
+                warnings.append(f"normalized cost unavailable: fallback pricing used for {table}")
+        pricing_tables = {
+            "snowflake": ("snowflake_credit_prices",),
+            "bigquery": ("bigquery_on_demand_prices",),
+            "redshift": ("redshift_node_prices",),
+            "databricks": ("databricks_dbu_prices",),
+            "databricks-df": ("databricks_dbu_prices",),
+            "athena": ("athena_price_per_tb",),
+            "synapse": (
+                "synapse_dedicated_dwu_prices"
+                if str(platform_config.get("mode") or "serverless").lower() == "dedicated"
+                else "synapse_serverless_price_per_tb",
+            ),
+            "fabric_dw": ("fabric_cu_prices", "fabric_sku_cu_map"),
+            "firebolt": ("firebolt_node_fbu_rates", "firebolt_fbu_price"),
+        }.get(platform_lower, ())
+        unknown_tables = [table for table in pricing_tables if get_pricing_age_days(table) is None]
+        stale_tables = [table for table in pricing_tables if (get_pricing_age_days(table) or 0) > 90]
+        if unknown_tables:
+            warnings.append(
+                "normalized cost unavailable: pricing provenance is unknown for " + ", ".join(unknown_tables)
+            )
+        if stale_tables:
+            warnings.append("normalized cost unavailable: pricing tables are stale: " + ", ".join(stale_tables))
         return warnings
 
     def calculate_query_cost(
@@ -345,39 +466,98 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for a Snowflake query.
 
+        Two paths, in order:
+
+        1. Explicit ``credits_used``: warehouse credits metered for the query.
+           Only genuine warehouse credits belong here; the cloud-services
+           figure from QUERY_HISTORY is reported separately as
+           ``credits_used_cloud_services`` and never priced.
+        2. Runtime estimation for provisioned warehouses: the query's measured
+           execution time multiplied by the warehouse size's credits/hour
+           rate. This is a marginal per-query cost: warehouse idle time
+           between queries and multi-cluster scaling are excluded.
+
         Expected resource_usage fields:
-            - credits_used: Number of credits consumed
+            - credits_used: Number of warehouse credits consumed, OR
+            - execution_time_seconds / execution_time_ms /
+              total_elapsed_time_ms: Measured query runtime for estimation
+            - warehouse_size: Per-query observed size (falls back to
+              platform_config)
 
         Expected platform_config fields:
             - edition: Snowflake edition (standard, enterprise, business_critical)
             - cloud: Cloud provider (aws, azure, gcp)
             - region: Region code
+            - warehouse_size: Warehouse size label (for estimation)
         """
-        credits_used = resource_usage.get("credits_used")
-        if credits_used is None:
-            return None
-
         # Get platform configuration
         edition = platform_config.get("edition", "standard")
         cloud = platform_config.get("cloud", "aws")
         region = platform_config.get("region", "us-east-1")
 
         # Get credit price
-        price_per_credit = get_snowflake_credit_price(edition, cloud, region)
+        resolution = resolve_snowflake_credit_price(edition, cloud, region)
+        if resolution.value is None:
+            return None
+        price_per_credit = resolution.value
 
-        # Calculate cost
-        compute_cost = credits_used * price_per_credit
-
-        return QueryCost(
-            compute_cost=compute_cost,
-            currency=CURRENCY,
-            pricing_details={
+        credits_used = resource_usage.get("credits_used")
+        if credits_used is not None:
+            compute_cost = credits_used * price_per_credit
+            details: dict[str, Any] = {
                 "credits_used": credits_used,
                 "price_per_credit": price_per_credit,
                 "edition": edition,
                 "cloud": cloud,
                 "region": region,
-            },
+            }
+            execution_seconds = _execution_seconds_from_resource_usage(resource_usage)
+            if execution_seconds is not None:
+                details["execution_time_seconds"] = execution_seconds
+            _stamp_price_unavailable(details, resolution)
+            return QueryCost(
+                compute_cost=compute_cost,
+                currency=CURRENCY,
+                pricing_details=details,
+            )
+
+        # Estimation path: measured runtime x warehouse credits/hour rate.
+        execution_seconds = _execution_seconds_from_resource_usage(resource_usage)
+        warehouse_size = resource_usage.get("warehouse_size") or platform_config.get("warehouse_size")
+        if execution_seconds is None or warehouse_size is None:
+            return None
+
+        size_resolution = resolve_snowflake_warehouse_credits_per_hour(str(warehouse_size))
+        if size_resolution.value is None:
+            return None
+        credits_per_hour = size_resolution.value
+
+        credits_used_estimated = (execution_seconds / 3600.0) * credits_per_hour
+        compute_cost = credits_used_estimated * price_per_credit
+
+        estimated_details: dict[str, Any] = {
+            "credits_used": credits_used_estimated,
+            "credits_used_estimated": True,
+            "execution_time_seconds": execution_seconds,
+            "warehouse_size": warehouse_size,
+            "credits_per_hour": credits_per_hour,
+            "price_per_credit": price_per_credit,
+            "edition": edition,
+            "cloud": cloud,
+            "region": region,
+            "note": "Warehouse credits estimated from measured execution time; warehouse idle time excluded",
+        }
+        # Stamp the size lookup first so the credit-price marker survives when
+        # both fall back: the marker holds one table, and the edition/price
+        # warning is the pinned one (unknown editions must name
+        # snowflake_credit_prices). Same price-stamped-last order as the
+        # Fabric and Synapse paths.
+        _stamp_price_unavailable(estimated_details, size_resolution)
+        _stamp_price_unavailable(estimated_details, resolution)
+        return QueryCost(
+            compute_cost=compute_cost,
+            currency=CURRENCY,
+            pricing_details=estimated_details,
         )
 
     def _calculate_bigquery_cost(
@@ -386,6 +566,10 @@ class CostCalculator:
         platform_config: dict[str, Any],
     ) -> Optional[QueryCost]:
         """Calculate cost for a BigQuery query.
+
+        BigQuery on-demand is priced per tebibyte (2^40 bytes); BenchBox
+        charges list rate from byte zero and does not model the first-1-TiB
+        monthly free tier (see the cost README and the billing-unit ADR).
 
         Expected resource_usage fields:
             - bytes_processed: Bytes scanned by the query (use bytes_billed if available)
@@ -402,21 +586,28 @@ class CostCalculator:
         location = platform_config.get("location", "us")
 
         # Get price per TB
-        price_per_tb = get_bigquery_price_per_tb(location)
+        resolution = resolve_bigquery_price_per_tb(location)
+        if resolution.value is None:
+            return None
+        price_per_tb = resolution.value
 
         # Calculate cost
-        tb_processed = bytes_processed / BYTES_PER_TB
+        unit, bytes_per_unit = _byte_unit_for_table("bigquery_on_demand_prices")
+        tb_processed = bytes_processed / bytes_per_unit
         compute_cost = tb_processed * price_per_tb
 
+        details = {
+            "bytes_processed": bytes_processed,
+            "tb_processed": tb_processed,
+            "price_per_tb": price_per_tb,
+            "unit": unit,
+            "location": location,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "bytes_processed": bytes_processed,
-                "tb_processed": tb_processed,
-                "price_per_tb": price_per_tb,
-                "location": location,
-            },
+            pricing_details=details,
         )
 
     def _calculate_redshift_cost(
@@ -460,22 +651,27 @@ class CostCalculator:
         region = platform_config.get("region", "us-east-1")
 
         # Get price per node-hour
-        price_per_node_hour = get_redshift_node_price(node_type, region)
+        resolution = resolve_redshift_node_price(node_type, region)
+        if resolution.value is None:
+            return None
+        price_per_node_hour = resolution.value
 
         # Calculate cost
         hours = execution_time_seconds / 3600.0
         compute_cost = hours * node_count * price_per_node_hour
 
+        details = {
+            "execution_time_seconds": execution_time_seconds,
+            "node_type": node_type,
+            "node_count": node_count,
+            "price_per_node_hour": price_per_node_hour,
+            "region": region,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "execution_time_seconds": execution_time_seconds,
-                "node_type": node_type,
-                "node_count": node_count,
-                "price_per_node_hour": price_per_node_hour,
-                "region": region,
-            },
+            pricing_details=details,
         )
 
     def _calculate_databricks_cost(
@@ -520,7 +716,10 @@ class CostCalculator:
         workload_type = platform_config.get("workload_type", "all_purpose")
 
         # Get DBU price
-        price_per_dbu = get_databricks_dbu_price(cloud, tier, workload_type)
+        resolution = resolve_databricks_dbu_price(cloud, tier, workload_type)
+        if resolution.value is None:
+            return None
+        price_per_dbu = resolution.value
 
         # Calculate cost (DBU cost only, not underlying cloud compute)
         compute_cost = dbu_consumed * price_per_dbu
@@ -533,6 +732,7 @@ class CostCalculator:
             "workload_type": workload_type,
             "is_estimated": is_estimated,
         }
+        _stamp_price_unavailable(details, resolution)
 
         if is_estimated:
             details["note"] = "DBU consumption estimated from execution time"
@@ -550,36 +750,48 @@ class CostCalculator:
     ) -> Optional[QueryCost]:
         """Calculate cost for an Athena query.
 
-        Athena charges $5.00 per TB of data scanned. BenchBox derives cost
-        from measured data_scanned_bytes plus its pricing table; legacy
+        Athena is priced per TB of data scanned from a regional table
+        ($5.00 in us-east-1/eu-west-1/ap-southeast-1/ap-northeast-1, $9.00
+        in sa-east-1); unlisted regions resolve as flagged fallbacks that
+        cannot publish as normalized cost. "TB" is read as decimal terabytes
+        (10^12 bytes) per the billing-unit ADR. BenchBox derives cost from
+        measured data_scanned_bytes plus its pricing table; legacy
         adapter-provided cost_usd is ignored when present.
 
         Expected resource_usage fields:
             - data_scanned_bytes: Bytes scanned by the query
 
         Expected platform_config fields:
-            - region: AWS region (for informational purposes; pricing is uniform)
+            - region: AWS region (pricing is verified per-region, not uniform)
         """
         data_scanned_bytes = resource_usage.get("data_scanned_bytes")
         if data_scanned_bytes is None:
             return None
 
         # Get price per TB
-        price_per_tb = get_athena_price_per_tb()
+        region = platform_config.get("region", "us-east-1")
+        resolution = resolve_athena_price_per_tb(region)
+        if resolution.value is None:
+            return None
+        price_per_tb = resolution.value
 
         # Calculate cost
-        tb_scanned = data_scanned_bytes / BYTES_PER_TB
+        unit, bytes_per_unit = _byte_unit_for_table("athena_price_per_tb")
+        tb_scanned = data_scanned_bytes / bytes_per_unit
         compute_cost = tb_scanned * price_per_tb
 
+        details = {
+            "data_scanned_bytes": data_scanned_bytes,
+            "tb_scanned": tb_scanned,
+            "price_per_tb": price_per_tb,
+            "unit": unit,
+            "region": region,
+        }
+        _stamp_price_unavailable(details, resolution)
         return QueryCost(
             compute_cost=compute_cost,
             currency=CURRENCY,
-            pricing_details={
-                "data_scanned_bytes": data_scanned_bytes,
-                "tb_scanned": tb_scanned,
-                "price_per_tb": price_per_tb,
-                "region": platform_config.get("region", "us-east-1"),
-            },
+            pricing_details=details,
         )
 
     def _calculate_synapse_cost(
@@ -590,7 +802,11 @@ class CostCalculator:
         """Calculate cost for an Azure Synapse Analytics query.
 
         Synapse has two modes:
-        - Serverless: $5.00 per TB of data processed (similar to Athena/BigQuery)
+        - Serverless: per-TB-of-data-processed pricing from a regional
+          table ($5.00 eastus/westeurope, $6.75 southeastasia, $5.50
+          canadacentral, $9.00 brazilsouth); unlisted regions resolve as
+          flagged fallbacks that cannot publish as normalized cost. "TB" is
+          read as decimal terabytes (10^12 bytes) per the billing-unit ADR.
         - Dedicated: DWU-hour based pricing (similar to Redshift)
 
         Expected resource_usage fields:
@@ -612,20 +828,27 @@ class CostCalculator:
             if bytes_processed is None:
                 return None
 
-            price_per_tb = get_synapse_serverless_price_per_tb()
-            tb_processed = bytes_processed / BYTES_PER_TB
+            resolution = resolve_synapse_serverless_price_per_tb(region)
+            if resolution.value is None:
+                return None
+            price_per_tb = resolution.value
+            unit, bytes_per_unit = _byte_unit_for_table("synapse_serverless_price_per_tb")
+            tb_processed = bytes_processed / bytes_per_unit
             compute_cost = tb_processed * price_per_tb
 
+            details = {
+                "mode": "serverless",
+                "bytes_processed": bytes_processed,
+                "tb_processed": tb_processed,
+                "price_per_tb": price_per_tb,
+                "unit": unit,
+                "region": region,
+            }
+            _stamp_price_unavailable(details, resolution)
             return QueryCost(
                 compute_cost=compute_cost,
                 currency=CURRENCY,
-                pricing_details={
-                    "mode": "serverless",
-                    "bytes_processed": bytes_processed,
-                    "tb_processed": tb_processed,
-                    "price_per_tb": price_per_tb,
-                    "region": region,
-                },
+                pricing_details=details,
             )
         else:
             # Dedicated: DWU-hour based pricing
@@ -634,21 +857,26 @@ class CostCalculator:
                 return None
 
             dwu_level = platform_config.get("dwu_level", "dw100c")
-            price_per_hour = get_synapse_dedicated_price(dwu_level, region)
+            resolution = resolve_synapse_dedicated_price(dwu_level, region)
+            if resolution.value is None:
+                return None
+            price_per_hour = resolution.value
 
             hours = execution_time_seconds / 3600.0
             compute_cost = hours * price_per_hour
 
+            details = {
+                "mode": "dedicated",
+                "execution_time_seconds": execution_time_seconds,
+                "dwu_level": dwu_level,
+                "price_per_hour": price_per_hour,
+                "region": region,
+            }
+            _stamp_price_unavailable(details, resolution)
             return QueryCost(
                 compute_cost=compute_cost,
                 currency=CURRENCY,
-                pricing_details={
-                    "mode": "dedicated",
-                    "execution_time_seconds": execution_time_seconds,
-                    "dwu_level": dwu_level,
-                    "price_per_hour": price_per_hour,
-                    "region": region,
-                },
+                pricing_details=details,
             )
 
     def _calculate_fabric_cost(
@@ -683,15 +911,22 @@ class CostCalculator:
                 return None
 
             # Get CU count for the SKU
-            cu_count = get_fabric_sku_cu_count(sku)
+            sku_resolution = resolve_fabric_sku_cu_count(sku)
+            if sku_resolution.value is None:
+                return None
+            cu_count = sku_resolution.value
             cu_seconds = execution_time_seconds * cu_count
             is_estimated = True
         else:
+            sku_resolution = None
             is_estimated = False
 
         # Convert CU-seconds to CU-hours and calculate cost
         cu_hours = cu_seconds / 3600.0
-        price_per_cu_hour = get_fabric_cu_price(region)
+        price_resolution = resolve_fabric_cu_price(region)
+        if price_resolution.value is None:
+            return None
+        price_per_cu_hour = price_resolution.value
         compute_cost = cu_hours * price_per_cu_hour
 
         details: dict[str, Any] = {
@@ -702,6 +937,9 @@ class CostCalculator:
             "region": region,
             "is_estimated": is_estimated,
         }
+        if sku_resolution is not None:
+            _stamp_price_unavailable(details, sku_resolution)
+        _stamp_price_unavailable(details, price_resolution)
 
         if is_estimated:
             details["note"] = "CU consumption estimated from execution time and SKU"
@@ -744,19 +982,26 @@ class CostCalculator:
             node_count = platform_config.get("node_count", 1)
 
             # Get FBU rate per hour for the node type
-            fbu_per_hour = get_firebolt_fbu_rate(node_type)
+            rate_resolution = resolve_firebolt_fbu_rate(node_type)
+            if rate_resolution.value is None:
+                return None
+            fbu_per_hour = rate_resolution.value
 
             # Calculate FBUs: (hours * FBU/hour * nodes)
             hours = execution_time_seconds / 3600.0
             fbu_consumed = hours * fbu_per_hour * node_count
             is_estimated = True
         else:
+            rate_resolution = None
             is_estimated = False
             node_type = platform_config.get("node_type", "unknown")
             node_count = platform_config.get("node_count", 1)
 
         # Calculate cost
-        fbu_price = get_firebolt_fbu_price()
+        price_resolution = resolve_firebolt_fbu_price()
+        if price_resolution.value is None:
+            return None
+        fbu_price = price_resolution.value
         compute_cost = fbu_consumed * fbu_price
 
         details: dict[str, Any] = {
@@ -766,6 +1011,9 @@ class CostCalculator:
             "node_count": node_count,
             "is_estimated": is_estimated,
         }
+        if rate_resolution is not None:
+            _stamp_price_unavailable(details, rate_resolution)
+        _stamp_price_unavailable(details, price_resolution)
 
         if is_estimated:
             details["note"] = "FBU consumption estimated from execution time and node configuration"

@@ -4,6 +4,13 @@ import pytest
 
 from benchbox.core.cost.calculator import CostCalculator, validate_resource_usage
 from benchbox.core.cost.models import QueryCost
+from benchbox.core.cost.pricing import (
+    resolve_athena_price_per_tb,
+    resolve_bigquery_price_per_tb,
+    resolve_databricks_dbu_price,
+    resolve_redshift_node_price,
+    resolve_snowflake_credit_price,
+)
 
 pytestmark = [
     pytest.mark.unit,
@@ -29,41 +36,54 @@ class TestCostCalculator:
 
         assert cost is not None
         assert isinstance(cost, QueryCost)
-        assert cost.compute_cost == 1.0  # 0.5 credits * $2.00 per credit
+        price_per_credit = resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
+        assert cost.compute_cost == 0.5 * price_per_credit
         assert cost.currency == "USD"
         assert cost.pricing_details["credits_used"] == 0.5
-        assert cost.pricing_details["price_per_credit"] == 2.00
+        assert cost.pricing_details["price_per_credit"] == price_per_credit
 
     def test_bigquery_cost_calculation(self):
         """Test BigQuery cost calculation with bytes_processed."""
         calculator = CostCalculator()
 
-        # 1 TB = 1024^4 bytes
-        bytes_per_tb = 1024**4
-        resource_usage = {"bytes_processed": bytes_per_tb}  # Exactly 1 TB
+        # 1 TiB = 1024^4 bytes (BigQuery bills per tebibyte)
+        bytes_per_tib = 1024**4
+        resource_usage = {"bytes_processed": bytes_per_tib}  # Exactly 1 TiB
         platform_config = {"location": "us"}
 
         cost = calculator.calculate_query_cost("bigquery", resource_usage, platform_config)
 
         assert cost is not None
-        assert cost.compute_cost == 5.0  # 1 TB * $5.00 per TB
-        assert cost.pricing_details["price_per_tb"] == 5.0
+        price_per_tb = resolve_bigquery_price_per_tb("us").value
+        assert cost.compute_cost == price_per_tb  # 1 TiB * table rate
+        assert cost.pricing_details["price_per_tb"] == price_per_tb
 
     def test_athena_cost_ignores_adapter_supplied_cost_usd(self):
         """Athena cost is derived from bytes scanned, not adapter-supplied totals."""
         calculator = CostCalculator()
 
         resource_usage = {
-            "data_scanned_bytes": 1024**4,
+            "data_scanned_bytes": 10**12,  # Exactly 1 decimal TB
             "cost_usd": 999.0,
         }
 
         cost = calculator.calculate_query_cost("athena", resource_usage, {"region": "us-east-1"})
 
         assert cost is not None
-        assert cost.compute_cost == 5.0
-        assert cost.pricing_details["data_scanned_bytes"] == 1024**4
+        assert cost.compute_cost == resolve_athena_price_per_tb("us-east-1").value
+        assert cost.pricing_details["data_scanned_bytes"] == 10**12
         assert "source" not in cost.pricing_details
+
+    def test_athena_cost_uses_decimal_terabyte(self):
+        """Athena divides by 10^12: one tebibyte of scan costs ~9.95% over list."""
+        calculator = CostCalculator()
+
+        cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "us-east-1"})
+
+        assert cost is not None
+        price_per_tb = resolve_athena_price_per_tb("us-east-1").value
+        assert cost.compute_cost == (1024**4 / 10**12) * price_per_tb
+        assert cost.pricing_details["unit"] == "terabyte"
 
     def test_athena_resource_usage_requires_data_scanned_bytes(self):
         """Athena validation rejects legacy cost_usd without measured scanned bytes."""
@@ -86,7 +106,8 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("redshift", resource_usage, platform_config)
 
         assert cost is not None
-        assert cost.compute_cost == 0.50  # 1 hour * 2 nodes * $0.25/node-hour
+        expected = 1.0 * 2 * resolve_redshift_node_price("dc2.large", "us-east-1").value
+        assert cost.compute_cost == expected  # 1 hour * 2 nodes * table rate
         assert cost.pricing_details["node_type"] == "dc2.large"
         assert cost.pricing_details["node_count"] == 2
 
@@ -105,8 +126,8 @@ class TestCostCalculator:
         cost = calculator.calculate_query_cost("databricks", resource_usage, platform_config)
 
         assert cost is not None
-        # 0.5 hours * 4 DBU/hour * $0.55/DBU = $1.10
-        expected_cost = 0.5 * 4.0 * 0.55
+        # 0.5 hours * 4 DBU/hour * premium all-purpose table rate
+        expected_cost = 0.5 * 4.0 * resolve_databricks_dbu_price("aws", "premium", "all_purpose").value
         assert abs(cost.compute_cost - expected_cost) < 0.001
         assert cost.pricing_details["is_estimated"] is True
 
@@ -167,8 +188,9 @@ class TestCostCalculator:
         assert len(benchmark_cost.phase_costs) == 2
         assert benchmark_cost.platform_details["platform"] == "snowflake"
 
-    def test_normalized_benchmark_cost_for_cloud_compute(self):
+    def test_normalized_benchmark_cost_for_cloud_compute(self, monkeypatch):
         """Cloud compute costs become normalized cost with deployment metadata."""
+        monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         calculator = CostCalculator()
         phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
         benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": "snowflake"})
@@ -219,8 +241,6 @@ class TestCostCalculator:
             "pandas-df",
             "cudf",
             "cudf-df",
-            "modin",
-            "modin-df",
             "dask",
             "dask-df",
             "pyspark",
@@ -268,3 +288,56 @@ class TestCostCalculator:
         assert normalized_cost.cost_status == "unavailable"
         assert normalized_cost.normalized_cost_usd is None
         assert any("region metadata was defaulted" in warning for warning in warnings)
+
+
+class TestBillingUnitContract:
+    """NormalizedCost.billing_unit reports the unit actually billed per platform.
+
+    Regression cover for the billing-unit ADR: BigQuery is priced per
+    tebibyte, so it must not share Athena/Synapse's decimal-terabyte label.
+    """
+
+    @staticmethod
+    def _normalized_billing_unit(platform, platform_config, monkeypatch=None):
+        calculator = CostCalculator()
+        if monkeypatch is not None:
+            monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
+        phase_cost = calculator.calculate_phase_cost("power_test", [QueryCost(1.0, "USD")])
+        benchmark_cost = calculator.calculate_benchmark_cost([phase_cost], {"platform": platform})
+        normalized_cost, warnings = calculator.calculate_normalized_benchmark_cost(
+            platform, benchmark_cost, platform_config
+        )
+        assert warnings == []
+        assert normalized_cost.cost_status == "normalized"
+        return normalized_cost.billing_unit
+
+    def test_bigquery_reports_tib_scanned(self):
+        assert self._normalized_billing_unit("bigquery", {"location": "us", "cloud": "gcp"}) == "tib_scanned"
+
+    def test_athena_reports_tb_scanned(self):
+        assert self._normalized_billing_unit("athena", {"region": "us-east-1", "cloud": "aws"}) == "tb_scanned"
+
+    def test_synapse_serverless_reports_tb_scanned(self):
+        assert (
+            self._normalized_billing_unit("synapse", {"mode": "serverless", "region": "eastus", "cloud": "azure"})
+            == "tb_scanned"
+        )
+
+    def test_synapse_dedicated_reports_dwu_hour(self):
+        assert (
+            self._normalized_billing_unit(
+                "synapse",
+                {"mode": "dedicated", "region": "eastus", "cloud": "azure", "dwu_level": "dw100c"},
+            )
+            == "dwu_hour"
+        )
+
+    def test_snowflake_reports_credit(self, monkeypatch):
+        assert (
+            self._normalized_billing_unit(
+                "snowflake",
+                {"edition": "standard", "cloud": "aws", "region": "us-east-1", "warehouse_size": "MEDIUM"},
+                monkeypatch,
+            )
+            == "credit"
+        )

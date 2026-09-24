@@ -5,7 +5,19 @@
 ```{tags} concept
 ```
 
-This section provides systematic documentation for each benchmark implementation in BenchBox. Each benchmark is designed for specific testing scenarios and database evaluation needs.
+Use this catalog to choose a workload, understand its data and query shape,
+and estimate the resources a run needs. BenchBox includes standards-based,
+academic, industry, real-world, primitive, and experimental workloads.
+
+List the benchmark names available in your installed version with:
+
+```bash
+uv run -- benchbox benchmarks list
+```
+
+Start with TPC-H for a general analytical comparison. Choose a focused
+primitive workload when you need to isolate one operation, or a domain-specific
+benchmark when its schema and query patterns match your system.
 
 Benchmark support status is sourced from `benchbox.core.benchmark_registry`, not
 from hand-maintained docs. Current status counts are documented and checked in
@@ -289,6 +301,7 @@ benchbox-primitives
 ai-ml-benchmarks
 benchbox-experimental
 support-status
+queries/index
 ```
 
 #### **Development and CI/CD**
@@ -436,8 +449,8 @@ Each benchmark documentation includes:
 ### General Support
 - [Usage Guide](../usage/README.md) for general BenchBox usage
 - [API Reference](../reference/api-reference.md) for detailed API documentation
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues) for bug reports
-- [GitHub Discussions](https://github.com/joeharris76/benchbox/discussions) for questions
+- [GitHub Issues](https://github.com/BenchBox-dev/benchbox/issues) for bug reports
+- [GitHub Discussions](https://github.com/BenchBox-dev/benchbox/discussions) for questions
 
 ---
 

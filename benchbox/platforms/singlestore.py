@@ -122,6 +122,7 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = _DEFAULT_PORT
 
     _platform_key: ClassVar[str] = "singlestore"
 
@@ -696,9 +697,11 @@ def _build_singlestore_config(
                 if m.get("port") is not None
                 else int(os.environ.get("SINGLESTORE_PORT", str(_DEFAULT_PORT)))
             ),
-            "username": lambda m: m.get("username")
-            or os.environ.get("SINGLESTORE_USER")
-            or os.environ.get("SINGLESTORE_USERNAME", "root"),
+            "username": lambda m: (
+                m.get("username")
+                or os.environ.get("SINGLESTORE_USER")
+                or os.environ.get("SINGLESTORE_USERNAME", "root")
+            ),
             "password": lambda m: m.get("password") or os.environ.get("SINGLESTORE_PASSWORD"),
             "database": lambda m: m.get("database") or os.environ.get("SINGLESTORE_DATABASE"),
         },

@@ -117,7 +117,23 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
 // Used by SVG views that plot latency distributions on a log2 ms axis.
 // ---------------------------------------------------------------------------
 
+/**
+ * Decade ticks. Kept as the coarsest rung for callers that want them, but a
+ * latency axis is rarely a whole decade wide: a run whose queries all land
+ * between 7 ms and 29 ms falls inside one decade, and a decade-only axis then
+ * carries a single label, which is not an axis.
+ */
 export const LOG_LATENCY_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
+
+/**
+ * Subdivisions of each decade, used when whole decades do not label the axis.
+ * Wider than the usual 1-2-5 because latency ranges inside one decade are the
+ * common case here: 22-55 ms would otherwise carry two labels.
+ */
+const LOG_LATENCY_TICK_MANTISSAS = [1, 1.5, 2, 3, 5, 7];
+
+/** Most labels a latency axis should carry before they crowd each other. */
+const MAX_LOG_LATENCY_TICKS = 8;
 
 export interface LogLatencyScale {
   logMin: number;
@@ -160,12 +176,91 @@ export function logLatencyFraction(ms: number, scale: LogLatencyScale): number {
   return (logLatencyValue(ms, scale.floorMs) - scale.logMin) / scale.logRange;
 }
 
+/**
+ * Ticks for a log latency axis, coarsest set that still labels the axis.
+ *
+ * Tries decades first, then 1-2-5 within each decade, and only then the axis
+ * endpoints. A caller gets at least two labels whenever the scale spans a
+ * range at all, so no chart renders an axis with one number on it.
+ */
 export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): number[] {
-  return LOG_LATENCY_TICKS_MS.filter(
-    (ms) =>
-      logLatencyValue(ms, scale.floorMs) >= scale.logMin - tolerance &&
-      logLatencyValue(ms, scale.floorMs) <= scale.logMax + tolerance,
-  );
+  const inRange = (ms: number, slack: number) =>
+    ms >= scale.floorMs &&
+    logLatencyValue(ms, scale.floorMs) >= scale.logMin - slack &&
+    logLatencyValue(ms, scale.floorMs) <= scale.logMax + slack;
+
+  // Decades get the caller's tolerance: it absorbs float wobble on the exact
+  // powers of ten a padded scale is often built around.
+  const decades = LOG_LATENCY_TICKS_MS.filter((ms) => inRange(ms, tolerance));
+  if (decades.length >= 3) return decades;
+
+  const lowestDecade = Math.floor(Math.log10(Math.max(2 ** scale.logMin, Number.MIN_VALUE)));
+  const highestDecade = Math.ceil(Math.log10(2 ** scale.logMax));
+  const subdivided: number[] = [];
+  for (let exponent = lowestDecade; exponent <= highestDecade; exponent += 1) {
+    for (const mantissa of LOG_LATENCY_TICK_MANTISSAS) {
+      const ms = mantissa * 10 ** exponent;
+      // Subdivided rungs must be strictly inside the domain. A rung admitted
+      // on tolerance alone is drawn past the end of the axis, where its label
+      // runs off the edge of the drawing.
+      if (inRange(ms, 0)) subdivided.push(ms);
+    }
+  }
+  // A sparse subdivision (fewer than 4 rungs) can still under-cover the
+  // domain: the fixed mantissa grid finds "10 ms" and "15 ms" inside an
+  // 8-18 ms padded domain and stops there, leaving the top third of the
+  // axis bare. Evenly spaced, nicely rounded ticks over the real domain
+  // fill that gap without abandoning round numbers.
+  const domainMin = Math.max(scale.floorMs, 2 ** scale.logMin);
+  const domainMax = 2 ** scale.logMax;
+  if (subdivided.length < 4 && Number.isFinite(domainMin) && Number.isFinite(domainMax) && domainMax > domainMin) {
+    const linear = niceLinearTicks(domainMin, domainMax, MAX_LOG_LATENCY_TICKS);
+    if (linear.length > subdivided.length) return thinTicks(linear, MAX_LOG_LATENCY_TICKS);
+  }
+
+  if (subdivided.length >= 2) return thinTicks(subdivided, MAX_LOG_LATENCY_TICKS);
+
+  // Nothing lands inside the range - a very narrow span such as 11-13 ms.
+  // Label its ends rather than one arbitrary rung, or nothing at all.
+  if (!Number.isFinite(domainMin) || !Number.isFinite(domainMax) || domainMax <= domainMin) return subdivided;
+  return [domainMin, Math.sqrt(domainMin * domainMax), domainMax];
+}
+
+/** Rounds a rough step to a "nice" 1-2-5-10 multiple of a power of ten. */
+function niceStep(roughStep: number): number {
+  if (!(roughStep > 0)) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const residual = roughStep / magnitude;
+  const niceResidual = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 5 ? 5 : 10;
+  return niceResidual * magnitude;
+}
+
+/**
+ * Evenly spaced, nicely rounded ticks across a real (non-log) domain.
+ * Used for narrow latency ranges where the fixed decade/mantissa grid
+ * (LOG_LATENCY_TICKS_MS / LOG_LATENCY_TICK_MANTISSAS) is too sparse: e.g. an
+ * 8-18 ms domain lands on only "10 ms" and "15 ms" from that grid, leaving
+ * the top third of the axis unlabeled even though the axis extends to 18 ms.
+ */
+function niceLinearTicks(min: number, max: number, targetCount: number): number[] {
+  if (!(max > min)) return [min];
+  const step = niceStep((max - min) / Math.max(1, targetCount - 1));
+  const start = Math.ceil(min / step) * step;
+  const raw: number[] = [];
+  for (let v = start; v <= max + step * 1e-6; v += step) {
+    raw.push(Number(v.toFixed(6)));
+  }
+  return raw;
+}
+
+/** Keeps the first and last tick and drops interior ones evenly until it fits. */
+function thinTicks(ticks: readonly number[], max: number): number[] {
+  if (ticks.length <= max) return [...ticks];
+  const stride = Math.ceil((ticks.length - 1) / (max - 1));
+  const kept = ticks.filter((_, index) => index % stride === 0);
+  const last = ticks[ticks.length - 1]!;
+  if (kept[kept.length - 1] !== last) kept.push(last);
+  return kept;
 }
 
 // ---------------------------------------------------------------------------
@@ -488,4 +583,74 @@ export function computePercentile(values: number[], p: number): number | null {
   const c = Math.ceil(k);
   if (f === c) return sorted[Math.round(k)]!;
   return sorted[f]! * (c - k) + sorted[c]! * (k - f);
+}
+
+// ---------------------------------------------------------------------------
+// Diverging ratio scale (multi-run heatmap)
+//
+// NO PYTHON COUNTERPART, deliberately. `chartMath.parity.test.ts` asserts the
+// helpers above are byte-identical to their Python references; this one is
+// additive and has no reference to match, because the multi-run heatmap is a
+// browser-only surface with no ASCII equivalent. Stated here so a future reader
+// does not go looking for the Python side and conclude it was lost.
+// ---------------------------------------------------------------------------
+
+/**
+ * Ratio at which the diverging scale saturates, in either direction.
+ *
+ * 4x matches the point where per-query differences stop being informative and
+ * start being outliers: beyond it the cell is already unambiguous, and letting
+ * the ramp keep going would compress everything nearer parity into a narrow
+ * band of indistinguishable colour.
+ */
+export const DIVERGING_RATIO_CLAMP = 4;
+
+/**
+ * Map a baseline-relative ratio to [-1, 1] for a two-hue diverging scale.
+ *
+ *   ratio < 1  (faster than baseline) -> negative
+ *   ratio = 1  (parity)               -> 0, the neutral midpoint
+ *   ratio > 1  (slower than baseline) -> positive
+ *
+ * SYMMETRIC IN LOG SPACE, which is the property that makes the chart honest: a
+ * 2x slowdown and a 2x speedup are the same distance from the midpoint in
+ * opposite directions. On a linear ratio scale they would not be -- 0.5 is 0.5
+ * below parity while 2.0 is 1.0 above it -- so a linear mapping would render
+ * slowdowns as visually larger than the equivalent speedups.
+ *
+ * Returns null for a ratio that is not a positive finite number, so an
+ * unanswerable cell can be rendered as unrecorded rather than as parity.
+ * Defaulting it to 0 would paint "we do not know" in the same colour as
+ * "identical to baseline", which is the specific misreading this chart must
+ * not invite.
+ */
+export function divergingRatioPosition(
+  ratio: number | null | undefined,
+  clamp: number = DIVERGING_RATIO_CLAMP,
+): number | null {
+  if (ratio === null || ratio === undefined) return null;
+  if (!Number.isFinite(ratio) || ratio <= 0) return null;
+  const limit = Math.log2(Math.max(clamp, 1 + Number.EPSILON));
+  const position = Math.log2(ratio) / limit;
+  return Math.max(-1, Math.min(1, position));
+}
+
+/**
+ * How much the runs disagree on a query, as the spread of their ratios.
+ *
+ * Log-space again, for the same reason: the disagreement between 0.5x and 2.0x
+ * is the same magnitude as between 1x and 4x, and a linear spread would rank
+ * the second as twice the first.
+ *
+ * Returns null when fewer than two runs produced a usable ratio -- a query only
+ * one run could answer has no disagreement to measure, and reporting 0 would
+ * rank it as perfect consensus.
+ */
+export function queryDisagreementSpread(ratios: readonly (number | null | undefined)[]): number | null {
+  const usable = ratios.filter(
+    (r): r is number => r !== null && r !== undefined && Number.isFinite(r) && r > 0,
+  );
+  if (usable.length < 2) return null;
+  const logs = usable.map((r) => Math.log2(r));
+  return Math.max(...logs) - Math.min(...logs);
 }

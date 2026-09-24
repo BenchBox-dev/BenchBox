@@ -19,13 +19,12 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import csv
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-from benchbox.core.manifest_utils import write_generator_manifest
+from benchbox.core.manifest_utils import write_delimited_manifest
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
 
@@ -34,6 +33,33 @@ if TYPE_CHECKING:
 
 # Type alias for paths that could be local or cloud
 PathLike = Union[Path, "CloudPath"]
+
+# Line terminator matching csv.writer defaults, preserved so loaders that
+# split on '\n' see identical row boundaries as before.
+_CSV_LINE_TERMINATOR = "\r\n"
+
+
+def quote_clickbench_field(value: Any, delimiter: str = "|") -> str:
+    """Render one pipe-delimited field, quoting empty strings.
+
+    Mirrors csv.QUOTE_MINIMAL except empty strings (and None) are emitted as
+    ``""``: several cloud CSV loaders (BigQuery, Snowflake, Databricks/Spark)
+    map bare empty fields to NULL, which violates ClickBench's NOT NULL
+    schema, while quoted empties load as empty strings.
+    """
+    if value is None:
+        return '""'
+    text = value if isinstance(value, str) else str(value)
+    if text == "":
+        return '""'
+    if any(char in text for char in (delimiter, '"', "\n", "\r")):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def format_clickbench_row(record: list, delimiter: str = "|") -> str:
+    """Format one record with empty-string quoting and a CRLF terminator."""
+    return delimiter.join(quote_clickbench_field(value, delimiter) for value in record) + _CSV_LINE_TERMINATOR
 
 
 class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
@@ -228,8 +254,6 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         base_time = datetime(2013, 7, 1)  # ClickBench data is from July 2013
 
         with self.open_output_file(file_path, "wt") as f:
-            writer = csv.writer(f, delimiter="|")
-
             for i in range(self.base_records):
                 # Generate event time within the month
                 event_time = base_time + timedelta(
@@ -241,7 +265,7 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
                 # Generate realistic web analytics record
                 record = self._generate_hit_record(i, event_time)
-                writer.writerow(record)
+                f.write(format_clickbench_row(record))
 
         return file_path, self.base_records
 
@@ -389,15 +413,11 @@ class ClickBenchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
         """Write manifest describing generated ClickBench dataset."""
-        write_generator_manifest(
-            self,
-            "clickbench",
-            table_paths,
-            self._table_row_counts,
-            metadata={
-                "csv_delimiter": "|",
-                "csv_has_header": False,
-                "csv_null_marker": None,
-                "csv_normalize_booleans": False,
-            },
+        # The __NULL__ sentinel is the load contract: only that literal maps
+        # to NULL so empty strings survive into NOT NULL columns (mirrors
+        # ClickBenchBenchmark.csv_null_marker and the DuckDB nullstr). Fields
+        # are quote-aware (empty strings emit as "") so loaders must parse
+        # quoting; declared here for quote-capable loaders (PostgreSQL COPY).
+        write_delimited_manifest(
+            self, "clickbench", table_paths, self._table_row_counts, null_marker="__NULL__", quote='"'
         )

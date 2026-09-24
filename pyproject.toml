@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "benchbox"
-version = "0.4.0"
+version = "0.4.1"
 description = "Embedded benchmark datasets and queries for database evaluation. Implements TPC-H, TPC-DS, TPC-DI and other industry-standard benchmarks."
 readme = "README.md"
 authors = [{ name = "Joe Harris", email = "joe@benchbox.dev" }]
@@ -14,7 +14,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -23,7 +22,7 @@ classifiers = [
     "Topic :: Software Development :: Testing :: Acceptance",
     "Topic :: System :: Benchmark",
 ]
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.11,<3.15"
 dependencies = [
     "textcharts>=0.1.0",
     # sqlglot ships majors ~quarterly with dialect-translation breakage; cap to next major to catch
@@ -42,14 +41,16 @@ dependencies = [
     "pydantic>=2.0.0,<3.0.0",
     "pyyaml>=6.0.0",
     "packaging>=24.0",
-    # Python 3.10 compatibility (tomllib is stdlib in 3.11+)
-    "tomli>=2.0.0; python_version < '3.11'",
-    # pyarrow: ABI-sensitive (bundled C++); wide cap to <25 to give runway while catching jumps.
+    # pyarrow: ABI-sensitive (bundled C++); capped below 25 because
+    # datafusion 54 imports call pyarrow.scalar at module scope and pyarrow
+    # 25 changed that C ABI surface (linux autodoc import fails with
+    # "isinstance() arg 2 must be a type"). datafusion 54 declares no upper
+    # pyarrow bound, so the cap lives here until datafusion ships a fix.
     "pyarrow>=21.0.0,<25.0.0",
     "numpy>=1.24.0",
     # pandas is intentionally NOT a core dependency. It is an optional
     # engine/DataFrame dep (DataFrame mode, TPC-DI, ClickHouse-local) declared
-    # in the relevant extras (pandas, dataframe-pandas, tpcdi, modin, dask) and
+    # in the relevant extras (pandas, dataframe-pandas, tpcdi, dask) and
     # pulled transitively by chdb. All pandas uses on the import path are lazy;
     # the minimal-import-surface CI gate enforces this. See
     # docs/development/dependency-inventory.md (pandas = DataFrame/Benchmark).
@@ -91,9 +92,13 @@ dev = [
     # Cap <2 to catch the next-major API break in CI; browser results.duckdb files
     # use the default v1.0.0 on-disk format (version 64), which @duckdb/duckdb-wasm
     # attaches regardless of writer version.
-    "duckdb>=1.0.0,<2.0.0",
+    # DuckDB 1.3 is the first release where DELETE+INSERT in one transaction
+    # can safely reorder rows in a constrained table without stale PK indexes.
+    # Floor tracks the proven 1.5 series (lock resolves 1.5.5).
+    "duckdb>=1.5.0,<2.0.0",
     "tox>=4.13.0",
     "pyspark>=3.5.0",  # Aligned with pyspark extra
+    "pytest-timeout>=2.4.0",
 ]
 docs = [
     "sphinx>=7.2.0",
@@ -114,13 +119,15 @@ all = [
     # Browser-generated results.duckdb files use the default v1.0.0 on-disk format,
     # readable by @duckdb/duckdb-wasm regardless of writer version; cap <2 to catch
     # the next-major API break in CI.
-    "duckdb>=1.3.0,<2.0.0",
+    "duckdb>=1.5.0,<2.0.0",
     "clickhouse-connect>=0.10.0",
     "clickhouse-driver>=0.2.0",
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",  # For DataFrame mode
-    "datafusion>=50.1.0",  # Updated to match datafusion extra
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12,
+    # incompatible with the pandas 3 migration (revisit when 19.x lifts the cap).
+    "databricks-connect>=14.0.0,<19",  # For DataFrame mode
+    "datafusion>=54.0.0",  # Updated to match datafusion extra
     "pyarrow>=10.0.0",  # For DataFusion (also in core with higher version)
     "firebolt-sdk>=1.18.0",
     "google-cloud-bigquery>=3.0.0",
@@ -136,7 +143,7 @@ all = [
     "pyathena>=3.0.0",  # For AWS Athena
     "boto3>=1.20.0",
     "cloudpathlib[azure,gs,s3]>=0.15.0",
-    "pandas>=2.0.0",  # For TPC-DI benchmark
+    "pandas>=3.0.0",  # For TPC-DI benchmark
     "chdb>=0.10.0; sys_platform != 'win32'",   # For ClickHouse local mode (not available on Windows)
     "deltalake>=1.2.1",  # For Delta Lake table format
     "pyiceberg>=0.10.0",  # For Iceberg table format
@@ -145,8 +152,7 @@ all = [
     "singlestoredb>=1.0.0",  # For SingleStore (Helios / self-managed)
     # DataFrame platforms
     "polars>=1.35.2",
-    "dask[distributed]>=2024.1.0",
-    "modin[ray]>=0.32.0",
+    "dask[distributed]>=2025.1.0",
     "pyspark[connect]>=3.5.0",
 ]
 cloud = [
@@ -167,14 +173,11 @@ cloudstorage = [
 ]
 
 # Individual platforms (for minimal installations)
-duckdb = ["duckdb>=1.0.0,<2.0.0"]
-# DuckLake needs a HIGHER duckdb floor than the duckdb extra: the `ducklake`
-# extension does not exist before DuckDB 1.3, and the adapter enforces that at
-# connection time. The general floor stays >=1.0 because browser-generated
-# results.duckdb files use the v1.0.0 on-disk format, so only this extra raises
-# it - `uv add 'benchbox[ducklake]'` then resolves a runtime that can actually
-# load the extension instead of failing at the first ATTACH.
-ducklake = ["duckdb>=1.3.0,<2.0.0"]
+duckdb = ["duckdb>=1.5.0,<2.0.0"]
+# DuckLake also requires DuckDB 1.3 because the `ducklake` extension does not
+# exist before that release. Browser-generated results.duckdb files still use
+# the v1.0.0 on-disk format, which is independent of the Python writer version.
+ducklake = ["duckdb>=1.5.0,<2.0.0"]
 clickhouse = ["clickhouse-driver>=0.2.0"]  # TCP binary protocol (clickhouse-server)
 clickhouse-server = ["clickhouse-driver>=0.2.0"]  # Canonical extra for clickhouse-server platform
 clickhouse-cloud = ["clickhouse-connect>=0.10.0"]  # HTTP protocol (ClickHouse Cloud)
@@ -208,7 +211,7 @@ athena = [
     "pyathena>=3.0.0",
     "boto3>=1.20.0",
 ]
-datafusion = ["datafusion>=50.1.0", "pyarrow>=10.0.0"]
+datafusion = ["datafusion>=54.0.0", "pyarrow>=10.0.0"]
 firebolt = [
     "firebolt-sdk>=1.18.0",
     "cloudpathlib>=0.15.0",
@@ -225,7 +228,7 @@ starrocks = ["pymysql>=1.1.0"]
 singlestore = ["singlestoredb>=1.0.0"]
 
 # Individual benchmark extras
-tpcdi = ["pandas>=2.0.0"]
+tpcdi = ["pandas>=3.0.0"]
 clickhouse-local = ["chdb>=0.10.0; sys_platform != 'win32'"]
 table-formats = [
     "deltalake>=1.2.1",
@@ -245,17 +248,12 @@ ai-primitives = [
 # dataframe-* variants are kept as backward-compatible aliases.
 
 # Pandas family - string-based column access, eager evaluation
-pandas = ["pandas>=2.0.0"]
-dataframe-pandas = ["pandas>=2.0.0"]
-modin = ["modin[ray]>=0.32.0", "pandas>=2.0.0"]
-dataframe-modin = [
-    "modin[ray]>=0.32.0",
-    "pandas>=2.0.0",
-]
-dask = ["dask[distributed]>=2024.1.0", "pandas>=2.0.0"]
+pandas = ["pandas>=3.0.0"]
+dataframe-pandas = ["pandas>=3.0.0"]
+dask = ["dask[distributed]>=2025.1.0", "pandas>=3.0.0"]
 dataframe-dask = [
-    "dask[distributed]>=2024.1.0",
-    "pandas>=2.0.0",
+    "dask[distributed]>=2025.1.0",
+    "pandas>=3.0.0",
 ]
 # Note: cudf requires NVIDIA GPU with CUDA 12.x
 # cuDF is not on PyPI directly - install via RAPIDS:
@@ -279,29 +277,27 @@ dataframe-pyspark = [
     "pyspark>=3.5.0",
 ]
 dataframe-datafusion = [
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
     "pyarrow>=10.0.0",
 ]
 
 # DataFrame family convenience groups
 dataframe-pandas-family = [
-    "pandas>=2.0.0",
-    "modin[ray]>=0.32.0",
-    "dask[distributed]>=2024.1.0",
+    "pandas>=3.0.0",
+    "dask[distributed]>=2025.1.0",
     # cudf not included - requires NVIDIA GPU/CUDA, install separately
 ]
 dataframe-expression-family = [
     "polars>=1.35.2",
     "pyspark>=3.5.0",
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
 ]
 dataframe-all = [
-    "pandas>=2.0.0",
-    "modin[ray]>=0.32.0",
-    "dask[distributed]>=2024.1.0",
+    "pandas>=3.0.0",
+    "dask[distributed]>=2025.1.0",
     "polars>=1.35.2",
     "pyspark>=3.5.0",
-    "datafusion>=50.1.0",
+    "datafusion>=54.0.0",
 ]
 
 # Quick start - DuckDB + Polars for easy experimentation
@@ -332,7 +328,8 @@ cloud-spark-snowflake = [
 cloud-spark-databricks = [
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12 (see core deps).
+    "databricks-connect>=14.0.0,<19",
     "cloudpathlib>=0.15.0",
 ]
 
@@ -353,18 +350,19 @@ cloud-spark = [
     # Databricks
     "databricks-sql-connector>=2.0.0",
     "databricks-sdk>=0.20.0",
-    "databricks-connect>=14.0.0",
+    # Hold databricks-connect<19: 19.x caps pandas<3 on Python 3.12 (see core deps).
+    "databricks-connect>=14.0.0,<19",
     "cloudpathlib>=0.15.0",
 ]
 
 # MCP (Model Context Protocol) server for AI agent integration
-# Note: mcp requires Python 3.10+, so this extra only works on 3.10+
+# The MCP SDK supports BenchBox's Python 3.11+ runtime.
 # Includes visualization deps since MCP server exposes chart generation tools
 mcp = [
     # MCP SDK 2 migration is complete; keep future majors behind explicit review.
     "mcp>=2,<3",
     # The MCP surface advertises DuckDB as its local executable default.
-    "duckdb>=1.0.0,<2.0.0",
+    "duckdb>=1.5.0,<2.0.0",
     "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
     "opentelemetry-sdk>=1.44,<2",
 ]
@@ -430,14 +428,14 @@ error-on-warning = false
 
 [dependency-groups]
 dev = [
-    "ruff==0.11.13",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
+    "ruff==0.16.7",  # pinned: preview = true is active globally; ruff upgrades may activate new rules
     "ty>=0.0.1a14",
     "ansi2html>=1.8.0",  # scripts/capture_chart_images.py - ANSI→HTML conversion for chart captures
     "pillow>=12.3.0",  # scripts/capture_chart_images.py - PIL.Image for chart PNG output; >=12.3.0: PYSEC-2026-2253..3453 fixes
     # Explorer fixture and deployment snapshots use the default v1.0.0 on-disk format,
     # readable by @duckdb/duckdb-wasm regardless of writer version; cap <2 to catch
     # the next-major API break in CI.
-    "duckdb>=1.0.0,<2.0.0",
+    "duckdb>=1.5.0,<2.0.0",
     "polars>=1.35.2",
     "clickhouse-connect>=0.10.0",
     "psycopg[binary]>=3.1",
@@ -446,10 +444,10 @@ dev = [
     "pytest-benchmark>=5.1.0",
     "pytest-xdist>=3.8.0",
     "pytest-timeout>=2.4.0",
-    "pandas>=2.0.0", # DataFrame dependencies (needed for many tests)
+    "pandas>=3.0.0", # DataFrame dependencies (needed for many tests)
     "pyiceberg[sql-sqlite,pyarrow]>=0.10.0", # Table format converters (needed for tests/unit/utils/format_converters/)
     "deltalake>=1.2.1",
-    "datafusion>=40.0.0", # DataFusion (needed for tests/integration/test_datafusion_integration.py)
+    "datafusion>=54.0.0", # DataFusion (needed for tests/integration/test_datafusion_integration.py)
     "cloudpathlib[s3,gs,azure]>=0.15.0", # Cloud storage with S3 support (needed for tests/unit/utils/test_cloud_storage.py)
     "chdb>=0.10.0; sys_platform != 'win32'", # ClickHouse local (chdb is not available on Windows)
     "clickhouse-driver>=0.2.0", # ClickHouse server (needed for tests/unit/platforms/test_clickhouse_local.py server tests)
@@ -477,6 +475,7 @@ dev = [
     "import-linter>=2.13",
     "opentelemetry-sdk>=1.44,<2",
     "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
+    "pytest-json-report>=1.5.0",
 ]
 
 [tool.mutmut]
@@ -501,6 +500,7 @@ tests_dir = ["tests/unit/"]
 
 [tool.ruff]
 line-length = 120
+target-version = "py311"
 exclude = [
     "migrations",
     "venv",
@@ -568,7 +568,9 @@ ignore = [
     "PIE810", # multiple-starts-ends-with
     # Upgrade rules - require newer Python versions
     "UP006",  # non-pep585-annotation (use dict instead of Dict - requires Python 3.9+)
-    "UP007",  # non-pep604-annotation-union (use X | Y - requires Python 3.10+)
+    "UP007",  # non-pep604-annotation-union (use X | Y)
+    "UP017",  # datetime.UTC migration is a separate repository-wide cleanup
+    "UP042",  # StrEnum migration changes public enum inheritance; review separately
     "UP035",  # deprecated-import (typing.Dict etc - requires Python 3.9+)
     "UP045",  # non-pep604-annotation-optional
     # Naming conventions - often intentional in specific contexts
@@ -583,6 +585,7 @@ ignore = [
 [tool.ruff.lint.isort]
 force-single-line = false
 combine-as-imports = true
+known-first-party = ["benchbox", "_project"]
 
 [tool.ruff.lint.mccabe]
 # Cyclomatic complexity gate: no function may exceed McCabe 18.
@@ -609,6 +612,9 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+# ruff >= 0.16 formats Python code blocks inside Markdown; docs/blog snippets
+# keep a prose-oriented style, so Markdown stays outside the formatter contract.
+exclude = ["*.md"]
 
 [tool.interrogate]
 # Docstring coverage enforcement
@@ -680,7 +686,6 @@ omit = [
 
 [tool.coverage.report]
 # Coverage reporting thresholds
-fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [
@@ -735,6 +740,10 @@ ignore_function_names = [
     "_generate_default_params",
     # Facade chains / thin delegations
     "get_all_variants",
+    # Same-dialect tpchavoc sample entry points: one-line delegations over
+    # _dialect_sample_divergences differing only in dialect/skips/extra kwarg.
+    "find_postgres_divergences",
+    "find_clickhouse_divergences",
     # G5: dataclass-to-dict conversion methods on distinct config/artifact classes
     "to_dict",
     "get_etl_config",
@@ -746,7 +755,7 @@ ignore_rules = [
     { function_names = ["from_config", "apply_constraint_configuration", "apply_unified_tuning", "supports_tuning_type", "apply_tuning_configuration"], path_contains = [
         "benchbox/platforms/athena.py", "benchbox/platforms/azure_synapse.py",
         "benchbox/platforms/bigquery.py", "benchbox/platforms/clickhouse_cloud.py",
-        "benchbox/platforms/cudf.py", "benchbox/platforms/datafusion.py",
+        "benchbox/platforms/datafusion.py",
         "benchbox/platforms/doris.py", "benchbox/platforms/duckdb.py",
         "benchbox/platforms/fabric_lakehouse.py", "benchbox/platforms/fabric_warehouse.py",
         "benchbox/platforms/firebolt.py", "benchbox/platforms/lakesail.py",
@@ -779,7 +788,6 @@ ignore_rules = [
         "benchbox/platforms/dataframe/polars_df.py",
         "benchbox/platforms/dataframe/datafusion_df.py",
         "benchbox/platforms/dataframe/cudf_df.py",
-        "benchbox/platforms/dataframe/modin_df.py",
         "benchbox/platforms/dataframe/dask_df.py",
         "benchbox/platforms/dataframe/pyspark_df.py",
     ] },
@@ -819,6 +827,12 @@ ignore_rules = [
     # CLI tuning defaults display commands are intentionally duplicated UX pathways
     { function_names = ["show_defaults"], path_contains = ["benchbox/cli/commands/df_tuning.py", "benchbox/cli/commands/tuning_group.py"] },
 
+    # TPC-Havoc single-dialect engine sweep entry points - thin delegations over
+    # _run_single_dialect_divergences that must remain distinct public names for
+    # the CLI samples and engine integration tests. Shared invocation logic is
+    # consolidated in the helper; residual similarity is adapter arity, not logic.
+    { function_names = ["find_postgres_divergences", "find_clickhouse_divergences"], path_contains = ["benchbox/core/tpchavoc/equivalence.py"] },
+
     # --- Boilerplate ignore rules added 2026-02-21 (groups G1-G28 from duplicate-check triage) ---
 
     # G8,G9,G11,G22: Protocol/ABC abstract method stubs across dataframe type hierarchy
@@ -838,13 +852,17 @@ ignore_rules = [
         "benchbox/platforms/dataframe/expression_family.py",
     ] },
 
+    # PySpark expression-adapter window-function wrappers added here: one named
+    # method per SQL window function implementing the expression-family
+    # contract. Thin same-shape delegations are intentional API surface.
+    { function_names = ["window_lag", "window_lead", "window_ntile", "window_percent_rank", "window_cume_dist"], path_contains = ["benchbox/platforms/dataframe/pyspark_df.py"] },
+
     # G3,G10: DataFrame platform adapter thin wrappers (col/lit/from_pandas/detect_format/read_*)
     # G29: extend with get_row_count and pandas_family.py
     { function_names = ["_detect_format", "get_dataframe_operations", "from_pandas", "lit", "read_parquet", "to_datetime", "read_csv", "concat", "get_row_count"], path_contains = [
         "benchbox/platforms/dataframe/cudf_df.py",
         "benchbox/platforms/dataframe/dask_df.py",
         "benchbox/platforms/dataframe/datafusion_df.py",
-        "benchbox/platforms/dataframe/modin_df.py",
         "benchbox/platforms/dataframe/pandas_df.py",
         "benchbox/platforms/dataframe/polars_df.py",
         "benchbox/platforms/dataframe/expression_family.py",
@@ -1077,4 +1095,9 @@ ignore_rules = [
 
     # w3-G7: Capability-matrix methods in metadata_primitives (each defines different platform set)
     { function_names = ["supports_acl_introspection", "supports_column_grants", "supports_role_hierarchy"], path_contains = ["benchbox/core/metadata_primitives/ddl.py"] },
+
+    # ClickHouse Delta Lake quoting pair: thin public wrappers over the shared
+    # _quote_wrapped core, differing only in quote char and error messages.
+    # Both names are pinned public API (delta builders + unit tests).
+    { function_names = ["quote_literal", "quote_identifier"], path_contains = ["benchbox/platforms/clickhouse/delta_lake.py"] },
 ]

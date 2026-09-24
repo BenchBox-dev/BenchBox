@@ -250,6 +250,11 @@ class TestCreateProfileConfigHelper:
         assert config.memory.spill_to_disk is True
         assert config.memory.memory_limit == "2GB"
 
+    def test_create_profile_config_for_datafusion_optimized(self):
+        config = _create_profile_config("datafusion", "optimized")
+
+        assert config.parallelism.thread_count == 4
+
     def test_create_profile_config_gpu_warns_for_non_cudf(self):
         """GPU profile should still enable GPU config and warn for non-cuDF platforms."""
         with patch.object(_tuning_group_module.console, "print") as mock_print:

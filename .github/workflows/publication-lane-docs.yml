@@ -1,0 +1,146 @@
+name: Publication Lane - Docs and Prose
+
+on:
+  push:
+    branches:
+      - develop
+      - release
+    paths:
+      - "docs/**"
+      - "landing/**"
+      - "_blog/**"
+      - "benchbox/**"
+      - "scripts/assemble_public_site.py"
+      - "scripts/publication/verify_lane_isolation.py"
+      - ".github/workflows/publication-lane-docs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  pull_request:
+    branches:
+      - develop
+      - release
+    paths:
+      - "docs/**"
+      - "landing/**"
+      - "_blog/**"
+      - "benchbox/**"
+      - "scripts/assemble_public_site.py"
+      - "scripts/publication/verify_lane_isolation.py"
+      - ".github/workflows/publication-lane-docs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: publication-lane-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-docs-lane:
+    name: Build prose site and release API docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history: the PR isolation gate diffs origin/${base}...HEAD
+          # (three-dot needs a merge base). A shallow checkout fails that diff
+          # with "no merge base" (CI 2022 lane red), failing closed for the
+          # wrong reason.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Build Sphinx documentation
+        run: |
+          cd docs
+          uv run sphinx-build -b html --keep-going . _build/html
+
+      - name: Assemble prose site artifact
+        run: |
+          mkdir -p lane_artifacts/prose_site
+          uv run python scripts/assemble_public_site.py --site-dir lane_artifacts/prose_site --prose-only
+
+      - name: Package release API documentation artifact
+        run: |
+          mkdir -p lane_artifacts/api_docs
+          if [ -f docs/_build/html/api.html ]; then
+            cp docs/_build/html/api.html lane_artifacts/api_docs/
+          fi
+          if [ -d docs/_build/html/_modules ]; then
+            cp -r docs/_build/html/_modules lane_artifacts/api_docs/
+          fi
+          if [ -d docs/_build/html/_static ]; then
+            mkdir -p lane_artifacts/api_docs/_static
+            cp -r docs/_build/html/_static/* lane_artifacts/api_docs/_static/
+          fi
+          if [ -d docs/_build/html/reference/python-api ]; then
+            mkdir -p lane_artifacts/api_docs/reference/python-api
+            cp -r docs/_build/html/reference/python-api lane_artifacts/api_docs/reference/
+          fi
+          if [ ! -f lane_artifacts/api_docs/api.html ]; then
+            echo "ERROR: api_docs artifact missing api.html" >&2
+            exit 1
+          fi
+          if [ -z "$(ls -A lane_artifacts/api_docs 2>/dev/null)" ]; then
+            echo "ERROR: api_docs artifact is empty" >&2
+            exit 1
+          fi
+
+      - name: Verify lane isolation
+        run: |
+          set -euo pipefail
+          CHANGED_FILE="${RUNNER_TEMP}/lane-changed-paths.txt"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch origin "${{ github.base_ref }}"
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" > "$CHANGED_FILE"
+            if [ ! -s "$CHANGED_FILE" ]; then
+              echo "ERROR: empty changed-paths for pull_request isolation check" >&2
+              exit 1
+            fi
+            uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths-file "$CHANGED_FILE"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BEFORE="${{ github.event.before }}"
+            if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+              git diff --name-only "${BEFORE}...HEAD" > "$CHANGED_FILE"
+              if [ -s "$CHANGED_FILE" ]; then
+                uv run python scripts/publication/verify_lane_isolation.py --lane site --changed-paths-file "$CHANGED_FILE"
+              else
+                uv run python scripts/publication/verify_lane_isolation.py --lane site
+              fi
+            else
+              uv run python scripts/publication/verify_lane_isolation.py --lane site
+            fi
+          else
+            uv run python scripts/publication/verify_lane_isolation.py --lane site
+          fi
+
+      - name: Upload prose site artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: prose_site
+          path: lane_artifacts/prose_site
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Upload API docs artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: api_docs
+          path: lane_artifacts/api_docs
+          retention-days: 90
+          if-no-files-found: error

@@ -40,9 +40,15 @@ concurrency:
 
 jobs:
   lint:
+    needs: sweep-coverage
     # Baseline cache writes must follow develop history order. A SHA-specific
     # workflow-level group does not serialize two pushes, so an older run can
     # save after a newer run and win the restore-prefix lookup.
+    #
+    # A covered tip skips the re-run on schedule only: the covering push run
+    # already wrote this SHA's fast-lane-count cache entry, so the skip
+    # leaves no baseline gap. Push and dispatch always run.
+    if: ${{ github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true' }}
     concurrency:
       group: develop-post-merge-lint-${{ github.ref }}
       cancel-in-progress: false
@@ -51,17 +57,17 @@ jobs:
       # Default branch is develop, so schedule/dispatch already resolve to the
       # tip workflow + tip SHA. Pin ref explicitly so a future default-branch
       # rename cannot silently re-target this sweep.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -90,7 +96,7 @@ jobs:
         # (or, in principle, a same-key collision) must not fail post-merge.
         if: always()
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: fast-lane-count.txt
           key: fast-lane-count-develop-${{ github.sha }}
@@ -104,33 +110,149 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ job.status }}" = "failure" ]; then
-            python scripts/post_merge_signature.py build --job lint --failed-step "Run CI lint mirror" --out signature.json
+            python scripts/post_merge_signature.py build --job lint --failed-step "Run CI lint mirror" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job lint --out signature.json
+            python scripts/post_merge_signature.py build --job lint --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload lint signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: signature-lint
           path: signature.json
           retention-days: 14
 
-  fast-test:
+  queue-certification:
+    name: queue-certification
+    # Always runs: downstream jobs read these outputs on every event, and
+    # references to a skipped job's outputs do not evaluate reliably. The
+    # script itself returns certified=false without any API call unless this
+    # is a push to develop, so schedule and workflow_dispatch always run the
+    # full gates and the manual dispatch stays the full-run escape hatch.
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      certified: ${{ steps.certify.outputs.certified }}
+      certifying_run_id: ${{ steps.certify.outputs.certifying_run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
+      - name: Look up merge-queue certification
+        id: certify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Bare python is intentional: the lookup is stdlib-only and always
+          # exits 0 (fail open), so this step never reds the workflow itself.
+          # Any API error, gap, ambiguity, or ineligible event runs the full
+          # gates instead.
+          python scripts/queue_certification.py \
+            --sha "$TARGET_SHA" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Emit certified-skip signatures
+        # Third-state representation (never a failure, never a fresh green
+        # baseline): on a certified SHA, fast-test and medium-test do not
+        # execute, so this job uploads their signature artifacts with kind
+        # "certified" under the exact artifact names the auto-revert
+        # signature check expects. Baseline selection walks back past
+        # certified runs instead of diffing real failures against them.
+        if: ${{ steps.certify.outputs.certified == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_ID="${{ steps.certify.outputs.certifying_run_id }}"
+          for gate_job in fast-test medium-test; do
+            mkdir -p "certified/${gate_job}"
+            python scripts/post_merge_signature.py build --job "${gate_job}" --certified-by "${RUN_ID}" \
+              --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out "certified/${gate_job}/signature.json"
+          done
+
+      - name: Upload fast-test certified signature
+        if: ${{ steps.certify.outputs.certified == 'true' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: signature-fast-test
+          path: certified/fast-test/signature.json
+          retention-days: 14
+
+      - name: Upload medium-test certified signature
+        if: ${{ steps.certify.outputs.certified == 'true' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: signature-medium-test
+          path: certified/medium-test/signature.json
+          retention-days: 14
+
+  sweep-coverage:
+    name: sweep-coverage
+    # Always runs: downstream jobs read these outputs on every event, and
+    # references to a skipped job's outputs do not evaluate reliably. The
+    # script itself returns covered=false without any API call unless this
+    # is a schedule run, so push and workflow_dispatch always run the full
+    # gates and the manual dispatch stays the full-run escape hatch.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      covered: ${{ steps.coverage.outputs.covered }}
+      covering_run_id: ${{ steps.coverage.outputs.covering_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+
+      - name: Check whether the tip is already covered
+        id: coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Bare python is intentional: the lookup is stdlib-only and always
+          # exits 0 (fail open), so this step never reds the workflow itself.
+          # Any API error, gap, ambiguity, or uncovered tip runs the full
+          # gates instead.
+          python scripts/sweep_coverage.py \
+            --sha "$TARGET_SHA" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+  fast-test:
+    needs: [queue-certification, sweep-coverage]
+    # Queue-certified pushes skip the re-run: the merge queue already passed
+    # this exact SHA (certified by the run recorded in the step summary and
+    # metrics). The lint job above still runs on every push: it writes the
+    # fast-lane-count-develop-<sha> cache the PR guard restores. A covered
+    # tip skips the re-run on schedule too: a success/failure push run (or
+    # a queue certification) already gated this exact SHA, so the sweep
+    # exits early with a step-summary note.
+    if: ${{ (github.event_name != 'push' || needs.queue-certification.outputs.certified != 'true') && (github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+          fetch-depth: 0
+
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -165,15 +287,15 @@ jobs:
           if [ -f fast-test-junit.xml ]; then
             python scripts/post_merge_signature.py build --job fast-test --junit fast-test-junit.xml \
               --failed-step "Run CI fast-test mirror (job failed with no testcase-level failures, e.g. coverage threshold)" \
-              $JOB_FAILED_FLAG --out signature.json \
-              || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --out signature.json
+              $JOB_FAILED_FLAG --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json \
+              || python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (junit xml unparseable)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --out signature.json
+            python scripts/post_merge_signature.py build --job fast-test --failed-step "Run CI fast-test mirror (no junit xml produced)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload fast-test signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: signature-fast-test
           path: signature.json
@@ -181,13 +303,17 @@ jobs:
 
   explorer-tokens:
     name: explorer-tokens
+    needs: sweep-coverage
     # Re-run the token-scan gate against the merged develop tree so that a
     # squash race that reintroduces raw Tailwind palette literals trips the
     # auto-revert path even when each PR-time scan passed against its own
-    # pre-merge tree. Stdlib-only so no dependency sync is required.
+    # pre-merge tree. Stdlib-only so no dependency sync is required. A
+    # covered tip skips the re-run on schedule only; push and dispatch
+    # always run.
+    if: ${{ github.event_name != 'schedule' || needs.sweep-coverage.outputs.covered != 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
@@ -214,14 +340,14 @@ jobs:
             failed_step="Run public site theme token scan"
           fi
           if [ -n "${failed_step}" ]; then
-            python scripts/post_merge_signature.py build --job explorer-tokens --failed-step "${failed_step}" --out signature.json
+            python scripts/post_merge_signature.py build --job explorer-tokens --failed-step "${failed_step}" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job explorer-tokens --out signature.json
+            python scripts/post_merge_signature.py build --job explorer-tokens --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload explorer-tokens signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: signature-explorer-tokens
           path: signature.json
@@ -262,21 +388,25 @@ jobs:
     # schedule (push + workflow_dispatch only). The ~40 min tier would
     # otherwise cost ~24 full medium runs/day even when tip is already
     # push-covered; lint/fast-test/explorer-tokens still bound tip exposure.
-    if: ${{ github.event_name != 'schedule' }}
+    # Queue-certified pushes skip the re-run alongside fast-test; the
+    # queue-certification job uploads the certified third-state signature.
+    if: ${{ github.event_name != 'schedule' && (github.event_name != 'push' || needs.queue-certification.outputs.certified != 'true') }}
+    needs: queue-certification
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -306,15 +436,15 @@ jobs:
           if [ -f medium-test-junit.xml ]; then
             python scripts/post_merge_signature.py build --job medium-test --junit medium-test-junit.xml \
               --failed-step "Run medium speed tier (job failed with no testcase-level failures)" \
-              $JOB_FAILED_FLAG --out signature.json \
-              || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --out signature.json
+              $JOB_FAILED_FLAG --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json \
+              || python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (junit xml unparseable)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           else
-            python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --out signature.json
+            python scripts/post_merge_signature.py build --job medium-test --failed-step "Run medium speed tier (no junit xml produced)" --source-input "published-results=$(git ls-remote origin refs/heads/published-results | cut -f1)" --out signature.json
           fi
 
       - name: Upload medium-test signature
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: signature-medium-test
           path: signature.json
@@ -345,7 +475,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       MERGED_SHA: ${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
@@ -450,10 +580,13 @@ jobs:
     # job's promotion note): the tier ran clean on the real runner after its
     # dispositioned failures were fixed (#977, #994), so a medium-test failure
     # now opens a (reviewable) revert PR, same as lint/fast-test/explorer-tokens.
-    needs: [lint, fast-test, explorer-tokens, medium-test]
+    needs: [lint, fast-test, explorer-tokens, medium-test, queue-certification]
     # Schedule path is gates-only: never open revert PRs / issues from a sweep.
     # event_name must lead so always() cannot re-enable mutation on schedule.
-    if: ${{ github.event_name != 'schedule' && always() && (needs.lint.result == 'failure' || needs.fast-test.result == 'failure' || needs.explorer-tokens.result == 'failure' || needs.medium-test.result == 'failure') }}
+    # A queue-certified skip never fires auto-revert: its gates report
+    # 'skipped', and this explicit guard keeps the trigger off even if a
+    # future edit changes how skipped results read here.
+    if: ${{ github.event_name != 'schedule' && always() && (needs.lint.result == 'failure' || needs.explorer-tokens.result == 'failure' || (needs.queue-certification.outputs.certified != 'true' && (needs.fast-test.result == 'failure' || needs.medium-test.result == 'failure'))) }}
     outputs:
       auto-revert-pr-opened-at: ${{ steps.open-revert.outputs.auto-revert-pr-opened-at }}
       auto-revert-pr-url: ${{ steps.open-revert.outputs.auto-revert-pr-url }}
@@ -471,7 +604,7 @@ jobs:
       FAILING_SHA: ${{ github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
           fetch-depth: 0
@@ -481,7 +614,7 @@ jobs:
         # crashed before its always()-run signature step) is one of the
         # fail-open triggers handled below, not a hard job failure.
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           pattern: signature-*
           path: current-signatures
@@ -492,20 +625,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          should_revert="true"
+          # A revert is a positive-evidence outcome, never the default for a
+          # missing artifact, comparison error, or unmappable failure.
+          should_revert="false"
           # Left empty (not "[]") unless the diff below actually succeeds,
           # so a fail-open run reports new_failure_ids as "no data" (null in
           # the metrics JSON) rather than the misleading "computed zero".
           new_failure_ids_json=""
           fail_open_reason=""
           previous_run_url=""
+          comparison_state="unknown"
 
           # Every external/parse command below is guarded (`if ! ...`) so a
           # failure sets fail_open_reason instead of aborting the step under
-          # `set -e`: an aborted step would leave should-revert unwritten and
-          # skip BOTH downstream steps, silently dropping the revert - the
-          # exact anti-pattern this design forbids. Each stage is skipped
-          # once fail_open_reason is set, and fail-open always reverts.
+          # `set -e`: an aborted step would leave outputs unwritten and skip
+          # the incident path. Each stage is skipped once fail_open_reason is
+          # set, and an incomplete comparison stays red with an incident.
 
           # Merge the four gate jobs' per-job signature artifacts (one
           # subdirectory per artifact, downloaded above) into a single
@@ -525,7 +660,7 @@ jobs:
           done
           if [ "${#missing_signatures[@]}" -gt 0 ]; then
             fail_open_reason="Missing current-run signature artifact(s) for: ${missing_signatures[*]} (gate job crashed, timed out, or was cancelled before its signature could upload)."
-          elif ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+          elif ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort), jobs: map({job, kind, failure_ids}), source_inputs: (map(.source_inputs // {}) | add // {})}' \
             current-signatures/*/signature.json > current-combined.json; then
             fail_open_reason="Could not combine this run's signature artifacts (malformed signature JSON)."
           fi
@@ -541,28 +676,62 @@ jobs:
             # predecessor. Mis-selection errs toward reverting (an older
             # baseline makes more failures look new), which is the safe
             # direction.
-            if ! runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=10")"; then
+            # The baseline is restricted to runs of the same event type:
+            # scheduled runs omit medium tests, so a push run must never
+            # diff against a scheduled lane set (or vice versa).
+            # Certified-skip runs are walked back past: their signatures
+            # carry kind "certified" with no failure IDs, so diffing real
+            # failures against one would misblame this merge for older red.
+            # A certified run is never a fresh green baseline that clears an
+            # unrelated open incident either: only a real all-green run can
+            # be the baseline a revert decision diffs against.
+            if ! runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/develop-post-merge.yml/runs?branch=develop&status=completed&per_page=20")"; then
               fail_open_reason="Could not list previous develop-post-merge runs via gh api."
-            elif ! prev_run_json="$(jq -c --argjson current "${GITHUB_RUN_NUMBER}" \
-              '[.workflow_runs[] | select(.run_number < $current)] | sort_by(.run_number) | last // empty' \
+            elif ! candidate_ids="$(jq -r --argjson current "${GITHUB_RUN_NUMBER}" --arg event "${{ github.event_name }}" \
+              '[.workflow_runs[] | select(.run_number < $current and .event == $event)] | sort_by(.run_number) | reverse | .[0:8] | .[].id' \
               <<<"${runs_json}")"; then
               fail_open_reason="Could not parse the previous-runs listing."
-            elif [ -z "${prev_run_json}" ] || [ "${prev_run_json}" = "null" ]; then
+            elif [ -z "${candidate_ids}" ]; then
               fail_open_reason="No previous completed develop-post-merge run was found on develop."
-            elif ! prev_run_id="$(jq -r '.id' <<<"${prev_run_json}")" \
-              || ! previous_run_url="$(jq -r '.html_url' <<<"${prev_run_json}")"; then
-              fail_open_reason="Could not extract the previous run's id/url."
             else
-              echo "Previous run: ${previous_run_url} (id ${prev_run_id})"
-              if ! gh run download "${prev_run_id}" --pattern 'signature-*' --dir previous-signatures 2>prev-download.log; then
-                fail_open_reason="Could not download the previous run's signature artifacts (likely expired retention): $(tail -n1 prev-download.log 2>/dev/null || true)"
+              prev_run_id=""
+              previous_run_url=""
+              for candidate_id in ${candidate_ids}; do
+                rm -rf previous-signatures
+                if ! candidate_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_id}")"; then
+                  fail_open_reason="Could not read candidate baseline run ${candidate_id} via gh api."
+                  break
+                fi
+                candidate_url="$(jq -r '.html_url // empty' <<<"${candidate_json}")"
+                if ! gh run download "${candidate_id}" --pattern 'signature-*' --dir previous-signatures 2>prev-download.log; then
+                  fail_open_reason="Could not download the previous run's signature artifacts (likely expired retention): $(tail -n1 prev-download.log 2>/dev/null || true)"
+                  break
+                fi
+                is_certified=false
+                for sig in previous-signatures/signature-fast-test/signature.json previous-signatures/signature-medium-test/signature.json; do
+                  if [ -f "${sig}" ] && jq -e '.kind == "certified"' "${sig}" >/dev/null 2>&1; then
+                    is_certified=true
+                    break
+                  fi
+                done
+                if [ "${is_certified}" = "true" ]; then
+                  echo "Baseline candidate ${candidate_id} is a certified skip; walking back."
+                  continue
+                fi
+                prev_run_id="${candidate_id}"
+                previous_run_url="${candidate_url}"
+                echo "Previous run: ${previous_run_url} (id ${prev_run_id})"
+                break
+              done
+              if [ -z "${fail_open_reason}" ] && [ -z "${prev_run_id}" ]; then
+                fail_open_reason="Only certified-skip baselines were found; nothing real to diff against."
               fi
             fi
           fi
 
           if [ -z "${fail_open_reason}" ]; then
             if compgen -G "previous-signatures/*/signature.json" > /dev/null; then
-              if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort)}' \
+              if ! jq -s '{failure_ids: ([.[].failure_ids] | add | unique | sort), jobs: map({job, kind, failure_ids}), source_inputs: (map(.source_inputs // {}) | add // {})}' \
                 previous-signatures/*/signature.json > previous-combined.json; then
                 fail_open_reason="Could not combine the previous run's signature artifacts (malformed signature JSON)."
               fi
@@ -586,18 +755,26 @@ jobs:
                 # is persistently red for the same reason, not because of
                 # this merge.
                 should_revert="false"
+                comparison_state="persistent"
+              else
+                # A new signature is necessary but not sufficient for a
+                # revert. Attribution must still provide positive ownership
+                # evidence before the revert step can run.
+                should_revert="true"
+                comparison_state="new"
               fi
             else
               fail_open_reason="scripts/post_merge_signature.py diff exited non-zero comparing this run to ${previous_run_url}."
             fi
           fi
 
-          # Never silently suppress a revert on a comparison error: any
-          # unresolved fail_open_reason forces should_revert back to true
-          # and is surfaced in the revert PR body below.
+          # Never silently suppress the red state on a comparison error. An
+          # unresolved reason routes to an unknown-attribution incident; it
+          # must not manufacture ownership from temporal adjacency.
           if [ -n "${fail_open_reason}" ]; then
-            echo "Failing open: ${fail_open_reason}"
-            should_revert="true"
+            echo "Comparison incomplete: ${fail_open_reason}"
+            should_revert="false"
+            comparison_state="unknown"
           fi
 
           if [ "${should_revert}" = "true" ]; then
@@ -611,6 +788,7 @@ jobs:
             echo "revert-suppressed=${revert_suppressed}"
             echo "fail-open-reason=${fail_open_reason}"
             echo "previous-run-url=${previous_run_url}"
+            echo "comparison-state=${comparison_state}"
           } >> "${GITHUB_OUTPUT}"
 
           {
@@ -621,48 +799,132 @@ jobs:
 
       - name: Attribute new failures to the blamed SHA
         id: attribute
-        if: steps.signature-decision.outputs.should-revert == 'true'
+        if: steps.signature-decision.outputs.comparison-state != 'persistent'
         shell: bash
         env:
           NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
+          COMPARISON_STATE: ${{ steps.signature-decision.outputs.comparison-state }}
+          COMPARISON_FAILURE: ${{ steps.signature-decision.outputs.fail-open-reason }}
         run: |
           set -euo pipefail
-          # Fail-open comparisons have empty/unusable new IDs: keep revert.
           if [ -z "${NEW_FAILURE_IDS}" ] || [ "${NEW_FAILURE_IDS}" = "null" ]; then
-            echo "action=revert" >> "${GITHUB_OUTPUT}"
-            echo "Attribution skipped (no new-failure-id payload); keeping revert."
-            exit 0
+            failure_ids_json="[]"
+          else
+            failure_ids_json="${NEW_FAILURE_IDS}"
           fi
-          printf '%s\n' "${NEW_FAILURE_IDS}" > new-failure-ids.json
+
+          # Capture the immutable PR association and live target before any
+          # mutation. A missing API result is evidence loss, not permission to
+          # fall back to the most recent merge.
+          pr_json="{}"
+          if ! pr_json="$(gh api graphql \
+            -f owner="${GITHUB_REPOSITORY_OWNER}" \
+            -f repo="${GITHUB_REPOSITORY#*/}" \
+            -f oid="${FAILING_SHA}" \
+            -f query='query($owner: String!, $repo: String!, $oid: GitObjectID!) { repository(owner: $owner, name: $repo) { object(oid: $oid) { ... on Commit { associatedPullRequests(first: 1) { nodes { number title url author { login } } } } } } }' \
+            --jq '.data.repository.object.associatedPullRequests.nodes[0] // {}')"; then
+            echo "Could not resolve the PR associated with ${FAILING_SHA}; recording unknown attribution."
+            pr_json="{}"
+          fi
+          pr_author="$(jq -r '.author.login // empty' <<<"${pr_json}")"
+          owner="${pr_author:-BenchBox-dev}"
+
+          current_target_sha=""
+          if ! current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"; then
+            current_target_sha=""
+          fi
+          predecessor_sha="$(git rev-parse --verify --quiet "${FAILING_SHA}^1" || true)"
+          # Comparison failures can leave current-combined.json absent or
+          # malformed. Keep this attribution step alive with a safe,
+          # explicit empty signature so the unknown incident is still
+          # recorded; an empty signature can never create ownership evidence.
+          empty_signature='{"failure_ids":[],"jobs":[],"source_inputs":{}}'
+          current_signature="${empty_signature}"
+          if [ -f current-combined.json ]; then
+            if ! current_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' current-combined.json 2>/dev/null)"; then
+              echo "Current combined signature is missing or malformed; using the safe unknown-attribution fallback."
+              current_signature="${empty_signature}"
+            fi
+          fi
+
+          previous_signature="${empty_signature}"
+          if [ -f previous-combined.json ]; then
+            if ! previous_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' previous-combined.json 2>/dev/null)"; then
+              echo "Previous combined signature is malformed; using the safe evidence fallback."
+              previous_signature="${empty_signature}"
+            fi
+          fi
+
+          jq -n \
+            --arg failing_sha "${FAILING_SHA}" \
+            --arg run_url "${RUN_URL}" \
+            --arg current_target_sha "${current_target_sha}" \
+            --arg predecessor_sha "${predecessor_sha}" \
+            --arg previous_run_url "${{ steps.signature-decision.outputs.previous-run-url }}" \
+            --arg owner "${owner}" \
+            --arg comparison_state "${COMPARISON_STATE}" \
+            --arg comparison_failure "${COMPARISON_FAILURE}" \
+            --argjson failure_ids "${failure_ids_json}" \
+            --argjson failing_pr "${pr_json}" \
+            --argjson current_signature "${current_signature}" \
+            --argjson previous_signature "${previous_signature}" \
+            '{
+              evidence_version: 2,
+              failing_sha: $failing_sha,
+              run_url: $run_url,
+              current_target_sha: $current_target_sha,
+              failure_ids: $failure_ids,
+              jobs: ($current_signature.jobs // []),
+              failing_pr: $failing_pr,
+              owner: $owner,
+              source_inputs: ($current_signature.source_inputs // {}),
+              predecessor_source_inputs: ($previous_signature.source_inputs // {}),
+              predecessor_evidence: {
+                run_url: $previous_run_url,
+                sha: $predecessor_sha,
+                signature: $previous_signature
+              },
+              comparison_state: $comparison_state,
+              comparison_failure: $comparison_failure,
+              proposed_revert: {inspected: false}
+            }' > attribution-evidence.json
+
           python3 scripts/post_merge_signature.py attribute \
             --sha "${FAILING_SHA}" \
-            --failure-ids new-failure-ids.json \
+            --failure-ids <(printf '%s\n' "${failure_ids_json}") \
+            --evidence attribution-evidence.json \
             --out attribution.json
           action="$(jq -r '.action' attribution.json)"
           echo "action=${action}" >> "${GITHUB_OUTPUT}"
+          echo "incident-key=$(jq -r '.incident_key' attribution.json)" >> "${GITHUB_OUTPUT}"
+          {
+            echo "incident-artifact<<EOF_ATTRIBUTION"
+            cat attribution.json
+            echo "EOF_ATTRIBUTION"
+          } >> "${GITHUB_OUTPUT}"
           echo "Attribution action: ${action}"
 
       - name: Finalize revert-suppressed for metrics
         id: revert-outcome
         # Always runs (even when the attribute step above was skipped) so the
         # job output below has a value in every case: the signature-decision
-        # step's revert-suppressed is computed before attribution runs, so it
-        # is still "false" for an advisory run even though this job's
-        # "Open revert PR or conflict issue" step explicitly skips the revert.
-        # Metrics consuming revert-suppressed must see that suppression.
+        # step's initial revert-suppressed value is based on comparison only;
+        # the final value below also accounts for attribution. Metrics must
+        # report a revert as suppressed unless positive ownership evidence
+        # actually reaches the revert step.
         if: always()
         shell: bash
         run: |
           set -euo pipefail
           revert_suppressed="${{ steps.signature-decision.outputs.revert-suppressed }}"
-          if [ "${{ steps.attribute.outputs.action }}" = "advisory" ]; then
+          if [ "${{ steps.attribute.outputs.action }}" != "revert" ]; then
             revert_suppressed="true"
           fi
           echo "revert-suppressed=${revert_suppressed}" >> "${GITHUB_OUTPUT}"
 
       - name: Open revert PR or conflict issue
         id: open-revert
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action != 'advisory'
+        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'revert'
         shell: bash
         env:
           FAIL_OPEN_REASON: ${{ steps.signature-decision.outputs.fail-open-reason }}
@@ -798,7 +1060,29 @@ jobs:
           git fetch --no-tags origin "${revert_branch}" || true
           git checkout -B "${revert_branch}" origin/develop
 
-          if git revert --no-edit "${FAILING_SHA}"; then
+          target_sha="$(git rev-parse --verify origin/develop || true)"
+          if [ -z "${target_sha}" ] || [ "${target_sha}" != "${FAILING_SHA}" ]; then
+            open_manual_action_issue \
+              "Auto-revert not attempted for stale develop target ${short_sha}" \
+              "The live develop target changed after attribution was computed (expected ${FAILING_SHA}, found ${target_sha:-missing}). Re-evaluate the failure against the current target; no stale revert was proposed."
+            exit 0
+          fi
+
+          # Prepare the inverse without committing so the target state and the
+          # exact proposed diff are visible before a retry/push/PR mutation.
+          if git revert --no-commit "${FAILING_SHA}"; then
+            proposed_revert_paths="$(git diff --name-only)"
+            if [ -z "${proposed_revert_paths}" ] || ! git diff --check; then
+              git revert --abort || git reset --hard HEAD
+              open_manual_action_issue \
+                "Auto-revert diff inspection failed for ${short_sha}" \
+                "The live target was checked, but the proposed inverse diff was empty or failed git diff --check. No revert PR was opened."
+              exit 0
+            fi
+            echo "Inspected proposed revert diff on develop@${target_sha}:"
+            git diff --stat
+            git diff --name-status
+            git commit -m "Revert ${pr_title} (${pr_label}) - develop went red post-merge"
             remote_lease="$(git rev-parse --verify --quiet "refs/remotes/origin/${revert_branch}" || true)"
             if [ -n "${remote_lease}" ]; then
               push_lease="--force-with-lease=${revert_branch}:${remote_lease}"
@@ -853,58 +1137,56 @@ jobs:
               "The automatic \`git revert ${FAILING_SHA}\` conflicted."
           fi
 
-      - name: Comment advisory instead of reverting
-        id: advisory-comment
-        if: steps.signature-decision.outputs.should-revert == 'true' && steps.attribute.outputs.action == 'advisory'
-        shell: bash
-        env:
-          NEW_FAILURE_IDS: ${{ steps.signature-decision.outputs.new-failure-ids }}
-        run: |
-          set -euo pipefail
-
-          # Idempotency: if a re-run of this workflow lands on the advisory
-          # path again for the same SHA (workflow re-run, retry), reuse the
-          # existing open issue instead of opening a duplicate. Match by SHA
-          # in the body via the GitHub search index, scoped to this label -
-          # mirrors open_manual_action_issue's search-before-create pattern
-          # above.
-          existing_issue_url="$(gh issue list \
-            --state open \
-            --label incident:develop-red \
-            --search "${FAILING_SHA} in:body" \
-            --json url \
-            --jq '.[0].url // ""')"
-          if [ -n "${existing_issue_url}" ]; then
-            echo "Advisory issue already exists: ${existing_issue_url}"
-            exit 0
-          fi
-
-          body="Post-merge is red with new failure IDs, but blamed SHA \`${FAILING_SHA}\` did not touch the failing test file(s) or a matching code-under-test basename. Skipping auto-revert; fix-forward the latent break.
-
-          Failing run: ${RUN_URL}
-          New failure IDs: ${NEW_FAILURE_IDS}"
-          echo "${body}"
-          gh issue create \
-            --title "Auto-revert advisory: ${FAILING_SHA:0:12} did not own the failing test" \
-            --label incident:develop-red \
-            --body "${body}" || true
-
       - name: Upsert develop-red incident issue
         id: upsert-incident
-        # Only reached when the signature comparison cleanly determined the
-        # previous run was already red with an identical-or-superset
-        # signature (should-revert=false) - never on the fail-open path,
-        # which always opens a revert PR instead.
-        if: steps.signature-decision.outputs.should-revert == 'false'
+        # Persistent, unknown, stale, external-reference, transient, and
+        # unmappable outcomes all share one owned incident path. Only the
+        # positive code-regression outcome opens a revert PR.
+        if: steps.signature-decision.outputs.should-revert == 'false' || steps.attribute.outputs.action == 'advisory'
         shell: bash
         env:
           PREVIOUS_RUN_URL: ${{ steps.signature-decision.outputs.previous-run-url }}
+          COMPARISON_STATE: ${{ steps.signature-decision.outputs.comparison-state }}
+          ATTRIBUTION_ACTION: ${{ steps.attribute.outputs.action }}
+          INCIDENT_KEY: ${{ steps.attribute.outputs.incident-key }}
+          ATTRIBUTION_ARTIFACT: ${{ steps.attribute.outputs.incident-artifact }}
         run: |
           set -euo pipefail
 
           gh label create incident:develop-red \
-            --description "Develop post-merge failure with an automatic revert PR" \
+            --description "Develop post-merge failure requiring an owned action" \
             --color B60205 >/dev/null 2>&1 || true
+
+          empty_signature='{"failure_ids":[],"jobs":[],"source_inputs":{}}'
+          current_signature="${empty_signature}"
+          if [ -f current-combined.json ]; then
+            if ! current_signature="$(jq -ce 'if type == "object" and ((.failure_ids // []) | type == "array") and ((.jobs // []) | type == "array") and ((.source_inputs // {}) | type == "object") then . else error("signature object has invalid fields") end' current-combined.json 2>/dev/null)"; then
+              echo "Current combined signature is missing or malformed; using the empty signature for the incident fallback."
+              current_signature="${empty_signature}"
+            fi
+          else
+            echo "Current combined signature is unavailable; using the empty signature for the incident fallback."
+          fi
+          current_failure_ids_json="$(jq -c '[.failure_ids[] | tostring] | unique | sort' <<<"${current_signature}")"
+          current_incident_key="$(printf '%s' "${current_failure_ids_json}" | sha256sum | cut -c1-16)"
+          incident_key="${INCIDENT_KEY}"
+          if [ "${COMPARISON_STATE}" = "persistent" ] || [ -z "${incident_key}" ]; then
+            incident_key="${current_incident_key}"
+          fi
+          artifact="${ATTRIBUTION_ARTIFACT}"
+          if [ -z "${artifact}" ]; then
+            artifact="$(jq -n \
+              --arg key "${incident_key}" \
+              --arg sha "${FAILING_SHA}" \
+              --arg run "${RUN_URL}" \
+              --arg prev "${PREVIOUS_RUN_URL}" \
+              --argjson signature "${current_signature}" \
+              '{schema_version: 2, incident_key: $key, failing_commit: {sha: $sha, run_url: $run}, failing_pr: {}, failure_ids: ($signature.failure_ids // []), jobs: ($signature.jobs // []), test_ids: ($signature.failure_ids // []), source_input_identities: {current: ($signature.source_inputs // {}), predecessor: {}}, predecessor_evidence: {run_url: $prev}, ownership_match: false, classification: "persistent-failure", action: "advisory", next_action: "Investigate the existing red incident; no new revert is needed.", owner: "BenchBox-dev", reasons: ["incident fallback uses the current combined failure signature"]}')"
+          fi
+          owner="$(jq -r '.owner // "BenchBox-dev"' <<<"${artifact}")"
+          classification="$(jq -r '.classification // "unknown"' <<<"${artifact}")"
+          next_action="$(jq -r '.next_action // "An owner must classify the evidence and choose fix-forward or a reviewed revert; keep develop red."' <<<"${artifact}")"
+          artifact_summary="$(jq -c . <<<"${artifact}")"
 
           # One open incident issue per persistent-red episode: reuse it
           # across every run that repeats the same failure signature instead
@@ -912,33 +1194,48 @@ jobs:
           existing_issue_url="$(gh issue list \
             --state open \
             --label incident:develop-red \
+            --search "${incident_key} in:body" \
             --json url \
             --jq '.[0].url // ""')"
 
-          comment_body="Develop is still red with the same failure signature as the previous run (${PREVIOUS_RUN_URL}).
+          comment_body="Develop post-merge incident update.
 
           Failing SHA: \`${FAILING_SHA}\`
           Failing run: ${RUN_URL}
+          Classification: ${classification}
+          Action: ${ATTRIBUTION_ACTION:-advisory}
+          Owner: @${owner#@}
+          Next action: ${next_action}
 
-          No new revert PR was opened for this run because no new failure IDs were introduced."
+          Incident key: \`${incident_key}\`
+          Evidence artifact: \`${artifact_summary}\`"
 
           if [ -n "${existing_issue_url}" ]; then
             gh issue comment "${existing_issue_url}" --body "${comment_body}"
             echo "incident-issue-url=${existing_issue_url}" >> "${GITHUB_OUTPUT}"
-            echo "Commented on existing incident issue: ${existing_issue_url}"
+            echo "Updated existing incident issue: ${existing_issue_url}"
           else
             body_file="$(mktemp)"
             cat > "${body_file}" <<EOF
-          Develop went red and remains red across develop-post-merge runs with no new failure signature.
+          Develop post-merge attribution requires an owned action.
 
           Failing SHA: \`${FAILING_SHA}\`
           Failing run: ${RUN_URL}
           Previous run: ${PREVIOUS_RUN_URL}
 
-          No revert PR was opened for this run: the failure signature matches (or is a subset of) the previous run's, so reverting this merge would not fix develop. A human needs to investigate the persistent failure.
+          Classification: ${classification}
+          Action: ${ATTRIBUTION_ACTION:-advisory}
+          Owner: @${owner#@}
+          Next action: ${next_action}
+          Incident key: \`${incident_key}\`
+
+          Immutable evidence artifact:
+          \`\`\`json
+          ${artifact}
+          \`\`\`
           EOF
             issue_url="$(gh issue create \
-              --title "Develop is red: persistent post-merge failure" \
+              --title "Develop is red: ${classification} attribution required" \
               --body-file "${body_file}" \
               --label incident:develop-red)"
             echo "incident-issue-url=${issue_url}" >> "${GITHUB_OUTPUT}"
@@ -966,7 +1263,7 @@ jobs:
       MERGED_SHA: ${{ github.sha }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ github.event_name == 'schedule' && 'develop' || github.sha }}
 
@@ -974,6 +1271,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          current_target_sha="$(git ls-remote origin refs/heads/develop | cut -f1)"
+          if [ -z "${current_target_sha}" ] || [ "${current_target_sha}" != "${MERGED_SHA}" ]; then
+            echo "Develop moved from ${MERGED_SHA} to ${current_target_sha:-missing}; leaving incidents and revert PRs open."
+            exit 0
+          fi
 
           comment_body="Closing: develop is green again at ${RUN_URL} (\`${MERGED_SHA:0:12}\`)."
 
@@ -1019,7 +1322,7 @@ jobs:
   metrics:
     name: metrics
     runs-on: ubuntu-latest
-    needs: [lint, fast-test, explorer-tokens, medium-test, auto-revert-on-failure]
+    needs: [lint, fast-test, explorer-tokens, medium-test, auto-revert-on-failure, queue-certification]
     if: ${{ always() }}
     permissions:
       actions: read
@@ -1041,6 +1344,7 @@ jobs:
       CONFLICT_ISSUE_URL: ${{ needs.auto-revert-on-failure.outputs.conflict-issue-url }}
       NEW_FAILURE_IDS: ${{ needs.auto-revert-on-failure.outputs.new-failure-ids }}
       REVERT_SUPPRESSED: ${{ needs.auto-revert-on-failure.outputs.revert-suppressed }}
+      CERTIFYING_RUN_ID: ${{ needs.queue-certification.outputs.certifying_run_id }}
     steps:
       - name: Write dev-loop metrics JSON
         shell: bash
@@ -1093,6 +1397,7 @@ jobs:
             --arg conflict_issue_url "${CONFLICT_ISSUE_URL}" \
             --arg new_failure_ids "${NEW_FAILURE_IDS}" \
             --arg revert_suppressed "${REVERT_SUPPRESSED}" \
+            --arg certifying_run_id "${CERTIFYING_RUN_ID}" \
             'def null_if_empty: if . == "" then null else . end;
              def ts: fromdateiso8601;
              ($pr.createdAt // null) as $created_at |
@@ -1131,13 +1436,18 @@ jobs:
                auto_revert_pr_url: ($auto_revert_pr_url | null_if_empty),
                conflict_issue_url: ($conflict_issue_url | null_if_empty),
                new_failure_ids: (($new_failure_ids | fromjson?) // null),
-               revert_suppressed: ($revert_suppressed == "true")
+               revert_suppressed: ($revert_suppressed == "true"),
+               queue_certified_by_run_id: (
+                 if ($certifying_run_id | test("^[0-9]+$")) then
+                   ($certifying_run_id | tonumber)
+                 else null end
+               )
              }' > "dev-loop-metrics/${MERGED_SHA}.json"
 
           cat "dev-loop-metrics/${MERGED_SHA}.json"
 
       - name: Upload metrics artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: metrics
           path: dev-loop-metrics/*.json

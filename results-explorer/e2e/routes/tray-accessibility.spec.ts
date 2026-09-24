@@ -23,10 +23,10 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await waitForDataLoaded(page, /TPC-H Results/);
 
     const duckdbCheckbox = page
-      .locator(`[data-testid="${fixtureIds.ids.duckdb}"]:visible`)
+      .locator(`[data-testid="list-${fixtureIds.ids.duckdb}"]:visible`)
       .first()
       .getByRole("checkbox");
-    await waitForDataElement(page, page.getByTestId(fixtureIds.ids.duckdb).first());
+    await waitForDataElement(page, page.getByTestId(`list-${fixtureIds.ids.duckdb}`).first());
     await duckdbCheckbox.scrollIntoViewIfNeeded();
     await duckdbCheckbox.focus();
     await duckdbCheckbox.check();
@@ -34,7 +34,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await expect(duckdbCheckbox).toBeFocused();
 
     const datafusionCheckbox = page
-      .locator(`[data-testid="${fixtureIds.ids.datafusion}"]:visible`)
+      .locator(`[data-testid="list-${fixtureIds.ids.datafusion}"]:visible`)
       .first()
       .getByRole("checkbox");
     await datafusionCheckbox.focus();
@@ -127,10 +127,10 @@ async function openBenchmarkTray(page: import("@playwright/test").Page): Promise
   await waitForShell(page);
   await waitForDataLoaded(page, /TPC-H Results/);
   const row1 = page
-    .locator(`[data-testid="${fixtureIds.ids.duckdb}"]:visible, [data-testid="query-heatmap-mobile-card-${fixtureIds.ids.duckdb}"]:visible`)
+    .locator(`[data-testid="list-${fixtureIds.ids.duckdb}"]:visible`)
     .first();
   const row2 = page
-    .locator(`[data-testid="${fixtureIds.ids.datafusion}"]:visible, [data-testid="query-heatmap-mobile-card-${fixtureIds.ids.datafusion}"]:visible`)
+    .locator(`[data-testid="list-${fixtureIds.ids.datafusion}"]:visible`)
     .first();
   await waitForDataElement(page, row1);
   await row1.scrollIntoViewIfNeeded();

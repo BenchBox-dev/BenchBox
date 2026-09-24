@@ -4,11 +4,16 @@ Provides JSON/CSV/HTML export of benchmark results with optional anonymization,
 and utilities to list, load, compare results. This module is UI-agnostic and can
 be used by both CLI and non-CLI runners.
 
-Schema v2.0 Companion Files:
+Schema v2.0 files:
 
-- Primary: ``{run_id}.json`` - Main result with queries, timing, summary
-- Plans: ``{run_id}.plans.json`` - Query plans (if captured)
-- Tuning: ``{run_id}.tuning.json`` - Tuning clauses applied (if any)
+- Primary: ``{run_id}.json`` - the whole result, including the tuning a run
+  requested and the ledger of what it applied (``platform.tuning``)
+- Plans: ``{run_id}.plans.json`` - query plans, when captured
+
+Plans stay a separate file because execution DAGs are large and most readers
+never open them. The ``{run_id}.tuning.json`` and ``{run_id}.applied.json``
+companions were retired into ``platform.tuning``; readers still accept them on
+bundles exported earlier.
 """
 
 from __future__ import annotations
@@ -51,8 +56,12 @@ from benchbox.core.results.schema import (
     build_plans_payload,
     build_result_payload,
     build_tuning_payload,
+    inline_tuning_artifacts,
 )
-from benchbox.core.results.schema_policy import is_loader_supported_result_schema
+from benchbox.core.results.schema_policy import (
+    is_loader_supported_result_schema,
+    result_schema_version_value,
+)
 from benchbox.core.runtime_paths import resolve_results_dir
 from benchbox.utils.cloud_storage import create_path_handler, is_cloud_path
 from benchbox.validation.bundle import COMPANION_SUFFIXES
@@ -84,8 +93,9 @@ class ResultExporter:
 
     Schema v2.0 exports:
 
-    - Primary result file: Contains run, benchmark, platform, summary, queries
-    - Companion files (optional): ``.plans.json`` for query plans, ``.tuning.json`` for tuning config
+    - Primary result file: run, benchmark, platform, summary, queries, and the
+      requested/applied tuning under ``platform.tuning``
+    - Companion file (optional): ``.plans.json`` for captured query plans
     """
 
     EXPORTER_NAME = "benchbox-exporter"
@@ -180,7 +190,11 @@ class ResultExporter:
 
             try:
                 existing_mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
-                if existing_mode is not None:
+                # os.fchmod is POSIX-only (no Windows implementation); Windows
+                # has no equivalent notion of the POSIX permission bits this
+                # preserves, so permission preservation is simply unavailable
+                # there and the write proceeds with the new file's default mode.
+                if existing_mode is not None and hasattr(os, "fchmod"):
                     os.fchmod(file_descriptor, existing_mode)
                 with os.fdopen(file_descriptor, mode, encoding="utf-8", newline="") as handle:
                     file_descriptor = None
@@ -301,6 +315,12 @@ class ResultExporter:
         # Build primary payload
         payload = build_result_payload(result, sanitize_platform_secrets=self.anonymize)
 
+        # Tuning artifacts are built once, in this export mode, and are then both
+        # inlined into the bundle and written as companions, so the two can never
+        # disagree about what the run requested or applied.
+        tuning_payload = self._build_export_tuning_payload(result)
+        applied_payload = self._build_export_applied_payload(result)
+
         # Apply anonymization if enabled
         if self.anonymize and self.anonymization_manager:
             self._apply_anonymization(payload)
@@ -312,10 +332,22 @@ class ResultExporter:
             payload = _redact_usernames(payload)
             anonymized = False
 
+        # Inline after the main anonymization walk, never before: both artifacts
+        # arrive already scrubbed by the tuning-specific and applied-ledger
+        # policies, which the general result anonymizer does not implement.
+        # Re-walking them with the general policy would not add protection and
+        # would let the inlined copy drift from the companion.
+        inline_tuning_artifacts(payload, tuning_payload, applied_payload)
+
         # Add export metadata
+        from benchbox.utils.version import get_package_version
+
+        benchbox_version = get_package_version()
+
         payload["export"] = {
             "timestamp": datetime.now().isoformat(),
             "tool": self.EXPORTER_NAME,
+            "benchbox_version": benchbox_version,
             "anonymized": anonymized,
         }
 
@@ -338,35 +370,64 @@ class ResultExporter:
 
         return filepath
 
-    def _write_companion_files(self, result: ResultLike, filename_base: str) -> None:
-        """Write companion files for plans and tuning if present."""
-        # Plans companion file
-        plans_payload = build_plans_payload(result)
-        if plans_payload:
-            if self.anonymize and self.anonymization_manager:
-                plans_payload = self._anonymize_plans_payload(plans_payload)
-            plans_path = self._create_file_path(f"{filename_base}.plans.json")
-            self._write_file(plans_path, canonical_json_text(plans_payload))
-            self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
-
-        # Tuning companion file
+    def _build_export_tuning_payload(self, result: ResultLike) -> dict[str, Any] | None:
+        """Build the requested-tuning payload, scrubbed for this export mode."""
         tuning_payload = build_tuning_payload(result)
-        if tuning_payload and self.anonymize and self.anonymization_manager:
-            tuning_payload = self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
-        if tuning_payload:
-            tuning_path = self._create_file_path(f"{filename_base}.tuning.json")
-            self._write_file(tuning_path, canonical_json_text(tuning_payload))
-            self.console.print(f"[dim]Exported tuning: {tuning_path}[/dim]")
+        if not tuning_payload:
+            return None
+        if self.anonymize and self.anonymization_manager:
+            return self.anonymization_manager.anonymize_tuning_payload(tuning_payload)
+        # Private exports keep the requested template verbatim, matching the
+        # long-standing `.tuning.json` behavior, minus connection identities.
+        return _redact_usernames(tuning_payload)
 
-        # Applied-tuning ledger companion file (ADR-1): what the execution path
-        # actually ran, additive to the requested-config .tuning.json above.
+    def _build_export_applied_payload(self, result: ResultLike) -> dict[str, Any] | None:
+        """Build the applied-tuning ledger payload, scrubbed for this export mode.
+
+        On the public path this drops the free-text ``statement`` / ``error``
+        fields and every identifier the ledger and its receipt can carry.
+
+        A private capture keeps them, exactly as ``.applied.json`` always has,
+        because the executed DDL is the point of the private ledger. Inlining
+        therefore widens what the primary ``<stem>.json`` holds on that path: the
+        raw statements now sit in the bundle as well as the companion beside it.
+        The pair is written together into the same private results directory, so
+        this adds no egress route, but a private bundle is not a redacted
+        artifact and must not be forwarded as one. ``export.anonymized`` records
+        which path produced it.
+        """
         applied_payload = build_applied_ledger_payload(result)
-        if applied_payload:
-            if self.anonymize and self.anonymization_manager:
-                applied_payload = self._anonymize_applied_payload(applied_payload)
-            applied_path = self._create_file_path(f"{filename_base}.applied.json")
-            self._write_file(applied_path, canonical_json_text(applied_payload))
-            self.console.print(f"[dim]Exported applied ledger: {applied_path}[/dim]")
+        if not applied_payload:
+            return None
+        if self.anonymize and self.anonymization_manager:
+            return self._anonymize_applied_payload(applied_payload)
+        return _redact_usernames(applied_payload)
+
+    def _write_companion_files(self, result: ResultLike, filename_base: str) -> None:
+        """Write the query-plans companion when plans were captured.
+
+        Plans are the one companion that still earns a separate file: execution
+        DAGs are large, most readers never open them, and carrying them inline
+        would multiply every bundle's size for a minority of consumers.
+
+        The requested tuning and the applied ledger used to ship here too, as
+        ``.tuning.json`` and ``.applied.json``. Both now live in the bundle's
+        ``platform.tuning`` block: they are small, and splitting them out cost
+        far more than it saved -- it fractured the answer to "what tuning did
+        this run request, and what did it execute?" across three files, made a
+        bundle separated from its companions lose that answer entirely, and left
+        every consumer to reimplement the stitch. Readers still accept the
+        companions where they exist, so bundles exported before this keep
+        loading; nothing writes them any more.
+        """
+        plans_payload = build_plans_payload(result)
+        if not plans_payload:
+            return
+        if self.anonymize and self.anonymization_manager:
+            plans_payload = self._anonymize_plans_payload(plans_payload)
+        plans_path = self._create_file_path(f"{filename_base}.plans.json")
+        self._write_file(plans_path, canonical_json_text(plans_payload))
+        self.console.print(f"[dim]Exported plans: {plans_path}[/dim]")
 
     def _record_plan_history(self, result: ResultLike) -> None:
         """Opt-in: append this run's plan fingerprints to a PlanHistory store.
@@ -854,7 +915,7 @@ class ResultExporter:
                 with open(json_file, encoding="utf-8") as handle:
                     data = json.load(handle)
 
-                version = data.get("version")
+                version = result_schema_version_value(data)
                 if not is_loader_supported_result_schema(data):
                     continue
 
@@ -929,12 +990,80 @@ class ResultExporter:
             with open(filepath, encoding="utf-8") as handle:
                 data = json.load(handle)
 
-            version = data.get("version", "unknown")
-            return {"data": data, "version": version, "filepath": filepath}
+            version = data.get("result_schema_version") or data.get("version") or "unknown"
+            return {"data": data, "version": version, "result_schema_version": version, "filepath": filepath}
 
         except Exception as exc:
             logger.error("Failed to load result from %s: %s", filepath, exc)
             return None
+
+    @staticmethod
+    def _check_generation_compatibility(baseline_data: dict[str, Any], current_data: dict[str, Any]) -> dict[str, Any]:
+        """Flag comparisons across incompatible data generations.
+
+        Returns a block with the stamped ``(version, hash)`` provenance of each side, a ``status``
+        of ``compatible``/``unknown``/``incompatible``, a legacy ``compatible`` boolean (None when
+        unknown, so API consumers cannot read "provenance unknown" as "safe to compare"), and a
+        human-readable warning. Results predating the stamp carry no provenance and are reported as
+        unknown rather than incompatible, so legacy comparisons keep working. Compatibility is only
+        asserted when both versions match and both hashes are present and equal.
+        """
+        outcome: dict[str, Any] = {"status": "compatible", "compatible": True, "warning": None}
+
+        def _provenance(data: dict[str, Any]) -> dict[str, Any]:
+            benchmark = data.get("benchmark") if isinstance(data, dict) else None
+            if not isinstance(benchmark, dict):
+                return {"data_generation_version": None, "data_generation_hash": None}
+            return {
+                "data_generation_version": benchmark.get("data_generation_version"),
+                "data_generation_hash": benchmark.get("data_generation_hash"),
+            }
+
+        baseline_prov = _provenance(baseline_data)
+        current_prov = _provenance(current_data)
+        outcome["baseline"] = baseline_prov
+        outcome["current"] = current_prov
+        baseline_version = baseline_prov["data_generation_version"]
+        current_version = current_prov["data_generation_version"]
+        baseline_hash = baseline_prov["data_generation_hash"]
+        current_hash = current_prov["data_generation_hash"]
+        if baseline_version is None or current_version is None:
+            outcome["status"] = "unknown"
+            outcome["compatible"] = None
+            outcome["warning"] = (
+                "One or both results predate data-generation stamping; "
+                "generation compatibility is unknown. Timing deltas may reflect dataset differences."
+            )
+            return outcome
+        if baseline_version != current_version:
+            outcome["status"] = "incompatible"
+            outcome["compatible"] = False
+            outcome["warning"] = (
+                "Results were generated from different data generations "
+                f"(baseline version={baseline_version}, current version={current_version}); "
+                "timing deltas may reflect dataset differences rather than performance changes."
+            )
+            return outcome
+        if baseline_hash is None or current_hash is None:
+            outcome["status"] = "unknown"
+            outcome["compatible"] = None
+            outcome["warning"] = (
+                f"Both results carry data-generation version {baseline_version}, but at least one "
+                "is missing its base-constants fingerprint; generation compatibility is unknown. "
+                "Timing deltas may reflect dataset differences."
+            )
+            return outcome
+        if baseline_hash != current_hash:
+            outcome["status"] = "incompatible"
+            outcome["compatible"] = False
+            outcome["warning"] = (
+                f"Both results carry data-generation version {baseline_version}, but their "
+                f"base-constants fingerprints differ ({str(baseline_hash)[:12]}… vs "
+                f"{str(current_hash)[:12]}…): the generator specs likely changed without a "
+                "version bump. Timing deltas may reflect dataset differences rather than "
+                "performance changes."
+            )
+        return outcome
 
     def compare_results(self, baseline_path: Path, current_path: Path) -> dict[str, Any]:
         """Compare two result files and return performance analysis.
@@ -944,7 +1073,9 @@ class ResultExporter:
             current_path: Path to current result file.
 
         Returns:
-            Comparison dictionary with performance changes and query comparisons.
+            Comparison dictionary with performance changes, query comparisons,
+            and a ``generation_compatibility`` block (``status``,
+            ``compatible``, ``warning``, plus each side's stamped provenance).
         """
         baseline_result = self.load_result_from_file(baseline_path)
         current_result = self.load_result_from_file(current_path)
@@ -958,8 +1089,8 @@ class ResultExporter:
 
         baseline_data = baseline_result["data"]
         current_data = current_result["data"]
-        baseline_version = baseline_result.get("version", "unknown")
-        current_version = current_result.get("version", "unknown")
+        baseline_version = baseline_result.get("result_schema_version") or baseline_result.get("version", "unknown")
+        current_version = current_result.get("result_schema_version") or current_result.get("version", "unknown")
 
         # Extract metrics using schema-agnostic normalizer
         perf_baseline = self._extract_performance_metrics(baseline_data)
@@ -970,6 +1101,7 @@ class ResultExporter:
             "current_file": current_path.name if self.anonymize else str(current_path),
             "baseline_version": baseline_version,
             "current_version": current_version,
+            "generation_compatibility": self._check_generation_compatibility(baseline_data, current_data),
             "performance_changes": {},
             "query_comparisons": [],
         }
@@ -1100,6 +1232,15 @@ class ResultExporter:
         summary = comparison.get("summary", {})
         performance_changes = comparison.get("performance_changes", {})
         query_comparisons = comparison.get("query_comparisons", [])
+        generation = comparison.get("generation_compatibility") or {}
+        generation_warning = str(generation.get("warning") or "")
+        generation_warning_html = (
+            '<div class="metric regressed" style="margin-bottom: 20px;">'
+            "<h3>Data generation warning</h3>"
+            f"<p>{html_escape(generation_warning, quote=True)}</p></div>"
+            if generation_warning
+            else ""
+        )
         total_queries_compared = html_escape(str(summary.get("total_queries_compared", 0)), quote=True)
         improved_queries = html_escape(str(summary.get("improved_queries", 0)), quote=True)
         regressed_queries = html_escape(str(summary.get("regressed_queries", 0)), quote=True)
@@ -1131,6 +1272,7 @@ class ResultExporter:
             <h1>Performance Comparison Report</h1>
             <p>Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
         </div>
+        {generation_warning_html}
         <div class="summary">
             <div class="metric neutral">
                 <h3>Queries Compared</h3>

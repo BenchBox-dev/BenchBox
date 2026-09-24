@@ -4,6 +4,7 @@ import pytest
 
 from benchbox.core.cost.integration import (
     PLATFORM_CONFIG_REQUIREMENTS,
+    _extract_platform_config_from_results,
     add_cost_estimation_to_results,
     validate_platform_config,
 )
@@ -144,6 +145,7 @@ class TestValidatePlatformConfig:
         config = {
             "cloud": "aws",
             "tier": "premium",
+            "warehouse_type": "PRO",
             "workload_type": "sql_compute",
             "cluster_size_dbu_per_hour": 8.0,
         }
@@ -157,6 +159,7 @@ class TestValidatePlatformConfig:
         config = {
             "cloud": "azure",
             "tier": "standard",
+            "warehouse_type": "CLASSIC",
             "workload_type": "all_purpose",
             "cluster_size_dbu_per_hour": 4.0,
             "warehouse_size": "Medium",
@@ -171,14 +174,122 @@ class TestValidatePlatformConfig:
         config = {
             "cloud": "gcp",
             "tier": "premium",
-            # Missing workload_type and cluster_size_dbu_per_hour
+            # Missing warehouse_type, workload_type and cluster_size_dbu_per_hour
         }
         is_valid, warnings = validate_platform_config("databricks", config)
 
         assert is_valid is False
-        assert len(warnings) == 2
+        assert len(warnings) == 3
+        assert any("warehouse_type" in w for w in warnings)
         assert any("workload_type" in w for w in warnings)
         assert any("cluster_size_dbu_per_hour" in w for w in warnings)
+
+    def test_databricks_workload_type_does_not_require_warehouse_type(self):
+        """An already-resolved Databricks workload type is sufficient."""
+        config = {
+            "cloud": "aws",
+            "tier": "premium",
+            "workload_type": "all_purpose",
+            "cluster_size_dbu_per_hour": 8.0,
+            # Missing warehouse_type
+        }
+        is_valid, warnings = validate_platform_config("databricks", config)
+
+        assert is_valid is True
+        assert warnings == []
+
+    def test_databricks_df_mirrors_databricks_requirements(self):
+        """databricks-df bills through the same calculator, so it needs the same fields."""
+        config = {
+            "cloud": "aws",
+            "tier": "premium",
+            "warehouse_type": "PRO",
+            "workload_type": "sql_compute",
+            "cluster_size_dbu_per_hour": 8.0,
+        }
+        is_valid, warnings = validate_platform_config("databricks-df", config)
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+    def test_athena_requires_region(self):
+        """Test Athena configuration validation."""
+        is_valid, warnings = validate_platform_config("athena", {"region": "us-east-1"})
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+        is_valid, warnings = validate_platform_config("athena", {})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "region" in warnings[0]
+
+    def test_synapse_requires_mode_and_region(self):
+        """Test Synapse configuration validation; dwu_level stays optional for serverless."""
+        config = {"mode": "serverless", "region": "eastus"}
+        is_valid, warnings = validate_platform_config("synapse", config)
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+        config = {"mode": "dedicated", "region": "eastus", "dwu_level": "dw100c"}
+        is_valid, warnings = validate_platform_config("synapse", config)
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+        is_valid, warnings = validate_platform_config("synapse", {"mode": "serverless"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "region" in warnings[0]
+
+        is_valid, warnings = validate_platform_config("synapse", {"region": "eastus"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "mode" in warnings[0]
+
+    def test_fabric_dw_requires_region_and_sku(self):
+        """Test Fabric DW configuration validation."""
+        config = {"region": "eastus", "sku": "f64"}
+        is_valid, warnings = validate_platform_config("fabric_dw", config)
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+        is_valid, warnings = validate_platform_config("fabric_dw", {"region": "eastus"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "sku" in warnings[0]
+
+        is_valid, warnings = validate_platform_config("fabric_dw", {"sku": "f64"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "region" in warnings[0]
+
+    def test_firebolt_requires_node_type_and_node_count(self):
+        """Test Firebolt configuration validation."""
+        config = {"node_type": "m", "node_count": 1}
+        is_valid, warnings = validate_platform_config("firebolt", config)
+
+        assert is_valid is True
+        assert len(warnings) == 0
+
+        is_valid, warnings = validate_platform_config("firebolt", {"node_type": "m"})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "node_count" in warnings[0]
+
+        is_valid, warnings = validate_platform_config("firebolt", {"node_count": 1})
+
+        assert is_valid is False
+        assert len(warnings) == 1
+        assert "node_type" in warnings[0]
 
     def test_unknown_platform_always_valid(self):
         """Test that unknown platforms are considered valid."""
@@ -210,11 +321,22 @@ class TestValidatePlatformConfig:
         assert is_valid3 is True
 
     def test_config_requirements_schema_completeness(self):
-        """Test that all platforms requiring validation are in schema."""
-        # Platforms that should have config requirements
-        platforms_with_costs = ["snowflake", "bigquery", "redshift", "databricks"]
+        """Every platform with a cost calculator has a config requirements entry.
 
-        for platform in platforms_with_costs:
+        The calculator registry is the source of truth: adding a priced
+        platform without a matching entry fails this test, so the platform
+        cannot silently bypass config validation the way athena, synapse,
+        fabric_dw, firebolt and databricks-df once did.
+        """
+        from benchbox.core.cost.calculator import CostCalculator
+
+        priced_platforms = list(CostCalculator()._platform_calculators)
+
+        # Nine priced platforms today; the dynamic check below is the real
+        # guard, this pins the count so a removed calculator gets noticed too.
+        assert len(priced_platforms) == 9
+
+        for platform in priced_platforms:
             assert platform in PLATFORM_CONFIG_REQUIREMENTS, (
                 f"Platform '{platform}' missing from PLATFORM_CONFIG_REQUIREMENTS"
             )
@@ -366,6 +488,68 @@ class TestConfigValidationIntegration:
         # Should have cost calculated (config is valid after extraction)
         assert "cost" in updated_results.query_results[0]
         assert updated_results.cost_summary is not None
+
+
+class TestDatabricksWorkloadDefaultFailsClosed:
+    """A missing warehouse_type must not publish a SQL run at all-purpose rates."""
+
+    def _results_without_warehouse_type(self):
+        return create_test_results(
+            platform="databricks",
+            platform_info={
+                "platform_type": "databricks",
+                "tier": "premium",
+                "host": "abc.cloud.databricks.com",
+                "region": "us-east-1",
+                "compute_configuration": {
+                    "warehouse_size": "Medium",
+                    "warehouse_metadata_collection_status": "available",
+                },
+            },
+            query_results=[
+                {"query_id": "Q1", "resource_usage": {"execution_time_seconds": 1800}},
+            ],
+        )
+
+    def test_missing_warehouse_type_records_workload_default(self):
+        """warehouse_size alone cannot prove SQL compute, so the mapping is defaulted."""
+        config = _extract_platform_config_from_results(self._results_without_warehouse_type())
+
+        assert config["workload_type"] == "all_purpose"
+        assert config["warehouse_size"] == "Medium"
+        assert "workload_type" in config["_defaulted_fields"]
+
+    def test_missing_warehouse_type_does_not_publish_normalized(self):
+        """The run still gets a per-query estimate, but no normalized total."""
+        updated_results = add_cost_estimation_to_results(self._results_without_warehouse_type())
+
+        assert "cost" in updated_results.query_results[0]
+        normalized_cost = updated_results.cost_summary["normalized_cost"]
+        assert normalized_cost["cost_status"] == "unavailable"
+        assert normalized_cost["normalized_cost_usd"] is None
+
+    def test_observed_warehouse_type_keeps_workload_clean(self):
+        """When warehouse_type is observed, nothing about the mapping is defaulted."""
+        results = create_test_results(
+            platform="databricks",
+            platform_info={
+                "platform_type": "databricks",
+                "tier": "premium",
+                "host": "abc.cloud.databricks.com",
+                "region": "us-east-1",
+                "compute_configuration": {
+                    "warehouse_size": "Medium",
+                    "warehouse_type": "PRO",
+                    "warehouse_metadata_collection_status": "available",
+                },
+            },
+        )
+
+        config = _extract_platform_config_from_results(results)
+
+        assert config["warehouse_type"] == "PRO"
+        assert config["workload_type"] == "sql_compute"
+        assert "workload_type" not in config.get("_defaulted_fields", [])
 
 
 class TestConfigValidationEdgeCases:

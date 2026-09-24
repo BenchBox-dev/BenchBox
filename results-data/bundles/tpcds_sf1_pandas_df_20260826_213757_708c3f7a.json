@@ -1,0 +1,5857 @@
+{
+  "benchmark": {
+    "compliance_class": "unofficial_nonstandard",
+    "id": "tpcds",
+    "name": "TPC-DS",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "dataframe",
+    "phases": [
+      "load",
+      "power"
+    ]
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "client_host": {
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple"
+    },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "dataframe_process",
+      "source": "inferred"
+    }
+  },
+  "errors": [
+    {
+      "message": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead.",
+      "phase": "query",
+      "query_id": "40",
+      "type": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead."
+    },
+    {
+      "message": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead.",
+      "phase": "query",
+      "query_id": "40",
+      "type": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead."
+    },
+    {
+      "message": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead.",
+      "phase": "query",
+      "query_id": "40",
+      "type": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead."
+    },
+    {
+      "message": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead.",
+      "phase": "query",
+      "query_id": "40",
+      "type": "Cannot compare Timestamp with datetime.date. Use ts == pd.Timestamp(date) or ts.date() == date instead."
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "47",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "47",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "47",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "47",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "57",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "57",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "57",
+      "type": "'diff'"
+    },
+    {
+      "message": "'diff'",
+      "phase": "query",
+      "query_id": "57",
+      "type": "'diff'"
+    },
+    {
+      "message": "single positional indexer is out-of-bounds",
+      "phase": "query",
+      "query_id": "58",
+      "type": "single positional indexer is out-of-bounds"
+    },
+    {
+      "message": "single positional indexer is out-of-bounds",
+      "phase": "query",
+      "query_id": "58",
+      "type": "single positional indexer is out-of-bounds"
+    },
+    {
+      "message": "single positional indexer is out-of-bounds",
+      "phase": "query",
+      "query_id": "58",
+      "type": "single positional indexer is out-of-bounds"
+    },
+    {
+      "message": "single positional indexer is out-of-bounds",
+      "phase": "query",
+      "query_id": "58",
+      "type": "single positional indexer is out-of-bounds"
+    }
+  ],
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "dataframe",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-08-26T21:24:12.522075",
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-08-26T21:37:58.022660",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 13025,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 802129,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "status": "NOT_RUN"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "status": "NOT_RUN"
+    }
+  },
+  "platform": {
+    "client_version": "unknown",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "copy_on_write": false,
+      "copy_on_write_active": false,
+      "driver_runtime_strategy": "current-process",
+      "dtype_backend": "numpy_nullable",
+      "execution_mode": "dataframe",
+      "family": "pandas"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "deployment_type": "dataframe",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_runtime_strategy": "current-process",
+    "name": "Pandas",
+    "raw_config": {
+      "copy_on_write": false,
+      "copy_on_write_active": false,
+      "dtype_backend": "numpy_nullable",
+      "memory_limit": "12GB",
+      "options": {
+        "dtype_backend": "numpy_nullable",
+        "force_recreate": false,
+        "force_upload": false,
+        "normalize_plan_literals": false,
+        "show_query_plans": false
+      },
+      "thread_limit": 8,
+      "tuning_source": "baseline"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "2.3.3"
+  },
+  "queries": [
+    {
+      "id": "31",
+      "iter": 0,
+      "ms": 2758.5,
+      "rows": 51,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "29",
+      "iter": 0,
+      "ms": 238.4,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "20",
+      "iter": 0,
+      "ms": 931.5,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "25",
+      "iter": 0,
+      "ms": 3626.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "21",
+      "iter": 0,
+      "ms": 577.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "23a",
+      "iter": 0,
+      "ms": 1032.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "23b",
+      "iter": 0,
+      "ms": 804.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "19",
+      "iter": 0,
+      "ms": 13003.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "17",
+      "iter": 0,
+      "ms": 340.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "27",
+      "iter": 0,
+      "ms": 233.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "18",
+      "iter": 0,
+      "ms": 237.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "22",
+      "iter": 0,
+      "ms": 801.5,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "24a",
+      "iter": 0,
+      "ms": 336.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "24b",
+      "iter": 0,
+      "ms": 337.1,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "26",
+      "iter": 0,
+      "ms": 1969.8,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "28",
+      "iter": 0,
+      "ms": 73.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "30",
+      "iter": 0,
+      "ms": 34.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "32",
+      "iter": 0,
+      "ms": 1101.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "16",
+      "iter": 0,
+      "ms": 67.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "15",
+      "iter": 0,
+      "ms": 2084.0,
+      "rows": 11,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14a",
+      "iter": 0,
+      "ms": 1202.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "14b",
+      "iter": 0,
+      "ms": 791.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "13",
+      "iter": 0,
+      "ms": 10743.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12",
+      "iter": 0,
+      "ms": 385.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11",
+      "iter": 0,
+      "ms": 2012.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10",
+      "iter": 0,
+      "ms": 183.5,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9",
+      "iter": 0,
+      "ms": 65.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8",
+      "iter": 0,
+      "ms": 81.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7",
+      "iter": 0,
+      "ms": 4789.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6",
+      "iter": 0,
+      "ms": 5659.3,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5",
+      "iter": 0,
+      "ms": 307.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4",
+      "iter": 0,
+      "ms": 3009.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3",
+      "iter": 0,
+      "ms": 1374.1,
+      "rows": 89,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2",
+      "iter": 0,
+      "ms": 664.1,
+      "rows": 53,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1",
+      "iter": 0,
+      "ms": 447.8,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "34",
+      "iter": 0,
+      "ms": 4913.0,
+      "rows": 483,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "35",
+      "iter": 0,
+      "ms": 496.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "36",
+      "iter": 0,
+      "ms": 4795.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "37",
+      "iter": 0,
+      "ms": 196.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "38",
+      "iter": 0,
+      "ms": 401.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "39a",
+      "iter": 0,
+      "ms": 10412.2,
+      "rows": 190,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "39b",
+      "iter": 0,
+      "ms": 10127.5,
+      "rows": 190,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "40",
+      "iter": 0,
+      "ms": 178.3,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "41",
+      "iter": 0,
+      "ms": 3.5,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "42",
+      "iter": 0,
+      "ms": 1501.0,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "43",
+      "iter": 0,
+      "ms": 1925.8,
+      "rows": 42,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "44",
+      "iter": 0,
+      "ms": 83.4,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "45",
+      "iter": 0,
+      "ms": 1157.3,
+      "rows": 19,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "46",
+      "iter": 0,
+      "ms": 10838.6,
+      "rows": 60,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "47",
+      "iter": 0,
+      "ms": 1194.5,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "48",
+      "iter": 0,
+      "ms": 8857.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "49",
+      "iter": 0,
+      "ms": 1273.7,
+      "rows": 32,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "50",
+      "iter": 0,
+      "ms": 364.7,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "51",
+      "iter": 0,
+      "ms": 283.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "52",
+      "iter": 0,
+      "ms": 1197.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "53",
+      "iter": 0,
+      "ms": 4834.7,
+      "rows": 16,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "54",
+      "iter": 0,
+      "ms": 91.5,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "55",
+      "iter": 0,
+      "ms": 1451.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "56",
+      "iter": 0,
+      "ms": 246.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "57",
+      "iter": 0,
+      "ms": 482.8,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "58",
+      "iter": 0,
+      "ms": 30.4,
+      "run_type": "warmup",
+      "status": "FAILED",
+      "stream": 0
+    },
+    {
+      "id": "59",
+      "iter": 0,
+      "ms": 942.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "60",
+      "iter": 0,
+      "ms": 206.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "61",
+      "iter": 0,
+      "ms": 46.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "62",
+      "iter": 0,
+      "ms": 1140.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "63",
+      "iter": 0,
+      "ms": 5021.6,
+      "rows": 16,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "64",
+      "iter": 0,
+      "ms": 840.5,
+      "rows": 1175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "65",
+      "iter": 0,
+      "ms": 5671.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "66",
+      "iter": 0,
+      "ms": 1506.3,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "67",
+      "iter": 0,
+      "ms": 5104.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "68",
+      "iter": 0,
+      "ms": 7491.2,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "69",
+      "iter": 0,
+      "ms": 299.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "70",
+      "iter": 0,
+      "ms": 171.8,
+      "rows": 3,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "71",
+      "iter": 0,
+      "ms": 85.8,
+      "rows": 1018,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "72",
+      "iter": 0,
+      "ms": 4649.8,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "73",
+      "iter": 0,
+      "ms": 7917.0,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "74",
+      "iter": 0,
+      "ms": 1947.7,
+      "rows": 90,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "75",
+      "iter": 0,
+      "ms": 460.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "76",
+      "iter": 0,
+      "ms": 49.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "77",
+      "iter": 0,
+      "ms": 81.4,
+      "rows": 43,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "78",
+      "iter": 0,
+      "ms": 4343.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "79",
+      "iter": 0,
+      "ms": 8059.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "80",
+      "iter": 0,
+      "ms": 1483.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "81",
+      "iter": 0,
+      "ms": 68.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "82",
+      "iter": 0,
+      "ms": 232.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "83",
+      "iter": 0,
+      "ms": 171.9,
+      "rows": 21,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "84",
+      "iter": 0,
+      "ms": 165.4,
+      "rows": 24,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "85",
+      "iter": 0,
+      "ms": 391.9,
+      "rows": 75,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "86",
+      "iter": 0,
+      "ms": 330.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "87",
+      "iter": 0,
+      "ms": 308.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "88",
+      "iter": 0,
+      "ms": 73.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "89",
+      "iter": 0,
+      "ms": 5581.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "90",
+      "iter": 0,
+      "ms": 381.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "91",
+      "iter": 0,
+      "ms": 575.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "92",
+      "iter": 0,
+      "ms": 480.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "93",
+      "iter": 0,
+      "ms": 318.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "94",
+      "iter": 0,
+      "ms": 29.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "95",
+      "iter": 0,
+      "ms": 28.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "96",
+      "iter": 0,
+      "ms": 3806.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "97",
+      "iter": 0,
+      "ms": 321.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "98",
+      "iter": 0,
+      "ms": 2375.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "99",
+      "iter": 0,
+      "ms": 2596.0,
+      "rows": 72,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "33",
+      "iter": 0,
+      "ms": 1255.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "31",
+      "iter": 1,
+      "ms": 2245.8,
+      "row_count_validation": {
+        "actual": 51,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 51,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "29",
+      "iter": 1,
+      "ms": 330.6,
+      "row_count_validation": {
+        "actual": 2,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "23a",
+      "iter": 1,
+      "ms": 1162.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "23b",
+      "iter": 1,
+      "ms": 808.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "21",
+      "iter": 1,
+      "ms": 477.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "25",
+      "iter": 1,
+      "ms": 2644.1,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "22",
+      "iter": 1,
+      "ms": 808.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "20",
+      "iter": 1,
+      "ms": 757.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "18",
+      "iter": 1,
+      "ms": 237.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "27",
+      "iter": 1,
+      "ms": 270.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "19",
+      "iter": 1,
+      "ms": 12250.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "33",
+      "iter": 1,
+      "ms": 1275.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "24a",
+      "iter": 1,
+      "ms": 385.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "24b",
+      "iter": 1,
+      "ms": 331.1,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "26",
+      "iter": 1,
+      "ms": 2194.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "28",
+      "iter": 1,
+      "ms": 181.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "30",
+      "iter": 1,
+      "ms": 43.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "32",
+      "iter": 1,
+      "ms": 1338.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "17",
+      "iter": 1,
+      "ms": 129.5,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "16",
+      "iter": 1,
+      "ms": 48.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "15",
+      "iter": 1,
+      "ms": 1857.9,
+      "row_count_validation": {
+        "actual": 11,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14a",
+      "iter": 1,
+      "ms": 1287.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "14b",
+      "iter": 1,
+      "ms": 805.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "13",
+      "iter": 1,
+      "ms": 10080.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12",
+      "iter": 1,
+      "ms": 458.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11",
+      "iter": 1,
+      "ms": 1798.6,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10",
+      "iter": 1,
+      "ms": 207.1,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9",
+      "iter": 1,
+      "ms": 66.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8",
+      "iter": 1,
+      "ms": 77.1,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7",
+      "iter": 1,
+      "ms": 4906.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6",
+      "iter": 1,
+      "ms": 5111.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5",
+      "iter": 1,
+      "ms": 281.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4",
+      "iter": 1,
+      "ms": 3338.8,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3",
+      "iter": 1,
+      "ms": 1784.3,
+      "row_count_validation": {
+        "actual": 89,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2",
+      "iter": 1,
+      "ms": 813.3,
+      "row_count_validation": {
+        "actual": 53,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 53,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1",
+      "iter": 1,
+      "ms": 496.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "35",
+      "iter": 1,
+      "ms": 323.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "36",
+      "iter": 1,
+      "ms": 4086.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "37",
+      "iter": 1,
+      "ms": 216.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "38",
+      "iter": 1,
+      "ms": 395.3,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "39a",
+      "iter": 1,
+      "ms": 10343.6,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "39b",
+      "iter": 1,
+      "ms": 10348.6,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "40",
+      "iter": 1,
+      "ms": 247.2,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "41",
+      "iter": 1,
+      "ms": 3.4,
+      "row_count_validation": {
+        "actual": 12,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "42",
+      "iter": 1,
+      "ms": 1738.3,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "43",
+      "iter": 1,
+      "ms": 2104.1,
+      "row_count_validation": {
+        "actual": 42,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 42,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "44",
+      "iter": 1,
+      "ms": 149.7,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "45",
+      "iter": 1,
+      "ms": 1367.0,
+      "row_count_validation": {
+        "actual": 19,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 19,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "46",
+      "iter": 1,
+      "ms": 11969.1,
+      "row_count_validation": {
+        "actual": 60,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 60,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "47",
+      "iter": 1,
+      "ms": 1152.0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "48",
+      "iter": 1,
+      "ms": 9230.3,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "49",
+      "iter": 1,
+      "ms": 1234.7,
+      "row_count_validation": {
+        "actual": 32,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "50",
+      "iter": 1,
+      "ms": 327.1,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "51",
+      "iter": 1,
+      "ms": 258.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "52",
+      "iter": 1,
+      "ms": 1175.4,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "53",
+      "iter": 1,
+      "ms": 4649.3,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "54",
+      "iter": 1,
+      "ms": 101.7,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "55",
+      "iter": 1,
+      "ms": 1325.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "56",
+      "iter": 1,
+      "ms": 163.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "57",
+      "iter": 1,
+      "ms": 492.4,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "58",
+      "iter": 1,
+      "ms": 32.8,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 1
+    },
+    {
+      "id": "59",
+      "iter": 1,
+      "ms": 986.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "60",
+      "iter": 1,
+      "ms": 287.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "61",
+      "iter": 1,
+      "ms": 45.1,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "62",
+      "iter": 1,
+      "ms": 1067.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "63",
+      "iter": 1,
+      "ms": 4802.1,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "64",
+      "iter": 1,
+      "ms": 875.5,
+      "row_count_validation": {
+        "actual": 1175,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "65",
+      "iter": 1,
+      "ms": 4950.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "66",
+      "iter": 1,
+      "ms": 1530.7,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "67",
+      "iter": 1,
+      "ms": 5026.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "68",
+      "iter": 1,
+      "ms": 7212.6,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "69",
+      "iter": 1,
+      "ms": 372.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "70",
+      "iter": 1,
+      "ms": 202.0,
+      "row_count_validation": {
+        "actual": 3,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "71",
+      "iter": 1,
+      "ms": 81.9,
+      "row_count_validation": {
+        "actual": 1018,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1018,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "72",
+      "iter": 1,
+      "ms": 4565.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "73",
+      "iter": 1,
+      "ms": 7482.9,
+      "row_count_validation": {
+        "actual": 8,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "74",
+      "iter": 1,
+      "ms": 1792.4,
+      "row_count_validation": {
+        "actual": 90,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 90,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "75",
+      "iter": 1,
+      "ms": 548.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "76",
+      "iter": 1,
+      "ms": 49.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "77",
+      "iter": 1,
+      "ms": 78.5,
+      "row_count_validation": {
+        "actual": 43,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 43,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "78",
+      "iter": 1,
+      "ms": 4305.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "79",
+      "iter": 1,
+      "ms": 8177.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "80",
+      "iter": 1,
+      "ms": 1447.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "81",
+      "iter": 1,
+      "ms": 70.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "82",
+      "iter": 1,
+      "ms": 166.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "83",
+      "iter": 1,
+      "ms": 170.5,
+      "row_count_validation": {
+        "actual": 21,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "84",
+      "iter": 1,
+      "ms": 167.0,
+      "row_count_validation": {
+        "actual": 24,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "85",
+      "iter": 1,
+      "ms": 411.7,
+      "row_count_validation": {
+        "actual": 75,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 75,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "86",
+      "iter": 1,
+      "ms": 296.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "87",
+      "iter": 1,
+      "ms": 254.2,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "88",
+      "iter": 1,
+      "ms": 70.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "89",
+      "iter": 1,
+      "ms": 4844.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "90",
+      "iter": 1,
+      "ms": 388.2,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "91",
+      "iter": 1,
+      "ms": 553.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "92",
+      "iter": 1,
+      "ms": 486.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "93",
+      "iter": 1,
+      "ms": 332.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "94",
+      "iter": 1,
+      "ms": 27.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "95",
+      "iter": 1,
+      "ms": 27.0,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "96",
+      "iter": 1,
+      "ms": 3048.0,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "97",
+      "iter": 1,
+      "ms": 296.0,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "98",
+      "iter": 1,
+      "ms": 2024.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "99",
+      "iter": 1,
+      "ms": 2901.7,
+      "row_count_validation": {
+        "actual": 72,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 72,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "34",
+      "iter": 1,
+      "ms": 5301.1,
+      "row_count_validation": {
+        "actual": 483,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 483,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "31",
+      "iter": 2,
+      "ms": 1837.5,
+      "row_count_validation": {
+        "actual": 51,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 51,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "18",
+      "iter": 2,
+      "ms": 277.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "23a",
+      "iter": 2,
+      "ms": 1044.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "23b",
+      "iter": 2,
+      "ms": 805.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "22",
+      "iter": 2,
+      "ms": 774.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "29",
+      "iter": 2,
+      "ms": 133.1,
+      "row_count_validation": {
+        "actual": 2,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "25",
+      "iter": 2,
+      "ms": 2530.5,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "21",
+      "iter": 2,
+      "ms": 522.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "19",
+      "iter": 2,
+      "ms": 12183.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "27",
+      "iter": 2,
+      "ms": 330.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "20",
+      "iter": 2,
+      "ms": 986.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "33",
+      "iter": 2,
+      "ms": 788.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "24a",
+      "iter": 2,
+      "ms": 378.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "24b",
+      "iter": 2,
+      "ms": 350.8,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "26",
+      "iter": 2,
+      "ms": 2118.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "28",
+      "iter": 2,
+      "ms": 118.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "30",
+      "iter": 2,
+      "ms": 44.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "32",
+      "iter": 2,
+      "ms": 1515.3,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "34",
+      "iter": 2,
+      "ms": 5052.7,
+      "row_count_validation": {
+        "actual": 483,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 483,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "17",
+      "iter": 2,
+      "ms": 314.7,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "16",
+      "iter": 2,
+      "ms": 54.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "15",
+      "iter": 2,
+      "ms": 1747.0,
+      "row_count_validation": {
+        "actual": 11,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14a",
+      "iter": 2,
+      "ms": 949.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "14b",
+      "iter": 2,
+      "ms": 789.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "13",
+      "iter": 2,
+      "ms": 9696.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12",
+      "iter": 2,
+      "ms": 456.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11",
+      "iter": 2,
+      "ms": 1851.1,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10",
+      "iter": 2,
+      "ms": 205.6,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9",
+      "iter": 2,
+      "ms": 67.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8",
+      "iter": 2,
+      "ms": 86.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7",
+      "iter": 2,
+      "ms": 4883.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6",
+      "iter": 2,
+      "ms": 5815.3,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5",
+      "iter": 2,
+      "ms": 317.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4",
+      "iter": 2,
+      "ms": 3072.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3",
+      "iter": 2,
+      "ms": 1525.8,
+      "row_count_validation": {
+        "actual": 89,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2",
+      "iter": 2,
+      "ms": 769.6,
+      "row_count_validation": {
+        "actual": 53,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 53,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1",
+      "iter": 2,
+      "ms": 440.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "36",
+      "iter": 2,
+      "ms": 4193.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "37",
+      "iter": 2,
+      "ms": 218.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "38",
+      "iter": 2,
+      "ms": 383.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "39a",
+      "iter": 2,
+      "ms": 9679.2,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "39b",
+      "iter": 2,
+      "ms": 9933.4,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "40",
+      "iter": 2,
+      "ms": 158.0,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "41",
+      "iter": 2,
+      "ms": 3.4,
+      "row_count_validation": {
+        "actual": 12,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "42",
+      "iter": 2,
+      "ms": 1448.5,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "43",
+      "iter": 2,
+      "ms": 1932.3,
+      "row_count_validation": {
+        "actual": 42,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 42,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "44",
+      "iter": 2,
+      "ms": 81.1,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "45",
+      "iter": 2,
+      "ms": 1264.4,
+      "row_count_validation": {
+        "actual": 19,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 19,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "46",
+      "iter": 2,
+      "ms": 11824.4,
+      "row_count_validation": {
+        "actual": 60,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 60,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "47",
+      "iter": 2,
+      "ms": 1245.7,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "48",
+      "iter": 2,
+      "ms": 8237.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "49",
+      "iter": 2,
+      "ms": 1031.8,
+      "row_count_validation": {
+        "actual": 32,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "50",
+      "iter": 2,
+      "ms": 351.9,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "51",
+      "iter": 2,
+      "ms": 230.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "52",
+      "iter": 2,
+      "ms": 1158.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "53",
+      "iter": 2,
+      "ms": 4648.0,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "54",
+      "iter": 2,
+      "ms": 101.0,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "55",
+      "iter": 2,
+      "ms": 1352.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "56",
+      "iter": 2,
+      "ms": 208.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "57",
+      "iter": 2,
+      "ms": 490.9,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "58",
+      "iter": 2,
+      "ms": 30.7,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 2
+    },
+    {
+      "id": "59",
+      "iter": 2,
+      "ms": 1060.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "60",
+      "iter": 2,
+      "ms": 214.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "61",
+      "iter": 2,
+      "ms": 44.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "62",
+      "iter": 2,
+      "ms": 1081.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "63",
+      "iter": 2,
+      "ms": 4434.4,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "64",
+      "iter": 2,
+      "ms": 886.8,
+      "row_count_validation": {
+        "actual": 1175,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "65",
+      "iter": 2,
+      "ms": 5128.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "66",
+      "iter": 2,
+      "ms": 1331.0,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "67",
+      "iter": 2,
+      "ms": 5057.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "68",
+      "iter": 2,
+      "ms": 7227.5,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "69",
+      "iter": 2,
+      "ms": 291.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "70",
+      "iter": 2,
+      "ms": 165.5,
+      "row_count_validation": {
+        "actual": 3,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "71",
+      "iter": 2,
+      "ms": 87.0,
+      "row_count_validation": {
+        "actual": 1018,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1018,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "72",
+      "iter": 2,
+      "ms": 4429.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "73",
+      "iter": 2,
+      "ms": 8192.9,
+      "row_count_validation": {
+        "actual": 8,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "74",
+      "iter": 2,
+      "ms": 1910.8,
+      "row_count_validation": {
+        "actual": 90,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 90,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "75",
+      "iter": 2,
+      "ms": 467.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "76",
+      "iter": 2,
+      "ms": 47.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "77",
+      "iter": 2,
+      "ms": 77.6,
+      "row_count_validation": {
+        "actual": 43,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 43,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "78",
+      "iter": 2,
+      "ms": 4244.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "79",
+      "iter": 2,
+      "ms": 7581.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "80",
+      "iter": 2,
+      "ms": 1004.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "81",
+      "iter": 2,
+      "ms": 60.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "82",
+      "iter": 2,
+      "ms": 149.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "83",
+      "iter": 2,
+      "ms": 161.4,
+      "row_count_validation": {
+        "actual": 21,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "84",
+      "iter": 2,
+      "ms": 164.9,
+      "row_count_validation": {
+        "actual": 24,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "85",
+      "iter": 2,
+      "ms": 413.2,
+      "row_count_validation": {
+        "actual": 75,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 75,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "86",
+      "iter": 2,
+      "ms": 314.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "87",
+      "iter": 2,
+      "ms": 224.8,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "88",
+      "iter": 2,
+      "ms": 72.9,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "89",
+      "iter": 2,
+      "ms": 4548.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "90",
+      "iter": 2,
+      "ms": 466.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "91",
+      "iter": 2,
+      "ms": 614.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "92",
+      "iter": 2,
+      "ms": 481.8,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "93",
+      "iter": 2,
+      "ms": 321.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "94",
+      "iter": 2,
+      "ms": 35.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "95",
+      "iter": 2,
+      "ms": 27.2,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "96",
+      "iter": 2,
+      "ms": 3088.8,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "97",
+      "iter": 2,
+      "ms": 352.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "98",
+      "iter": 2,
+      "ms": 2021.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "99",
+      "iter": 2,
+      "ms": 2743.6,
+      "row_count_validation": {
+        "actual": 72,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 72,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "35",
+      "iter": 2,
+      "ms": 513.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "31",
+      "iter": 3,
+      "ms": 2014.8,
+      "row_count_validation": {
+        "actual": 51,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 51,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "19",
+      "iter": 3,
+      "ms": 11333.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "25",
+      "iter": 3,
+      "ms": 2871.6,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "22",
+      "iter": 3,
+      "ms": 887.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "29",
+      "iter": 3,
+      "ms": 193.5,
+      "row_count_validation": {
+        "actual": 2,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "23a",
+      "iter": 3,
+      "ms": 905.2,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "23b",
+      "iter": 3,
+      "ms": 800.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "35",
+      "iter": 3,
+      "ms": 234.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "20",
+      "iter": 3,
+      "ms": 609.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "27",
+      "iter": 3,
+      "ms": 214.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "21",
+      "iter": 3,
+      "ms": 441.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "33",
+      "iter": 3,
+      "ms": 739.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "24a",
+      "iter": 3,
+      "ms": 308.0,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "24b",
+      "iter": 3,
+      "ms": 317.9,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "26",
+      "iter": 3,
+      "ms": 1894.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "28",
+      "iter": 3,
+      "ms": 63.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "30",
+      "iter": 3,
+      "ms": 42.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "32",
+      "iter": 3,
+      "ms": 1167.8,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "34",
+      "iter": 3,
+      "ms": 4531.4,
+      "row_count_validation": {
+        "actual": 483,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 483,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "18",
+      "iter": 3,
+      "ms": 350.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "17",
+      "iter": 3,
+      "ms": 308.5,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "16",
+      "iter": 3,
+      "ms": 69.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "15",
+      "iter": 3,
+      "ms": 1983.8,
+      "row_count_validation": {
+        "actual": 11,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14a",
+      "iter": 3,
+      "ms": 983.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "14b",
+      "iter": 3,
+      "ms": 791.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "13",
+      "iter": 3,
+      "ms": 9361.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12",
+      "iter": 3,
+      "ms": 425.4,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11",
+      "iter": 3,
+      "ms": 1973.1,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10",
+      "iter": 3,
+      "ms": 179.7,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9",
+      "iter": 3,
+      "ms": 71.2,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8",
+      "iter": 3,
+      "ms": 76.7,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7",
+      "iter": 3,
+      "ms": 4508.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6",
+      "iter": 3,
+      "ms": 6031.6,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5",
+      "iter": 3,
+      "ms": 186.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4",
+      "iter": 3,
+      "ms": 2819.8,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3",
+      "iter": 3,
+      "ms": 1132.2,
+      "row_count_validation": {
+        "actual": 89,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2",
+      "iter": 3,
+      "ms": 697.5,
+      "row_count_validation": {
+        "actual": 53,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 53,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1",
+      "iter": 3,
+      "ms": 433.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "37",
+      "iter": 3,
+      "ms": 172.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "38",
+      "iter": 3,
+      "ms": 306.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "39a",
+      "iter": 3,
+      "ms": 9458.9,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "39b",
+      "iter": 3,
+      "ms": 9386.8,
+      "row_count_validation": {
+        "actual": 190,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 190,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "40",
+      "iter": 3,
+      "ms": 149.9,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "41",
+      "iter": 3,
+      "ms": 3.4,
+      "row_count_validation": {
+        "actual": 12,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "42",
+      "iter": 3,
+      "ms": 1539.1,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "43",
+      "iter": 3,
+      "ms": 2014.0,
+      "row_count_validation": {
+        "actual": 42,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 42,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "44",
+      "iter": 3,
+      "ms": 83.1,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "45",
+      "iter": 3,
+      "ms": 1245.9,
+      "row_count_validation": {
+        "actual": 19,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 19,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "46",
+      "iter": 3,
+      "ms": 11726.9,
+      "row_count_validation": {
+        "actual": 60,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 60,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "47",
+      "iter": 3,
+      "ms": 1113.4,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "48",
+      "iter": 3,
+      "ms": 8419.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "49",
+      "iter": 3,
+      "ms": 1269.9,
+      "row_count_validation": {
+        "actual": 32,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "50",
+      "iter": 3,
+      "ms": 352.1,
+      "row_count_validation": {
+        "actual": 6,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "51",
+      "iter": 3,
+      "ms": 235.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "52",
+      "iter": 3,
+      "ms": 1071.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "53",
+      "iter": 3,
+      "ms": 4628.2,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "54",
+      "iter": 3,
+      "ms": 78.7,
+      "row_count_validation": {
+        "actual": 0,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "55",
+      "iter": 3,
+      "ms": 1554.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "56",
+      "iter": 3,
+      "ms": 236.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "57",
+      "iter": 3,
+      "ms": 612.6,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "58",
+      "iter": 3,
+      "ms": 30.9,
+      "run_type": "measurement",
+      "status": "FAILED",
+      "stream": 3
+    },
+    {
+      "id": "59",
+      "iter": 3,
+      "ms": 952.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "60",
+      "iter": 3,
+      "ms": 191.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "61",
+      "iter": 3,
+      "ms": 44.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "62",
+      "iter": 3,
+      "ms": 889.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "63",
+      "iter": 3,
+      "ms": 4678.8,
+      "row_count_validation": {
+        "actual": 16,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 16,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "64",
+      "iter": 3,
+      "ms": 792.0,
+      "row_count_validation": {
+        "actual": 1175,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "65",
+      "iter": 3,
+      "ms": 4790.4,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "66",
+      "iter": 3,
+      "ms": 1425.3,
+      "row_count_validation": {
+        "actual": 4,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "67",
+      "iter": 3,
+      "ms": 4961.8,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "68",
+      "iter": 3,
+      "ms": 7187.6,
+      "row_count_validation": {
+        "actual": 10,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "69",
+      "iter": 3,
+      "ms": 286.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "70",
+      "iter": 3,
+      "ms": 137.7,
+      "row_count_validation": {
+        "actual": 3,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "71",
+      "iter": 3,
+      "ms": 82.4,
+      "row_count_validation": {
+        "actual": 1018,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1018,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "72",
+      "iter": 3,
+      "ms": 4582.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "73",
+      "iter": 3,
+      "ms": 8508.0,
+      "row_count_validation": {
+        "actual": 8,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "74",
+      "iter": 3,
+      "ms": 1895.4,
+      "row_count_validation": {
+        "actual": 90,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 90,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "75",
+      "iter": 3,
+      "ms": 444.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "76",
+      "iter": 3,
+      "ms": 51.3,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "77",
+      "iter": 3,
+      "ms": 79.8,
+      "row_count_validation": {
+        "actual": 43,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 43,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "78",
+      "iter": 3,
+      "ms": 4201.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "79",
+      "iter": 3,
+      "ms": 8776.1,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "80",
+      "iter": 3,
+      "ms": 1541.0,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "81",
+      "iter": 3,
+      "ms": 98.5,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "82",
+      "iter": 3,
+      "ms": 180.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "83",
+      "iter": 3,
+      "ms": 171.0,
+      "row_count_validation": {
+        "actual": 21,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 21,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "84",
+      "iter": 3,
+      "ms": 169.6,
+      "row_count_validation": {
+        "actual": 24,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "85",
+      "iter": 3,
+      "ms": 434.4,
+      "row_count_validation": {
+        "actual": 75,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 75,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "86",
+      "iter": 3,
+      "ms": 301.6,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "87",
+      "iter": 3,
+      "ms": 272.4,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "88",
+      "iter": 3,
+      "ms": 73.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "89",
+      "iter": 3,
+      "ms": 4799.7,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "90",
+      "iter": 3,
+      "ms": 385.7,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "91",
+      "iter": 3,
+      "ms": 571.6,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "92",
+      "iter": 3,
+      "ms": 516.1,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "93",
+      "iter": 3,
+      "ms": 323.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "94",
+      "iter": 3,
+      "ms": 28.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "95",
+      "iter": 3,
+      "ms": 27.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "96",
+      "iter": 3,
+      "ms": 3363.5,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "97",
+      "iter": 3,
+      "ms": 342.1,
+      "row_count_validation": {
+        "actual": 1,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "98",
+      "iter": 3,
+      "ms": 2385.9,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "99",
+      "iter": 3,
+      "ms": 2973.6,
+      "row_count_validation": {
+        "actual": 72,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 72,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "36",
+      "iter": 3,
+      "ms": 4871.2,
+      "row_count_validation": {
+        "actual": 100,
+        "expected": null,
+        "status": "SKIPPED",
+        "warning": "TPC-DS expected row counts are not seed-aligned with this DataFrame run"
+      },
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "run": {
+    "id": "708c3f7a",
+    "iterations": 3,
+    "query_time_ms": 589928,
+    "streams": 4,
+    "timestamp": "2026-08-26T21:24:12.532223",
+    "total_duration_ms": 825433
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 13025.8,
+      "rows_loaded": 19557376
+    },
+    "queries": {
+      "failed": 12,
+      "passed": 297,
+      "total": 309
+    },
+    "timing": {
+      "avg_ms": 1986.3,
+      "geometric_mean_ms": 675.7,
+      "max_ms": 12250.3,
+      "min_ms": 3.4,
+      "p90_ms": 5301.1,
+      "p95_ms": 9361.5,
+      "p99_ms": 11969.1,
+      "stdev_ms": 2820.6,
+      "total_ms": 589928.3
+    },
+    "tpc_metrics": {
+      "reason": "compliance_class=unofficial_nonstandard",
+      "suppressed": true
+    },
+    "validation": "not_run"
+  },
+  "tables": {
+    "call_center": {
+      "load_ms": 4,
+      "rows": 6
+    },
+    "catalog_page": {
+      "load_ms": 11,
+      "rows": 11718
+    },
+    "catalog_returns": {
+      "load_ms": 129,
+      "rows": 144067
+    },
+    "catalog_sales": {
+      "load_ms": 1546,
+      "rows": 1441548
+    },
+    "customer": {
+      "load_ms": 102,
+      "rows": 100000
+    },
+    "customer_address": {
+      "load_ms": 41,
+      "rows": 50000
+    },
+    "customer_demographics": {
+      "load_ms": 422,
+      "rows": 1920800
+    },
+    "date_dim": {
+      "load_ms": 4904,
+      "rows": 73049
+    },
+    "dbgen_version": {
+      "load_ms": 1,
+      "rows": 1
+    },
+    "household_demographics": {
+      "load_ms": 1,
+      "rows": 7200
+    },
+    "income_band": {
+      "rows": 20
+    },
+    "inventory": {
+      "load_ms": 897,
+      "rows": 11745000
+    },
+    "item": {
+      "load_ms": 1833,
+      "rows": 18000
+    },
+    "promotion": {
+      "load_ms": 1,
+      "rows": 300
+    },
+    "reason": {
+      "rows": 75
+    },
+    "ship_mode": {
+      "rows": 20
+    },
+    "store": {
+      "load_ms": 2,
+      "rows": 12
+    },
+    "store_returns": {
+      "load_ms": 193,
+      "rows": 287514
+    },
+    "store_sales": {
+      "load_ms": 2084,
+      "rows": 2880404
+    },
+    "time_dim": {
+      "load_ms": 33,
+      "rows": 86400
+    },
+    "warehouse": {
+      "load_ms": 1,
+      "rows": 5
+    },
+    "web_page": {
+      "load_ms": 7,
+      "rows": 60
+    },
+    "web_returns": {
+      "load_ms": 52,
+      "rows": 71763
+    },
+    "web_sales": {
+      "load_ms": 743,
+      "rows": 719384
+    },
+    "web_site": {
+      "load_ms": 5,
+      "rows": 30
+    }
+  },
+  "version": "2.2"
+}

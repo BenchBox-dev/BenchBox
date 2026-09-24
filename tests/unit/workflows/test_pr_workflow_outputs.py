@@ -38,12 +38,31 @@ def test_required_umbrella_observes_every_selected_lane(workflow: dict[str, Any]
         "package-smoke",
         "dependency-audit",
         "parity-check",
+        "publication-reconciliation",
     ]
 
 
 def test_code_lanes_still_path_gated_only(workflow: dict[str, Any]) -> None:
     expected = "${{ needs.ci-paths.outputs.needs-code-ci == 'true' }}"
-    for job_id in ("code-lint", "code-test", "correctness-gate", "plan-capture-gate", "medium-test"):
+    for job_id in ("code-lint", "code-test"):
+        assert workflow["jobs"][job_id]["if"] == expected
+
+
+def test_heavy_tier_gates_on_heavy_needed(workflow: dict[str, Any]) -> None:
+    # Since the heavy-tier queue-only change, the heavy tier runs on
+    # merge_group for every code-routed tree and skips on pull_request
+    # unless a carve-out fires; code-lint/code-test still run on every
+    # code-routed PR.
+    expected = "${{ needs.ci-paths.outputs.heavy-needed == 'true' }}"
+    for job_id in (
+        "medium-test",
+        "correctness-gate",
+        "plan-capture-gate",
+        "tpch-binary-framing",
+        "postgres-integration",
+        "datafusion-integration",
+        "clickhouse-integration",
+    ):
         assert workflow["jobs"][job_id]["if"] == expected
 
 

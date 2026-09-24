@@ -271,3 +271,80 @@ class TestDownloadStats:
         assert stats["scale_factor"] == 2.0
         assert stats["year"] == 2020
         assert stats["months"] == [6, 7]
+
+
+class TestSourceContractIdentity:
+    """Contract id, provenance labels, and stale-cache detection."""
+
+    def test_contract_id_stable_and_pin_sensitive(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = NYCTaxiDataDownloader(output_dir=tmpdir)
+            second = NYCTaxiDataDownloader(output_dir=tmpdir)
+            other_year = NYCTaxiDataDownloader(output_dir=tmpdir, year=2020)
+        assert first.source_contract_id() == second.source_contract_id()
+        assert first.source_contract_id() != other_year.source_contract_id()
+
+    def test_stats_report_tlc_when_nothing_synthetic(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stats = NYCTaxiDataDownloader(output_dir=tmpdir).get_download_stats()
+        assert stats["source"] == "nyc-tlc"
+        assert stats["synthetic_months"] == []
+
+    def test_stats_report_mixed_and_synthetic_provenance(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            downloader = NYCTaxiDataDownloader(output_dir=tmpdir, year=2020, months=[6, 7])
+            downloader._record_synthetic_fallback("https://x/yellow_tripdata_2020-06.parquet")
+            assert downloader.get_download_stats()["source"] == "nyc-tlc-synthetic-mixed"
+            downloader._record_synthetic_fallback("https://x/yellow_tripdata_2020-07.parquet")
+            stats = downloader.get_download_stats()
+            assert stats["source"] == "synthetic"
+            assert stats["synthetic_months"] == ["2020-06", "2020-07"]
+
+    def test_stale_sidecar_detected(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            output_path = tmpdir / "trips.csv.gz"
+            output_path.write_text("x", encoding="utf-8")
+            current = NYCTaxiDataDownloader(output_dir=tmpdir)
+            current._write_contract_sidecar(output_path)
+            assert current._read_persisted_contract_id(output_path) == current.source_contract_id()
+            other = NYCTaxiDataDownloader(output_dir=tmpdir, year=2020)
+            assert other._read_persisted_contract_id(output_path) != other.source_contract_id()
+
+    def test_missing_sidecar_reads_none(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            downloader = NYCTaxiDataDownloader(output_dir=tmpdir)
+            assert downloader._read_persisted_contract_id(Path(tmpdir) / "trips.csv.gz") is None
+
+
+class TestCleanCsvValue:
+    """Parquet-derived values must be strict-loader-safe CSV scalars."""
+
+    def test_integral_float_becomes_int(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(1.0, 0) == 1
+        assert isinstance(NYCTaxiDataDownloader._clean_csv_value(1.0, 0), int)
+
+    def test_fractional_float_kept(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(1.2, 0) == 1.2
+
+    def test_nan_falls_back_to_default(self):
+        assert NYCTaxiDataDownloader._clean_csv_value(float("nan"), 0) == 0
+        assert NYCTaxiDataDownloader._clean_csv_value(None, 1) == 1
+
+    def test_map_row_normalizes_parquet_floats(self):
+        import tempfile
+
+        row = {
+            "VendorID": 1.0,
+            "passenger_count": 2.0,
+            "congestion_surcharge": float("nan"),
+            "fare_amount": 6.5,
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            downloader = NYCTaxiDataDownloader(output_dir=tmpdir)
+            mapped = downloader._map_row_to_schema(row, 0)
+        by_col = dict(zip(["trip_id", *NYCTaxiDataDownloader._COLUMN_PROVIDER()], mapped))
+        assert by_col["vendor_id"] == 1
+        assert by_col["passenger_count"] == 2
+        assert by_col["congestion_surcharge"] == 0
+        assert by_col["fare_amount"] == 6.5

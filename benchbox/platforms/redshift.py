@@ -11,6 +11,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,7 @@ from benchbox.core.benchmark_mixins import CursorValidationQueryExecutionMixin
 from benchbox.core.sql_utils import normalize_table_name_in_sql
 from benchbox.platforms.base.tuning import make_informational_constraint_applier
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.iceberg_layout import is_iceberg_directory, relocate_iceberg_table
 
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import (
@@ -177,6 +179,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
+
+        # Last session cache-control receipt (sanitized). Recorded when
+        # session cache validation runs and persisted into platform_compute
+        # as deterministic cache-state evidence. None until validated.
+        self._cache_control_receipt: dict[str, Any] | None = None
 
         # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
@@ -486,7 +493,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         metadata["platform_deployment"] = self._redshift_deployment_metadata(config)
         metadata["platform_cloud"] = self._redshift_cloud_metadata(config)
-        metadata["platform_compute"] = self._redshift_compute_metadata(config, compute)
+        metadata["platform_compute"] = self._redshift_compute_metadata(
+            config, compute, cache_control=getattr(self, "_cache_control_receipt", None)
+        )
         metadata["platform_storage"] = self._redshift_storage_metadata(config)
         return metadata
 
@@ -545,6 +554,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         cls,
         config: Mapping[str, Any],
         compute: Mapping[str, Any],
+        cache_control: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         service_model = cls._redshift_service_model(config)
         rpu = config.get("base_capacity_rpu") or config.get("current_rpu_capacity")
@@ -583,6 +593,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 "enhanced_vpc_routing": config.get("enhanced_vpc_routing"),
                 "encrypted": config.get("encrypted"),
                 "result_cache_enabled": config.get("result_cache_enabled"),
+                "cache_control": dict(cache_control) if isinstance(cache_control, Mapping) else None,
                 "compupdate": config.get("compupdate"),
                 "wlm_query_slot_count": config.get("wlm_query_slot_count"),
                 "wlm_query_queue_name": config.get("wlm_query_queue_name"),
@@ -1287,7 +1298,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.execute(f'SET search_path TO "{self.schema}"')
 
             # Use common schema creation helper
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
@@ -1651,8 +1662,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             return "BOOLEAN"
         return "VARCHAR(65535)"
 
-    def _build_external_column_definitions(self, benchmark: Any, table_name: str) -> str:
-        """Build external table column definitions from benchmark schema."""
+    def _build_external_column_list(self, benchmark: Any, table_name: str) -> list[tuple[str, str]]:
+        """Build (name, Spectrum type) column pairs from benchmark schema."""
         if not hasattr(benchmark, "get_schema"):
             raise ValueError(
                 f"Benchmark schema metadata unavailable for '{table_name}'. "
@@ -1668,18 +1679,100 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         if not columns:
             raise ValueError(f"No columns found in schema definition for table '{table_name}'.")
 
-        column_defs = []
+        column_list = []
         for column in columns:
             column_name = str(column.get("name", "")).strip().lower()
             if not column_name:
                 continue
             mapped_type = self._map_external_column_type(str(column.get("type", "")))
-            column_defs.append(f"{column_name} {mapped_type}")
+            column_list.append((column_name, mapped_type))
 
-        if not column_defs:
+        if not column_list:
             raise ValueError(f"No valid column definitions were generated for table '{table_name}'.")
 
-        return ", ".join(column_defs)
+        return column_list
+
+    def _build_external_column_definitions(self, benchmark: Any, table_name: str) -> str:
+        """Build external table column definitions from benchmark schema."""
+        return ", ".join(
+            f"{name} {column_type}" for name, column_type in self._build_external_column_list(benchmark, table_name)
+        )
+
+    @staticmethod
+    def _map_external_column_type_to_glue(spectrum_type: str) -> str:
+        """Map a Spectrum column type to its Glue/Hive catalog type name."""
+        upper = spectrum_type.strip().upper()
+        # Hive has no NUMERIC or TIMESTAMP WITH TIME ZONE spellings.
+        if upper.startswith("NUMERIC"):
+            return "DECIMAL" + upper[len("NUMERIC") :]
+        if upper.startswith("TIMESTAMP"):
+            return "TIMESTAMP"
+        aliases = {"INTEGER": "INT", "DOUBLE PRECISION": "DOUBLE", "REAL": "FLOAT"}
+        return aliases.get(upper, spectrum_type)
+
+    def _create_glue_client(self):
+        """Create a Glue Data Catalog client sharing the S3 upload session config."""
+        if not boto3:
+            raise ValueError("boto3 is required for Glue catalog registration (Redshift Iceberg external mode).")
+        if bool(self.aws_access_key_id) != bool(self.aws_secret_access_key):
+            raise ValueError("Explicit Glue credentials require both aws_access_key_id and aws_secret_access_key.")
+        session = boto3.Session(
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+            aws_session_token=self.aws_session_token,
+            region_name=self.aws_region,
+        )
+        if session.get_credentials() is None:
+            raise ValueError(
+                "AWS credentials not found. Configure credentials via explicit config, AWS CLI, or environment."
+            )
+        return session.client("glue")
+
+    def _register_iceberg_table_in_glue(
+        self,
+        glue_client: Any,
+        database: str,
+        table_name: str,
+        location: str,
+        columns: list[tuple[str, str]],
+        metadata_location: str | None = None,
+    ) -> None:
+        """Register an uploaded Iceberg table root in the Glue Data Catalog.
+
+        Redshift Spectrum reads Iceberg tables only through the Glue catalog:
+        ad-hoc ``CREATE EXTERNAL TABLE ... table_type='ICEBERG'`` is not a
+        documented form, so the table must exist in the catalog database that
+        the Redshift external schema points at. Any existing registration is
+        replaced to mirror the recreate semantics of the other formats.
+        """
+        try:
+            glue_client.delete_table(DatabaseName=database, Name=table_name)
+        except Exception as e:
+            response = getattr(e, "response", None)
+            error_code = response.get("Error", {}).get("Code", "") if isinstance(response, dict) else ""
+            if error_code != "EntityNotFoundException":
+                raise
+        parameters = {"table_type": "iceberg", "classification": "iceberg"}
+        if metadata_location:
+            parameters["metadata_location"] = metadata_location
+        glue_client.create_table(
+            DatabaseName=database,
+            TableInput={
+                "Name": table_name,
+                "TableType": "EXTERNAL_TABLE",
+                "Parameters": parameters,
+                "StorageDescriptor": {
+                    "Location": location,
+                    "InputFormat": "org.apache.iceberg.mr.hive.HiveIcebergInputFormat",
+                    "OutputFormat": "org.apache.iceberg.mr.hive.HiveIcebergOutputFormat",
+                    "SerdeInfo": {"SerializationLibrary": "org.apache.iceberg.mr.hive.HiveIcebergSerDe"},
+                    "Columns": [
+                        {"Name": name, "Type": self._map_external_column_type_to_glue(column_type)}
+                        for name, column_type in columns
+                    ],
+                },
+            },
+        )
 
     def _upload_external_parquet_files_to_s3(self, s3_client: Any, table_name: str, parquet_files: list[Path]) -> str:
         """Upload table Parquet files and return Spectrum LOCATION prefix."""
@@ -1690,16 +1783,24 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             s3_client.upload_file(str(file_path), self.s3_bucket, s3_key)
         return f"s3://{self.s3_bucket}/{s3_prefix}/"
 
+    def _external_s3_table_uri(self, table_name: str) -> tuple[str, str]:
+        """Return the (bucket, key prefix) for an external-mode table."""
+        s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name.lower()}"
+        return self.s3_bucket, s3_prefix
+
+    def _upload_local_file_to_s3(self, s3_client: Any, local_path: Path, bucket: str, key: str) -> None:
+        """Upload one local file to S3."""
+        s3_client.upload_file(str(local_path), bucket, key)
+
     def _upload_external_directory_to_s3(self, s3_client: Any, table_name: str, directory: Path) -> str:
         """Upload a directory tree for external Delta-style registration."""
-        table_name_lower = table_name.lower()
-        s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name_lower}"
+        s3_bucket, s3_prefix = self._external_s3_table_uri(table_name)
         for file_path in directory.rglob("*"):
             if not file_path.is_file():
                 continue
             relative = file_path.relative_to(directory).as_posix()
-            s3_client.upload_file(str(file_path), self.s3_bucket, f"{s3_prefix}/{relative}")
-        return f"s3://{self.s3_bucket}/{s3_prefix}/"
+            self._upload_local_file_to_s3(s3_client, file_path, s3_bucket, f"{s3_prefix}/{relative}")
+        return f"s3://{s3_bucket}/{s3_prefix}/"
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
@@ -1728,6 +1829,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if not isinstance(data_source, DataSource):
                 data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
             s3_client = self._create_s3_client()
+            glue_client: Any = None
 
             cursor.execute(
                 f"""
@@ -1743,18 +1845,61 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 table_name_lower = table_name.lower()
                 valid_files = self._filter_valid_files(file_paths)
                 delta_dirs = [path for path in valid_files if path.is_dir() and (path / "_delta_log").is_dir()]
+                iceberg_dirs = [path for path in valid_files if is_iceberg_directory(path)]
                 parquet_files = [path for path in valid_files if path.suffix.lower() == ".parquet"]
                 if delta_dirs:
                     location = self._upload_external_directory_to_s3(s3_client, table_name_lower, delta_dirs[0])
                     source_format = "delta"
+                elif iceberg_dirs:
+                    # Relocated upload happens in the Iceberg branch below so
+                    # stale file:// graph files never reach S3.
+                    location = ""
+                    source_format = "iceberg"
                 elif parquet_files:
                     location = self._upload_external_parquet_files_to_s3(s3_client, table_name_lower, parquet_files)
                     source_format = "parquet"
                 else:
                     raise ValueError(
-                        f"Redshift external mode requires Parquet files or Delta directories for table "
-                        f"'{table_name_lower}'. No supported sources were found."
+                        f"Redshift external mode requires Parquet files, Delta directories, or Iceberg "
+                        f"directories for table '{table_name_lower}'. No supported sources were found."
                     )
+
+                if source_format == "iceberg":
+                    # Spectrum reads Iceberg only through the Glue catalog, so
+                    # register the uploaded table instead of issuing ad-hoc DDL.
+                    # A byte copy would leave file:// references throughout the
+                    # metadata graph, so relocate it to S3 before uploading.
+                    # The client is created once, on first use, so non-Iceberg
+                    # tables never pay for it.
+                    if glue_client is None:
+                        glue_client = self._create_glue_client()
+                    glue_database = f"{self.database.lower()}_external"
+                    s3_bucket, s3_prefix = self._external_s3_table_uri(table_name_lower)
+                    dest_uri = f"s3://{s3_bucket}/{s3_prefix}"
+                    with tempfile.TemporaryDirectory(prefix="benchbox-iceberg-reloc-") as staging:
+                        relocated = relocate_iceberg_table(iceberg_dirs[0], dest_uri, staging)
+                        for rel in relocated.data_files:
+                            self._upload_local_file_to_s3(
+                                s3_client, iceberg_dirs[0] / rel, s3_bucket, f"{s3_prefix}/{rel}"
+                            )
+                        for rel, staged in relocated.graph_files.items():
+                            self._upload_local_file_to_s3(s3_client, staged, s3_bucket, f"{s3_prefix}/{rel}")
+                    column_list = self._build_external_column_list(benchmark, table_name_lower)
+                    self.log_notice(
+                        f"Registering Redshift Iceberg table in Glue catalog: {glue_database}.{table_name_lower}"
+                    )
+                    self._register_iceberg_table_in_glue(
+                        glue_client,
+                        glue_database,
+                        table_name_lower,
+                        dest_uri + "/",
+                        column_list,
+                        relocated.metadata_location,
+                    )
+                    cursor.execute(f"SELECT COUNT(*) FROM {external_schema}.{table_name_lower}")
+                    result = cursor.fetchone()
+                    table_stats[table_name_lower] = int(result[0]) if result else 0
+                    continue
 
                 column_defs = self._build_external_column_definitions(benchmark, table_name_lower)
 
@@ -1763,24 +1908,18 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 )
                 cursor.execute(f"DROP TABLE IF EXISTS {external_schema}.{table_name_lower}")
                 if source_format == "delta":
-                    cursor.execute(
-                        f"""
-                        CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
-                        ({column_defs})
-                        STORED AS PARQUET
-                        LOCATION '{location}'
-                        TABLE PROPERTIES ('table_type'='DELTA')
-                        """
-                    )
+                    table_properties = "\n                        TABLE PROPERTIES ('table_type'='DELTA')"
                 else:
-                    cursor.execute(
-                        f"""
-                        CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
-                        ({column_defs})
-                        STORED AS PARQUET
-                        LOCATION '{location}'
-                        """
-                    )
+                    table_properties = ""
+                escaped_location = location.replace("'", "''")
+                cursor.execute(
+                    f"""
+                    CREATE EXTERNAL TABLE {external_schema}.{table_name_lower}
+                    ({column_defs})
+                    STORED AS PARQUET
+                    LOCATION '{escaped_location}'{table_properties}
+                    """
+                )
                 cursor.execute(f"SELECT COUNT(*) FROM {external_schema}.{table_name_lower}")
                 result = cursor.fetchone()
                 table_stats[table_name_lower] = int(result[0]) if result else 0
@@ -1922,6 +2061,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if self.disable_result_cache or critical_failures:
                 self.logger.debug("Validating cache control settings...")
                 validation_result = self.validate_session_cache_control(connection)
+                from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(validation_result)
 
                 if not validation_result["validated"]:
                     self.logger.warning(f"Cache control validation failed: {validation_result.get('errors', [])}")
@@ -1929,6 +2071,19 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     self.logger.info(
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
+            else:
+                # The result cache was explicitly left enabled, so there is no
+                # disabled state to probe. Record the configured enabled state
+                # so the bundle carries enabled-cache evidence instead of an
+                # absent receipt that the submission gate would grandfather.
+                from benchbox.platforms.cloud_shared import (
+                    explicit_cache_enabled_receipt,
+                    sanitize_cache_control_receipt,
+                )
+
+                self._cache_control_receipt = sanitize_cache_control_receipt(
+                    explicit_cache_enabled_receipt("enable_result_cache_for_session", "ON")
+                )
 
             # Run VACUUM and ANALYZE on all tables if configured.
             # These operations use a **separate connection** because they are

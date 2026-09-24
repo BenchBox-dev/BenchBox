@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   LEGACY_UNLABELLED_TUNING_MODE,
   NOT_RECORDED_TUNING_MODE,
+  appendFacetParams,
   matchesFacetRow,
   physicalRenderingIdsMatch,
   type FacetMatchRow,
@@ -78,6 +79,20 @@ describe("facetMatching tuning_mode", () => {
   it("custom (ADR-2) is an exact-match value like any other", () => {
     expect(matchesFacetRow(row("custom"), facets(["custom"]), TUNING_ONLY)).toBe(true);
     expect(matchesFacetRow(row("custom"), facets(["tuned"]), TUNING_ONLY)).toBe(false);
+  });
+});
+
+describe("appendFacetParams", () => {
+  it("carries architecture and CPU-family filters into drill-down links", () => {
+    const params = new URLSearchParams();
+    appendFacetParams(
+      params,
+      { ...DEFAULT_FACETS, arch: ["arm64"], cpu_family: ["apple_silicon"] },
+      new Set(),
+    );
+
+    expect(params.getAll("arch")).toEqual(["arm64"]);
+    expect(params.getAll("cpu_family")).toEqual(["apple_silicon"]);
   });
 });
 

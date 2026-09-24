@@ -1063,6 +1063,25 @@ class TestDataFusionUnifiedFrameMethods:
         ids = [v.as_py() for v in result.column("id")]
         assert ids == [3, 2, 1]
 
+    # ----- UnifiedListExpr.get() index path -----
+
+    def test_list_get_with_expression_index(self):
+        """Test list.get() with a per-row UInt64 index casts to Int64.
+
+        A UInt64 index (e.g. from array_length) plus a Python int coerces
+        to Decimal128, which array_element rejects during planning.
+        """
+        from benchbox.platforms.dataframe.unified_frame import UnifiedExpr
+
+        adapter = DataFusionDataFrameAdapter()
+        adapter.register_table("lists", pa.table({"tags": [["a", "b", "c"], ["x", "y"]]}))
+
+        unified = UnifiedExpr(adapter.col("tags"))
+        last = unified.list.get(unified.list.len() - 1)
+
+        result = self._collect_expr(adapter, "lists", last)
+        assert result.column("result").to_pylist() == ["c", "y"]
+
 
 class TestDataFusionNotAvailable:
     """Tests for behavior when DataFusion is not installed."""

@@ -141,6 +141,10 @@ _FILE_STEM_TO_PLATFORM_KEY: dict[str, str] = {
 # instead of the helper module's private file stem.
 _DDL_HELPER_PLATFORM_KEYS: dict[tuple[str, str], tuple[str, ...]] = {
     ("_spark_helpers.py", "optimize_spark_table_definition"): ("lakesail", "spark", "velox"),
+    # Shared Presto/Trino base-class hook: one _optimize_table_definition
+    # serves both governed platforms (each keeps its own registered
+    # DDL_OPTIMIZE transformer, resolved via the aliases below).
+    ("presto_trino_adapter_base.py", "_optimize_table_definition"): ("presto", "trino"),
 }
 _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("athena", "_convert_to_external_table"): ("athena_convert_to_external_table",),
@@ -153,6 +157,15 @@ _DDL_GOVERNANCE_TRANSFORMER_ALIASES: dict[tuple[str, str], tuple[str, ...]] = {
     ("clickhouse", "_resolve_tuned_ddl_clauses"): ("clickhouse_ddl_optimizer",),
     ("databend", "_optimize_table_definition"): ("databend_ddl_optimizer",),
     ("databricks", "_convert_to_delta_table"): ("databricks_delta_ddl_optimizer",),
+    # _convert_to_hudi_table is a helper invoked by _convert_to_delta_table
+    # when table_format is "hudi" to emit USING HUDI DDL; it is part of the
+    # same registered DDL_OPTIMIZE transform, not a second independent rewrite.
+    ("databricks", "_convert_to_hudi_table"): ("databricks_delta_ddl_optimizer",),
+    # _hudi_table_properties is a helper invoked by _convert_to_hudi_table
+    # to compute the per-statement TBLPROPERTIES it splices into the
+    # statement; it is part of the same registered DDL_OPTIMIZE transform,
+    # not a second independent rewrite.
+    ("databricks", "_hudi_table_properties"): ("databricks_delta_ddl_optimizer",),
     ("doris", "_inject_doris_ddl_clauses"): ("doris_inject_ddl_clauses",),
     ("fabric_dw", "_optimize_table_definition"): ("fabric_dw_ddl_optimizer",),
     ("firebolt", "_optimize_table_definition"): ("firebolt_ddl_optimizer",),
@@ -571,7 +584,7 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 suggested_phase="benchmark_gate",
                 description="caps.unsupported_benchmarks access - benchmark_gate preflight",
             )
-        # Current CLI shape: getattr(caps, "unsupported_benchmarks", None)
+        # Legacy CLI shape: getattr(caps, "unsupported_benchmarks", None)
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -587,6 +600,26 @@ def _detect_unsupported_benchmarks(tree: ast.Module, filepath: Path, root: Path)
                 platforms=[],
                 suggested_phase="benchmark_gate",
                 description="getattr(caps, 'unsupported_benchmarks') - benchmark_gate preflight",
+            )
+        # Explicit compatibility API: PlatformRegistry.get_benchmark_block_reason(),
+        # get_unsupported_benchmarks(), or is_benchmark_supported() call sites.
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr
+            in (
+                "get_benchmark_block_reason",
+                "get_unsupported_benchmarks",
+                "is_benchmark_supported",
+            )
+        ):
+            yield InventoryEntry(
+                file=rel,
+                line=node.lineno,
+                kind="benchmark_gate",
+                platforms=[],
+                suggested_phase="benchmark_gate",
+                description=f"{node.func.attr}() - benchmark_gate preflight via compatibility API",
             )
 
 

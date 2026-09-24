@@ -194,6 +194,91 @@ class TestGetPlatformInfoSdkPath:
 
 
 # ---------------------------------------------------------------------------
+# workspace region detection via metastore summary
+# ---------------------------------------------------------------------------
+
+
+class TestDetectDatabricksRegion:
+    """Test workspace region detection when the region was not configured."""
+
+    def _mock_sdk_with_region(self, region):
+        mock_summary = MagicMock()
+        mock_summary.region = region
+        mock_workspace = MagicMock()
+        mock_workspace.metastores.summary.return_value = mock_summary
+        # Fail warehouse lookup: an unconstrained warehouses.get() mock would
+        # store MagicMocks throughout compute_configuration, which the
+        # normalization path cannot sanitize promptly.
+        mock_workspace.warehouses.get.side_effect = RuntimeError("warehouse lookup disabled")
+        mock_sdk = MagicMock()
+        mock_sdk.WorkspaceClient.return_value = mock_workspace
+        return mock_sdk, mock_workspace
+
+    def test_detected_region_fills_unconfigured_region(self):
+        adapter = _make_adapter()
+        assert adapter.region is None
+
+        mock_sdk, _ = self._mock_sdk_with_region("us-east-2")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region == "us-east-2"
+        assert info["configuration"]["region"] == "us-east-2"
+
+        metadata = adapter.get_normalized_result_metadata(platform_info=info)
+        assert metadata["platform_cloud"]["region"] == "us-east-2"
+        assert metadata["platform_cloud"]["region_collection_status"] == "available"
+
+    def test_configured_region_takes_precedence_over_detection(self):
+        adapter = _make_adapter(region="us-west-2")
+
+        mock_sdk, mock_workspace = self._mock_sdk_with_region("us-east-2")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region == "us-west-2"
+        assert info["configuration"]["region"] == "us-west-2"
+        mock_workspace.metastores.summary.assert_not_called()
+
+    def test_detection_failure_leaves_region_unset(self):
+        adapter = _make_adapter()
+
+        mock_sdk = MagicMock()
+        mock_sdk.WorkspaceClient.side_effect = RuntimeError("SDK error")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region is None
+        assert info["configuration"]["region"] is None
+
+    def test_detection_rejects_blank_region(self):
+        adapter = _make_adapter()
+
+        mock_sdk, _ = self._mock_sdk_with_region("   ")
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": mock_sdk}),
+        ):
+            info = adapter.get_platform_info(connection=None)
+
+        assert adapter.region is None
+        assert info["configuration"]["region"] is None
+
+
+# ---------------------------------------------------------------------------
 # normalized result metadata
 # ---------------------------------------------------------------------------
 
@@ -491,6 +576,11 @@ class TestLoadSingleTable:
 
         cursor = MagicMock()
         cursor.fetchone.return_value = (42,)
+        # DESCRIBE TABLE response, then COPY INTO result rows
+        cursor.fetchall.side_effect = [
+            [("id", "int", ""), ("amount", "decimal(8,2)", "")],
+            [("orders.parquet", "LOADED", "", 42, "", "")],
+        ]
         connection = MagicMock()
         benchmark = MagicMock()
         # Return no schema so column_list is empty
@@ -516,6 +606,92 @@ class TestLoadSingleTable:
         assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
         assert "ORDERS" in copy_sql
         assert "dbfs:/Volumes/main/bench/orders.parquet" in copy_sql
+        # Parquet loads cast through a SELECT to the Delta column types
+        assert "FILEFORMAT = PARQUET" in copy_sql
+        assert "CAST(`id` AS int)" in copy_sql
+
+    def _copy_sql_for_csv(self, tmp_stem, metadata):
+        """Run _load_single_table for a CSV and return the COPY INTO SQL."""
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench"
+        adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        adapter.enable_delta_optimization = False
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (10,)
+        cursor.fetchall.return_value = [("id", "int", "")]
+        file_path = Path(f"{tmp_stem}.csv")
+        ds = resolver_data_source(tmp_stem, file_path, metadata)
+        adapter._load_single_table(
+            cursor=cursor,
+            connection=MagicMock(),
+            benchmark=None,
+            table_name=tmp_stem,
+            file_path=file_path,
+            stage_root="dbfs:/Volumes/main/bench",
+            existing_tables={tmp_stem},
+            data_source=ds,
+        )
+        executed_sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+        copy_sql = next((s for s in executed_sqls if "COPY INTO" in s), None)
+        assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
+        return copy_sql
+
+    def test_copy_into_honors_manifest_header(self):
+        """Manifest csv_has_header=true must set header=true in FORMAT_OPTIONS."""
+        copy_sql = self._copy_sql_for_csv(
+            "trips",
+            {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""},
+        )
+        assert "'header'='true'" in copy_sql
+
+    def test_copy_into_header_csv_uses_cast_select(self):
+        """Header CSVs load through a DESCRIBE-driven cast SELECT."""
+        from unittest.mock import call, patch
+
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        adapter = _make_adapter()
+        adapter.catalog = "main"
+        adapter.schema = "bench"
+        adapter.get_effective_tuning_configuration = Mock(return_value=None)
+        adapter.enable_delta_optimization = False
+
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (10,)
+        cursor.fetchall.return_value = [("id", "int", ""), ("amount", "decimal(8,2)", "")]
+        file_path = Path("orders.csv")
+        ds = resolver_data_source(
+            "orders", file_path, {"csv_delimiter": ",", "csv_has_header": True, "csv_null_marker": ""}
+        )
+        with (
+            patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0),
+            patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.1),
+        ):
+            adapter._load_single_table(
+                cursor=cursor,
+                connection=MagicMock(),
+                benchmark=None,
+                table_name="orders",
+                file_path=file_path,
+                stage_root="dbfs:/Volumes/main/bench",
+                existing_tables={"orders"},
+                data_source=ds,
+            )
+        executed_sqls = [str(c.args[0]) for c in cursor.execute.call_args_list]
+        copy_sql = next((s for s in executed_sqls if "COPY INTO" in s), None)
+        assert copy_sql is not None, f"No COPY INTO found in: {executed_sqls}"
+        assert "FILEFORMAT = CSV" in copy_sql
+        assert "CAST(`id` AS int)" in copy_sql
+        assert "CAST(`amount` AS decimal(8,2))" in copy_sql
+
+    def test_copy_into_defaults_to_no_header(self):
+        """CSVs without manifest metadata keep header=false."""
+        copy_sql = self._copy_sql_for_csv("orders", {})
+        assert "'header'='false'" in copy_sql
 
 
 # ---------------------------------------------------------------------------
@@ -649,19 +825,19 @@ class TestExecuteQueryFailurePath:
 class TestResolveClusteringStrategy:
     """Test _resolve_databricks_clustering_strategy precedence rules."""
 
-    def test_returns_z_order_when_no_effective_config(self):
+    def test_returns_none_when_no_effective_config(self):
         adapter = _make_adapter()
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
             result = adapter._resolve_databricks_clustering_strategy()
-        assert result == "z_order"
+        assert result == "none"
 
-    def test_returns_z_order_when_platform_opts_is_none(self):
+    def test_returns_none_when_platform_opts_is_none(self):
         adapter = _make_adapter()
         effective_config = MagicMock()
         effective_config.platform_optimizations = None
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=effective_config):
             result = adapter._resolve_databricks_clustering_strategy()
-        assert result == "z_order"
+        assert result == "none"
 
     def test_liquid_enabled_flag_returns_liquid_clustering(self):
         adapter = _make_adapter()
@@ -1146,6 +1322,15 @@ class TestConvertToDeltaTable:
         result = adapter._convert_to_delta_table(sql)
         assert "CREATE OR REPLACE TABLE" in result
 
+    def test_if_not_exists_kept_without_or_replace(self):
+        # CREATE OR REPLACE ... IF NOT EXISTS is a Databricks syntax error.
+        adapter = _make_adapter()
+        sql = "CREATE TABLE IF NOT EXISTS DimDate (SK_DateID BIGINT)"
+        result = adapter._convert_to_delta_table(sql)
+        assert "OR REPLACE" not in result
+        assert "IF NOT EXISTS" in result
+        assert "USING DELTA" in result
+
     def test_adds_tblproperties_when_auto_optimize_enabled(self):
         adapter = _make_adapter()
         adapter.delta_auto_optimize = True
@@ -1172,6 +1357,47 @@ class TestConvertToDeltaTable:
         assert len(results) == len(statements)
         assert all("CREATE OR REPLACE TABLE" in r for r in results)
         assert all("USING DELTA" in r for r in results)
+
+
+# ---------------------------------------------------------------------------
+# _apply_tpcdi_databricks_rewrites
+# ---------------------------------------------------------------------------
+
+
+class TestApplyTpcdiDatabricksRewrites:
+    """Test _apply_tpcdi_databricks_rewrites dialect normalization."""
+
+    def test_flag_literals_become_boolean(self):
+        """BIT flag comparisons use IS TRUE/FALSE; integer columns untouched."""
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT * FROM DimCustomer WHERE IsCurrent = 1 AND BatchID = 1"
+        )
+        assert "IsCurrent IS TRUE" in result
+        assert "BatchID = 1" in result
+
+    def test_zero_flag_literal_becomes_false(self):
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT CASE WHEN TT_IS_SELL = 0 THEN 1 ELSE 0 END FROM TradeType"
+        )
+        assert "TT_IS_SELL IS FALSE" in result
+
+    def test_julianday_and_now_rewritten(self):
+        """SQLite date idioms map to Databricks equivalents."""
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites("SELECT JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))")
+        assert "JULIANDAY" not in result
+        assert "DATE('now')" not in result
+        assert "DATEDIFF" in result
+        assert "CURRENT_DATE()" in result
+
+    def test_relative_now_rewritten(self):
+        adapter = _make_adapter()
+        result = adapter._apply_tpcdi_databricks_rewrites(
+            "SELECT * FROM t WHERE d.DateValue >= DATE('now', '-90 days')"
+        )
+        assert "DATE_SUB(CURRENT_DATE(), 90)" in result
 
 
 # ---------------------------------------------------------------------------
@@ -1264,6 +1490,7 @@ class TestAnalyzeTable:
 
         # Should not raise
         adapter.analyze_table(mock_conn, "lineitem")
+        mock_cursor.execute.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1315,7 +1542,7 @@ class TestApplyTableTunings:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.CLUSTERING else []
         except ImportError:
             tuning.get_columns_by_type.return_value = [col1]
 
@@ -1349,7 +1576,7 @@ class TestApplyTableTunings:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col1] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col1] if t == TuningType.CLUSTERING else []
         except ImportError:
             tuning.get_columns_by_type.return_value = [col1]
 
@@ -1697,15 +1924,17 @@ class TestApplyPlatformOptimizations:
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_platform_optimizations(None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(None, mock_conn)
+            mock_info.assert_not_called()
 
     def test_logs_when_config_provided(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_config = MagicMock()
-        # Should not raise
-        adapter.apply_platform_optimizations(mock_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(mock_config, mock_conn)
+            mock_info.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1719,8 +1948,13 @@ class TestApplyUnifiedTuning:
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_platform_optimizations") as mock_plat,
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraint,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+            mock_plat.assert_not_called()
+            mock_constraint.assert_not_called()
 
     def test_calls_apply_platform_optimizations(self):
         adapter = _make_adapter()
@@ -1753,8 +1987,9 @@ class TestApplyConstraintConfiguration:
     def test_no_op_when_pk_and_fk_are_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_constraint_configuration(None, None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(None, None, mock_conn)
+            mock_info.assert_not_called()
 
     def test_logs_when_pk_enabled(self):
         adapter = _make_adapter()
@@ -1766,8 +2001,9 @@ class TestApplyConstraintConfiguration:
         fk_config = MagicMock()
         fk_config.enabled = False
 
-        # Should not raise
-        adapter.apply_constraint_configuration(pk_config, fk_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(pk_config, fk_config, mock_conn)
+            mock_info.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1824,8 +2060,9 @@ class TestValidateExternalTableRequirements:
         adapter.uc_schema = None
         adapter.uc_volume = None
 
-        # Should not raise
-        adapter.validate_external_table_requirements()
+        with patch.object(adapter, "_is_cloud_uri", wraps=adapter._is_cloud_uri) as mock_check:
+            adapter.validate_external_table_requirements()
+            mock_check.assert_called_once_with("s3://bucket/path")
 
     def test_passes_when_uc_volume_configured(self):
         adapter = _make_adapter()
@@ -1834,8 +2071,9 @@ class TestValidateExternalTableRequirements:
         adapter.uc_schema = "sch"
         adapter.uc_volume = "vol"
 
-        # Should not raise
+        # Valid UC volume triple satisfies requirement without raising ValueError
         adapter.validate_external_table_requirements()
+        assert adapter.uc_catalog == "cat" and adapter.uc_schema == "sch" and adapter.uc_volume == "vol"
 
 
 # ---------------------------------------------------------------------------
@@ -1913,16 +2151,66 @@ class TestResolveFileUriAndDelimiter:
 
     def test_dbfs_multi_file_list_uses_shared_directory(self):
         adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
+            "dbfs:/Volumes/cat/sch/vol/orders/region=EUROPE/part-00000.parquet",
+        ]
         file_uri, filename, delimiter = adapter._resolve_file_uri_and_delimiter(
-            [
-                "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
-                "dbfs:/Volumes/cat/sch/vol/orders/region=EUROPE/part-00000.parquet",
-            ],
+            files,
             "dbfs:/Volumes/cat/sch/vol",
         )
         assert file_uri == "dbfs:/Volumes/cat/sch/vol/orders"
         assert filename == "orders"
         assert delimiter == ","
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == [file_uri]
+
+    def test_flat_multi_file_list_expands_to_exact_uris(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/flights_0001_2024_12.csv.gz",
+            "dbfs:/Volumes/cat/sch/vol/flights_0002_2024_11.csv.gz",
+        ]
+        file_uri, _filename, _delimiter = adapter._resolve_file_uri_and_delimiter(
+            files,
+            "dbfs:/Volumes/cat/sch/vol",
+        )
+
+        assert file_uri == "dbfs:/Volumes/cat/sch/vol"
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == files
+
+    def test_files_within_one_partition_keep_partition_directory_source(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00000.parquet",
+            "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA/part-00001.parquet",
+        ]
+        file_uri, _filename, _delimiter = adapter._resolve_file_uri_and_delimiter(
+            files,
+            "dbfs:/Volumes/cat/sch/vol",
+        )
+
+        assert file_uri == "dbfs:/Volumes/cat/sch/vol/orders/region=ASIA"
+        assert adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri) == [file_uri]
+
+    def test_wildcard_shard_set_expands_to_exact_per_file_uris(self):
+        adapter = _make_adapter()
+        files = [
+            "dbfs:/Volumes/cat/sch/vol/customer_demographics_1_10.dat.gz",
+            "dbfs:/Volumes/cat/sch/vol/customer_demographics_2_10.dat.gz",
+        ]
+        file_uri, filename, delimiter = adapter._resolve_file_uri_and_delimiter(files, "dbfs:/Volumes/cat/sch/vol")
+        assert "*" in file_uri
+        sources = adapter._expand_copy_sources(files, "dbfs:/Volumes/cat/sch/vol", file_uri)
+        assert sources == files
+        assert all("*" not in source for source in sources)
+
+    def test_non_wildcard_source_passes_through(self):
+        adapter = _make_adapter()
+        assert adapter._expand_copy_sources(
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl",
+            "dbfs:/Volumes/cat/sch/vol",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl",
+        ) == ["dbfs:/Volumes/cat/sch/vol/orders.tbl"]
 
 
 # ---------------------------------------------------------------------------
@@ -1941,15 +2229,18 @@ class TestCloseConnection:
 
     def test_handles_none_connection(self):
         adapter = _make_adapter()
-        # Should not raise
-        adapter.close_connection(None)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(None)
+            mock_warn.assert_not_called()
 
     def test_handles_close_exception(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_conn.close.side_effect = RuntimeError("close failed")
-        # Should not raise - exception is caught and logged as warning
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(mock_conn)
+            mock_warn.assert_called_once()
+            assert "close failed" in mock_warn.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------
@@ -1991,7 +2282,9 @@ class TestGetRemoteFileUrisFromManifest:
         assert "lineitem" in result
         assert result["orders"] == "dbfs:/Volumes/cat/sch/vol/orders.parquet"
 
-    def test_sharded_files_get_wildcard_pattern(self):
+    def test_sharded_files_get_exact_uri_list(self):
+        # COPY INTO rejects mid-path globs, so sharded tables map to exact
+        # per-file URIs (one COPY INTO per shard at load time).
         adapter = _make_adapter()
         manifest = {
             "tables": {
@@ -2003,8 +2296,10 @@ class TestGetRemoteFileUrisFromManifest:
         }
         result = adapter._get_remote_file_uris_from_manifest("dbfs:/Volumes/cat/sch/vol", manifest)
 
-        assert "orders" in result
-        assert "*" in result["orders"]
+        assert result["orders"] == [
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.1.zst",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.2.zst",
+        ]
 
     def test_empty_table_entries_skipped(self):
         adapter = _make_adapter()
@@ -2100,7 +2395,7 @@ class TestGenerateTuningClause:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col] if t == TuningType.PARTITIONING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col] if t == TuningType.PARTITIONING else []
         except ImportError:
             tuning.get_columns_by_type.side_effect = lambda t: [col] if t.__class__.__name__ == "TuningType" else []
 
@@ -2119,7 +2414,7 @@ class TestGenerateTuningClause:
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            tuning.get_columns_by_type.side_effect = lambda t: ([col] if t == TuningType.CLUSTERING else [])
+            tuning.get_columns_by_type.side_effect = lambda t: [col] if t == TuningType.CLUSTERING else []
         except ImportError:
             pytest.skip("TuningType not available")
 
@@ -2644,6 +2939,85 @@ class TestUploadShardedFiles:
 
 
 # ---------------------------------------------------------------------------
+# _upload_single_table_path (shard auto-detect branch)
+# ---------------------------------------------------------------------------
+
+
+class TestUploadSingleTablePath:
+    """Shard auto-detect must return exact URIs, never a glob (COPY INTO rejects globs)."""
+
+    def test_sharded_branch_returns_exact_uri_list(self, tmp_path):
+        from pathlib import Path
+
+        adapter = _make_adapter()
+        first = tmp_path / "orders.tbl.1.zst"
+        first.write_bytes(b"chunk")
+        chunks = [tmp_path / "orders.tbl.1.zst", tmp_path / "orders.tbl.2.zst"]
+        mock_workspace = MagicMock()
+
+        with (
+            patch.object(
+                adapter,
+                "_detect_sharded_files",
+                return_value=(True, "orders.tbl.*.zst", chunks),
+            ),
+            patch.object(adapter, "_upload_sharded_files", return_value=None),
+        ):
+            result = adapter._upload_single_table_path(
+                "orders",
+                first,
+                "orders.tbl.1.zst",
+                "/Volumes/cat/sch/vol",
+                "dbfs:/Volumes/cat/sch/vol",
+                mock_workspace,
+                tmp_path,
+            )
+
+        assert isinstance(result, list)
+        assert all("*" not in uri for uri in result)
+        assert result == [
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.1.zst",
+            "dbfs:/Volumes/cat/sch/vol/orders.tbl.2.zst",
+        ]
+        assert isinstance(chunks[0], Path)
+
+    def test_expand_copy_sources_raises_on_unexpandable_glob(self):
+        adapter = _make_adapter()
+        with pytest.raises(ValueError, match="does not accept glob"):
+            adapter._expand_copy_sources(
+                "dbfs:/Volumes/cat/sch/vol/orders.*.zst",
+                "dbfs:/Volumes/cat/sch/vol",
+                "dbfs:/Volumes/cat/sch/vol/orders.*.zst",
+            )
+
+
+# ---------------------------------------------------------------------------
+# _deduplicate_output_aliases
+# ---------------------------------------------------------------------------
+
+
+class TestDeduplicateOutputAliases:
+    """Duplicate top-level outputs gain numeric suffixes; unique queries pass through."""
+
+    def test_self_join_duplicates_get_suffixes(self):
+        adapter = _make_adapter()
+        sql = (
+            "SELECT a.syear AS syear, a.cnt AS cnt, b.syear AS syear, b.cnt AS cnt "
+            "FROM (SELECT syear, COUNT(*) AS cnt FROM t GROUP BY syear) a "
+            "JOIN (SELECT syear, COUNT(*) AS cnt FROM t GROUP BY syear) b ON a.syear = b.syear"
+        )
+        result = adapter._deduplicate_output_aliases(sql)
+        assert "syear_2" in result
+        assert "cnt_2" in result
+        assert "JOIN" in result
+
+    def test_unique_outputs_unchanged(self):
+        adapter = _make_adapter()
+        sql = "SELECT a, b, COUNT(*) AS cnt FROM t GROUP BY a, b"
+        assert adapter._deduplicate_output_aliases(sql) == sql
+
+
+# ---------------------------------------------------------------------------
 # _upload_file_content_to_uc
 # ---------------------------------------------------------------------------
 
@@ -2826,3 +3200,385 @@ class TestManifestPatternForName:
         base, ext = DatabricksAdapter._manifest_pattern_for_name("orders.parquet")
         # Non-sharded - uses stem/suffix logic
         assert "orders" in base
+
+    def test_dsdgen_underscore_chunks_detected(self):
+        from benchbox.platforms.databricks import DatabricksAdapter
+
+        names = [
+            "customer_demographics_1_10.dat.gz",
+            "customer_demographics_5_10.dat.gz",
+            "customer_demographics_10_10.dat.gz",
+        ]
+        for name in names:
+            assert DatabricksAdapter._is_manifest_shard_name(name) is True
+        assert _make_adapter()._detect_manifest_wildcard(names) == "customer_demographics.*.dat.gz"
+
+    def test_dsdgen_underscore_chunk_rejects_flat_file(self):
+        from benchbox.platforms.databricks import DatabricksAdapter
+
+        assert DatabricksAdapter._is_manifest_shard_name("customer_demographics.dat") is False
+        assert DatabricksAdapter._is_manifest_shard_name("inventory_3.dat") is False
+
+
+# ---------------------------------------------------------------------------
+# Databricks version probing via SELECT current_version()
+# ---------------------------------------------------------------------------
+
+_LIVE_WAREHOUSE_STRUCT = {
+    "dbr_version": None,
+    "dbsql_version": "2026.36",
+    "u_build_hash": "ae9b8c94bd7756748eadf8dbbb27f84a703ed782",
+    "r_build_hash": "85f51ee3c849b3c03c13ad723d1a65378a77d8c2",
+}
+
+_LIVE_SPARK_RAW = "4.2.0 0000000000000000000000000000000000000000"
+
+
+def _mock_version_connection(
+    fetchone_values=None,
+    execute_side_effect=None,
+    fetchall_values=None,
+):
+    """Build a MagicMock connection with a single shared cursor."""
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_conn.cursor.return_value = mock_cursor
+    if fetchone_values is not None:
+        mock_cursor.fetchone.side_effect = list(fetchone_values)
+    if fetchall_values is not None:
+        mock_cursor.fetchall.side_effect = list(fetchall_values)
+    if execute_side_effect is not None:
+        mock_cursor.execute.side_effect = execute_side_effect
+    return mock_conn, mock_cursor
+
+
+class TestSanitizeSparkEngineVersion:
+    """Unit tests for hash-aware SELECT version() sanitization."""
+
+    def test_strips_placeholder_hash(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version(_LIVE_SPARK_RAW) == "4.2.0"
+
+    def test_strips_real_commit_hash(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version("3.5.0 abcdef1234567890abcdef1234567890abcdef12") == "3.5.0"
+
+    def test_preserves_runtime_string(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version("Runtime 14.3 LTS") == "Runtime 14.3 LTS"
+
+    def test_preserves_spark_detail_string(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        raw = "14.3 LTS (apache-spark-3.5.0-bin-hadoop3)"
+        assert _sanitize_spark_engine_version(raw) == raw
+
+    def test_none_and_blank(self):
+        from benchbox.platforms.databricks.adapter import _sanitize_spark_engine_version
+
+        assert _sanitize_spark_engine_version(None) is None
+        assert _sanitize_spark_engine_version("") is None
+        assert _sanitize_spark_engine_version("   ") is None
+
+
+class TestFirstColumnScalarGuard:
+    """_first_column must not truncate bare scalar strings via indexing."""
+
+    def test_bare_string_returned_intact(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column("Spark 3.4.1") == "Spark 3.4.1"
+
+    def test_bytes_returned_intact(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column(b"3.5.1") == b"3.5.1"
+
+    def test_tuple_still_unpacks(self):
+        from benchbox.platforms.databricks.adapter import _first_column
+
+        assert _first_column(("4.2.0",)) == "4.2.0"
+        assert _first_column(None) is None
+
+
+class TestParseCurrentVersionPayload:
+    """Unit tests for current_version() struct normalization."""
+
+    def test_parses_warehouse_dict(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        parsed = _parse_current_version_payload(dict(_LIVE_WAREHOUSE_STRUCT))
+        assert parsed is not None
+        assert parsed["dbsql_version"] == "2026.36"
+        assert parsed["dbr_version"] is None
+        assert parsed["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert parsed["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+
+    def test_parses_dbr_cluster_dict(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        parsed = _parse_current_version_payload({"dbr_version": "14.3 LTS", "dbsql_version": None})
+        assert parsed is not None
+        assert parsed["dbr_version"] == "14.3 LTS"
+        assert parsed["dbsql_version"] is None
+
+    def test_parses_connector_row(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        parsed = _parse_current_version_payload(row)
+        assert parsed is not None
+        assert parsed["dbsql_version"] == "2026.36"
+
+    def test_parses_row_wrapped_in_tuple(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        from benchbox.platforms.databricks.adapter import (
+            _parse_current_version_payload,
+            _unwrap_current_version_struct,
+        )
+
+        row = Row(dbr_version="14.3 LTS", dbsql_version=None, u_build_hash=None, r_build_hash=None)
+        unwrapped = _unwrap_current_version_struct((row,))
+        parsed = _parse_current_version_payload(unwrapped)
+        assert parsed is not None
+        assert parsed["dbr_version"] == "14.3 LTS"
+
+    def test_rejects_plain_string(self):
+        from benchbox.platforms.databricks.adapter import _parse_current_version_payload
+
+        assert _parse_current_version_payload("4.2.0 0000000000000000000000000000000000000000") is None
+        assert _parse_current_version_payload(None) is None
+        assert _parse_current_version_payload({}) is None
+
+    def test_prefers_dbsql_over_dbr(self):
+        from benchbox.platforms.databricks.adapter import _select_databricks_platform_version
+
+        assert _select_databricks_platform_version({"dbsql_version": "2026.36", "dbr_version": "14.3"}) == "2026.36"
+        assert _select_databricks_platform_version({"dbsql_version": None, "dbr_version": "14.3 LTS"}) == "14.3 LTS"
+        assert _select_databricks_platform_version({"dbsql_version": None, "dbr_version": None}) is None
+
+
+class TestGetPlatformInfoCurrentVersion:
+    """get_platform_info() prefers current_version() with version() fallback."""
+
+    def test_warehouse_dict_struct(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(fetchone_values=[(dict(_LIVE_WAREHOUSE_STRUCT),)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "2026.36"
+        assert info["engine_version"] == "2026.36"
+        assert info["engine_version_source"] == "current_version"
+        assert info["dbsql_version"] == "2026.36"
+        assert info["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert info["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+        assert cursor.execute.call_args_list[0].args[0] == "SELECT current_version()"
+        cursor.close.assert_called()
+
+    def test_connector_row_struct(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        adapter = _make_adapter()
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        conn, cursor = _mock_version_connection(fetchone_values=[(row,)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "2026.36"
+        assert info["engine_version_source"] == "current_version"
+        assert info["dbsql_version"] == "2026.36"
+
+    def test_dbr_cluster_selects_dbr_version(self):
+        adapter = _make_adapter()
+        struct = {"dbr_version": "14.3 LTS", "dbsql_version": None, "u_build_hash": None, "r_build_hash": None}
+        conn, _ = _mock_version_connection(fetchone_values=[(struct,)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "14.3 LTS"
+        assert info["engine_version"] == "14.3 LTS"
+        assert info["engine_version_source"] == "current_version"
+
+    def test_current_version_error_falls_back_to_sanitized_version(self):
+        adapter = _make_adapter()
+
+        def _execute(query, *args, **kwargs):
+            if "current_version()" in query:
+                raise RuntimeError("no such function current_version")
+            return Mock()
+
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(_LIVE_SPARK_RAW,)],
+            execute_side_effect=_execute,
+        )
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "4.2.0"
+        assert info["engine_version"] == "4.2.0"
+        assert info["engine_version_source"] == "sql_query"
+
+    def test_current_version_none_falls_back_to_version(self):
+        adapter = _make_adapter()
+        conn, _ = _mock_version_connection(fetchone_values=[None, ("Runtime 14.3 LTS",)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "Runtime 14.3 LTS"
+        assert info["engine_version_source"] == "sql_query"
+
+    def test_version_fallback_spark_version_query(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(fetchone_values=[None, None, ("3.5.1",)])
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] == "3.5.1"
+        assert info["engine_version_source"] == "sql_query"
+        queries = [call.args[0] for call in cursor.execute.call_args_list]
+        assert queries[0] == "SELECT current_version()"
+        assert queries[1] == "SELECT version()"
+        assert queries[2] == "SELECT spark_version() as version"
+
+    def test_total_failure_returns_nones(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(execute_side_effect=RuntimeError("down"))
+
+        with (
+            patch.object(adapter, "get_effective_tuning_configuration", return_value=None),
+            patch.dict("sys.modules", {"databricks.sdk": None}),
+        ):
+            info = adapter.get_platform_info(connection=conn)
+
+        assert info["platform_version"] is None
+        assert info["engine_version"] is None
+        assert info["engine_version_source"] is None
+        cursor.close.assert_called()
+
+    def test_no_connection_returns_nones(self):
+        adapter = _make_adapter()
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            with patch.dict("sys.modules", {"databricks.sdk": None}):
+                info = adapter.get_platform_info(connection=None)
+
+        assert info["platform_version"] is None
+        assert info["engine_version"] is None
+        assert info["engine_version_source"] is None
+
+
+class TestGetPlatformMetadataCurrentVersion:
+    """_get_platform_metadata() records DBSQL version plus sanitized Spark version."""
+
+    def test_warehouse_records_dbsql_and_spark_versions(self):
+        adapter = _make_adapter()
+        conn, cursor = _mock_version_connection(
+            fetchone_values=[
+                (dict(_LIVE_WAREHOUSE_STRUCT),),
+                (_LIVE_SPARK_RAW,),
+                ("main", "benchbox"),
+            ],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "2026.36"
+        assert metadata["engine_version"] == "2026.36"
+        assert metadata["engine_version_source"] == "current_version"
+        assert metadata["dbsql_version"] == "2026.36"
+        assert metadata["u_build_hash"] == _LIVE_WAREHOUSE_STRUCT["u_build_hash"]
+        assert metadata["r_build_hash"] == _LIVE_WAREHOUSE_STRUCT["r_build_hash"]
+        assert metadata["spark_version"] == "4.2.0"
+        assert metadata["current_catalog"] == "main"
+        assert metadata["current_schema"] == "benchbox"
+        queries = [call.args[0] for call in cursor.execute.call_args_list]
+        assert queries[0] == "SELECT current_version()"
+
+    def test_row_struct_metadata(self):
+        pytest.importorskip("databricks.sql.types")
+        from databricks.sql.types import Row
+
+        adapter = _make_adapter()
+        row = Row(
+            dbr_version=None,
+            dbsql_version="2026.36",
+            u_build_hash=_LIVE_WAREHOUSE_STRUCT["u_build_hash"],
+            r_build_hash=_LIVE_WAREHOUSE_STRUCT["r_build_hash"],
+        )
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(row,), (_LIVE_SPARK_RAW,), ("main", "benchbox")],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "2026.36"
+        assert metadata["spark_version"] == "4.2.0"
+
+    def test_fallback_metadata_sanitizes_version(self):
+        adapter = _make_adapter()
+
+        def _execute(query, *args, **kwargs):
+            if "current_version()" in query:
+                raise RuntimeError("unsupported")
+            return Mock()
+
+        conn, _ = _mock_version_connection(
+            fetchone_values=[(_LIVE_SPARK_RAW,), ("main", "benchbox")],
+            fetchall_values=[[("current_database",)], [("spark.sql.shuffle.partitions", "200")]],
+            execute_side_effect=_execute,
+        )
+
+        with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
+            metadata = adapter._get_platform_metadata(conn)
+
+        assert metadata["platform_version"] == "4.2.0"
+        assert metadata["engine_version_source"] == "sql_query"
+        assert metadata["spark_version"] == "4.2.0"

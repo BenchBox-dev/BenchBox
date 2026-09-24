@@ -94,19 +94,20 @@ class TestStarRocksPreviewExecutionParity:
         table_tunings = {"lineitem": table_tuning}
 
         preview = _preview_clauses(table_tuning)
-        assert preview.partition_by == "l_shipdate"
-        assert preview.distribute_by == "l_orderkey"
-        assert preview.order_by == "l_linenumber"
-        assert preview.additional_clauses == ["DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"]
+        assert preview.partition_by == "PARTITION BY (l_shipdate)"
+        assert preview.distribute_by == "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8"
+        assert preview.order_by == "ORDER BY (l_linenumber)"
+        assert preview.additional_clauses == []
 
         adapter = _HostAdapter()
         statement = "CREATE TABLE lineitem (l_orderkey INT, l_linenumber INT, l_shipdate DATE)"
         rendered = adapter._optimize_table_definition(statement, table_tunings)
 
-        # Execution emits exactly the preview clause strings.
-        assert f"PARTITION BY ({preview.partition_by})" in rendered
-        assert preview.additional_clauses[0] in rendered
-        assert f"ORDER BY ({preview.order_by})" in rendered
+        # Every preview field is rendered SQL by contract, so execution uses
+        # each verbatim -- preview and execution render identical strings.
+        assert preview.partition_by in rendered
+        assert preview.distribute_by in rendered
+        assert preview.order_by in rendered
 
         # No duplicate DISTRIBUTED BY, and StarRocks clause order is preserved.
         assert rendered.count("DISTRIBUTED BY") == 1
@@ -118,7 +119,7 @@ class TestStarRocksPreviewExecutionParity:
             distribution=[TuningColumn(name="o_custkey", type="INTEGER", order=1)],
         )
         preview = _preview_clauses(table_tuning)
-        assert preview.distribute_by == "o_custkey"
+        assert preview.distribute_by == "DISTRIBUTED BY HASH(`o_custkey`) BUCKETS 8"
 
         adapter = _HostAdapter()
         statement = "CREATE TABLE orders (o_orderkey INT, o_custkey INT, o_orderdate DATE)"
@@ -207,3 +208,38 @@ class TestStarRocksAppliedLedgerInstrumentation:
         statement = "CREATE TABLE lineitem (l_orderkey INT)"
         rendered = adapter._optimize_table_definition(statement, {"lineitem": table_tuning})
         assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in rendered
+
+
+class TestStarRocksDryRunEntryParity:
+    """The dry-run DDL entry (core/dryrun.py::_build_table_ddl_entry, via
+    get_inline_clauses) must not emit a stray bare column line: the rendered
+    DISTRIBUTED BY appears exactly once and matches the execution DDL."""
+
+    def test_dry_run_entry_matches_execution(self):
+        from benchbox.core.dryrun import _build_table_ddl_entry
+
+        table_tuning = TableTuning(
+            table_name="lineitem",
+            distribution=[TuningColumn(name="l_orderkey", type="INTEGER", order=1)],
+            partitioning=[TuningColumn(name="l_shipdate", type="DATE", order=1)],
+            sorting=[TuningColumn(name="l_linenumber", type="INTEGER", order=1)],
+        )
+        preview = _preview_clauses(table_tuning)
+        entry = _build_table_ddl_entry(preview)
+        ddl_clauses = entry["ddl_clauses"] or ""
+
+        # No stray bare column lines: every clause is fully rendered.
+        assert "l_orderkey" not in ddl_clauses.splitlines()
+        assert "l_shipdate" not in ddl_clauses.splitlines()
+        assert "l_linenumber" not in ddl_clauses.splitlines()
+        assert ddl_clauses.count("DISTRIBUTED BY") == 1
+        assert "PARTITION BY (l_shipdate)" in ddl_clauses
+        assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in ddl_clauses
+        assert "ORDER BY (l_linenumber)" in ddl_clauses
+
+        adapter = _HostAdapter()
+        statement = "CREATE TABLE lineitem (l_orderkey INT, l_linenumber INT, l_shipdate DATE)"
+        rendered = adapter._optimize_table_definition(statement, {"lineitem": table_tuning})
+        assert "DISTRIBUTED BY HASH(`l_orderkey`) BUCKETS 8" in rendered
+        assert rendered.count("DISTRIBUTED BY") == 1
+        assert rendered.index("PARTITION BY") < rendered.index("DISTRIBUTED BY") < rendered.index("ORDER BY")

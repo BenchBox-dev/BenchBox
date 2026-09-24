@@ -57,7 +57,11 @@ clickbench (the one classified exception is the order-less ``Q18``),
 joinorder_synthetic and h2odb (single ``trips`` table; SQL and DataFrame ids
 correspond 1:1 as ``Q1`` .. ``Q10``; the one classified exception is ``Q9``'s
 PERCENTILE_CONT, where DuckDB returns the percentile at the source column's
-DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``). Additional dual-surface
+DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
+flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
+``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
+.. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
+``"Q1"`` .. ``"Q22"``). Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
@@ -95,6 +99,8 @@ from benchbox.core.equivalence.builders import (
     build_amplab_duckdb,
     build_clickbench_duckdb,
     build_coffeeshop_duckdb,
+    build_datavault_duckdb,
+    build_flightdata_duckdb,
     build_h2odb_duckdb,
     build_joinorder_synthetic_duckdb,
     build_read_primitives_duckdb,
@@ -418,6 +424,11 @@ class CrossSurfaceGate:
     # for a deliberate, defensible presentational difference - never to mute a
     # regression.
     known_divergences: dict[str, str | ClassifiedDivergence] = field(default_factory=dict)
+    # Dtype waivers are deliberately separate from value divergences. A cell
+    # may have an accepted approximate or tie-broken value while its schema is
+    # still required to match. Add only representation pairs that cannot share
+    # a useful dtype category (for example SQL JSON text vs a native list).
+    dtype_skip_keys: frozenset[str] = frozenset()
     # Queries whose SQL reference legitimately returns 0 rows at the bounded
     # cell, keyed by query id, with a rationale string. A both-empty cell
     # compares empty-vs-empty and is NON-discriminating (every backend trivially
@@ -614,6 +625,161 @@ def count_executed_cells(
             if query.get_impl_for_family(backend) is not None:
                 coverage[backend] += 1
     return coverage
+
+
+def _dtype_category(dtype: Any) -> str:
+    """Map an Arrow or Polars dtype to a coarse comparison category.
+
+    One spelling table covers both engines: their spellings are disjoint and
+    no spelling maps to different categories per engine, so a single pass
+    classifies both (widths and engine spellings ignored).
+    """
+    text = str(dtype).lower()
+    if text.startswith(("int", "uint")):
+        return "integer"
+    if text.startswith(("float", "double", "halffloat")):
+        return "float"
+    if text.startswith("decimal"):
+        return "decimal"
+    if text in ("string", "large_string", "utf8", "large_utf8", "string_view", "utf8_view"):
+        return "string"
+    if text in ("bool", "boolean"):
+        return "boolean"
+    if text.startswith(("date", "timestamp", "datetime", "time", "duration", "interval", "month_day_nano")):
+        return "temporal"
+    if text.startswith(("list", "large_list", "fixed_size_list", "array", "struct", "map")):
+        return "nested"
+    if text == "null":
+        return "null"
+    if text.startswith(("binary", "large_binary")):
+        return "binary"
+    return f"other:{text}"
+
+
+def _dtype_categories_equivalent(reference: str, candidate: str) -> bool:
+    """Whether two dtype categories acceptably describe the same column.
+
+    Exact category match, plus the one documented loader mapping: the
+    production DataFrame loader casts DECIMAL source columns to DOUBLE, so a
+    decimal SQL result legitimately arrives as a float frame column.
+    """
+    if reference == candidate:
+        return True
+    # Ordered, not symmetric: only a SQL decimal legitimately arrives as a
+    # frame float. The reverse (SQL float, frame decimal) is the wrong-dtype
+    # regression this cell exists to catch, so a set comparison would mask it.
+    return reference == "decimal" and candidate == "float"
+
+
+def _frame_polars_categories(result: Any) -> list[str] | None:
+    """Return ordered dtype categories for a Polars-schema frame, else None.
+
+    Unwraps the same result shapes :func:`materialize_rows` accepts
+    (``UnifiedLazyFrame`` wrappers, lazy or eager Polars frames) without
+    materializing rows. Returns None for frames without a Polars-style
+    ``schema`` mapping (notably Pandas results, whose numpy/object dtypes carry
+    no reliable type signal and stay covered by value comparison instead).
+    """
+    native = getattr(result, "native", result)
+    if hasattr(native, "collect"):
+        native = native.collect()
+    schema = getattr(native, "schema", None)
+    if schema is None:
+        return None
+    values = schema.values() if hasattr(schema, "values") else schema
+    return [_dtype_category(dtype) for dtype in values]
+
+
+def find_cross_surface_dtype_divergences(
+    connection: Any,
+    *,
+    query_ids: Iterable[Any],
+    reference_sql: Callable[[Any], str],
+    dataframe_query: Callable[[Any], Any],
+    contexts: dict[str, Any],
+    backends: tuple[str, ...] = ("expression",),
+    skip_keys: frozenset[str] = frozenset(),
+    skip_query_ids: frozenset[Any] = frozenset(),
+) -> tuple[list[SurfaceDivergence], dict[str, int]]:
+    """Compare each cell's frame column dtypes against the SQL reference types.
+
+    Value comparison normalizes scalars (Decimal to float, timestamps to
+    strings), so a column that arrives with the wrong dtype but equal-looking
+    values - the TEXT->null / TIMESTAMP->string loader bugs the value gate
+    caught - passes silently. This cell compares dtype *categories* (widths and
+    engine spellings ignored) per result column instead.
+
+    Only backends with typed frames participate (the Polars expression family);
+    Pandas results use numpy/object dtypes with no reliable type signal and
+    stay covered by value comparison. Cells without an impl are skipped, cells
+    in ``skip_keys`` (classified value divergences) and queries in
+    ``skip_query_ids`` (vacuous references whose empty frames cannot carry
+    dtypes) are skipped by the caller. Anything else that cannot be compared -
+    a failing reference, a failing frame build, an untyped frame, a width or
+    category mismatch - is returned as a divergence, never silently passed.
+
+    Returns:
+        Tuple of (divergences, compared counts per backend).
+    """
+    divergences: list[SurfaceDivergence] = []
+    compared = dict.fromkeys(backends, 0)
+    for query_id in query_ids:
+        if query_id in skip_query_ids:
+            continue
+        try:
+            # fetch_arrow_table() (not .arrow()) so the result is a
+            # materialized pyarrow.Table on every DuckDB version, matching the
+            # loader path in dataframe_surface.
+            reference_schema = connection.execute(reference_sql(query_id)).fetch_arrow_table().schema
+        except Exception as exc:
+            divergences.append(SurfaceDivergence(query_id=query_id, cell="reference", detail=f"error: {exc}"))
+            continue
+        reference_categories = [_dtype_category(field.type) for field in reference_schema]
+        query = dataframe_query(query_id)
+        for backend in backends:
+            key = f"{query_id}_{backend}"
+            if key in skip_keys:
+                continue
+            impl = query.get_impl_for_family(backend)
+            if impl is None:
+                continue
+            try:
+                candidate_categories = _frame_polars_categories(impl(contexts[backend]))
+            except Exception as exc:
+                divergences.append(SurfaceDivergence(query_id=query_id, cell=backend, detail=f"error: {exc}"))
+                continue
+            if candidate_categories is None:
+                divergences.append(
+                    SurfaceDivergence(
+                        query_id=query_id,
+                        cell=backend,
+                        detail="error: frame has no Polars-style schema to compare",
+                    )
+                )
+                continue
+            compared[backend] += 1
+            if len(candidate_categories) != len(reference_categories):
+                divergences.append(
+                    SurfaceDivergence(
+                        query_id=query_id,
+                        cell=backend,
+                        detail=(
+                            "dtype width mismatch: reference has "
+                            f"{len(reference_categories)} columns, frame has {len(candidate_categories)}"
+                        ),
+                    )
+                )
+                continue
+            for index, (reference, candidate) in enumerate(zip(reference_categories, candidate_categories)):
+                if not _dtype_categories_equivalent(reference, candidate):
+                    divergences.append(
+                        SurfaceDivergence(
+                            query_id=query_id,
+                            cell=backend,
+                            detail=(f"dtype mismatch at column {index}: reference {reference}, frame {candidate}"),
+                        )
+                    )
+    return divergences, compared
 
 
 _PRODUCTION_ADAPTERS: dict[str, str] = {
@@ -1232,6 +1398,9 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
 # to classify a benchmark as cross-surface "guarded", so only clean+enforced gates
 # belong here (registering a red gate here would be coverage theater).
+_FLIGHTDATA_SCALE = 0.01
+_DATAVAULT_SCALE = 0.01
+
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
         name="ssb",
@@ -1317,6 +1486,15 @@ GATES: dict[str, CrossSurfaceGate] = {
         name="read_primitives",
         build=build_read_primitives_duckdb,
         known_divergences=_READ_PRIMITIVES_KNOWN_DIVERGENCES,
+        dtype_skip_keys=frozenset(
+            {
+                "approx_quantile_groupby_expression",
+                "json_aggregates_expression",
+                "map_access_expression",
+                "map_construction_expression",
+                "map_keys_values_expression",
+            }
+        ),
         legitimately_empty=_READ_PRIMITIVES_LEGITIMATELY_EMPTY,
         # Pandas decodes selected SQL NULL cells as NaN in object/numeric result
         # columns (for example MAP lookup misses and LEAD/LAG frame edges). Keep
@@ -1329,15 +1507,51 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_READ_PRIMITIVES_SCALE,
     ),
+    # FlightData: 20 SQL queries and 20 DataFrame queries overlap verbatim, and
+    # the bounded cell is one synthetic month (SF=0.01), which stays offline
+    # (larger scales attempt a BTS download with a synthetic fallback) while
+    # keeping every query discriminating. Promoted from STAGED_GATES with an
+    # empty baseline: all 40 query-backend cells compare equal, so there is no
+    # burn-down to stage behind. Stability from here is observed in CI, where
+    # this gate blocks.
+    "flightdata": CrossSurfaceGate(
+        name="flightdata",
+        build=build_flightdata_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "FlightData expression and pandas DataFrame implementations are separately handwritten for each "
+            "query (expression helpers plus a compact pandas metadata DSL), so the gate has stronger "
+            "cross-implementation signal than shared-spec generators."
+        ),
+        scale_factor=_FLIGHTDATA_SCALE,
+    ),
+    # Data Vault: 22 SQL queries ("1" .. "22") and 22 DataFrame queries
+    # ("Q1" .. "Q22") correspond by the mechanical ``Q`` prefix (the same
+    # convention as enforced amplab) -- an independently authored numbering on
+    # each surface, not a guessed mapping. Promoted from STAGED_GATES with an
+    # empty baseline: all 44 query-backend cells compare equal, and the
+    # query-execution burn-down is done. The builder keeps forcing regeneration
+    # on every build so probes can never pass on a stale manifest.
+    "datavault": CrossSurfaceGate(
+        name="datavault",
+        build=build_datavault_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "Data Vault expression and pandas DataFrame implementations are separately handwritten for each "
+            "query, so the gate has stronger cross-implementation signal than shared-spec generators."
+        ),
+        scale_factor=_DATAVAULT_SCALE,
+    ),
 }
 
-# Staged gates: a load-faithful builder is wired and runnable in report mode, but
-# the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). Kept OUT of GATES so the
-# coverage map does not prematurely mark these benchmarks "guarded". Currently empty
-# - read_primitives graduated to GATES after its burn-down; the next gateable
-# benchmarks (datavault, flightdata, nyctaxi, tpcds_obt, tpch_skew, tsbs_devops)
-# land here first when their builders are wired.
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# The next gateable benchmarks (nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
 STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 

@@ -217,10 +217,11 @@ class TestOfficialFlagReachesTheClassifier:
         from benchbox.core.benchmark_loader import compliance_mode_kwargs
         from benchbox.core.schemas import BenchmarkConfig
 
-        gated = BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=1.0, official=True)
-        assert compliance_mode_kwargs(gated) == {"official": True}
+        for name, display_name in (("tpcds", "TPC-DS"), ("tpch", "TPC-H")):
+            gated = BenchmarkConfig(name=name, display_name=display_name, scale_factor=1.0, official=True)
+            assert compliance_mode_kwargs(gated) == {"official": True}
 
-        ungated = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, official=True)
+        ungated = BenchmarkConfig(name="tpcdi", display_name="TPC-DI", scale_factor=1.0, official=True)
         assert compliance_mode_kwargs(ungated) == {}
 
     def test_official_benchmark_wrapper_defaults_to_official(self):

@@ -13,6 +13,10 @@ def build_baseline_unified_config() -> UnifiedTuningConfiguration:
     """Build the canonical baseline config for `--tuning notuning` semantics."""
     baseline_config = UnifiedTuningConfiguration()
     baseline_config.disable_all_constraints()
+    # No clustering is requested for untuned runs: plain Delta OPTIMIZE
+    # (file compaction) stays independent of the clustering strategy, so the
+    # strategy must report "none" rather than inherit a tuned default.
+    baseline_config.platform_optimizations.databricks_clustering_strategy = "none"
     return baseline_config
 
 

@@ -48,6 +48,7 @@ from benchbox.platforms.base import DriverIsolationCapability, PlatformAdapter
 from benchbox.platforms.base.cloud_spark import (
     CloudSparkConfigMixin,
     CloudSparkStaging,
+    SparkExternalTableMixin,
     SparkTuningMixin,
 )
 from benchbox.platforms.base.cloud_spark.config import CloudPlatform
@@ -91,7 +92,7 @@ class DataprocBatchState:
     SUCCESS_STATES = {SUCCEEDED}
 
 
-class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
+class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
     """GCP Dataproc Serverless platform adapter.
 
     Dataproc Serverless is Google Cloud's fully managed Spark service that
@@ -300,6 +301,7 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, Platfor
         results_path = f"{self.gcs_staging_dir}/results/{batch_id}"
 
         # Create PySpark script that runs the query and saves results
+        query_literal = json.dumps(query)
         job_script = f'''
 from pyspark.sql import SparkSession
 
@@ -310,7 +312,7 @@ spark = SparkSession.builder \\
 
 spark.sql("USE {self.database}")
 
-result = spark.sql("""{query}""")
+result = spark.sql({query_literal})
 result.write.mode("overwrite").json("{results_path}")
 
 spark.stop()
@@ -455,13 +457,31 @@ spark.stop()
 
             create_table_query = f"""
                 CREATE EXTERNAL TABLE IF NOT EXISTS {self.database}.{table}
-                USING {self.table_format.upper()}
+                USING {file_format.upper()}
                 LOCATION '{table_uri}'
             """
             self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
             logger.info(f"Created table {self.database}.{table}")
 
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
+
+    def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
+        """Register one external table over staged files via a Spark SQL batch."""
+        self._validate_external_identifier(table_name, "table name")
+        self._validate_external_identifier(self.database, "database name")
+        safe_location = self._escape_external_location(location)
+        create_table_query = f"""
+            CREATE OR REPLACE TABLE {self.database}.{table_name}
+            USING {file_format.upper()}
+            LOCATION '{safe_location}'
+        """
+        batch_id, state = self._submit_spark_sql_batch(create_table_query, wait_for_completion=True)
+        if state not in DataprocBatchState.SUCCESS_STATES:
+            raise RuntimeError(
+                f"Dataproc Serverless external table registration failed for "
+                f"'{self.database}.{table_name}' with state: {state} (batch {batch_id})"
+            )
+        logger.info(f"Registered external table {self.database}.{table_name}")
 
     def execute_query(
         self,

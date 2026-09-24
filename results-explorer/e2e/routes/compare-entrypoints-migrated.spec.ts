@@ -4,61 +4,51 @@ import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures
 test.describe("compare entrypoints after tray migration (rx-18)", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("Home compare entry shows picking count and links to compareHref when picking non-empty", async ({ page }) => {
+  test("Overview links to comparison rankings", async ({ page }) => {
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Recent Results/i);
-    // Home entry always visible, with empty picking it shows Compare →
-    const homeEntry = page.getByTestId("home-compare-entrypoint");
+    const homeEntry = page.getByTestId("overview-compare-cta");
     await expect(homeEntry).toBeVisible();
     await expect(homeEntry).toContainText(/Compare/);
-    // With no picks, href is builder
-    await expect(homeEntry).toHaveAttribute("href", "/results/compare/");
-    // PickingState is in-memory; selecting via other routes in same session via SPA routing would reflect it,
-    // but full page.goto resets it. Verify empty state badge is correct.
+    await expect(homeEntry).toHaveAttribute("href", "/results/compare");
   });
 
-  test("ResultDetail Compare this result link plus picking toggle and compareHref link", async ({ page }) => {
+  test("ResultDetail links to Find runs with the current result selected", async ({ page }) => {
     const id = fixtureIds.ids.duckdb;
     await page.goto(`/results/r/${id}`);
     await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
-    await expect(page.getByTestId("result-detail-compare-link")).toHaveAttribute("href", new RegExp(`/results/compare\\?ids=${id}`));
-    const toggle = page.getByTestId("result-detail-picking-toggle");
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await expect(toggle).toContainText("Add to comparison");
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    await expect(toggle).toContainText("Remove from comparison");
-    // At 1 picked, the compare-picked link should not yet show (needs 2)
-    await expect(page.getByTestId("result-detail-compare-picked")).toBeHidden().catch(() => {});
-    // PickingState toggle is in-memory on this page; verify toggle worked then compare link appears after second pick via same page.
-    // For cross-route picking, SPA navigation would be used; full goto resets.
-    // Verify that after toggling off, it returns to Add state.
-    await toggle.click();
-    await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await expect(toggle).toContainText("Add to comparison");
+    await waitForDataLoaded(page, /Query timings/);
+    const compareLink = page.getByTestId("result-detail-compare-link");
+    await expect(compareLink).toHaveAttribute("href", new RegExp(`/results/query\\?pick=${id}`));
+    await compareLink.click();
+    await waitForDataLoaded(page, /Find benchmark runs/);
+    await expect(page.getByTestId("query-compare-tray")).toContainText("1 result selected");
+    await expect(page.getByTestId("query-compare-tray")).toContainText("pick a compatible second row");
   });
 
-  test("all entrypoints share one disabled rule: compare enabled only at >=2", async ({ page }) => {
+  test("overview, benchmark, and receipt pages expose comparison entrypoints", async ({ page }) => {
     // Home
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Recent Results/i);
     // Home entry is always a link, but its text reflects picking count
-    await expect(page.getByTestId("home-compare-entrypoint")).toBeVisible();
+    await expect(page.getByTestId("overview-compare-cta")).toBeVisible();
 
     // BenchmarkIndex guidance is disabled below 2
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    await expect(page.getByRole("button", { name: "Select 2 comparable results" })).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
 
-    // ResultDetail picking toggle aria-pressed reflects picking
+    // ResultDetail sends the current run to Find runs, where the second run is selected.
     await page.goto(`/results/r/${fixtureIds.ids.duckdb}`);
     await waitForShell(page);
-    await waitForDataLoaded(page, /Query Timings/);
-    await expect(page.getByTestId("result-detail-picking-toggle")).toHaveAttribute("aria-pressed", "false");
+    await waitForDataLoaded(page, /Query timings/);
+    await expect(page.getByTestId("result-detail-compare-link")).toHaveAttribute(
+      "href",
+      new RegExp(`/results/query\\?pick=${fixtureIds.ids.duckdb}`),
+    );
   });
 
   test("no stale compare labels remain", async ({ page }) => {
@@ -68,6 +58,6 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
     // Should have BenchmarkIndex's tray once 2 selected, not old 'Compare 0 runs'
-    await expect(page.getByText("Select 2 comparable results")).toBeVisible();
+    await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
   });
 });

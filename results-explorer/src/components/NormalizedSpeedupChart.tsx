@@ -22,6 +22,7 @@ import {
   paletteColor,
 } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 
 function toX(speedup: number, width: number): number {
   const clamped = Math.max(0.1, Math.min(speedup, 10));
@@ -42,7 +43,7 @@ interface Props {
 export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
   // Use measured width; fall back to 600 if not yet observed (before first paint).
-  const drawWidth = Math.max(containerWidth, 300);
+  const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
   // w6 (chart-panel-scope-and-labeling): default to "comparable only"
   // so cohorts with hundreds of queries (e.g. read_primitives' ~149)
@@ -89,6 +90,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
     !hasMissingSpeedups &&
     measuredSpeedups.length > 0 &&
     measuredSpeedups.every((speedup) => Math.abs(speedup - 1) <= 0.01);
+  const chartDescription = `Per-query speedup relative to ${results[baselineIdx]?.platform ?? "the selected baseline"}. Values above 1 are faster; values below 1 are slower. ${entries.length} queries are shown. An accessible table follows the chart.`;
 
   if (allNearEqual && hiddenEntryCount === 0) {
     return (
@@ -102,6 +104,7 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
+      <p id="normalized-speedup-description" class="sr-only">{chartDescription}</p>
       {(hiddenEntryCount > 0 || (!showComparableOnly && fullyComparableEntries.length < allEntries.length)) && (
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--bb-data-fg-muted)]">
           <span>
@@ -126,7 +129,9 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
-        aria-label="Normalized speedup chart"
+        role="img"
+        aria-label="Per-query results relative to the selected baseline"
+        aria-describedby="normalized-speedup-description"
       >
         {/* Grid lines and axis labels */}
         {SPEEDUP_GRID_STOPS.map((stop) => {
@@ -200,12 +205,21 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                       fill={isSlower ? SLOWER_FILL : FASTER_FILL}
                       opacity={0.75}
                     />
+                    {/* A speedup at the clamp reaches the end of the plot, so a
+                        label started past the bar would be drawn outside the
+                        viewBox and cropped. */}
                     <text
-                      x={isSlower ? barX - 2 : sx + 2}
+                      x={
+                        edgeSafeValueLabel(isSlower ? barX : sx, drawWidth, isSlower ? "left" : "right")
+                          .x
+                      }
                       y={barY + BAR_H / 2 + 3}
                       font-size="8"
                       fill={color}
-                      text-anchor={isSlower ? "end" : "start"}
+                      text-anchor={
+                        edgeSafeValueLabel(isSlower ? barX : sx, drawWidth, isSlower ? "left" : "right")
+                          .textAnchor
+                      }
                     >
                       {formatSpeedup(speedup, { unit: "×" }).valueText}
                     </text>
@@ -216,6 +230,24 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
           );
         })}
       </svg>
+
+      <table class="sr-only">
+        <caption>Per-query speedups relative to {results[baselineIdx]?.platform ?? "the selected baseline"}</caption>
+        <thead>
+          <tr><th>Query</th><th>Candidate</th><th>Speedup</th></tr>
+        </thead>
+        <tbody>
+          {entries.flatMap((entry, entryIndex) =>
+            entry.speedups.map((speedup, candidateIndex) => (
+              <tr key={`${entry.queryId}-${entryIndex}-${candidateIndex}`}>
+                <td>{entry.queryId}</td>
+                <td>{nonBaselineResults[candidateIndex]?.platform ?? "Candidate"}</td>
+                <td>{speedup === null ? "Not available" : formatSpeedup(speedup).valueText}</td>
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
 
       {/* Legend */}
       <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
@@ -254,9 +286,9 @@ function SpeedupParityState({
 }) {
   return (
     <div class="rounded-lg panel-muted p-4 text-sm">
-      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query speedup difference</p>
+      <p class="font-semibold text-[var(--bb-data-fg-primary)]">No meaningful per-query difference</p>
       <p class="mt-1 text-[var(--bb-data-fg-muted)]">
-        All {speedupCount.toLocaleString()} compared query speedups are 1.00× versus baseline {baseline}.
+        All {speedupCount.toLocaleString()} compared queries are 1.00× relative to {baseline}.
       </p>
       <p class="mt-2 text-xs text-[var(--bb-data-fg-muted)]">
         Baseline: <strong>{baseline}</strong>

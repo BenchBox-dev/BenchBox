@@ -412,7 +412,13 @@ class DataVaultBenchmark(BaseBenchmark):
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
             statements = [stmt.strip() for stmt in ddl.split(";\n") if stmt.strip()]
             translated = [
-                translate_sql_query(stmt, target_dialect=target, source_dialect="postgres", identify=True)
+                translate_sql_query(
+                    stmt,
+                    target_dialect=target,
+                    source_dialect="standard",
+                    identify=True,
+                    scope="schema_ddl",
+                )
                 for stmt in statements
             ]
             ddl = ";\n\n".join(translated) + ";"
@@ -508,4 +514,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Force data regeneration",
         aliases=("force-regenerate",),
     ),
+    benchmark_class=DataVaultBenchmark,
 )

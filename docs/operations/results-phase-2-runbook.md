@@ -5,15 +5,23 @@ corpus. The product boundary and launch rationale live in
 [`docs/development/benchbox-results-platform-strategy.md`](../development/benchbox-results-platform-strategy.md).
 This runbook documents the current operating model only: contributor PRs target
 `published-results`, CI validates them, maintainers review them, and the protected
-release workflow is the only path that can rebuild and deploy the static Explorer;
+publication transaction is the normal path that rebuilds and deploys the static Explorer;
 no hosted API is involved.
 
 Authority is split by surface: `develop` owns code, validators, generators,
-the recurring maintainer seed, and the curated release-preview corpus;
-`published-results` owns the complete accepted Phase 2 archive. Each branch
-generates its inventory from its own tree. Published-only submissions are
-expected and are not automatically backported into the curated Explorer
-source.
+Explorer admission and presentation policy, the recurring maintainer seed, and the
+legacy curated release-preview corpus; `published-results` owns the complete accepted
+Phase 2 archive. Each branch generates its inventory from its own tree. Published-only
+submissions are expected and are not automatically backported into the legacy curated
+Explorer source.
+
+For independent publication, the accepted contract is
+[`independent-publication-contract.md`](independent-publication-contract.md): a reviewed
+manifest pins an exact `published-results` SHA, and every validator-clean result at that
+SHA is publication input by default. Visibility, trust, withdrawal, and ranking
+eligibility are orthogonal presentation fields owned with policy on `develop`; they do
+not create another corpus authority. A merge to `published-results` proves acceptance,
+not live deployment. Only an attested live receipt proves publication.
 
 ## 1. Submission Lifecycle
 
@@ -76,24 +84,63 @@ exists only on `published-results`, it becomes **published-only** and is kept
 on the next mirror. That protects community submissions the automated sync
 must never wipe.
 
-When a maintainer must remove a path from the public corpus (privacy
-remediation, takedown, mistaken publish):
+For a maintainer-approved removal from the public archive, open a hand-created
+PR against `published-results` that is **deletion-only**: it may remove the
+affected primary bundle, every same-stem `.manifest.json`, `.plans.json`,
+`.tuning.json`, and `.applied.json` companion, and regenerate the inventory,
+but it must not add or replace bundles. Submission CI rejects a primary
+deletion while any of those companions remains. If an affected bundle path
+also exists on `develop`, remove it from `develop` first as part of the same
+coordinated change; otherwise the next union mirror will copy it back onto
+`published-results`. There is no
+durable archive exclusion or tombstone mechanism in this workflow. After the
+`develop` removal is in place, open the deletion-only `published-results` PR.
+PRs #1882 and #1940 are worked examples. During the A0 freeze, do not delete
+paths from `published-results` or `develop`; use the presentation withdrawal
+and artifact-access suppression procedure below.
 
-1. **Do not** reintroduce a wipe-then-checkout of `results-data/bundles/` on
-   the sync workflow, and **do not** run a full-tree wipe of published bundles
-   while any published-only paths should survive. A full wipe would delete
-   every community submission that is not on develop.
-2. Open a **manual PR against `published-results`** that deletes only the
-   intended path(s) under `results-data/bundles/` (and any related docs if
-   needed).
-3. Regenerate inventory on that branch:
-   `uv run -- python scripts/generate_corpus_inventory.py --write`, then
-   stage `results-data/corpus-inventory.json` with the path removals.
-4. Merge after review. Leave develop in sync if the same path still exists
-   there (delete on develop in a separate PR if the seed/corpus copy must go
-   too); the next develop→published mirror will not resurrect a path that is
-   already gone from both trees, and will not re-delete other published-only
-   paths.
+Maintainer and seed additions to the public archive land on `develop` first,
+then sync through the mirror — never via a hand-opened maintainer PR that
+adds or replaces bundles. Community submissions remain hand-opened PRs against
+`published-results` as in §1.1. For maintainer/seed content, run:
+
+```bash
+gh workflow run sync-results-data-to-published.yml
+```
+
+Review and merge the resulting `auto/results-mirror-*` PR. Hand-opened
+*maintainer archive-content* PRs against `published-results` must stay
+deletion-only; do not use them to add maintainer or seed archive content. A
+hand-opened workflow-only PR is the required exception whenever
+`.github/workflows/validate-submission.yml` changes on `develop`, because the
+mirror token cannot update workflow files. The sync uses a union
+overlay so an automated mirror never deletes public content. Its four-signal
+waiver for trusted mirror content requires all of the following: base
+`published-results`, `head.repo.fork == false`, PR author
+`github-actions[bot]`, and `head_ref` matching `auto/results-mirror-*`. Do not
+relax this waiver to make a hand-opened addition pass. If one change both
+adds and deletes paths, mirror last: complete the reviewed deletion first,
+then land the addition on `develop` and run the mirror so the corpus floor is
+never violated on the public branch.
+
+During the A0 migration freeze, privacy remediation, takedown, or mistaken
+publication authorizes presentation withdrawal and artifact-access suppression,
+not accepted-archive deletion:
+
+1. Record the authorized withdrawal, affected public IDs, actor, reason, and time.
+2. Carry the withdrawal into publication desired state, rebuild presentation without the
+   affected rows, deploy, probe externally, and require an attested live receipt before
+   reporting the takedown live.
+3. Suppress accessible derived artifacts where the provider permits, without claiming
+   that Git history or accepted source bytes were erased.
+4. **Do not** delete a path from `published-results` or `develop` while the A0 freeze is
+   active. One-maintainer takedown authority does not supersede the preservation floor.
+
+Irreversible source-byte erasure requires a separately approved incident plan that either
+releases the applicable A0 preservation gate or explicitly supersedes it. That plan must
+inventory Git history, workflow artifacts, caches, mirrors, and inventory consequences.
+Only then may operators use a narrow reviewed deletion PR; a full-tree wipe remains
+forbidden, and the deletion merge is never proof that public bytes are gone.
 
 If the workflow's heuristics ever miss a path (or a one-off mirror is
 needed outside the trigger conditions), trigger it manually via
@@ -178,10 +225,10 @@ reads more protection into a green badge than is there:
 
 ### 1.3 Explorer publish path
 
-The static Explorer at `benchbox.dev/results/` is wired through
-[`docs.yml`](../../.github/workflows/docs.yml): the `build` job runs for
-documentation PRs targeting `release` or `develop` and for pushes to `release`,
-while the `deploy` job runs only for a protected push to `release`.
+The static Explorer at `benchbox.dev/results/` publishes through the independent publication
+transaction from `develop` (candidate build plus `github-pages`-approved promotion in
+`publication-deployer-soak-and-retirement.md`). The legacy `docs.yml` release-to-Pages deploy
+remains in the tree but is skipped while a recent independent publication owns Pages.
 `published-results` is **not** the Explorer's build source — it is the
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.
@@ -192,8 +239,10 @@ corpus-archive branch that contributor PRs target and that mirrors develop's
 > The `docs.yml` build still gates Explorer steps on
 > `hashFiles('results-explorer/package.json')`, but a release that includes the
 > application now fails closed when the corpus, helper set, or generated
-> snapshot is missing. The deploy job runs only after a protected push to
-> `release`, and the `github-pages` environment must permit `release`.
+> snapshot is missing. The legacy `docs.yml` deploy job runs only after a protected push to
+> `release`, and the `github-pages` environment must permit `release` for that fallback path.
+> Normal production writes use the transaction writer, whose `github-pages` approval is granted
+> on a dispatch from `develop`.
 >
 > This is a curated preview, not a broad leaderboard or full-cohort claim.
 > Completion evidence must pin the release SHA, artifact digest, deployment
@@ -278,21 +327,35 @@ result IDs from the *published* bytes, so regenerate the inventory afterwards
 
 ## 5. Rolling Back a Bad Merge
 
-Use a fresh branch off the affected target branch. Set `REMOTE` to the repo you are
-operating against.
+First classify whether the merge introduced an accepted bundle. During the A0
+freeze, an accepted bundle must remain in the archive tip and remain recoverable.
+For an accepted bundle, do **not** run `git revert` against `published-results`.
+Request presentation withdrawal, deploy the suppression generation, and retain
+the accepted source bytes. Removing those bytes requires a separately approved
+erasure exception and evidence plan.
+
+The archive-reversing procedure below is reserved for a merge that changed only
+unaccepted staging or non-corpus material, or for an explicitly approved erasure
+exception. Use a fresh branch off the affected target branch. Set `REMOTE` to the
+repo you are operating against. Because `published-results` uses squash merges,
+select the exact merged PR commit and inspect it before reverting. Do not use
+`git log --merges` or `git revert -m`.
 
 ```bash
 REMOTE=public
+PR_NUMBER=<published-results-pr-number>
 git fetch "$REMOTE" published-results
 git switch -c rollback-results "$REMOTE/published-results"
-MERGE_SHA="$(git log --merges --oneline -n 1)"
-echo "$MERGE_SHA"
-git revert -m 1 "${MERGE_SHA%% *}"
+BAD_SHA="$(gh pr view "$PR_NUMBER" --repo BenchBox-dev/BenchBox --json mergeCommit --jq '.mergeCommit.oid')"
+git show --stat --oneline "$BAD_SHA"
+# Stop unless this is the exact non-accepted change approved for archive reversal.
+git revert "$BAD_SHA"
 git push "$REMOTE" HEAD:published-results
 ```
 
-Then comment on the reverted PR explaining whether the bundle was broken or merely
-misleading, and whether a corrected resubmission is welcome.
+Then comment on the reverted PR explaining why archive reversal was permitted,
+whether the material was broken or merely misleading, and whether a corrected
+resubmission is welcome. Record the erasure approval when that exception was used.
 
 ## 6. Re-triggering an Explorer Rebuild
 
@@ -305,11 +368,10 @@ gh run watch --repo BenchBox-dev/BenchBox
 
 Use `workflow_dispatch` only after confirming there is no newer push already
 rebuilding the site. Note that `workflow_dispatch` runs the `build` job but
-**not** the `deploy` job — the Pages deploy is gated on
+**not** the legacy `deploy` job — the legacy Pages deploy is gated on
 `github.event_name == 'push' && github.ref == 'refs/heads/release'` — so a manual
-run validates the build without publishing. A publish requires a push to
-`release` (and, per §1.3, the Explorer paths actually being present on
-`release`).
+run validates the build without publishing. A publish uses the candidate build plus
+transaction promotion in §1.3, not a push to `release`.
 
 ## 7. Data Locations
 

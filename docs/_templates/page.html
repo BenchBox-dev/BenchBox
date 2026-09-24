@@ -35,20 +35,53 @@
       <a class="benchbox-site-header__link" href="https://benchbox.dev/docs/"{% if not is_blog_page %} aria-current="page"{% endif %}>Docs</a>
       <a class="benchbox-site-header__link" href="https://benchbox.dev/blog/"{% if is_blog_page %} aria-current="page"{% endif %}>Blog</a>
       <a class="benchbox-site-header__link" href="https://benchbox.dev/results/">Results</a>
-      <a class="benchbox-site-header__link" href="https://benchbox.dev/prompts/">Instruct an agent</a>
       <a class="benchbox-site-header__link" href="https://github.com/BenchBox-dev/BenchBox" target="_blank" rel="noopener">GitHub</a>
       <a class="benchbox-site-header__cta" href="https://benchbox.dev/docs/usage/installation.html">Run benchmark</a>
-      <button
-        class="benchbox-site-header__theme"
-        type="button"
-        aria-label="Theme: system. Activate to switch theme."
-        data-benchbox-theme-toggle
-      >System</button>
     </nav>
   </div>
 </header>
 {{ super() }}
 {%- endblock body %}
+
+{# Add the shared footer theme control to Furo's footer block #}
+{%- block footer %}
+{{ super() }}
+<div class="benchbox-site-footer-theme" role="radiogroup" aria-label="Color theme">
+  <button
+    type="button"
+    role="radio"
+    class="benchbox-site-footer-theme__option"
+    data-benchbox-theme-option="system"
+    aria-checked="true"
+    aria-label="System theme"
+    title="System theme"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="2.75"></circle><path d="M8 2.25v1M8 12.75v1M2.25 8h1M12.75 8h1M3.93 3.93l.7.7M3.93 12.07l.7-.7M12.07 3.93l-.7.7"></path><path d="M21.5 17.2A5.6 5.6 0 1 1 14.8 10.5a5 5 0 0 0 6.7 6.7z"></path></svg>
+  </button>
+  <button
+    type="button"
+    role="radio"
+    class="benchbox-site-footer-theme__option"
+    data-benchbox-theme-option="light"
+    aria-checked="false"
+    aria-label="Light theme"
+    title="Light theme"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+  </button>
+  <button
+    type="button"
+    role="radio"
+    class="benchbox-site-footer-theme__option"
+    data-benchbox-theme-option="dark"
+    aria-checked="false"
+    aria-label="Dark theme"
+    title="Dark theme"
+  >
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.1A8.5 8.5 0 1 1 9.9 3.5a7.6 7.6 0 0 0 10.6 10.6z"></path></svg>
+  </button>
+</div>
+{%- endblock footer %}
 
 {# Add RSS/Atom feed link in head for blog pages #}
 {%- block extrahead %}

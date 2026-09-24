@@ -213,5 +213,5 @@ benchbox run --platform polars-df --tuning tuning/performance.yaml ...
 ## Related Documentation
 
 - [DataFrame Platform Documentation](../platforms/dataframe.md)
-- [Profiling Guide](./profiling.md)
-- [Tuning Configuration](../advanced/tuning.md)
+- [Profiling Guide](dataframe-benchmarks.md)
+- [Tuning Configuration](../advanced/performance-tuning.rst)

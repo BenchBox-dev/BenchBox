@@ -251,8 +251,22 @@ class TestGenerateInventory:
         inventory = script.generate_inventory(tmp_path)
 
         assert inventory["cohorts"] == {
-            "tpch@sf0.1": ["DataFusion", "DuckDB", "Polars"],
+            "tpch@sf0.1": ["DataFusion v1.0.0", "DuckDB v1.0.0", "Polars v1.0.0"],
         }
+
+    def test_duckdb_cohort_uses_resolved_package_version(self, tmp_path: Path) -> None:
+        bundle = _minimal_bundle(benchmark_id="tpch", scale_factor=10.0)
+        bundle["platform"].update({"version": "2.0.0-alpha38615", "client_version": "1.6.0.dev365"})
+        bundle["execution"] = {
+            "driver_version_actual": "2.0.0-alpha38615",
+            "driver_version_resolved": "1.6.0.dev365",
+        }
+        (tmp_path / "duckdb-dev.json").write_text(json.dumps(bundle), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["bundles"][0]["platform_version"] == "1.6.0.dev365"
+        assert inventory["cohorts"] == {"tpch@sf10.0": ["DuckDB v1.6.0.dev365"]}
 
     def test_internal_benchmark_bundles_are_hidden(self, tmp_path: Path) -> None:
         _write_bundle(tmp_path / "joinorder.json", benchmark_id="joinorder", scale_factor=1.0, platform="DuckDB")

@@ -37,12 +37,9 @@ def _minimal_bundle() -> dict:
         },
         "summary": {
             "validation": "passed",
-            "queries": {"total": 2, "passed": 2, "failed": 0},
+            "queries": {"total": 22, "passed": 22, "failed": 0},
         },
-        "queries": [
-            {"id": "Q1", "ms": 100, "status": "SUCCESS"},
-            {"id": "Q2", "ms": 200, "status": "SUCCESS"},
-        ],
+        "queries": [{"id": f"Q{i}", "ms": 100 + i, "status": "SUCCESS"} for i in range(1, 23)],
     }
 
 
@@ -74,6 +71,10 @@ def _copy_slim_validator(repo_root: Path, slim_root: Path) -> None:
     shutil.copy2(
         repo_root / "benchbox" / "core" / "results" / "query_status.py",
         slim_root / "benchbox" / "core" / "results" / "query_status.py",
+    )
+    shutil.copy2(
+        repo_root / "benchbox" / "core" / "results" / "schema_policy.py",
+        slim_root / "benchbox" / "core" / "results" / "schema_policy.py",
     )
 
 

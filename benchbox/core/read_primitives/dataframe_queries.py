@@ -2,7 +2,7 @@
 
 This module provides DataFrame implementations of Read Primitives benchmark queries
 that can run on both expression-based (Polars, PySpark, DataFusion) and
-Pandas-like (Pandas, Modin, Dask) platforms.
+Pandas-like (Pandas and Dask) platforms.
 
 Read Primitives is a microbenchmark testing isolated database operations using
 the TPC-H schema. Unlike full TPC-H queries, these focus on single operations
@@ -142,7 +142,7 @@ SKIP_FOR_DATAFRAME = [
 # NOTE: EXPRESSION_FAMILY_ONLY list has been removed.
 #
 # All queries now support both expression-family (Polars, PySpark, DataFusion)
-# and pandas-family (Pandas, Modin, cuDF, Dask) implementations.
+# and pandas-family (Pandas, cuDF, Dask) implementations.
 #
 # Queries previously in this list have valid pandas-family implementations:
 # - QUALIFY queries: Use window + filter pattern (add window col, then filter)
@@ -174,12 +174,38 @@ SKIP_FOR_PYSPARK = [
     # PySpark does not override element() so it raises NotImplementedError.
     "list_filter",
     "list_transform",
-    # window_lead_lag_same_frame's expression impl uses raw Polars (`.native` +
-    # pl.col(...).shift().over()) for a deterministic composite-key LAG/LEAD that
-    # the unified window helpers cannot yet express (single-column order_by only;
-    # see TODO read-primitives-simplify-inline-window-helpers). pl.col(...) on a
-    # non-Polars native frame fails, so PySpark skips it until the impl is ported.
-    "window_lead_lag_same_frame",
+    # window_moving_frame's expression impl uses raw Polars rolling_mean and
+    # rolling_sum_by for bounded ROWS/RANGE frames the unified window helpers
+    # cannot express. pl.col(...) on a non-Polars native frame fails, so
+    # PySpark skips it until the impl is ported.
+    "window_moving_frame",
+    # window_multiple_orderings' expression impl uses raw Polars
+    # (.native + pl.col(...).rank().over()) for the dense-rank/percent-rank/
+    # cume-dist combination. Same porting precondition as above.
+    "window_multiple_orderings",
+    # optimizer_common_subexpression's expression impl builds the revenue
+    # expression with raw Polars (pl.col arithmetic + pl.when). pl.col(...)
+    # on a non-Polars native frame fails, so PySpark skips it until ported.
+    "optimizer_common_subexpression",
+    # statistical_correlation's expression impl uses raw Polars (pl.corr/pl.cov
+    # with ddof control UnifiedExpr.var/std lack). Same precondition.
+    "statistical_correlation",
+    # statistical_variance_stddev's expression impl uses raw Polars
+    # (.var(ddof=1)/.std(ddof=0/1)) for sample/population moments.
+    # Same porting precondition as above.
+    "statistical_variance_stddev",
+    # struct_construction's expression impl uses raw Polars (.native +
+    # pl.concat_list) for the contact-info array. Same precondition.
+    "struct_construction",
+    # timeseries_trend_analysis's expression impl uses raw Polars (.native +
+    # .dt.truncate + pl.len) for month bucketing. Same precondition.
+    "timeseries_trend_analysis",
+    # olap_cube_analysis's expression impl builds the 2^4 grouping sets with
+    # raw Polars (.native + pl.col/pl.len/pl.concat). Same precondition.
+    "olap_cube_analysis",
+    # olap_rollup_analysis's expression impl uses the same raw-Polars
+    # grouping-set construction. Same porting precondition as above.
+    "olap_rollup_analysis",
 ]
 
 # Queries skipped specifically for DataFusion DataFrame mode.
@@ -189,9 +215,6 @@ SKIP_FOR_DATAFUSION = [
     "list_transform",  # .list.eval() is Polars-only - no DataFusion equivalent
     "list_reduce",  # array_sum() not in DataFusion v50 Python bindings
     "array_distinct",  # DataFusion array_distinct returns Dictionary(Int32,Utf8) causing Arrow type mismatch
-    # Raw-Polars (`.native` + pl.col) deterministic LAG/LEAD impl; pl.col on a
-    # non-Polars native frame fails (see SKIP_FOR_PYSPARK note above).
-    "window_lead_lag_same_frame",
 ]
 
 
@@ -1038,7 +1061,7 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count fallback for the pandas family.
 
     Dask uses native `nunique_approx()` (HLL) for this single-value
-    query. Pandas, Modin, and cuDF expose only exact `.nunique()` at
+    query. Pandas and cuDF expose only exact `.nunique()` at
     the API surface, so the "approximate" label degrades to exact on
     those platforms.
     """
@@ -1052,7 +1075,7 @@ def approx_count_distinct_simple_pandas_impl(ctx: DataFrameContext) -> Any:
 def approx_count_distinct_groupby_pandas_impl(ctx: DataFrameContext) -> Any:
     """Approximate distinct count groupby fallback for the pandas family.
 
-    Pandas, Modin, cuDF, and current Dask expose no groupby approximate
+    Pandas and cuDF, and current Dask expose no groupby approximate
     distinct aggregate matching this query shape. Dask has Series-level
     `nunique_approx()`, but no groupby equivalent in the dask-expr API,
     so this query remains an exact fallback for the pandas family.
@@ -1546,21 +1569,21 @@ def window_growing_frame_pandas_impl(ctx: DataFrameContext) -> Any:
 def window_lead_lag_expression_impl(ctx: DataFrameContext) -> Any:
     """Offset window functions over the same frame (deterministic tie-break).
 
-    Uses raw Polars via ``.native``: ``UnifiedExpr`` has no ``.shift`` and the
-    ``window_lag``/``window_lead`` helpers shift before sorting. LAG/LEAD are
-    computed with ``shift().over()`` after a total-order sort that matches the
-    catalog SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break.
+    LAG/LEAD come from the ``window_lag``/``window_lead`` helpers over the
+    catalog SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break; the
+    explicit sort reproduces the previous output row order.
     """
-    import polars as pl
-
+    order_by = [("o_orderdate", True), ("o_orderkey", True)]
     return (
         ctx.get_table("orders")
-        .native.filter((pl.col("o_orderdate") >= date(1995, 1, 1)) & (pl.col("o_orderdate") < date(1996, 1, 1)))
-        .sort(["o_custkey", "o_orderdate", "o_orderkey"])
-        .with_columns(
-            pl.col("o_totalprice").shift(1).over("o_custkey").alias("prev_order_price"),
-            pl.col("o_totalprice").shift(-1).over("o_custkey").alias("next_order_price"),
+        .filter(
+            (ctx.col("o_orderdate") >= ctx.lit(date(1995, 1, 1))) & (ctx.col("o_orderdate") < ctx.lit(date(1996, 1, 1)))
         )
+        .with_columns(
+            ctx.window_lag("o_totalprice", 1, partition_by=["o_custkey"], order_by=order_by).alias("prev_order_price"),
+            ctx.window_lead("o_totalprice", 1, partition_by=["o_custkey"], order_by=order_by).alias("next_order_price"),
+        )
+        .sort(["o_custkey", "o_orderdate", "o_orderkey"])
         .select("o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price", "next_order_price")
     )
 
@@ -3373,33 +3396,20 @@ def qualify_dense_rank_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_ntile_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders in top quartile by value for each market segment using NTILE.
 
-    The ``window_ntile`` helper uses a wrong bucket formula, so NTILE is computed
-    inline (raw Polars): the SQL definition assigns the first ``cnt % n`` buckets
-    ``ceil(cnt/n)`` rows. Ordering matches the catalog tie-break
+    Buckets come from the ``window_ntile`` helper over the catalog tie-break
     ``ORDER BY o_totalprice, o_orderkey``.
     """
-    import polars as pl
-
     n = 4
-    lf = (
-        _orders_customer_since_1995_expr(ctx)
-        .native.sort(["c_mktsegment", "o_totalprice", "o_orderkey"])
-        .with_columns(
-            pl.int_range(0, pl.len()).over("c_mktsegment").alias("_r0"),
-            pl.len().over("c_mktsegment").alias("_cnt"),
-        )
-    )
-    base = pl.col("_cnt") // n
-    rem = pl.col("_cnt") % n
-    big = rem * (base + 1)
-    quartile = (
-        pl.when(pl.col("_r0") < big)
-        .then(pl.col("_r0") // (base + 1) + 1)
-        .otherwise(rem + (pl.col("_r0") - big) // base + 1)
-    )
-    lf = lf.with_columns(quartile.cast(pl.Int64).alias("quartile"))
     return (
-        lf.filter(pl.col("quartile") == n)
+        _orders_customer_since_1995_expr(ctx)
+        .with_columns(
+            ctx.window_ntile(
+                n,
+                order_by=[("o_totalprice", True), ("o_orderkey", True)],
+                partition_by=["c_mktsegment"],
+            ).alias("quartile")
+        )
+        .filter(ctx.col("quartile") == n)
         .select("c_mktsegment", "o_orderkey", "o_totalprice", "quartile")
         .sort(["c_mktsegment", "o_totalprice", "o_orderkey"], descending=[False, True, True])
     )
@@ -3517,16 +3527,20 @@ def qualify_cume_dist_pandas_impl(ctx: DataFrameContext) -> Any:
 def qualify_lag_lead_expression_impl(ctx: DataFrameContext) -> Any:
     """Find orders where price increased from previous order using LAG.
 
-    Raw Polars (via ``.native``) for a correct LAG: ``shift(1).over()`` after a
-    total-order sort matching the catalog SQL's ``ORDER BY o_orderdate, o_orderkey``
-    window tie-break (the ``window_lag`` helper shifts before sorting).
+    The previous price comes from the ``window_lag`` helper over the catalog
+    SQL's ``ORDER BY o_orderdate, o_orderkey`` window tie-break.
     """
-    import polars as pl
-
-    lf = _orders_customer_since_1995_expr(ctx).native.sort(["c_custkey", "o_orderdate", "o_orderkey"])
-    lf = lf.with_columns(pl.col("o_totalprice").shift(1).over("c_custkey").alias("prev_order_price"))
     return (
-        lf.filter(pl.col("o_totalprice") > pl.col("prev_order_price"))
+        _orders_customer_since_1995_expr(ctx)
+        .with_columns(
+            ctx.window_lag(
+                "o_totalprice",
+                1,
+                partition_by=["c_custkey"],
+                order_by=[("o_orderdate", True), ("o_orderkey", True)],
+            ).alias("prev_order_price")
+        )
+        .filter(ctx.col("o_totalprice") > ctx.col("prev_order_price"))
         .select("c_custkey", "c_name", "o_orderkey", "o_orderdate", "o_totalprice", "prev_order_price")
         .sort(["c_custkey", "o_orderdate", "o_orderkey"])
     )
@@ -4218,7 +4232,9 @@ def timeseries_trend_analysis_pandas_impl(ctx: DataFrameContext) -> Any:
         avg_order_value=("o_totalprice", "mean"),
     )
     monthly = monthly.sort_values("order_month")
-    monthly["month_epoch"] = monthly["order_month"].astype("int64") // 1_000_000_000
+    # Pandas 3 resolves to_timestamp() to datetime64[us] (was [ns]), so pin the
+    # unit to seconds before the int cast to keep epoch seconds stable.
+    monthly["month_epoch"] = monthly["order_month"].astype("datetime64[s]").astype("int64")
     epoch = monthly["month_epoch"]
     slope = epoch.cov(monthly["monthly_revenue"], ddof=0) / epoch.var(ddof=0)
     monthly["revenue_trend_slope"] = slope
@@ -4402,7 +4418,9 @@ def get_skip_for_pyspark() -> list[str]:
     """Get query IDs that should be skipped for PySpark DataFrame mode.
 
     PySpark lacks native implementations for higher-order list functions
-    that use the unified expression API's element() hook.
+    that use the unified expression API's element() hook, and several
+    window expression impls use raw Polars (``.native`` + ``pl.col``)
+    until they are ported to the unified window helpers.
 
     Returns:
         List of query IDs to skip for PySpark

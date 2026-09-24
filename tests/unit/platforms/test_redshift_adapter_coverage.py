@@ -1221,9 +1221,13 @@ class TestDropDatabase:
     def test_non_existent_db_skips_drop(self):
         adapter = _make_adapter()
 
-        with patch.object(adapter, "check_server_database_exists", return_value=False):
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=False),
+            patch.object(adapter, "create_connection") as mock_conn,
+        ):
             # Should return without error and without trying to connect
             adapter.drop_database(database="nonexistent_db")
+            mock_conn.assert_not_called()
 
     def test_retry_on_active_connections_error(self):
         adapter = _make_adapter()
@@ -1870,6 +1874,7 @@ class TestAnalyzeAndVacuumTable:
         mock_cursor.execute.side_effect = Exception("relation does not exist")
 
         adapter.vacuum_table(mock_conn, "orders")
+        mock_cursor.execute.assert_called_once_with("VACUUM orders")
 
 
 # ---------------------------------------------------------------------------
@@ -1922,11 +1927,16 @@ class TestCloseConnection:
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_conn.close.side_effect = Exception("already closed")
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(mock_conn)
+            mock_warn.assert_called_once()
+            assert "already closed" in mock_warn.call_args[0][0]
 
     def test_none_connection_does_not_raise(self):
         adapter = _make_adapter()
-        adapter.close_connection(None)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(None)
+            mock_warn.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -2188,7 +2198,10 @@ class TestRunVacuumAnalyzeIsolated:
 
         with patch.object(adapter, "_connect_with_driver", side_effect=Exception("connection refused")):
             with patch.object(adapter, "_long_running_timeout", return_value=300):
-                adapter._run_vacuum_analyze_isolated(main_conn)
+                with patch.object(adapter.logger, "warning") as mock_warn:
+                    adapter._run_vacuum_analyze_isolated(main_conn)
+                    mock_warn.assert_called_once()
+                    assert "connection refused" in mock_warn.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------
@@ -2218,12 +2231,16 @@ class TestApplyUnifiedTuning:
         mock_pk.enabled = True
         mock_fk = MagicMock()
         mock_fk.enabled = True
-        adapter.apply_constraint_configuration(mock_pk, mock_fk, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(mock_pk, mock_fk, mock_conn)
+            assert mock_info.call_count == 2
 
     def test_apply_constraint_configuration_none_pk_fk(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        adapter.apply_constraint_configuration(None, None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(None, None, mock_conn)
+            mock_info.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -3264,7 +3281,9 @@ class TestApplyTableTunings:
         mock_cursor.fetchone.return_value = ("public", "orders", "AUTO", None, None, None, None, None)
 
         # Should not raise
-        adapter.apply_table_tunings(mock_table_tuning, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_table_tunings(mock_table_tuning, mock_conn)
+            mock_info.assert_called()
 
 
 # ---------------------------------------------------------------------------
@@ -3671,8 +3690,14 @@ class TestApplyUnifiedTuning:
     def test_none_config_returns_early(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_platform_optimizations") as mock_plat,
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraint,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+            mock_plat.assert_not_called()
+            mock_constraint.assert_not_called()
+            mock_conn.cursor.assert_not_called()
 
     def test_config_with_no_optimizations_skips_apply_platform_optimizations(self):
         adapter = _make_adapter()
@@ -3823,3 +3848,80 @@ class TestCreateSchema:
 
         executed_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
         assert any("DROP TABLE IF EXISTS" in sql for sql in executed_sqls)
+
+
+# ---------------------------------------------------------------------------
+# configure_for_benchmark: cache-control receipt persistence
+# ---------------------------------------------------------------------------
+
+
+class TestCacheControlReceiptPersistence:
+    """The session receipt must reach platform_compute as bundle evidence."""
+
+    def test_receipt_stored_on_validation(self):
+        from unittest.mock import Mock, patch
+
+        adapter = _make_adapter(disable_result_cache=True)
+        assert adapter._cache_control_receipt is None
+
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = Mock()
+        with patch.object(
+            adapter,
+            "validate_session_cache_control",
+            return_value={"validated": True, "cache_disabled": True},
+        ):
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        assert adapter._cache_control_receipt == {
+            "validated": True,
+            "cache_disabled": True,
+            "settings": {},
+            "warnings": [],
+            "errors": [],
+        }
+
+    def test_receipt_flows_into_compute_metadata(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        receipt = {"validated": True, "cache_disabled": True}
+        payload = RedshiftAdapter._redshift_compute_metadata({}, {}, cache_control=receipt)
+        assert payload["cache_control"] == receipt
+
+    def test_compute_metadata_omits_absent_receipt(self):
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        payload = RedshiftAdapter._redshift_compute_metadata({"number_of_nodes": 2}, {"num_compute_nodes": 2})
+        assert "cache_control" not in payload
+
+    def test_explicitly_enabled_cache_records_receipt_without_session_probe(self):
+        from unittest.mock import Mock, patch
+
+        adapter = _make_adapter(disable_result_cache=False)
+        assert adapter._cache_control_receipt is None
+
+        mock_conn = Mock()
+        mock_conn.cursor.return_value = Mock()
+        with patch.object(adapter, "validate_session_cache_control") as mock_validate:
+            adapter.configure_for_benchmark(mock_conn, "olap")
+
+        mock_validate.assert_not_called()
+        assert adapter._cache_control_receipt == {
+            "validated": True,
+            "cache_disabled": False,
+            "settings": {"enable_result_cache_for_session": "ON"},
+            "warnings": [
+                "result cache explicitly left enabled (disable_result_cache=False); "
+                "timings measured under an enabled cache are not comparable clean evidence"
+            ],
+            "errors": [],
+        }
+
+    def test_enabled_receipt_flows_into_compute_metadata(self):
+        from benchbox.platforms.cloud_shared import explicit_cache_enabled_receipt
+        from benchbox.platforms.redshift import RedshiftAdapter
+
+        receipt = explicit_cache_enabled_receipt("enable_result_cache_for_session", "ON")
+        payload = RedshiftAdapter._redshift_compute_metadata({"result_cache_enabled": True}, {}, cache_control=receipt)
+        assert payload["result_cache_enabled"] is True
+        assert payload["cache_control"]["cache_disabled"] is False

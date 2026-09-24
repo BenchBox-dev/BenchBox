@@ -100,7 +100,7 @@ function parseResultSelect(query: BuiltQuery): ParsedResultSelect {
   const match = normalizedSql.match(
     /^(SELECT .+?)( FROM bench\.results)( WHERE .+?)? ORDER BY ([a-z_]+) (ASC|DESC) LIMIT (\d+)$/s,
   );
-  if (!match) throw new Error("Unexpected Query workbench select shape");
+  if (!match) throw new Error("The results query could not be prepared.");
   return {
     selectSql: `${match[1]}${match[2]}`,
     fromSql: match[2]!,
@@ -148,6 +148,11 @@ export interface ResultRow extends CostDeploymentFields {
   execution_mode: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string,
+  // see DetailResult in types.ts). List-only: the audit fields
+  // (evidence/approver/expires) stay detail-only. Optional so fixtures and
+  // SQL paths predating this column default to undefined. Display-only.
+  override_rules?: string | null;
   // ADR-1 bundle-emitted tuning identities (see DetailResult in types.ts):
   // canonical requested-config hash and physical applied-ledger hash. Optional
   // (like physical_rendering_id below) so fixtures/SQL paths predating these
@@ -177,6 +182,9 @@ export interface ResultRow extends CostDeploymentFields {
   // SQL paths predating this field default to undefined rather than needing
   // updates everywhere a ResultRow is constructed.
   physical_rendering_id?: string | null;
+  arch?: string | null;
+  cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
@@ -189,6 +197,18 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
+  // Required, not optional. An optional marker here is what previously let the
+  // projection omit both columns while `getDetailResult` still compiled: the
+  // reads were `undefined` forever and every receipt reported the CPU as not
+  // recorded. Required means the omission is a type error.
+  cpu_model: string | null;
+  cpu_family: string | null;
+  cpu_identity_provenance: "measured" | "user_attested" | "inferred" | null;
+  client_region: string | null;
+  client_cloud: string | null;
+  statement_overhead_min_ms: number | null;
+  statement_overhead_median_ms: number | null;
+  link_status: string | null;
   // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
   // physical_mechanisms in DetailResult). Tri-state, preserved from the
   // pipeline: SQL NULL (-> null here) means no logical tuning profile was
@@ -201,6 +221,15 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   // Detail-only - the list projection never selects it. Optional so fixtures
   // and SQL paths predating this column default to undefined.
   applied_receipt?: string | null;
+  // Accepted plausibility-override badge data (see DetailResult): the covered
+  // rule ids as a canonical JSON array string plus the audit fields, carried
+  // verbatim from the pipeline. Detail-only - the list projection carries
+  // only override_rules. Optional so fixtures predating these columns default
+  // to undefined. Display-only; never a join/dedup key.
+  override_rules?: string | null;
+  override_evidence?: string | null;
+  override_approver?: string | null;
+  override_expires?: string | null;
 }
 
 export interface QueryDisplayTimingRow {
@@ -220,6 +249,25 @@ export interface QueryExecutionRow {
   run_type: string | null;
   iter: number | null;
   stream: number | null;
+}
+
+/**
+ * One row of `bench.result_basis_availability`, the pipeline's precomputed
+ * answer to "which measurement bases can this run serve?".
+ *
+ * `available_bases` is a comma-separated token list in the same vocabulary the
+ * URL grammar uses (see measurementBasis.ts), so an availability check is a
+ * token comparison rather than a translation. `varying_pass_queries` is a JSON
+ * object mapping query_id to that query's usable pass count, present only when
+ * a run's queries disagree; it is null for the common uniform case.
+ */
+export interface ResultBasisAvailabilityRow {
+  result_id: string;
+  has_warmup: boolean;
+  measurement_pass_count: number;
+  warmup_status: string;
+  available_bases: string;
+  varying_pass_queries: string | null;
 }
 
 export interface BenchmarkMatrixCellRow {
@@ -247,6 +295,9 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   funding: string;
   platform_version?: string | null;
   validation_status?: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string).
+  // Optional so fixtures predating this column default to undefined.
+  override_rules?: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
   execution_mode: string | null;
@@ -288,6 +339,7 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   platform: string;
   platform_id: string;
   driver_version: string | null;
+  platform_version?: string | null;
   run_date: string;
   power_score: number | null;
   total_duration_s: number;
@@ -306,11 +358,18 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   validation_status?: string | null;
+  // Accepted plausibility-override rule ids (canonical JSON array string).
+  // Optional so fixtures predating this column default to undefined.
+  override_rules?: string | null;
   tuning_mode: string | null;
+  tuning_validation_status?: string | null;
   execution_mode: string | null;
   compliance_class: string | null;
   cost_usd: number | null;
   primary_metric: string;
+  arch?: string | null;
+  cpu_family?: string | null;
+  memory_gb?: number | null;
 }
 
 export interface CohortMetadataRow {
@@ -406,6 +465,8 @@ const RESULT_COLUMNS = [
   "tuning_policy_generation",
   "test_type",
   "validation_status",
+  // Accepted-override rule ids (list-safe: small JSON array, unlike applied_receipt).
+  "override_rules",
   "cost_usd",
   "normalized_cost_usd",
   "cost_model_version",
@@ -432,6 +493,8 @@ const RESULT_COLUMNS = [
   "bundle_download_url",
   "physical_rendering_id",
 ].join(", ");
+
+const RESULT_HARDWARE_COLUMNS = `${RESULT_COLUMNS}, arch, cpu_family, memory_gb`;
 
 const RESULT_DETAIL_METRICS_COLUMNS = [
   "result_id",
@@ -467,6 +530,12 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   // ADR-1 per-statement introspection receipt, detail-only (the list
   // projection above deliberately omits this potentially large JSON blob).
   "applied_receipt",
+  // Accepted plausibility-override badge data, detail-only (the list
+  // projection carries only override_rules; the audit fields stay here).
+  "override_rules",
+  "override_evidence",
+  "override_approver",
+  "override_expires",
   "tuning_policy_generation",
   "test_type",
   "validation_status",
@@ -500,6 +569,14 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "cpu_count",
   "memory_gb",
   "python",
+  "cpu_model",
+  "cpu_family",
+  "cpu_identity_provenance",
+  "client_region",
+  "client_cloud",
+  "statement_overhead_min_ms",
+  "statement_overhead_median_ms",
+  "link_status",
 ].join(", ");
 
 const COHORT_METADATA_COLUMNS = [
@@ -626,8 +703,21 @@ export function memoizedSnapshotQueryRows<T>(
   );
 }
 
-export async function listResults(where: FacetWhereClause = { sql: "", params: [] }): Promise<ResultRow[]> {
-  const sql = `SELECT ${RESULT_COLUMNS} FROM bench.results ${where.sql} ORDER BY run_date DESC`;
+export async function listResults(
+  where: FacetWhereClause = { sql: "", params: [] },
+  options: { includeHardware?: boolean } = {},
+): Promise<ResultRow[]> {
+  // Only pay for the result_detail_metrics join when a caller filters on
+  // hardware (arch/cpu_family/memory_gb appear in the facet WHERE clause) or explicitly
+  // asks to display those columns (includeHardware) -- unfiltered browse
+  // queries like Home and CorpusSectionIndex don't touch arch/cpu_family and
+  // shouldn't carry the join cost.
+  const needsHardware = options.includeHardware === true || /\b(?:arch|cpu_family|memory_gb)\b/.test(where.sql);
+  const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
+  const source = needsHardware
+    ? "(SELECT r.*, d.arch, d.cpu_family, d.memory_gb FROM bench.results r LEFT JOIN bench.result_detail_metrics d USING (result_id))"
+    : "bench.results";
+  const sql = `SELECT ${columns} FROM ${source} ${where.sql} ORDER BY run_date DESC`;
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
@@ -660,18 +750,47 @@ export async function getResultDetailMetrics(resultId: string): Promise<ResultDe
   return rows[0] ?? null;
 }
 
-export async function getQueryDisplayTimings(resultId: string): Promise<QueryDisplayTimingRow[]> {
+export async function getQueryDisplayTimings(
+  resultIdOrIds: string | readonly string[],
+): Promise<QueryDisplayTimingRow[]> {
+  if (Array.isArray(resultIdOrIds)) {
+    if (resultIdOrIds.length === 0) return [];
+    const placeholders = resultIdOrIds.map(() => "?").join(",");
+    return queryRows<QueryDisplayTimingRow>(
+      "SELECT result_id, query_id, display_ms, sample_count," +
+        " is_valid_display_timing, timing_exclusion_reason" +
+        " FROM bench.query_display_timings" +
+        ` WHERE result_id IN (${placeholders})` +
+        " ORDER BY query_id",
+      [...resultIdOrIds],
+    );
+  }
   return queryRows<QueryDisplayTimingRow>(
     "SELECT result_id, query_id, display_ms, sample_count," +
       " is_valid_display_timing, timing_exclusion_reason" +
       " FROM bench.query_display_timings" +
       " WHERE result_id = ?" +
       " ORDER BY query_id",
-    [resultId],
+    [resultIdOrIds],
   );
 }
 
-export async function getQueryExecutions(resultId: string): Promise<QueryExecutionRow[]> {
+export async function getQueryExecutions(
+  resultIdOrIds: string | readonly string[],
+): Promise<QueryExecutionRow[]> {
+  if (Array.isArray(resultIdOrIds)) {
+    if (resultIdOrIds.length === 0) return [];
+    const placeholders = resultIdOrIds.map(() => "?").join(",");
+    return queryRows<QueryExecutionRow>(
+      "SELECT result_id, query_id, duration_ms, status, run_type, iter, stream" +
+        " FROM bench.query_executions" +
+        ` WHERE result_id IN (${placeholders})` +
+        " ORDER BY query_id," +
+        " CASE WHEN stream IS NULL THEN 0 ELSE stream END," +
+        " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
+      [...resultIdOrIds],
+    );
+  }
   return queryRows<QueryExecutionRow>(
     "SELECT result_id, query_id, duration_ms, status, run_type, iter, stream" +
       " FROM bench.query_executions" +
@@ -679,32 +798,132 @@ export async function getQueryExecutions(resultId: string): Promise<QueryExecuti
       " ORDER BY query_id," +
       " CASE WHEN stream IS NULL THEN 0 ELSE stream END," +
       " CASE WHEN iter IS NULL THEN 0 ELSE iter END",
-    [resultId],
+    [resultIdOrIds],
   );
 }
 
 /**
- * Compose a DetailResult from the canonical DuckDB tables.
+ * Bulk accessor for cohort basis resolution.
  *
- * Returns null when the result_id is not present in `result_detail_metrics`.
- * display_timings and queries are read verbatim from their canonical tables;
- * this helper performs only shape pivoting (wide-row → nested Environment
- * object, row arrays with presentation-ready fields).
+ * Issues one query each against `bench.result_detail_metrics`,
+ * `bench.query_display_timings`, and `bench.query_executions` for the entire
+ * cohort result-id set, avoiding the N-query loop that previously blocked
+ * interactive basis selection on the cohort index pages. Shares
+ * `detailResultFromWideRow` with `getDetailResult` so exclusion reasons,
+ * trust/visibility/compliance labels, and display timings can't silently
+ * diverge between the single-id and bulk read paths.
  */
-export async function getDetailResult(resultId: string): Promise<DetailResult | null> {
-  const [wide, timingRows, executionRows] = await Promise.all([
-    getResultDetailMetrics(resultId),
-    getQueryDisplayTimings(resultId),
-    getQueryExecutions(resultId),
+export async function getCohortBasisDetails(
+  resultIds: readonly string[],
+): Promise<Map<string, DetailResult>> {
+  if (resultIds.length === 0) return new Map();
+  const placeholders = resultIds.map(() => "?").join(",");
+  const [wideRows, timingRows, executionRows] = await Promise.all([
+    queryRows<ResultDetailMetricsRow>(
+      `SELECT ${RESULT_DETAIL_METRICS_COLUMNS} FROM bench.result_detail_metrics WHERE result_id IN (${placeholders})`,
+      [...resultIds],
+    ),
+    getQueryDisplayTimings(resultIds),
+    getQueryExecutions(resultIds),
   ]);
-  if (!wide) return null;
 
+  const timingsByResult = new Map<string, QueryDisplayTimingRow[]>();
+  for (const row of timingRows) {
+    const list = timingsByResult.get(row.result_id);
+    if (list) list.push(row);
+    else timingsByResult.set(row.result_id, [row]);
+  }
+
+  const executionsByResult = new Map<string, QueryExecutionRow[]>();
+  for (const row of executionRows) {
+    const list = executionsByResult.get(row.result_id);
+    if (list) list.push(row);
+    else executionsByResult.set(row.result_id, [row]);
+  }
+
+  const byId = new Map<string, DetailResult>();
+  for (const wide of wideRows) {
+    byId.set(
+      wide.result_id,
+      detailResultFromWideRow(
+        wide,
+        executionsByResult.get(wide.result_id) ?? [],
+        timingsByResult.get(wide.result_id) ?? [],
+      ),
+    );
+  }
+  return byId;
+}
+
+/**
+ * Read a run's precomputed basis availability.
+ *
+ * Surfaces use this rather than deriving availability from raw executions:
+ * the pipeline has already made the determination, and pulling every
+ * execution row for a 103-query run just to re-derive it would be a large
+ * download to reach an answer the read model already holds. The pure
+ * `basisAvailability` helper in measurementBasis.ts remains the authority for
+ * per-query detail once those rows are in hand.
+ *
+ * Returns null for a result the table does not cover, which is the honest
+ * answer for a snapshot built before the basis columns existed.
+ */
+/** Fetch the small basis inventory in one query for a platform page. */
+export async function getResultsBasisAvailability(resultIds: readonly string[]): Promise<ResultBasisAvailabilityRow[]> {
+  if (resultIds.length === 0) return [];
+  return queryRows<ResultBasisAvailabilityRow>(
+    "SELECT result_id, has_warmup, measurement_pass_count, warmup_status, available_bases, varying_pass_queries" +
+      ` FROM bench.result_basis_availability WHERE result_id IN (${resultIds.map(() => "?").join(",")})`,
+    [...resultIds],
+  );
+}
+
+export async function getResultBasisAvailability(
+  resultId: string,
+): Promise<ResultBasisAvailabilityRow | null> {
+  const rows = await queryRows<ResultBasisAvailabilityRow>(
+    "SELECT result_id, has_warmup, measurement_pass_count, warmup_status," +
+      " available_bases, varying_pass_queries" +
+      " FROM bench.result_basis_availability" +
+      " WHERE result_id = ?",
+    [resultId],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Compose a DetailResult from a `result_detail_metrics` wide row plus its
+ * query execution and display timing rows.
+ *
+ * Shared by the single-id (`getDetailResult`) and bulk (`getCohortBasisDetails`)
+ * read paths so exclusion reasons, trust/visibility/compliance labels, and
+ * timing data are always sourced from the same mapping -- a bulk accessor that
+ * reimplements this shape independently is how those fields silently drift out
+ * of sync with the per-row path.
+ */
+function detailResultFromWideRow(
+  wide: ResultDetailMetricsRow,
+  executionRows: readonly QueryExecutionRow[],
+  timingRows: readonly QueryDisplayTimingRow[],
+): DetailResult {
   const environment: Environment = {};
   if (wide.os !== null) environment.os = wide.os;
   if (wide.arch !== null) environment.arch = wide.arch;
   if (wide.cpu_count !== null) environment.cpu_count = wide.cpu_count;
   if (wide.memory_gb !== null) environment.memory_gb = wide.memory_gb;
   if (wide.python !== null) environment.python = wide.python;
+  if (wide.cpu_model !== null) environment.cpu_model = wide.cpu_model;
+  if (wide.cpu_family !== null) environment.cpu_family = wide.cpu_family;
+  if (wide.cpu_identity_provenance !== null) environment.cpu_identity_provenance = wide.cpu_identity_provenance;
+  if (wide.client_region !== null && wide.client_region !== undefined) environment.client_region = wide.client_region;
+  if (wide.client_cloud !== null && wide.client_cloud !== undefined) environment.client_cloud = wide.client_cloud;
+  if (wide.statement_overhead_min_ms !== null && wide.statement_overhead_min_ms !== undefined) {
+    environment.statement_overhead_min_ms = wide.statement_overhead_min_ms;
+  }
+  if (wide.statement_overhead_median_ms !== null && wide.statement_overhead_median_ms !== undefined) {
+    environment.statement_overhead_median_ms = wide.statement_overhead_median_ms;
+  }
+  if (wide.link_status !== null && wide.link_status !== undefined) environment.link_status = wide.link_status;
 
   const display_timings: QueryDisplayTiming[] = timingRows.map((r) => ({
     query_id: r.query_id,
@@ -761,6 +980,10 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
     applied_ledger_hash: wide.applied_ledger_hash ?? null,
     tuning_validation_status: wide.tuning_validation_status ?? null,
     applied_receipt: wide.applied_receipt ?? null,
+    override_rules: wide.override_rules ?? null,
+    override_evidence: wide.override_evidence ?? null,
+    override_approver: wide.override_approver ?? null,
+    override_expires: wide.override_expires ?? null,
     tuning_policy_generation: wide.tuning_policy_generation ?? null,
     test_type: wide.test_type,
     validation_status: wide.validation_status,
@@ -792,7 +1015,30 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
           ? []
           : wide.physical_mechanisms.split(","),
     physical_rendering_id: wide.physical_rendering_id,
+    client_region: wide.client_region,
+    client_cloud: wide.client_cloud,
+    statement_overhead_min_ms: wide.statement_overhead_min_ms,
+    statement_overhead_median_ms: wide.statement_overhead_median_ms,
+    link_status: wide.link_status,
   };
+}
+
+/**
+ * Compose a DetailResult from the canonical DuckDB tables.
+ *
+ * Returns null when the result_id is not present in `result_detail_metrics`.
+ * display_timings and queries are read verbatim from their canonical tables;
+ * detailResultFromWideRow performs only shape pivoting (wide-row → nested
+ * Environment object, row arrays with presentation-ready fields).
+ */
+export async function getDetailResult(resultId: string): Promise<DetailResult | null> {
+  const [wide, timingRows, executionRows] = await Promise.all([
+    getResultDetailMetrics(resultId),
+    getQueryDisplayTimings(resultId),
+    getQueryExecutions(resultId),
+  ]);
+  if (!wide) return null;
+  return detailResultFromWideRow(wide, executionRows, timingRows);
 }
 
 export async function getBenchmarkMatrixCells(
@@ -818,7 +1064,7 @@ export async function getBenchmarkRanking(
 ): Promise<BenchmarkRankingRow[]> {
   benchmark = canonicalBenchmarkSlug(benchmark);
   return queryRows<BenchmarkRankingRow>(
-    `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status,` +
+    `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status, r.override_rules,` +
       " r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
       " r.cost_scope, r.cost_status, r.billing_unit, r.pricing_region," +
       " r.deployment_class, r.cloud_provider, r.cloud_region, r.instance_or_warehouse," +
@@ -938,6 +1184,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       trust_label: row.trust_label,
       funding: row.funding,
       validation_status: row.validation_status ?? null,
+      override_rules: row.override_rules ?? null,
       run_date: row.run_date,
       is_ranking_eligible: row.is_ranking_eligible,
       has_display_timing: row.has_display_timing,
@@ -1011,6 +1258,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +
+    " r.platform_version," +
     " r.run_date," +
     " r.power_score," +
     " r.total_duration_s," +
@@ -1028,7 +1276,9 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.trust_label," +
     " r.funding," +
     " r.validation_status," +
+    " r.override_rules," +
     " r.tuning_mode," +
+    " r.tuning_validation_status," +
     " r.execution_mode," +
     " r.compliance_class," +
     " r.cost_usd," +
@@ -1044,11 +1294,15 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.cloud_region," +
     " r.instance_or_warehouse," +
     " r.storage_format," +
+    " e.arch," +
+    " e.cpu_family," +
+    " e.memory_gb," +
     " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +
     " LEFT JOIN bench.short_ids si ON si.result_id = r.result_id" +
-    " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id";
+    " LEFT JOIN bench.benchmark_rankings br ON br.result_id = r.result_id" +
+    " LEFT JOIN bench.result_environment e ON e.result_id = r.result_id";
   if (platformId === undefined) {
     return queryRows<PlatformIndexRowRow>(`${sql} ORDER BY r.run_date DESC`);
   }

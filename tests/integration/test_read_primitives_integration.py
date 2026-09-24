@@ -121,7 +121,7 @@ class TestReadPrimitivesBenchmarkExtended:
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
         mock_connection.cursor.return_value = mock_cursor
-        delattr(mock_connection, "execute")  # Remove execute method to force cursor path
+        del mock_connection.execute  # Remove execute method to force cursor path
 
         with patch.object(primitives_benchmark, "get_query") as mock_get_query:
             mock_get_query.return_value = "SELECT * FROM orders"
@@ -137,8 +137,8 @@ class TestReadPrimitivesBenchmarkExtended:
     def test_execute_query_unsupported_connection(self, primitives_benchmark: ReadPrimitivesBenchmark):
         """Test execute_query with unsupported connection type."""
         mock_connection = Mock()
-        delattr(mock_connection, "execute")
-        delattr(mock_connection, "cursor")
+        del mock_connection.execute
+        del mock_connection.cursor
 
         with patch.object(primitives_benchmark, "get_query") as mock_get_query:
             mock_get_query.return_value = "SELECT * FROM orders"
@@ -184,8 +184,8 @@ class TestReadPrimitivesBenchmarkExtended:
             mock_cursor = Mock()
             mock_connection.cursor.return_value = mock_cursor
             mock_connection.commit = Mock()
-            delattr(mock_connection, "executescript")
-            delattr(mock_connection, "executemany")
+            del mock_connection.executescript
+            del mock_connection.executemany
 
             with patch.object(primitives_benchmark, "get_create_tables_sql") as mock_get_sql:
                 mock_get_sql.return_value = "CREATE TABLE region (...);"
@@ -207,7 +207,7 @@ class TestReadPrimitivesBenchmarkExtended:
             mock_connection = Mock()
             mock_connection.executescript = Mock()
             mock_connection.executemany = Mock()
-            delattr(mock_connection, "commit")
+            del mock_connection.commit
 
             with patch.object(primitives_benchmark, "get_create_tables_sql") as mock_get_sql:
                 mock_get_sql.return_value = "CREATE TABLE region (...);"

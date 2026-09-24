@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 from pathlib import Path
 
@@ -317,6 +318,12 @@ class FileArtifactMixin:
             },
             "tables": {},
         }
+        try:
+            from benchbox.utils.datagen_version import current_datagen_stamp
+
+            manifest.update(current_datagen_stamp("tpcds"))
+        except Exception as exc:
+            logging.getLogger(__name__).debug("datagen stamp unavailable for tpcds: %s", exc)
         # Collect ALL chunk files for each table
         for table, file_paths in table_paths.items():
             # Use collected manifest entries if available (from streaming generation)

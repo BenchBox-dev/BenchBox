@@ -3,6 +3,14 @@
 > Unifying BenchBox TODOs, Beads concepts, and Claude Code Tasks into a
 > coherent three-layer system.
 
+> **Superseded — the tracker interface is now the `todo-db-mcp` server; see
+> `_project/decisions/todo-db-upgrade-0-6-0-mcp-2026-09-03.md`.** The
+> `todo_cli.py` / YAML commands below (`ready`, `next`, `done`, `check-graph`)
+> describe the original design and no longer exist as written; the equivalent
+> operations are MCP tools (`ready`, `next`, `done`, and dependency validation)
+> plus the floor CLI `uv run --project _project/scripts --locked -- todo-db
+> <verb>`. The layered model is kept here as design rationale.
+
 ## Problem Statement
 
 The current TODO system is **rich but flat**. Each YAML item embeds a

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import re
+import zlib
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -247,7 +248,10 @@ class TemplateLoader:
         if not count_match:
             return None
         count = int(count_match.group(1))
-        rng = random.Random(self.query_id * 1000 + hash(name) % 10000)
+        # zlib.crc32, not hash(): the builtin str hash is salted per process
+        # (PYTHONHASHSEED), which made these "default" ulist values differ
+        # between runs and broke reproducibility of the rendered query text.
+        rng = random.Random(self.query_id * 1000 + zlib.crc32(name.encode()) % 10000)
         if hi - lo + 1 < count:
             return None  # Range too small for unique values
         return rng.sample(range(lo, hi + 1), count)
@@ -1247,9 +1251,15 @@ class QueryConverter:
 
         # Q51: Ambiguous item_sk between web and store CTEs - qualify all references
         if query_id == 51:
-            # Fix the CASE expression that tries to coalesce item_sk from both CTEs
+            # Fix the CASE expression that tries to coalesce item_sk from both CTEs.
+            # sqlglot <=30.6 renders IS NOT NULL as "NOT x IS NULL"; 30.18+
+            # renders it canonically, so handle both serializations.
             sql_text = sql_text.replace(
                 "CASE WHEN NOT item_sk IS NULL THEN item_sk ELSE item_sk END AS item_sk",
+                "COALESCE(web.item_sk, store.item_sk) AS item_sk",
+            )
+            sql_text = sql_text.replace(
+                "CASE WHEN item_sk IS NOT NULL THEN item_sk ELSE item_sk END AS item_sk",
                 "COALESCE(web.item_sk, store.item_sk) AS item_sk",
             )
             # Fix the JOIN ON clause

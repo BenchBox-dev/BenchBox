@@ -639,7 +639,7 @@ class AthenaAdapter(PlatformAdapter):
 
         try:
             # Get schema SQL using common helper with Trino dialect
-            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+            schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
             # Split and execute statements
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
@@ -975,7 +975,7 @@ class AthenaAdapter(PlatformAdapter):
 
     def _build_external_table_statements(self, benchmark: Any) -> dict[str, str]:
         """Build CREATE EXTERNAL TABLE SQL statements keyed by normalized table name."""
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
         statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
         table_sql: dict[str, str] = {}
 
@@ -1226,9 +1226,14 @@ class AthenaAdapter(PlatformAdapter):
                     stream_id=stream_id,
                 )
 
-            # Calculate query cost (Athena charges $5 per TB scanned)
-            cost_per_tb = 5.0
-            cost = (data_scanned_bytes / (1024**4)) * cost_per_tb
+            # Client-side estimate only: core/cost recomputes the authoritative
+            # figure from raw bytes. Decimal TB and the region-aware rate come
+            # from the unit contract (decimal TB for Athena) via the central
+            # resolver, so this cannot drift from the published pricing.
+            from benchbox.core.cost.pricing import resolve_athena_price_per_tb
+
+            cost_per_tb = resolve_athena_price_per_tb(self.region or "us-east-1").value or 5.0
+            cost = (data_scanned_bytes / (10**12)) * cost_per_tb
 
             # Build result dict
             result_dict = self._build_query_result_with_validation(
@@ -1273,13 +1278,20 @@ class AthenaAdapter(PlatformAdapter):
         return result_dict
 
     def get_cost_summary(self) -> dict[str, Any]:
-        """Get cost summary for the benchmark run."""
-        cost_per_tb = 5.0
-        total_cost = (self._total_data_scanned_bytes / (1024**4)) * cost_per_tb
+        """Get cost summary for the benchmark run.
+
+        Client-side estimate only, in decimal TB per the unit contract;
+        core/cost recomputes the authoritative figure from raw bytes.
+        """
+        from benchbox.core.cost.pricing import resolve_athena_price_per_tb
+
+        cost_per_tb = resolve_athena_price_per_tb(self.region or "us-east-1").value or 5.0
+        total_tb = self._total_data_scanned_bytes / (10**12)
+        total_cost = total_tb * cost_per_tb
 
         return {
             "total_data_scanned_bytes": self._total_data_scanned_bytes,
-            "total_data_scanned_tb": self._total_data_scanned_bytes / (1024**4),
+            "total_data_scanned_tb": total_tb,
             "query_count": self._query_count,
             "cost_per_tb_usd": cost_per_tb,
             "total_cost_usd": total_cost,
@@ -1302,7 +1314,7 @@ class AthenaAdapter(PlatformAdapter):
         """Normalize table names to lowercase in CREATE TABLE statements."""
         return normalize_table_name_in_sql(sql)
 
-    def get_query_plan(self, connection: Any, query: str) -> str:
+    def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
 
         Athena runs the Presto engine, so its EXPLAIN JSON is parsed by
@@ -1310,16 +1322,9 @@ class AthenaAdapter(PlatformAdapter):
         does not scan data or incur cost. If a given Athena engine version
         returns a non-JSON plan, the parser degrades gracefully (returns None).
         """
-        cursor = connection.cursor()
-        try:
-            cursor.execute(f"EXPLAIN (FORMAT JSON) {query}")
-            plan_rows = cursor.fetchall()
-            return "\n".join(str(row[0]) for row in plan_rows)
-        except Exception as e:
-            self.logger.debug(f"Could not get query plan: {e}")
-            return f"Could not get query plan: {e}"
-        finally:
-            cursor.close()
+        from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
+
+        return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)", logger=self.logger)
 
     def get_query_plan_parser(self):
         """Return the Presto/Trino parser stamped as ``athena``.

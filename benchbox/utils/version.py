@@ -13,17 +13,12 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import json
 import re
 import sys
+import tomllib
 from dataclasses import dataclass
 from functools import lru_cache
 from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Optional
-
-# Python 3.11+ has tomllib in stdlib, older versions need tomli package
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib  # type: ignore[import-not-found]
 
 # NOTE: This module intentionally does NOT `import benchbox`. Doing so used
 # to create a root-package import edge (this module is imported by

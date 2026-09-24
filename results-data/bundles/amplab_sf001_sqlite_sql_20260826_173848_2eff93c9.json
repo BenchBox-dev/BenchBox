@@ -1,0 +1,541 @@
+{
+  "benchmark": {
+    "id": "amplab",
+    "name": "AMPLab Big Data",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "load",
+      "power"
+    ],
+    "platform_option_sources": {
+      "check_same_thread": "saved_config",
+      "database_name": "database_f3ba6a7c0af9",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "show_query_plans": "saved_config",
+      "timeout": "saved_config",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "check_same_thread": false,
+      "database_name": "database_5d7b725135a6",
+      "force_recreate": false,
+      "force_upload": false,
+      "normalize_plan_literals": false,
+      "show_query_plans": false,
+      "timeout": 30.0,
+      "tuning_source": "baseline"
+    }
+  },
+  "cost": {
+    "model": "estimated",
+    "total_usd": 0
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_identity_provenance": "user_attested",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "os": "Darwin",
+      "python": "3.12.13"
+    },
+    "cpu_identity_provenance": "user_attested",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "os": "Darwin",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "local_process",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_runtime_strategy": "current-process",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-08-26T17:38:48.476294",
+    "translation": {
+      "attempt_count": 41,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "count": 1,
+          "normalized_source_dialect": "duckdb",
+          "normalized_target_dialect": "sqlite",
+          "source_dialect": "duckdb",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "sqlite",
+          "translator": "sqlglot"
+        },
+        {
+          "count": 40,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "sqlite",
+          "source_dialect": "netezza",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "sqlite",
+          "translator": "sqlglot"
+        }
+      ],
+      "source_dialects": [
+        "duckdb",
+        "netezza"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 41,
+      "target_dialects": [
+        "sqlite"
+      ],
+      "translators": [
+        "sqlglot"
+      ]
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "timestamp": "2026-08-26T17:38:48.777867",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2025.11",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 86,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 54,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 13,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 50,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "builtin",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "config": {
+      "check_same_thread": false,
+      "connection_mode": "file",
+      "driver_runtime_strategy": "current-process",
+      "execution_mode": "sql",
+      "timeout": 30.0
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "file",
+      "deployment_type": "embedded",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_runtime_strategy": "current-process",
+    "name": "SQLite",
+    "raw_config": {
+      "check_same_thread": false,
+      "force_recreate": false,
+      "timeout": 30.0,
+      "tuning_source": "baseline",
+      "type": "sqlite"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "version": "3.53.1"
+  },
+  "queries": [
+    {
+      "id": "1",
+      "iter": 0,
+      "ms": 0.1,
+      "rows": 13,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1a",
+      "iter": 0,
+      "ms": 0.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2",
+      "iter": 0,
+      "ms": 2.7,
+      "rows": 8,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2a",
+      "iter": 0,
+      "ms": 2.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3",
+      "iter": 0,
+      "ms": 1.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3a",
+      "iter": 0,
+      "ms": 2.3,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4",
+      "iter": 0,
+      "ms": 2.1,
+      "rows": 32,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5",
+      "iter": 0,
+      "ms": 2.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1",
+      "iter": 1,
+      "ms": 0.1,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1a",
+      "iter": 1,
+      "ms": 0.043,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2",
+      "iter": 1,
+      "ms": 2.6,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2a",
+      "iter": 1,
+      "ms": 2.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3",
+      "iter": 1,
+      "ms": 1.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3a",
+      "iter": 1,
+      "ms": 2.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4",
+      "iter": 1,
+      "ms": 2.1,
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5",
+      "iter": 1,
+      "ms": 2.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1",
+      "iter": 2,
+      "ms": 0.048166,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1a",
+      "iter": 2,
+      "ms": 0.039125,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2",
+      "iter": 2,
+      "ms": 2.6,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2a",
+      "iter": 2,
+      "ms": 2.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3",
+      "iter": 2,
+      "ms": 1.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3a",
+      "iter": 2,
+      "ms": 2.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4",
+      "iter": 2,
+      "ms": 2.0,
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5",
+      "iter": 2,
+      "ms": 2.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1",
+      "iter": 3,
+      "ms": 0.043708,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1a",
+      "iter": 3,
+      "ms": 0.036583,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2",
+      "iter": 3,
+      "ms": 2.5,
+      "rows": 8,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2a",
+      "iter": 3,
+      "ms": 2.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3",
+      "iter": 3,
+      "ms": 1.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3a",
+      "iter": 3,
+      "ms": 2.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4",
+      "iter": 3,
+      "ms": 2.1,
+      "rows": 32,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5",
+      "iter": 3,
+      "ms": 2.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "run": {
+    "id": "2eff93c9",
+    "iterations": 3,
+    "query_time_ms": 41,
+    "streams": 4,
+    "timestamp": "2026-08-26T17:38:48.755051",
+    "total_duration_ms": 198
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 86.6,
+      "rows_loaded": 28750
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 24,
+      "total": 24
+    },
+    "timing": {
+      "avg_ms": 1.7,
+      "geometric_mean_ms": 0.8,
+      "max_ms": 2.7,
+      "min_ms": 0.036583,
+      "p90_ms": 2.6,
+      "p95_ms": 2.6,
+      "p99_ms": 2.7,
+      "stdev_ms": 1.1,
+      "total_ms": 40.8
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "documents": {
+      "rows": 1250
+    },
+    "rankings": {
+      "rows": 2500
+    },
+    "uservisits": {
+      "rows": 25000
+    }
+  },
+  "version": "2.2"
+}

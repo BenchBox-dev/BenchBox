@@ -140,6 +140,8 @@ UNOFFICIAL_COMPLIANCE_CLASSES: frozenset[str] = frozenset(
     }
 )
 
+APPLIED_TUNING_STATUSES: frozenset[str] = frozenset({"applied_unverified", "applied_verified"})
+
 
 class ManifestEntry(BaseModel):
     """One result row in the explorer browser read model."""
@@ -199,6 +201,15 @@ class ManifestEntry(BaseModel):
     # broken companion never fails the build. Never recomputed or re-derived:
     # the explorer renders the verdicts as recorded. Display-only.
     applied_receipt: str | None = None
+    # Accepted plausibility overrides, read verbatim from the
+    # {stem}.override.json companion (never recomputed): covered rule
+    # ids plus the audit fields. Empty/absent when the companion is
+    # missing, invalid, or expired -- a broken companion never fails the
+    # build. Display-only; NEVER a join/dedup/grouping key.
+    override_rules: list[str] = Field(default_factory=list)
+    override_evidence: str | None = None
+    override_approver: str | None = None
+    override_expires: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
@@ -215,12 +226,25 @@ class ManifestEntry(BaseModel):
     instance_or_warehouse: str | None = None
     storage_format: str | None = None
     compliance_class: str | None = None
+    basis_availability: BasisAvailability | None = None
 
     @model_validator(mode="after")
     def _default_logical_query_count(self) -> ManifestEntry:
         if self.logical_query_count == 0 and self.query_count > 0:
             self.logical_query_count = self.query_count
         return self
+
+
+class BasisAvailability(BaseModel):
+    """Measurement basis availability for a result bundle."""
+
+    has_warmup: bool = False
+    measurement_pass_count: int = 0
+    warmup_status: str = "no_warmup_recorded"
+    available_bases: list[str] = Field(default_factory=list)
+    unavailable_bases: dict[str, str] = Field(default_factory=dict)
+    query_pass_counts: dict[str, int] = Field(default_factory=dict)
+    varying_pass_queries: dict[str, int] = Field(default_factory=dict)
 
 
 class QueryTiming(BaseModel):
@@ -429,6 +453,15 @@ class DetailResult(BaseModel):
     # broken companion never fails the build. Never recomputed or re-derived:
     # the explorer renders the verdicts as recorded. Display-only.
     applied_receipt: str | None = None
+    # Accepted plausibility overrides, read verbatim from the
+    # {stem}.override.json companion (never recomputed): covered rule
+    # ids plus the audit fields. Empty/absent when the companion is
+    # missing, invalid, or expired -- a broken companion never fails the
+    # build. Display-only; NEVER a join/dedup/grouping key.
+    override_rules: list[str] = Field(default_factory=list)
+    override_evidence: str | None = None
+    override_approver: str | None = None
+    override_expires: str | None = None
     # ADR-3 seam: explicit tuning-policy generation marker, ingested verbatim
     # from platform.tuning (never derived from benchbox_version). Null for
     # legacy bundles predating the field (treated downstream as "pre-seam").
@@ -459,6 +492,7 @@ class DetailResult(BaseModel):
     # mechanisms" mismatch instead of "nothing to compare".
     physical_mechanisms: list[str] | None = None
     physical_rendering_id: str | None = None
+    basis_availability: BasisAvailability | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -474,8 +508,20 @@ def is_ranking_eligible(entry: ManifestEntry) -> bool:
         and entry.compliance_class not in UNOFFICIAL_COMPLIANCE_CLASSES
         and entry.failed_query_count == 0
         and not validation_status_is_non_clean(entry.validation_status)
+        and custom_tuning_is_materially_applied(entry)
         and entry.comparison_exclusion_reason is None
     )
+
+
+def custom_tuning_is_materially_applied(entry: ManifestEntry) -> bool:
+    """Return whether a custom-mode run has execution-derived applied tuning evidence.
+
+    ``custom`` records how tuning was requested, not whether the adapter changed
+    physical execution.  Fail closed for legacy/unknown, noop, and failed custom
+    runs so a configuration label alone cannot create a ranked tuning claim.
+    Other canonical modes retain their existing ranking policy.
+    """
+    return entry.tuning_mode != "custom" or entry.tuning_validation_status in APPLIED_TUNING_STATUSES
 
 
 def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = None) -> str | None:
@@ -490,6 +536,8 @@ def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = 
         return "failed_queries"
     if validation_status_is_non_clean(entry.validation_status):
         return "validation_not_clean"
+    if not custom_tuning_is_materially_applied(entry):
+        return "tuning_not_applied"
     if entry.comparison_exclusion_reason is not None:
         return entry.comparison_exclusion_reason
 

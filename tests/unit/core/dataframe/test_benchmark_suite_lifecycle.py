@@ -41,7 +41,9 @@ from benchbox.core.dataframe.benchmark_suite import (
     PlatformCategory,
     QueryBenchmarkResult,
     SQLComparisonResult,
+    SQLVsDataFrameBenchmark,
     SQLVsDataFrameSummary,
+    resolve_table_paths,
 )
 
 pytestmark = [
@@ -1405,3 +1407,93 @@ class TestBenchmarkSuiteConvenienceFunctions:
         assert exported == output_paths
         normalized.assert_called_once_with(summary)
         generate.assert_called_once()
+
+
+# ===========================================================================
+# Sharded parquet table resolution
+# ===========================================================================
+
+
+class TestResolveTablePaths:
+    """Tests for resolve_table_paths used by suite table loading."""
+
+    def test_single_file_preferred(self, tmp_path):
+        single = tmp_path / "lineitem.parquet"
+        single.write_text("stub")
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == [single]
+
+    def test_shards_returned_in_numeric_order(self, tmp_path):
+        for shard in ("lineitem.2.parquet", "lineitem.10.parquet", "lineitem.1.parquet"):
+            (tmp_path / shard).write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == [
+            tmp_path / "lineitem.1.parquet",
+            tmp_path / "lineitem.2.parquet",
+            tmp_path / "lineitem.10.parquet",
+        ]
+
+    def test_non_numeric_suffix_ignored(self, tmp_path):
+        (tmp_path / "lineitem.bak.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "lineitem") == []
+
+    def test_missing_table_returns_empty(self, tmp_path):
+        assert resolve_table_paths(tmp_path, "orders") == []
+
+    def test_other_tables_not_matched(self, tmp_path):
+        (tmp_path / "partsupp.1.parquet").write_text("stub")
+
+        assert resolve_table_paths(tmp_path, "part") == []
+        assert resolve_table_paths(tmp_path, "partsupp") == [tmp_path / "partsupp.1.parquet"]
+
+    def test_create_context_loads_sharded_tables(self, tmp_path):
+        suite = DataFrameBenchmarkSuite(config=BenchmarkConfig())
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+        (tmp_path / "lineitem.2.parquet").write_text("stub")
+        (tmp_path / "nation.parquet").write_text("stub")
+        fake_adapter = MagicMock()
+        fake_adapter.create_context.return_value = object()
+
+        with patch("benchbox.platforms.get_dataframe_adapter", return_value=fake_adapter):
+            suite._create_context("dask-df", tmp_path)
+
+        loaded = {call.args[1]: call.args[2] for call in fake_adapter.load_table.call_args_list}
+        assert loaded["lineitem"] == [tmp_path / "lineitem.1.parquet", tmp_path / "lineitem.2.parquet"]
+        assert loaded["nation"] == [tmp_path / "nation.parquet"]
+        assert "orders" not in loaded
+
+    def test_single_plus_shards_warns_and_prefers_single(self, tmp_path, caplog):
+        single = tmp_path / "lineitem.parquet"
+        single.write_text("stub")
+        (tmp_path / "lineitem.1.parquet").write_text("stub")
+
+        with caplog.at_level("WARNING", logger="benchbox.core.dataframe.benchmark_suite"):
+            assert resolve_table_paths(tmp_path, "lineitem") == [single]
+        assert "lineitem.parquet" in caplog.text
+
+    def test_duckdb_connect_loads_shards_via_parameter(self, tmp_path):
+        pytest.importorskip("duckdb")
+        pd = pytest.importorskip("pandas")
+        odd_dir = tmp_path / "odd'dir"
+        odd_dir.mkdir()
+        pd.DataFrame({"a": [1, 2]}).to_parquet(odd_dir / "nation.1.parquet", index=False)
+        pd.DataFrame({"a": [3]}).to_parquet(odd_dir / "nation.2.parquet", index=False)
+
+        conn = SQLVsDataFrameBenchmark._connect_duckdb(odd_dir)
+        try:
+            assert conn.execute("SELECT COUNT(*) FROM nation").fetchone()[0] == 3
+        finally:
+            conn.close()
+
+    def test_sqlite_connect_loads_shards_incrementally(self, tmp_path):
+        pd = pytest.importorskip("pandas")
+        pd.DataFrame({"a": [1, 2]}).to_parquet(tmp_path / "nation.1.parquet", index=False)
+        pd.DataFrame({"a": [3, 4, 5]}).to_parquet(tmp_path / "nation.2.parquet", index=False)
+
+        conn = SQLVsDataFrameBenchmark._connect_sqlite(tmp_path)
+        try:
+            assert conn.execute("SELECT COUNT(*) FROM nation").fetchone()[0] == 5
+        finally:
+            conn.close()

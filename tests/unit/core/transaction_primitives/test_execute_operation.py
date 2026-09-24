@@ -442,3 +442,60 @@ class TestAutoSetup:
         bench.execute_operation("op1", conn)
 
         bench.setup.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# platform_fallback_key kwarg (shared-dialect override inheritance)
+# ---------------------------------------------------------------------------
+class TestPlatformFallbackKey:
+    def test_fallback_null_override_skips(self, tmp_path: Path):
+        """A duckdb null override skips DuckLake via fallback (SAVEPOINT case)."""
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="SAVEPOINT sp1",
+            platform_overrides={"duckdb": None},
+        )
+        conn = _make_connection()
+
+        result = bench.execute_operation("op1", conn, platform_key="ducklake", platform_fallback_key="duckdb")
+
+        assert result.status == "SKIPPED"
+        conn.execute.assert_not_called()
+
+    def test_fallback_string_override_used(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="generic SQL",
+            platform_overrides={"duckdb": "duckdb SQL"},
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key="ducklake", platform_fallback_key="duckdb")
+
+        conn.execute.assert_called_once_with("duckdb SQL")
+
+    def test_engine_entry_wins_over_fallback(self, tmp_path: Path):
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="generic SQL",
+            platform_overrides={"ducklake": "engine SQL", "duckdb": None},
+        )
+        conn = _make_connection()
+
+        result = bench.execute_operation("op1", conn, platform_key="ducklake", platform_fallback_key="duckdb")
+
+        assert result.status is None  # executed, not skipped
+        conn.execute.assert_called_once_with("engine SQL")
+
+    def test_no_fallback_keeps_catalog_default(self, tmp_path: Path):
+        """Without a fallback key the old exact-match behavior is unchanged."""
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="generic SQL",
+            platform_overrides={"duckdb": "duckdb SQL"},
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key="ducklake")
+
+        conn.execute.assert_called_once_with("generic SQL")

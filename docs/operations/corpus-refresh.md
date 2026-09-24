@@ -17,15 +17,14 @@ Do not add a second nightly UAT gate for this. Generation already lives in
 
 ## Recurring matrix
 
-This is the `seed-corpus.yml` matrix. It is DuckDB / DataFusion / Polars
-(and optional ClickHouse Cloud when secrets exist). Cloud warehouses
-(Snowflake, Databricks, BigQuery) are not on this calendar until live
-credentials are confirmed.
+The workflow is the canonical matrix. It uses only local DuckDB, DataFusion,
+Polars DataFrame, and ClickHouse Local identities. Cloud warehouses are not on
+this calendar.
 
 | Benchmark | Scales | Platforms | Notes |
 | --- | --- | --- | --- |
-| TPC-H | 0.01, 0.1, 1.0 | DuckDB, DataFusion, Polars-DF (SF 0.01/0.1); DuckDB, DataFusion, ClickHouse Cloud optional (SF 1.0) | Power phase only |
-| TPC-DS | 1 | DuckDB, DataFusion | Integer SF only. Runs with `--official --seed 42` so submit/admission will not classify them unofficial |
+| TPC-H | 0.01, 0.1, 1.0 | DuckDB, DataFusion, Polars-DF (SF 0.01/0.1); DuckDB, DataFusion, ClickHouse Local (SF 1.0) | Power phase only |
+| TPC-DS | 1 | DuckDB, DataFusion, ClickHouse Local | Integer SF only |
 | SSB | 0.01, 0.1 | DuckDB, DataFusion, Polars-DF | Power phase only |
 
 TPC-H SF10 / SF100 and extra TPC-DS platforms stay operator-run (too large
@@ -44,3 +43,28 @@ gh workflow run seed-corpus.yml
 After the develop PR merges, confirm the mirror draft against
 `published-results` and merge it. `corpus-drift-check.yml` remains the
 loud canary if a push-triggered mirror is dropped.
+
+The mirror workflow captures the accepted `published-results` commit before it
+builds its union overlay and compares that ref again before pushing the draft
+branch. If the accepted branch moved during the run, the workflow reports both
+SHAs, opens no stale mirror PR, and must be rerun after the accepted
+publication settles. This is a freshness/reconciliation check; it does not
+change the immutable snapshot used to reproduce an existing ledger seed.
+
+## Freshness ownership
+
+Freshness — whether the accepted corpus moved and when the ledger seed
+must be regenerated — belongs to this flow, not to the ledger. The seed
+(`publication/ledger-seed.json`) records the exact snapshot SHA it
+validated (`source` plus `source_resolved_at/from` provenance). Ledger
+interfaces never fetch, resolve, or reconcile freshness: `materialize`
+reads bytes from the recorded SHA, and reproduction/validation passes
+`--expect-source` with the recorded SHA so a moved mirror fails with an
+actionable message instead of silently switching inputs.
+
+Regenerating the seed against a new source SHA is a deliberate, reviewed
+act (regenerate, inspect the union diff, commit). The cutover workflow's
+regen-and-diff step is the loud detector: it regenerates from the live
+ref, and any content drift against the committed seed means the mirror
+moved and freshness must be revalidated through this flow. Generation
+without `--expect-source` exists only for that detection step.

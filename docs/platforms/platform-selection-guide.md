@@ -277,7 +277,7 @@ adapter = DataFusionAdapter(
 
 | Platform       | Pricing Model   | Cost Control        |
 | -------------- | --------------- | ------------------- |
-| **BigQuery**   | $5/TB queried   | Query limits, slots |
+| **BigQuery**   | $6.25/TiB queried (US/EU/Asia multi-region) | Query limits, slots |
 | **Databricks SQL** | DBU consumption | Auto-termination    |
 
 **Cost-Optimized Configuration**:

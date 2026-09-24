@@ -89,7 +89,13 @@ erDiagram
 
 ## Query Characteristics
 
-The 99 TPC-DS queries are organized into different complexity categories and test various aspects of analytical query processing:
+The 99 TPC-DS queries are organized into different complexity categories and test various aspects of analytical query processing.
+
+```{tip}
+Each query has a [query template](queries/tpcds/index.md) with a representative
+SQL and DataFrame rendering, plus how to extract the exact statement for your
+platform and scale.
+```
 
 ### Query Categories by Complexity
 

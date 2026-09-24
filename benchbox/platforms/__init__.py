@@ -107,7 +107,6 @@ DataFusionAdapter|.datafusion
 PolarsAdapter|.polars_platform
 PolarsDataFrameAdapter|.dataframe
 PandasDataFrameAdapter|.dataframe
-ModinDataFrameAdapter|.dataframe
 CuDFDataFrameAdapter|.dataframe
 DaskDataFrameAdapter|.dataframe
 DataFusionDataFrameAdapter|.dataframe
@@ -120,7 +119,6 @@ _LAZY_ADAPTERS = dict(row.split("|", 1) for row in _LAZY_ADAPTER_ROWS.splitlines
 _LAZY_CONSTANT_ROWS = """\
 POLARS_AVAILABLE|.dataframe
 PANDAS_AVAILABLE|.dataframe
-MODIN_AVAILABLE|.dataframe
 CUDF_AVAILABLE|.dataframe
 DASK_AVAILABLE|.dataframe
 DATAFUSION_DF_AVAILABLE|.dataframe
@@ -281,9 +279,9 @@ ClickHouseAdapter ClickHouseCloudAdapter DatabricksAdapter BigQueryAdapter Redsh
 TrinoAdapter AthenaAdapter SparkAdapter PySparkSQLAdapter FireboltAdapter DatabendAdapter InfluxDBAdapter
 PrestoAdapter PostgreSQLAdapter PgDuckDBAdapter PgMooncakeAdapter CedarDBAdapter QuestDBAdapter AzureSynapseAdapter
 FabricWarehouseAdapter FabricLakehouseAdapter FabricSparkAdapter StarRocksAdapter SingleStoreAdapter QuantonAdapter
-LakeSailAdapter DorisAdapter PolarsDataFrameAdapter PandasDataFrameAdapter ModinDataFrameAdapter CuDFDataFrameAdapter
+LakeSailAdapter DorisAdapter PolarsDataFrameAdapter PandasDataFrameAdapter CuDFDataFrameAdapter
 DaskDataFrameAdapter DataFusionDataFrameAdapter PySparkDataFrameAdapter LakeSailDataFrameAdapter POLARS_AVAILABLE
-PANDAS_AVAILABLE MODIN_AVAILABLE CUDF_AVAILABLE DASK_AVAILABLE DATAFUSION_DF_AVAILABLE PYSPARK_AVAILABLE
+PANDAS_AVAILABLE CUDF_AVAILABLE DASK_AVAILABLE DATAFUSION_DF_AVAILABLE PYSPARK_AVAILABLE
 DataFramePlatformChecker get_adapter is_dataframe_mode get_available_modes get_available_deployments
 get_default_deployment get_platform_adapter get_dataframe_adapter list_available_platforms
 list_available_dataframe_platforms get_platform_requirements get_dataframe_requirements check_platform_connectivity
@@ -480,7 +478,6 @@ def check_platform_connectivity(platform_name: str, **config) -> bool:
 _DATAFRAME_PLATFORM_ROWS = """\
 polars-df|PolarsDataFrameAdapter|POLARS_AVAILABLE|pip install polars (core dependency - should be installed)
 pandas-df|PandasDataFrameAdapter|PANDAS_AVAILABLE|pip install pandas  # standalone\\n  uv add benchbox --extra pandas  # inside a project
-modin-df|ModinDataFrameAdapter|MODIN_AVAILABLE|pip install modin[ray]  # standalone\\n  uv add benchbox --extra modin  # inside a project
 cudf-df|CuDFDataFrameAdapter|CUDF_AVAILABLE|pip install cudf-cu12 (requires NVIDIA GPU with CUDA)
 dask-df|DaskDataFrameAdapter|DASK_AVAILABLE|pip install dask[distributed]  # standalone\\n  uv add benchbox --extra dask  # inside a project
 datafusion-df|DataFusionDataFrameAdapter|DATAFUSION_DF_AVAILABLE|pip install datafusion  # standalone\\n  uv add benchbox --extra datafusion  # inside a project
@@ -790,6 +787,8 @@ databend|password|Databend password (or set DATABEND_PASSWORD env var)|{}
 databend|database|Database name (default: benchbox)|{'default': 'benchbox'}
 databend|dsn|Full Databend DSN (overrides individual connection params)|{}
 databend|warehouse|Databend Cloud warehouse name|{}
+databend|ssl|Enable SSL/TLS for Databend connections|{'parser': 'parse_bool', 'default': True}
+databend|disable_result_cache|Disable Databend query result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
 doris|host|Doris FE node hostname|{'default': 'localhost'}
 doris|port|Doris MySQL protocol port|{'parser': 'int', 'default': 9030}
 doris|http_port|Doris Stream Load HTTP port (FE)|{'parser': 'int', 'default': 8030}
@@ -806,7 +805,6 @@ polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool
 polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
 polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
 pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
-modin|engine|Modin execution engine|{'choices': ('ray', 'dask'), 'default': 'ray'}
 cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
 cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
 dask|n_workers|Number of worker processes|{'parser': 'int'}
@@ -825,6 +823,8 @@ sqlite|database_path|Path to the SQLite database file (auto-generated from --ben
 sqlite|timeout|SQLite connection timeout in seconds|{'parser': 'float', 'default': '30.0'}
 sqlite|check_same_thread|Enforce that connections are used on the creating thread only|{'parser': 'parse_bool', 'default': 'false'}
 spark|adaptive_enabled|Enable or disable Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+synapse-spark|adaptive_enabled|Enable or disable Synapse Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
+fabric-spark|adaptive_enabled|Enable or disable Fabric Spark Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 spark|java_home|Path to the JDK Spark should run under|{}
 spark|driver_memory|Spark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
 pyspark|driver_memory|PySpark driver JVM heap, e.g. 4g or 8g (default 4g)|{}
@@ -840,6 +840,7 @@ redshift|staging_root|S3 path for staging data (e.g., s3://bucket/path)|{}
 snowflake|staging_root|Cloud storage path for staging data|{}
 snowflake|iceberg_external_volume|Snowflake EXTERNAL VOLUME name for Iceberg tables|{}
 lakesail|endpoint|Spark Connect server endpoint (for example, sc://localhost:50051)|{'default': 'sc://localhost:50051'}
+lakesail|adaptive_enabled|Enable or disable LakeSail Adaptive Query Execution (AQE)|{'parser': 'parse_bool', 'default': 'true'}
 velox|deployment|Deployment mode: 'local' (in-process SparkSession, Linux only) or 'remote' (Spark-Connect server)|{'choices': ('local', 'remote'), 'default': 'local'}
 velox|endpoint|Spark-Connect endpoint for remote mode (e.g., sc://localhost:50051)|{'default': 'sc://localhost:50051'}
 velox|gluten_jar_path|Absolute path to the Gluten Velox bundle jar (required for local mode)|{'aliases': ('jar',)}
@@ -847,6 +848,8 @@ velox|offheap_size|Off-heap memory for Velox native engine (e.g., '8g', '16g')|{
 velox|driver_memory|Spark driver JVM heap memory (e.g., '4g')|{'default': '4g'}
 velox|shuffle_partitions|Number of shuffle partitions|{'parser': 'int', 'default': '200'}
 velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_bool', 'default': 'true'}
+velox|table_format|Lakehouse table format for accelerated reads (parquet, orc, delta, iceberg, hudi)|{'choices': ('parquet', 'orc', 'delta', 'iceberg', 'hudi'), 'default': 'parquet'}
+velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads (local paths, URIs, or Maven coordinates; required for lakehouse formats in local mode)|{}
 """
 
     _SPEC_PARSERS = {"int": int, "float": float, "parse_bool": parse_bool}
@@ -970,8 +973,6 @@ velox|adaptive_enabled|Enable Spark Adaptive Query Execution|{'parser': 'parse_b
     # Polars DataFrame
 
     # Pandas DataFrame
-
-    # Modin DataFrame
 
     # cuDF DataFrame
 

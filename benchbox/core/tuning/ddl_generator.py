@@ -94,6 +94,13 @@ class ColumnDefinition:
         )
 
 
+# Platforms whose dialect requires DISTRIBUTED BY after PARTITION BY in the
+# CREATE TABLE statement (StarRocks, Doris). get_inline_clauses() orders the
+# rendered distribute_by after partition_by for these platforms; every other
+# platform keeps the legacy distribution-first order.
+_DISTRIBUTE_AFTER_PARTITION_PLATFORMS = frozenset({"starrocks", "doris"})
+
+
 @dataclass
 class TuningClauses:
     """Structured output from DDL generation.
@@ -110,7 +117,16 @@ class TuningClauses:
     # Clustering clause (e.g., "CLUSTER BY (col1, col2)" for Snowflake)
     cluster_by: str | None = None
 
-    # Distribution clause (e.g., "DISTSTYLE KEY DISTKEY(col)" for Redshift)
+    # Distribution clause, always rendered SQL ready for inline emission --
+    # never a bare column name. The exact form is platform-specific:
+    # - Redshift: "DISTSTYLE KEY\nDISTKEY (col)" / "DISTSTYLE ALL" / ...
+    # - StarRocks/Doris: "DISTRIBUTED BY HASH(`col`) BUCKETS N"
+    # - Firebolt: "PRIMARY INDEX (col1, col2)"
+    # - Spark family: "CLUSTERED BY (cols) INTO N BUCKETS"
+    # - Synapse: "HASH([col])" / "ROUND_ROBIN" fragment consumed by the
+    #   "DISTRIBUTION = ..." wrapper in its WITH clause.
+    # get_inline_clauses() emits this value verbatim; each generator's
+    # generate_create_table_ddl() uses it directly without re-rendering.
     distribute_by: str | None = None
 
     # Sort key clause (e.g., "COMPOUND SORTKEY(col1, col2)" for Redshift)
@@ -135,6 +151,12 @@ class TuningClauses:
     # e.g., OPTIMIZE, Z-ORDER, CREATE INDEX, ALTER TABLE
     post_create_statements: list[str] = field(default_factory=list)
 
+    # Dialect marker set by generators whose inline-clause order differs from
+    # the legacy default (e.g., "starrocks", "doris"). Metadata only: ignored
+    # by is_empty(), serialized only when set. get_inline_clauses() uses it
+    # to pick the platform-aware clause order.
+    platform: str | None = None
+
     def is_empty(self) -> bool:
         """Check if no tuning clauses are defined."""
         return (
@@ -153,8 +175,13 @@ class TuningClauses:
     def get_inline_clauses(self) -> list[str]:
         """Get all clauses that go in the CREATE TABLE statement.
 
-        Returns clauses in the standard order for most SQL dialects.
-        Platform-specific generators may override this ordering.
+        Returns clauses in the standard order for most SQL dialects
+        (distribution before partitioning, the Redshift pattern), except for
+        platforms in _DISTRIBUTE_AFTER_PARTITION_PLATFORMS (StarRocks, Doris),
+        whose dialects require DISTRIBUTED BY after PARTITION BY; Doris
+        additionally orders its DUPLICATE KEY (``sort_by``) first. The order
+        is keyed off the ``platform`` marker the corresponding generators set;
+        every other platform keeps the legacy order byte-identical.
         """
         clauses = []
 
@@ -162,20 +189,36 @@ class TuningClauses:
         if self.primary_key:
             clauses.append(self.primary_key)
 
-        # Distribution before partitioning (Redshift pattern)
-        if self.distribute_by:
-            clauses.append(self.distribute_by)
+        if self.platform == "doris":
+            # Doris pattern: DUPLICATE KEY -> PARTITION BY -> DISTRIBUTED BY,
+            # mirroring DorisDDLGenerator.generate_create_table_ddl.
+            if self.sort_by:
+                clauses.append(self.sort_by)
+            if self.partition_by:
+                clauses.append(self.partition_by)
+            if self.distribute_by:
+                clauses.append(self.distribute_by)
+        elif self.platform in _DISTRIBUTE_AFTER_PARTITION_PLATFORMS:
+            # StarRocks pattern: PARTITION BY -> DISTRIBUTED BY.
+            if self.partition_by:
+                clauses.append(self.partition_by)
+            if self.distribute_by:
+                clauses.append(self.distribute_by)
+        else:
+            # Distribution before partitioning (Redshift pattern)
+            if self.distribute_by:
+                clauses.append(self.distribute_by)
 
-        # Partitioning
-        if self.partition_by:
-            clauses.append(self.partition_by)
+            # Partitioning
+            if self.partition_by:
+                clauses.append(self.partition_by)
 
         # Clustering
         if self.cluster_by:
             clauses.append(self.cluster_by)
 
-        # Sort keys
-        if self.sort_by:
+        # Sort keys (all platforms except Doris, ordered above)
+        if self.sort_by and self.platform != "doris":
             clauses.append(self.sort_by)
 
         # ORDER BY (ClickHouse, DuckDB)
@@ -242,6 +285,10 @@ class TuningClauses:
             result["additional_clauses"] = self.additional_clauses
         if self.post_create_statements:
             result["post_create_statements"] = self.post_create_statements
+        # Ordering metadata is meaningless with no clauses to order, so an
+        # empty-but-marked instance serializes exactly like an empty one.
+        if self.platform and not self.is_empty():
+            result["platform"] = self.platform
 
         return result
 
@@ -263,6 +310,7 @@ class TuningClauses:
             table_options=data.get("table_options", {}),
             additional_clauses=data.get("additional_clauses", []),
             post_create_statements=data.get("post_create_statements", []),
+            platform=data.get("platform"),
         )
 
     def merge(self, other: TuningClauses) -> TuningClauses:
@@ -288,6 +336,7 @@ class TuningClauses:
             table_options={**self.table_options, **other.table_options},
             additional_clauses=[*self.additional_clauses, *other.additional_clauses],
             post_create_statements=[*self.post_create_statements, *other.post_create_statements],
+            platform=other.platform or self.platform,
         )
 
 
@@ -625,17 +674,76 @@ DDLGeneratorType = DDLGenerator | BaseDDLGenerator
 # Platforms known to have no physical tuning surface (no partitioning, clustering,
 # distribution, or sort-key clauses to emit) - the NoOp fallback for these is
 # expected and permanent, so get_ddl_generator() does not warn for them.
+# Bare `lakesail` and `velox` are deliberately NOT listed: their SQL adapters
+# call _create_schema_with_tuning() and their generate_tuning_clause() methods
+# emit PARTITIONED BY, so a tuned dry run must keep the warning that exposes
+# the preview-versus-execution gap until they get real registry generators.
 _TUNING_FREE_PLATFORMS: frozenset[str] = frozenset(
     {
         "sqlite",
         "sqlite3",
         "pandas",
-        "modin",
         "cudf",
         "dask",
         "polars",
+        "datafusion",
+        "pyspark",
     }
 )
+
+# Base engine keys that own a declared "<engine>-df" spelling in the platform
+# manifest (the CLI aliases plus the "databricks-df" entry key - see
+# benchbox/core/platform_manifest.py). Only these bases strip the "-df"
+# suffix below; undeclared combinations such as "snowflake-df" never resolve
+# to an unrelated real generator and instead take the warning/NoOp path.
+# Update trigger: a new manifest "<engine>-df" alias or entry key.
+_DATAFRAME_SUFFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+        "lakesail",
+        "databricks",
+    }
+)
+
+# Base engine keys that own a declared "dataframe-<engine>" packaging extra
+# (see pyproject.toml [project.optional-dependencies]). Only these bases
+# strip the "dataframe-" prefix below, so "dataframe-snowflake" takes the
+# warning/NoOp path instead of resolving to SnowflakeDDLGenerator.
+# Update trigger: a new dataframe-* extra in pyproject.toml.
+_DATAFRAME_PREFIX_BASES: frozenset[str] = frozenset(
+    {
+        "pandas",
+        "cudf",
+        "dask",
+        "polars",
+        "datafusion",
+        "pyspark",
+    }
+)
+
+_DATAFRAME_KEY_PREFIX = "dataframe-"
+_DATAFRAME_KEY_SUFFIX = "-df"
+
+
+def _normalize_dataframe_platform_key(platform_lower: str) -> str:
+    """Normalize a declared DataFrame-mode platform key to its base engine key.
+
+    Only declared spellings normalize: "<engine>-df" when the base owns a
+    manifest-declared DataFrame spelling, and "dataframe-<engine>" when the
+    base owns a dataframe-* packaging extra. Anything else returns unchanged.
+    """
+    if platform_lower.startswith(_DATAFRAME_KEY_PREFIX):
+        base = platform_lower[len(_DATAFRAME_KEY_PREFIX) :]
+        return base if base in _DATAFRAME_PREFIX_BASES else platform_lower
+    if platform_lower.endswith(_DATAFRAME_KEY_SUFFIX):
+        base = platform_lower[: -len(_DATAFRAME_KEY_SUFFIX)]
+        return base if base in _DATAFRAME_SUFFIX_BASES else platform_lower
+    return platform_lower
 
 
 def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
@@ -722,13 +830,26 @@ def get_ddl_generator(platform_type: str) -> BaseDDLGenerator:
     if platform_lower in generators:
         return generators[platform_lower]()
 
+    # Declared DataFrame-mode keys ("<engine>-df" for manifest-declared engines,
+    # "dataframe-<engine>" for packaging-extra engines) resolve behind the same
+    # registry-owned path: normalize to the base engine key and retry the
+    # generators mapping so a real generator always wins when one exists
+    # (e.g. "databricks-df" renders Delta DDL). Undeclared combinations skip
+    # normalization entirely and fall through to the warning/NoOp path below.
+    normalized = _normalize_dataframe_platform_key(platform_lower)
+    if normalized != platform_lower and normalized in generators:
+        return generators[normalized]()
+
     # Platforms with no physical tuning surface at all (in-memory/embedded engines
     # with no indexes, partitioning, or clustering clauses to emit). NoOp is the
     # correct, permanent answer for these, so the fallback stays silent. Anything
     # else falling through here is either a platform that should get a real
     # generator eventually or a typo'd platform string - both are worth a
     # warning since dry-run/tuning preview would otherwise go silently empty.
-    if platform_lower not in _TUNING_FREE_PLATFORMS:
+    # The tuning-free check runs on the normalized key so DataFrame-mode
+    # spellings ("polars-df", "dataframe-polars", ...) stay silent exactly when
+    # their base engine is tuning-free.
+    if normalized not in _TUNING_FREE_PLATFORMS:
         logger.warning(
             "No DDL generator registered for platform %r; tuning clauses will be "
             "empty (NoOp fallback). If %r supports physical tuning, register it "

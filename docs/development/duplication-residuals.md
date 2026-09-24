@@ -15,7 +15,7 @@ collapse meaningful platform differences or require cross-boundary refactors
 owned by a different TODO.
 
 The full ranked inventory lives at
-[`duplication-inventory.csv`](./duplication-inventory.csv).
+`duplication-inventory.csv`.
 
 | Snapshot | Cluster pairs (≥15-line, full benchbox/) | Top cluster size |
 |---|---|---|
@@ -173,7 +173,7 @@ dedicated multi-day TODO or are accepted residuals.
 - **Pattern**: Two DataFrame family base classes both implement
   `_run_query_phase`, `_load_table_data`, and `_persist_results` with
   the same control flow but different per-backend operations (Polars
-  Expression API vs Pandas/Modin/cuDF).
+  Expression API vs Pandas/cuDF).
 - **Inspected in w5**: w5 already extracted the per-call result-dict
   builders (`_result_helpers.py`). The remaining 79-line cluster covers
   the orchestration shells. Extracting them needs a shared

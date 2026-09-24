@@ -74,7 +74,9 @@ function writeToUrl<T>(key: string, value: T, initial: T, serde: UrlSerde<T>): v
   const newSearch = params.toString();
   const search = newSearch.length > 0 ? `?${newSearch}` : "";
   const newUrl = `${window.location.pathname}${search}${window.location.hash}`;
-  history.replaceState(null, "", newUrl);
+  // Preserve whatever the entry already carries: the router and any other
+  // consumer own `history.state`, and passing null here would discard it.
+  history.replaceState(history.state, "", newUrl);
 }
 
 /**
@@ -107,7 +109,11 @@ export function useUrlState<T>(
     params.delete(key);
     const newSearch = params.toString();
     const search = newSearch.length > 0 ? `?${newSearch}` : "";
-    history.replaceState(null, "", `${window.location.pathname}${search}${window.location.hash}`);
+    history.replaceState(
+      history.state,
+      "",
+      `${window.location.pathname}${search}${window.location.hash}`,
+    );
     // Intentionally mount-only: later equality checks happen inside setValue → writeToUrl.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -7,24 +7,21 @@ const LONG_DUCKDB = fixtureIds.ids.duckdb;
 const STALE_ID = "deadbeef";
 const DUPLICATE_IDS = `${SHORT_DUCKDB},${SHORT_DUCKDB}`;
 
-test.describe("compare parity (rx-19 gate: before candidate table retirement)", () => {
+test.describe("compare selection and direct-link parity", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("empty ?ids= opens builder with no pinned result", async ({ page }) => {
+  test("empty ?ids= points to Find runs", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole("heading", { name: "Pick runs to compare" })).toBeVisible();
-    await expect(page.getByTestId("compare-builder-status")).toContainText("0 results selected");
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
-  test("?ids=<one> pins that run and opens builder", async ({ page }) => {
+  test("?ids=<one> keeps that run selected when linking to Find runs", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB}`);
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-builder-status")).toContainText("1 result selected");
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    await expect(page.getByTestId("compare-builder-query-link")).toHaveAttribute("href", /\/results\/query/);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toHaveAttribute("href", /\/results\/query\?pick=/);
   });
 
   test("?ids=<a,b> renders comparison with both results", async ({ page }) => {
@@ -44,7 +41,7 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
     await page.goto(`/results/compare?ids=${urlIds}`);
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison|Comparison/i);
-    await expect(page.getByRole("main").getByRole("heading", { name: /Query-Level Diff|Comparison/ }).first()).toBeVisible();
+    await expect(page.getByRole("main").getByRole("heading", { name: /Query-level differences|Comparison/ }).first()).toBeVisible();
     // Verify all distinct ids present in URL (cap handling)
     const urlSearchIds = new URL(page.url()).searchParams.get("ids")?.split(",") ?? [];
     expect(urlSearchIds.length).toBeGreaterThanOrEqual(2);
@@ -53,17 +50,18 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
   test("stale id shows friendly error, does not crash", async ({ page }) => {
     await page.goto(`/results/compare?ids=${STALE_ID}`);
     await waitForShell(page);
-    // Should show error or builder, not blank
-    const builder = page.getByTestId("compare-builder");
+    // Show an error or recovery state, never a blank page.
+    const recovery = page.getByRole("heading", { name: "Compare benchmark results" });
     const error = page.getByText(/No result found|not found|unavailable/i);
-    await expect(builder.or(error).first()).toBeVisible({ timeout: 20000 });
+    await expect(recovery.or(error).first()).toBeVisible({ timeout: 20000 });
   });
 
   test("duplicate ids are deduplicated (ids list stays unique)", async ({ page }) => {
     await page.goto(`/results/compare?ids=${DUPLICATE_IDS}`);
     await waitForShell(page);
     // Should handle deduplication gracefully
-    await expect(page.getByTestId("compare-builder").or(page.getByText(/Comparison|TPC-H/)).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId("compare-url-notice")).toContainText("Ignored duplicate result ID");
   });
 
   test("reload preserves comparison state", async ({ page }) => {
@@ -76,16 +74,10 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
     await expect(page.getByRole("main").locator(`a[href="/results/r/${LONG_DUCKDB}"]`).first()).toBeVisible();
   });
 
-  test("shared link (copy URL) round-trips correctly", async ({ page, context }) => {
-    if (page.context().browser()?.browserType().name() === "chromium") {
-      await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    }
+  test("shared link (copy URL) round-trips correctly", async ({ page }) => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison|Comparison/i);
-    const shareBtn = page.getByRole("button", { name: /Share URL/ });
-    await shareBtn.click();
-    await expect(page.getByRole("button", { name: /Copied!/ })).toBeVisible();
     const url = page.url();
     expect(url).toContain("/results/compare?ids=");
     // Re-visit copied URL
@@ -95,14 +87,11 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
     await expect(page.getByRole("main").locator(`a[href="/results/r/${LONG_DUCKDB}"]`).first()).toBeVisible();
   });
 
-  test("all-excluded set handled (builder shows empty or filtered message)", async ({ page }) => {
-    // Builder with filters that exclude all is covered by builder empty state
+  test("empty selection has a clear recovery action", async ({ page }) => {
     await page.goto("/results/compare");
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20000 });
-    // Apply a benchmark filter that matches no candidates in fixture (unlikely)
-    // Instead verify builder guidance is present
-    await expect(page.getByTestId("compare-builder-status")).toContainText(/results selected/i);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
   });
 
   test("Pages 404 restore round-trip (deep-link URL preserved via redirect)", async ({ page }) => {
@@ -115,7 +104,7 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
     // Reload should still honor ids from URL (sessionStorage redirect is consumed on app boot)
     await page.reload();
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder").or(page.getByText(/Comparison|TPC-H/)).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
   });
 
   test("document height with large fixture is bounded (no unbounded candidate table)", async ({ page }) => {
@@ -123,10 +112,9 @@ test.describe("compare parity (rx-19 gate: before candidate table retirement)", 
     // After retirement, the builder should be compact regardless of corpus size.
     await page.goto("/results/compare?ids=" + SHORT_DUCKDB);
     await waitForShell(page);
-    await expect(page.getByTestId("compare-builder")).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId("compare-builder-query-cta")).toBeVisible();
-    // The candidate table should not render (false && wrapper)
-    await expect(page.locator("table")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Compare benchmark results" })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole("link", { name: "Find runs to compare with this run" })).toBeVisible();
+    await expect(page.getByRole("grid", { name: "Cross-benchmark leaderboard" })).toBeVisible();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // Compact builder should be well under old 17k threshold
     expect(height).toBeLessThan(5000);

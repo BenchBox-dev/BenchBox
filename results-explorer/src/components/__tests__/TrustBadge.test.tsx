@@ -12,7 +12,7 @@
 
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
-import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
+import { OverrideBadge, TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 
 describe("TrustBadge", () => {
   // -----------------------------------------------------------------------
@@ -90,7 +90,7 @@ describe("TrustBadge", () => {
     const badge = container.querySelector(".badge");
     const title = badge?.getAttribute("title") ?? "";
     expect(title).toContain("some-new-tier");
-    expect(title).toContain("unrecognised");
+    expect(title).toContain("not recognized");
   });
 
   it("empty trustLabel renders an explicit Unknown badge (not nothing)", () => {
@@ -178,7 +178,7 @@ describe("ValidationBadge", () => {
     const badge = container.querySelector(".badge");
     expect(badge?.getAttribute("data-tone")).toBe("info");
     expect(badge?.textContent).toBe("exact");
-    expect(badge?.getAttribute("title")).toContain("Validation status: exact");
+    expect(badge?.getAttribute("title")).toContain("Recorded status: exact");
   });
 
   it("emits data-role=validation", () => {
@@ -192,6 +192,101 @@ describe("ValidationBadge", () => {
     expect(hidden.container.querySelector(".badge")).toBeNull();
 
     const shown = render(<ValidationBadge validationStatus={null} showMissing />);
-    expect(shown.getByText("validation n/a")).toBeTruthy();
+    expect(shown.getByText("Not recorded")).toBeTruthy();
+  });
+
+  // -----------------------------------------------------------------------
+  // Reader-facing vocabulary: the chip must never show the raw enum for
+  // statuses users cannot interpret (not_run and friends). It renders the
+  // shared describeValidationStatus() label instead; the raw status is still
+  // reachable via the title tooltip.
+  // -----------------------------------------------------------------------
+
+  it("renders not_run as plain language, not the raw enum, with a warning tone", () => {
+    const { container } = render(<ValidationBadge validationStatus="not_run" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("no validation");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    const title = badge?.getAttribute("title") ?? "";
+    expect(title).toContain("Recorded status: not_run");
+    expect(title.toLowerCase()).toContain("was not run");
+  });
+
+  it.each([
+    ["failed", "danger"],
+    ["interrupted", "danger"],
+    ["partial", "danger"],
+    ["error", "danger"],
+    ["not_run", "warning"],
+    ["not_validated", "warning"],
+    ["uncertain", "warning"],
+    ["unknown", "warning"],
+  ] as const)("%s never falls through to the neutral tone (%s)", (status, expectedTone) => {
+    const { container } = render(<ValidationBadge validationStatus={status} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.getAttribute("data-tone")).toBe(expectedTone);
+    expect(badge?.getAttribute("data-tone")).not.toBe("neutral");
+  });
+
+  it("passed still renders as a clean, interpretable label", () => {
+    const { container } = render(<ValidationBadge validationStatus="passed" />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("passed");
+    expect(badge?.getAttribute("data-tone")).toBe("info");
+  });
+});
+
+describe("ValidationBadge with overrideRules", () => {
+  it("never renders clean for an overridden run, even with a passing status", () => {
+    const { container } = render(<ValidationBadge validationStatus="passed" overrideRules={["timing-plateau"]} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("Overridden: timing-plateau");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+    expect(badge?.getAttribute("title")).toContain("timing-plateau");
+    expect(badge?.getAttribute("title")).toContain("Recorded status: passed.");
+  });
+
+  it("badges an override even when no status was recorded", () => {
+    const { container } = render(<ValidationBadge validationStatus={null} overrideRules={["scale-invariant"]} />);
+    const badge = container.querySelector(".badge");
+    expect(badge?.textContent).toBe("Overridden: scale-invariant");
+    expect(badge?.getAttribute("data-tone")).toBe("warning");
+  });
+
+  it("stays silent without a status or an override", () => {
+    const { container } = render(<ValidationBadge validationStatus={null} />);
+    expect(container.textContent).toBe("");
+  });
+});
+
+describe("OverrideBadge", () => {
+  it("renders nothing when no override was accepted", () => {
+    const { container } = render(<OverrideBadge rules={[]} />);
+    expect(container.textContent).toBe("");
+    const { container: empty } = render(<OverrideBadge rules={null} />);
+    expect(empty.textContent).toBe("");
+  });
+
+  it("names the covered rules and the audit fields", () => {
+    render(
+      <OverrideBadge
+        rules={["timing-plateau"]}
+        approver="reviewer"
+        evidence="https://example.test/pr/1"
+        expires="2099-01-01"
+      />,
+    );
+    const badge = screen.getByText("Overridden: timing-plateau");
+    expect(badge.getAttribute("data-tone")).toBe("warning");
+    expect(badge.getAttribute("data-role")).toBe("override");
+    expect(screen.getByText("by reviewer")).toBeTruthy();
+    expect(screen.getByText("https://example.test/pr/1")).toBeTruthy();
+    expect(screen.getByText("expires 2099-01-01")).toBeTruthy();
+  });
+
+  it("compacts to a bare badge", () => {
+    render(<OverrideBadge rules={["timing-plateau"]} approver="reviewer" compact />);
+    expect(screen.getByText("Overridden")).toBeTruthy();
+    expect(screen.queryByText("by reviewer")).toBeNull();
   });
 });

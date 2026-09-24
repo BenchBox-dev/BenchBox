@@ -21,61 +21,62 @@
 // own color rather than a "cautionary" yellow.
 // ---------------------------------------------------------------------------
 
+import { describeOverride, describeValidationStatus } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 
 const TRUST_CONFIG: Record<string, { label: string; tone: StatusTone; title: string }> = {
   "maintainer-run": {
     label: "Maintainer",
     tone: "success",
-    title: "Run by a BenchBox project maintainer under controlled conditions",
+    title: "A BenchBox maintainer ran and reviewed this result.",
   },
   "community-submission": {
     label: "Community",
     tone: "info",
-    title: "Submitted by a community member - see result detail for provenance",
+    title: "A community member submitted this result. Open it to review the source details.",
   },
   "vendor-supplied": {
     label: "Vendor",
     tone: "warning",
     title:
-      "Produced by the platform vendor - ranked, but the vendor has a direct interest in the outcome; verify against independent results",
+      "The platform vendor produced this result. Compare it with independent results before drawing conclusions.",
   },
   "ci-verified": {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   "ci-validated": {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   ci: {
     label: "CI",
     tone: "neutral",
-    title: "Validated by automated CI pipeline",
+    title: "An automated test run produced this result.",
   },
   "local-run": {
     label: "Local",
     tone: "neutral",
-    title: "Run on a developer machine - environment may vary",
+    title: "This result came from a developer machine, so its environment may differ from other runs.",
   },
   local: {
     label: "Local",
     tone: "neutral",
-    title: "Run on a developer machine - environment may vary",
+    title: "This result came from a developer machine, so its environment may differ from other runs.",
   },
   "unofficial-research": {
     label: "Unofficial",
     tone: "warning",
-    title: "Unofficial / non-standard configuration - not comparable and excluded from official rankings",
+    title: "This result used a nonstandard configuration and is not included in rankings.",
   },
 };
 
 const DEFAULT_CONFIG = {
   label: "Unknown",
   tone: "neutral" as StatusTone,
-  title: "Trust level not recorded",
+  title: "The source of this result was not recorded.",
 };
 
 /** Tooltip/legend prose for a trust label. Single source for both surfaces. */
@@ -92,6 +93,21 @@ interface TrustBadgeProps {
 interface ValidationBadgeProps {
   validationStatus?: string | null;
   showMissing?: boolean;
+  /**
+   * Accepted-override rule ids (parsed `override_rules`). When non-empty the
+   * badge never renders clean: tone is forced to "warning" and the title
+   * names the covering override, regardless of the recorded status.
+   */
+  overrideRules?: string[] | null;
+}
+
+export interface OverrideBadgeProps {
+  /** Accepted-override rule ids (parsed `override_rules`). Renders nothing when empty. */
+  rules?: string[] | null;
+  approver?: string | null;
+  evidence?: string | null;
+  expires?: string | null;
+  compact?: boolean;
 }
 
 export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
@@ -106,7 +122,7 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
       ? {
           ...DEFAULT_CONFIG,
           label: trustLabel,
-          title: `Trust tier: ${trustLabel} (unrecognised - contact maintainers)`,
+          title: `The source label “${trustLabel}” is not recognized. Contact the BenchBox maintainers for details.`,
         }
       : DEFAULT_CONFIG);
   const text = compact ? (config.label.split(" ")[0] ?? config.label) : config.label;
@@ -117,27 +133,79 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
   );
 }
 
-export function ValidationBadge({ validationStatus, showMissing = false }: ValidationBadgeProps) {
-  if (!validationStatus && !showMissing) return null;
-  const status = validationStatus?.trim() || "not recorded";
-  const lower = status.toLowerCase();
-  const tone = validationTone(lower);
-  const label = validationStatus ? lower : "validation n/a";
+// Renders the shared validation-status vocabulary (see
+// `describeValidationStatus` in src/lib/displayLabels.ts) as a badge. The
+// visible text is the reader-facing label, never the raw enum value (e.g.
+// "no validation", not "not_run") - the raw status is still available via the
+// title tooltip for anyone who wants precision.
+export function ValidationBadge({ validationStatus, showMissing = false, overrideRules }: ValidationBadgeProps) {
+  const override = describeOverride(overrideRules ?? []);
+  if (!validationStatus && !showMissing && !override) return null;
+  if (!validationStatus) {
+    if (override) {
+      return (
+        <StatusBadge role="validation" tone="warning" title={override.title}>
+          {override.label}
+        </StatusBadge>
+      );
+    }
+    return (
+      <StatusBadge role="validation" tone="neutral" title="No validation status was recorded for this result.">
+        Not recorded
+      </StatusBadge>
+    );
+  }
+  const info = describeValidationStatus(validationStatus);
+  if (override) {
+    // An accepted override is never a clean pass, even when the recorded
+    // status alone would badge as one.
+    return (
+      <StatusBadge
+        role="validation"
+        tone="warning"
+        title={`${info.description} Recorded status: ${info.status}. ${override.title}`}
+      >
+        {override.label}
+      </StatusBadge>
+    );
+  }
   return (
-    <StatusBadge role="validation" tone={tone} title={`Validation status: ${status}`}>
-      {label}
+    <StatusBadge role="validation" tone={info.tone} title={`${info.description} Recorded status: ${info.status}.`}>
+      {info.label}
     </StatusBadge>
   );
 }
 
-function validationTone(status: string): StatusTone {
-  if (status.includes("fail")) return "danger";
-  if (status.includes("disabled") || status.includes("partial")) return "warning";
-  if (status === "exact" || status === "full" || status === "passed" || status === "pass") {
-    return "info";
-  }
-  if (status === "loose" || status === "range") return "warning";
-  return "neutral";
+// Renders an accepted plausibility override as its own badge. Null (renders
+// nothing) when no override was accepted. The evidence link, when present,
+// is a plain text URL — never fetched, only shown as the audit trail.
+export function OverrideBadge({ rules, approver, evidence, expires, compact = false }: OverrideBadgeProps) {
+  const override = describeOverride(rules ?? [], { approver, expires });
+  if (!override) return null;
+  const text = compact ? "Overridden" : override.label;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <StatusBadge role="override" tone="warning" title={override.title}>
+        {text}
+      </StatusBadge>
+      {!compact && approver ? (
+        <span className="text-xs text-[var(--bb-data-fg-muted)]" title={`Override approved by ${approver}`}>
+          by {approver}
+        </span>
+      ) : null}
+      {!compact && evidence ? (
+        <span className="font-mono text-xs text-[var(--bb-data-fg-muted)]" title={`Override evidence: ${evidence}`}>
+          {evidence}
+        </span>
+      ) : null}
+      {!compact && expires ? (
+        <span className="text-xs text-[var(--bb-data-fg-muted)]" title={`Override expires ${expires}`}>
+          expires {expires}
+        </span>
+      ) : null}
+    </span>
+  );
 }
+
 
 export default TrustBadge;

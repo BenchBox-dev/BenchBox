@@ -27,7 +27,7 @@ from benchbox.core.errors import PlanCaptureError
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
 
-from .base import DriverIsolationCapability, PlatformAdapter
+from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
 from .base.ddl_helpers import strip_foreign_keys
 
 if TYPE_CHECKING:
@@ -531,6 +531,14 @@ class DuckDBAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
     plan_capture_phase_eligible = True
+    # DuckDB's Python client is documented thread-safe at cursor level against
+    # one process-local database
+    # (https://duckdb.org/docs/stable/guides/python/multiple_threads), so
+    # concurrent throughput streams share cursors of the single connection
+    # instead of opening N connections (which the TPC-DI work explicitly
+    # forbids for embedded DuckDB). Proven by
+    # tests/integration/test_throughput_session_isolation.py.
+    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
     def platform_name(self) -> str:
@@ -602,6 +610,8 @@ class DuckDBAdapter(PlatformAdapter):
         # ever sees this rebuilt config, never the original.
         for key in [
             "thread_limit",
+            "max_temp_directory_size",
+            "progress_bar",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",
@@ -868,6 +878,15 @@ class DuckDBAdapter(PlatformAdapter):
             return DuckDBConnectionWrapper(conn, self)
         return conn
 
+    def _rewrite_schema_statement(self, statement: str) -> str:
+        """Rewrite one schema statement for the execution engine.
+
+        Identity by default. Engines sharing the DuckDB dialect but rejecting
+        parts of its DDL (e.g. DuckLake and PRIMARY KEY constraints) override
+        this hook; PRIMARY KEY handling stays in each adapter.
+        """
+        return statement
+
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema using benchmark's SQL definitions."""
         start_time = mono_time()
@@ -880,8 +899,8 @@ class DuckDBAdapter(PlatformAdapter):
             f"Schema constraints - Primary keys: {enable_primary_keys}, Foreign keys: {enable_foreign_keys}"
         )
 
-        # Use common schema creation helper (no translation needed for DuckDB)
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        # Use common schema creation helper (standard ANSI DDL translated to DuckDB)
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         # For TPC-DS, remove foreign key constraints to avoid constraint violations during parallel loading
         benchmark_name = getattr(benchmark, "_name", "") or benchmark.__class__.__name__
@@ -908,6 +927,10 @@ class DuckDBAdapter(PlatformAdapter):
         tables_created = 0
         for statement in statements:
             if statement.strip():
+                # Engine-specific rewrite (identity by default; e.g. DuckLake
+                # strips PRIMARY KEY constraints its engine rejects).
+                statement = self._rewrite_schema_statement(statement)
+
                 # Extract table name
                 import re
 
@@ -1007,12 +1030,14 @@ class DuckDBAdapter(PlatformAdapter):
     def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
         """CTAS-sort a table, then re-create its sort index so the footprint survives.
 
-        The shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``,
-        which drops the ``idx_<table>_sort`` index ``apply_table_tunings`` built
-        pre-load. Left there, post-load introspection finds no catalog footprint
-        (``duckdb_indexes()`` is empty for the table) and the run stays
-        ``applied_unverified`` even though it physically sorted. Re-create the
-        index post-CTAS so introspection can corroborate it.
+        The normal shared CTAS sort issues ``CREATE OR REPLACE TABLE ... ORDER BY``
+        and can drop the ``idx_<table>_sort`` index ``apply_table_tunings`` built
+        pre-load. When foreign keys are enabled, the shared path instead uses an
+        atomic in-place rewrite that preserves the table and index identity. If
+        populated dependent rows make that rewrite unsafe, the shared helper
+        leaves the table unchanged rather than violating referential integrity.
+        The re-create remains idempotent and covers the normal replacement path
+        so introspection can corroborate the physical sort.
         """
         applied = super().apply_ctas_sort(table_name, tuning_config, connection)
         if applied and not self.dry_run_mode:

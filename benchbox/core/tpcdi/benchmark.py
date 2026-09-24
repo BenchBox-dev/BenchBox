@@ -43,9 +43,8 @@ from benchbox.core.tpcdi.etl import (
 from benchbox.core.tpcdi.etl.customer_mgmt_processor import CustomerManagementProcessor
 from benchbox.core.tpcdi.etl.data_quality_monitor import DataQualityMonitor
 from benchbox.core.tpcdi.etl.error_recovery import ErrorRecoveryManager
-from benchbox.core.tpcdi.etl.finwire_processor import FinWireProcessor
+from benchbox.core.tpcdi.etl.finwire_processor import FinWireParser, FinWireProcessor
 from benchbox.core.tpcdi.etl.incremental_loader import IncrementalDataLoader
-from benchbox.core.tpcdi.etl.parallel_batch_processor import ParallelBatchProcessor
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult
 from benchbox.core.tpcdi.etl.scd_processor import EnhancedSCDType2Processor
 from benchbox.core.tpcdi.generator import TPCDIDataGenerator
@@ -72,6 +71,13 @@ _DATE_INTERVAL_RE = re.compile(
     re.IGNORECASE,
 )
 _DATE_NOW_RE = re.compile(r"DATE\s*\(\s*['\"]now['\"]\s*\)", re.IGNORECASE)
+DATAFRAME_ETL_TABLE_DIR = "dataframe-etl-tables"
+"""Directory (under output_dir) holding DataFrame-mode ETL tables.
+
+DataFrame ETL writes tables here instead of the caller CWD so runs do not
+scatter relative directories; paths from earlier releases that wrote to the
+CWD are not migrated automatically."""
+
 _DOUBLE_COUNT_RE = re.compile(
     r"\(\s*SELECT\s+COUNT\s*\(\s*\*\s*\)\s+FROM\s+\(\s*(?:(?:/\*[^*]*\*/|--[^\n]*)\s*)?"
     r"SELECT\s+COUNT\s*\(\s*\*\s*\)\s+AS\s+\w+\s+(FROM\s+[^)]+)\)\s*\)",
@@ -177,7 +183,9 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         # Initialize components
         self.query_manager = TPCDIQueryManager()
-        self.data_generator = TPCDIDataGenerator(self.config.scale_factor, self.output_dir, **kwargs)
+        generator_kwargs = dict(kwargs)
+        generator_kwargs.setdefault("generation_seed", getattr(self.config, "generation_seed", 42))
+        self.data_generator = TPCDIDataGenerator(self.config.scale_factor, self.output_dir, **generator_kwargs)
 
         # Initialize new integrated systems
         self.schema_manager = TPCDISchemaManager()
@@ -190,7 +198,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self.finwire_processor = None  # Initialized when connection is available
         self.customer_mgmt_processor = None  # Initialized when connection is available
         self.scd_processor = None  # Initialized when connection is available
-        self.parallel_batch_processor = None  # Initialized when connection is available
         self.incremental_loader = None  # Initialized when connection is available
         self.data_quality_monitor = None  # Initialized when connection is available
         self.error_recovery_manager = None  # Initialized when connection is available
@@ -228,13 +235,21 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self.staging_dir = config.staging_dir
         self.warehouse_dir = config.warehouse_dir
 
-    def generate_data(self, tables: Optional[list[str]] = None, output_format: str = "csv") -> list[Union[str, Path]]:
+    def generate_data(
+        self,
+        tables: Optional[list[str]] = None,
+        output_format: str = "csv",
+        seed: Optional[int] = None,
+    ) -> list[Union[str, Path]]:
         """Generate TPC-DI data.
 
         Args:
             tables: Optional list of tables to generate. If None, generates all.
             output_format: Format for output data (only "csv" supported
                 currently)
+            seed: Optional explicit generation seed for this request,
+                overriding the configured generation_seed. Recorded in output
+                metadata with the generation algorithm version.
 
         Returns:
             List of paths to generated data files
@@ -245,6 +260,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
+        # Duck-typed generators (including test doubles) may not carry a
+        # generation_seed attribute; only real generators participate in the
+        # request-scoped override contract below.
+        original_generation_seed = getattr(self.data_generator, "generation_seed", None)
+        if seed is not None:
+            self.data_generator.generation_seed = int(seed)
+
         if tables is None:
             tables = list(TABLES.keys())
 
@@ -253,8 +275,13 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if invalid_tables:
             raise ValueError(f"Invalid table names: {invalid_tables}")
 
-        self.tables = self.data_generator.generate_data(tables)
-        return list(self.tables.values())
+        try:
+            self.tables = self.data_generator.generate_data(tables)
+            return list(self.tables.values())
+        finally:
+            # A request override must not change the benchmark instance's
+            # configured seed for a later generation request.
+            self.data_generator.generation_seed = original_generation_seed
 
     def get_query(
         self,
@@ -348,19 +375,31 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         from benchbox.sql_compat.context import CompatibilityContext, Phase
         from benchbox.sql_compat.registry import REGISTRY
         from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
+            BIGQUERY_EQ7_SQL,
             CLICKHOUSE_AQ6_SQL,
             CLICKHOUSE_AQ7_SQL,
             CLICKHOUSE_AQ8_SQL,
             CLICKHOUSE_AQ10_SQL,
             CLICKHOUSE_EQ7_SQL,
+            DATABRICKS_EQ7_SQL,
             DATAFUSION_AQ9_SQL,
             DATAFUSION_EQ7_SQL,
             DATAFUSION_VQ6_SQL,
             DORIS_EQ7_SQL,
+            SNOWFLAKE_EQ7_SQL,
             STARROCKS_EQ7_SQL,
         )
 
         variants: dict[str, dict[str, str]] = {
+            "bigquery": {
+                "EQ7": BIGQUERY_EQ7_SQL,
+            },
+            "databricks": {
+                "EQ7": DATABRICKS_EQ7_SQL,
+            },
+            "snowflake": {
+                "EQ7": SNOWFLAKE_EQ7_SQL,
+            },
             "clickhouse": {
                 "AQ6": CLICKHOUSE_AQ6_SQL,
                 "AQ7": CLICKHOUSE_AQ7_SQL,
@@ -409,7 +448,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     query_params.update(params)
                 return variant_sql.format(**query_params)
 
-            if platform == "clickhouse" and query_id == "EQ7" and params is not None:
+            if (
+                platform in ("bigquery", "clickhouse", "databricks", "snowflake")
+                and query_id == "EQ7"
+                and params is not None
+            ):
                 query_params = self.query_manager.etl_queries._generate_default_params(query_id)
                 query_params.update(params)
                 default_params = self.query_manager.etl_queries._generate_default_params(query_id)
@@ -494,6 +537,17 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 query_text,
             )
 
+        elif target_dialect.lower() == "snowflake":
+            # Snowflake has no JULIANDAY function and rejects DATE('now').
+            # Rewrite DATE idioms here; JULIANDAY is rewritten after
+            # translation below (SQLGlot passes it through untouched, while
+            # the shared diff regex cannot handle nested function args).
+            query_text = _DATE_INTERVAL_RE.sub(
+                lambda m: f"DATEADD(day, -{m.group(1)}, CURRENT_DATE())",
+                query_text,
+            )
+            query_text = _DATE_NOW_RE.sub("CURRENT_DATE()", query_text)
+
         elif (
             "clickhouse" in target_dialect.lower()
             or "starrocks" in target_dialect.lower()
@@ -556,6 +610,23 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             query_text = _POSTGRES_BOOLEAN_NUMBER_RE.sub(
                 lambda m: f"{m.group('column')} IS {'TRUE' if m.group('value') == '1' else 'FALSE'}",
                 query_text,
+            )
+
+        elif target_dialect.lower() == "snowflake":
+            # SQLGlot passes unknown JULIANDAY calls through for Snowflake.
+            # Rewrite diffs first (nesting-safe), then any surviving bare
+            # call as day-number arithmetic.
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)\s*-\s*JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"DATEDIFF(day, \2, \1)",
+                query_text,
+                flags=re.IGNORECASE,
+            )
+            query_text = re.sub(
+                r"JULIANDAY\s*\(((?:[^()]|\([^()]*\))*)\)",
+                r"(DATEDIFF(day, DATE '1970-01-01', \1) + 2440588)",
+                query_text,
+                flags=re.IGNORECASE,
             )
 
         return query_text
@@ -967,7 +1038,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
             return results
 
-        backend = DataFrameETLBackend(maintenance_ops=maintenance_ops, platform_name=platform_name)
+        backend = DataFrameETLBackend(
+            maintenance_ops=maintenance_ops,
+            platform_name=platform_name,
+            table_root=Path(self.output_dir) / DATAFRAME_ETL_TABLE_DIR,
+        )
         return results + self._execute_etl_stage_queries(
             backend=backend,
             stage_map=stage_map,
@@ -1474,7 +1549,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Phase 3: Load - Load into target warehouse
             load_start = mono_time()
-            load_results = backend.load_dataframes(transformation_results["staged_data"], batch_type=batch_type)
+            load_results = self._load_transformed_data(
+                backend=backend,
+                staged_data=transformation_results["staged_data"],
+                batch_type=batch_type,
+            )
             load_time = elapsed_seconds(load_start)
 
             pipeline_results["phases"]["load"] = {
@@ -1609,12 +1688,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         file_name = Path(file_path).name.lower()
         if "customer" in file_name:
             # Map to DimCustomer schema - only essential columns for demo
-            # Generate batch-specific surrogate keys to avoid conflicts
-            sk_offsets = {"historical": 0, "incremental": 1000000, "scd": 2000000}
-            batch_offset = sk_offsets.get(batch_type, 0)
+            # The SQL backend replaces these source defaults with values
+            # allocated from the warehouse inside its SCD transaction.
+            batch_offset = {"historical": 0, "incremental": 1_000_000, "scd": 2_000_000}.get(batch_type, 0)
             df["SK_CustomerID"] = range(batch_offset + 1, batch_offset + len(df) + 1)
             df["IsCurrent"] = True
-            df["BatchID"] = 1
+            df["BatchID"] = batch_offset // 1_000_000 + 1
+            # Preserve the source effective date for the first warehouse
+            # version; subsequent versions are dated by the SQL loader.
 
             # Reorder columns to match DimCustomer schema
             column_order = [
@@ -1637,6 +1718,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "Email1",
                 "IsCurrent",
                 "BatchID",
+                "EffectiveDate",
+                "EndDate",
             ]
             df = df[column_order]
         else:
@@ -1732,8 +1815,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         """Transform a JSON file to a table DataFrame."""
         transformations = ["json_parsing", "json_normalization", "schema_mapping"]
 
-        # Read JSON file using pandas
-        df = pd.read_json(file_path)
+        # Read JSON file using pandas. convert_dates=False keeps date-like
+        # payloads as text through ingest: pandas infers datetimes by column
+        # name (a column literally named "date" becomes datetime64), and
+        # downstream loads treat these fields as strings.
+        df = pd.read_json(file_path, convert_dates=False)
 
         # Add batch metadata
         df["batch_id"] = batch_type
@@ -1747,6 +1833,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "status",
             "account_desc",
             "tax_status",
+            "date",
             "opening_date",
             "batch_id",
             "load_timestamp",
@@ -1811,6 +1898,35 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             else:
                 staged_data[table_name] = pd.concat(table_parts, ignore_index=True)
         aggregate["staged_data"] = staged_data
+
+    def _load_transformed_data(
+        self,
+        *,
+        backend: TPCDIETLBackend,
+        staged_data: dict[str, pd.DataFrame],
+        batch_type: str,
+    ) -> dict[str, Any]:
+        """Load staged data, applying SCD2 expiration before incremental customer inserts."""
+        customers = staged_data.get("DimCustomer")
+        if customers is None or customers.empty:
+            return backend.load_dataframes(staged_data, batch_type=batch_type)
+
+        load_customer_scd2_batch = getattr(backend, "load_customer_scd2_batch", None)
+        if callable(load_customer_scd2_batch):
+            other_data = {table_name: data for table_name, data in staged_data.items() if table_name != "DimCustomer"}
+            load_results = backend.load_dataframes(other_data, batch_type=batch_type)
+            customer_result = load_customer_scd2_batch(customers, batch_type=batch_type)
+            customer_records = int(customer_result["rows_affected"])
+            load_results["records_loaded"] += customer_records
+            if customer_records and "DimCustomer" not in load_results["tables_updated"]:
+                load_results["tables_updated"].append("DimCustomer")
+            return load_results
+
+        if batch_type in {"incremental", "scd"}:
+            raise RuntimeError(
+                "Incremental TPC-DI customer loads require a backend with durable atomic SCD2 batch support"
+            )
+        return backend.load_dataframes(staged_data, batch_type=batch_type)
 
     def _create_sql_etl_backend(self, *, connection: Any) -> SQLETLBackend:
         """Create SQL ETL backend from benchmark SQL connection."""
@@ -1908,14 +2024,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             scd_config = SCDProcessingConfig()
             self.scd_processor = EnhancedSCDType2Processor(connection, config=scd_config)
-
-        if self.parallel_batch_processor is None:
-            from benchbox.core.tpcdi.etl.parallel_batch_processor import (
-                ParallelProcessingConfig,
-            )
-
-            parallel_config = ParallelProcessingConfig(max_workers=self.max_workers)
-            self.parallel_batch_processor = ParallelBatchProcessor(parallel_config)
 
         if self.incremental_loader is None:
             from benchbox.core.tpcdi.etl.incremental_loader import IncrementalLoadConfig
@@ -2217,25 +2325,26 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self,
         connection: Any,
         dialect: str = "duckdb",
-        enable_parallel_processing: bool | None = None,
         enable_data_quality_monitoring: bool = True,
         enable_error_recovery: bool = True,
     ) -> dict[str, Any]:
         """Run the enhanced TPC-DI ETL pipeline with Phase 3 capabilities.
 
+        Parallel ETL is not a phase of this pipeline: concurrent execution
+        lives on the canonical path via ``TPCDIConfig(enable_parallel=True,
+        max_workers=N)`` (see ``run_etl_pipeline``). The removed
+        ``enable_parallel_processing`` flag gated only synthetic batch tasks
+        that processed no data (adr-tpcdi-enhanced-parallel-support-decision).
+
         Args:
             connection: Database connection
             dialect: SQL dialect
-            enable_parallel_processing: Enable parallel batch processing (uses config if None)
             enable_data_quality_monitoring: Enable real-time data quality monitoring
             enable_error_recovery: Enable error recovery and retry mechanisms
 
         Returns:
             Enhanced ETL execution results
         """
-        if enable_parallel_processing is None:
-            enable_parallel_processing = self.enable_parallel
-
         emit("Starting enhanced TPC-DI ETL pipeline (Phase 3)")
         start_time = datetime.now()
         start_mono = mono_time()
@@ -2246,7 +2355,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         pipeline_results: dict[str, Any] = {
             "start_time": start_time.isoformat(),
             "enhanced_features": {
-                "parallel_processing": enable_parallel_processing,
                 "data_quality_monitoring": enable_data_quality_monitoring,
                 "error_recovery": enable_error_recovery,
             },
@@ -2285,89 +2393,83 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "success": phase2_results.get("success", False),
             }
 
-            # Phase 3: Parallel Batch Processing (if enabled)
-            if enable_parallel_processing:
-                emit("Phase 3: Parallel batch processing...")
-                phase3_start = mono_time()
+            # Phase 3: Incremental Data Loading
+            emit("Phase 3: Incremental data loading...")
+            phase3_start = mono_time()
 
-                phase3_results = self._run_parallel_batch_processing()
-                phase3_time = elapsed_seconds(phase3_start)
-
-                pipeline_results["phases"]["parallel_batch_processing"] = {
-                    "duration": phase3_time,
-                    "batches_processed": phase3_results.get("batches_processed", 0),
-                    "parallel_workers": phase3_results.get("workers_used", 0),
-                    "success": phase3_results.get("success", False),
-                }
-
-            # Phase 4: Incremental Data Loading
-            emit("Phase 4: Incremental data loading...")
-            phase4_start = mono_time()
-
-            phase4_results = self._run_incremental_data_loading(connection)
-            phase4_time = elapsed_seconds(phase4_start)
+            phase3_results = self._run_incremental_data_loading(connection)
+            phase3_time = elapsed_seconds(phase3_start)
 
             pipeline_results["phases"]["incremental_loading"] = {
-                "duration": phase4_time,
-                "incremental_batches": phase4_results.get("batches_loaded", 0),
-                "records_loaded": phase4_results.get("records_loaded", 0),
-                "success": phase4_results.get("success", False),
+                "duration": phase3_time,
+                "incremental_batches": phase3_results.get("batches_loaded", 0),
+                "records_loaded": phase3_results.get("records_loaded", 0),
+                "success": phase3_results.get("success", False),
             }
 
-            # Phase 5: Data Quality Monitoring (if enabled)
+            # Phase 4: Data Quality Monitoring (if enabled)
             if enable_data_quality_monitoring:
-                emit("Phase 5: Data quality monitoring...")
-                phase5_start = mono_time()
+                emit("Phase 4: Data quality monitoring...")
+                phase4_start = mono_time()
 
-                phase5_results = self._run_data_quality_monitoring(connection)
-                phase5_time = elapsed_seconds(phase5_start)
+                phase4_results = self._run_data_quality_monitoring(connection)
+                phase4_time = elapsed_seconds(phase4_start)
 
                 pipeline_results["phases"]["data_quality_monitoring"] = {
-                    "duration": phase5_time,
-                    "quality_rules_executed": phase5_results.get("rules_executed", 0),
-                    "quality_score": phase5_results.get("quality_score", 0.0),
-                    "issues_detected": phase5_results.get("issues_detected", 0),
-                    "success": phase5_results.get("success", False),
+                    "duration": phase4_time,
+                    "quality_rules_executed": phase4_results.get("rules_executed", 0),
+                    "quality_score": phase4_results.get("quality_score", 0.0),
+                    "issues_detected": phase4_results.get("issues_detected", 0),
+                    "success": phase4_results.get("success", False),
                 }
-                pipeline_results["quality_score"] = phase5_results.get("quality_score", 0.0)
+                pipeline_results["quality_score"] = phase4_results.get("quality_score", 0.0)
 
             # Calculate total records processed
             pipeline_results["total_records_processed"] = (
                 phase1_results.get("total_records", 0)
                 + phase2_results.get("records_processed", 0)
-                + phase4_results.get("records_loaded", 0)
+                + phase3_results.get("records_loaded", 0)
             )
 
-            # Determine overall success - be more resilient to failures in advanced features
-            # For test environments, focus on core functionality rather than advanced ETL features
-            # Core phases that must succeed: phase2 (SCD processing) - essential functionality
-            core_phase_successes = [
-                phase2_results.get("success", False),
+            required_phase_results = {
+                "enhanced_data_processing": phase1_results,
+                "enhanced_scd_processing": phase2_results,
+                "incremental_loading": phase3_results,
+            }
+            failed_phases = [
+                {
+                    "phase": phase_name,
+                    "error": phase_result.get("error") or phase_result.get("errors") or "phase reported failure",
+                }
+                for phase_name, phase_result in required_phase_results.items()
+                if not phase_result.get("success", False)
             ]
 
-            # Optional phases - failure doesn't fail the entire pipeline
-            optional_phase_successes = [
-                phase1_results.get("success", False),  # Advanced FinWire/CustomerMgmt processing
-                phase4_results.get("success", False),  # Incremental loading
-            ]
-            if enable_parallel_processing:
-                optional_phase_successes.append(phase3_results.get("success", False))
+            # Quality monitoring is observational and remains optional. Every
+            # requested ETL phase must succeed for the pipeline to succeed.
+            optional_phase_successes = []
             if enable_data_quality_monitoring:
-                optional_phase_successes.append(phase5_results.get("success", False))
+                optional_phase_successes.append(pipeline_results["phases"]["data_quality_monitoring"]["success"])
 
-            # Pipeline succeeds if core phases succeed
-            core_success = all(core_phase_successes)
+            core_success = not failed_phases
             optional_success_count = sum(optional_phase_successes)
 
             pipeline_results["success"] = core_success
             pipeline_results["core_phases_success"] = core_success
+            pipeline_results["failed_phases"] = failed_phases
             pipeline_results["optional_phases_success"] = f"{optional_success_count}/{len(optional_phase_successes)}"
 
             end_time = datetime.now()
             pipeline_results["end_time"] = end_time.isoformat()
             pipeline_results["total_duration"] = elapsed_seconds(start_mono)
 
-            emit(f"✅ Enhanced ETL pipeline completed successfully in {pipeline_results['total_duration']:.2f} seconds")
+            if core_success:
+                emit(
+                    f"✅ Enhanced ETL pipeline completed successfully in {pipeline_results['total_duration']:.2f} seconds"
+                )
+            else:
+                failed_names = ", ".join(failure["phase"] for failure in failed_phases)
+                emit(f"❌ Enhanced ETL pipeline failed required phases: {failed_names}")
 
         except Exception as e:
             if enable_error_recovery and self.error_recovery_manager:
@@ -2471,130 +2573,22 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         return results
 
-    def _run_parallel_batch_processing(self) -> dict[str, Any]:
-        """Run parallel batch processing."""
-        results = {"success": False, "batches_processed": 0, "workers_used": 0}
-
-        try:
-            if self.parallel_batch_processor:
-                # Submit actual batch processing tasks
-                from benchbox.core.tpcdi.etl.parallel_batch_processor import (
-                    BatchProcessingTask,
-                )
-
-                def process_historical_batch(data):
-                    return {
-                        "batch_type": "historical",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                def process_incremental_batch(data):
-                    return {
-                        "batch_type": "incremental",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                def process_staging_batch(data):
-                    return {
-                        "batch_type": "staging",
-                        "records": data.get("records", 0),
-                        "processed": True,
-                    }
-
-                # Create and submit actual batch processing tasks
-                tasks = [
-                    BatchProcessingTask(
-                        task_id="historical_batch",
-                        task_function=process_historical_batch,
-                        task_data={"records": int(1000 * self.scale_factor)},
-                        priority=1,
-                    ),
-                    BatchProcessingTask(
-                        task_id="incremental_batch",
-                        task_function=process_incremental_batch,
-                        task_data={"records": int(500 * self.scale_factor)},
-                        priority=2,
-                    ),
-                    BatchProcessingTask(
-                        task_id="staging_batch",
-                        task_function=process_staging_batch,
-                        task_data={"records": int(200 * self.scale_factor)},
-                        priority=3,
-                    ),
-                ]
-
-                # Submit tasks to parallel processor
-                for task in tasks:
-                    self.parallel_batch_processor.submit_task(task)
-
-                # Execute parallel batch processing
-                execution_result = self.parallel_batch_processor.execute_parallel_batch(timeout_seconds=300)
-
-                results["batches_processed"] = execution_result.get("tasks_completed", 0)
-                results["workers_used"] = min(self.max_workers, len(tasks))
-                results["success"] = execution_result.get("tasks_failed", 0) == 0
-
-                if not results["success"]:
-                    results["error"] = f"Failed tasks: {execution_result.get('tasks_failed', 0)}"
-
-        except Exception as e:
-            emit(f"❌ Parallel batch processing failed: {e}")
-            results["error"] = str(e)
-
-        return results
-
     def _run_incremental_data_loading(self, connection: Any) -> dict[str, Any]:
         """Run incremental data loading."""
         results = {"success": False, "batches_loaded": 0, "records_loaded": 0}
 
         try:
-            if self.incremental_loader:
-                # Process incremental batches for different tables
-                tables_to_process = ["DimCustomer", "DimAccount", "FactTrade"]
-                batch_id = 2  # Incremental batch
-
-                total_records = 0
-                for table_name in tables_to_process:
-                    try:
-                        # Get watermark for table
-                        last_watermark = self.incremental_loader.get_watermark(table_name)
-
-                        # Detect changes since last watermark
-                        changes = list(self.incremental_loader.detect_changes(table_name, last_watermark, batch_id))
-
-                        if changes:
-                            # Create sample incremental data based on detected changes
-                            incremental_data = pd.DataFrame(
-                                [
-                                    {
-                                        "CustomerID": i,
-                                        "FirstName": f"Customer_{i}",
-                                        "LastModified": datetime.now(),
-                                    }
-                                    for i in range(len(changes))
-                                ]
-                            )
-
-                            # Load incremental batch
-                            load_result = self.incremental_loader.load_incremental_batch(
-                                table_name, incremental_data, batch_id
-                            )
-
-                            if load_result.get("success", False):
-                                total_records += load_result.get("records_loaded", 0)
-                                results["batches_loaded"] += 1
-
-                    except Exception as table_error:
-                        emit(f"⚠️ Error processing incremental data for {table_name}: {table_error}")
-                        continue
-
-                results["records_loaded"] = total_records
-                results["success"] = results["batches_loaded"] > 0
-
-                if not results["success"] and results["batches_loaded"] == 0:
-                    results["error"] = "No incremental batches were successfully loaded"
+            # TPC-DI changes come from the incremental source batch. Warehouse
+            # tables have no LastModified CDC column, so scanning them cannot
+            # discover source changes or produce rows for another load.
+            pipeline = self.run_etl_pipeline(connection=connection, batch_type="incremental", validate_data=False)
+            load = pipeline.get("phases", {}).get("load")
+            if pipeline.get("success") and load is not None:
+                results["success"] = True
+                results["batches_loaded"] = 1
+                results["records_loaded"] = load["records_loaded"]
+            else:
+                results["error"] = pipeline.get("error", "Incremental ETL did not complete its load phase")
 
         except Exception as e:
             emit(f"❌ Incremental data loading failed: {e}")
@@ -2691,7 +2685,6 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "finwire_processor": self.finwire_processor is not None,
                 "customer_mgmt_processor": self.customer_mgmt_processor is not None,
                 "scd_processor": self.scd_processor is not None,
-                "parallel_batch_processor": self.parallel_batch_processor is not None,
                 "incremental_loader": self.incremental_loader is not None,
                 "data_quality_monitor": self.data_quality_monitor is not None,
                 "error_recovery_manager": self.error_recovery_manager is not None,
@@ -2720,42 +2713,72 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         num_securities = max(1, int(500 * self.scale_factor))
         num_financials = max(1, int(200 * self.scale_factor))
 
+        def format_record(layout: dict[str, tuple[int, int, type]], values: dict[str, str | int]) -> str:
+            record = [" "] * max(start + width for start, width, _ in layout.values())
+            for field, value in values.items():
+                start, width, _ = layout[field]
+                text = str(value)
+                if len(text) > width:
+                    raise ValueError(f"FinWire {field} exceeds its {width}-character field")
+                record[start : start + width] = text.ljust(width)
+            return "".join(record)
+
         with open(finwire_file, "w", encoding="utf-8") as f:
             # Generate Company Fundamental records (CMP)
             for i in range(num_companies):
-                pts = "20230101000000"
-                cmp_id = f"{i + 1:012d}"
-                company_name = f"Company_{i + 1:04d}".ljust(60)
-                industry = "Technology".ljust(50)
-                sp_rating = "AAA".ljust(4)
-                ceo_name = f"CEO_{i + 1}".ljust(50)
-
-                # Fixed-width FinWire CMP record format
-                record = f"{pts}CMP{cmp_id}{company_name}{industry}{sp_rating}{ceo_name}"
+                cmp_id = f"{i + 1:010d}"
+                record = format_record(
+                    FinWireParser.CMP_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "CMP",
+                        "company_name": f"Company_{i + 1:04d}",
+                        "cik": cmp_id,
+                        "status": "ACTV",
+                        "industry_id": "01",
+                        "sp_rating": "AAA",
+                        "founding_date": "20000101",
+                        "ceo_name": f"CEO_{i + 1}",
+                    },
+                )
                 f.write(record + "\n")
 
             # Generate Security Master records (SEC)
             for i in range(num_securities):
-                pts = "20230101000000"
-                symbol = f"SEC{i + 1:04d}".ljust(15)
-                issue = f"Security_{i + 1:04d} Inc".ljust(70)
-                status = "Active".ljust(10)
-                exchange = "NYSE".ljust(6)
-                shares = str(1000000 + i * 1000).rjust(15)
-
-                # Fixed-width FinWire SEC record format
-                record = f"{pts}SEC{symbol}{issue}{status}{exchange}{shares}"
+                record = format_record(
+                    FinWireParser.SEC_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "SEC",
+                        "symbol": f"SEC{i + 1:04d}",
+                        "issue_type": "CS",
+                        "status": "A",
+                        "name": f"Security_{i + 1:04d} Inc",
+                        "ex_id": "NYSE",
+                        "sh_out": 1000000 + i * 1000,
+                        "first_trade_date": "20230101",
+                        "first_trade_exchg": "20230101",
+                        "dividend": "0",
+                        "co_name_or_cik": f"{(i % num_companies) + 1:010d}",
+                    },
+                )
                 f.write(record + "\n")
 
             # Generate Financial records (FIN)
             for i in range(num_financials):
-                pts = "20230101000000"
-                symbol = f"SEC{(i % num_securities) + 1:04d}".ljust(15)
-                quarter = "2023Q1".ljust(6)
-                revenue = str(1000000 + i * 10000).rjust(15)
-
-                # Fixed-width FinWire FIN record format
-                record = f"{pts}FIN{symbol}{quarter}{revenue}"
+                record = format_record(
+                    FinWireParser.FIN_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "FIN",
+                        "year": 2023,
+                        "quarter": 1,
+                        "qtrsartdate": "20230101",
+                        "postdate": "20230401",
+                        "revenue": 1000000 + i * 10000,
+                        "co_name_or_cik": f"{(i % num_companies) + 1:010d}",
+                    },
+                )
                 f.write(record + "\n")
 
         finwire_files.append(finwire_file)
@@ -2844,4 +2867,5 @@ BenchmarkHookRegistry.register_option_specs(
         help="Maximum number of parallel workers",
         aliases=("max-workers",),
     ),
+    benchmark_class=TPCDIBenchmark,
 )

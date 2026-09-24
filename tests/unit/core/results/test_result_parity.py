@@ -91,6 +91,9 @@ class ExportParitySqlBenchmark(BaseBenchmark):
         self._name = "TPC-H"
         super().__init__(scale_factor=0.01, output_dir=output_dir)
         self.tables = {}
+        # Mirror the classification a real SF=0.01 TPC-H benchmark carries so
+        # the cross-mode contract covers the compliance field both surfaces emit.
+        self.compliance_class = "unofficial_subscale"
 
     def generate_data(self) -> list[Path]:
         return []
@@ -392,7 +395,7 @@ def test_exported_sql_and_dataframe_bundles_share_cross_mode_contract(tmp_path):
     df_payload = _export_payload(tmp_path, _build_dataframe_export_parity_result(), "df-export-parity")
 
     required_top_level = {
-        "version",
+        "result_schema_version",
         "run",
         "benchmark",
         "platform",
@@ -407,7 +410,9 @@ def test_exported_sql_and_dataframe_bundles_share_cross_mode_contract(tmp_path):
     assert required_top_level.issubset(df_payload)
     assert set(sql_payload) - set(df_payload) <= {"tables"}
     assert set(df_payload) - set(sql_payload) <= {"tables"}
-    assert sql_payload["version"] == df_payload["version"]
+    assert sql_payload["result_schema_version"] == df_payload["result_schema_version"]
+    assert sql_payload["version"] == "2.2"
+    assert df_payload["version"] == "2.2"
     assert sql_payload["benchmark"] == df_payload["benchmark"]
 
     assert sql_payload["config"]["compression"] == df_payload["config"]["compression"]

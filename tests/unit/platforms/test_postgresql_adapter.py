@@ -103,7 +103,16 @@ class TestPostgreSQLAdapter:
         assert params["dbname"] == "override_db"
 
     def test_new_stream_connection_opens_independent_session(self, postgres_stubs):
-        """Each stream gets a fresh psycopg session with adapter GUCs applied."""
+        """Each stream gets a fresh psycopg session with adapter GUCs applied.
+
+        Contract evolution (throughput-adapter-session-capability-contract):
+        the stream session must also replay the benchmark-type tuning the
+        shared connection carries (equivalence dimension 4), otherwise a
+        stream measures vanilla planner settings while the setup session
+        measures OLAP tuning. The OLAP SETs below come from the virtual
+        configure_for_benchmark dispatch, which lets wire-compatible
+        subclasses reapply their own deltas per stream.
+        """
         stream_connection = Mock()
         stream_cursor = Mock()
         stream_connection.cursor.return_value = stream_cursor
@@ -118,7 +127,7 @@ class TestPostgreSQLAdapter:
         )
         shared_connection = Mock()
 
-        result = adapter.new_stream_connection(shared_connection)
+        result = adapter.new_stream_connection(shared_connection, benchmark_type="olap")
 
         assert result is stream_connection
         postgres_stubs.connect.assert_called_once_with(**adapter._get_connection_params())
@@ -128,10 +137,44 @@ class TestPostgreSQLAdapter:
             (("SET effective_cache_size = '1GB'",), {}),
             (("SET max_parallel_workers_per_gather = 2",), {}),
             (('SET search_path TO "analytics", public',), {}),
+            (("SET enable_seqscan = on",), {}),
+            (("SET enable_hashjoin = on",), {}),
+            (("SET enable_mergejoin = on",), {}),
+            (("SET random_page_cost = 1.1",), {}),
+            (("SET cpu_tuple_cost = 0.01",), {}),
+        ]
+        # One commit inside configure_for_benchmark, one final commit for the
+        # stream session setup as a whole; both commits are idempotent SET
+        # finalizations on a fresh connection.
+        assert stream_connection.commit.call_count == 2
+        stream_cursor.close.assert_called_with()
+        shared_connection.cursor.assert_not_called()
+
+    def test_new_stream_connection_without_benchmark_type_skips_tuning_replay(self, postgres_stubs):
+        """Omitting benchmark_type preserves the pre-contract behavior.
+
+        Maintenance and legacy callers pass no benchmark type, so their
+        streams must keep measuring exactly what they measured before the
+        tuning-replay contract existed: base GUCs only, no
+        configure_for_benchmark replay.
+        """
+        stream_connection = Mock()
+        stream_cursor = Mock()
+        stream_connection.cursor.return_value = stream_cursor
+        postgres_stubs.connect.return_value = stream_connection
+        adapter = PostgreSQLAdapter(schema="analytics")
+
+        result = adapter.new_stream_connection(Mock())
+
+        assert result is stream_connection
+        assert stream_cursor.execute.call_args_list == [
+            (("SET work_mem = '256MB'",), {}),
+            (("SET maintenance_work_mem = '512MB'",), {}),
+            (("SET effective_cache_size = '1GB'",), {}),
+            (("SET max_parallel_workers_per_gather = 2",), {}),
+            (('SET search_path TO "analytics", public',), {}),
         ]
         stream_connection.commit.assert_called_once_with()
-        stream_cursor.close.assert_called_once_with()
-        shared_connection.cursor.assert_not_called()
 
     def test_add_cli_arguments_registers_postgres_compatible_flags(self, postgres_stubs):
         """CLI parser should expose shared PostgreSQL-compatible arguments."""
@@ -752,6 +795,48 @@ class TestPostgreSQLDataLoading:
         assert "FORMAT csv" in copy_sql
         assert "HEADER" not in copy_sql
         assert "NULL '__BENCHBOX_NO_NULL__'" in copy_sql
+
+    def test_copy_sql_quoted_dialect_uses_csv_with_null_marker(self, postgres_stubs, tmp_path):
+        """csv_quote declared + explicit null marker → FORMAT csv, not text.
+
+        FORMAT text performs no quote parsing, so a quoted empty ("") would
+        load as two literal quote characters instead of an empty string
+        (ClickBench predicate corruption). FORMAT csv parses quoted empties
+        as empty strings while only the bare sentinel maps to NULL.
+        """
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (1,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        dat_file = tmp_path / "hits.dat"
+        dat_file.write_text('1|""|bar\n2|__NULL__|baz\n')
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"hits": dat_file},
+            table_metadata={
+                "hits": {
+                    "csv_has_header": False,
+                    "csv_delimiter": "|",
+                    "csv_null_marker": "__NULL__",
+                    "csv_quote": '"',
+                }
+            },
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert mock_cursor.copy.called, "cursor.copy() was not called"
+        copy_sql = mock_cursor.copy.call_args.args[0]
+        assert "FORMAT csv" in copy_sql
+        assert "FORMAT text" not in copy_sql
+        assert "HEADER" not in copy_sql
+        assert "NULL '__NULL__'" in copy_sql
 
     def test_load_data_converts_parquet_to_csv_copy(self, postgres_stubs, tmp_path):
         """Parquet-backed benchmarks are converted to CSV before PostgreSQL COPY."""

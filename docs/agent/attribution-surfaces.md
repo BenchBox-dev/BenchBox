@@ -50,9 +50,10 @@ agent-authored comment from a human one on an OWNER-attributed post. That cost
 is accepted deliberately, on two grounds: a footer on every post is noise that
 readers stop seeing, and a blanket machine marker under the maintainer's account
 is itself misleading about who is speaking. The rule therefore asks for
-disclosure **in the text, where it is load-bearing** — for example when a
-comment reports what an agent verified, or when a reviewer would act differently
-knowing the analysis was automated — instead of an unconditional footer.
+disclosure **in the text, where it changes what a reader would do** — for
+example when a comment reports what an agent verified, or when a reviewer
+would act differently knowing the analysis was automated — instead of an
+unconditional footer.
 
 Two alternatives were considered and not chosen:
 

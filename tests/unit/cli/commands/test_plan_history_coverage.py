@@ -24,6 +24,7 @@ class _Entry:
     timestamp: str
     fingerprint: str
     execution_time_ms: float
+    platform: str = "duckdb"
 
 
 class _HistoryNoRuns:
@@ -41,7 +42,7 @@ class _HistoryNoEntries:
     def get_run_count(self) -> int:
         return 2
 
-    def query_plan_history(self, _query_id: str):
+    def query_plan_history(self, _query_id: str, platform: str | None = None):
         return []
 
 
@@ -55,13 +56,16 @@ class _HistoryOk:
     def get_run_count(self) -> int:
         return len(self._entries)
 
-    def query_plan_history(self, _query_id: str):
+    def query_plan_history(self, _query_id: str, platform: str | None = None):
         return self._entries
 
-    def get_plan_version_history(self, _query_id: str):
+    def get_plan_version_history(self, _query_id: str, platform: str | None = None):
         return [("r1", 1), ("r2", 2)]
 
-    def detect_plan_flapping(self, _query_id: str) -> bool:
+    def count_unique_plans(self, _query_id: str, platform: str | None = None) -> int:
+        return 2
+
+    def detect_plan_flapping(self, _query_id: str, platform: str | None = None) -> bool:
         return True
 
 

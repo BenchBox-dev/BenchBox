@@ -9,12 +9,16 @@ The cost estimation framework calculates compute costs for benchmark executions 
 - **Detailed cost breakdown** by phase (power test, throughput test, maintenance test)
 - **Validation and error handling** for robustness
 
+Pricing tables contain selected derived list-price values, not vendor catalog
+mirrors. Per-table provenance is authoritative; entries with unknown retrieval
+dates are stale-by-default and do not support normalized publication.
+
 ## Supported Platforms
 
 | Platform | Cost Model | Pricing Basis | Accuracy |
 |----------|------------|---------------|----------|
 | **Snowflake** | Credit-based | Credits consumed × price per credit | ±10% |
-| **BigQuery** | Per-TB scanned | Data scanned (TB) × price per TB | ±10% |
+| **BigQuery** | Per-TiB scanned | Data scanned (TiB) × price per TiB | ±10% |
 | **Redshift** | Time-based | Execution time × node count × hourly rate | Marginal cost only* |
 | **Databricks** | DBU-based | Execution time × DBU/hour × price per DBU | ±15% |
 | **DuckDB** | Zero cost | Local execution | Exact ($0.00) |
@@ -46,7 +50,7 @@ JSON export (schema v1.1)
 
 1. **`integration.py`** - Main entry point, orchestrates cost calculation
 2. **`calculator.py`** - Platform-specific cost calculation logic
-3. **`pricing.py`** - Pricing tables with version tracking
+3. **`pricing_data.yaml`** - Pricing tables with version tracking (loaded by `pricing.py`)
 4. **`models.py`** - Data models (QueryCost, PhaseCost, BenchmarkCost)
 5. **`storage.py`** - Storage cost estimation
 
@@ -89,8 +93,8 @@ The cost estimation framework adds a `cost_summary` object to benchmark results 
       "edition": "standard",
       "cloud": "aws",
       "region": "us-east-1",
-      "pricing_version": "2025.11",
-      "pricing_date": "2025-11-09",
+      "pricing_version": "2026.09",
+      "pricing_date": "unknown",
       "storage_estimate": {
         "storage_cost": 0.1534,
         "storage_tb": 4.87,
@@ -126,7 +130,7 @@ The cost estimation framework adds a `cost_summary` object to benchmark results 
 - `effective_cost_per_hour` - Computed as `total_cost / (wall_clock_duration_seconds / 3600)` (optional)
 
 **Platform details fields**:
-- `pricing_version` - Semantic version of pricing data (e.g., "2025.11")
+- `pricing_version` - Semantic version of pricing data (e.g., "2026.09")
 - `pricing_date` - Last validation date in ISO 8601 format
 - `storage_estimate` - Detailed storage cost breakdown (optional)
 
@@ -193,8 +197,8 @@ All cost estimates include pricing version tracking:
 
 ```python
 platform_details = {
-    "pricing_version": "2025.11",      # YYYY.MM format
-    "pricing_date": "2025-11-09",      # Last validation
+    "pricing_version": "2026.09",      # YYYY.MM format
+    "pricing_date": "unknown",         # No file-level refresh date tracked
     # ... other platform details
 }
 ```
@@ -202,6 +206,13 @@ platform_details = {
 - Pricing is validated monthly
 - Staleness warning after 90 days
 - Target accuracy: ±5% for major regions
+
+`pricing_date` is `"unknown"` because `pricing_data.yaml` no longer carries a
+file-level refresh date (a previous date asserted a refresh that never
+occurred). The per-table provenance blocks in
+[`pricing_data.yaml`](./pricing_data.yaml) — source URL, retrieved date,
+method, verified regions — are authoritative instead. `pricing_version` still
+tracks the table version (`YYYY.MM`).
 
 ### Storage Cost Estimation
 
@@ -227,20 +238,49 @@ storage_estimate = {
 
 ### Snowflake
 
-**Formula**: `credits_used × price_per_credit`
+**Formula**: `credits_used × price_per_credit`, or when metered credits are
+absent, `(execution_seconds / 3600) × credits_per_hour(warehouse_size) × price_per_credit`
 
-**Resource Usage Required**:
-- `credits_used` (required) - From Snowflake query history
+**Resource Usage Required** (one runtime signal):
+- `credits_used` - Metered warehouse credits for the query, when available.
+  QUERY_HISTORY only exposes `CREDITS_USED_CLOUD_SERVICES`, which covers the
+  cloud-services layer and is reported separately as
+  `credits_used_cloud_services`; it is never priced as warehouse compute.
+- `execution_time_seconds` / `execution_time_ms` / `total_elapsed_time_ms` -
+  Measured runtime used to estimate warehouse credits. Server-side execution
+  time is preferred; total elapsed includes queueing and compilation.
+- `warehouse_size` (optional per query) - Observed size, falling back to the
+  platform config.
+
+The estimate is a marginal per-query cost: warehouse idle time between queries
+and multi-cluster scaling are excluded.
 
 **Configuration Required**:
-- `edition` - standard | enterprise | business_critical
+- `edition` - standard | enterprise | business_critical | vps. The edition is
+  not queryable from the service, so the operator must set it
+  (`--platform-option edition=...`); normalized cost stays `unavailable`
+  without it.
 - `cloud` - aws | azure | gcp
 - `region` - e.g., us-east-1, eu-west-1
+- `warehouse_size` - e.g., X-Small, Medium (for estimation; read from observed
+  warehouse metadata when available)
 
-**Pricing** (2025 list prices):
-- Standard: $2.00/credit (AWS US), $2.40/credit (EU), $2.50/credit (AP)
-- Enterprise: $3.00/credit (AWS US), $3.60/credit (EU), $3.75/credit (AP)
-- Business Critical: $4.00/credit (AWS US), $4.80/credit (EU), $5.00/credit (AP)
+**Pricing** (list prices; the calculator reads
+[`pricing_data.yaml`](./pricing_data.yaml), which is the source of truth):
+- Standard: $2.00/credit (US tier), $2.50/credit (EU tier), $2.60/credit (AP tier)
+- Enterprise: $3.00/credit (US tier), $3.75/credit (EU tier), $3.90/credit (AP tier)
+- Business Critical: $4.00/credit (US tier), $5.00/credit (EU tier), $5.20/credit (AP tier)
+- VPS: $6.00/credit (US tier), $7.50/credit (EU tier), $7.80/credit (AP tier)
+
+Tier values are approximations: within a tier, Snowflake list prices vary by
+region. Per the Snowflake Service Consumption Table (effective 2026-09-16),
+Standard is $2.40 in AWS Stockholm, $2.60 in AWS Dublin/Frankfurt, Azure West
+Europe/North Europe, and GCP Netherlands/Frankfurt, and $2.70 in London and GCP
+London — so the previous README figure of "$2.40 EU" was Stockholm's price
+mislabeled as the EU-wide rate, and the table's `eu: 2.5` splits the common
+$2.40–$2.60 range. The same applies to the other tiers (e.g. Enterprise EU is
+$3.60 Stockholm / $3.90 Dublin/Frankfurt / $4.00 London). For exact regions, see
+the vendor table; for what the calculator charges, see `pricing_data.yaml`.
 
 **Example**:
 ```python
@@ -251,7 +291,7 @@ config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 
 ### BigQuery
 
-**Formula**: `bytes_billed / (1024^4) × price_per_TB`
+**Formula**: `bytes_billed / (1024^4) × price_per_TiB`
 
 **Resource Usage Required**:
 - `bytes_billed` (preferred) OR `bytes_processed`
@@ -259,17 +299,42 @@ config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 **Configuration Required**:
 - `location` - us | eu | asia-northeast1 | etc.
 
-**Pricing** (2025 on-demand):
-- US multi-region: $5.00/TB
-- EU multi-region: $5.00/TB
-- Single regions: $6.00/TB (varies)
+**Pricing** (on-demand per-TiB rates from
+[`pricing_data.yaml`](./pricing_data.yaml), the source of truth):
+- US / EU / Asia multi-region: $6.25/TiB
+- US single-regions: $6.25/TiB
+- EU / Asia single-regions: $6.875/TiB, with published regional overrides in
+  `pricing_data.yaml` (for example, Europe West 1 is $7.50/TiB).
+- Australia: $7.50/TiB by bucket and $8.125/TiB for the published Australia
+  regional entries; Middle East: $7.50/TiB.
+- South America: $7.8125/TiB; other locations: $6.875/TiB only when the
+  location is explicitly priced, otherwise the result is marked as fallback.
 
 **Example**:
 ```python
-resource_usage = {"bytes_billed": 1024**4}  # 1 TB
+resource_usage = {"bytes_billed": 1024**4}  # 1 TiB
 config = {"location": "us"}
-# Cost = 1 TB × $5.00 = $5.00
+# Cost = 1 TiB × $6.25 = $6.25
 ```
+
+**No free-tier modeling**: BenchBox charges the on-demand list rate from byte
+zero and does not model the first 1 TiB per month free tier. The credit is
+monthly and account-level, so no per-run attribution is principled, and
+modeling it would break cross-platform comparability. Most benchmark runs
+scan under 1 TiB, so do not read a BenchBox BigQuery figure as a Google bill.
+
+### Billing units (`NormalizedCost.billing_unit`)
+
+Scan-priced platforms report the unit actually billed, per
+`docs/development/adr/adr-billing-unit-tb-tib-contract.md`:
+
+- BigQuery: `tib_scanned` (tebibyte, 2^40 bytes — vendor-confirmed).
+- Athena and Synapse serverless: `tb_scanned` (decimal terabyte, 10^12
+  bytes — the SI reading of the bare "TB" both vendors print; neither
+  publishes a divisor).
+- Other platforms: `credit` (Snowflake), `node_hour` (Redshift),
+  `dbu` (Databricks), `dwu_hour` (Synapse dedicated), `cu_hour`
+  (Fabric), `fbu` (Firebolt).
 
 ### Redshift
 
@@ -283,7 +348,8 @@ config = {"location": "us"}
 - `node_count` - Number of nodes in cluster
 - `region` - AWS region
 
-**Pricing** (2025 on-demand, varies by region):
+**Pricing** (on-demand, varies by region; full table in
+[`pricing_data.yaml`](./pricing_data.yaml), the source of truth):
 - dc2.large: $0.25/node-hour (us-east-1)
 - ra3.xlplus: $1.086/node-hour
 - ra3.4xlarge: $3.26/node-hour
@@ -320,11 +386,13 @@ config = {"node_type": "ra3.4xlarge", "node_count": 4, "region": "us-east-1"}
 - 3X-Large: 128 DBU/hour
 - 4X-Large: 256 DBU/hour
 
-**Pricing** (2025, AWS Premium tier):
+**Pricing** (AWS Premium tier; full per-cloud table in
+[`pricing_data.yaml`](./pricing_data.yaml), the source of truth):
 - All-purpose compute: $0.55/DBU
-- SQL compute: $0.22/DBU
+- Jobs compute: $0.20/DBU
+- SQL Classic / warehouse: $0.22/DBU
+- SQL Pro (`sql_compute`): $0.55/DBU
 - Serverless SQL: $0.70/DBU
-- Jobs compute: $0.15/DBU
 
 **Example**:
 ```python
@@ -332,10 +400,10 @@ resource_usage = {"execution_time_seconds": 1800}  # 30 minutes
 config = {
     "cloud": "aws",
     "tier": "premium",
-    "workload_type": "sql_compute",
+    "workload_type": "sql_compute",  # billed at the SQL Pro rate
     "cluster_size_dbu_per_hour": 8.0,  # Medium warehouse
 }
-# Cost = 0.5 hours × 8 DBU/hour × $0.22 = $0.88
+# Cost = 0.5 hours × 8 DBU/hour × $0.55 = $2.20
 ```
 
 ## Concurrent Query Cost Semantics
@@ -391,15 +459,17 @@ Total Cost: A + B + C (sum of all queries)
 #### Platform-Specific Behavior
 
 **Snowflake**:
-- Credits are consumed per query
-- Multiple concurrent queries = multiple credits consumed
-- Total cost = sum of credits × price per credit
-- ✅ Accurate representation
+- Metered `credits_used`: Snowflake attributes shared-warehouse cost across
+  concurrent queries exactly — ✅ Accurate representation
+- Runtime-estimated queries: each estimate prices exclusive warehouse use, so
+  concurrent streams sharing one warehouse sum above the warehouse's
+  wall-clock spend — ⚠️ disclosed in the bundle warnings; sequential runs
+  are exact
 
 **BigQuery**:
-- Charged per TB scanned
+- Charged per TiB scanned
 - Concurrent queries scan data independently
-- Total cost = sum of data scanned × price per TB
+- Total cost = sum of data scanned × price per TiB
 - ✅ Accurate representation
 
 **Redshift** (dedicated cluster):
@@ -747,26 +817,41 @@ All errors are logged with platform/phase context for debugging.
 - ❌ Idle cluster time (for dedicated clusters)
 
 ### Assumptions
-1. **List Prices**: All pricing based on 2025 public list prices
+1. **List Prices**: All pricing based on public list prices (see the per-table provenance blocks in `pricing_data.yaml` for retrieval dates)
 2. **USD Only**: No currency conversion
 3. **On-Demand**: No reserved instance or savings plan discounts
 4. **Compute Only**: Storage, network, and other costs not included
 5. **Marginal Cost**: Dedicated clusters (Redshift, Databricks all-purpose) show per-query marginal cost, not total cluster TCO
+6. **No free tiers**: List rate from byte zero, including BigQuery's first 1 TiB/month (see BigQuery section)
+7. **Decimal TB for "TB"-printed scan pricing**: Athena and Synapse serverless divide by 10^12 bytes per the billing-unit ADR; BigQuery divides by 2^40
 
 ## Pricing Data Maintenance
 
-Pricing tables are in `benchbox/core/cost/pricing.py`:
+Pricing tables live in [`pricing_data.yaml`](./pricing_data.yaml) (loaded by
+`pricing.py`); it is the single source of truth for every rate the calculator
+charges and every rate this document quotes:
 
-- Last updated: January 2026
-- Source: Public cloud provider pricing pages
+- Source: Public cloud provider pricing pages (per-table provenance blocks in
+  the YAML record source URL, retrieved date, method, and verified regions)
 - Update frequency: Review quarterly or on major pricing changes
 
 To update pricing:
 1. Review cloud provider pricing pages
-2. Update pricing dictionaries in `pricing.py`
-3. Update "Last updated" comment
-4. Run tests to ensure calculations still work
-5. Update this documentation if pricing models change
+2. Update the tables in `pricing_data.yaml` (and their provenance blocks)
+3. Run tests to ensure calculations still work
+4. Update this documentation if pricing models change — or better, replace
+   restated constants with a pointer to the YAML table so figures cannot drift
+   silently again
+
+### Cost model version in stored results
+
+Result bundles embed `cost_model_version` (currently `"2026.09"`, matching the
+`pricing_data.yaml` metadata version). The stamp records which table produced
+the estimate; nothing cross-checks it. Decision: when the pricing version is
+bumped, historical bundles keep the version stamped at export time — no
+backfill or migration. Old bundles will read as soft-stale against the new
+table, which is drift rather than breakage, and rewriting history would destroy
+the audit trail of what rate actually produced each estimate.
 
 ## Testing
 
@@ -806,7 +891,7 @@ Potential improvements for future versions:
 ## See Also
 
 - [Cost Models Documentation](./models.py) - Data structures
-- [Pricing Tables](./pricing.py) - Platform pricing data
+- [Pricing Tables](./pricing_data.yaml) - Platform pricing data
 - [Calculator Implementation](./calculator.py) - Cost calculation logic
 - [Integration Layer](./integration.py) - Result integration
 - [Test Suite](../../tests/unit/core/cost/) - Comprehensive tests

@@ -1,8 +1,21 @@
+import { RunDateChip } from "@/components/RunAge";
 import type { DetailResult, Environment } from "@/types";
 import { humanizeBenchmark, shortHash } from "@/utils";
 import { costModelSummary, costScopeSummary, normalizedCostLabel } from "@/lib/costDisplay";
 import { formatCount, formatWarningCount } from "@/lib/copyFormatters";
+import {
+  formatArchitecture,
+  formatCpuFamily,
+  formatEnumLabel,
+  formatExecutionMode,
+  formatMemoryGb,
+  formatTuningMode,
+  formatValidationStatus,
+  parseOverrideRules,
+} from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "@/components/StatusBadge";
+import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
+import { formatRunDate, formatRunDateWithAge } from "@/lib/runAge";
 
 interface ComparabilityReceiptProps {
   results: DetailResult[];
@@ -18,6 +31,7 @@ export interface ComparabilityField {
   status: ComparabilityStatus;
   summary: string;
   detail?: string;
+  dates?: { platform: string; runDate: string }[];
 }
 
 export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
@@ -28,12 +42,12 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
   const warningCount = warningFields.length;
 
   return (
-    <section id={COMPARABILITY_RECEIPT_ID} aria-label="Comparability receipt" class="panel-elevated mb-8 p-4">
+    <section id={COMPARABILITY_RECEIPT_ID} aria-label="Comparison checks" class="panel-elevated mb-8 p-4">
       <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparability Receipt</h2>
+          <h2 class="text-base font-semibold text-[var(--bb-data-fg-primary)]">Comparison checks</h2>
           <p class="mt-1 text-xs text-[var(--bb-data-fg-muted)]">
-            Workload, version, validation, and environment checks for the selected result set.
+            Check the workload, software, validation, and hardware before you compare these runs.
           </p>
         </div>
         <StatusBadge role="comparison" tone={warningCount > 0 ? "warning" : "success"}>
@@ -49,11 +63,11 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           class="mb-4 rounded-md border border-[var(--bb-tone-warning-border)] bg-[var(--bb-tone-warning-bg)] px-3 py-2 text-xs text-[var(--bb-tone-warning-fg)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-accent)]"
           data-testid="comparability-warning-target"
         >
-          <h3 class="font-semibold">{formatWarningCount(warningCount)}</h3>
+          <p class="font-semibold">Review these differences before drawing a conclusion.</p>
           <ul class="mt-1 list-disc space-y-1 pl-4">
             {warningFields.map((field) => (
               <li key={field.label}>
-                <span class="font-medium">{field.label}:</span> {field.summary}
+                <span class="font-medium">{field.label}:</span> {field.dates ? <DateWindowChips dates={field.dates} /> : field.summary}
               </li>
             ))}
           </ul>
@@ -65,6 +79,9 @@ export function ComparabilityReceipt({ results }: ComparabilityReceiptProps) {
           <ComparabilityFieldRow key={field.label} field={field} />
         ))}
       </div>
+      <span class="sr-only">
+        Environment: {formatPerPlatform(results.map((r) => ({ platform: r.platform, value: formatEnvironment(r.environment) })))}
+      </span>
     </section>
   );
 }
@@ -75,15 +92,32 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
   const fields: ComparabilityField[] = [
     compareValues("Benchmark", results, (result) => humanizeBenchmark(result.benchmark)),
     compareValues("Scale factor", results, (result) => `SF ${result.scale_factor}`),
-    compareValues("Phase", results, (result) => valueOrMissing(result.test_type)),
+    compareValues("Test phase", results, (result) => result.test_type ? formatEnumLabel(result.test_type) : "Not recorded"),
     compareValues("Query scope", results, (result) => formatCount(queryCount(result), "query", "queries")),
     buildDateWindowField(results),
     compareValues("Platform version", results, (result) => valueOrMissing(result.platform_version)),
     compareValues("Driver version", results, (result) => valueOrMissing(result.driver_version)),
-    compareValues("Execution mode", results, (result) => valueOrMissing(result.execution_mode)),
+    compareValues("Execution mode", results, (result) => result.execution_mode ? formatExecutionMode(result.execution_mode) : "Not recorded"),
     buildTuningField(results),
-    compareValues("Validation", results, (result) => valueOrMissing(result.validation_status)),
-    buildEnvironmentField(results),
+    compareValues(
+      "Validation",
+      results,
+      (result) =>
+        formatValidationStatusReceiptValue(result.validation_status, parseOverrideRules(result.override_rules)),
+    ),
+    compareHardwareValues("Architecture", results, (result) => result.environment?.arch ? formatArchitecture(result.environment.arch) : "Not recorded"),
+    compareHardwareValues("CPU family", results, (result) => result.environment?.cpu_family ? formatCpuFamily(result.environment.cpu_family) : "Not recorded"),
+    compareHardwareValues("CPU model", results, (result) => valueOrMissing(result.environment?.cpu_model)),
+    compareHardwareValues("CPU evidence", results, (result) =>
+      formatCpuIdentityProvenance(result.environment?.cpu_identity_provenance),
+    ),
+    compareHardwareValues("CPU count", results, (result) =>
+      result.environment?.cpu_count !== undefined ? `${result.environment.cpu_count} CPU` : "Not recorded",
+    ),
+    compareHardwareValues("Memory", results, (result) =>
+      result.environment?.memory_gb !== undefined ? formatMemoryGb(result.environment.memory_gb) : "Not recorded",
+    ),
+    buildLocalityField(results),
     compareValues("Normalized cost", results, normalizedCostLabel),
     compareValues("Cost model", results, costModelSummary),
     compareValues("Cost scope", results, costScopeSummary),
@@ -94,6 +128,9 @@ export function buildComparabilityFields(results: DetailResult[]): Comparability
 
   const tuningPolicyGenerationField = buildTuningPolicyGenerationField(results);
   if (tuningPolicyGenerationField) fields.push(tuningPolicyGenerationField);
+
+  const overrideField = buildOverrideField(results);
+  if (overrideField) fields.push(overrideField);
 
   return fields;
 }
@@ -130,20 +167,20 @@ function buildTuningPolicyGenerationField(results: DetailResult[]): Comparabilit
 
   if (uniqueGenerations.length === 1) {
     return {
-      label: "Tuning policy generation",
+      label: "Tuning rules version",
       status: "match",
-      summary: uniqueGenerations[0]!,
+      summary: uniqueGenerations[0] === PRE_SEAM_GENERATION ? "Earlier rules" : uniqueGenerations[0]!,
     };
   }
 
   return {
-    label: "Tuning policy generation",
+    label: "Tuning rules version",
     status: "diff",
-    summary: "Tuned runs span different tuning-policy generations",
+    summary: "The selected runs used different generations of BenchBox tuning rules",
     detail: formatPerPlatform(
       tunedResults.map((result) => ({
         platform: result.platform,
-        value: generationOf(result),
+        value: generationOf(result) === PRE_SEAM_GENERATION ? "Earlier rules" : generationOf(result),
       })),
     ),
   };
@@ -170,22 +207,170 @@ function buildPhysicalMechanismsField(results: DetailResult[]): ComparabilityFie
   if (allMatch) {
     const count = sets[0]!.size;
     return {
-      label: "Physical tuning mechanisms",
+      label: "Applied tuning features",
       status: "match",
-      summary: count > 0 ? formatCount(count, "mechanism", "mechanisms") : "None rendered",
+      summary: count > 0 ? formatCount(count, "feature", "features") : "None applied",
     };
   }
 
   return {
-    label: "Physical tuning mechanisms",
+    label: "Applied tuning features",
     status: "diff",
-    summary: "Tuned runs rendered different physical mechanisms",
+    summary: "The selected runs applied different tuning features",
     detail: formatPerPlatform(
       tunedResults.map((result) => ({
         platform: result.platform,
         value: (result.physical_mechanisms ?? []).join(", ") || "none",
       })),
     ),
+  };
+}
+
+function isRemoteOrCloudPlatform(result: DetailResult): boolean {
+  if (result.deployment_class === "cloud" || result.deployment_class === "remote") {
+    return true;
+  }
+  if (result.cloud_provider && result.cloud_provider !== "local" && result.cloud_provider !== "none") {
+    return true;
+  }
+  if (result.cloud_region && result.cloud_region !== "unknown" && result.cloud_region !== "local") {
+    return true;
+  }
+  return false;
+}
+
+function getClientRegion(result: DetailResult): string | null {
+  const r = result.environment?.client_region ?? result.client_region;
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function getPlatformRegion(result: DetailResult): string | null {
+  const r = result.cloud_region ?? (result.pricing_region !== "unknown" ? result.pricing_region : null);
+  return r && String(r).trim() ? String(r).trim() : null;
+}
+
+function getClientCloud(result: DetailResult): string | null {
+  const c = result.environment?.client_cloud ?? result.client_cloud;
+  if (!c || !String(c).trim()) return null;
+  const token = String(c).trim().toLowerCase();
+  // "unknown" is the default when only --client-region is attested: it
+  // carries no cloud signal and must not force a cross-cloud verdict.
+  if (token === "unknown" || token === "local" || token === "none") return null;
+  return String(c).trim();
+}
+
+function getPlatformCloud(result: DetailResult): string | null {
+  const c = result.cloud_provider;
+  return c && String(c).trim() && String(c).trim().toLowerCase() !== "unknown"
+    ? String(c).trim()
+    : null;
+}
+
+function getOverheadMedian(result: DetailResult): number | null {
+  const m = result.environment?.statement_overhead_median_ms ?? result.statement_overhead_median_ms;
+  const n = m == null ? NaN : Number(m);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Region tokens arrive in provider-native spellings: Snowflake reports
+// `CURRENT_REGION()` as `AWS_US_EAST_1`, Azure as `East US 2`, GCP IMDS as
+// `us-east1`, AWS IMDS as `us-east-1`. Compare canonical forms so equal
+// footprints do not false-warn.
+function canonicalRegion(region: string): string {
+  return region
+    .toLowerCase()
+    .replace(/^(aws|azure|gcp)_/, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function buildLocalityField(results: DetailResult[]): ComparabilityField {
+  const entries = results.map((result) => {
+    const isRemote = isRemoteOrCloudPlatform(result);
+    const clientReg = getClientRegion(result);
+    const platformReg = getPlatformRegion(result);
+
+    if (isRemote) {
+      if (!clientReg) {
+        return {
+          platform: result.platform,
+          value: "Unknown client locality",
+          warn: true,
+        };
+      }
+      // Cloud identity is evidence independent of region spellings: a
+      // client attested on one cloud against a platform on another never
+      // shares a footprint, even when the region names normalize equally.
+      const clientCloud = getClientCloud(result);
+      const platformCloud = getPlatformCloud(result);
+      if (
+        clientCloud != null &&
+        platformCloud != null &&
+        clientCloud.toLowerCase() !== platformCloud.toLowerCase()
+      ) {
+        return {
+          platform: result.platform,
+          value: `Cross-cloud: client in ${clientReg} (${clientCloud}), platform in ${platformReg ?? "unknown locality"} (${platformCloud})`,
+          warn: true,
+        };
+      }
+      // No platform region is no evidence: asserting collocation here
+      // would publish an unearned match (remote self-hosted platforms
+      // and cloud runs with uncaptured regions land in this branch).
+      if (!platformReg) {
+        return {
+          platform: result.platform,
+          value: `Client in ${clientReg}, platform locality unknown`,
+          warn: true,
+        };
+      }
+      if (canonicalRegion(clientReg) !== canonicalRegion(platformReg)) {
+        const overhead = getOverheadMedian(result);
+        const overheadCtx =
+          overhead != null ? ` (client statement floor ${overhead.toFixed(2)} ms)` : "";
+        return {
+          platform: result.platform,
+          value: `Cross-region: client in ${clientReg}, platform in ${platformReg}${overheadCtx}`,
+          warn: true,
+        };
+      }
+      return {
+        platform: result.platform,
+        value: `Collocated (${clientReg})`,
+        warn: false,
+      };
+    }
+
+    return {
+      platform: result.platform,
+      value: clientReg ? `Local (${clientReg})` : "Local",
+      warn: false,
+    };
+  });
+
+  const values = entries.map((e) => e.value);
+  const uniqueValues = [...new Set(values)];
+  const hasWarning = entries.some((e) => e.warn);
+  const hasDiff = hasWarning || uniqueValues.length > 1;
+
+  if (hasDiff) {
+    let summary: string;
+    if (uniqueValues.length === 1) {
+      summary = uniqueValues[0]!;
+    } else {
+      summary = `${uniqueValues.length} localities differ`;
+    }
+    return {
+      label: "Locality",
+      status: "diff",
+      summary,
+      detail: formatPerPlatform(entries),
+    };
+  }
+
+  return {
+    label: "Locality",
+    status: "match",
+    summary: uniqueValues[0] ?? "Local",
   };
 }
 
@@ -201,6 +386,26 @@ export function comparabilityWarningFields(fields: readonly ComparabilityField[]
   return fields.filter((field) => field.status === "diff");
 }
 
+/**
+ * Warning-field labels ordered for a truncated summary (e.g. the guardrails
+ * banner's "Warning classes: A, B, C, +N more"). A validation difference is
+ * not equivalent to a cosmetic environment difference like "CPU model" or
+ * "Driver version" - it means at least one candidate's numbers are unverified
+ * - so it is always sorted to the front instead of risking getting folded
+ * into "+N more" by field-build order. Relative order of the rest is
+ * preserved.
+ */
+export function orderWarningLabelsForSummary(warningFields: readonly ComparabilityField[]): string[] {
+  const labels = warningFields.map((field) => field.label);
+  const priority = labels.filter((label) => label === "Validation");
+  const rest = labels.filter((label) => label !== "Validation");
+  return [...priority, ...rest];
+}
+
+function DateWindowChips({ dates }: { dates: NonNullable<ComparabilityField["dates"]> }) {
+  return <span class="inline-flex flex-wrap gap-2">{dates.map((entry, index) => <span key={index} class="inline-flex items-center gap-1">{entry.platform} <RunDateChip runDate={entry.runDate} /></span>)}</span>;
+}
+
 function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
   return (
     <div class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-3 py-2">
@@ -208,8 +413,8 @@ function ComparabilityFieldRow({ field }: { field: ComparabilityField }) {
         <h3 class="text-xs font-semibold uppercase text-[var(--bb-data-fg-subtle)]">{field.label}</h3>
         <StatusBadge role="comparison" tone={statusTone(field.status)}>{statusLabel(field.status)}</StatusBadge>
       </div>
-      <p class="break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{field.summary}</p>
-      {field.detail && <p class="mt-1 break-words text-xs text-[var(--bb-data-fg-muted)]">{field.detail}</p>}
+      <p class="break-words text-xs font-medium text-[var(--bb-data-fg-primary)]">{field.dates ? <DateWindowChips dates={field.dates} /> : field.summary}</p>
+      {field.detail && !field.dates && <p class="mt-1 break-words text-xs text-[var(--bb-data-fg-muted)]">{field.detail}</p>}
     </div>
   );
 }
@@ -249,31 +454,80 @@ function compareValues(
 }
 
 function buildDateWindowField(results: DetailResult[]): ComparabilityField {
-  const dates = results.map((result) => result.run_date.slice(0, 10));
+  const dateEntries = results.map((result) => ({ platform: result.platform, runDate: result.run_date }));
+  const dates = results.map((result) => formatRunDate(result.run_date));
   const uniqueDates = [...new Set(dates)];
   if (uniqueDates.length === 1) {
     return {
       label: "Date window",
       status: "match",
-      summary: uniqueDates[0]!,
+      summary: formatRunDateWithAge(results[0]!.run_date),
+      dates: dateEntries,
     };
   }
   const sortedDates = [...uniqueDates].sort();
+  const labelForDate = (date: string) =>
+    formatRunDateWithAge(results.find((result) => formatRunDate(result.run_date) === date)?.run_date);
   return {
     label: "Date window",
     status: "diff",
-    summary: `${sortedDates[0]} to ${sortedDates[sortedDates.length - 1]}`,
+    summary: `${labelForDate(sortedDates[0]!)} to ${labelForDate(sortedDates[sortedDates.length - 1]!)}`,
+    dates: dateEntries,
     detail: formatPerPlatform(
       results.map((result) => ({
         platform: result.platform,
-        value: result.run_date.slice(0, 10),
+        value: formatRunDateWithAge(result.run_date),
       })),
     ),
   };
 }
 
-function buildEnvironmentField(results: DetailResult[]): ComparabilityField {
-  return compareValues("Environment", results, (result) => formatEnvironment(result.environment));
+function compareHardwareValues(
+  label: string,
+  results: DetailResult[],
+  readValue: (result: DetailResult) => string,
+): ComparabilityField {
+  const entries = results.map((result) => ({
+    platform: result.platform,
+    value: readValue(result),
+  }));
+  const values = entries.map((entry) => entry.value);
+  const uniqueValues = [...new Set(values)];
+  const allMissing = values.every((value) => value === "Not recorded");
+  if (allMissing) {
+    return {
+      label,
+      status: "missing",
+      summary: "Not recorded",
+    };
+  }
+
+  // Pin no-flip guarantee: if any run lacks metadata on this hardware axis,
+  // report status "missing" ("Not recorded") rather than "diff" ("Differs").
+  const anyMissing = values.some((value) => value === "Not recorded");
+  if (anyMissing) {
+    return {
+      label,
+      status: "missing",
+      summary: "Not recorded",
+      detail: formatPerPlatform(entries),
+    };
+  }
+
+  if (uniqueValues.length === 1) {
+    return {
+      label,
+      status: "match",
+      summary: uniqueValues[0]!,
+    };
+  }
+
+  return {
+    label,
+    status: "diff",
+    summary: `${uniqueValues.length} values differ`,
+    detail: formatPerPlatform(entries),
+  };
 }
 
 function queryCount(result: DetailResult) {
@@ -293,7 +547,7 @@ function formatTuning(result: DetailResult) {
     return "Not recorded";
   }
   const parts = [
-    result.tuning_mode ? result.tuning_mode : "Recorded",
+    result.tuning_mode ? formatTuningMode(result.tuning_mode) : "Recorded",
     requestedHash ? `requested ${shortHash(requestedHash)}` : null,
     appliedHash ? `applied ${shortHash(appliedHash)}` : null,
   ].filter((part): part is string => part !== null);
@@ -319,9 +573,9 @@ function buildTuningField(results: DetailResult[]): ComparabilityField {
 function formatEnvironment(environment: Environment) {
   const parts = [
     environment.os,
-    environment.arch,
+    environment.arch ? formatArchitecture(environment.arch) : null,
     environment.cpu_count !== undefined ? `${environment.cpu_count} CPU` : null,
-    environment.memory_gb !== undefined ? `${environment.memory_gb} GB` : null,
+    environment.memory_gb !== undefined ? formatMemoryGb(environment.memory_gb) : null,
     environment.python ? `Python ${environment.python}` : null,
   ].filter((part): part is string => part !== null && part !== undefined && part !== "");
   return parts.length > 0 ? parts.join(", ") : "Not recorded";
@@ -329,6 +583,58 @@ function formatEnvironment(environment: Environment) {
 
 function formatPerPlatform(entries: { platform: string; value: string }[]) {
   return entries.map((entry) => `${entry.platform}: ${entry.value}`).join("; ");
+}
+
+/**
+ * Reader-facing label for the receipt's Validation row, with the raw status
+ * kept alongside it in parentheses - the receipt is exactly the "detail
+ * field" surface the shared vocabulary is meant to keep precision available
+ * on, per describeValidationStatus's contract.
+ */
+function formatValidationStatusReceiptValue(status: string | null | undefined, overrideRules?: string[]) {
+  // An accepted override is never a clean pass: name the covered rules
+  // alongside the recorded status so an overridden run cannot read clean here.
+  const suffix = overrideRules && overrideRules.length > 0 ? ` — overridden (${overrideRules.join(", ")})` : "";
+  if (!status) return overrideRules && overrideRules.length > 0 ? `Not recorded${suffix}` : "Not recorded";
+  const label = formatValidationStatus(status);
+  const base = label === status ? label : `${label} (${status})`;
+  return `${base}${suffix}`;
+}
+
+/**
+ * Accepted plausibility overrides across the compared runs. Null when no
+ * compared result carries override data (pre-v11 snapshots leave the fields
+ * undefined — unknown, not "no override") or when every result is known to
+ * have none, keeping the receipt quiet in the normal case. Otherwise a
+ * warning naming the covered rules per platform; an override is a
+ * comparability caveat, never a match/dedup key.
+ */
+function buildOverrideField(results: DetailResult[]): ComparabilityField | null {
+  if (results.some((result) => result.override_rules === undefined)) return null;
+  const withRules = results.filter((result) => parseOverrideRules(result.override_rules).length > 0);
+  if (withRules.length === 0) return null;
+  return {
+    label: "Override",
+    status: "diff",
+    summary: "One or more compared runs were accepted under a plausibility override",
+    detail: formatPerPlatform(
+      results.map((result) => {
+        const rules = parseOverrideRules(result.override_rules);
+        const value = rules.length > 0 ? `overridden (${rules.join(", ")})` : "no override";
+        const audit =
+          rules.length > 0
+            ? [
+                result.override_approver ? `approved by ${result.override_approver}` : null,
+                result.override_expires ? `expires ${result.override_expires}` : null,
+                result.override_evidence ? `evidence: ${result.override_evidence}` : null,
+              ]
+                .filter((part): part is string => part !== null)
+                .join("; ")
+            : null;
+        return { platform: result.platform, value: audit ? `${value} — ${audit}` : value };
+      }),
+    ),
+  };
 }
 
 function valueOrMissing(value: string | number | null | undefined) {

@@ -4,6 +4,8 @@
 ```
 
 > **CLI name:** `joinorder` - use `benchbox run --benchmark joinorder --scale 1`
+>
+> **Query templates:** [every Join Order Benchmark query](queries/joinorder/index.md)
 
 BenchBox's public Join Order Benchmark implementation uses the canonical IMDb
 2013 dataset used by the JOB paper, "How Good Are Query Optimizers, Really?"
@@ -127,7 +129,10 @@ query_1a = queries.get_query("1a")
 ```
 
 The SQL text is imported from the Greg Rahn JOB query corpus pinned by the
-canonical build. Runtime platform adapters handle dialect translation.
+canonical build. The benchmark translates queries to the engine dialect via
+SQLGlot when a `dialect` is requested; platform adapters request translation
+automatically, so adapter runs execute translated SQL rather than the
+canonical text.
 
 ## Python API
 

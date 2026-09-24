@@ -1,0 +1,296 @@
+{
+  "attestation": "Operator attestation, not a measurement. Every run in this corpus executed on a single machine -- natively, or driving Apple container Linux images whose engines share that host CPU. No other machine has been used in the project's development. Corroborating recorded evidence: every bundle that records a client host records Darwin/arm64, and the raw local archive shows a single machine_id. The CPU itself was never captured, because the capture path was defective (see fix/cpu-identity-capture-source).",
+  "bundles": [
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_0_0_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-30029472",
+      "new_sha256": "300294723c45607b420c8e7c40535bf024034eed25fb8b26ee795be34d25bf53",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-674ac843",
+      "old_sha256": "674ac84332f7bab7db2b32e273f59f57a079138a98fc890785b328a6edd896b7"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_1_3_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-23e1f0da",
+      "new_sha256": "23e1f0daeaedd7969c11788a0af38f73f64f38884c4faf2cd546055e7a980c38",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-b46802e4",
+      "old_sha256": "b46802e4afee505508db57f728763e03dbd60761f2c16508fb86f18f7f5ed799"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_2_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-519d799a",
+      "new_sha256": "519d799a720e97c2484669bc77590106c24905f0f971e675febbf563acd17c4b",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-14e394ea",
+      "old_sha256": "14e394eae1a60ad8a9cc297fa7517d12298277e3fa2e0fd66bad59917395a3e8"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_3_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-ac545644",
+      "new_sha256": "ac54564403f7efc167d864325ee0221c48bb5d3d6580f88fed4e3655709f0b18",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-ac8e1561",
+      "old_sha256": "ac8e156107b866ab56acaebae3bad638ff372efbd7cafc67d8f6f115bf4c2d97"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_4_4_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-9242bfaa",
+      "new_sha256": "9242bfaa69e7db42accf538ebc5080fdc16fce2c69366e85bee3e088ebdd1bf0",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-7c2b1f6f",
+      "old_sha256": "7c2b1f6fe5f53ed989400ffdfd8b7352988422f1d821b28b0911ba09340dd591"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_5_5_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-b48a8a7a",
+      "new_sha256": "b48a8a7af79159159fe8484260a9e3f9fd949a2e7321f5dfa86a662089467cd7",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-b5e89b63",
+      "old_sha256": "b5e89b6325cb38b3954c4977219511831bc02cd0d95167d6302ad3e2e353844e"
+    },
+    {
+      "changed": true,
+      "file": "clickbench_sf10_duckdb_v1_6_0_dev365_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "clickbench-duckdb-sf10.0-20260829-dcd56a26",
+      "new_sha256": "dcd56a2632d2f99dd25b155ab51ad9eca0e1ee5e12a10e5adba1fa7ecd1634d3",
+      "old_result_id": "clickbench-duckdb-sf10.0-20260829-f6b7a977",
+      "old_sha256": "f6b7a9778559122a1854dc925e4d6bce1c18bc714ba0df4fe53c7b4f21745f92"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_0_0_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-771967b3",
+      "new_sha256": "771967b33771438050ca1ba47142297f8699390f92288bad87c2c27218466666",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-1bdc2bb5",
+      "old_sha256": "1bdc2bb5eb26c771a2b4d3c6232b6277429553aff45b2be0fed16c41a022b1a5"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_1_3_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-eb928f47",
+      "new_sha256": "eb928f47294b3fc4376f380f1dab3325a1bc7e4cfecbf933188cdec81670bcab",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-77a18af7",
+      "old_sha256": "77a18af7e2f33b0e87112d76dde9108441068317985e4c47c22f9d02770a66df"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_2_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-d20c1ddd",
+      "new_sha256": "d20c1dddd615adbd25ca3fc70f7e63acc4571aad10370f567755f3b42adb47cf",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-116128f3",
+      "old_sha256": "116128f32df56b54e82c55b9b359fcb6e6c2f460800a7f9dd960c69a9c2d2953"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_3_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-21f073d2",
+      "new_sha256": "21f073d2d0041b6f1e0286e1b63af1a08cee893ae4654a5bd18dc4c2797c7de5",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-c96b4341",
+      "old_sha256": "c96b4341c61f2e405d95424e19355843a8bf85c21d41c7b1d86eab8a02cc6280"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_4_4_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-df28f864",
+      "new_sha256": "df28f8644aa63fbc08a20d355299ecd4ada9a3c2cb42ae8ab986b3e079b57459",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-112789b6",
+      "old_sha256": "112789b610f6fbf9c80ef06fe39e42bb66c6b092a21e0aae9300c770e26e400d"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_5_5_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-c15f366f",
+      "new_sha256": "c15f366fcdea0ac19e5cace5a3e4f3ba08cba9eaef345b87d41e3b3326ce0441",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-da642d95",
+      "old_sha256": "da642d95d2044eca45f20c41f1a84f01cb10a66ff9c110044410266cde30612d"
+    },
+    {
+      "changed": true,
+      "file": "ssb_sf10_duckdb_v1_6_0_dev365_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "ssb-duckdb-sf10.0-20260829-cd218a13",
+      "new_sha256": "cd218a132094db4162319da4098c25cddd17dc3cf0197e40da7b4e40a5577f7d",
+      "old_result_id": "ssb-duckdb-sf10.0-20260829-239efa81",
+      "old_sha256": "239efa81d01f9b32ad33c36707c3dd43327c3441fbbdaba5625f66016ff136f0"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_0_0_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-75c09d4a",
+      "new_sha256": "75c09d4ab532f529a40f1d7a26bb8f333b47e0cb1ddbe7c30b9a44c78166101e",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-b0c41588",
+      "old_sha256": "b0c415887694813caee9b16e533a383a600c2a0e2889f35e191a8763b19d6ddc"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_1_3_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-3657e981",
+      "new_sha256": "3657e9811ff3c3937deb67582bf43790bb6684173d4f0c5d73c6e3661ed3d788",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-cb079885",
+      "old_sha256": "cb079885269ddb43261e130955d4154b12063586f8cbc44cfcf2c4404aac7256"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_2_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-7dc5b097",
+      "new_sha256": "7dc5b097734d869933a413f0eb97b71e986d3b85aa735ecace7f5bed5beadf3a",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-b80a1444",
+      "old_sha256": "b80a14445f0af9c48d00365f5dab0518f2ea90cc42965b81cc94bcbb293b6870"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_3_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-5b0d5737",
+      "new_sha256": "5b0d5737b3b03a35a94281b767e71160afb1c373ac03e66745ac90e077b5aee1",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-c103ca20",
+      "old_sha256": "c103ca20ef76d55d5690107fd324a337e4b407ccd8d9a370941b50e13aa2289d"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_4_4_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-06d0b813",
+      "new_sha256": "06d0b8139b7f57c5bacc86166c0c3d1f0e8723c8f10f29d40a89250dc91562ed",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-f227cae6",
+      "old_sha256": "f227cae679aa8be98aa8d1b2c8e8f4aae313c1397d74b0daa0e645c20da3406f"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_5_5_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-0561288d",
+      "new_sha256": "0561288dc828c468f9372d8d78ad1d8b7bb1df0243a72512654d231cb32ccdff",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-283ab4c1",
+      "old_sha256": "283ab4c147af4b4acf5578cbc911216f0053668c6f2899d1383997cce8a73285"
+    },
+    {
+      "changed": true,
+      "file": "tpcds_sf10_duckdb_v1_6_0_dev365_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpcds-duckdb-sf10.0-20260829-b590d673",
+      "new_sha256": "b590d67384f6e0218d96972ee6a1890c7178b812222474715568f8bc28f66b98",
+      "old_result_id": "tpcds-duckdb-sf10.0-20260829-8a84581e",
+      "old_sha256": "8a84581e5bd67a45426c249349760a147a6d2432d0332b9548cb9de161695d3f"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_0_0_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-783d9105",
+      "new_sha256": "783d9105ff2e358101fbee1319a65e283c786ec5ae55a54ced905fb8b5a3f99d",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-8de6a6c8",
+      "old_sha256": "8de6a6c8035740280c8c3cdc139d69e7c8e8366aba595c6f372a30b9d4cbccbd"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_1_3_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-cdc57c95",
+      "new_sha256": "cdc57c9503ec63449b062b7238391e2bb63a9e429fad23e1b7b7ce08023d160b",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-e28f7b3d",
+      "old_sha256": "e28f7b3dd939744877cc85214004d7d037b84d6350723576f85f49380f53f3ab"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_2_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-4ccc5014",
+      "new_sha256": "4ccc50146eb49b95587c9db4054e4763f7259c8599edc6ea40b3025817d53fd0",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-f4c5f107",
+      "old_sha256": "f4c5f10737d6a7faaf88909e4c73bbc2b3c8b03c29234fb71bc76ae9c2ce35f2"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_3_2_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-e66d5854",
+      "new_sha256": "e66d58542da0daa64a6ba5026a79d9d433a98dc6666e7cc3868af3261673c98c",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-175d7f21",
+      "old_sha256": "175d7f21d2c62c5a0c28fb9d65caae129c9c983c5f5578f294e26af0902da876"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_4_4_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-19c3d520",
+      "new_sha256": "19c3d520e8a8b34ba01fcb0ac628a48b48ea3573804f655a6d3999e17b2b33ab",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-4371d6f1",
+      "old_sha256": "4371d6f12dd53789103afe5b1a09ff4f2e37ab074259022a4a319b874ec58084"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_5_5_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-eb439aa8",
+      "new_sha256": "eb439aa821f653cb196001c8a1e45f2e35a84daac36353dd3605f1a004bf871d",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-e61cd207",
+      "old_sha256": "e61cd2075e2543e4e08de0920258e3b6a01c6ebc0045ef87479df6c3857f861f"
+    },
+    {
+      "changed": true,
+      "file": "tpch_sf10_duckdb_v1_6_0_dev365_median.json",
+      "had_client_host": true,
+      "manifest_change": null,
+      "new_result_id": "tpch-duckdb-sf10.0-20260829-875f8968",
+      "new_sha256": "875f8968a8b8483dc6e7cc90a2e80320a2f630c678bcdc55efa86a7e96b21431",
+      "old_result_id": "tpch-duckdb-sf10.0-20260829-e43946c7",
+      "old_sha256": "e43946c7da1edc476956ac4bbc20faf996fc785105ecba85ce2fa47c84aef3f4"
+    }
+  ],
+  "cpu_model": "Apple M4",
+  "cpu_vendor": "Apple",
+  "provenance": "operator-attested",
+  "totals": {
+    "bundles": 28,
+    "changed": 28,
+    "had_client_host": 28,
+    "lacked_client_host": 0,
+    "manifest_changes": 0,
+    "result_ids_changed": 28
+  }
+}

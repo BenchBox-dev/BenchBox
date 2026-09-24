@@ -95,6 +95,9 @@ class DatabendQueryPlanParser(QueryPlanParser):
     def __init__(self):
         super().__init__("databend")
 
+    # The plan producers now return None for unavailable plans; both the
+    # retired prefix and "Failed to get query plan" stay rejected as defense
+    # so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")

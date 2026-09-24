@@ -73,7 +73,13 @@ The TRIPS table contains realistic data distributions that reflect actual taxi u
 
 ## Query Characteristics
 
-The H2O DB benchmark includes analytical queries that test different aspects of database performance:
+The H2O DB benchmark includes analytical queries that test different aspects of database performance.
+
+```{tip}
+Each query has a [query template](queries/h2odb/index.md) with a representative
+SQL and DataFrame rendering, plus how to extract the exact statement for your
+platform and scale.
+```
 
 ### Basic Aggregation Queries
 

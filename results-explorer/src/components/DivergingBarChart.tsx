@@ -2,15 +2,17 @@
 // DivergingBarChart - per-query improvement/regression vs baseline
 //
 // delta_pct = (this_ms - baseline_ms) / baseline_ms * 100
-//   negative (green): faster than baseline
-//   positive (red): slower than baseline
+//   negative (left of centre): faster than baseline
+//   positive (right of centre): slower than baseline
+//   bar color: the run the bar belongs to
 //
 // Sorted by abs(delta_pct) descending so biggest changes appear first.
 // ---------------------------------------------------------------------------
 
 import { deltaPct, sortByMagnitudeDesc } from "@/lib/chartMath";
-import { DIVERGING_MAX_PCT, FASTER_FILL, SLOWER_FILL, paletteColor } from "@/lib/chartTheme";
+import { DIVERGING_MAX_PCT, paletteColor } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
+import { chartFrame, edgeSafeValueLabel } from "@/lib/chartFrame";
 
 interface DivergingEntry {
   queryId: string;
@@ -27,7 +29,7 @@ interface Props {
 
 export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const drawWidth = Math.max(containerWidth, 300);
+  const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
   if (queries.length === 0 || results.length < 2) return null;
 
@@ -45,8 +47,10 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
     if (!baselineMs) continue;
     timings.forEach((t, i) => {
       if (i === baselineIdx || !t || t.ms <= 0) return;
-      const colorIdx = i < baselineIdx ? i : i + 1;
-      const color = paletteColor(colorIdx);
+      // The run's own index, not a baseline-relative one. Shifting later runs
+      // up by one to skip the baseline's color wraps the last run back onto the
+      // first run's color once the shift passes the end of the palette.
+      const color = paletteColor(i);
       const dp = deltaPct(t.ms, baselineMs);
       if (dp === null) return;
       rawEntries.push({
@@ -79,9 +83,11 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const medianDelta = sorted.length > 0
     ? sorted[Math.floor(sorted.length / 2)]?.deltaPct ?? 0
     : 0;
+  const chartDescription = `Per-query percentage change relative to ${results[baselineIdx]?.platform ?? "the selected baseline"}. Negative values are faster; positive values are slower. ${faster} entries are faster and ${slower} are slower. An accessible table follows the chart.`;
 
   return (
     <div ref={containerRef} class="w-full overflow-x-auto">
+      <p id="diverging-bar-description" class="sr-only">{chartDescription}</p>
       <p class="mb-2 text-xs text-[var(--bb-data-fg-muted)]">
         {faster} quer{faster === 1 ? "y" : "ies"} faster, {slower} quer{slower === 1 ? "y" : "ies"} slower
         {rawEntries.length > 0 && ` · median delta: ${medianDelta >= 0 ? "+" : ""}${medianDelta.toFixed(1)}%`}
@@ -92,7 +98,9 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         width="100%"
         height={totalHeight}
         viewBox={`0 0 ${drawWidth} ${totalHeight}`}
+        role="img"
         aria-label="Diverging bar chart"
+        aria-describedby="diverging-bar-description"
       >
         {/* Center axis */}
         <line
@@ -139,6 +147,11 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                 const isRegression = entry.deltaPct > 0;
                 const barX = isRegression ? centerX : centerX - barW;
                 return (
+                  // Bars are colored by the run they belong to, not by
+                  // direction: which side of the centre line a bar falls on
+                  // already says faster or slower, so spending fill on that
+                  // too would leave nothing to say WHICH run it is.
+                  //
                   // Composite key: a single platform name can appear twice
                   // in `entries` if the caller passes variant rows (same
                   // platform, different tuning_mode). The loop index `si`
@@ -150,15 +163,30 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                       y={barY}
                       width={Math.max(barW, 1)}
                       height={BAR_H}
-                      fill={isRegression ? SLOWER_FILL : FASTER_FILL}
-                      opacity={0.75}
+                      fill={entry.color}
+                      opacity={0.85}
                     />
+                    {/* A delta at the clamp reaches the end of its half of the
+                        plot; a label started past the bar would fall outside
+                        the viewBox and be cropped. */}
                     <text
-                      x={isRegression ? barX + barW + 2 : barX - 2}
+                      x={
+                        edgeSafeValueLabel(
+                          isRegression ? barX + barW : barX,
+                          drawWidth,
+                          isRegression ? "right" : "left",
+                        ).x
+                      }
                       y={barY + BAR_H / 2 + 3}
                       font-size="8"
                       fill={entry.color}
-                      text-anchor={isRegression ? "start" : "end"}
+                      text-anchor={
+                        edgeSafeValueLabel(
+                          isRegression ? barX + barW : barX,
+                          drawWidth,
+                          isRegression ? "right" : "left",
+                        ).textAnchor
+                      }
                     >
                       {entry.deltaPct >= 0 ? "+" : ""}{entry.deltaPct.toFixed(1)}%
                     </text>
@@ -170,15 +198,39 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         })}
       </svg>
 
-      {/* Legend */}
-      <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
-        <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
-        <span class="ml-2">
-            <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: FASTER_FILL }} />faster (negative %)
-        </span>
+      <table class="sr-only">
+        <caption>Per-query percentage changes relative to {results[baselineIdx]?.platform ?? "the selected baseline"}</caption>
+        <thead>
+          <tr><th>Query</th><th>Candidate</th><th>Change</th></tr>
+        </thead>
+        <tbody>
+          {rawEntries.map((entry, index) => (
+            <tr key={`${entry.queryId}-${entry.platform}-${index}`}>
+              <td>{entry.queryId}</td>
+              <td>{entry.platform}</td>
+              <td>{entry.deltaPct >= 0 ? "+" : ""}{entry.deltaPct.toFixed(1)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Legend: colors name the runs, position names the direction. */}
+      <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--bb-data-fg-muted)]">
         <span>
-          <span class="inline-block h-2 w-3 rounded-sm mr-1" style={{ backgroundColor: SLOWER_FILL }} />slower (positive %)
+          Baseline: <strong>{results[baselineIdx]?.platform}</strong>
         </span>
+        {results.map((result, index) =>
+          index === baselineIdx ? null : (
+            <span key={result.platform} class="flex items-center gap-1">
+              <span
+                class="inline-block h-2 w-3 rounded-sm"
+                style={{ backgroundColor: paletteColor(index) }}
+              />
+              {result.platform}
+            </span>
+          ),
+        )}
+        <span>Left of centre is faster than the baseline, right is slower.</span>
       </div>
     </div>
   );

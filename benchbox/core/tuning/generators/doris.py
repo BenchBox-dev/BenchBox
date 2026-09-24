@@ -392,6 +392,10 @@ class DorisDDLGenerator(BaseDDLGenerator):
     def platform_name(self) -> str:
         return "doris"
 
+    def render_partition_clause(self, partition_by: str) -> str:
+        """Render ``PARTITION BY RANGE (...) ()`` from a comma-joined column expression."""
+        return f"PARTITION BY RANGE ({partition_by}) ()"
+
     def _get_benchmark_tuning(self) -> dict[str, Any] | None:
         """Get benchmark-specific tuning dictionaries.
 
@@ -435,10 +439,17 @@ class DorisDDLGenerator(BaseDDLGenerator):
 
         Produces TuningClauses with:
         - ``sort_by``: DUPLICATE KEY columns (sort prefix)
-        - ``distribute_by``: DISTRIBUTED BY HASH column
-        - ``partition_by``: Optional PARTITION BY RANGE expression
+        - ``distribute_by``: rendered ``DISTRIBUTED BY HASH(`col`) BUCKETS N``
+          clause (rendered-SQL contract: never a bare column name, so dry-run
+          preview via ``TuningClauses.get_inline_clauses()`` and execution DDL
+          render the identical string exactly once)
+        - ``partition_by``: rendered ``PARTITION BY RANGE (...) ()`` clause
+          (rendered-SQL contract: never a bare column name, so dry-run
+          preview via ``TuningClauses.get_inline_clauses()`` and execution
+          DDL render the identical string exactly once)
         - ``table_properties``: Doris PROPERTIES (replication, colocate, bloom filter)
-        - ``additional_clauses``: Distribution clause with bucket count
+        - ``platform``: ``"doris"`` so inline clauses order DISTRIBUTED BY
+          after PARTITION BY, as the Doris dialect requires
         - ``post_create_statements``: CREATE INDEX for bitmap indexes
 
         When ``table_tuning`` provides explicit columns via TuningType, those
@@ -451,7 +462,7 @@ class DorisDDLGenerator(BaseDDLGenerator):
         Returns:
             TuningClauses with Doris-specific configuration.
         """
-        clauses = TuningClauses()
+        clauses = TuningClauses(platform=self.platform_name)
 
         if not table_tuning:
             return clauses
@@ -481,10 +492,14 @@ class DorisDDLGenerator(BaseDDLGenerator):
             logger.info(f"Doris table {table_name}: using benchmark default distribution key ({clauses.distribute_by})")
 
         # ── PARTITION BY RANGE (from PARTITIONING tuning) ──
+        # Stored rendered (not bare), mirroring the distribute_by contract:
+        # get_inline_clauses() emits it verbatim and
+        # generate_create_table_ddl() uses it directly, so preview and
+        # execution can never disagree or duplicate it.
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             sorted_cols = sorted(partition_columns, key=lambda c: c.order)
-            clauses.partition_by = ", ".join(c.name for c in sorted_cols)
+            clauses.partition_by = self.render_partition_clause(", ".join(c.name for c in sorted_cols))
 
         # ── Clustering warning ──
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
@@ -512,12 +527,13 @@ class DorisDDLGenerator(BaseDDLGenerator):
 
         clauses.table_properties = properties
 
-        # ── Distribution clause with buckets (stored in additional_clauses) ──
-        # This is used by generate_create_table_ddl to build the full clause
+        # ── Distribution clause with buckets (rendered into distribute_by) ──
+        # Stored rendered (not bare): get_inline_clauses() emits it verbatim
+        # after PARTITION BY, and generate_create_table_ddl() uses it directly,
+        # so preview and execution can never disagree or duplicate it.
         bucket_count = self._compute_bucket_count(table_name)
         if clauses.distribute_by:
-            dist_clause = f"DISTRIBUTED BY HASH(`{clauses.distribute_by}`) BUCKETS {bucket_count}"
-            clauses.additional_clauses.append(dist_clause)
+            clauses.distribute_by = f"DISTRIBUTED BY HASH(`{clauses.distribute_by}`) BUCKETS {bucket_count}"
 
         # ── Bitmap indexes as post-create statements ──
         if self._enable_bitmap_index and tuning and table_name in tuning.get("bitmap_index_columns", {}):
@@ -579,11 +595,13 @@ class DorisDDLGenerator(BaseDDLGenerator):
             if tuning.sort_by:
                 statement = f"{statement}\nDUPLICATE KEY ({tuning.sort_by})"
 
-            # PARTITION BY RANGE clause (if specified)
+            # PARTITION BY RANGE clause (already rendered in partition_by).
             if tuning.partition_by:
-                statement = f"{statement}\nPARTITION BY RANGE ({tuning.partition_by}) ()"
+                statement = f"{statement}\n{tuning.partition_by}"
 
-            # DISTRIBUTED BY HASH ... BUCKETS N (from additional_clauses)
+            # DISTRIBUTED BY HASH ... BUCKETS N (already rendered in distribute_by)
+            if tuning.distribute_by:
+                statement = f"{statement}\n{tuning.distribute_by}"
             for clause in tuning.additional_clauses:
                 statement = f"{statement}\n{clause}"
 

@@ -135,17 +135,20 @@ uv run -- python -m pytest -m unit -v
 # Comprehensive CI testing
 make test-ci
 # or
-uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or flaky or local_only)"
+uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)"
 
 # Run tests with coverage for CI
 make coverage-report
 # or
-uv run -- python -m pytest --cov=benchbox --cov-report=xml --junit-xml=test-results.xml
+uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml --junit-xml=test-results.xml
 
-# Parallel testing for CI
+# Include stress and live tests only when their services and credentials are available
+make coverage-opt-in-all
+
+# Explicit full-tree parallel testing (requires live services and credentials)
 make test-parallel
 # or
-uv run -- python -m pytest -n auto -m "not (slow or flaky)"
+uv run -- python -m pytest -n auto --tb=short
 ```
 
 ### Integration Validation

@@ -14,7 +14,9 @@
 --   - Cohort/ranking identity is derived during publish: raw `benchmark` and
 --     `test_type` remain immutable evidence, while canonical aliases
 --     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
---     ranking/cohort keys. The frontend consumes the same v7 contract.
+--     ranking/cohort keys. The frontend consumes the versioned read-model
+--     contract (`EXPLORER_READ_MODEL_VERSION`); bump it when this file's
+--     column set changes.
 
 -- ---------------------------------------------------------------------------
 -- Metadata table (required by browser read-model version guard)
@@ -34,7 +36,15 @@ CREATE TABLE IF NOT EXISTS result_environment (
     arch             VARCHAR,
     cpu_count        INTEGER,
     memory_gb        DOUBLE,
-    python           VARCHAR
+    python           VARCHAR,
+    cpu_model        VARCHAR,
+    cpu_family       VARCHAR,
+    cpu_identity_provenance VARCHAR,
+    client_region    VARCHAR,
+    client_cloud     VARCHAR,
+    statement_overhead_min_ms DOUBLE,
+    statement_overhead_median_ms DOUBLE,
+    link_status      VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS result_phase_durations (
@@ -42,6 +52,15 @@ CREATE TABLE IF NOT EXISTS result_phase_durations (
     phase            VARCHAR NOT NULL,
     duration_s       DOUBLE  NOT NULL,
     PRIMARY KEY (result_id, phase)
+);
+
+CREATE TABLE IF NOT EXISTS result_basis_availability (
+    result_id               VARCHAR PRIMARY KEY,
+    has_warmup              BOOLEAN NOT NULL,
+    measurement_pass_count  INTEGER NOT NULL,
+    warmup_status           VARCHAR NOT NULL,
+    available_bases         VARCHAR NOT NULL,
+    varying_pass_queries    VARCHAR
 );
 
 -- ---------------------------------------------------------------------------
@@ -88,10 +107,19 @@ CREATE TABLE IF NOT EXISTS results (
     -- run/query validation_status column below.
     tuning_validation_status VARCHAR,
     -- ADR-1 per-statement introspection receipt, carried verbatim from the
-    -- run's `{stem}.applied.json` companion as an opaque JSON string and
+    -- run's `platform.tuning.applied.receipt` as an opaque JSON string and
     -- rendered read-only by the RunReceipt drill-down. NULL when the run
     -- published no receipt (introspection did not run, or a legacy bundle).
     applied_receipt      VARCHAR,
+    -- Accepted plausibility overrides ({stem}.override.json companion),
+    -- stored verbatim as display-only badge data: override_rules holds the
+    -- covered rule ids as a canonical JSON array string; the audit fields
+    -- are plain text. NULL / empty when no override was accepted. Never
+    -- parsed, joined on, or re-derived downstream.
+    override_rules       VARCHAR,
+    override_evidence    VARCHAR,
+    override_approver    VARCHAR,
+    override_expires     VARCHAR,
     -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
     -- never a join/dedup key). NULL for legacy bundles, treated downstream as
     -- the "pre-seam" generation.
@@ -204,6 +232,10 @@ SELECT
     r.applied_ledger_hash,
     r.tuning_validation_status,
     r.applied_receipt,
+    r.override_rules,
+    r.override_evidence,
+    r.override_approver,
+    r.override_expires,
     r.tuning_policy_generation,
     r.test_type,
     r.validation_status,
@@ -236,7 +268,15 @@ SELECT
     e.arch,
     e.cpu_count,
     e.memory_gb,
-    e.python
+    e.python,
+    e.cpu_model,
+    e.cpu_family,
+    e.cpu_identity_provenance,
+    e.client_region,
+    e.client_cloud,
+    e.statement_overhead_min_ms,
+    e.statement_overhead_median_ms,
+    e.link_status
 FROM results r
 LEFT JOIN result_environment e USING (result_id);
 

@@ -20,15 +20,17 @@ const UNSPECIFIED_ID = fixtureIds.ids.duckdb;
 // Scope header assertions to the summary region: the expanded legend renders
 // its own sample chips, so an unscoped [data-role="funding"] would match those
 // too and make the "no chip" assertion depend on legend state.
-const summary = (page: Page) => page.getByRole("region", { name: "Result summary" });
-const fundingChip = (page: Page) => summary(page).locator('[data-role="funding"]');
-const trustBadge = (page: Page) => summary(page).locator('[data-role="trust"]');
+// Trust and funding are run identity, so they sit in the page header beside
+// the run's date and public id, not among the metric cards.
+const identity = (page: Page) => page.getByTestId("page-header");
+const fundingChip = (page: Page) => identity(page).locator('[data-role="funding"]');
+const trustBadge = (page: Page) => identity(page).locator('[data-role="trust"]');
 
 test.describe("Funding chip", () => {
   test("@smoke a funded result renders its funding chip beside the trust badge", async ({ page }) => {
     await page.goto(`/results/r/${FUNDED_ID}`);
     await waitForShell(page);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     const chip = fundingChip(page).first();
     await expect(chip).toBeVisible();
@@ -38,7 +40,7 @@ test.describe("Funding chip", () => {
 
   test("funding is orthogonal to trust: a community result can be employer-funded", async ({ page }) => {
     await page.goto(`/results/r/${FUNDED_ID}`);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     // Both badges render, independently, in the same header row.
     await expect(trustBadge(page).first()).toHaveText("Community");
@@ -47,7 +49,7 @@ test.describe("Funding chip", () => {
 
   test("funding chip is neutral-toned, never a trust-style warning", async ({ page }) => {
     await page.goto(`/results/r/${FUNDED_ID}`);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     // A tone gradient would re-encode "who paid" as "how much to trust this".
     await expect(fundingChip(page).first()).toHaveAttribute("data-tone", "neutral");
@@ -57,7 +59,7 @@ test.describe("Funding chip", () => {
     page,
   }) => {
     await page.goto(`/results/r/${UNSPECIFIED_ID}`);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     // The trust badge still renders - proving the page loaded and that omitting
     // the funding chip did not suppress the orthogonal trust surface.
@@ -69,7 +71,7 @@ test.describe("Funding chip", () => {
 test.describe("Provenance legend", () => {
   test("@smoke the legend is reachable from a page that shows the badges", async ({ page }) => {
     await page.goto(`/results/r/${FUNDED_ID}`);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     // hosted-results-contract.md requires a legend accessible from every page
     // displaying trust labels.
@@ -80,14 +82,14 @@ test.describe("Provenance legend", () => {
 
   test("expanding the legend explains both the trust and funding axes", async ({ page }) => {
     await page.goto(`/results/r/${FUNDED_ID}`);
-    await waitForDataLoaded(page, /TPC-H\s+-\s+DuckDB/);
+    await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
     const toggle = page.getByRole("button", { name: /What do these labels mean\?/i });
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
 
     const legend = page.getByTestId("provenance-legend");
-    await expect(legend.getByRole("heading", { name: "Trust label" })).toBeVisible();
+    await expect(legend.getByRole("heading", { name: "Result source" })).toBeVisible();
     await expect(legend.getByRole("heading", { name: "Funding" })).toBeVisible();
 
     // Every disclosed funding source gets a row, and the omitted `unspecified`
@@ -98,7 +100,7 @@ test.describe("Provenance legend", () => {
     await expect(legend.getByText(/Funding was not disclosed for this run/i)).toBeVisible();
 
     // The legend states the orthogonality explicitly.
-    await expect(legend.getByText(/disclosure, not a trust signal/i)).toBeVisible();
+    await expect(legend.getByText(/Funding does not change how BenchBox reviews or ranks a result/i)).toBeVisible();
   });
 });
 

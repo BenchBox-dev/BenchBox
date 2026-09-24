@@ -1,7 +1,7 @@
 """Unit tests for UnifiedPandasFrame wrapper.
 
 Tests for the platform-agnostic DataFrame wrapper that handles API differences
-between Pandas, Modin, cuDF, and Dask DataFrames.
+between Pandas, cuDF, and Dask DataFrames.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -511,6 +511,41 @@ class TestUnifiedPandasGroupByAgg:
         adapter.groupby_agg.assert_called_once()
         assert isinstance(result, UnifiedPandasFrame)
 
+    def test_agg_forwards_groupby_kwargs(self):
+        """Test that agg forwards construction kwargs (e.g. dropna=False)."""
+        import pandas as pd
+
+        df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
+        result_df = pd.DataFrame({"a": [1, 2], "sum_b": [30, 30]})
+
+        adapter = Mock()
+        adapter.groupby_agg = Mock(return_value=result_df)
+
+        groupby = UnifiedPandasGroupBy(df, ["a"], adapter, as_index=False, kwargs={"dropna": False})
+        groupby.agg(sum_b=("b", "sum"))
+
+        adapter.groupby_agg.assert_called_once_with(
+            df,
+            ["a"],
+            {"sum_b": ("b", "sum")},
+            as_index=False,
+            dropna=False,
+        )
+
+    def test_null_group_survives_production_wrapper_path(self):
+        """NULL groups are kept when groupby(dropna=False) flows to agg."""
+        import pandas as pd
+
+        from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
+
+        df = pd.DataFrame({"g": ["x", None, "x"], "v": [1, 2, 3]})
+        adapter = PandasDataFrameAdapter()
+        result = UnifiedPandasFrame(df, adapter).groupby("g", as_index=False, dropna=False).agg(total=("v", "sum"))
+        native = result.compute() if hasattr(result, "compute") else result
+        frame = native._df if isinstance(native, UnifiedPandasFrame) else native
+        assert len(frame) == 2
+        assert frame["total"].sum() == 6
+
 
 class TestUnifiedPandasGroupByGetattr:
     """Tests for UnifiedPandasGroupBy attribute proxy."""
@@ -578,7 +613,7 @@ class TestUnifiedPandasFrameIntegration:
 
         # Create adapter mock that implements groupby_agg properly
         adapter = Mock()
-        adapter.groupby_agg = lambda df, by, agg, as_index: (df.groupby(by, as_index=False).agg(**agg))
+        adapter.groupby_agg = lambda df, by, agg, as_index: df.groupby(by, as_index=False).agg(**agg)
 
         wrapper = UnifiedPandasFrame(df, adapter)
         result = wrapper.groupby("group", as_index=False).agg(total=("value", "sum"))

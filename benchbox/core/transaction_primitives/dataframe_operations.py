@@ -49,6 +49,7 @@ from benchbox.core.dataframe.maintenance_interface import (
     get_maintenance_operations_for_platform,
 )
 from benchbox.core.dataframe_manager_factory import get_dataframe_manager
+from benchbox.utils.iceberg_layout import is_iceberg_directory
 
 logger = logging.getLogger(__name__)
 
@@ -495,12 +496,8 @@ class DataFrameTransactionOperationsManager:
             return True, ""
 
         # Check for Iceberg table (metadata directory)
-        iceberg_metadata = table_path / "metadata"
-        if iceberg_metadata.exists() and iceberg_metadata.is_dir():
-            # Look for Iceberg-specific files
-            version_hint = iceberg_metadata / "version-hint.text"
-            if version_hint.exists() or list(iceberg_metadata.glob("*.metadata.json")):
-                return True, ""
+        if is_iceberg_directory(table_path):
+            return True, ""
 
         # Table exists but is not transactional
         if table_path.exists():

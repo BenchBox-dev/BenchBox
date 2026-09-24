@@ -222,6 +222,10 @@ class TPCHSkew(BaseBenchmark):
         """
         return self._impl.get_skew_info()
 
+    def manifest_matches_datagen_identity(self, manifest: dict[str, Any]) -> bool:
+        """Return whether ``manifest`` was generated from this skew configuration."""
+        return self._impl.manifest_matches_datagen_identity(manifest)
+
     def get_benchmark_info(self) -> dict[str, Any]:
         """Get information about the benchmark.
 

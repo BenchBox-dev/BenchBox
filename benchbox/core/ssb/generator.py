@@ -21,6 +21,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import csv
+import logging
 import random
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -319,6 +320,12 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             "generator_version": "v1",
             "tables": {},
         }
+        try:
+            from benchbox.utils.datagen_version import current_datagen_stamp
+
+            manifest.update(current_datagen_stamp("ssb"))
+        except Exception as exc:
+            logging.getLogger(__name__).debug("datagen stamp unavailable for ssb: %s", exc)
         for table, path in table_paths.items():
             p = Path(path)
             size = p.stat().st_size if p.exists() else 0

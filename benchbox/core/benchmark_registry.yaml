@@ -223,7 +223,7 @@ benchmark_metadata:
     default_scale: 1.0
     scale_options:
     - 1.0
-    min_scale: 1.0
+    min_scale: 0.01
     complexity: Medium
     estimated_time_range:
     - 5

@@ -100,3 +100,60 @@ def test_slim_fallback_does_not_echo_a_leaking_key(slim_leak_detector) -> None:
 def test_slim_fallback_still_reports_ordinary_value_leaks(slim_leak_detector) -> None:
     """Key scanning must not regress the original value behaviour."""
     assert slim_leak_detector({"nested": [{"working_dir": "/Users/alice/private"}]}) == ["nested.0.working_dir"]
+
+
+BUNDLE_POLICY_CANONICAL = "benchbox.core.results.schema_policy"
+
+VERSION_MATRIX = [
+    pytest.param({"result_schema_version": "2.2"}, "2.2", id="new-key"),
+    pytest.param({"version": "2.1"}, "2.1", id="legacy-key"),
+    pytest.param({"schema_version": "2.0"}, "2.0", id="oldest-key"),
+    pytest.param(
+        {"result_schema_version": "2.2", "version": "2.2", "schema_version": "2.0"},
+        "2.2",
+        id="aliases-match",
+    ),
+    pytest.param({"version": "2.1", "schema_version": "2.0"}, "2.1", id="legacy-wins"),
+    pytest.param({}, None, id="missing"),
+]
+
+
+@pytest.fixture(scope="module")
+def slim_version_helper():
+    """Load bundle.py with the canonical policy module unimportable.
+
+    Binding `sys.modules[name] = None` makes `from name import ...` raise
+    ImportError, which is the condition the slim branch is really in. The
+    loader must then resolve the helper from the mirrored file.
+    """
+    saved = sys.modules.get(BUNDLE_POLICY_CANONICAL, ...)
+    sys.modules[BUNDLE_POLICY_CANONICAL] = None  # type: ignore[assignment]
+    try:
+        spec = importlib.util.spec_from_file_location("_bundle_slim", ROOT / "benchbox/validation/bundle.py")
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        if saved is ...:
+            del sys.modules[BUNDLE_POLICY_CANONICAL]
+        else:
+            sys.modules[BUNDLE_POLICY_CANONICAL] = saved  # type: ignore[assignment]
+
+    helper = module.result_schema_version_value
+    # Guard the guard: if the module ever imports the canonical function
+    # despite the block, these tests would silently stop covering the file path.
+    # (The helper's home module is the file-loaded policy, not the bundle shim.)
+    assert helper.__module__ == "_benchbox_schema_policy", "fixture did not exercise the slim file-load path"
+    return helper
+
+
+def _canonical_version_helper():
+    from benchbox.core.results.schema_policy import result_schema_version_value
+
+    return result_schema_version_value
+
+
+@pytest.mark.parametrize("bundle,expected", VERSION_MATRIX)
+def test_slim_version_helper_matches_canonical(slim_version_helper, bundle, expected) -> None:
+    """Single implementation: the mirrored file load must match the helper."""
+    assert slim_version_helper(bundle) == _canonical_version_helper()(bundle) == expected

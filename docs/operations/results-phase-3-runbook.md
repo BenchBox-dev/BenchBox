@@ -2,7 +2,8 @@
 
 **Created:** 2026-04-01
 **Phase scope:** Phase 3 (Hosted API at `api.benchbox.dev`)
-**Prerequisite reading:** `docs/reference/threat-model.md`
+**Prerequisite reading:** `docs/reference/threat-model.md` and
+`docs/reference/hosted-results-contract.md`
 
 Phase 1 and Phase 2 have no hosted services. This runbook applies exclusively to
 Phase 3. Until Phase 3 launches, file GitHub issues for any anomalies found in
@@ -135,7 +136,9 @@ the original byte or entry count in the stored receipt.
 | `self-reported` | Actor-submitted; not independently verified | Automatic on successful ingest |
 | `public-curated` | Reviewed and approved by a maintainer | Manual promotion via admin CLI |
 | `rejected` | Failed validation or maintainer review | Set by ingest pipeline or admin |
-| `withdrawn` | Removed by actor or admin | Set via withdrawal API or admin CLI |
+
+Withdrawal is an orthogonal presentation state, not a trust tier. The API or admin CLI
+records `withdrawal_requested`; only a matching live receipt records `withdrawn`.
 
 ### Trust Promotion Path (self-reported → curated)
 
@@ -158,9 +161,11 @@ the original byte or entry count in the stored receipt.
    ```
    benchbox admin reject --submission-id X --reason schema_invalid|cohort_mismatch|sanity_fail|manual_review
    ```
-   Status is set to `rejected` with the reason code. The actor receives an
-   email notification (if contact on file). The bundle is retained for 30 days,
-   then purged by lifecycle policy.
+   Rejection is valid only before archive acceptance. Status is set to `rejected`
+   with the reason code. The actor receives an email notification (if contact on
+   file). Unaccepted staging data is retained for 30 days, then purged by staging
+   lifecycle policy. Once a bundle is accepted, maintainers must use presentation
+   withdrawal; rejection must never purge accepted source bytes.
 
 ### Takedown Process
 
@@ -170,11 +175,14 @@ the original byte or entry count in the stored receipt.
 benchbox result withdraw --submission-id X
 ```
 
-- Sets status to `withdrawn` immediately
-- Removes the result from the public index within one read model rebuild cycle
-  (target: < 15 minutes)
-- Bundle is retained for 90 days in case the actor wants to resubmit after
-  correcting an error
+- Records `withdrawal_requested` immediately and excludes the result from the candidate
+  public and ranking read models
+- Reserves, deploys, and probes a new generation (target: < 15 minutes); status becomes
+  `withdrawn` only when a matching live receipt confirms public suppression
+- Accepted source bytes remain in the accepted archive indefinitely. Withdrawal
+  suppresses presentation and ranking only; it does not start a purge clock.
+  Unaccepted staging data may be retained for 90 days in case the actor wants to
+  resubmit after correcting an error, then purged by staging lifecycle policy.
 
 **Admin-forced withdrawal** (any result; triggered by abuse, false data, or
 legal request):
@@ -183,10 +191,14 @@ legal request):
 benchbox admin withdraw --submission-id X --reason abuse|false_data|legal|policy_violation
 ```
 
-- Sets status to `withdrawn` with force-withdrawal flag and reason code
-- Triggers immediate removal from public index (synchronous rebuild)
+- Records `withdrawal_requested` with a force-withdrawal flag and reason code
+- Triggers an immediate candidate-index rebuild and controlled deployment; status becomes
+  `withdrawn` only after the matching live receipt confirms public suppression
 - Actor is notified by email within 24 hours with the reason code
-- Bundle is retained for 180 days for audit purposes, then purged
+- Accepted source bytes remain in the accepted archive indefinitely for audit and
+  lineage. A 180-day purge applies only to unaccepted staging data. Deleting an
+  accepted bundle requires the separately approved erasure exception and evidence
+  plan defined by the independent-publication operations contract.
 
 ### Audit Log Schema
 
@@ -213,9 +225,14 @@ metadata DB (write-once object store or managed audit logging service).
 |---|---|
 | `submitted` | Actor via submission API |
 | `validated` | Ingest pipeline (automated) |
-| `published` | Ingest pipeline (result becomes public-self-reported) |
+| `accepted` | Ingest pipeline commits validator-clean input to the accepted archive |
+| `promotion-requested` | Publication controller reserves a target generation |
+| `promotion-failed` | Build, deployment, or observation ends without a matching receipt |
+| `live-receipt-issued` | Attestor confirms the target generation at the public endpoint |
 | `rejected` | Ingest pipeline or admin |
-| `withdrawn` | Actor or admin |
+| `withdrawal-requested` | Actor or admin records desired presentation suppression |
+| `withdrawn` | Attestor confirms suppression in a matching live receipt |
+| `readmission-requested` | Admin records authorized desired restoration after receipt-confirmed withdrawal |
 | `trust-promoted` | Admin |
 | `trust-revoked` | Admin |
 | `redacted` | Admin (sensitive field removed; bundle hash invalidated) |
@@ -268,25 +285,27 @@ post-publish; incorrect query timings attributed to wrong platform.
 **Severity:** P2 (High)
 
 **Detection signals:**
-- Automated bundle-hash re-verification job fails for a published result
+- Automated bundle-hash re-verification job fails for a receipt-confirmed live result
 - Community report via GitHub issue or email to security@benchbox.dev
-- Ingest pipeline audit log shows unexpected `validated` → `published` transition
-  for a result with a known-bad hash
+- Audit log shows `live-receipt-issued` for a known-bad hash or without matching
+  `accepted`, `promotion-requested`, and receipt-evidence events
 
 **Response steps:**
 
-1. **Withdraw affected result(s) immediately** (target: < 1 hour from detection)
+1. **Request withdrawal of affected result(s) immediately** (target: < 1 hour from detection)
    ```
    benchbox admin withdraw --submission-id X --reason false_data
    ```
-   Confirm result is removed from public index and explorer rebuild is triggered.
+   Confirm the request is recorded and the candidate public-index rebuild is triggered. Do
+   not claim public removal until external probes and a matching live receipt confirm it.
 
 2. **Re-verify all results published in the same time window** (± 2 hours around
    the affected result's publish timestamp). Use:
    ```
    benchbox admin verify-window --from <ts> --to <ts>
    ```
-   Any result that fails hash verification is withdrawn pending investigation.
+   Any result that fails hash verification receives `withdrawal_requested` pending
+   investigation and becomes `withdrawn` only after matching receipt confirmation.
 
 3. **Identify root cause.** Three categories:
    - Storage tampering: compare bundle in object store against original ingest

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
-import type { BenchmarkSummary } from "@/types";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { ComponentChildren, JSX } from "preact";
+import type { BenchmarkSummary, RankingConfig } from "@/types";
 import {
   applicableCharts,
   buildRenderableSummary,
@@ -9,6 +10,8 @@ import {
   type ChartRegistryEntry,
 } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
+import { stringSerde, useUrlState } from "@/lib/useUrlState";
+import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
 import { PowerBar } from "@/components/PowerBar";
 import { DistributionBox } from "@/components/DistributionBox";
 import { QueryHeatmap } from "@/components/QueryHeatmap";
@@ -23,8 +26,10 @@ import { StackedPhase } from "@/components/StackedPhase";
 import { SparklineTable } from "@/components/SparklineTable";
 import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
+import { SummaryChartOverview } from "@/components/SummaryChartOverview";
 import { fmtGeomean, fmtScore } from "@/utils";
 import { paletteColor } from "@/lib/chartTheme";
+import { RunDateChip } from "@/components/RunAge";
 import {
   formatRunIdentitiesForCohort,
   formatRunIdentityLabelsForCohort,
@@ -32,6 +37,7 @@ import {
 } from "@/lib/runIdentity";
 import {
   buildLatencyBarScale,
+  geomeanMs,
   latencyScaleFraction,
   latencyScaleTicks,
 } from "@/lib/chartMath";
@@ -50,20 +56,29 @@ import {
 
 interface ChartPanelProps {
   context: ChartContext;
+  /** Use the long summary layout when the page already owns the matrix view. */
+  summaryLayout?: "tabs" | "long";
   baselineIndex?: number;
   onBaselineIndexChange?: (baselineIndex: number) => void;
-  // w18: thread the Compare-page guardrail (cohort mismatch → suppress
-  // winner language) into chart-level summaries. Without this, ChartPanel
-  // could still surface "Best power" / "Best geomean" claims even when the
-  // page-level decision summary correctly avoided them.
+  // Suppress winner language when the page-level comparison boundary is not
+  // suitable for a sound winner claim.
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
-  // w2 (chart-panel-scope-and-labeling): hosts that already render a
-  // chart at page level (e.g. BenchmarkIndex matrix view rendering
-  // QueryHeatmap above the panel) pass the duplicated chart ids here so
-  // the panel does not expose the same view as a redundant subtab.
+  // Hosts that render a chart at page level can exclude its duplicate from
+  // the panel's chart navigation.
   excludeChartIds?: readonly string[];
+  queryFilter?: readonly string[];
+  /** Long layout only: maps a chart id to a DOM id placed on its card, for deep links. */
+  cardAnchors?: Readonly<Record<string, string>>;
+  /** Long layout only: chart id to open (and keep open) on mount / when it changes. */
+  forceOpenChartId?: string | null;
+  /** Long layout only: see `SummaryChartOverview`'s prop of the same name. */
+  rankGateReason?: string | null;
+  rankGateContext?: { benchmark: string; scaleFactor: string; phase: string };
 }
+
+/** URL parameter carrying the open chart. */
+const CHART_URL_KEY = "chart";
 
 interface CompareQueryRow {
   queryId: string;
@@ -77,20 +92,117 @@ interface ValueLabelPlacement {
   placement: "outside" | "inside" | "gutter";
 }
 
-export function ChartPanel({
+export function ChartPanel(props: ChartPanelProps) {
+  if (props.summaryLayout === "long") {
+    if (props.context.kind === "summary") {
+      if (props.context.summary !== null) {
+        return (
+          <SummaryChartOverview
+            context={props.context}
+            excludeChartIds={props.excludeChartIds}
+            cardAnchors={props.cardAnchors}
+            forceOpenChartId={props.forceOpenChartId}
+            rankGateReason={props.rankGateReason}
+            rankGateContext={props.rankGateContext}
+          />
+        );
+      }
+      return <ChartPanelTabs {...props} />;
+    }
+    return <ChartPanelLong {...props} />;
+  }
+  return <ChartPanelTabs {...props} />;
+}
+
+function selectPanelCharts(
+  context: ChartContext,
+  excludeChartIds: readonly string[] | undefined,
+  queryFilter: readonly string[] | undefined,
+): ChartRegistryEntry[] {
+  const applicable = applicableCharts(context);
+  const exclude = new Set(excludeChartIds ?? []);
+  if (queryFilter) {
+    exclude.add("cost_scatter");
+    exclude.add("power_bar");
+  }
+  if (exclude.size === 0) return [...applicable];
+  return applicable.filter((entry) => !exclude.has(entry.id));
+}
+
+function buildChartSummary(
+  summary: BenchmarkSummary | null,
+  eligibilityClass: ChartDatasetEligibilityClass,
+  queryFilter: readonly string[] | undefined,
+): BenchmarkSummary | null {
+  if (!summary) return null;
+  const base = filterSummaryForChartDataset(summary, eligibilityClass);
+  if (!queryFilter) return base;
+  const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
+  // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
+  const sharedValidQueryIds = filteredQueryIds.filter((q) =>
+    base.platforms.every((p) => {
+      const v = p.timings[q];
+      return v !== null && v !== undefined && Number.isFinite(v) && v > 0;
+    }),
+  );
+  const filteredPlatforms = base.platforms.map((platform) => {
+    const filteredTimings: Record<string, number | null> = {};
+    for (const q of filteredQueryIds) {
+      if (q in platform.timings) {
+        filteredTimings[q] = platform.timings[q] ?? null;
+      }
+    }
+    const geomean =
+      sharedValidQueryIds.length >= 2
+        ? geomeanMs(sharedValidQueryIds.map((q) => platform.timings[q]!))
+        : null;
+    return {
+      ...platform,
+      timings: filteredTimings,
+      display_geomean_ms: geomean,
+      sample_geomean_ms: geomean,
+      power_score: null,
+      normalized_cost_usd: null,
+      cost_status: "unavailable" as const,
+    };
+  });
+  const ranking: RankingConfig | null =
+    queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
+      ? {
+          primary_metric: "display_geomean_ms",
+          secondary_metric: base.ranking.secondary_metric,
+          primary_order: "asc",
+        }
+      : base.ranking;
+  return {
+    ...base,
+    ranking,
+    query_ids: filteredQueryIds,
+    platforms: filteredPlatforms,
+  };
+}
+
+function chartSummaryLabelList(chartSummary: BenchmarkSummary | null): string[] {
+  if (!chartSummary) return [];
+  return formatRunIdentitiesForCohort(
+    chartSummary.platforms.map((platform) => ({ ...platform, scale_factor: chartSummary.scale_factor })),
+    "chart",
+  );
+}
+
+function ChartPanelTabs({
   context,
   baselineIndex,
   onBaselineIndexChange,
   suppressWinnerClaims = false,
   suppressionReason,
   excludeChartIds,
+  queryFilter,
 }: ChartPanelProps) {
-  const charts = useMemo(() => {
-    const applicable = applicableCharts(context);
-    if (!excludeChartIds || excludeChartIds.length === 0) return applicable;
-    const exclude = new Set(excludeChartIds);
-    return applicable.filter((entry) => !exclude.has(entry.id));
-  }, [context, excludeChartIds]);
+  const charts = useMemo(
+    () => selectPanelCharts(context, excludeChartIds, queryFilter),
+    [context, excludeChartIds, queryFilter],
+  );
   const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
   const summary = useMemo(() => buildRenderableSummary(context), [context]);
   const historical = useMemo(
@@ -113,8 +225,14 @@ export function ChartPanel({
     [summary],
   );
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
-  const [activeId, setActiveId] = useState<string>(preferredId);
+  // The open chart belongs in the URL: a reader who finds the view that answers
+  // their question should be able to send that view, not an address that lands
+  // the recipient back on the default. An unknown or no-longer-applicable id is
+  // canonicalised to the preferred chart by the effect below, which rewrites
+  // the parameter as it goes.
+  const [activeId, setActiveId] = useUrlState<string>(CHART_URL_KEY, preferredId, stringSerde);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
+  const groupTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const isBaselineControlled = baselineIndex !== undefined;
   const baselineIdx = normalizeBaselineIndex(
     summary?.platforms.length ?? 0,
@@ -127,6 +245,22 @@ export function ChartPanel({
       setActiveId(preferredId);
     }
   }, [activeId, charts, preferredId]);
+
+  // Router navigation between two routes that both host this panel uses
+  // pushState, which fires no popstate, so the panel stays mounted with the
+  // chart the reader chose while the destination URL says nothing about it.
+  // The parameter has to describe what is on screen, or a shared link does not
+  // reproduce the view it was copied from.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // Only an id this cohort can actually show belongs in the URL. Without this
+    // guard the effect races the canonicalisation above and writes back the
+    // very id that was just rejected.
+    if (!charts.some((chart) => chart.id === activeId)) return;
+    const inUrl = new URLSearchParams(window.location.search).get(CHART_URL_KEY);
+    const expected = activeId === preferredId ? null : activeId;
+    if (inUrl !== expected) setActiveId(activeId);
+  }, [activeId, charts, preferredId, setActiveId]);
 
   useEffect(() => {
     if (!isBaselineControlled) setLocalBaselineIdx(0);
@@ -146,19 +280,10 @@ export function ChartPanel({
     context.kind === "compare" &&
     (activeChart?.id === "normalized_speedup" || activeChart?.id === "diverging_bar");
   const chartSummary = useMemo(
-    () => (summary ? filterSummaryForChartDataset(summary, activeEligibilityClass) : null),
-    [activeEligibilityClass, summary],
+    () => buildChartSummary(summary, activeEligibilityClass, queryFilter),
+    [activeEligibilityClass, summary, queryFilter],
   );
-  const chartPlatformLabels = useMemo(
-    () =>
-      chartSummary
-        ? formatRunIdentitiesForCohort(
-            chartSummary.platforms.map((platform) => ({ ...platform, scale_factor: chartSummary.scale_factor })),
-            "chart",
-          )
-        : [],
-    [chartSummary],
-  );
+  const chartPlatformLabels = useMemo(() => chartSummaryLabelList(chartSummary), [chartSummary]);
   const compareRows = useMemo(() => {
     if (context.kind !== "compare" || !chartSummary) return [];
     return chartSummary.query_ids.map((queryId) => ({
@@ -199,6 +324,23 @@ export function ChartPanel({
     if (nextChart) setActiveId(nextChart.id);
   };
 
+  const selectGroupFromKey = (
+    event: JSX.TargetedKeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") nextIndex = (currentIndex + 1) % chartGroups.length;
+    else if (event.key === "ArrowLeft" || event.key === "ArrowUp") nextIndex = (currentIndex - 1 + chartGroups.length) % chartGroups.length;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = chartGroups.length - 1;
+    else return;
+    event.preventDefault();
+    const group = chartGroups[nextIndex];
+    if (!group) return;
+    selectGroup(group);
+    groupTabRefs.current[group.id]?.focus();
+  };
+
   return (
     <section class="card">
       <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -209,12 +351,16 @@ export function ChartPanel({
             role="tablist"
             aria-label="Chart question groups"
           >
-            {chartGroups.map((group) => {
+            {chartGroups.map((group, groupIndex) => {
               const selected = group.id === activeGroup.id;
+              const tabId = `chart-question-${group.id}`;
               return (
                 <button
                   key={group.id}
                   role="tab"
+                  id={tabId}
+                  ref={(node) => { groupTabRefs.current[group.id] = node; }}
+                  tabIndex={selected ? 0 : -1}
                   type="button"
                   aria-selected={selected}
                   aria-controls="chart-panel-chart"
@@ -225,6 +371,7 @@ export function ChartPanel({
                       : "text-[var(--bb-data-fg-muted)] hover:bg-[var(--bb-surface-data)] hover:text-[var(--bb-data-fg-primary)]"
                   }`}
                   onClick={() => selectGroup(group)}
+                  onKeyDown={(event) => selectGroupFromKey(event, groupIndex)}
                   title={group.description}
                 >
                   {group.label}
@@ -282,9 +429,19 @@ export function ChartPanel({
         )}
       </div>
 
-      <div id="chart-panel-chart" role="tabpanel" aria-label={`${activeGroup.label} chart`} data-chart-container>
+      <div
+        id="chart-panel-chart"
+        role="tabpanel"
+        aria-labelledby={chartGroups.length > 1 ? `chart-question-${activeGroup.id}` : undefined}
+        aria-label={chartGroups.length > 1 ? undefined : `${activeGroup.label} chart`}
+        data-chart-container
+      >
         {chartDatasetEmpty ? (
           <ChartDatasetEmptyState chart={activeChart} summary={summary!} />
+        ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
         ) : (
           <>
             {renderChart(activeChart, {
@@ -295,8 +452,14 @@ export function ChartPanel({
               compareGroups,
               baselineIdx,
               platformLabels: chartPlatformLabels,
-              suppressWinnerClaims,
-              suppressionReason,
+              suppressWinnerClaims:
+                suppressWinnerClaims || Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2),
+              suppressionReason:
+                suppressionReason ??
+                (Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2)
+                  ? "No winner is named when fewer than two usable queries are selected"
+                  : undefined),
+              queryFilter,
             })}
             {summary && chartSummary && chartSummary.platforms.length > 0 && chartExclusionSummary.length > 0 && (
               <ChartDatasetExclusionSummary
@@ -317,6 +480,205 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
   return chart.shortTitle;
 }
 
+// The open layout renders every applicable chart group and chart at once,
+// with no tab or disclosure gating: a reader who lands on the page sees the
+// charts, not the controls that would reveal them.
+function ChartPanelLong({
+  context,
+  baselineIndex,
+  onBaselineIndexChange,
+  suppressWinnerClaims = false,
+  suppressionReason,
+  excludeChartIds,
+  queryFilter,
+}: ChartPanelProps) {
+  const charts = useMemo(
+    () => selectPanelCharts(context, excludeChartIds, queryFilter),
+    [context, excludeChartIds, queryFilter],
+  );
+  const chartGroups = useMemo(() => groupChartsByQuestion(charts), [charts]);
+  const summary = useMemo(() => buildRenderableSummary(context), [context]);
+  const historical = useMemo(
+    () =>
+      context.kind === "summary"
+        ? context.historical ?? []
+        : context.kind === "detail"
+          ? context.historical ?? []
+          : [],
+    [context],
+  );
+  const summaryPlatformSelectLabels = useMemo(
+    () =>
+      summary
+        ? formatRunIdentitiesForCohort(
+            summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
+            "selectOption",
+          )
+        : [],
+    [summary],
+  );
+  const isBaselineControlled = baselineIndex !== undefined;
+  const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
+  const baselineIdx = normalizeBaselineIndex(
+    summary?.platforms.length ?? 0,
+    isBaselineControlled ? baselineIndex : localBaselineIdx,
+  );
+  const setBaselineIdx = onBaselineIndexChange ?? setLocalBaselineIdx;
+
+  useEffect(() => {
+    if (!isBaselineControlled) setLocalBaselineIdx(0);
+  }, [context, isBaselineControlled]);
+
+  if (charts.length === 0) return null;
+
+  const showBaseline =
+    !isBaselineControlled &&
+    context.kind === "compare" &&
+    charts.some((chart) => chart.id === "normalized_speedup" || chart.id === "diverging_bar");
+
+  return (
+    <section class="card" data-testid="chart-panel-long">
+      <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {showBaseline && summary && summary.platforms.length > 1 && (
+          <div class="ml-auto flex items-center gap-2">
+            <label class="text-xs text-[var(--bb-data-fg-muted)]" for="chart-panel-long-baseline">
+              Baseline:
+            </label>
+            <select
+              id="chart-panel-long-baseline"
+              class="min-w-0 max-w-full rounded border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-2 py-1 text-xs text-[var(--bb-data-fg-primary)]"
+              value={String(baselineIdx)}
+              onChange={(event) => setBaselineIdx(Number((event.target as HTMLSelectElement).value))}
+            >
+              {summary.platforms.map((platform, index) => (
+                <option key={platform.result_id} value={String(index)}>
+                  {summaryPlatformSelectLabels[index] ?? platform.platform}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+      <div class="space-y-8">
+        {chartGroups.map((group) => (
+          <div key={group.id} class="space-y-8" data-testid={`chart-panel-group-${group.id}`}>
+            {group.charts.map((chart) => (
+              <ChartFigure
+                key={chart.id}
+                chart={chart}
+                context={context}
+                summary={summary}
+                historical={historical}
+                baselineIdx={baselineIdx}
+                suppressWinnerClaims={suppressWinnerClaims}
+                suppressionReason={suppressionReason}
+                queryFilter={queryFilter}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChartFigure({
+  chart,
+  context,
+  summary,
+  historical,
+  baselineIdx,
+  suppressWinnerClaims = false,
+  suppressionReason,
+  queryFilter,
+}: {
+  chart: ChartRegistryEntry;
+  context: ChartContext;
+  summary: BenchmarkSummary | null;
+  historical: ChartHistoricalEntry[];
+  baselineIdx: number;
+  suppressWinnerClaims?: boolean;
+  suppressionReason?: string;
+  queryFilter?: readonly string[];
+}) {
+  const chartSummary = useMemo(
+    () => buildChartSummary(summary, chart.eligibilityClass, queryFilter),
+    [summary, chart.eligibilityClass, queryFilter],
+  );
+  const platformLabels = useMemo(() => chartSummaryLabelList(chartSummary), [chartSummary]);
+  const compareRows = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      timings: chartSummary.platforms.map((platform) => {
+        const ms = platformTimingValue(platform, queryId);
+        return ms !== null ? { ms, status: "pass" as const } : null;
+      }),
+    }));
+  }, [chartSummary, context]);
+  const compareGroups = useMemo(() => {
+    if (context.kind !== "compare" || !chartSummary) return [];
+    return chartSummary.query_ids.map((queryId) => ({
+      queryId,
+      values: chartSummary.platforms.map((platform, index) => {
+        const timing = platformTimingValue(platform, queryId);
+        return {
+          label: platformLabels[index] ?? platform.platform,
+          value: timing ?? null,
+          color: paletteColor(index),
+        };
+      }),
+    }));
+  }, [chartSummary, context, platformLabels]);
+  const exclusionReasons = useMemo(
+    () => (summary ? summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass) : []),
+    [summary, chart.eligibilityClass],
+  );
+  const datasetEmpty = shouldShowChartDatasetEmpty(chart.eligibilityClass, summary, chartSummary);
+  const fewUsableQueries = Boolean(queryFilter && (chartSummary?.query_ids.length ?? 0) < 2);
+
+  return (
+    <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
+      <div class="mt-3">
+        {datasetEmpty ? (
+          <ChartDatasetEmptyState chart={chart} summary={summary!} />
+        ) : queryFilter && chartSummary && chartSummary.query_ids.length === 0 ? (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
+        ) : (
+          <>
+            {renderChart(chart, {
+              context,
+              summary: chartSummary,
+              historical,
+              compareRows,
+              compareGroups,
+              baselineIdx,
+              platformLabels,
+              suppressWinnerClaims: suppressWinnerClaims || fewUsableQueries,
+              suppressionReason:
+                suppressionReason ??
+                (fewUsableQueries
+                  ? "No winner is named when fewer than two usable queries are selected"
+                  : undefined),
+              queryFilter,
+            })}
+            {summary && chartSummary && chartSummary.platforms.length > 0 && exclusionReasons.length > 0 && (
+              <ChartDatasetExclusionSummary
+                eligibilityClass={chart.eligibilityClass}
+                originalCount={summary.platforms.length}
+                renderedCount={chartSummary.platforms.length}
+                reasons={exclusionReasons}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function normalizeBaselineIndex(platformCount: number, baselineIndex: number) {
   return baselineIndex >= 0 && baselineIndex < platformCount ? baselineIndex : 0;
 }
@@ -333,15 +695,17 @@ function shouldShowChartDatasetEmpty(
 function ChartDatasetEmptyState({
   chart,
   summary,
+  displayTitle,
 }: {
   chart: ChartRegistryEntry;
   summary: BenchmarkSummary;
+  displayTitle?: string;
 }) {
   const reasons = summarizeChartDatasetExclusions(summary.platforms, chart.eligibilityClass);
   return (
     <div
       role="status"
-      aria-label={`${chart.title} unavailable`}
+      aria-label={`${displayTitle ?? chart.title} unavailable`}
       class="rounded-md border border-[var(--bb-data-border)] bg-[var(--bb-surface-data-muted)] px-4 py-3 text-sm"
     >
       <p class="font-semibold text-[var(--bb-data-fg-primary)]">{chartDatasetEmptyTitle(chart.eligibilityClass)}</p>
@@ -406,8 +770,12 @@ function preferredChartId(
     if (ids.has("summary_box")) return "summary_box";
   }
 
-  if (context.kind === "summary" && ids.has("sparkline_table")) {
-    return "sparkline_table";
+  // A section headed "Charts" should open on a chart. The sparkline table is an
+  // HTML metrics table; it stays available in the Overview group, but leading
+  // with it meant a reader who never touched the controls saw no chart at all.
+  if (context.kind === "summary") {
+    if (ids.has("performance_bar")) return "performance_bar";
+    if (ids.has("sparkline_table")) return "sparkline_table";
   }
 
   return charts[0]?.id ?? "";
@@ -425,6 +793,7 @@ function renderChart(
     platformLabels,
     suppressWinnerClaims = false,
     suppressionReason,
+    queryFilter,
   }: {
     context: ChartContext;
     summary: BenchmarkSummary | null;
@@ -435,6 +804,7 @@ function renderChart(
     platformLabels: string[];
     suppressWinnerClaims?: boolean;
     suppressionReason?: string;
+    queryFilter?: readonly string[];
   },
 ) {
   switch (chart.id) {
@@ -445,9 +815,13 @@ function renderChart(
     case "distribution_box":
       return summary ? <DistributionBox summary={summary} /> : null;
     case "query_heatmap":
-      return summary ? <QueryHeatmap summary={summary} /> : null;
+      return summary ? (
+        <QueryHeatmap summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "query_histogram":
-      return summary ? <QueryHistogram summary={summary} /> : null;
+      return summary ? (
+        <QueryHistogram summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     case "cost_scatter":
       return summary ? <CostScatter summary={summary} /> : null;
     case "time_series":
@@ -487,16 +861,26 @@ function renderChart(
           })()}
           <GroupedQueryChart groups={compareGroups} />
         </div>
-      ) : null;
+      ) : (
+        <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+          No queries match the selected filter.
+        </div>
+      );
     case "diverging_bar":
       return summary ? (
-        <DivergingBarChart
-          queries={compareRows}
-          results={summary.platforms.map((platform, index) => ({
-            platform: platformLabels[index] ?? platform.platform,
-          }))}
-          baselineIdx={baselineIdx}
-        />
+        compareRows.length > 0 ? (
+          <DivergingBarChart
+            queries={compareRows}
+            results={summary.platforms.map((platform, index) => ({
+              platform: platformLabels[index] ?? platform.platform,
+            }))}
+            baselineIdx={baselineIdx}
+          />
+        ) : (
+          <div class="panel-muted rounded p-6 text-center text-sm text-[var(--bb-data-fg-muted)]">
+            No queries match the selected filter.
+          </div>
+        )
       ) : null;
     case "summary_box":
       return (
@@ -550,7 +934,9 @@ function renderChart(
     case "cdf_chart":
       return summary ? <CDFChart summary={summary} /> : null;
     case "rank_table":
-      return summary ? <RankTable summary={summary} /> : null;
+      return summary ? (
+        <RankTable summary={summary} preserveOrder={Boolean(queryFilter)} />
+      ) : null;
     default:
       return null;
   }
@@ -558,7 +944,8 @@ function renderChart(
 
 function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const width = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const width = frame.width;
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
@@ -590,19 +977,25 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
     );
   }
 
-  const labelWidth = 160;
-  const rowHeight = 36;
+  const layout = barRowLayout(frame, { labelWidth: 160, rowHeight: 36, valueTrail: 96 });
+  const labelWidth = layout.labelWidth;
+  const rowHeight = layout.rowHeight;
   const axisHeight = 32;
   const topPadding = 8;
-  const valueLabelGutter = 96;
-  const plotWidth = width - labelWidth - valueLabelGutter;
+  const plotWidth = layout.plotWidth;
   const totalHeight = topPadding + rows.length * rowHeight + axisHeight;
   const scale = buildLatencyBarScale(rows.map((row) => row.display_geomean_ms));
   if (scale === null) return null;
 
   const ticks = latencyScaleTicks(scale);
-  const scaleLabel =
-    scale.mode === "log"
+  // The full caption is wider than a phone column, so a compact drawing names
+  // the scale and the direction and leaves the metric to the chart's heading
+  // and accessible name, which already say "geomean performance".
+  const scaleLabel = layout.labelAbove
+    ? scale.mode === "log"
+      ? "Log scale - lower is better"
+      : "Median of passing - lower is better"
+    : scale.mode === "log"
       ? "Geomean query time (log scale) - lower is better"
       : "Geomean query time (median-of-passing) - lower is better";
 
@@ -610,8 +1003,9 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
     <div ref={containerRef} class="w-full overflow-x-auto">
       <svg
         class="bb-chart-svg"
-        width={width}
+        width="100%"
         height={totalHeight}
+        viewBox={`0 0 ${width} ${totalHeight}`}
         role="img"
         aria-label={
           scale.mode === "log"
@@ -624,28 +1018,33 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
           const barWidth = fraction * plotWidth;
           const renderedBarWidth = Math.max(2, barWidth);
           const valueLabel = fmtGeomean(row.display_geomean_ms);
-          const valueLabelPlacement = placePerformanceValueLabel({
-            barWidth: renderedBarWidth,
-            plotWidth,
-            labelWidth,
-            valueText: valueLabel,
-          });
+          // A compact row has no gutter to place the value in: it shares the
+          // label line, at the opposite end, where no bar length can displace
+          // it. Wide rows keep the measured three-way placement.
+          const valueLabelPlacement: ValueLabelPlacement = layout.labelAbove
+            ? { x: width, textAnchor: "end", fill: "var(--bb-chart-label)", placement: "outside" }
+            : placePerformanceValueLabel({
+                barWidth: renderedBarWidth,
+                plotWidth,
+                labelWidth,
+                valueText: valueLabel,
+              });
           const y = topPadding + index * rowHeight;
-          const midY = y + rowHeight * 0.5;
-          const barHeight = rowHeight * 0.55;
+          const midY = y + layout.barCenter;
+          const barHeight = 36 * 0.55;
           return (
             <g key={row.result_id}>
               <text
-                x={labelWidth - 6}
-                y={midY + 4}
-                textAnchor="end"
+                x={layout.labelAbove ? 0 : labelWidth - 6}
+                y={y + layout.labelBaseline}
+                text-anchor={layout.labelAbove ? "start" : "end"}
                 style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{row.fullLabel}</title>
                 {row.displayLabel}
               </text>
               <rect
-                x={labelWidth}
+                x={layout.plotX}
                 y={midY - barHeight / 2}
                 width={renderedBarWidth}
                 height={barHeight}
@@ -657,19 +1056,19 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </rect>
               {valueLabelPlacement.placement === "gutter" && (
                 <line
-                  x1={labelWidth + renderedBarWidth + 4}
+                  x1={layout.plotX + renderedBarWidth + 4}
                   y1={midY}
                   x2={valueLabelPlacement.x - 5}
                   y2={midY}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
-                  strokeDasharray="2 2"
+                  stroke-width={1}
+                  stroke-dasharray="2 2"
                 />
               )}
               <text
                 x={valueLabelPlacement.x}
-                y={midY + 4}
-                textAnchor={valueLabelPlacement.textAnchor}
+                y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
+                text-anchor={valueLabelPlacement.textAnchor}
                 data-value-placement={valueLabelPlacement.placement}
                 style={{ fontSize: "11px", fill: valueLabelPlacement.fill }}
               >
@@ -682,7 +1081,7 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
                   x2={width}
                   y2={y + rowHeight}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
+                  stroke-width={1}
                 />
               )}
             </g>
@@ -691,23 +1090,23 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
 
         <g transform={`translate(0, ${topPadding + rows.length * rowHeight})`}>
           <line
-            x1={labelWidth}
+            x1={layout.plotX}
             y1={0}
-            x2={labelWidth + plotWidth}
+            x2={layout.plotX + plotWidth}
             y2={0}
             stroke="var(--bb-chart-grid)"
-            strokeWidth={1}
+            stroke-width={1}
           />
           {ticks.map((value) => {
             const fraction = latencyScaleFraction(value, scale) ?? 0;
-            const x = labelWidth + fraction * plotWidth;
+            const x = layout.plotX + fraction * plotWidth;
             return (
               <g key={value}>
-                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" strokeWidth={1} />
+                <line x1={x} y1={0} x2={x} y2={4} stroke="var(--bb-chart-label-muted)" stroke-width={1} />
                 <text
                   x={x}
                   y={16}
-                  textAnchor="middle"
+                  text-anchor={axisLabelAnchor(x, width)}
                   style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
                 >
                   {fmtGeomean(value)}
@@ -715,10 +1114,12 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </g>
             );
           })}
+          {/* Centred, this caption is wider than a phone column and would spill
+              from both ends. A compact drawing anchors it at the left instead. */}
           <text
-            x={labelWidth + plotWidth / 2}
+            x={layout.labelAbove ? 0 : layout.plotX + plotWidth / 2}
             y={axisHeight - 2}
-            textAnchor="middle"
+            text-anchor={layout.labelAbove ? "start" : "middle"}
             style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
             {scaleLabel}
@@ -792,7 +1193,7 @@ function SummaryBoxPanel({
       <div class="grid gap-3 sm:grid-cols-3">
         <SummaryStat label="Runs" value={String(historical.length)} />
         <SummaryStat label="Benchmarks" value={String(benchmarks.size)} />
-        <SummaryStat label="Latest run" value={latest ? latest.run_date.slice(0, 10) : "-"} />
+        <SummaryStat label="Latest run" value={latest ? <RunDateChip runDate={latest.run_date} /> : "-"} />
       </div>
     );
   }
@@ -858,7 +1259,7 @@ function SummaryBoxPanel({
   );
 }
 
-function SummaryStat({ label, value, title }: { label: string; value: string; title?: string }) {
+function SummaryStat({ label, value, title }: { label: string; value: ComponentChildren; title?: string }) {
   return (
     <div class="rounded-lg panel-muted px-4 py-3" title={title}>
       <div class="text-xs font-medium uppercase tracking-wide text-[var(--bb-data-fg-subtle)]">{label}</div>

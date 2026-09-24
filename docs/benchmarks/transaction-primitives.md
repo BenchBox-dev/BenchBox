@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `transaction_primitives` - use `benchbox run --benchmark transaction_primitives`
+>
+> **Query templates:** [every Transaction Primitives query](queries/transaction_primitives/index.md)
 
 ## Overview
 

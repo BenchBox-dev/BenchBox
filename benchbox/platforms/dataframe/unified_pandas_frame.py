@@ -2,14 +2,14 @@
 
 This module provides UnifiedPandasFrame, a wrapper class that provides a
 consistent DataFrame API across different Pandas-family platforms
-(Pandas, Modin, cuDF, Dask).
+(Pandas, cuDF, Dask).
 
 The wrapper intercepts method calls and translates them to platform-specific
 implementations. This allows query implementations to use a single API that
 works transparently across all Pandas-family platforms.
 
 Key API translations:
-- groupby(as_index=False): Works on Pandas/Modin/cuDF; for Dask uses reset_index()
+- groupby(as_index=False): Works on Pandas/cuDF; for Dask uses reset_index()
 - .dt accessor: Works on all platforms with proper handling
 - nunique aggregation: Standard on Pandas; Dask requires separate computation
 
@@ -229,7 +229,7 @@ class UnifiedPandasFrame(Generic[DF]):
         """Create a grouped DataFrame for aggregation.
 
         Intercepts groupby to handle platform differences:
-        - Pandas/Modin/cuDF: Support as_index=False natively
+        - Pandas/cuDF: Support as_index=False natively
         - Dask: Does not support as_index, use reset_index() instead
 
         Args:
@@ -433,7 +433,7 @@ class UnifiedPandasGroupBy(Generic[DF]):
     """Platform-agnostic GroupBy wrapper for Pandas-family.
 
     Intercepts aggregation operations and handles platform differences:
-    - Pandas/Modin/cuDF: Use as_index=False in groupby
+    - Pandas/cuDF: Use as_index=False in groupby
     - Dask: Use reset_index() after aggregation
 
     Attributes:
@@ -483,11 +483,15 @@ class UnifiedPandasGroupBy(Generic[DF]):
         # Merge positional dict arg with kwargs
         agg_spec = args[0] if args and isinstance(args[0], dict) else kwargs
 
+        # Forward the groupby kwargs (e.g. dropna=False): without them the
+        # adapter regroups with native defaults and NULL groups vanish even
+        # though the wrapper was constructed to keep them.
         result = self._adapter.groupby_agg(
             self._df,
             self._by,
             agg_spec,
             as_index=self._as_index,
+            **self._kwargs,
         )
         return UnifiedPandasFrame(result, self._adapter)
 

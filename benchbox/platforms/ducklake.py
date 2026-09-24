@@ -35,6 +35,7 @@ from typing import Any
 
 from benchbox.core.config_inheritance import resolve_dialect_for_query_translation
 from benchbox.platforms.base.data_loading import escape_sql_string_literal
+from benchbox.platforms.base.ddl_helpers import strip_primary_keys
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 
 from .duckdb import DuckDBAdapter, DuckDBConnectionWrapper
@@ -274,6 +275,19 @@ class DuckLakeAdapter(DuckDBAdapter):
     available on earlier DuckDB releases). This is enforced at connection
     time regardless of the driver version pinned in pyproject.toml.
     """
+
+    # Engine identity for operation execution: DuckLake shares DuckDB's SQL
+    # dialect but rejects parts of its DDL (e.g. PRIMARY KEY constraints), so
+    # capability lookups must resolve "ducklake", not "duckdb".
+    operation_platform_key = "ducklake"
+
+    # Shared-dialect fallback for catalog override lookups: DuckLake reuses
+    # DuckDB's SQL dialect unchanged (see class docstring), so an override
+    # entry missing under "ducklake" resolves from "duckdb" instead of
+    # dropping to the catalog default (e.g. the duckdb null overrides that
+    # skip DuckDB's unsupported SAVEPOINT operations). Engine-true "ducklake"
+    # entries (e.g. PK capability decisions) still win.
+    operation_platform_fallback_key = "duckdb"
 
     # Declared explicitly (not just inherited from DuckDBAdapter) because
     # test_plan_capture_phase_eligibility.py requires every concrete
@@ -680,7 +694,7 @@ class DuckLakeAdapter(DuckDBAdapter):
             )
             return
 
-        if self.dry_run:
+        if self.is_dry_run:
             # Never mutate on-disk artifacts during a dry run.
             self.log_verbose("DuckLake catalog validation skipped (dry run mode)")
             return
@@ -837,6 +851,20 @@ class DuckLakeAdapter(DuckDBAdapter):
                 "and tuning configuration). Use --force or a fresh catalog."
             )
 
+    def ducklake_strip_primary_keys(self, statement: str) -> str:
+        """Strip PRIMARY KEY/UNIQUE constraints DuckLake rejects.
+
+        Registered as the ``ddl_optimize.ducklake.all.strip_primary_keys``
+        REWRITE_DDL transformer (see
+        benchbox.sql_compat.rules.ddl_optimize.ducklake_ddl_rewrites);
+        :meth:`_rewrite_schema_statement` routes execution through it.
+        """
+        return strip_primary_keys(statement)
+
+    def _rewrite_schema_statement(self, statement: str) -> str:
+        """See :meth:`ducklake_strip_primary_keys` (registered DDL rewrite)."""
+        return self.ducklake_strip_primary_keys(statement)
+
     def create_schema(self, benchmark: Any, connection: Any) -> float:
         """Create benchmark tables and persist their benchmark/run identity."""
         elapsed = super().create_schema(benchmark, connection)
@@ -861,7 +889,7 @@ class DuckLakeAdapter(DuckDBAdapter):
         Parquet in DATA_PATH is not reclaimed here - see _reset_ducklake_catalog
         for the same caveat on cloud storage.
         """
-        if self.dry_run:
+        if self.is_dry_run:
             self.log_verbose("DuckLake postgres catalog reuse detection skipped (dry run mode)")
             return
 

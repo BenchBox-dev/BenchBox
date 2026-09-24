@@ -29,8 +29,8 @@ describe("result links and public identity", () => {
   });
 
   it("names the public ID in accessible result-link labels", () => {
-    expect(resultIdentityAriaLabel(row, "receipt")).toBe(
-      "Open receipt for Polars public ID a62d0d72 from 2026-04-03",
+    expect(resultIdentityAriaLabel(row, "receipt")).toMatch(
+      /^Open receipt for Polars public ID a62d0d72 from 2026-04-03 \(.*days ago\)$/,
     );
   });
 });

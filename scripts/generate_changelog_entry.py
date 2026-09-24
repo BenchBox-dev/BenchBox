@@ -37,11 +37,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import signal
 import subprocess
 import sys
+import tempfile
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -74,6 +78,10 @@ _BULLET_RE = re.compile(r"^\s*- \S")
 # undated "## [X.Y.Z]" header, since a dated header is this repo's convention
 # for a section that claims to be released (see CHANGELOG.md's own entries).
 _CHANGELOG_VERSION_HEADER_RE = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - ", re.MULTILINE)
+
+_PYPROJECT_VERSION_RE = re.compile(r'^version\s*=\s*["\'](?P<version>[^"\']+)["\']', re.MULTILINE)
+_STABLE_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+_PYPI_RELEASE_URL = "https://pypi.org/pypi/benchbox/json"
 
 # Matches a release-cut branch name, e.g. "v0.3.1" or "v0.3.1-rc1". Mirrors
 # the HEAD_REF regex in .github/workflows/validate-release-pr.yml so the two
@@ -344,28 +352,48 @@ def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str
     return (not problems), problems
 
 
-def existing_tags(source: Path) -> set[str]:
-    """Return the set of vX.Y.Z tag names visible to this checkout.
+def curated_section_body(source: Path, version: str) -> tuple[str | None, list[str]]:
+    """Return a validated, non-empty release-note body for ``version``."""
+    ok, problems = check_changelog_curation(source, version)
+    if not ok:
+        return None, problems
+    body = section_body((source / "CHANGELOG.md").read_text(encoding="utf-8"), version)
+    if body is None or not body.strip():
+        return None, ["section body is empty"]
+    return body.strip(), []
 
-    Prefers local tags (`git tag -l`), which is what
-    `_resolve_log_range`'s `git describe --tags` above also relies on.
-    Falls back to `git ls-remote --tags origin` when no local tags are
-    present (e.g. a shallow or tag-less local clone) so the guard doesn't
-    silently pass for lack of local tag data.
+
+def existing_tags(source: Path) -> set[str]:
+    """Return ``v*`` tags available locally or from ``origin``.
+
+    Complete local checkouts avoid a network dependency. Shallow or tag-less
+    checkouts query ``origin`` and union its tags with any local subset so the
+    fast-suite repository guards work after the default shallow Actions
+    checkout. Discovery failures raise instead of silently passing.
     """
     local = _run_git(source, "tag", "-l", "v*")
+    if local.returncode != 0:
+        raise RuntimeError(f"could not inspect local release tags: {local.stderr.strip() or 'git tag failed'}")
     tags = {line.strip() for line in local.stdout.splitlines() if line.strip()}
-    if tags:
+
+    shallow = _run_git(source, "rev-parse", "--is-shallow-repository")
+    if shallow.returncode != 0:
+        raise RuntimeError(f"could not inspect checkout depth: {shallow.stderr.strip() or 'git rev-parse failed'}")
+    is_shallow = shallow.stdout.strip() == "true"
+    if tags and not is_shallow:
         return tags
+
     remote = _run_git(source, "ls-remote", "--tags", "origin", "refs/tags/v*")
+    if remote.returncode != 0:
+        reason = remote.stderr.strip() or "git ls-remote failed"
+        raise RuntimeError(f"could not discover release tags from origin: {reason}")
     for line in remote.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        ref = line.rsplit("\t", 1)[-1]
+        ref = line.strip().rsplit("\t", 1)[-1]
         name = ref.rsplit("/", 1)[-1]
         if name and not name.endswith("^{}"):
             tags.add(name)
+    if not tags:
+        raise RuntimeError("no release tags were discovered locally or on origin")
     return tags
 
 
@@ -421,6 +449,137 @@ def check_tag_claims(source: Path) -> tuple[bool, list[str]]:
     branch = _current_branch(source)
     untagged = find_untagged_changelog_versions(text, tags, current_branch=branch)
     return (not untagged, untagged)
+
+
+def latest_published_version() -> str:
+    """Return PyPI's current published BenchBox version."""
+    try:
+        with urllib.request.urlopen(_PYPI_RELEASE_URL, timeout=15) as response:
+            payload = json.load(response)
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"could not read published BenchBox version from PyPI: {exc}") from exc
+
+    version = payload.get("info", {}).get("version") if isinstance(payload, dict) else None
+    if not isinstance(version, str) or not _STABLE_VERSION_RE.fullmatch(version):
+        raise RuntimeError(f"PyPI returned an invalid stable BenchBox version: {version!r}")
+    return version
+
+
+def find_release_accounting_errors(
+    changelog_text: str,
+    tags: set[str],
+    *,
+    published_version: str,
+    pyproject_version: str | None,
+    current_branch: str | None = None,
+) -> list[str]:
+    """Return repository accounting drift relative to the published release.
+
+    PyPI is authoritative for publication state. The published version must
+    have a visible git tag, a dated changelog section, and the ``[Unreleased]``
+    comparison anchor. A newer tag that has not reached PyPI does not advance
+    these expectations. Release-cut branches may advance only to their own
+    candidate version.
+    """
+    if not _STABLE_VERSION_RE.fullmatch(published_version):
+        return [f"published version {published_version!r} is not a stable X.Y.Z version"]
+    tag = f"v{published_version}"
+
+    errors: list[str] = []
+    if tag not in tags:
+        errors.append(f"published PyPI version {published_version} has no visible git tag {tag}")
+
+    if published_version not in released_versions_in_changelog(changelog_text):
+        errors.append(f"CHANGELOG.md has no dated [{published_version}] section for published version {tag}")
+
+    expected_compare = f"[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/{tag}...HEAD"
+    if expected_compare not in changelog_text:
+        errors.append(f"CHANGELOG.md [Unreleased] comparison does not start at {tag}")
+
+    branch_match = _RELEASE_BRANCH_RE.fullmatch(current_branch) if current_branch else None
+    expected_project_version = branch_match.group("version") if branch_match else published_version
+    if pyproject_version != expected_project_version:
+        expectation = f"release branch v{expected_project_version}" if branch_match else f"published PyPI version {tag}"
+        errors.append(f"pyproject.toml version {pyproject_version!r} does not match {expectation}")
+
+    return errors
+
+
+def check_release_accounting(source: Path, published_version: str) -> tuple[bool, list[str]]:
+    """Return whether repository accounting matches ``published_version``."""
+    changelog_text = (source / "CHANGELOG.md").read_text(encoding="utf-8")
+    pyproject_text = (source / "pyproject.toml").read_text(encoding="utf-8")
+    version_match = _PYPROJECT_VERSION_RE.search(pyproject_text)
+    pyproject_version = version_match.group("version") if version_match else None
+    errors = find_release_accounting_errors(
+        changelog_text,
+        existing_tags(source),
+        published_version=published_version,
+        pyproject_version=pyproject_version,
+        current_branch=_current_branch(source),
+    )
+    return (not errors, errors)
+
+
+def update_github_release_notes(source: Path, version: str, body: str) -> None:
+    """Idempotently replace the existing GitHub Release notes for ``version``."""
+    tag = f"v{version}"
+    notes_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as notes_file:
+            notes_file.write(body.strip() + "\n")
+            notes_path = Path(notes_file.name)
+        result = subprocess.run(
+            ["gh", "release", "edit", tag, "--notes-file", str(notes_path)],
+            cwd=source,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            reason = result.stderr.strip() or result.stdout.strip() or "gh release edit failed"
+            raise RuntimeError(f"could not update GitHub Release {tag}: {reason}")
+    finally:
+        if notes_path is not None:
+            notes_path.unlink(missing_ok=True)
+
+
+def _publishable_body_or_report(source: Path, version: str) -> str | None:
+    body, problems = curated_section_body(source, version)
+    if body is not None:
+        return body
+    print(f"  Error: CHANGELOG.md section [{version}] is not publishable:", file=sys.stderr)
+    for problem in problems:
+        print(f"    - {problem}", file=sys.stderr)
+    return None
+
+
+def _run_release_accounting_check(source: Path) -> int:
+    try:
+        published_version = latest_published_version()
+        ok, errors = check_release_accounting(source, published_version)
+    except RuntimeError as exc:
+        print(f"  Error: {exc}", file=sys.stderr)
+        return 1
+    if not ok:
+        print(f"  Repository accounting does not match published PyPI version v{published_version}:")
+        for error in errors:
+            print(f"    - {error}")
+        return 1
+    print(f"  Published-release accounting guard: OK (PyPI v{published_version})")
+    return 0
+
+
+def _run_release_notes_sync(source: Path, version: str) -> int:
+    body = _publishable_body_or_report(source, version)
+    if body is None:
+        return 1
+    try:
+        update_github_release_notes(source, version, body)
+    except RuntimeError as exc:
+        print(f"  Error: {exc}", file=sys.stderr)
+        return 1
+    print(f"  Updated GitHub Release v{version} from curated CHANGELOG.md notes")
+    return 0
 
 
 def _diff_name_status(source: Path, since_ref: str) -> list[tuple[str, str]]:
@@ -663,6 +822,14 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--check-release-accounting",
+        action="store_true",
+        help=(
+            "Read the current published version from PyPI and verify its git tag, "
+            "CHANGELOG.md section, [Unreleased] comparison, and project version."
+        ),
+    )
+    parser.add_argument(
         "--check-curation",
         action="store_true",
         help=(
@@ -671,6 +838,16 @@ def main() -> int:
             f"{MAX_CURATED_BULLETS} bullets), then exit. Requires --version. "
             "Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
         ),
+    )
+    parser.add_argument(
+        "--print-section",
+        action="store_true",
+        help="Print the curated CHANGELOG.md body for --version, then exit.",
+    )
+    parser.add_argument(
+        "--sync-github-release-notes",
+        action="store_true",
+        help="Replace the existing GitHub Release notes for vVERSION with the curated section.",
     )
     parser.add_argument(
         "--version",
@@ -714,8 +891,21 @@ def main() -> int:
         print("  CHANGELOG.md tag-claim guard: OK")
         return 0
 
+    if args.check_release_accounting:
+        return _run_release_accounting_check(args.source)
+
     if not args.version:
-        parser.error("--version is required unless --check-tag-claims is set")
+        parser.error("--version is required unless a check-only option is set")
+
+    if args.print_section:
+        body = _publishable_body_or_report(args.source, args.version)
+        if body is None:
+            return 1
+        print(body)
+        return 0
+
+    if args.sync_github_release_notes:
+        return _run_release_notes_sync(args.source, args.version)
 
     if args.check_curation:
         ok, problems = check_changelog_curation(args.source, args.version)

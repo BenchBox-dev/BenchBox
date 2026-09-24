@@ -14,7 +14,13 @@ test.describe("benchmark and platform section indexes", () => {
       "href",
       "/results/benchmarks/",
     );
-    await expect(page.getByRole("link", { name: /TPC-H/ })).toHaveAttribute("href", "/results/tpch/");
+    await expect(
+      page.getByTestId("benchmarks-index-list").getByRole("link", { name: /TPC-H/ }),
+    ).toHaveAttribute("href", "/results/tpch/");
+    // The activity chart links each row to the same page.
+    await expect(
+      page.getByTestId("submission-activity-grid").getByRole("link", { name: "TPC-H" }),
+    ).toHaveAttribute("href", "/results/tpch/");
     await page.getByRole("combobox", { name: "Sort benchmarks" }).selectOption("recent");
     await expect(page).toHaveURL(/\/results\/benchmarks\/\?sort=recent$/);
 
@@ -27,6 +33,8 @@ test.describe("benchmark and platform section indexes", () => {
       "href",
       "/results/platforms/",
     );
-    await expect(page.getByRole("link", { name: /DuckDB/ }).first()).toHaveAttribute("href", "/results/p/duckdb/");
+    await expect(
+      page.getByTestId("platforms-index-list").getByRole("link", { name: /DuckDB/ }).first(),
+    ).toHaveAttribute("href", "/results/p/duckdb/");
   });
 });

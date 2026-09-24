@@ -6,6 +6,8 @@
 ```
 
 > **CLI name:** `vector_search` - use `benchbox run --benchmark vector_search`
+>
+> **Query templates:** [every Vector Search query](queries/vector_search/index.md)
 
 The Vector Search benchmark tests similarity-search performance across OLAP
 databases that support array/vector operations. It covers exact kNN, filtered

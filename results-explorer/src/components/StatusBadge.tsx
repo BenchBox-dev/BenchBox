@@ -9,6 +9,7 @@ export type StatusRole =
   | "computed"
   | "comparison"
   | "ranking"
+  | "override"
   | "generic";
 
 interface StatusBadgeProps {

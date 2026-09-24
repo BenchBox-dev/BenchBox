@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 import re
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from benchbox.core.sql_utils import (
@@ -29,6 +29,75 @@ from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
 # Spark / Hive metastore caps identifiers at 128 characters.
 _SPARK_IDENTIFIER_MAX_LEN = 128
+
+# Adaptive Query Execution keys. Set explicitly in both directions at session
+# build: Spark enables AQE by default since 3.2.0, so omitting the keys would
+# silently leave it on even when adaptive_enabled is False.
+SPARK_AQE_KEYS = (
+    "spark.sql.adaptive.enabled",
+    "spark.sql.adaptive.coalescePartitions.enabled",
+    "spark.sql.adaptive.skewJoin.enabled",
+)
+
+# Cost-based optimizer keys applied alongside AQE for OLAP benchmark shapes.
+SPARK_CBO_KEYS = (
+    "spark.sql.cbo.enabled",
+    "spark.sql.cbo.joinReorder.enabled",
+)
+
+
+def spark_aqe_conf_entries(adaptive_enabled: bool) -> dict[str, str]:
+    """Return explicit AQE key/value entries for a session-build conf dict."""
+    value = "true" if adaptive_enabled else "false"
+    return dict.fromkeys(SPARK_AQE_KEYS, value)
+
+
+def adaptive_enabled_from_config(config: Mapping[str, Any]) -> bool:
+    """Resolve the ``adaptive_enabled`` toggle from an adapter config dict.
+
+    Platforms without a registered config builder receive parsed CLI options
+    nested under ``config["options"]`` (see ``get_platform_config``), so read
+    the top level first and fall back to the nested options. Accepts bools
+    (direct API use) and option-parser strings (config files).
+    """
+    options = config.get("options") or {}
+    value = config.get("adaptive_enabled", options.get("adaptive_enabled", True))
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "y", "on")
+    return bool(value)
+
+
+def apply_spark_olap_runtime_conf(
+    connection: Any,
+    benchmark_type: str,
+    benchmark_types: tuple[str, ...] = ("olap", "analytics", "tpch", "tpcds", "joinorder"),
+    *,
+    adaptive_enabled: bool = True,
+    spark_config: Mapping[str, str] | None = None,
+    logger: logging.Logger | None = None,
+    platform_label: str = "Spark",
+) -> None:
+    """Gate on benchmark type, then apply OLAP run-time conf (resolve-then-apply).
+
+    Honors the adapter's AQE setting instead of force-enabling, and lets an
+    explicit ``spark_config`` entry win so session-build overrides are not
+    clobbered at run time. CBO keys get the same ``spark_config`` precedence.
+    Failures are logged, never raised, so a best-effort tuning step cannot
+    fail a benchmark run.
+    """
+    try:
+        if benchmark_type.lower() not in tuple(t.lower() for t in benchmark_types):
+            return
+        overrides = spark_config or {}
+        aqe_value = "true" if adaptive_enabled else "false"
+        for aqe_key in SPARK_AQE_KEYS:
+            connection.conf.set(aqe_key, overrides.get(aqe_key, aqe_value))
+        for cbo_key in SPARK_CBO_KEYS:
+            connection.conf.set(cbo_key, overrides.get(cbo_key, "true"))
+        if logger is not None:
+            logger.debug("Applied OLAP optimizations for %s", platform_label)
+    except Exception as exc:
+        (logger or logging.getLogger(__name__)).warning("Failed to apply benchmark configuration: %s", exc)
 
 
 def validate_spark_identifier(identifier: str) -> bool:
@@ -110,7 +179,12 @@ def analyze_spark_table(connection: Any, table_name: str, *, logger: logging.Log
         logger.warning(f"Failed to analyze table {table_name}: {e}")
 
 
-def get_spark_query_plan(connection: Any, query: str) -> str:
+def get_spark_query_plan(
+    connection: Any,
+    query: str,
+    *,
+    logger: logging.Logger | None = None,
+) -> str | None:
     """Return the ``EXPLAIN EXTENDED`` plan text for a Spark-like session.
 
     Works for both full PySpark sessions and Spark Connect sessions (LakeSail)
@@ -119,17 +193,33 @@ def get_spark_query_plan(connection: Any, query: str) -> str:
     Args:
         connection: Active Spark / Spark Connect session.
         query: SQL query to explain.
+        logger: Logger for the failure warning. Defaults to this module's logger.
 
     Returns:
-        Multi-line plan text, or a short error string on failure.
+        Multi-line plan text, or ``None`` on failure.
+
+    On failure this returns ``None`` and logs the exception, rather than
+    returning the error text AS the plan (qpc-05 / qpc-13). Encoding the error
+    in the data channel was actively harmful: the capture path
+    (``capture_query_plan``) would hand that error string to the platform
+    parser as though it were EXPLAIN output. A ``None`` return is treated as a
+    clean capture failure by callers and simply skips best-effort display.
     """
+    log = logger or logging.getLogger(__name__)
     spark = connection
+    from benchbox.platforms.base.sql_execution import join_explain_rows
+
     try:
         result_df = spark.sql(f"EXPLAIN EXTENDED {query}")
         plan_rows = result_df.collect()
-        return "\n".join([str(row[0]) for row in plan_rows])
+        # Pinned historical contract (see test_empty_plan_returns_empty_string):
+        # empty output stays ""; only exceptions yield None. No production
+        # caller distinguishes the two (both are falsy downstream); the "" is
+        # kept for stability, not for an operational difference.
+        return join_explain_rows(plan_rows) or ""
     except Exception as e:
-        return f"Could not get query plan: {e}"
+        log.warning("Could not get query plan via EXPLAIN: %s", e)
+        return None
 
 
 # Spark V1 datasource tables (USING PARQUET / ORC) do not support PRIMARY KEY,
@@ -346,6 +436,9 @@ class SparkLikeAdapterMixin:
       key/value to ``spark.conf.set("spark.<key>", value)``.  Every override
       that fails is logged at WARNING; the final summary line uses
       ``self.platform_name`` for engine-specific output.
+    - ``apply_olap_runtime_conf``: delegates OLAP run-time conf to
+      ``apply_spark_olap_runtime_conf`` with this adapter's AQE toggle and
+      spark_config; the engine label stays an explicit argument.
 
     Extending classes must:
       * Provide ``self.logger`` (PlatformAdapter does).
@@ -410,6 +503,21 @@ class SparkLikeAdapterMixin:
                 self._record_spark_conf_ledger(ledger, key, value, applied=True)
 
         self.logger.info(f"{platform} platform optimizations applied")  # type: ignore[attr-defined]
+
+    def apply_olap_runtime_conf(self, connection: Any, benchmark_type: str, platform_label: str) -> None:
+        """Delegate OLAP run-time conf with this adapter's AQE toggle.
+
+        Extending classes must provide ``self.adaptive_enabled``,
+        ``self.spark_config``, and ``self.logger``.
+        """
+        apply_spark_olap_runtime_conf(
+            connection,
+            benchmark_type,
+            adaptive_enabled=self.adaptive_enabled,  # type: ignore[attr-defined]
+            spark_config=self.spark_config,  # type: ignore[attr-defined]
+            logger=self.logger,  # type: ignore[attr-defined]
+            platform_label=platform_label,
+        )
 
     @staticmethod
     def _record_spark_conf_ledger(ledger: Any, key: str, value: Any, *, applied: bool, error: Any = None) -> None:

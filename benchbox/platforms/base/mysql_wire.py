@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import Any, Callable
 
+from benchbox.platforms.base.connection_wrappers import StreamConnectionCapability
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
@@ -97,6 +98,14 @@ class MySqlWireConnectionWrapper:
 
 class MySqlWireLifecycleMixin:
     """Common database, schema, query-plan, and health plumbing."""
+
+    # MySQL-wire connections are per-connection sessions (server-side state
+    # such as ``@@session`` variables lives on the connection) and neither
+    # pymysql nor the SingleStore driver supports concurrent statement
+    # execution across cursors of one connection, so every throughput stream
+    # gets its own connection (Doris, SingleStore). See
+    # ``StreamConnectionCapability`` equivalence dimensions.
+    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     database_identifier_max_length = 128
     connection_operation_name = "MySQL-wire connection"
@@ -240,13 +249,54 @@ class MySqlWireLifecycleMixin:
                 ) from exc
             raise
 
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        """Open an independent MySQL-wire connection for one throughput stream.
+
+        Connects straight through ``_connect_database`` (which selects the
+        benchmark database at connect time, preserving catalog identity)
+        instead of repeating ``create_connection``: the one-time setup there
+        (``handle_existing_database`` with its ``force_recreate`` drop path,
+        database creation) must run exactly once on the shared connection,
+        never per stream. The benchmark-type session tuning is still
+        reapplied per stream via ``configure_for_benchmark`` (Doris cache and
+        memory SETs, SingleStore query-cache/packet SETs - equivalence
+        dimension 4). The caller closes the returned connection in the
+        stream's own ``finally`` block (dimension 6).
+
+        Args:
+            connection: The adapter's shared platform connection. Not reused.
+            benchmark_type: Benchmark tuning vocabulary (replay skipped when
+                omitted).
+        """
+        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        conn = self._connect_database()
+        try:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            finally:
+                cursor.close()
+            # Replay only when the caller supplies benchmark_type (the
+            # throughput drivers always do); other callers keep their previous
+            # behavior.
+            if benchmark_type is not None:
+                self.configure_for_benchmark(conn, benchmark_type)
+            return self._wrap_database_connection(conn)
+        except Exception:
+            try:
+                conn.close()
+            except Exception as close_error:  # noqa: BLE001 - preserve setup failure
+                self.logger.debug("Failed to close stream connection after setup error: %r", close_error)
+            raise
+
     def _transform_schema_statement(self, stmt: str, benchmark: Any) -> str:
         return stmt
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
         cursor = connection.cursor()
@@ -329,11 +379,13 @@ class MySqlWireLifecycleMixin:
             if not self._validate_identifier(target_table) and not self._handle_invalid_load_table(
                 target_table, table_stats
             ):
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
             data_files = self._resolve_data_files(table_path)
             if not data_files:
                 self.logger.warning(f"Data file not found for {target_table}")
                 table_stats[target_table] = 0
+                per_table_timings[target_table] = {"rows": 0, "duration_seconds": 0.0, "total_ms": 0}
                 continue
 
             table_start = mono_time()
@@ -349,7 +401,12 @@ class MySqlWireLifecycleMixin:
                         table_rows = 0
                         break
             table_stats[target_table] = table_rows
-            per_table_timings[target_table] = {"rows": table_rows, "duration_seconds": elapsed_seconds(table_start)}
+            table_time = elapsed_seconds(table_start)
+            per_table_timings[target_table] = {
+                "rows": table_rows,
+                "duration_seconds": table_time,
+                "total_ms": table_time * 1000,
+            }
             self.log_verbose(f"Loaded {table_rows:,} rows into {target_table}")
 
         loading_time = elapsed_seconds(start_time)
@@ -367,13 +424,14 @@ class MySqlWireLifecycleMixin:
         connection: Any,
         query: str,
         explain_options: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str | None:
         cursor = connection.cursor()
         try:
             cursor.execute(f"{self._explain_query_prefix(explain_options)} {query}")
             return self._format_query_plan_rows(cursor.fetchall())
         except Exception as exc:
-            return f"Failed to get query plan: {exc}"
+            self.logger.warning(f"Failed to get query plan: {exc}")
+            return None
         finally:
             cursor.close()
 

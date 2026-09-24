@@ -10,6 +10,7 @@
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
+import { barRowLayout, chartFrame } from "@/lib/chartFrame";
 import { PHASE_COLORS } from "@/lib/chartTheme";
 import { formatDurationSeconds } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
@@ -46,7 +47,9 @@ interface Props {
 
 export function StackedPhase({ summary }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  const w = Math.max(containerWidth, 400);
+  const frame = chartFrame(containerWidth);
+  const w = frame.width;
+  const layout = barRowLayout(frame, { labelWidth: LABEL_W, rowHeight: ROW_H, valueTrail: VALUE_TRAIL });
 
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
@@ -93,32 +96,33 @@ export function StackedPhase({ summary }: Props) {
     Object.values(r.phase_durations!).reduce((a, b) => a + b, 0),
   );
   const maxTotal = Math.max(...allTotals, 1);
-  const plotW = w - LABEL_W - VALUE_TRAIL;
-  const totalH = PADDING_TOP + rows.length * ROW_H + AXIS_H;
+  const plotW = layout.plotWidth;
+  const totalH = PADDING_TOP + rows.length * layout.rowHeight + AXIS_H;
 
   return (
-    <div ref={containerRef} class="w-full overflow-x-auto">
+    <div ref={containerRef} class="w-full">
       <svg
         class="bb-chart-svg"
-        width={w}
+        width="100%"
         height={totalH}
+        viewBox={`0 0 ${w} ${totalH}`}
         role="img"
         aria-label="Benchmark phase duration breakdown"
       >
         {rows.map((row, ri) => {
-          const y = PADDING_TOP + ri * ROW_H;
-          const midY = y + ROW_H * 0.5;
+          const y = PADDING_TOP + ri * layout.rowHeight;
+          const midY = y + layout.barCenter;
           const barH = ROW_H * 0.55;
           const pd = row.phase_durations!;
           const total = Object.values(pd).reduce((a, b) => a + b, 0);
 
-          let xOffset = LABEL_W;
+          let xOffset = layout.plotX;
           return (
             <g key={row.result_id}>
               <text
-                x={LABEL_W - 6}
-                y={midY + 4}
-                textAnchor="end"
+                x={layout.labelAbove ? 0 : LABEL_W - 6}
+                y={y + layout.labelBaseline}
+                text-anchor={layout.labelAbove ? "start" : "end"}
                 style={{ fontSize: "11px", fill: "var(--bb-chart-label)" }}
               >
                 <title>{fullLabelByResultId.get(row.result_id) ?? row.platform}</title>
@@ -147,8 +151,9 @@ export function StackedPhase({ summary }: Props) {
               })}
 
               <text
-                x={xOffset + 5}
-                y={midY + 4}
+                x={layout.labelAbove ? w : xOffset + 5}
+                y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
+                text-anchor={layout.labelAbove ? "end" : "start"}
                 style={{ fontSize: "10px", fill: "var(--bb-chart-axis)" }}
               >
                 {formatDurationSeconds(total).valueText}
@@ -157,11 +162,11 @@ export function StackedPhase({ summary }: Props) {
               {ri < rows.length - 1 && (
                 <line
                   x1={0}
-                  y1={y + ROW_H}
-                  x2={w - VALUE_TRAIL}
-                  y2={y + ROW_H}
+                  y1={y + layout.rowHeight}
+                  x2={layout.plotX + plotW}
+                  y2={y + layout.rowHeight}
                   stroke="var(--bb-chart-grid)"
-                  strokeWidth={1}
+                  stroke-width={1}
                 />
               )}
             </g>
@@ -169,12 +174,12 @@ export function StackedPhase({ summary }: Props) {
         })}
 
         <line
-          x1={LABEL_W}
-          y1={PADDING_TOP + rows.length * ROW_H}
-          x2={LABEL_W + plotW}
-          y2={PADDING_TOP + rows.length * ROW_H}
+          x1={layout.plotX}
+          y1={PADDING_TOP + rows.length * layout.rowHeight}
+          x2={layout.plotX + plotW}
+          y2={PADDING_TOP + rows.length * layout.rowHeight}
           stroke="var(--bb-chart-grid)"
-          strokeWidth={1}
+          stroke-width={1}
         />
       </svg>
 

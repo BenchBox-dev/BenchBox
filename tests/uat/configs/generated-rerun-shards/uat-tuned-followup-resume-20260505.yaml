@@ -14,7 +14,7 @@ phases:
 dry_run: false
 
 platforms:
-  include: ["sqlite", "spark", "polars-df", "pandas-df", "modin-df", "pyspark-df", "dask-df", "datafusion-df"]
+  include: ["sqlite", "spark", "polars-df", "pandas-df", "pyspark-df", "dask-df", "datafusion-df"]
 
 benchmarks:
   groups: ["all"]

@@ -86,6 +86,30 @@ def _get_datafusion_type_mapping() -> dict[str, Any]:
     return _DATAFUSION_TYPE_MAPPING
 
 
+# =============================================================================
+# PySpark Python-Type Mapping (module-level for efficiency)
+# =============================================================================
+# Maps plain Python types to Spark types for UnifiedExpr.cast() on PySpark.
+# ``int`` maps to LongType (64-bit) to match Polars (Int64) and DataFusion
+# (Int64): IntegerType would diverge cross-family and overflow under ANSI.
+_PYSPARK_PYTHON_TYPE_MAP: dict[Any, Any] | None = None
+
+
+def _pyspark_python_type(dtype: Any) -> Any:
+    """Get or create the PySpark Python-type mapping (lazy initialization)."""
+    global _PYSPARK_PYTHON_TYPE_MAP
+    if _PYSPARK_PYTHON_TYPE_MAP is None:
+        from pyspark.sql import types as _pyspark_types
+
+        _PYSPARK_PYTHON_TYPE_MAP = {
+            int: _pyspark_types.LongType(),
+            float: _pyspark_types.DoubleType(),
+            str: _pyspark_types.StringType(),
+            bool: _pyspark_types.BooleanType(),
+        }
+    return _PYSPARK_PYTHON_TYPE_MAP[dtype]
+
+
 def _is_pyspark_column(expr: Any) -> bool:
     """Check if an expression is a PySpark Column."""
     type_name = type(expr).__module__
@@ -276,8 +300,10 @@ class UnifiedStrExpr:
 
             return UnifiedListExpr(F.split(self._expr, separator), is_pyspark=True)
         if self._is_datafusion:
-            # string_to_array not in v50 Python bindings; use split_part proxy
-            return _DataFusionSplitListExpr(self._expr, separator)
+            from datafusion import functions as df_f, lit as df_lit
+
+            sep = separator if _is_datafusion_expr(separator) else df_lit(separator)
+            return UnifiedListExpr(df_f.string_to_array(self._expr, sep), is_datafusion=True)
         return UnifiedListExpr(self._expr.str.split(separator), is_polars=True)
 
     def len_chars(self) -> UnifiedExpr:
@@ -295,30 +321,6 @@ class UnifiedStrExpr:
 
             return UnifiedExpr(df_f.character_length(self._expr))
         return UnifiedExpr(self._expr.str.len_chars())
-
-
-class _DataFusionSplitListExpr:
-    """Proxy for DataFusion str.split() that delegates .list.get(n) to split_part.
-
-    DataFusion v50 Python bindings lack string_to_array. This proxy intercepts
-    the .list.get(n) pattern (used by json_extract queries) and translates it
-    to split_part(expr, separator, n+1).
-    """
-
-    def __init__(self, expr: DataFusionExpr, separator: str) -> None:
-        self._expr = expr
-        self._separator = separator
-
-    @property
-    def list(self) -> _DataFusionSplitListExpr:
-        return self
-
-    def get(self, index: int | DataFusionExpr) -> UnifiedExpr:
-        from datafusion import functions as df_f, lit as df_lit
-
-        # split_part is 1-indexed
-        idx = index + 1 if isinstance(index, int) else index
-        return UnifiedExpr(df_f.split_part(self._expr, df_lit(self._separator), df_lit(idx)))
 
 
 class UnifiedListExpr:
@@ -339,24 +341,30 @@ class UnifiedListExpr:
         is_pyspark: bool = False,
         is_datafusion: bool = False,
         is_polars: bool = False,
+        _ordered_collect_descending: bool | None = None,
     ) -> None:
         self._expr = expr
         self._is_pyspark = is_pyspark or _is_pyspark_column(expr)
         self._is_datafusion = is_datafusion or _is_datafusion_expr(expr)
         self._is_polars = is_polars or _is_polars_expr(expr)
+        self._ordered_collect_descending = _ordered_collect_descending
 
     def __call__(self) -> UnifiedExpr:
         """List aggregation - collect values into a list.
 
         Used in .agg() context: col("x").list() -> collect into list.
         - Polars: .implode() (renamed from .list() in newer versions)
-        - PySpark: F.collect_list()
+        - PySpark: F.collect_list(), wrapped in sort_array() when a preceding
+          agg-context .sort() recorded an element order
         - DataFusion: f.array_agg()
         """
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.collect_list(self._expr))
+            collected = F.collect_list(self._expr)
+            if self._ordered_collect_descending is not None:
+                collected = F.sort_array(collected, asc=not self._ordered_collect_descending)
+            return UnifiedExpr(collected, _is_agg_array=True)
         if self._is_datafusion:
             from datafusion import functions as df_f
 
@@ -510,17 +518,28 @@ class UnifiedListExpr:
         """Get element at index from list.
 
         Args:
-            index: Element index (0-based)
+            index: Element index (0-based); a plain int or an expression
+                (UnifiedExpr or backend-native) evaluating to one per row.
         """
+        native_index = index.native if isinstance(index, UnifiedExpr) else index
         if self._is_pyspark:
-            return UnifiedExpr(self._expr.getItem(index))
+            return UnifiedExpr(self._expr.getItem(native_index))
         if self._is_datafusion:
             from datafusion import functions as df_f, lit as df_lit
 
-            # DataFusion array_element is 1-indexed
-            idx = index + 1 if isinstance(index, int) else index
-            return UnifiedExpr(df_f.array_element(self._expr, df_lit(idx)))
-        return UnifiedExpr(self._expr.list.get(index))
+            # DataFusion array_element is 1-indexed: offset plain ints and
+            # per-row index expressions alike from 0-based to 1-based.
+            if isinstance(native_index, int):
+                native_index = df_lit(native_index + 1)
+            else:
+                import pyarrow as pa
+
+                # Cast per-row indices to Int64 first: a UInt64 index (e.g.
+                # from array_length) plus a Python int coerces to Decimal128,
+                # which array_element rejects during planning.
+                native_index = native_index.cast(pa.int64()) + 1
+            return UnifiedExpr(df_f.array_element(self._expr, native_index))
+        return UnifiedExpr(self._expr.list.get(native_index))
 
     def eval(self, expr: Any) -> UnifiedListExpr:
         """Evaluate an expression on each list element (Polars-only).
@@ -547,6 +566,15 @@ class UnifiedListExpr:
         enables the Polars-style .list accessor on list-typed expressions.
         """
         return self
+
+    @property
+    def native(self) -> Any:
+        """Get the underlying backend-native list expression.
+
+        Mirrors UnifiedExpr.native so unaliased list expressions can flow
+        through with_columns/select unwrapping like any other expression.
+        """
+        return self._expr
 
     def alias(self, name: str) -> UnifiedExpr:
         """Alias the list expression.
@@ -645,9 +673,9 @@ class UnifiedDtExpr:
 
             return UnifiedExpr(getattr(F, pyspark_fn_name or part)(self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
-            return UnifiedExpr(df_f.date_part(df_lit(part), self._expr))
+            return UnifiedExpr(df_f.date_part(part, self._expr))
         return UnifiedExpr(getattr(self._expr.dt, part)())
 
     def year(self) -> UnifiedExpr:
@@ -682,10 +710,10 @@ class UnifiedDtExpr:
             # PySpark dayofweek: 1=Sunday..7=Saturday; convert to ISO
             return UnifiedExpr((F.dayofweek(self._expr) + 5) % 7)
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
             # DataFusion dow: 0=Sunday..6=Saturday; convert to ISO
-            return UnifiedExpr((df_f.date_part(df_lit("dow"), self._expr) + 6) % 7)
+            return UnifiedExpr((df_f.date_part("dow", self._expr) + 6) % 7)
         return UnifiedExpr(self._expr.dt.weekday())
 
     def truncate(self, every: str) -> UnifiedExpr:
@@ -705,11 +733,11 @@ class UnifiedDtExpr:
             fmt = fmt_map.get(every, every)
             return UnifiedExpr(F.date_trunc(fmt, self._expr))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
             fmt_map = {"1m": "minute", "1h": "hour", "1d": "day", "1w": "week", "1mo": "month", "1y": "year"}
             fmt = fmt_map.get(every, every)
-            return UnifiedExpr(df_f.date_trunc(df_lit(fmt), self._expr))
+            return UnifiedExpr(df_f.date_trunc(fmt, self._expr))
         return UnifiedExpr(self._expr.dt.truncate(every))
 
     def total_seconds(self) -> UnifiedExpr:
@@ -722,9 +750,9 @@ class UnifiedDtExpr:
             # PySpark durations: cast to long (seconds)
             return UnifiedExpr(self._expr.cast("long"))
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
+            from datafusion import functions as df_f
 
-            return UnifiedExpr(df_f.extract(df_lit("epoch"), self._expr))
+            return UnifiedExpr(df_f.extract("epoch", self._expr))
         return UnifiedExpr(self._expr.dt.total_seconds())
 
     def total_days(self) -> UnifiedExpr:
@@ -742,7 +770,7 @@ class UnifiedDtExpr:
             from datafusion import functions as df_f, lit as df_lit
 
             # Extract epoch seconds and divide by 86400
-            return UnifiedExpr(df_f.extract(df_lit("epoch"), self._expr) / df_lit(86400))
+            return UnifiedExpr(df_f.extract("epoch", self._expr) / df_lit(86400))
         return UnifiedExpr(self._expr.dt.total_days())
 
 
@@ -792,6 +820,8 @@ class UnifiedExpr:
         *,
         _is_string_literal: bool = False,
         _literal_value: Any = _NO_LITERAL_VALUE,
+        _is_agg_array: bool = False,
+        _ordered_collect_descending: bool | None = None,
     ) -> None:
         """Initialize the expression wrapper.
 
@@ -800,6 +830,11 @@ class UnifiedExpr:
             _is_string_literal: Internal flag indicating this is a string literal
                                (used for PySpark string concatenation detection)
             _literal_value: Optional scalar value behind a backend literal expression.
+            _is_agg_array: Marks a PySpark array produced by an aggregation
+                           (collect_list/collect_set), which ``sort()`` sorts
+                           in place instead of recording a collect order.
+            _ordered_collect_descending: Element order recorded by ``sort()``
+                           on a plain PySpark column, honored by ``list()``.
 
         `expr: Any` is the same escape-hatch documented on `.native`: the
         honest type is the union of every backend's expression class plus
@@ -812,6 +847,8 @@ class UnifiedExpr:
         self._is_datafusion = _is_datafusion_expr(expr)
         self._is_string_literal = _is_string_literal
         self._literal_value = _literal_value
+        self._is_agg_array = _is_agg_array
+        self._ordered_collect_descending = _ordered_collect_descending
 
     @property
     def native(self) -> Any:
@@ -1162,8 +1199,17 @@ class UnifiedExpr:
     # =========================================================================
 
     def alias(self, name: str) -> UnifiedExpr:
-        """Rename the expression/column."""
-        return UnifiedExpr(self._expr.alias(name))
+        """Rename the expression/column.
+
+        Aggregation markers (``_is_agg_array`` and the ``sort()`` collect
+        order) travel with the rename so ``col("v").sort().alias("w").list()``
+        keeps the recorded element order instead of silently reverting.
+        """
+        return UnifiedExpr(
+            self._expr.alias(name),
+            _is_agg_array=self._is_agg_array,
+            _ordered_collect_descending=self._ordered_collect_descending,
+        )
 
     # =========================================================================
     # Cast Methods
@@ -1177,12 +1223,20 @@ class UnifiedExpr:
         - PySpark: Accepts PySpark types (IntegerType(), StringType(), etc.)
         - DataFusion: Accepts PyArrow types (pa.int64(), pa.utf8(), etc.)
 
+        The PySpark branch also accepts plain Python types (``int``, ``float``,
+        ``str``, ``bool``), which PySpark's ``Column.cast`` rejects, mapping
+        them to the matching Spark type. ``int`` maps to ``LongType``
+        (64-bit) to match Polars ``Int64`` and DataFusion ``Int64``.
+
         Args:
             dtype: The target data type (platform-specific or common type name)
 
         Returns:
             UnifiedExpr with casted values
         """
+        if self._is_pyspark and dtype in (int, float, str, bool):
+            return UnifiedExpr(self._expr.cast(_pyspark_python_type(dtype)))
+
         if self._is_datafusion:
             import pyarrow as pa
 
@@ -1763,6 +1817,13 @@ class UnifiedExpr:
 
         In Polars agg context: col("x").sort_by("y") sorts x by y within each group.
         In DataFusion: wraps in array_agg with order_by to produce ordered list.
+        In PySpark agg context: collects key/value structs, sorts the array
+        (which orders by the key field first), then projects the values back
+        out, producing an ordered list aggregate. Null-key placement follows
+        Spark (nulls first ascending, last when descending via reverse) rather
+        than Polars' nulls-first default, and unorderable value types (e.g.
+        maps) cannot ride in the sort struct. The result is already an
+        aggregate: chaining ``.list()`` after ``sort_by`` raises on PySpark.
 
         Args:
             column: Column name or expression to sort by
@@ -1778,8 +1839,15 @@ class UnifiedExpr:
                 order_expr = col_name.sort(ascending=not descending)
             return UnifiedExpr(df_f.array_agg(self._expr, order_by=[order_expr]))
         if self._is_pyspark:
-            # PySpark: no direct equivalent in agg context, pass through
-            return UnifiedExpr(self._expr)
+            from pyspark.sql import functions as F  # noqa: N812
+
+            key = column._expr if isinstance(column, UnifiedExpr) else column
+            if isinstance(key, str):
+                key = F.col(key)
+            ordered = F.sort_array(F.collect_list(F.struct(key.alias("__sort_key"), self._expr.alias("__sort_value"))))
+            if descending:
+                ordered = F.reverse(ordered)
+            return UnifiedExpr(F.transform(ordered, lambda entry: entry.getField("__sort_value")), _is_agg_array=True)
         col_name = column._expr if isinstance(column, UnifiedExpr) else column
         return UnifiedExpr(self._expr.sort_by(col_name, descending=descending))
 
@@ -1793,7 +1861,7 @@ class UnifiedExpr:
         if self._is_pyspark:
             from pyspark.sql import functions as F  # noqa: N812
 
-            return UnifiedExpr(F.collect_set(self._expr))
+            return UnifiedExpr(F.collect_set(self._expr), _is_agg_array=True)
         if self._is_datafusion:
             from datafusion import functions as df_f
 
@@ -1804,12 +1872,22 @@ class UnifiedExpr:
         """Sort expression values (used in aggregation context).
 
         In Polars agg context: col("x").sort() sorts collected values.
+        In PySpark agg context: when applied to an already-collected array
+        (e.g. ``col("x").unique().sort()``) this sorts the array; when applied
+        to a plain column (e.g. ``col("x").sort().list()``) it records the
+        requested element order, which ``list()`` honors when collecting.
 
         Args:
             descending: Sort in descending order
         """
-        if self._is_pyspark or self._is_datafusion:
-            # PySpark/DataFusion: no direct agg-context sort, pass through
+        if self._is_pyspark:
+            from pyspark.sql import functions as F  # noqa: N812
+
+            if self._is_agg_array:
+                return UnifiedExpr(F.sort_array(self._expr, asc=not descending), _is_agg_array=True)
+            return UnifiedExpr(self._expr, _ordered_collect_descending=descending)
+        if self._is_datafusion:
+            # DataFusion: no direct agg-context sort, pass through
             return UnifiedExpr(self._expr)
         return UnifiedExpr(self._expr.sort(descending=descending))
 
@@ -1868,6 +1946,7 @@ class UnifiedExpr:
             is_pyspark=self._is_pyspark,
             is_datafusion=self._is_datafusion,
             is_polars=not self._is_pyspark and not self._is_datafusion,
+            _ordered_collect_descending=self._ordered_collect_descending,
         )
 
     @property
@@ -3762,8 +3841,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if len(columns) == 1 and isinstance(columns[0], list):
             columns = tuple(columns[0])
 
-        # Unwrap UnifiedExpr objects
-        unwrapped = [c.native if isinstance(c, UnifiedExpr) else c for c in columns]
+        # Unwrap UnifiedExpr/UnifiedListExpr objects (the latter covers
+        # unaliased list expressions, which expose .native like UnifiedExpr)
+        unwrapped = [c.native if isinstance(c, (UnifiedExpr, UnifiedListExpr)) else c for c in columns]
 
         if _is_datafusion_df(self._df):
             # DataFusion: Check if any expression contains aggregates
@@ -3843,8 +3923,9 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         if len(exprs) == 1 and isinstance(exprs[0], list):
             exprs = tuple(exprs[0])
 
-        # Unwrap UnifiedExpr objects
-        unwrapped = [e.native if isinstance(e, UnifiedExpr) else e for e in exprs]
+        # Unwrap UnifiedExpr/UnifiedListExpr objects (the latter covers
+        # unaliased list expressions, which expose .native like UnifiedExpr)
+        unwrapped = [e.native if isinstance(e, (UnifiedExpr, UnifiedListExpr)) else e for e in exprs]
 
         if _is_pyspark_df(self._df):
             # PySpark: Use withColumn which properly replaces existing columns
@@ -3937,6 +4018,33 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
             result = self._df.mean()
 
         return UnifiedLazyFrame(result, self._adapter)
+
+    def agg(self, *exprs: Expr | list) -> UnifiedLazyFrame:
+        """Global (ungrouped) aggregation over the whole frame.
+
+        A frame-level ``agg`` is exactly a select of aggregate expressions:
+        - Polars: ``select`` with aggregate expressions yields one row.
+        - PySpark: ``select`` with aggregate expressions is a global aggregation.
+        - DataFusion: :meth:`select` routes aggregate expressions to
+          ``aggregate([])``.
+
+        Only plain column aggregates (``sum``/``mean``/``count``/``min``/``max``
+        over a single column) are portable here. Do not combine aggregates with
+        arithmetic inside ``agg``: precompute row-level values with
+        :meth:`with_columns` first, or apply arithmetic to the aggregated
+        columns in a later :meth:`select`.
+
+        Delegating to :meth:`select` keeps one backend-routing implementation
+        instead of a second per-backend branch here.
+
+        Args:
+            *exprs: Aliased aggregate expressions (may be UnifiedExpr).
+                    Also accepts a single list of expressions for convenience.
+
+        Returns:
+            UnifiedLazyFrame with a single row of aggregation results
+        """
+        return self.select(*exprs)
 
     # =========================================================================
     # Unique/Distinct Operations

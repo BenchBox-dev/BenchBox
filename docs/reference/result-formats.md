@@ -47,7 +47,9 @@ benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 
 The JSON export is the canonical schema-v2 result bundle containing complete
 benchmark details. BenchBox currently writes schema version `"2.2"` in the
-top-level `version` field.
+top-level `result_schema_version` field. Readers accept
+`result_schema_version` -> `version` -> `schema_version` in that order, so
+bundles written before the rename keep loading.
 
 Consumer policy is intentionally split by use case:
 
@@ -63,7 +65,7 @@ Consumer policy is intentionally split by use case:
 
 ```json
 {
-  "version": "2.2",
+  "result_schema_version": "2.2",
   "run": {
     "id": "tpch-duckdb-20260521",
     "timestamp": "2026-05-21T14:30:21.123456Z",
@@ -126,7 +128,9 @@ Consumer policy is intentionally split by use case:
 #### Version
 | Field | Type | Description |
 |-------|------|-------------|
-| `version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
+| `result_schema_version` | string | Result bundle schema version. Current producer version is `"2.2"`. |
+| `version` | string | Compatibility alias emitted with `result_schema_version` during the schema-v2 transition; accepted as a fallback when the new key is absent. If both keys are present, they must match. |
+| `schema_version` | string | Oldest key, accepted as a last-resort fallback for pre-rename bundles. |
 
 #### Benchmark Block
 | Field | Type | Description |
@@ -143,12 +147,22 @@ Consumer policy is intentionally split by use case:
 | `version` | string | Platform/driver version |
 | `deployment` | object | Optional normalized deployment metadata |
 | `cloud`, `compute`, `storage` | object | Optional normalized environment facets |
+| `config` | object | Optional adapter configuration flattened out of `platform_info` (e.g. Databricks clustering strategy below) |
+| `tuning` | object | Optional requested-tuning summary (see `platform.tuning`) |
 
 Platform-specific extensions should stay inside the existing schema-v2 blocks
 where possible. Current canonical locations are `platform.*` for platform
 facets and raw platform metadata, `phases.<stage>` for lifecycle-stage
 summaries, and `comparisons.*` for cross-engine comparison data. New top-level
 keys require a public-contract update and consumer tests.
+
+##### `platform.config` (optional)
+
+Adapter configuration recorded per run. The Databricks adapter records its
+resolved clustering strategy here as `databricks_clustering_strategy`:
+`"z_order"`, `"liquid_clustering"`, `"liquid_clustering_auto"`, or `"none"`
+for untuned runs. Bundles predating this field omit it. (`platform.tuning`
+carries the requested-tuning summary and never holds this key.)
 
 ##### `platform.tuning` (optional)
 
@@ -175,6 +189,13 @@ and check constraint settings), `requested.platform_optimizations`
 tuning structure), plus `requested_config_hash`, `tuning_policy_generation`,
 `tuning_source`, and `source_file` (a repo-relative path or
 `"<basename>:<content-hash>"` - never a raw local filesystem path).
+
+The `.plans.json` companion file (same base filename, `.plans.json` suffix)
+carries captured query plans keyed by query id. Tree depth is bounded by the
+run's `plan_max_depth` platform option (default 50): nodes beyond the bound
+are serialized as shallow markers carrying `truncated_at_depth`, and the
+payload top level always records the applied `max_depth` plus a `truncated`
+flag telling consumers whether any node was depth-truncated.
 
 #### Run Block
 | Field | Type | Description |
@@ -224,6 +245,113 @@ duration, counts, and stage-specific metadata.
 | `timing.avg_ms` | number | Average query execution time in milliseconds |
 | `validation` | string or object | Validation result summary |
 | `tpc_metrics` | object | Optional TPC-style metrics such as `power_at_size` |
+
+#### Environment Block
+
+The top-level `environment` block contains execution environment metadata for the BenchBox client runner, including host operating system, architecture, CPU details, and memory. It also supports optional structured subsections for container isolation and client-to-platform connectivity.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `os` | string | Operating system name (e.g., `macOS`, `Linux`, `Windows`) |
+| `arch` | string | Host architecture (e.g., `arm64`, `x86_64`) |
+| `cpu_count` | int | Logical CPU count |
+| `memory_gb` | number | Total system memory in gigabytes |
+| `python` | string | Python interpreter version |
+| `client_host` | object | Normalized client host profile |
+| `platform_runtime` | object | Target platform runtime environment profile |
+| `container` | object | Optional container environment profile |
+| `client_link` | object | Optional client-to-platform locality disclosure and statement overhead probe metrics |
+
+##### `environment.client_link` (optional)
+
+Discloses the client execution location and connectivity characteristics relative to remote and cloud data warehouses. Because client-to-platform distance (such as cross-region network latency or WAN round trips) can dominate small query execution times, `client_link` provides standardized, non-identifying locality metrics without publishing private network identifiers (such as raw IP addresses, hostnames, or ports).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `collection_status` | string | Locality probe lifecycle status: `"available"` (region and probe recorded), `"partial"` (region or probe recorded, but not both), `"unavailable"` (neither recorded), or `"not_requested"` (collection disabled or skipped). |
+| `source` | string | Provenance of client cloud/region metadata: `"observed"` (detected via link-local cloud instance metadata service / IMDS), `"cli_option"` (attested via CLI options `--client-cloud` / `--client-region`), or `"unavailable"`. |
+| `client_region` | string \| null | Cloud region where the BenchBox client runner is executing (e.g., `"us-east-1"`, `"eu-west-2"`). Omitted or `null` when running outside known clouds or unavailable. |
+| `client_cloud` | string \| null | Cloud provider of the client runner (`"aws"`, `"gcp"`, `"azure"`). Omitted or `null` when running outside known clouds or unavailable. |
+| `statement_overhead_ms` | object | Post-benchmark statement round-trip overhead probe against the target platform. Measures baseline client↔platform transaction round-trip latency using repeated lightweight queries (typically 5 `SELECT 1` statements). |
+| `statement_overhead_ms.samples` | int | Number of overhead probe query executions recorded (typically `5`). |
+| `statement_overhead_ms.min` | float | Minimum statement overhead observed across samples, in milliseconds floor. Serves as the transport/driver floor. |
+| `statement_overhead_ms.median` | float | Median statement overhead observed across samples, in milliseconds. |
+| `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
+| `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
+
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design. A published Explorer snapshot must be rebuilt after the v10 upgrade to surface the new `client_*` columns; older snapshots show NULLs for them without failing.
+
+###### Example: Observed Cloud VM Run
+
+An AWS EC2 runner in `us-east-1` executing benchmarks against a cloud data warehouse in the same cloud region:
+
+```json
+{
+  "client_link": {
+    "collection_status": "available",
+    "source": "observed",
+    "client_cloud": "aws",
+    "client_region": "us-east-1",
+    "statement_overhead_ms": {
+      "samples": 5,
+      "min": 1.42,
+      "median": 1.68
+    }
+  }
+}
+```
+
+###### Example: Non-Cloud / Laptop Run
+
+A developer running BenchBox on a local workstation or laptop against a remote database without cloud IMDS:
+
+```json
+{
+  "client_link": {
+    "collection_status": "partial",
+    "source": "unavailable",
+    "client_cloud": null,
+    "client_region": null,
+    "statement_overhead_ms": {
+      "samples": 5,
+      "min": 42.15,
+      "median": 45.80
+    }
+  }
+}
+```
+
+#### Tables Block
+
+The optional top-level `tables` block records per-table load outcomes keyed
+by table name.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tables.{table}.rows` | number | Rows loaded into the table. |
+| `tables.{table}.load_ms` | number | Wall-clock load time for the table in milliseconds. |
+
+Absence of `load_ms` means "not measured" and is always accepted; an
+explicit `load_ms: 0` is a measured zero and stays distinguishable from a
+missing key. Seed-corpus coverage is partial (forward-only rollout), which is
+expected for an additive field. The Explorer read model does not project this
+block yet; it is bundle-level diagnostic data until a read-model decision
+lands.
+
+#### Export Block
+
+The `export` block records how and when the bundle file was written.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | Export time (ISO 8601). |
+| `tool` | string | Exporter name. |
+| `benchbox_version` | string | BenchBox package version that wrote the bundle. Useful as a provenance marker when bundle semantics change across releases. |
+| `anonymized` | boolean | Whether the payload passed the anonymization pass. |
+
+Emitted top-level keys follow `canonical_key_order` in
+`benchbox/core/results/schema_specs.yaml` (starting with
+`result_schema_version`).
 
 ### Query Execution Details
 
@@ -417,9 +545,9 @@ export_ascii(
 ### Current Version: 2.2
 
 Schema v2.2 is the current producer version for BenchBox result bundles. It
-uses top-level `version`, `run`, `benchmark`, `platform`, `summary`, `queries`,
-and optional companion blocks such as `phases`, `environment`,
-`normalized_cost`, `validation`, and `comparisons`.
+uses top-level `result_schema_version`, `run`, `benchmark`, `platform`,
+`summary`, `queries`, and optional companion blocks such as `phases`,
+`environment`, `normalized_cost`, `validation`, and `comparisons`.
 
 Runtime loading and explorer generation intentionally accept only known v2
 minor versions (`"2.0"`, `"2.1"`, and `"2.2"`). The public submission validator accepts
@@ -432,7 +560,7 @@ compatibility path.
 
 | Version | Changes |
 |---------|---------|
-| 2.2 | Added bounded per-query `row_count_validation` evidence |
+| 2.2 | Added bounded per-query `row_count_validation` evidence; top-level version key renamed to `result_schema_version` with `version`/`schema_version` fallback reads |
 | 2.1 | Added typed result and companion metadata used by the previous producer |
 | 2.0 | First schema-v2 bundle contract consumed by loader, submissions, and explorer |
 | 1.x | Legacy shape supported only by normalization helpers |
@@ -597,5 +725,5 @@ print(f'PASS: Power@Size {power}')
 ## Related Documentation
 
 - [Getting Started](../usage/getting-started.md)
-- [Python API](python-api/results.md)
+- [Python API](python-api/results.rst)
 - [Understanding Results](../tutorials/understanding-results.md)

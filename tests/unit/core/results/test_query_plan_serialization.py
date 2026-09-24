@@ -202,6 +202,7 @@ class TestSchemaV2ExportWithPlans:
         payload = build_result_payload(results)
 
         # v2.x schema version
+        assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
         # Should have compact queries array
         assert len(payload["queries"]) == 1
@@ -564,6 +565,7 @@ class TestSchemaV2ExportWithPlans:
 
         # Main payload should have compact queries
         payload = build_result_payload(results)
+        assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
         assert len(payload["queries"]) == 1
         assert payload["queries"][0]["id"] == "01"
@@ -620,6 +622,7 @@ class TestBackwardCompatibility:
         )
 
         payload_no_plans = build_result_payload(results_no_plans)
+        assert payload_no_plans["result_schema_version"] == "2.2"
         assert payload_no_plans["version"] == "2.2"
         plans_payload_none = build_plans_payload(results_no_plans)
         assert plans_payload_none is None
@@ -654,6 +657,7 @@ class TestBackwardCompatibility:
         )
 
         payload_with_plans = build_result_payload(results_with_plans)
+        assert payload_with_plans["result_schema_version"] == "2.2"
         assert payload_with_plans["version"] == "2.2"
         plans_payload = build_plans_payload(results_with_plans)
         assert plans_payload is not None
@@ -784,6 +788,7 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
+        assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
         assert payload["summary"]["queries"]["total"] == 0
         assert payload["summary"]["queries"]["passed"] == 0
@@ -865,6 +870,7 @@ class TestSchemaV2Validation:
 
         payload = build_result_payload(results)
 
+        assert payload["result_schema_version"] == "2.2"
         assert payload["version"] == "2.2"
         assert payload["platform"]["name"] == "duckdb"
         assert payload["platform"]["version"] == "1.0.1"
@@ -910,3 +916,109 @@ class TestSchemaV2Validation:
         assert payload["summary"]["timing"]["avg_ms"] == 200.0
         assert payload["summary"]["timing"]["min_ms"] == 100.0
         assert payload["summary"]["timing"]["max_ms"] == 300.0
+
+
+def _chain_plan(depth: int) -> QueryPlanDAG:
+    """Build a single-chain plan `depth` operators deep for truncation tests."""
+    root = None
+    for level in reversed(range(depth)):
+        root = LogicalOperator(
+            operator_type=LogicalOperatorType.SCAN,
+            operator_id=f"op_{level}",
+            table_name="lineitem",
+            children=[root] if root is not None else [],
+        )
+    assert root is not None
+    return QueryPlanDAG(query_id="q01", platform="duckdb", logical_root=root)
+
+
+def _results_with_plan(plan: QueryPlanDAG, platform_options: dict | None) -> object:
+    run_config = {"platform_options": platform_options} if platform_options is not None else {}
+    return make_benchmark_results(
+        benchmark_id="tpch",
+        benchmark_name="tpch",
+        platform="duckdb",
+        scale_factor=1.0,
+        execution_id="test-depth",
+        timestamp=datetime(2025, 1, 1, 12, 0, 0),
+        duration_seconds=10.0,
+        total_queries=1,
+        successful_queries=1,
+        query_plans_captured=1,
+        execution_metadata={"run_config": run_config},
+        query_results=[
+            {
+                "query_id": "q01",
+                "status": "SUCCESS",
+                "execution_time_ms": 150,
+                "rows_returned": 4,
+                "query_plan": plan,
+                "plan_fingerprint": plan.plan_fingerprint,
+            }
+        ],
+    )
+
+
+class TestCompanionMaxDepth:
+    """The persisted companion honors the run's configured plan_max_depth."""
+
+    def test_companion_truncates_at_configured_depth(self) -> None:
+        import json
+
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, {"plan_max_depth": 1}))
+
+        assert payload is not None
+        entry = payload["queries"]["q01"]
+        assert entry["plan_format"] == "dag"
+        assert "truncated_at_depth" in json.dumps(entry["plan"])
+
+    def test_companion_full_depth_when_unset(self) -> None:
+        import json
+
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, None))
+
+        assert payload is not None
+        entry = payload["queries"]["q01"]
+        assert "truncated_at_depth" not in json.dumps(entry["plan"])
+        leaf = entry["plan"]["logical_root"]["children"][0]["children"][0]
+        assert leaf["operator_id"] == "op_2"
+
+    def test_companion_marks_truncation_at_payload_level(self) -> None:
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, {"plan_max_depth": 1}))
+
+        assert payload is not None
+        assert payload["max_depth"] == 1
+        assert payload["truncated"] is True
+
+    def test_companion_untruncated_payload_level_marker(self) -> None:
+        from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+
+        plan = _chain_plan(3)
+        payload = build_plans_payload(_results_with_plan(plan, None))
+
+        assert payload is not None
+        assert payload["max_depth"] == DEFAULT_PLAN_MAX_DEPTH
+        assert payload["truncated"] is False
+
+    def test_resolve_companion_max_depth_fallbacks(self) -> None:
+        from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+        from benchbox.core.results.schema import _resolve_companion_max_depth
+
+        assert _resolve_companion_max_depth(object()) == DEFAULT_PLAN_MAX_DEPTH
+        assert (
+            _resolve_companion_max_depth(
+                make_benchmark_results(execution_metadata={"run_config": {"platform_options": {"plan_max_depth": 4}}})
+            )
+            == 4
+        )
+        assert (
+            _resolve_companion_max_depth(
+                make_benchmark_results(
+                    execution_metadata={"run_config": {"platform_options": {"plan_max_depth": "deep"}}}
+                )
+            )
+            == DEFAULT_PLAN_MAX_DEPTH
+        )

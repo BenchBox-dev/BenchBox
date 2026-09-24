@@ -4,18 +4,33 @@ BenchBox releases follow a **version-branch flow** on a single repo
 (`BenchBox-dev/BenchBox`) with two long-lived branches: `develop` (dev work)
 and `release` (release-only). This guide is the maintainer runbook.
 
-## The flow (2 commands)
+## The flow
 
 ```bash
-git checkout develop && git pull
+make worktree-create BRANCH=chore/cut-next-release WORKTREE_PATH=../BenchBox.wt-cut-next-release
+cd ../BenchBox.wt-cut-next-release
+make agent-write-preflight
 make release-cut VERSION=X.Y.Z
 # review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z
 ```
 
-That's the entire flow. The two Make targets do the rest. Wheel install,
+Choose an unused version and resolve any existing `vX.Y.Z` branch or tag before
+starting. `release-cut` fetches `origin` and accepts a new cut only from a clean
+linked worktree whose HEAD is exactly the fetched `origin/develop` commit. An
+ahead, behind, or dirty checkout stops before any version file changes. The
+two release Make targets handle the cut and finalization. Wheel install,
 release canary, and correctness remain the blocking gates; UAT is a
 non-blocking matrix campaign.
+
+This flow releases the Python package. It does not publish `benchbox.dev` while independent
+publication owns Pages: the site publishes from `develop` through the candidate build plus
+`github-pages`-approved transaction in `docs/operations/publication-deployer-soak-and-retirement.md`.
+The `docs.yml` release-to-Pages job is a legacy fallback that is skipped while a recent
+independent publication owns Pages. The guard detects ownership through unexpired
+`publication-live-receipt-*` artifacts (live receipts are retained 90 days), so the skip
+guarantee lapses if no publication has run within that window or the receipt artifacts are
+gone; a later package release could then execute the legacy Pages deploy.
 
 ## Pre-merge release-required contract
 
@@ -107,7 +122,8 @@ must not be bypassed with an undocumented local change.
 
 ### What `release-cut` does
 
-1. Cuts a `vX.Y.Z` branch off `develop` (`develop` itself is never modified).
+1. Cuts a `vX.Y.Z` branch from the exact fetched `origin/develop` commit in a
+   linked worktree (`develop` itself is never modified).
 2. Bumps the 6 version sources via `scripts/update_version.py` and generates
    the CHANGELOG entry via `scripts/generate_changelog_entry.py --since-ref
    origin/release`. The release note boundary is the current release branch patch
@@ -162,12 +178,20 @@ untouched — so a section you curated between runs survives. To throw the cut
 away instead:
 
 ```bash
-make release-cut-abort VERSION=X.Y.Z   # reset, return to develop, delete the branch
+make release-cut-abort VERSION=X.Y.Z   # discard tracked edits and restore the creating worktree branch
 ```
 
-`release-cut-abort` refuses once `vX.Y.Z` exists on origin, and refuses to run
-from any branch other than `vX.Y.Z` or `develop`. `release-cut` likewise
-refuses to resume a branch that already carries its `Release vX.Y.Z` commit.
+`release-cut-abort` works in the creating linked worktree, even if the primary
+clone holds `develop`. It returns to the branch recorded when the worktree was
+created and deletes only an uncommitted local release branch. It refuses a
+pushed branch or tag, any local tag, a moved or committed branch, and untracked
+files. Inspect the edits before deliberately discarding them. `release-cut`
+refuses to resume a branch that already carries its `Release vX.Y.Z` commit or
+exists on origin or when a local release tag already exists. It also refuses
+when fetched `origin/develop` has advanced
+past the cut's starting commit. The branch and curated files remain untouched;
+review the new develop commits and preserve any authored changelog text before
+deciding whether to discard the cut and start again.
 
 Changelog summarization shells out to the `claude` CLI. It is skipped
 automatically inside a Claude Code session (where the nested call blocks until
@@ -177,21 +201,39 @@ raw commit subjects, which step 3 requires you to curate anyway.
 
 ### What `release-finalize` does
 
-1. Finds the open release PR for `vX.Y.Z`.
-2. Checks the required PR status list once and refuses to continue unless
+1. Finds the unique open or merged release PR for `vX.Y.Z`.
+2. For an open PR, checks the required PR status list once and refuses to continue unless
    both `validate-base` and `release-required-result` are present and green.
    Missing means the ruleset/workflow contract is broken; pending means wait
    in GitHub Actions and rerun the command. `release-finalize` does not poll.
-3. Squash-merges the PR. (Ruleset `release-only` also blocks the merge
-   unless `validate-base` and `release-required-result` are green.)
-4. Fast-forwards `release` and tags `vX.Y.Z`.
-5. Pushes the tag — which fires `.github/workflows/release.yml`:
+3. Rechecks the PR head and squash-merges with that expected SHA. A concurrent
+   head change fails before merge. The `release-only` ruleset also requires the
+   two green contexts.
+4. Confirms the PR is `MERGED` with `mergedAt` and a merge commit, fetches
+   `origin/release` and tags, then checks that the merge commit is on `release`.
+   It creates or verifies `vX.Y.Z` at that exact commit without checking out a
+   local `release` branch. A mismatched local or remote tag stops finalization.
+5. Pushes an absent remote tag — which fires `.github/workflows/release.yml`:
    `dependency-bounds` → `build` (with `SOURCE_DATE_EPOCH` from the tag
    commit) → `publish` (PyPI trusted publisher) → `github-release` →
    `test-installation` (cross-platform pip install verification).
+   The GitHub Release step extracts a non-empty, curated changelog section and
+   creates or updates the release idempotently, including its attached build
+   artifacts.
 6. Leaves `develop` untouched. Dev-only paths persist on develop by
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
+
+**Resuming finalization.** Run `make release-finalize VERSION=X.Y.Z` again after
+an interrupted merge, tag creation, or tag push. If the PR is still open, its
+current exact head must pass the required checks before merge. If it is merged,
+the command resumes from the recorded merge commit and does not merge again. A
+matching local tag is pushed; a matching remote tag is accepted as already
+pushed. A mismatched tag, closed unmerged PR, missing merge commit, or merge
+commit not on fetched `release` requires investigation and is never retagged
+or force-pushed. If the tag is already pushed and `release.yml` is pending or
+failed, inspect that workflow and the PyPI/GitHub artifacts separately; a
+successful finalize command alone does not prove package publication.
 
 **Syncing `develop`'s version.** `release-cut`/`release-finalize` never modify
 `develop` (step 6), so its declared version does not track releases on its own —
@@ -203,6 +245,25 @@ then PR back to `develop`. This realigns all six version sources
 (`benchbox/__init__.py`, `pyproject.toml`, the three `Current release:` doc
 markers, and the `landing/index.html` badge) with the latest published release,
 so `develop` no longer trails PyPI.
+
+After the synchronization PR is prepared, verify it against PyPI's live
+publication state rather than assuming the newest git tag was published:
+
+```bash
+uv run -- python scripts/generate_changelog_entry.py --check-release-accounting
+```
+
+If an existing GitHub Release has missing or generic notes, replace only its
+body from the validated changelog section. This command is idempotent and
+refuses empty, placeholder, or raw commit-subject notes:
+
+```bash
+uv run -- python scripts/generate_changelog_entry.py \
+  --version X.Y.Z --sync-github-release-notes
+```
+
+The notes-only recovery does not retag, republish to PyPI, or replace release
+assets.
 
 Push-to-release jobs are post-merge signals. They may still start when `release`
 advances, but they are not pre-publish evidence: the tag push follows the
@@ -276,7 +337,9 @@ The forward-fix path uses the same flow as any other release — there is no
 separate recovery procedure:
 
 ```bash
-git checkout develop && git pull
+make worktree-create BRANCH=chore/cut-patch-release WORKTREE_PATH=../BenchBox.wt-cut-patch-release
+cd ../BenchBox.wt-cut-patch-release
+make agent-write-preflight
 make release-cut VERSION=X.Y.Z
 # review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z

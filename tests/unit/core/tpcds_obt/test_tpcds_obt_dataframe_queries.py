@@ -55,6 +55,13 @@ def _sample_polars() -> pl.LazyFrame:
             "channel": ["store", "web", "store", "catalog"],
             "has_return": ["N", "Y", "Y", "N"],
             "return_amount": [0.0, 12.5, 7.5, 0.0],
+            "item_sk": [1, 2, 1, 3],
+            "quantity": [2, 1, 3, 1],
+            "ext_discount_amt": [1.0, 0.0, 0.5, 0.0],
+            "coupon_amt": [0.0, 2.0, 0.0, 0.0],
+            "net_paid": [19.0, 18.0, 29.5, 15.0],
+            "net_paid_inc_tax": [20.9, 19.8, 32.45, 16.5],
+            "net_profit": [5.0, 6.0, 8.0, 4.0],
         }
     ).lazy()
 
@@ -66,17 +73,52 @@ def _sample_pandas() -> pd.DataFrame:
             "channel": ["store", "web", "store", "catalog"],
             "has_return": ["N", "Y", "Y", "N"],
             "return_amount": [0.0, 12.5, 7.5, 0.0],
+            "item_sk": [1, 2, 1, 3],
+            "quantity": [2, 1, 3, 1],
+            "ext_discount_amt": [1.0, 0.0, 0.5, 0.0],
+            "coupon_amt": [0.0, 2.0, 0.0, 0.0],
+            "net_paid": [19.0, 18.0, 29.5, 15.0],
+            "net_paid_inc_tax": [20.9, 19.8, 32.45, 16.5],
+            "net_profit": [5.0, 6.0, 8.0, 4.0],
         }
     )
 
 
-def test_registry_exposes_three_queries() -> None:
+def test_registry_exposes_seventeen_queries() -> None:
     from benchbox.core.tpcds_obt.dataframe_queries import REGISTRY
 
-    assert REGISTRY.get("Q1") is not None
-    assert REGISTRY.get("Q2") is not None
-    assert REGISTRY.get("Q3") is not None
-    assert len(REGISTRY.get_query_ids()) == 3
+    for query_id in [f"Q{i}" for i in range(1, 18)]:
+        assert REGISTRY.get(query_id) is not None, f"{query_id} missing from registry"
+    assert len(REGISTRY.get_query_ids()) == 17
+
+
+def test_malformed_specs_fail_at_import() -> None:
+    from benchbox.core.tpcds_obt.dataframe_queries import _ObtQuerySpec
+
+    base = {
+        "query_id": "QX",
+        "query_name": "bad",
+        "description": "bad",
+        "categories": (),
+        "sql_equivalent": "SELECT 1",
+    }
+    with pytest.raises(ValueError, match="Unknown aggregation func"):
+        _ObtQuerySpec(aggregations=(("a", "b", "nope"),), **base)
+    with pytest.raises(ValueError, match="Unknown filter op"):
+        _ObtQuerySpec(filters=(("a", ">>", 1),), **base)
+    with pytest.raises(ValueError, match="must match sort_keys"):
+        _ObtQuerySpec(sort_keys=("a",), descending=(True, False), **base)
+    with pytest.raises(ValueError, match="limit must be"):
+        _ObtQuerySpec(limit=-1, **base)
+
+
+def test_q5_carries_deterministic_tiebreaker() -> None:
+    from benchbox.core.tpcds_obt.dataframe_queries import _QUERY_SPECS
+
+    q5 = next(spec for spec in _QUERY_SPECS if spec.query_id == "Q5")
+    assert q5.sort_keys == ("total_quantity", "item_sk")
+    assert q5.descending == (True, False)
+    assert "item_sk ASC" in q5.sql_equivalent
 
 
 def test_query_outputs_match_between_families() -> None:
@@ -111,3 +153,30 @@ def test_query_outputs_match_sql_reference() -> None:
         sql_result = conn.execute(query.sql_equivalent).fetchdf().sort_index(axis=1).reset_index(drop=True)
         assert list(pandas_result.columns) == list(sql_result.columns)
         assert len(pandas_result) == len(sql_result)
+        # Values, not just shapes: proves the COALESCE contract and catches
+        # wrong aliases/columns/aggregates in the specs.
+        left = pandas_result.sort_values(by=list(pandas_result.columns)).reset_index(drop=True)
+        right = sql_result.sort_values(by=list(sql_result.columns)).reset_index(drop=True)
+        pd.testing.assert_frame_equal(left, right, check_dtype=False, check_exact=False, rtol=1e-9, atol=1e-9)
+
+
+@pytest.mark.skipif(not DUCKDB_AVAILABLE, reason="duckdb not installed")
+def test_empty_filter_reports_zero_not_null() -> None:
+    """The Q10/Q15/Q16 COALESCE claim: empty sets report 0.0, matching SQL."""
+    from benchbox.core.tpcds_obt.dataframe_queries import REGISTRY
+
+    sample = _sample_pandas()
+    empty = sample[sample["net_paid"] < 0]
+    assert empty.empty
+    conn = duckdb.connect(database=":memory:")
+    conn.register("tpcds_sales_returns_obt", empty)
+    pandas_ctx = PandasDataFrameAdapter().create_context()
+    pandas_ctx.register_table("tpcds_sales_returns_obt", empty)
+
+    for query_id in ("Q10", "Q15", "Q16"):
+        query = REGISTRY.get(query_id)
+        assert query is not None
+        pandas_result = _to_pandas(query.pandas_impl(pandas_ctx)).reset_index(drop=True)
+        sql_result = conn.execute(query.sql_equivalent).fetchdf().reset_index(drop=True)
+        assert len(pandas_result) == len(sql_result) == 1
+        pd.testing.assert_frame_equal(pandas_result, sql_result, check_dtype=False, check_exact=False)

@@ -1,11 +1,19 @@
 resource_usage_schema:
   snowflake:
-    required:
-    - credits_used
+    required: []
     optional:
+    - credits_used
+    - credits_used_cloud_services
     - bytes_scanned
+    - execution_time_seconds
     - execution_time_ms
+    - total_elapsed_time_ms
     - warehouse_size
+    requires_one_of:
+    - credits_used
+    - execution_time_seconds
+    - execution_time_ms
+    - total_elapsed_time_ms
   bigquery:
     required: []
     optional:
@@ -197,3 +205,31 @@ platform_config_requirements:
     - cluster_size_dbu_per_hour
     optional:
     - warehouse_size
+  databricks-df:
+    required:
+    - cloud
+    - tier
+    - workload_type
+    - cluster_size_dbu_per_hour
+    optional:
+    - warehouse_size
+  athena:
+    required:
+    - region
+    optional: []
+  synapse:
+    required:
+    - mode
+    - region
+    optional:
+    - dwu_level
+  fabric_dw:
+    required:
+    - region
+    - sku
+    optional: []
+  firebolt:
+    required:
+    - node_type
+    - node_count
+    optional: []

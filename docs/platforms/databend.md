@@ -63,19 +63,19 @@ benchbox run --platform databend --benchmark tpch --scale 0.01 \
     --platform-option dsn=databend+http://benchbox:benchbox@localhost:8000/benchbox?sslmode=disable
 ```
 
-## Configuration Options
+## Platform Options
 
-| Option | CLI Argument | Environment Variable | Default | Description |
-|--------|-------------|---------------------|---------|-------------|
-| `host` | `--host` | `DATABEND_HOST` | - | Databend host (required unless DSN is set) |
-| `port` | `--port` | `DATABEND_PORT` | `443` (SSL) / `8000` (no SSL) | Connection port |
-| `username` | `--username` | `DATABEND_USER` | `benchbox` | Database username |
-| `password` | `--password` | `DATABEND_PASSWORD` | - | Database password |
-| `database` | `--database` | `DATABEND_DATABASE` | `benchbox` | Target database name |
-| `dsn` | `--dsn` | `DATABEND_DSN` | - | Full DSN string (overrides individual params) |
-| `warehouse` | `--warehouse` | `DATABEND_WAREHOUSE` | - | Databend Cloud warehouse name |
-| `ssl` | `--databend-no-ssl` | - | `true` | SSL/TLS for connections (disable with flag) |
-| `disable_result_cache` | `--disable-result-cache` | - | `true` | Disable query result cache for benchmarking |
+| Option | Environment Variable | Default | Description |
+|--------|---------------------|---------|-------------|
+| `host` | `DATABEND_HOST` | - | Databend host (required unless DSN is set) |
+| `port` | `DATABEND_PORT` | `443` (SSL) / `8000` (no SSL) | Connection port |
+| `username` | `DATABEND_USER` | `benchbox` | Database username |
+| `password` | `DATABEND_PASSWORD` | - | Database password |
+| `database` | `DATABEND_DATABASE` | `benchbox` | Target database name |
+| `dsn` | `DATABEND_DSN` | - | Full DSN string (overrides individual params) |
+| `warehouse` | `DATABEND_WAREHOUSE` | - | Databend Cloud warehouse name |
+| `ssl` | - | `true` | SSL/TLS for connections (set `ssl=false` to disable) |
+| `disable_result_cache` | - | `true` | Disable query result cache for benchmarking |
 
 ### DSN Format
 
@@ -302,7 +302,7 @@ Error: SSL handshake failed
 ```
 
 **Solutions:**
-1. For self-hosted without TLS: `--platform-option ssl=false` or use `--databend-no-ssl`
+1. For self-hosted without TLS: `--platform-option ssl=false`
 2. For cloud: SSL is required; verify certificate chain
 3. Check that the port matches the SSL setting (443 for SSL, 8000 for non-SSL)
 
@@ -341,6 +341,6 @@ Warning: Query results may be cached
 
 - [Platform Comparison Matrix](comparison-matrix.md) - Compare all platforms
 - [Platform Selection Guide](platform-selection-guide.md) - Choosing the right platform
-- [TPC-H Benchmark](../benchmarks/tpch.md) - TPC-H benchmark guide
-- [TPC-DS Benchmark](../benchmarks/tpcds.md) - TPC-DS benchmark guide
+- [TPC-H Benchmark](../benchmarks/tpc-h.md) - TPC-H benchmark guide
+- [TPC-DS Benchmark](../benchmarks/tpc-ds.md) - TPC-DS benchmark guide
 - [Deployment Modes Guide](deployment-modes.md) - Platform deployment architecture

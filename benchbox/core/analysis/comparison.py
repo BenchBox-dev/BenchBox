@@ -33,6 +33,7 @@ from benchbox.core.analysis.statistics import (
     detect_outliers_iqr,
     welchs_t_test,
 )
+from benchbox.core.cost.models import published_total_cost
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.query_execution import (
     DURATION_CONSISTENCY_TOLERANCE_MS,
@@ -690,20 +691,21 @@ class PlatformComparison:
         query_counts = {}
 
         for result in self.results:
-            if result.cost_summary and "total_cost" in result.cost_summary:
-                total_cost = result.cost_summary["total_cost"]
-                if total_cost > 0:
-                    cost_data[result.platform] = total_cost
-                    query_counts[result.platform] = result.total_queries
+            # Unavailable-status runs contribute no ranking or savings
+            # figure: a fallback-priced number must not order platforms.
+            total_cost = published_total_cost(result.cost_summary)
+            if total_cost is not None and total_cost > 0:
+                cost_data[result.platform] = total_cost
+                query_counts[result.platform] = result.total_queries
 
-                    # Calculate queries per second
-                    # BenchmarkResults stores aggregate execution time in seconds
-                    # (both the lifecycle builder and the v2 loader use that unit).
-                    total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
-                    qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
+                # Calculate queries per second
+                # BenchmarkResults stores aggregate execution time in seconds
+                # (both the lifecycle builder and the v2 loader use that unit).
+                total_time_sec = result.total_execution_time if result.total_execution_time else 1.0
+                qps = result.total_queries / total_time_sec if total_time_sec > 0 else 0
 
-                    # Performance per dollar (QPS / cost)
-                    perf_data[result.platform] = qps / total_cost if total_cost > 0 else 0
+                # Performance per dollar (QPS / cost)
+                perf_data[result.platform] = qps / total_cost if total_cost > 0 else 0
 
         if not cost_data:
             return None
@@ -915,16 +917,23 @@ def _dict_to_benchmark_results(data: dict[str, Any]) -> BenchmarkResults:
         BenchmarkResults instance
 
     Raises:
-        ValueError: If schema version is not v2.0
+        ValueError: If schema version is not supported for comparison.
     """
     from benchbox.core.results.loader import reconstruct_benchmark_results
+    from benchbox.core.results.schema_policy import is_loader_supported_result_schema, result_schema_version_value
 
     # Validate schema version
-    version = data.get("version")
-    if version != "2.0":
-        raise ValueError(f"Unsupported schema version: {version}. Only schema v2.0 is supported for comparison.")
+    version = result_schema_version_value(data)
+    if not is_loader_supported_result_schema(data):
+        raise ValueError(f"Unsupported schema version: {version}. Only schema v2 is supported for comparison.")
 
     return reconstruct_benchmark_results(data)
+
+
+def _is_comparable(execution) -> bool:
+    # Older in-memory results omit status; retain those rows for backwards
+    # compatibility while excluding explicitly failed or skipped work.
+    return execution.status in {"SUCCESS", "UNKNOWN"}
 
 
 def _extract_query_ids(result: BenchmarkResults) -> list[str]:
@@ -938,21 +947,16 @@ def _extract_query_ids(result: BenchmarkResults) -> list[str]:
     """
     query_ids = set()
 
-    def is_comparable(execution) -> bool:
-        # Older in-memory results omit status; retain those rows for backwards
-        # compatibility while excluding explicitly failed or skipped work.
-        return execution.status in {"SUCCESS", "UNKNOWN"}
-
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
-        if execution.query_id and is_comparable(execution):
+        if execution.query_id and _is_comparable(execution):
             query_ids.add(execution.query_id)
 
     # From per_query_timings
     for timing in result.per_query_timings or []:
         execution = query_execution_from_legacy_dict(timing)
-        if execution.query_id and is_comparable(execution):
+        if execution.query_id and _is_comparable(execution):
             query_ids.add(execution.query_id)
 
     return sorted(query_ids)
@@ -999,17 +1003,12 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
     """
     samples: dict[str, list[float]] = {}
 
-    def is_comparable(execution) -> bool:
-        # Older in-memory results omit status; retain those rows for backwards
-        # compatibility while excluding explicitly failed or skipped work.
-        return execution.status in {"SUCCESS", "UNKNOWN"}
-
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
         query_id = execution.query_id
         time_ms = execution.execution_time_ms
-        if query_id and is_comparable(execution) and time_ms is not None:
+        if query_id and _is_comparable(execution) and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
     # From per_query_timings (may have multiple runs)
@@ -1017,7 +1016,7 @@ def _extract_query_times(result: BenchmarkResults) -> dict[str, float]:
         execution = query_execution_from_legacy_dict(timing)
         query_id = execution.query_id
         time_ms = execution.execution_time_ms
-        if query_id and is_comparable(execution) and time_ms is not None:
+        if query_id and _is_comparable(execution) and time_ms is not None:
             samples.setdefault(query_id, []).append(time_ms)
 
     return {query_id: sum(query_samples) / len(query_samples) for query_id, query_samples in samples.items()}
@@ -1040,15 +1039,10 @@ def _get_query_times_for_query(
     """
     times = []
 
-    def is_comparable(execution) -> bool:
-        # Older in-memory results omit status; retain those rows for backwards
-        # compatibility while excluding explicitly failed or skipped work.
-        return execution.status in {"SUCCESS", "UNKNOWN"}
-
     # From query_results
     for qr in result.query_results or []:
         execution = query_execution_from_legacy_dict(qr)
-        if execution.query_id == query_id and is_comparable(execution):
+        if execution.query_id == query_id and _is_comparable(execution):
             time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)
@@ -1056,7 +1050,7 @@ def _get_query_times_for_query(
     # From per_query_timings
     for timing in result.per_query_timings or []:
         execution = query_execution_from_legacy_dict(timing)
-        if execution.query_id == query_id and is_comparable(execution):
+        if execution.query_id == query_id and _is_comparable(execution):
             time_ms = execution.execution_time_ms
             if time_ms is not None:
                 times.append(time_ms)

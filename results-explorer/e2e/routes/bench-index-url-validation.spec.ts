@@ -15,7 +15,7 @@ test.describe("BenchmarkIndex URL validation", () => {
       .poll(() => searchParam(page.url(), "phase"), { timeout: 20_000 })
       .toBe("standard");
 
-    await expect(page.getByRole("grid", { name: /tpch SF0\.01 standard results/i })).toBeVisible();
+    await expect(page.getByRole("table", { name: /tpch SF0\.01 standard results/i })).toBeVisible();
     await expect(page.getByText(/No benchmark data available/i)).not.toBeVisible();
   });
 
@@ -28,7 +28,7 @@ test.describe("BenchmarkIndex URL validation", () => {
       .poll(() => searchParam(page.url(), "sf"), { timeout: 20_000 })
       .toBe("0.01");
 
-    await expect(page.getByRole("grid", { name: /tpch SF0\.01 standard results/i })).toBeVisible();
+    await expect(page.getByRole("table", { name: /tpch SF0\.01 standard results/i })).toBeVisible();
     await expect(page.getByText(/No benchmark data available/i)).not.toBeVisible();
   });
 });

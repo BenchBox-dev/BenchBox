@@ -374,8 +374,9 @@ Query Plans and Optimization
 
     print(f"This query will process {query_job.total_bytes_processed:,} bytes")
 
-    # Estimated cost: $5 per TB processed
-    cost_per_tb = 5.0
+    # On-demand rate varies by location; US/EU/Asia multi-region is $6.25/TiB.
+    # See benchbox/core/cost/pricing_data.yaml for all locations.
+    cost_per_tb = 6.25
     estimated_cost = (query_job.total_bytes_processed / 1024**4) * cost_per_tb
     print(f"Estimated cost: ${estimated_cost:.4f}")
 

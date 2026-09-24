@@ -147,7 +147,7 @@ def _get_recommended_max_scale(memory_gb: float, benchmark: str = "tpch") -> flo
     Different benchmarks have vastly different memory requirements:
     - TPC-H: ~1GB per SF=1.0
     - TPC-DS: ~7-10GB per SF=1.0 (due to larger schema, more complex queries)
-    - ClickBench: ~1GB for full dataset
+    - ClickBench: ~1GB per SF=1.0 synthetic dataset
     - SSB: ~0.5GB per SF=1.0
 
     Args:
@@ -163,9 +163,6 @@ def _get_recommended_max_scale(memory_gb: float, benchmark: str = "tpch") -> flo
     if benchmark_lower == "tpcds":
         # TPC-DS uses 7-10x more memory than TPC-H at same scale
         memory_gb = memory_gb / 8.0  # Conservative multiplier
-    elif benchmark_lower == "clickbench":
-        # ClickBench doesn't use scale factors, return 1.0
-        return 1.0
     elif benchmark_lower == "ssb":
         # SSB uses less memory than TPC-H
         memory_gb = memory_gb * 1.5

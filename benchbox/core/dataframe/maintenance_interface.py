@@ -69,6 +69,10 @@ class MaintenanceOperationType(Enum):
     BULK_INSERT = "bulk_insert"  # Large batch insert
     BULK_DELETE = "bulk_delete"  # Partition-based delete
 
+    # Table-format optimization operations (lakehouse tables only)
+    OPTIMIZE = "optimize"  # Compaction / clustering (Delta, Hudi)
+    VACUUM = "vacuum"  # Reclaim stale files and snapshots (Delta, Iceberg, Hudi)
+
 
 class TransactionIsolation(Enum):
     """Transaction isolation levels for maintenance operations."""
@@ -99,8 +103,14 @@ class DataFrameMaintenanceCapabilities:
         supports_partitioned_delete: Can delete entire partitions efficiently
         supports_row_level_delete: Can delete individual rows
         supports_time_travel: Can query historical versions
+        supports_optimize: Can compact/cluster files (lakehouse tables)
+        supports_vacuum: Can reclaim stale files and snapshots
         max_batch_size: Recommended maximum rows per operation
         notes: Additional platform-specific notes
+        accepts_sql_predicates: Can consume backend-rendered SQL predicate
+            strings and SQL-rendered update values. False when the adapter
+            only parses a narrow predicate subset and needs native
+            predicate/value operands instead.
     """
 
     platform_name: str
@@ -113,8 +123,11 @@ class DataFrameMaintenanceCapabilities:
     supports_partitioned_delete: bool = False  # File-level deletion
     supports_row_level_delete: bool = False  # Row-level deletion
     supports_time_travel: bool = False
+    supports_optimize: bool = False  # File compaction/clustering needs table-format support
+    supports_vacuum: bool = False  # Stale-file reclamation needs table-format support
     max_batch_size: int = 100000
     notes: str = ""
+    accepts_sql_predicates: bool = True
 
     def supports_operation(self, operation: MaintenanceOperationType) -> bool:
         """Check if a specific operation type is supported.
@@ -132,6 +145,8 @@ class DataFrameMaintenanceCapabilities:
             MaintenanceOperationType.MERGE: self.supports_merge,
             MaintenanceOperationType.BULK_INSERT: self.supports_insert,
             MaintenanceOperationType.BULK_DELETE: self.supports_partitioned_delete,
+            MaintenanceOperationType.OPTIMIZE: self.supports_optimize,
+            MaintenanceOperationType.VACUUM: self.supports_vacuum,
         }
         return mapping.get(operation, False)
 
@@ -171,6 +186,8 @@ DELTA_LAKE_CAPABILITIES = DataFrameMaintenanceCapabilities(
     supports_partitioned_delete=True,
     supports_row_level_delete=True,
     supports_time_travel=True,
+    supports_optimize=True,  # OPTIMIZE / Z-ORDER via delta-rs
+    supports_vacuum=True,  # VACUUM via delta-rs
     max_batch_size=1000000,
     notes="Full ACID compliance via Delta Lake protocol",
 )
@@ -186,8 +203,13 @@ ICEBERG_CAPABILITIES = DataFrameMaintenanceCapabilities(
     supports_partitioned_delete=True,
     supports_row_level_delete=True,
     supports_time_travel=True,
+    supports_optimize=False,  # pyiceberg has no binpack rewrite; use Spark rewrite_data_files
+    supports_vacuum=True,  # Snapshot expiration plus orphan-file reclamation on local tables
     max_batch_size=1000000,
     notes="Full ACID compliance via Apache Iceberg",
+    # The Iceberg condition parser handles single unquoted comparisons only;
+    # callers must pass native predicate/value operands instead of SQL text.
+    accepts_sql_predicates=False,
 )
 
 HUDI_CAPABILITIES = DataFrameMaintenanceCapabilities(
@@ -201,6 +223,8 @@ HUDI_CAPABILITIES = DataFrameMaintenanceCapabilities(
     supports_partitioned_delete=True,
     supports_row_level_delete=True,
     supports_time_travel=True,
+    supports_optimize=True,  # run_compaction / run_clustering procedures via Spark SQL
+    supports_vacuum=True,  # run_clean procedure via Spark SQL
     max_batch_size=1000000,
     notes=(
         "Full ACID compliance via Apache Hudi. Requires PySpark with hudi-spark-bundle. "
@@ -423,6 +447,91 @@ class DataFrameMaintenanceOperations(Protocol):
 
         Raises:
             NotImplementedError: If MERGE is not supported
+        """
+        ...
+
+
+@runtime_checkable
+class TableFormatOptimizationOperations(Protocol):
+    """Protocol for lakehouse compaction, optimization, and vacuum operations.
+
+    This is intentionally separate from DataFrameMaintenanceOperations: only
+    table-format backends (Delta Lake, Iceberg, Hudi) can implement it, and
+    file-based engines must never be forced to absorb it. Implementations
+    return standardized MaintenanceResult values with operation_type
+    OPTIMIZE or VACUUM, raise NotImplementedError for unsupported strategies,
+    and return MaintenanceResult.failure for execution errors.
+
+    Per-format native support:
+    - Delta Lake: OPTIMIZE (compact, z_order) and VACUUM via delta-rs,
+      including dry-run vacuum.
+    - Iceberg: VACUUM as snapshot expiration
+      (table.maintenance.expire_snapshots); OPTIMIZE is not implemented
+      because pyiceberg has no binpack rewrite — use Spark
+      rewrite_data_files for file layout work.
+    - Hudi: OPTIMIZE as run_compaction / run_clustering and VACUUM as
+      run_clean, executed as Spark SQL CALL procedures on the operation's
+      session. run_clean has no dry-run mode, so dry_run=True raises
+      NotImplementedError there.
+    """
+
+    def optimize_table(
+        self,
+        table_path: Path | str,
+        *,
+        strategy: str = "compact",
+        columns: list[str] | None = None,
+        partition_filter: Any | None = None,
+    ) -> MaintenanceResult:
+        """Compact or cluster a table's files.
+
+        Args:
+            table_path: Path to the table/directory, or catalog identifier
+            strategy: "compact" (binpack small files; Delta, Hudi MOR) or
+                "cluster" (locality ordering; Delta z_order, Hudi clustering).
+                "z_order" is accepted as an alias of "cluster" on Delta.
+            columns: Ordering columns for the "cluster"/"z_order" strategy
+                (required there, ignored by "compact")
+            partition_filter: Backend-native partition predicate scoping the
+                operation (None = whole table)
+
+        Returns:
+            MaintenanceResult with operation outcome; native file metrics
+            (files added/removed) are carried in metrics and folded into
+            rows_affected as documented by each implementation.
+
+        Raises:
+            NotImplementedError: If the strategy is unknown or unsupported
+        """
+        ...
+
+    def vacuum_table(
+        self,
+        table_path: Path | str,
+        *,
+        retention_hours: int | None = None,
+        dry_run: bool = True,
+        enforce_retention: bool = True,
+    ) -> MaintenanceResult:
+        """Reclaim stale files and snapshots subject to a retention floor.
+
+        Args:
+            table_path: Path to the table/directory, or catalog identifier
+            retention_hours: Minimum age of data eligible for reclamation
+                (None = backend default)
+            dry_run: Report reclaimable state without deleting anything.
+                Backends whose native vacuum has no dry-run mode (Hudi
+                run_clean) raise NotImplementedError when True.
+            enforce_retention: Refuse retentions below the backend safety
+                floor instead of deleting recent history (Delta enforces a
+                168-hour floor unless this is False)
+
+        Returns:
+            MaintenanceResult with operation outcome; reclaimed (or, for a
+            dry run, reclaimable) paths are carried in metrics.
+
+        Raises:
+            NotImplementedError: If dry-run is requested where unsupported
         """
         ...
 

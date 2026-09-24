@@ -41,7 +41,7 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from ..utils.file_format import get_data_extension
-from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
+from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin, StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -126,9 +126,19 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """
 
     plan_capture_phase_eligible = True
+    default_service_port = 8812
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)
+    # QuestDB is a server engine over the PG wire protocol: one psycopg
+    # connection is one session, so streams need independent connections
+    # (QuestDBAdapter is NOT a PostgreSQLAdapter subclass, so this needs its
+    # own override below - the manifest sweep fails the build otherwise).
+    # Connection params come from QuestDB._get_connection_params, autocommit
+    # is restored inline by the override (required over the PG wire), and
+    # tuning by QuestDB.configure_for_benchmark (cairo parallel-filter
+    # SETs). See StreamConnectionCapability dimensions.
+    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:
@@ -333,6 +343,40 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         )
         return conn
 
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        """Open an independent QuestDB connection for one throughput stream.
+
+        QuestDB carries server-side session state on each PG-wire connection
+        and requires autocommit mode, so streams must not share the setup
+        connection's cursors. One-time setup (nothing beyond connecting for
+        QuestDB's single-database instance) is not repeated here; the stream
+        session reproduces the setup session directly: autocommit is restored
+        inline (dimension 3 - a vanilla psycopg connection defaults it off,
+        which would leave every stream transacted while the setup session
+        runs autocommitted) and ``configure_for_benchmark`` reapplies the
+        parallel-filter tuning (dimension 4). The caller closes the returned
+        connection in the stream's own ``finally`` block (dimension 6).
+        """
+        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        params = self._get_connection_params()
+        conn = psycopg.connect(**params)
+        try:
+            conn.autocommit = True
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
+            finally:
+                cursor.close()
+            # Replay only when the caller supplies benchmark_type (the
+            # throughput drivers always do); other callers keep theirs.
+            if benchmark_type is not None:
+                self.configure_for_benchmark(conn, benchmark_type)
+            return conn
+        except Exception:
+            conn.close()
+            raise
+
     def check_benchmark_tables_exist(self, **connection_config) -> bool | None:
         """Validate that required benchmark tables exist and are non-empty.
 
@@ -441,7 +485,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
         # Get schema SQL and translate to PostgreSQL dialect
-        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="duckdb")
+        schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
@@ -454,7 +498,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # "table already exists" while other tables rebuild cleanly.
             # Skipped for dry-run (no DDL should execute) and when we've
             # already confirmed the existing database is being reused.
-            if not self.dry_run and not getattr(self, "database_was_reused", False):
+            if not self.is_dry_run and not getattr(self, "database_was_reused", False):
                 benchmark_tables = getattr(benchmark, "tables", None)
                 if isinstance(benchmark_tables, dict):
                     droppable = [
@@ -1232,14 +1276,13 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         connection: Any,
         query: str,
         explain_options: dict[str, Any] | None = None,
-    ) -> str:
+    ) -> str | None:
         """Get query execution plan using EXPLAIN.
 
         QuestDB supports EXPLAIN for query plans but with fewer options
         than standard PostgreSQL. The plan is returned as a ``QUERY PLAN`` text
-        column (one row per line). On failure returns an error string (which the
-        plan-capture parser rejects via its error-sentinel guard, so capture
-        degrades silently rather than fabricating a plan).
+        column (one row per line). On failure logs a warning and returns None
+        so capture records ``explain_failed`` rather than ``parse_error``.
         """
         query = _rewriter_rewrite(query)
         # In TPC-DS streaming paths a per-stream cursor is passed as
@@ -1260,7 +1303,8 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
         except Exception as e:
             if _owns_cursor:
                 cursor.close()
-            return f"Failed to get query plan: {e}"
+            self.logger.warning(f"Failed to get query plan: {e}")
+            return None
 
     def get_query_plan_parser(self):
         """Get the QuestDB query plan parser."""

@@ -311,6 +311,14 @@ def test_compact_adapter_rejects_unknown_schema_fields() -> None:
     [
         {"first_row": (1,), "sql_text": "SELECT 1"},
         {
+            "job_id": "bquxjob_123",
+            "job_statistics": {"bytes_processed": 100, "slot_ms": 5},
+            "bytes_billed": 100,
+        },
+        {
+            "query_statistics": {"elapsed_ms": 12, "rows_produced": 3},
+        },
+        {
             "duration_microsecs": 900,
             "cpu_time_microsecs": 100,
             "bytes_returned": 8,
@@ -319,6 +327,8 @@ def test_compact_adapter_rejects_unknown_schema_fields() -> None:
             "aborted": False,
         },
         {"translated_query": "SELECT 1", "validation_time": 0.1, "validation_passed": True},
+        {"job_id": "bdf8296d", "job_statistics": {"bytes_processed": 10}},
+        {"query_statistics": {"rows_produced": 5}},
         {"results": [(1,)], "columns": ["one"], "execution_mode": "dataframe"},
         {"cleanup_time": 0.01, "table_name": "orders", "platform": "spark", "reason": "unsupported"},
     ],

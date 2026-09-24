@@ -32,10 +32,6 @@ _compare_module = _sys.modules["benchbox.cli.commands.compare"]
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
-    pytest.mark.skipif(
-        sys.version_info < (3, 11),
-        reason="Click command mock.patch requires Python 3.11+ for attribute access",
-    ),
 ]
 
 

@@ -592,6 +592,48 @@ non-zero if fewer than `N` (platform, benchmark) pairs passed AND
 validator-cleaned every rung. Default null (off) — convention is the
 primary enforcement, tooling teeth are opt-in.
 
+## Throughput UAT cells
+
+Two nightly cells prove the throughput driver honors a requested stream
+count end to end via the production CLI (`run-official --streams 3`):
+
+- DuckDB TPC-H SF1 (`uat-throughput-duckdb-nightly.yaml`) on the
+  SHARED_CURSOR fast path.
+- Docker Postgres TPC-H SF1 (`uat-throughput-postgresql-nightly.yaml`,
+  the deferred w4) on INDEPENDENT_CONNECTION: one fresh session per
+  stream. The cell manages its own compose stack
+  (`cleanup.docker_manage_platforms`), so the nightly job needs no
+  service container for it.
+
+Both cells gate on the sweep exit code plus an independent assert step
+(`validate_stream_count` and `validate_stream_success` over that run's
+result JSON). PR fast-lane coverage stays with the focused
+session-isolation integration tests.
+
+## Throughput performance floor (relative model)
+
+The nightly `throughput-uat` job gates breakage (stream-count wiring via
+`validate_stream_count`, per-stream success via `validate_stream_success`),
+not gradual slowdown. The Throughput@Size floor closes that gap: a green
+run must also clear a per-platform/scale floor derived from observed
+spread. It is additive -- a floor failure never masks or replaces a
+stream-count failure, which keeps gating independently.
+
+Model: fail when observed Throughput@Size drops more than X% below the
+rolling median of the last N green runs for that cell
+(`THROUGHPUT_FLOOR_MEDIAN`, `THROUGHPUT_FLOOR_MAX_DROP_FRACTION`,
+default X = 20%). A relative floor tracks hardware/runner drift; a
+hardcoded absolute number would flake on the next runner.
+
+Status: observe-only. The DuckDB TPC-H SF1 cell is green on recent
+nightlies, but runners are ephemeral and no run retains its
+`summary.tpc_metrics.throughput_at_size`, so no defensible spread
+exists yet -- setting X/N now would manufacture false failures. Until
+`THROUGHPUT_FLOOR_MEDIAN` is configured, the nightly assert reports
+each observed value (`::notice::`) for baseline accumulation and never
+fails on the floor. Wiring the median (retained observations, N, and
+the sign-off on X) is the remaining step before the floor gates.
+
 ## Compatibility Pruning
 
 UAT compatibility pruning is explicit policy, not an implicit skip. Rules live

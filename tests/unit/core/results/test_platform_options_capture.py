@@ -593,6 +593,51 @@ def test_result_payload_exports_platform_option_sources_from_run_config() -> Non
     }
 
 
+def test_result_payload_serializes_dataframe_tuning_config() -> None:
+    """DataFrame tuning objects must not make the primary result non-JSON-serializable."""
+    import json
+
+    from benchbox.core.dataframe.tuning.interface import DataFrameTuningConfiguration
+
+    builder = ResultBuilder(
+        benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=1.0, benchmark_id="tpch"),
+        platform=PlatformInfoInput(name="Polars", platform_version="1.3", client_library_version="1.3"),
+        execution_id="dataframe-tuning-config-test",
+    )
+    dataframe_tuning = DataFrameTuningConfiguration()
+    dataframe_tuning.memory.chunk_size = 1024
+    builder.set_run_config(
+        RunConfigInput(
+            tuning_mode="tuned",
+            tuning_config=dataframe_tuning,
+        )
+    )
+    builder.add_query_result(
+        normalize_query_result(
+            {
+                "query_id": "Q1",
+                "execution_time_seconds": 0.1,
+                "rows_returned": 1,
+                "status": "SUCCESS",
+                "run_type": "measurement",
+            }
+        )
+    )
+
+    payload = build_result_payload(builder.build())
+
+    json.dumps(payload)
+    assert payload["config"]["tuning_config"] == {
+        "memory": {
+            "memory_limit": None,
+            "chunk_size": 1024,
+            "spill_to_disk": False,
+            "spill_directory": None,
+            "rechunk_after_filter": True,
+        }
+    }
+
+
 class TestUsernameRedactionInternalPath:
     """Connection usernames must not ride into internal bundles verbatim.
 

@@ -72,11 +72,14 @@ describe("CompareSummary", () => {
 
     render(<CompareSummary summary={summary} />);
 
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).not.toBeNull();
-    expect(summaryRegion).toHaveTextContent("DuckDB leads by 10.00x on power score.");
-    expect(summaryRegion).toHaveTextContent("2 fastest of 2 comparable");
-    expect(summaryRegion).toHaveTextContent("p50 15 ms");
+    expect(summaryRegion).toHaveTextContent("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
+    // The card label names the run and the question; the value is the count.
+    expect(summaryRegion).toHaveTextContent("Where DuckDB wins");
+    expect(summaryRegion).toHaveTextContent("2 of 2 queries");
+    expect(summaryRegion).toHaveTextContent("p50");
+    expect(summaryRegion).toHaveTextContent("15 ms");
     expect(summaryRegion).toHaveTextContent("winner cost $0.50");
     expect(summaryRegion).toHaveTextContent("30.00x cost/performance");
   });
@@ -101,10 +104,107 @@ describe("CompareSummary", () => {
 
     render(<CompareSummary summary={summary} />);
 
-    const summaryRegion = screen.getByRole("heading", { name: "Decision Summary" }).closest("section");
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summaryRegion).toHaveTextContent("Not directly comparable: benchmarks differ.");
-    expect(summaryRegion).toHaveTextContent("Claims suppressed");
+    expect(summaryRegion).toHaveTextContent("No winner named");
     expect(summaryRegion).toHaveTextContent("Not claimed");
-    expect(summaryRegion).toHaveTextContent("Winner claim suppressed");
+    expect(summaryRegion).toHaveTextContent("Review the individual query measurements below");
+  });
+
+  // -----------------------------------------------------------------------
+  // Live reproduction: DuckDB (validated) vs Pandas (validation_status
+  // "not_run") at H2ODB SF0.01. The headline used to claim a confident
+  // winner off an unvalidated candidate with no visible caveat. It must now
+  // carry the caveat in the headline itself, plus a distinct warning badge
+  // and callout - a reader who only sees the headline must not conclude the
+  // comparison rests on validated data.
+  // -----------------------------------------------------------------------
+
+  it("caveats the winner claim when one selected candidate is unvalidated (not_run)", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000, validation_status: "passed" }),
+        makeResult({
+          result_id: "pandas",
+          platform: "Pandas",
+          platform_id: "pandas",
+          power_score: 843,
+          validation_status: "not_run",
+          display_timings: [
+            { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+            { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          ],
+        }),
+      ],
+      "power_score",
+    );
+
+    // The winner claim is not suppressed by this gap alone...
+    expect(summary.claimSuppressed).toBe(false);
+    expect(summary.winner?.platform).toBe("DuckDB");
+    // ...but the headline itself must not read as a clean, confident claim.
+    expect(summary.headline).toContain("DuckDB's power score was");
+    expect(summary.headline).toContain("Validation caution");
+    expect(summary.headline).toContain("Pandas is no validation");
+
+    render(<CompareSummary summary={summary} />);
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(summaryRegion).toHaveTextContent("Unvalidated result");
+    expect(summaryRegion).toHaveTextContent("Validation caution:");
+    expect(summaryRegion).toHaveTextContent("Pandas is no validation");
+    expect(screen.getByTestId("compare-validation-caveat")).toBeTruthy();
+  });
+
+  it("does not show a validation caveat when both candidates are clean (passed)", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000, validation_status: "passed" }),
+        makeResult({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          power_score: 300,
+          validation_status: "passed",
+          display_timings: [
+            { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+            { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          ],
+        }),
+      ],
+      "power_score",
+    );
+
+    expect(summary.nonCleanValidation).toHaveLength(0);
+    expect(summary.validationCaveat).toBeNull();
+    expect(summary.headline).toBe("In these selected runs, DuckDB's power score was 10.00x better than the lowest selected run.");
+
+    render(<CompareSummary summary={summary} />);
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(summaryRegion).not.toHaveTextContent("Unvalidated result");
+    expect(screen.queryByTestId("compare-validation-caveat")).toBeNull();
+  });
+
+  it("does not show a validation caveat when validation_status is simply absent (not a non-clean status)", () => {
+    const summary = buildCompareDecisionSummary(
+      [
+        makeResult({ result_id: "duck", platform: "DuckDB", power_score: 3000 }),
+        makeResult({
+          result_id: "r2",
+          platform: "SQLite",
+          platform_id: "sqlite",
+          power_score: 300,
+          display_timings: [
+            { query_id: "Q1", display_ms: 100, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+            { query_id: "Q2", display_ms: 200, sample_count: 3, is_valid_display_timing: true, timing_exclusion_reason: null },
+          ],
+        }),
+      ],
+      "power_score",
+    );
+
+    expect(summary.nonCleanValidation).toHaveLength(0);
+    render(<CompareSummary summary={summary} />);
+    const summaryRegion = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(summaryRegion).not.toHaveTextContent("Unvalidated result");
   });
 });

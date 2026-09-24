@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any, Union
 
 from benchbox.base import BaseBenchmark
 from benchbox.core.data_fetch import ExtractionRequiredError, fetch_data, load_manifest
+from benchbox.core.query_catalog_base import TranslatableQueryMixin
+from benchbox.core.query_utils import get_queries_with_translation
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 from .queries import JoinOrderQueryManager
@@ -28,13 +30,17 @@ if TYPE_CHECKING:
     from benchbox.core.tuning import UnifiedTuningConfiguration
 
 
-class JoinOrderBenchmark(BaseBenchmark):
+class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
     """Canonical Join Order Benchmark implementation.
 
     The public ``joinorder`` benchmark uses the canonical IMDb 2013 Parquet
     archive produced by the foundation build. The old synthetic generator is
     available as the internal ``joinorder_synthetic`` benchmark.
     """
+
+    # The JOB corpus is PostgreSQL. Stated explicitly (rather than inheriting
+    # the mixin default) so the translation source stays deliberate.
+    _source_dialect = "postgres"
 
     data_manifest_path = Path(__file__).with_name("data_manifest.toml")
 
@@ -184,28 +190,58 @@ class JoinOrderBenchmark(BaseBenchmark):
         """
         return self._schema.get_table_names()
 
-    def get_query(self, query_id: str, *, params: dict[str, Any] | None = None) -> str:
+    def get_query(
+        self,
+        query_id: str,
+        *,
+        params: dict[str, Any] | None = None,
+        dialect: str | None = None,
+    ) -> str:
         """Get a specific query by ID.
 
         Args:
             query_id: Query identifier (e.g., '1a', '2b', etc.)
             params: Optional parameter values (not supported for JoinOrder)
+            dialect: Target SQL dialect for query translation. If None,
+                returns the canonical query text unchanged.
 
         Returns:
-            SQL query text
+            SQL query text, translated to *dialect* when requested
 
         Raises:
-            ValueError: If params are provided
+            ValueError: If params are provided, or if the query ID is unknown
         """
         if params is not None:
             raise ValueError("JoinOrder queries are static and don't accept parameters")
-        return self._query_manager.get_query(query_id)
+        query = self._query_manager.get_query(query_id)
+        if dialect:
+            return self.translate_query_text(query, dialect)
+        return query
 
-    def get_queries(self) -> dict[str, str]:
+    def get_queries(self, dialect: str | None = None) -> dict[str, str]:
         """Get all queries.
+
+        Args:
+            dialect: Target SQL dialect for query translation. If None,
+                returns the canonical queries unchanged.
 
         Returns:
             Dictionary mapping query IDs to SQL text
+        """
+        return get_queries_with_translation(self._query_manager, dialect, self.translate_query_text)
+
+    # translate_query_text() is inherited from TranslatableQueryMixin
+
+    @property
+    def query_manager(self) -> JoinOrderQueryManager:
+        """Public query-manager handle (shared translation contract)."""
+        return self._query_manager
+
+    def get_all_queries(self) -> dict[str, str]:
+        """Get all available JoinOrder queries (canonical text).
+
+        Returns:
+            A dictionary mapping query identifiers to their SQL text
         """
         return self._query_manager.get_all_queries()
 
@@ -397,4 +433,5 @@ BenchmarkHookRegistry.register_option_specs(
         ),
         aliases=("force-regenerate",),
     ),
+    benchmark_class=JoinOrderBenchmark,
 )

@@ -23,6 +23,8 @@ from benchbox.core.results.models import (
     NativeComparison,
     NativeComparisonEntry,
     SetupPhase,
+    ThroughputStream,
+    ThroughputTestPhase,
 )
 from benchbox.core.results.query_execution import (
     query_execution_from_compact_v2,
@@ -34,6 +36,7 @@ from benchbox.core.results.schema_policy import (
     LOADER_SCHEMA_POLICY,
     ROW_COUNT_VALIDATION_SCHEMA_VERSION,
     is_loader_supported_result_schema,
+    result_schema_version_value,
 )
 from benchbox.validation.bundle import COMPANION_SUFFIXES
 
@@ -149,7 +152,7 @@ def load_result_file(filepath: Path | str) -> tuple[BenchmarkResults, dict[str, 
         raise ResultLoadError(f"Failed to read result file: {e}") from e
 
     # Check schema version through the named runtime loader policy.
-    version_decision = LOADER_SCHEMA_POLICY.evaluate(data.get("version"))
+    version_decision = LOADER_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not version_decision.accepted:
         raise UnsupportedSchemaError(version_decision.error_message())
 
@@ -213,7 +216,7 @@ def _load_companion_file(main_file: Path, suffix: str) -> tuple[dict[str, Any] |
 
 def _validate_versioned_query_extensions(data: dict[str, Any]) -> None:
     """Reject query extensions that predate their schema contract."""
-    version = str(data.get("version", ""))
+    version = str(result_schema_version_value(data) or "")
     if version == ROW_COUNT_VALIDATION_SCHEMA_VERSION:
         return
 
@@ -269,7 +272,7 @@ def reconstruct_benchmark_results(
     environment_section = data.get("environment", {})
     system_profile = _extract_system_profile(environment_section)
     execution_environment = _extract_execution_environment(environment_section)
-    cost_summary = _extract_cost_summary(data.get("cost", {}), data.get("normalized_cost"))
+    cost_summary = _extract_cost_summary(data.get("cost", {}), data.get("normalized_cost"), summary_section.get("cost"))
     plans_captured, plan_failures = _extract_plans_info(plans_data)
 
     queries_counts = summary_section.get("queries", {})
@@ -320,8 +323,8 @@ def reconstruct_benchmark_results(
         tuning_config_hash=tuning["tuning_config_hash"],
         tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
-        applied_tuning_ledger=applied_data or None,
-        applied_ledger_hash=(applied_data or {}).get("applied_ledger_hash"),
+        applied_tuning_ledger=_extract_applied_ledger(platform_section, applied_data),
+        applied_ledger_hash=_extract_applied_ledger_hash(platform_section, applied_data),
         query_plans_captured=plans_captured,
         plan_capture_failures=plan_failures,
         cost_summary=cost_summary,
@@ -330,11 +333,38 @@ def reconstruct_benchmark_results(
         _benchmark_id_override=benchmark_section.get("id"),
         compliance_class=benchmark_section.get("compliance_class"),
         dataset_version=benchmark_section.get("dataset_version"),
+        data_generation_version=_coerce_datagen_version(benchmark_section.get("data_generation_version")),
+        data_generation_hash=_coerce_datagen_hash(benchmark_section.get("data_generation_hash")),
         manifest_hash=benchmark_section.get("manifest_hash"),
         data_archive_hash=benchmark_section.get("data_archive_hash"),
         funding=provenance_section.get("funding"),
         result_source=provenance_section.get("source"),
     )
+
+
+def _coerce_datagen_version(value: object) -> int | None:
+    """Coerce a persisted datagen version to int; unknown shapes stay unset."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def _coerce_datagen_hash(value: object) -> str | None:
+    """Coerce a persisted datagen hash to str; unknown shapes stay unset."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, Any] | None:
@@ -343,6 +373,9 @@ def _extract_execution_metadata(execution_section: dict[str, Any]) -> dict[str, 
     translation = execution_section.get("translation")
     if isinstance(translation, dict):
         metadata["translation"] = translation
+    comparability = execution_section.get("variant_comparability")
+    if isinstance(comparability, dict):
+        metadata["variant_comparability"] = comparability
     return metadata or None
 
 
@@ -394,9 +427,16 @@ def _extract_platform_info(platform_section: dict[str, Any]) -> dict[str, Any]:
 def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str, Any] | None) -> dict[str, Any]:
     """Extract tuning configuration from platform section and companion data.
 
-    Prefers the new ADR-1 fields (``requested_config_hash``, ``tuning_source``)
-    and falls back to the legacy ``hash``/``source`` bridge keys for older
-    bundles that predate this extraction (see schema.py's
+    Reads the inlined ``platform.tuning`` block first: since the requested
+    configuration and the applied ledger are folded into the bundle, a bundle is
+    self-describing and needs no companion to reconstruct its tuning. A
+    ``.tuning.json`` companion still wins where it is present, because it is the
+    only source for bundles exported before the inlining and because a
+    republished corpus bundle may carry the companion alone.
+
+    Prefers the ADR-1 fields (``requested_config_hash``, ``tuning_source``) and
+    falls back to the legacy ``hash``/``source`` bridge keys for older bundles
+    that predate this extraction (see schema.py's
     ``_legacy_tuning_source_bridge``).
     """
     tunings_applied = None
@@ -409,33 +449,34 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
     if tuning_summary:
         tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
         tuning_source = tuning_summary.get("tuning_source")
+        tuning_validation_status = tuning_summary.get("validation_status")
         # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
         # source in the summary block, with no companion .tuning.json carrying
         # a real source_file. Reconstruct the old "yaml" sentinel here so those
         # summary-only bundles keep round-tripping a truthy tuning_source_file,
         # matching this function's pre-existing behavior.
-        tuning_source_file = "yaml" if tuning_summary.get("source") == "yaml" else None
+        tuning_source_file = tuning_summary.get("source_file") or (
+            "yaml" if tuning_summary.get("source") == "yaml" else None
+        )
+        inline_requested = tuning_summary.get("requested")
+        if isinstance(inline_requested, dict) and inline_requested:
+            tunings_applied = _flatten_requested_tuning(inline_requested)
 
     if tuning_data:
+        # A companion wins field by field, never wholesale. A companion that is
+        # stale, hand-authored, or minimal can carry only `requested`, and
+        # overwriting unconditionally would wipe the inlined `source_file` and
+        # `validation_status` with None -- losing, on a bundle that states them,
+        # the template the run used and whether its tuning was verified.
         requested = tuning_data.get("requested")
         if requested:
-            # schema.py's _requested_tuning_sections groups
-            # primary_keys/foreign_keys/unique_constraints/check_constraints
-            # under requested["constraints"] for export. tunings_applied must
-            # carry the flat UnifiedTuningConfiguration.to_dict() shape
-            # (builder.py's documented contract) so a load -> re-export round
-            # trip through build_tuning_payload doesn't drop every constraint
-            # and its platform.tuning.counts entry.
-            tunings_applied = dict(requested.get("constraints") or {})
-            for key in ("platform_optimizations", "table_tunings"):
-                if key in requested:
-                    tunings_applied[key] = requested[key]
-        else:
-            tunings_applied = tuning_data.get("clauses", {})
-        tuning_source_file = tuning_data.get("source_file")
+            tunings_applied = _flatten_requested_tuning(requested)
+        elif tuning_data.get("clauses"):
+            tunings_applied = tuning_data["clauses"]
+        tuning_source_file = tuning_data.get("source_file") or tuning_source_file
         tuning_config_hash = tuning_data.get("requested_config_hash") or tuning_data.get("hash") or tuning_config_hash
         tuning_source = tuning_data.get("tuning_source") or tuning_source
-        tuning_validation_status = tuning_data.get("validation_status")
+        tuning_validation_status = tuning_data.get("validation_status") or tuning_validation_status
 
     return {
         "tunings_applied": tunings_applied,
@@ -444,6 +485,65 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         "tuning_source": tuning_source,
         "tuning_validation_status": tuning_validation_status,
     }
+
+
+def _extract_applied_ledger(
+    platform_section: dict[str, Any],
+    applied_data: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Reconstruct the applied-tuning ledger from the bundle or its companion.
+
+    An ``.applied.json`` companion wins when present: it is the only source for
+    bundles exported before the ledger was inlined, and a republished corpus
+    bundle may ship the companion alone. Otherwise the inlined
+    ``platform.tuning.applied`` block is the ledger, with the hash re-attached
+    from the summary that owns it.
+    """
+    if applied_data:
+        return applied_data
+
+    tuning_summary = platform_section.get("tuning")
+    if not isinstance(tuning_summary, dict):
+        return None
+    applied = tuning_summary.get("applied")
+    if not isinstance(applied, dict) or not applied:
+        return None
+
+    ledger = dict(applied)
+    ledger_hash = tuning_summary.get("applied_ledger_hash")
+    if ledger_hash and "applied_ledger_hash" not in ledger:
+        ledger["applied_ledger_hash"] = ledger_hash
+    return ledger
+
+
+def _extract_applied_ledger_hash(
+    platform_section: dict[str, Any],
+    applied_data: dict[str, Any] | None,
+) -> str | None:
+    """Resolve the applied-ledger hash, companion first, then the summary."""
+    if applied_data and applied_data.get("applied_ledger_hash"):
+        return applied_data["applied_ledger_hash"]
+    tuning_summary = platform_section.get("tuning")
+    if isinstance(tuning_summary, dict):
+        return tuning_summary.get("applied_ledger_hash")
+    return None
+
+
+def _flatten_requested_tuning(requested: dict[str, Any]) -> dict[str, Any]:
+    """Restore the flat requested-tuning shape from its exported grouping.
+
+    schema.py's ``_requested_tuning_sections`` groups
+    primary_keys/foreign_keys/unique_constraints/check_constraints under
+    ``requested["constraints"]`` for export. ``tunings_applied`` must carry the
+    flat ``UnifiedTuningConfiguration.to_dict()`` shape (builder.py's documented
+    contract) so a load -> re-export round trip through ``build_tuning_payload``
+    does not drop every constraint and its ``platform.tuning.counts`` entry.
+    """
+    flattened = dict(requested.get("constraints") or {})
+    for key in ("platform_optimizations", "table_tunings"):
+        if key in requested:
+            flattened[key] = requested[key]
+    return flattened
 
 
 def _extract_system_profile(environment_section: dict[str, Any]) -> dict[str, Any]:
@@ -484,7 +584,7 @@ def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[
 
     normalized = {
         key: environment_section[key]
-        for key in ("client_host", "platform_runtime", "container")
+        for key in ("client_host", "platform_runtime", "container", "client_link")
         if isinstance(environment_section.get(key), dict)
     }
     return normalized or None
@@ -493,6 +593,7 @@ def _extract_execution_environment(environment_section: dict[str, Any]) -> dict[
 def _extract_cost_summary(
     cost_section: dict[str, Any],
     normalized_cost_section: dict[str, Any] | None = None,
+    scan_bytes_section: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Extract cost summary from cost section.
 
@@ -501,14 +602,20 @@ def _extract_cost_summary(
     bundles without a normalized_cost block still round-trip their direct
     total via the schema-side missing-vs-rejected distinction.
     """
-    if not cost_section:
+    if not cost_section and not isinstance(scan_bytes_section, dict):
         return None
-    summary: dict[str, Any] = {
-        "total_cost": cost_section.get("total_usd"),
-        "cost_model": cost_section.get("model", "estimated"),
-    }
+    summary: dict[str, Any] = {}
+    if cost_section:
+        summary.update(
+            {
+                "total_cost": cost_section.get("total_usd"),
+                "cost_model": cost_section.get("model", "estimated"),
+            }
+        )
     if isinstance(normalized_cost_section, dict):
         summary["normalized_cost"] = normalized_cost_section
+    if isinstance(scan_bytes_section, dict):
+        summary["scan_bytes"] = dict(scan_bytes_section)
     return summary
 
 
@@ -731,18 +838,57 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
             per_table_stats={},  # Not serialized; summary-level only
         )
 
+    throughput = None
+    throughput_data = phases_section.get("throughput_test")
+    if throughput_data and throughput_data.get("status") != "NOT_RUN":
+        streams = [
+            ThroughputStream(
+                stream_id=stream.get("stream_id", 0),
+                start_time="",
+                end_time="",
+                duration_ms=0,
+                query_executions=[],
+                success=stream.get("success", False),
+                error_message=stream.get("error"),
+            )
+            for stream in throughput_data.get("stream_results", [])
+        ]
+        outstanding_work = throughput_data.get("outstanding_work")
+        throughput = ThroughputTestPhase(
+            start_time="",
+            end_time="",
+            duration_ms=throughput_data.get("duration_ms", 0),
+            num_streams=len(streams),
+            streams=streams,
+            total_queries_executed=0,
+            throughput_at_size=None,
+            success=throughput_data.get("status") == "COMPLETED",
+            errors=list(throughput_data.get("errors", [])),
+            outstanding_work=(
+                {
+                    "stream_ids": list(outstanding_work.get("stream_ids", [])),
+                    "cleanup_state": outstanding_work.get("cleanup_state", "complete"),
+                }
+                if isinstance(outstanding_work, dict)
+                else None
+            ),
+        )
+
     # Only return ExecutionPhases if we have at least one reconstructable phase.
     # Setup sub-phases (data_generation, schema_creation, etc.) are serialized as
     # flat status/duration_ms pairs - insufficient to reconstruct the full dataclass
     # tree, so we provide a minimal SetupPhase shell for round-trip fidelity.
-    if migration is None and not any(
-        phases_section.get(p, {}).get("status") not in (None, "NOT_RUN") for p in ("power_test", "throughput_test")
+    if (
+        migration is None
+        and throughput is None
+        and not any(phases_section.get(p, {}).get("status") not in (None, "NOT_RUN") for p in ("power_test",))
     ):
         return None
 
     return ExecutionPhases(
         setup=SetupPhase(),  # Placeholder; sub-phase detail not recoverable
         migration=migration,
+        throughput_test=throughput,
     )
 
 

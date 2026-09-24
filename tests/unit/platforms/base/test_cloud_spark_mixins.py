@@ -242,6 +242,48 @@ class TestCloudSparkConfigMixin:
         mixin.configure_for_benchmark(connection=None, benchmark_type="TPC-H")
         assert mixin._benchmark_type == "tpc-h"
 
+    def test_toggle_flows_into_optimizer(self):
+        mixin = StubCloudSparkConfig()
+        mixin.adaptive_enabled = False
+        mixin.configure_for_benchmark(connection=None, benchmark_type="tpch")
+        self.mock_optimizer.for_tpch.assert_called_once_with(
+            scale_factor=mixin._scale_factor,
+            platform=mixin.cloud_platform,
+            adaptive_enabled=False,
+        )
+
+    def test_missing_toggle_defaults_to_aqe_on(self):
+        mixin = StubCloudSparkConfig()
+        mixin.configure_for_benchmark(connection=None, benchmark_type="tpch")
+        self.mock_optimizer.for_tpch.assert_called_once_with(
+            scale_factor=mixin._scale_factor,
+            platform=mixin.cloud_platform,
+            adaptive_enabled=True,
+        )
+
+    def test_explicit_user_entries_win_over_optimizer(self):
+        mixin = StubCloudSparkConfig()
+        mixin._spark_config = {"spark.sql.adaptive.enabled": "false", "custom.key": "keep"}
+        self.mock_config.to_dict.return_value = {
+            "spark.sql.adaptive.enabled": "true",
+            "other.key": "opt",
+        }
+        mixin.configure_for_benchmark(connection=None, benchmark_type="tpch")
+        assert mixin._spark_config == {
+            "spark.sql.adaptive.enabled": "false",
+            "other.key": "opt",
+            "custom.key": "keep",
+        }
+
+    def test_reconfigure_does_not_resurrect_stale_output(self):
+        mixin = StubCloudSparkConfig()
+        self.mock_config.to_dict.return_value = {"k": "v1"}
+        mixin.configure_for_benchmark(connection=None, benchmark_type="tpch")
+        assert mixin._spark_config == {"k": "v1"}
+        self.mock_config.to_dict.return_value = {"k": "v2"}
+        mixin.configure_for_benchmark(connection=None, benchmark_type="tpcds")
+        assert mixin._spark_config == {"k": "v2"}
+
 
 # ---------------------------------------------------------------------------
 # SparkTableFormat
@@ -623,7 +665,7 @@ class TestHiveTuning:
         col_mock.name = "region"
         col_mock.order = 1
         tt = MagicMock()
-        tt.get_columns_by_type.side_effect = lambda t: ([col_mock] if t == TuningType.PARTITIONING else [])
+        tt.get_columns_by_type.side_effect = lambda t: [col_mock] if t == TuningType.PARTITIONING else []
         clauses = mixin._generate_hive_tuning(tt)
         assert "region STRING" in clauses.partition_by
 
