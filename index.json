@@ -1997,10 +1997,15 @@
       "title": "Find why 22% of Documentation workflow PR runs fail and fix or re-scope the cause"
     },
     "ci-dedupe-09-preflight-impact-selection": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T16:07:32Z",
+        "generation": "e793ff83a5e14703aa870d3cb89830b0",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:aa802de5ae8cc2800aa5f3ff"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Run only impact-selected tests in the local preflight medium tier"
     },
     "ci-dedupe-10-docs-visual-lane-decision": {
