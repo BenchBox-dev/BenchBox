@@ -1990,15 +1990,10 @@
       "title": "Watch the queue-only heavy tier for 14 days and roll back on the recorded trigger"
     },
     "ci-dedupe-08-docs-pr-failure-triage": {
-      "claim": {
-        "expires_at": "2026-09-25T15:56:32Z",
-        "generation": "bad8e1e4681840069f96e23956083b5a",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:b8606aa857d6b408645943eb"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Find why 22% of Documentation workflow PR runs fail and fix or re-scope the cause"
     },
     "ci-dedupe-09-preflight-impact-selection": {
