@@ -6,7 +6,7 @@
     "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
     "make pr-preflight passes on the implementation PR."
   ],
-  "context": "The implementation and release-template follow-up are committed in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery at exact HEAD 56882087a12b87f60255a4d94dcad82ac9103d59; branch is clean and matches origin, base origin/develop 435d07e97c2e0f30a002d721fbc42aca508d6a52. PR #2321 is OPEN/non-draft/mergeable at that exact head. Fresh hosted snapshot: 31 SUCCESS, 12 SKIPPED, all completed. Its only review thread PRRT_kwDOQ7J64c6lXzuz is resolved by commit 56882087a; no release merge/tag has happened. Exact-head local focused, medium, and required-preflight receipts are absent. A separate TODO DB preflight currently owns /Users/joe/.benchbox/test.lock (PID 84975 in /Users/joe/Developer/BenchBox.wt-todo-db-0-8-0); wait for it to exit before starting this worktree's tests. Next: run make pr-preflight on exact HEAD 56882087a when the lock is free, then refresh the PR checks and threads. No merge or release tag is authorized.",
+  "context": "The implementation and release-template follow-up are committed in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery at exact HEAD 56882087a12b87f60255a4d94dcad82ac9103d59; branch is clean and matches origin, base origin/develop 435d07e97c2e0f30a002d721fbc42aca508d6a52. PR #2321 is OPEN/non-draft/mergeable at that exact head. Fresh hosted snapshot: 31 SUCCESS, 12 SKIPPED, all complete. Its only review thread PRRT_kwDOQ7J64c6lXzuz is resolved by commit 56882087a; no release merge/tag has happened. Exact-head local focused, medium, and required-preflight receipts are absent. An unrelated TODO DB preflight is active in /Users/joe/Developer/BenchBox.wt-todo-db-0-8-0 (outer PID 84903; currently inside required preflight). Wait for that entire run to exit before starting this worktree's tests, even though no live test-lock fd appeared in the last snapshot. Next: run make pr-preflight on exact HEAD 56882087a when the other run exits, then refresh the PR checks and threads. No merge or release tag is authorized.",
   "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
   "links": [
     "Makefile",
@@ -190,6 +190,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "1264b1c924f34ae08d7c0a6ad35ea2d4",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-24T01:50:24Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "58807bd79af54db49d417e9c215eba2c",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
