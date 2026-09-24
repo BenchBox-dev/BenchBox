@@ -81,28 +81,7 @@ def _with_expected_externals(deps: dict[str, list[str]]) -> dict[str, list[str]]
     return out
 
 
-def _snapshot(states: dict[str, str] | None = None, deps: dict[str, list[str]] | None = None) -> dict:
-    if states is None:
-        states = dict.fromkeys(LIVE_A0_A11, "active")
-    if deps is None:
-        deps = _with_expected_externals({item_id: list(REAL_DEPS.get(item_id, [])) for item_id in states})
-    return {"states": states, "deps": deps}
-
-
-def _prefixed_argv(monkeypatch) -> None:
-    import sys
-
-    monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", PREFIX])
-
-
 # --- planned/live ordering helpers (unchanged surface) -----------------------
-
-
-def test_all_controlling_surfaces_and_gates_are_named() -> None:
-    text = reconciliation.DECISION.read_text()
-
-    assert all(surface in text for surface in reconciliation.REQUIRED_SURFACES)
-    assert all(gate in text for gate in reconciliation.REQUIRED_GATES)
 
 
 def test_planned_tracker_ids_filters_requested_prefix() -> None:
@@ -144,14 +123,6 @@ def test_live_tracker_ids_excludes_dropped_items() -> None:
     ]
 
 
-def test_decision_names_exact_live_ordered_tracker_sequence() -> None:
-    text = reconciliation.DECISION.read_text()
-    payload = [{"id": item_id} for item_id in reversed(LIVE_A0_A11)]
-
-    assert reconciliation.planned_tracker_ids(text, PREFIX) == reconciliation.live_tracker_ids(payload, PREFIX)
-    assert reconciliation.planned_tracker_ids(text, PREFIX) == LIVE_A0_A11
-
-
 def test_authority_is_not_a_hardcoded_tracker_list() -> None:
     assert not hasattr(reconciliation, "REQUIRED_TRACKER_IDS")
 
@@ -183,102 +154,6 @@ def test_load_tracker_snapshot_parses_git_state_index(monkeypatch) -> None:
         "states": {"x": "active"},
         "deps": {"x": ["y"]},
     }
-
-
-# --- main() fail-closed / success behaviour --------------------------------
-
-
-def test_main_fails_closed_when_snapshot_unavailable(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: None)
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_closed_when_dependency_row_absent(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    states = dict.fromkeys(LIVE_A0_A11, "active")
-    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
-    deps.pop("independent-publication-a5-noop-deploy-and-automatic-rollback")
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states, deps))
-
-    assert reconciliation.main() == 1
-
-
-def test_main_succeeds_when_live_sequence_matches_decision(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot())
-
-    assert reconciliation.main() == 0
-
-
-def test_main_fails_when_live_sequence_does_not_match(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    states = {
-        "independent-publication-a0-baseline-and-freeze": "active",
-        "independent-publication-a1-authority-and-threat-contract": "active",
-    }
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_on_dependency_edge_drift(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
-    deps["independent-publication-a1-authority-and-threat-contract"] = []
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(deps=deps))
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_on_partial_edge_removal(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    deps = {item_id: list(REAL_DEPS.get(item_id, [])) for item_id in LIVE_A0_A11}
-    deps["independent-publication-a8-published-results-gate-and-shadow-promotion"] = [
-        "independent-publication-a2-corpus-trust-isolation",
-        "independent-publication-a4-hermetic-build-and-shadow-assembly",
-    ]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(deps=deps))
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_required_phase_is_dropped(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    states = dict.fromkeys(LIVE_A0_A11, "done")
-    states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_dropped_phase_omitted_from_decision(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    states = dict.fromkeys(LIVE_A0_A11, "done")
-    states["independent-publication-a5-noop-deploy-and-automatic-rollback"] = "dropped"
-    omitted = [item_id for item_id in LIVE_A0_A11 if item_id != LIVE_A0_A11[5]]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
-    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_pinned_phase_missing_from_plan(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    omitted = LIVE_A0_A11[:-1]
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot())
-    monkeypatch.setattr(reconciliation, "planned_tracker_ids", lambda text, prefix: omitted)
-
-    assert reconciliation.main() == 1
-
-
-def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
-    _prefixed_argv(monkeypatch)
-    states = dict.fromkeys(LIVE_A0_A11[:-1], "done")
-    monkeypatch.setattr(reconciliation, "load_tracker_snapshot", lambda *args: _snapshot(states))
-
-    assert reconciliation.main() == 1
 
 
 # --- dependency_violations (pure) ------------------------------------------

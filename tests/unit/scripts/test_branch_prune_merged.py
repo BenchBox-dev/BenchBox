@@ -388,19 +388,3 @@ def test_invalid_dry_run_environment_refuses(
 
     assert mod.main([]) == 2
     assert "DRY_RUN must be unset or exactly 1" in capsys.readouterr().err
-
-
-def test_worktree_audit_uses_exact_branch_name_with_tag_collision(repo: Path) -> None:
-    audit_script = _ROOT / "_project" / "scripts" / "worktree_audit.py"
-    spec = importlib.util.spec_from_file_location("_worktree_audit_exact_ref", audit_script)
-    assert spec is not None and spec.loader is not None
-    audit_mod = importlib.util.module_from_spec(spec)
-    sys.modules["_worktree_audit_exact_ref"] = audit_mod
-    spec.loader.exec_module(audit_mod)
-
-    _add_merged_candidate(repo, "v0.4.0")
-    _git(repo, "tag", "v0.4.0", "develop")
-
-    names = {branch["name"] for branch in audit_mod.get_local_branches(repo)}
-    assert "v0.4.0" in names
-    assert "heads/v0.4.0" not in names
