@@ -690,6 +690,8 @@ class DataSourceResolver:
             selector = lambda paths: any(path.suffix.lower() != ".parquet" for path in paths)
         elif platform_name == "redshift" and table_mode != "external":
             selector = lambda paths: any(path.exists() and path.is_dir() for path in paths)
+        elif platform_name == "bigquery" and table_mode == "native":
+            selector = lambda paths: bool(paths)
         else:
             return
 
@@ -706,6 +708,13 @@ class DataSourceResolver:
             replacement = self._get_case_insensitive(manifest_source.tables, table_name)
             if replacement is None:
                 continue
+
+            if platform_name == "bigquery":
+                current_paths = set(self._normalize_paths(table_paths))
+                replacement_paths = set(self._normalize_paths(replacement))
+                replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+                if replacement_format != "tbl" or not current_paths < replacement_paths:
+                    continue
 
             source.tables[table_name] = replacement
             replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
