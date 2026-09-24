@@ -54,8 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   come from vendor price lists, and Snowflake cost reflects run time and
   warehouse size.
 - **Safer throughput tests.** BenchBox waits for timed-out queries to stop
-  before the next phase starts. If the throughput phase fails, official result
-  files omit Throughput@Size.
+  before the next phase starts. If the throughput phase fails, results from
+  `benchbox run` omit Throughput@Size.
 
 ### Fixed
 
