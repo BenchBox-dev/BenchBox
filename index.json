@@ -1941,10 +1941,15 @@
       "title": "Skip post-merge fast and medium tests on develop commits the merge queue already passed"
     },
     "ci-dedupe-02-hourly-sweep-skip-tested-tip": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T15:53:32Z",
+        "generation": "f0a62f72ce3a4bbd984cc39bb5463a02",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:b8606aa857d6b408645943eb"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Make the hourly post-merge sweep exit when the develop tip is already tested"
     },
     "ci-dedupe-03-docs-cancel-superseded-pr-runs": {
