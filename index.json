@@ -1996,6 +1996,13 @@
       "status": "blocked",
       "title": "Find why 22% of Documentation workflow PR runs fail and fix or re-scope the cause"
     },
+    "ci-dedupe-09-preflight-impact-selection": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Run only impact-selected tests in the local preflight medium tier"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],
