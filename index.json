@@ -2003,6 +2003,13 @@
       "status": "open",
       "title": "Run only impact-selected tests in the local preflight medium tier"
     },
+    "ci-dedupe-10-docs-visual-lane-decision": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decision gate: choose the public-site visual comparison lane policy"
+    },
     "ci-failure-baseline-dev-loop-metrics": {
       "claim": null,
       "needs": [],
