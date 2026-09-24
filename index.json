@@ -2514,6 +2514,15 @@
       "status": "done",
       "title": "Add sorted data ingestion support for cloud data warehouses to compare against clustering/Z-order/partitioning"
     },
+    "cloud-executor-bq-create-semantics": {
+      "claim": null,
+      "needs": [
+        "cloud-executor-rebase-reverify"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Preserve IF NOT EXISTS semantics in BigQuery DDL conversion"
+    },
     "cloud-executor-rebase-reverify": {
       "claim": null,
       "needs": [],

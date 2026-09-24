@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "DECISION GATE: IF NOT EXISTS is preserved with target qualification (chosen approach recorded), or reuse-safety is proven with tests",
+    "New tests: reuse of populated staging tables on the BigQuery convert path keeps rows; shared manifest keeps both benchmarks' provenance rows",
+    "Touched BigQuery adapter suites green; make pr-preflight passes"
+  ],
+  "context": "Adversarial finding Critical-1 (accepted with corrected framing): the IF NOT EXISTS to CREATE OR REPLACE rebuild in _convert_to_bigquery_table predates this change (HEAD lines ~1821-1870), but this change makes cloud staging reuse load-bearing (compatible-database reuse, PR 2310) and widens the funnel into that converter (comment-gated chunks, CTAS qualification). Setup uses IF NOT EXISTS for staging tables (write_primitives/benchmark.py ~882-895) and the shared provenance manifest (transactional/benchmark_base.py ~449-459); replacing erases rows/provenance. Guardrails: do not change create semantics as a drive-by; cover both manifest rows in tests.",
+  "description": "Stop BigQuery DDL conversion from destroying reused staging data: preserve IF NOT EXISTS (qualifying its target without changing create semantics) in _convert_to_bigquery_table, covering matched CREATE, CTAS, and comment-prefixed chunks. Staging worktree: wt-cloud-executor-loader, file benchbox/platforms/bigquery.py.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:38:05Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "a9a32a55e17f4a72840c487449a17493",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}
