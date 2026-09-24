@@ -112,7 +112,11 @@ class SQLETLBackend:
         """Atomically expire and replace current customer rows for one source batch."""
         self.create_schema()
         customers = dataframe.copy()
-        cursor = self.connection.cursor() if hasattr(self.connection, "cursor") else self.connection
+        # Run BEGIN, the writes and COMMIT on one handle. DuckDB's cursor() opens
+        # a separate connection whose transaction the parent's commit never covers.
+        cursor = self.connection
+        if not hasattr(cursor, "execute") and hasattr(cursor, "cursor"):
+            cursor = cursor.cursor()
         try:
             cursor.execute("BEGIN")
             current_max_sk, current_max_batch, latest_effective = cursor.execute(
