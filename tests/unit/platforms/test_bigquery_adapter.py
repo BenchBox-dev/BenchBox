@@ -8,6 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import logging
 import tempfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -2268,6 +2269,251 @@ class TestConvertToBigqueryTable:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64,\n    PRIMARY KEY (id) NOT ENFORCED)")
         assert result.count("NOT ENFORCED") == 1
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists(self, mock_bigquery):
+        """Preserves IF NOT EXISTS semantics and qualifies the target."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS orders (id INT64)")
+        assert result == "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS` (id INT64)"
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_ctas(self, mock_bigquery):
+        """Preserves IF NOT EXISTS semantics on CTAS and qualifies the target."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = (
+            "CREATE TABLE IF NOT EXISTS orders_1995 AS\nSELECT *\nFROM orders\nWHERE o_orderdate >= DATE '1995-01-01'\n"
+        )
+        result = adapter._convert_to_bigquery_table(sql)
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_1995` AS" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_with_comment_prefix(self, mock_bigquery):
+        """Preserves IF NOT EXISTS on comment-prefixed schema chunks."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        chunk = "-- Generated staging table\nCREATE TABLE IF NOT EXISTS orders_stage (id INT64)"
+        result = adapter._convert_to_bigquery_table(chunk)
+        assert result.startswith("-- Generated staging table\n")
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_STAGE` (id INT64)" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_ctas_with_comment_prefix(self, mock_bigquery):
+        """Preserves IF NOT EXISTS on comment-prefixed CTAS chunks."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        chunk = "-- Generated staging CTAS\nCREATE TABLE IF NOT EXISTS orders_stage AS SELECT 1"
+        result = adapter._convert_to_bigquery_table(chunk)
+        assert result.startswith("-- Generated staging CTAS\n")
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_STAGE` AS SELECT 1" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_already_qualified(self, mock_bigquery):
+        """Table name already containing dataset qualification preserves IF NOT EXISTS without double qualification."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS `my_ds.orders` (id INT64)")
+        assert result == "CREATE TABLE IF NOT EXISTS `my_ds.ORDERS` (id INT64)"
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_staging_manifest_ddl_preserves_if_not_exists(self, mock_bigquery):
+        """Staging manifest DDL preserves IF NOT EXISTS and maps VARCHAR to STRING."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        manifest_ddl = (
+            "CREATE TABLE IF NOT EXISTS benchbox_staging_manifest ("
+            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
+            "source_digest VARCHAR, created_at VARCHAR)"
+        )
+        result = adapter._convert_to_bigquery_table(manifest_ddl)
+        expected = (
+            "CREATE TABLE IF NOT EXISTS `my-proj.my_ds.BENCHBOX_STAGING_MANIFEST` ("
+            "benchmark STRING, scale STRING, spec_version STRING, "
+            "source_digest STRING, created_at STRING)"
+        )
+        assert result == expected
+        assert "OR REPLACE" not in result
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestBigQueryCreateSemanticsStagingAndManifest:
+    """Test that BigQuery DDL conversion preserves staging data and shared provenance manifests.
+
+    Adversarial finding Critical-1: Converting IF NOT EXISTS into CREATE OR REPLACE
+    wipes out populated staging tables during setup reuse, and drops the shared
+    benchbox_staging_manifest table when a second benchmark runs, erasing the first
+    benchmark's provenance row.
+    """
+
+    class _SimulatedBigQueryConnection:
+        """Simulate BigQuery table storage executing statements through _convert_to_bigquery_table."""
+
+        def __init__(self, adapter: BigQueryAdapter):
+            self.adapter = adapter
+            self.tables: dict[str, list[tuple]] = {}
+            self.executed_queries: list[str] = []
+
+        def execute(self, sql: str, parameters: Any = None):
+            import re
+
+            converted = self.adapter._convert_to_bigquery_table(sql)
+            self.executed_queries.append(converted)
+            clean = re.sub(r"/\*.*?\*/|--[^\n]*", "", converted).strip()
+
+            def _target(name: str) -> str:
+                return name.split(".")[-1].strip("`").upper()
+
+            # CREATE OR REPLACE TABLE: drops existing table and resets rows
+            or_replace = re.match(
+                r"^CREATE\s+OR\s+REPLACE\s+TABLE\s+(`?[a-zA-Z0-9_.]+`?)",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if or_replace:
+                self.tables[_target(or_replace.group(1))] = []
+                return self._cursor([])
+
+            # CREATE TABLE IF NOT EXISTS: preserves existing table and rows
+            if_not_exists = re.match(
+                r"^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(`?[a-zA-Z0-9_.]+`?)",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if if_not_exists:
+                table = _target(if_not_exists.group(1))
+                if table not in self.tables:
+                    self.tables[table] = []
+                return self._cursor([])
+
+            # INSERT INTO: parses row values
+            insert = re.match(
+                r"^INSERT\s+INTO\s+(`?[a-zA-Z0-9_.]+`?)\s*(?:\([^)]*\))?\s*VALUES\s*(.*)",
+                clean,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if insert:
+                table = _target(insert.group(1))
+                values = tuple(re.findall(r"'([^']*)'", insert.group(2)))
+                if table not in self.tables:
+                    self.tables[table] = []
+                self.tables[table].append(values)
+                return self._cursor([])
+
+            # DELETE FROM: filters out matching benchmark rows
+            delete = re.match(
+                r"^DELETE\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if delete:
+                table = _target(delete.group(1))
+                where = delete.group(2)
+                if table in self.tables and where:
+                    bench_match = re.search(r"benchmark\s*=\s*'([^']*)'", where)
+                    if bench_match:
+                        target_bench = bench_match.group(1)
+                        self.tables[table] = [r for r in self.tables[table] if not (r and r[0] == target_bench)]
+                    else:
+                        self.tables[table] = []
+                return self._cursor([])
+
+            # SELECT COUNT(*):
+            count = re.match(
+                r"^SELECT\s+COUNT\(\*\)\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if count:
+                table = _target(count.group(1))
+                where = count.group(2)
+                rows = self.tables.get(table, [])
+                if where:
+                    bench_match = re.search(r"benchmark\s*=\s*'([^']*)'", where)
+                    if bench_match:
+                        target_bench = bench_match.group(1)
+                        rows = [r for r in rows if r and r[0] == target_bench]
+                return self._cursor([(len(rows),)])
+
+            return self._cursor([])
+
+        def _cursor(self, rows: list[tuple]):
+            class _Cursor:
+                def __init__(self, data: list[tuple]):
+                    self.data = data
+
+                def fetchone(self):
+                    return self.data[0] if self.data else None
+
+                def fetchall(self):
+                    return self.data
+
+            return _Cursor(rows)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_reuse_of_populated_staging_tables_keeps_rows(self, mock_bigquery):
+        """Reusing populated staging tables through BigQuery convert path preserves row data."""
+        from benchbox.core.write_primitives.benchmark import get_create_table_sql
+
+        adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
+        conn = self._SimulatedBigQueryConnection(adapter)
+
+        # Pre-populate staging table
+        target_table = "UPDATE_OPS_ORDERS"
+        initial_rows = [("1", "comment 1"), ("2", "comment 2"), ("3", "comment 3")]
+        conn.tables[target_table] = list(initial_rows)
+
+        # Execute setup DDL with if_not_exists=True as done during reuse
+        create_sql = get_create_table_sql("update_ops_orders", dialect="bigquery", if_not_exists=True)
+        conn.execute(create_sql)
+
+        # Confirm executed query preserved IF NOT EXISTS
+        last_query = conn.executed_queries[-1]
+        assert "CREATE TABLE IF NOT EXISTS `my-project.my_ds.UPDATE_OPS_ORDERS`" in last_query
+        assert "OR REPLACE" not in last_query
+
+        # Rows must be preserved, not wiped
+        assert len(conn.tables[target_table]) == 3
+        assert conn.tables[target_table] == initial_rows
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_shared_manifest_keeps_both_benchmarks_provenance_rows(self, mock_bigquery):
+        """Shared provenance manifest keeps both benchmarks' rows across consecutive setup writes."""
+        from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
+        from benchbox.core.write_primitives.benchmark import WritePrimitivesBenchmark
+
+        adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
+        conn = self._SimulatedBigQueryConnection(adapter)
+
+        # Seed source tables so _staging_source_digest can calculate digest
+        conn.tables["ORDERS"] = [(1,)]
+        conn.tables["LINEITEM"] = [(1,)]
+        conn.tables["CUSTOMER"] = [(1,)]
+
+        bench1 = TransactionPrimitivesBenchmark(scale_factor=0.01)
+        bench1._setup_dialect = "bigquery"
+        bench2 = WritePrimitivesBenchmark(scale_factor=0.01)
+        bench2._setup_dialect = "bigquery"
+
+        source_tables = ["orders", "lineitem", "customer"]
+
+        # First benchmark writes its staging manifest
+        bench1._write_staging_manifest(conn, source_tables)
+        assert bench1._staging_manifest_matches(conn, source_tables) is True
+
+        manifest_table = "BENCHBOX_STAGING_MANIFEST_V2"
+        assert len(conn.tables[manifest_table]) == 1
+        assert conn.tables[manifest_table][0][0] == "Transaction Primitives"
+
+        # Second benchmark writes its staging manifest on the same database
+        bench2._write_staging_manifest(conn, source_tables)
+        assert bench2._staging_manifest_matches(conn, source_tables) is True
+
+        # CRITICAL: bench1's provenance row must STILL be preserved in the shared manifest
+        assert bench1._staging_manifest_matches(conn, source_tables) is True
+        assert len(conn.tables[manifest_table]) == 2
+        benchmarks_in_manifest = {r[0] for r in conn.tables[manifest_table]}
+        assert benchmarks_in_manifest == {"Transaction Primitives", "Write Primitives"}
 
 
 @pytest.mark.usefixtures("dependencies_available")

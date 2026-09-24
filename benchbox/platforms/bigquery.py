@@ -1916,30 +1916,93 @@ class BigQueryAdapter(PlatformAdapter):
             if name.upper() not in _pk_keywords
         ]
 
+    @staticmethod
+    def _normalize_bq_column_types(text: str) -> str:
+        """Map DECIMAL/NUMERIC exceeding scale 9 to BIGNUMERIC, and VARCHAR to STRING.
+
+        BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
+        exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
+        BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
+        NUMERIC and inherits its limits. BigQuery also has no VARCHAR
+        type: benchmark staging DDL spells text columns VARCHAR(n)
+        (valid on Snowflake/Postgres/DuckDB); map to STRING.
+        """
+        import re
+
+        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
+            precision, scale = int(match.group(2)), int(match.group(3))
+            if scale > 9 or precision > 38:
+                return f"BIGNUMERIC({precision},{scale})"
+            return match.group(0)
+
+        text = re.sub(
+            r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
+            _decimal_to_bignumeric,
+            text,
+            flags=re.IGNORECASE,
+        )
+        return re.sub(
+            r"\bVARCHAR\s*(\(\s*\d+\s*\))?",
+            "STRING",
+            text,
+            flags=re.IGNORECASE,
+        )
+
+    def _qualify_table_target(self, raw_target: str) -> str:
+        """Dataset-qualify a table target identifier and uppercase the table segment."""
+        target_bare = raw_target.strip("`")
+        if "." in target_bare:
+            *qualifier, bare = target_bare.split(".")
+            normalized = ".".join([*qualifier, bare.upper()])
+        else:
+            normalized = target_bare.upper()
+
+        if f"{self.dataset_id}." not in normalized:
+            return f"`{self.project_id}.{self.dataset_id}.{normalized}`"
+        elif not normalized.startswith("`"):
+            *qualifier, bare = normalized.split(".")
+            return "`" + ".".join([*qualifier, bare.upper()]) + "`"
+        return normalized
+
     def _qualify_ctas_target(self, work: str) -> str:
-        """Dataset-qualify a bare CTAS target.
+        """Dataset-qualify a CTAS target while preserving create semantics.
 
         CTAS has no parenthesized column list, so the main CREATE branch
         never fires for it: qualify here instead, since the later
         table-name pass only rewrites FROM/JOIN/DML positions and BigQuery
-        rejects unqualified targets.
+        rejects unqualified targets. Preserves IF NOT EXISTS when present;
+        bare CREATE TABLE converts to CREATE OR REPLACE TABLE for idempotency.
         """
         import re
 
         ctas = re.match(
-            r"^(\s*CREATE\s+OR\s+REPLACE\s+TABLE\s+)(`?[A-Za-z0-9_]+`?)(\s+AS\b)",
+            r"^(\s*CREATE\s+(.+?)\s+)(`?[A-Za-z0-9_.]+`?)(\s+AS\b.*)",
             work,
-            flags=re.IGNORECASE,
+            flags=re.IGNORECASE | re.DOTALL,
         )
-        if ctas and "." not in ctas.group(2):
-            qualified_target = f"`{self.project_id}.{self.dataset_id}.{ctas.group(2).strip('`').upper()}`"
-            return ctas.group(1) + qualified_target + ctas.group(3) + work[ctas.end() :]
-        return work
+        if not ctas:
+            return work
+
+        raw_prefix = ctas.group(1)
+        modifiers = ctas.group(2).upper()
+        raw_target = ctas.group(3)
+        as_and_rest = ctas.group(4)
+
+        leading_space = raw_prefix[: len(raw_prefix) - len(raw_prefix.lstrip())]
+        if "IF NOT EXISTS" in modifiers:
+            verb = f"{leading_space}CREATE TABLE IF NOT EXISTS "
+        else:
+            verb = f"{leading_space}CREATE OR REPLACE TABLE "
+
+        qualified_target = self._qualify_table_target(raw_target)
+        return verb + qualified_target + as_and_rest
 
     def _convert_to_bigquery_table(self, statement: str) -> str:
         """Convert CREATE TABLE statement to BigQuery format.
 
-        Makes tables idempotent by using CREATE OR REPLACE TABLE.
+        Preserves CREATE TABLE IF NOT EXISTS semantics when specified (preventing
+        destruction of reused staging tables or shared provenance manifests).
+        Converts bare CREATE TABLE to CREATE OR REPLACE TABLE for idempotency.
         Table names are normalized to UPPERCASE to match the adapter-wide
         convention used by loads, validation, row counts, and query
         normalization (TPC-DS DDL sources use lowercase names).
@@ -1957,69 +2020,35 @@ class BigQueryAdapter(PlatformAdapter):
         if not work.strip().upper().startswith("CREATE"):
             return statement
 
-        # BigQuery NUMERIC caps scale at 9 (precision 38). Decimal columns
-        # exceeding that (e.g. DECIMAL(18,14) latitude/longitude) must use
-        # BIGNUMERIC (precision 76.76, scale 38); DECIMAL is only an alias for
-        # NUMERIC and inherits its limits. BigQuery also has no VARCHAR
-        # type: benchmark staging DDL spells text columns VARCHAR(n)
-        # (valid on Snowflake/Postgres/DuckDB); map to STRING.
-        def _decimal_to_bignumeric(match: re.Match[str]) -> str:
-            precision, scale = int(match.group(2)), int(match.group(3))
-            if scale > 9 or precision > 38:
-                return f"BIGNUMERIC({precision},{scale})"
-            return match.group(0)
-
-        def _normalize_bq_column_types(text: str) -> str:
-            # Applied to the column-definition remainder (`rest`), not the
-            # rebuilt query: the match path below rebuilds `work` from
-            # `rest`, which would otherwise silently discard these rewrites.
-            text = re.sub(
-                r"\b(DECIMAL|NUMERIC)\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)",
-                _decimal_to_bignumeric,
-                text,
-                flags=re.IGNORECASE,
-            )
-            text = re.sub(
-                r"\bVARCHAR\s*(\(\s*\d+\s*\))?",
-                "STRING",
-                text,
-                flags=re.IGNORECASE,
-            )
-            return text
-
         pattern = re.compile(
-            r"^\s*CREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([a-zA-Z0-9_.]+)`?\s*(\(.*)",
+            r"^\s*CREATE\s+(?:(OR\s+REPLACE)\s+)?TABLE\s+(?:(IF\s+NOT\s+EXISTS)\s+)?`?([a-zA-Z0-9_.]+)`?\s*(\(.*)",
             re.IGNORECASE | re.DOTALL,
         )
         match = pattern.match(work)
         if match:
-            # Uppercase only the table segment; a qualified name keeps its
-            # project/dataset case (BigQuery table identifiers are
-            # case-sensitive while the adapter convention is UPPERCASE tables).
-            table_name = match.group(1)
-            if "." in table_name:
-                *qualifier, bare = table_name.split(".")
-                table_name = ".".join([*qualifier, bare.upper()])
-            else:
-                table_name = table_name.upper()
-            rest = _normalize_bq_column_types(match.group(2))
-            # BigQuery table identifiers are case-sensitive: normalize the
-            # table segment to UPPERCASE to match the adapter-wide convention
-            # used by loads, validation, row counts, and query qualification.
-            # Project and dataset segments keep their configured case.
-            if f"{self.dataset_id}." not in table_name:
-                qualified_table = f"`{self.project_id}.{self.dataset_id}.{table_name.upper()}`"
-            elif not table_name.startswith("`"):
-                *qualifier, bare = table_name.split(".")
-                qualified_table = "`" + ".".join([*qualifier, bare.upper()]) + "`"
-            else:
-                qualified_table = table_name
-            work = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+            has_if_not_exists = bool(match.group(2))
+            create_verb = "CREATE TABLE IF NOT EXISTS" if has_if_not_exists else "CREATE OR REPLACE TABLE"
+            qualified_table = self._qualify_table_target(match.group(3))
+            rest = self._normalize_bq_column_types(match.group(4))
+            work = f"{create_verb} {qualified_table} {rest}"
         else:
-            if "CREATE TABLE" in work and "OR REPLACE" not in work.upper():
-                work = work.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
-            work = self._qualify_ctas_target(work)
-            work = _normalize_bq_column_types(work)
+            ctas_work = self._qualify_ctas_target(work)
+            if ctas_work != work:
+                work = ctas_work
+            else:
+                if (
+                    re.search(r"\bCREATE\s+TABLE\b", work, flags=re.IGNORECASE)
+                    and not re.search(r"\bOR\s+REPLACE\b", work, flags=re.IGNORECASE)
+                    and not re.search(r"\bIF\s+NOT\s+EXISTS\b", work, flags=re.IGNORECASE)
+                ):
+                    work = re.sub(
+                        r"\bCREATE\s+TABLE\b",
+                        "CREATE OR REPLACE TABLE",
+                        work,
+                        count=1,
+                        flags=re.IGNORECASE,
+                    )
+            work = self._normalize_bq_column_types(work)
 
         # BigQuery rejects enforced PRIMARY KEY; it only supports informational
         # NOT ENFORCED table constraints. Convert inline column PRIMARY KEYs
@@ -2038,7 +2067,7 @@ class BigQueryAdapter(PlatformAdapter):
                         if depth == 0:
                             rest = rest[:i] + f", PRIMARY KEY ({', '.join(pk_cols)}) NOT ENFORCED" + rest[i:]
                             break
-            work = f"CREATE OR REPLACE TABLE {qualified_table} {rest}"
+            work = f"{create_verb} {qualified_table} {rest}"
         else:
             work = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", work, flags=re.IGNORECASE)
 
