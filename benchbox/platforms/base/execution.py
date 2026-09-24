@@ -1535,6 +1535,7 @@ class TestDriversMixin:
 
     def enable_dry_run(self) -> None:
         """Enable dry-run mode for SQL capture without execution."""
+        self.dry_run = True
         self.dry_run_mode = True
         self.captured_sql = []
         self.query_counter = 0
@@ -1542,6 +1543,7 @@ class TestDriversMixin:
 
     def disable_dry_run(self) -> None:
         """Disable dry-run mode and return to normal execution."""
+        self.dry_run = bool(getattr(self, "_initial_dry_run", False))
         self.dry_run_mode = False
         self.logger.info("Dry-run mode disabled - returning to normal execution")
 

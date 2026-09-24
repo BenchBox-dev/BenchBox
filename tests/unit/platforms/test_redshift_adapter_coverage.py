@@ -1221,9 +1221,13 @@ class TestDropDatabase:
     def test_non_existent_db_skips_drop(self):
         adapter = _make_adapter()
 
-        with patch.object(adapter, "check_server_database_exists", return_value=False):
+        with (
+            patch.object(adapter, "check_server_database_exists", return_value=False),
+            patch.object(adapter, "create_connection") as mock_conn,
+        ):
             # Should return without error and without trying to connect
             adapter.drop_database(database="nonexistent_db")
+            mock_conn.assert_not_called()
 
     def test_retry_on_active_connections_error(self):
         adapter = _make_adapter()
@@ -1870,6 +1874,7 @@ class TestAnalyzeAndVacuumTable:
         mock_cursor.execute.side_effect = Exception("relation does not exist")
 
         adapter.vacuum_table(mock_conn, "orders")
+        mock_cursor.execute.assert_called_once_with("VACUUM orders")
 
 
 # ---------------------------------------------------------------------------
@@ -1922,11 +1927,16 @@ class TestCloseConnection:
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_conn.close.side_effect = Exception("already closed")
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(mock_conn)
+            mock_warn.assert_called_once()
+            assert "already closed" in mock_warn.call_args[0][0]
 
     def test_none_connection_does_not_raise(self):
         adapter = _make_adapter()
-        adapter.close_connection(None)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(None)
+            mock_warn.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -2188,7 +2198,10 @@ class TestRunVacuumAnalyzeIsolated:
 
         with patch.object(adapter, "_connect_with_driver", side_effect=Exception("connection refused")):
             with patch.object(adapter, "_long_running_timeout", return_value=300):
-                adapter._run_vacuum_analyze_isolated(main_conn)
+                with patch.object(adapter.logger, "warning") as mock_warn:
+                    adapter._run_vacuum_analyze_isolated(main_conn)
+                    mock_warn.assert_called_once()
+                    assert "connection refused" in mock_warn.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------
@@ -2218,12 +2231,16 @@ class TestApplyUnifiedTuning:
         mock_pk.enabled = True
         mock_fk = MagicMock()
         mock_fk.enabled = True
-        adapter.apply_constraint_configuration(mock_pk, mock_fk, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(mock_pk, mock_fk, mock_conn)
+            assert mock_info.call_count == 2
 
     def test_apply_constraint_configuration_none_pk_fk(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        adapter.apply_constraint_configuration(None, None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(None, None, mock_conn)
+            mock_info.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -3264,7 +3281,9 @@ class TestApplyTableTunings:
         mock_cursor.fetchone.return_value = ("public", "orders", "AUTO", None, None, None, None, None)
 
         # Should not raise
-        adapter.apply_table_tunings(mock_table_tuning, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_table_tunings(mock_table_tuning, mock_conn)
+            mock_info.assert_called()
 
 
 # ---------------------------------------------------------------------------
@@ -3671,8 +3690,14 @@ class TestApplyUnifiedTuning:
     def test_none_config_returns_early(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_platform_optimizations") as mock_plat,
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraint,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+            mock_plat.assert_not_called()
+            mock_constraint.assert_not_called()
+            mock_conn.cursor.assert_not_called()
 
     def test_config_with_no_optimizations_skips_apply_platform_optimizations(self):
         adapter = _make_adapter()

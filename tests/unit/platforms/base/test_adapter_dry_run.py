@@ -113,3 +113,32 @@ class TestAdapterDryRunFlag:
         with patch.object(adapter, "check_database_exists", return_value=False) as mock_check:
             adapter.handle_existing_database(database="test")
             mock_check.assert_called_once()
+
+    def test_is_dry_run_property_and_synchronization(self):
+        adapter = self._make_adapter(dry_run=False)
+        assert adapter.dry_run is False
+        assert adapter.dry_run_mode is False
+        assert adapter.is_dry_run is False
+
+        adapter.enable_dry_run()
+        assert adapter.dry_run is True
+        assert adapter.dry_run_mode is True
+        assert adapter.is_dry_run is True
+
+        adapter.disable_dry_run()
+        assert adapter.dry_run is False
+        assert adapter.dry_run_mode is False
+        assert adapter.is_dry_run is False
+
+    def test_enable_dry_run_preserves_initial_true_config_on_disable(self):
+        adapter = self._make_adapter(dry_run=True)
+        assert adapter.dry_run is True
+        assert adapter.is_dry_run is True
+
+        adapter.enable_dry_run()
+        assert adapter.dry_run is True
+        assert adapter.is_dry_run is True
+
+        adapter.disable_dry_run()
+        assert adapter.dry_run is True
+        assert adapter.is_dry_run is True

@@ -498,7 +498,7 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
             # "table already exists" while other tables rebuild cleanly.
             # Skipped for dry-run (no DDL should execute) and when we've
             # already confirmed the existing database is being reused.
-            if not self.dry_run and not getattr(self, "database_was_reused", False):
+            if not self.is_dry_run and not getattr(self, "database_was_reused", False):
                 benchmark_tables = getattr(benchmark, "tables", None)
                 if isinstance(benchmark_tables, dict):
                     droppable = [

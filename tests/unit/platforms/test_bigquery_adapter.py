@@ -692,8 +692,9 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Should not raise exception - BigQuery optimizations are automatic
         adapter.configure_for_benchmark(mock_client, "olap")
+        assert mock_client._default_job_config is not None
+        assert mock_client._default_job_config.use_legacy_sql is False
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_success(self, mock_bigquery, dependencies_available):
@@ -818,8 +819,8 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Should not raise exception - BigQuery client doesn't need explicit closing
         adapter.close_connection(mock_client)
+        mock_client.close.assert_called_once()
 
     def test_supports_tuning_type(self, dependencies_available):
         """Test tuning type support checking."""
@@ -937,8 +938,8 @@ class TestBigQueryAdapter:
 
             mock_tuning.get_columns_by_type.side_effect = mock_get_columns_by_type
 
-            # Should not raise exception - BigQuery tuning is applied during table creation
             adapter.apply_table_tunings(mock_tuning, mock_client)
+            mock_client.get_table.assert_called_once()
 
     def test_apply_unified_tuning(self, dependencies_available):
         """Test unified tuning configuration application."""
@@ -952,10 +953,13 @@ class TestBigQueryAdapter:
             mock_unified_config.platform_optimizations = Mock()
             mock_unified_config.table_tunings = {}
 
-            # Should not raise exception
-            with patch.object(adapter, "apply_constraint_configuration"):
-                with patch.object(adapter, "apply_platform_optimizations"):
-                    adapter.apply_unified_tuning(mock_unified_config, mock_client)
+            with (
+                patch.object(adapter, "apply_constraint_configuration") as mock_constraint,
+                patch.object(adapter, "apply_platform_optimizations") as mock_platform,
+            ):
+                adapter.apply_unified_tuning(mock_unified_config, mock_client)
+                mock_constraint.assert_called_once()
+                mock_platform.assert_called_once()
 
     def test_apply_constraint_configuration(self, dependencies_available):
         """Test constraint configuration application."""
@@ -968,8 +972,10 @@ class TestBigQueryAdapter:
             mock_foreign_key_config = Mock()
             mock_foreign_key_config.enabled = False
 
-            # Should not raise exception - constraints are not enforced in BigQuery
-            adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_client)
+            with patch.object(adapter.logger, "info") as mock_info:
+                adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_client)
+                mock_info.assert_called_once()
+                assert "Primary key" in mock_info.call_args[0][0]
 
     def test_cost_control_features(self, dependencies_available):
         """Test BigQuery cost control features."""
@@ -2624,7 +2630,9 @@ class TestCloseConnectionEdgeCases:
     def test_close_none_connection(self, mock_bigquery):
         """close_connection(None) does nothing."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
-        adapter.close_connection(None)  # should not raise
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(None)
+            mock_warn.assert_not_called()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_suppresses_token_error(self, mock_bigquery):
@@ -2632,7 +2640,13 @@ class TestCloseConnectionEdgeCases:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("token expired during refresh")
-        adapter.close_connection(mock_conn)  # should not raise
+        with (
+            patch.object(adapter, "log_very_verbose") as mock_log,
+            patch.object(adapter.logger, "warning") as mock_warn,
+        ):
+            adapter.close_connection(mock_conn)
+            mock_log.assert_called_once()
+            mock_warn.assert_not_called()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_suppresses_auth_error(self, mock_bigquery):
@@ -2640,7 +2654,13 @@ class TestCloseConnectionEdgeCases:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("auth credentials invalid")
-        adapter.close_connection(mock_conn)  # should not raise
+        with (
+            patch.object(adapter, "log_very_verbose") as mock_log,
+            patch.object(adapter.logger, "warning") as mock_warn,
+        ):
+            adapter.close_connection(mock_conn)
+            mock_log.assert_called_once()
+            mock_warn.assert_not_called()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_transport_cleanup(self, mock_bigquery):
@@ -2697,9 +2717,9 @@ class TestValidateCompressionSupport:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock()
 
-        with patch("benchbox.platforms.bigquery.detect_compression", return_value="gzip"):
-            # should not raise
+        with patch("benchbox.platforms.bigquery.detect_compression", return_value="gzip") as mock_detect:
             adapter._validate_compression_support({"lineitem": [Path("/tmp/lineitem.csv.gz")]}, mock_benchmark)
+            mock_detect.assert_called_once_with(Path("/tmp/lineitem.csv.gz"))
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_uncompressed_file_passes(self, mock_bigquery):
@@ -2707,8 +2727,9 @@ class TestValidateCompressionSupport:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock()
 
-        with patch("benchbox.platforms.bigquery.detect_compression", return_value="none"):
+        with patch("benchbox.platforms.bigquery.detect_compression", return_value="none") as mock_detect:
             adapter._validate_compression_support({"nation": [Path("/tmp/nation.tbl")]}, mock_benchmark)
+            mock_detect.assert_called_once_with(Path("/tmp/nation.tbl"))
 
 
 @pytest.mark.usefixtures("dependencies_available")

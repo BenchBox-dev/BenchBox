@@ -289,6 +289,40 @@ class TestMakefileCommands:
         assert "--timeout=300" in test_all
         assert "--timeout=1200" in test_all
 
+    def test_pytest_ini_declares_baseline_timeout(self):
+        repo_root = Path.cwd()
+        pytest_ini = (repo_root / "pytest.ini").read_text(encoding="utf-8")
+        pytest_ci_ini = (repo_root / "pytest-ci.ini").read_text(encoding="utf-8")
+
+        assert "timeout = 300" in pytest_ini
+        assert "timeout = 300" in pytest_ci_ini
+
+    def test_pytest_timeout_kills_hanging_test(self, tmp_path: Path):
+        """Verify that pytest reads timeout configuration directly from ini without a CLI flag."""
+        ini_file = tmp_path / "pytest.ini"
+        ini_file.write_text("[pytest]\ntimeout = 1\n", encoding="utf-8")
+
+        test_file = tmp_path / "test_hang.py"
+        test_file.write_text(
+            "import time\ndef test_hang():\n    time.sleep(5)\n",
+            encoding="utf-8",
+        )
+        env = {**os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", str(test_file), "-q", "--tb=short", "-p", "no:cov"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
+        )
+        assert result.returncode != 0
+        assert (
+            "Timeout (>1.0s) from pytest-timeout" in result.stdout
+            or "Timeout" in result.stdout
+            or "Timeout" in result.stderr
+        )
+
     def test_skill_integrity_preflight_pure_skill_selects_only_focused_lane(self, tmp_path: Path):
         result, calls = _run_skill_integrity_preflight_route(
             tmp_path,

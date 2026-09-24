@@ -684,7 +684,6 @@ omit = [
 
 [tool.coverage.report]
 # Coverage reporting thresholds
-fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [

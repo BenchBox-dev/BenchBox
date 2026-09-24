@@ -433,7 +433,7 @@ class TestRenderPostRunCharts:
             side_effect=ImportError("no module"),
         ):
             _render_post_run_charts(mock_result, mock_console, quiet=False)
-        # Should not raise
+        mock_console.print.assert_not_called()
 
 
 # ===================================================================
@@ -563,6 +563,7 @@ class TestErrorHandlerBranches:
         err = DatabaseError("connection refused", include_version=False)
         ctx = ErrorContext(operation="load", stage="connect", database_type="duckdb")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_database_error_postgresql(self):
         from benchbox.cli.exceptions import DatabaseError, ErrorContext, ErrorHandler
@@ -571,6 +572,7 @@ class TestErrorHandlerBranches:
         err = DatabaseError("connection refused", include_version=False)
         ctx = ErrorContext(operation="load", stage="connect", database_type="postgresql")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_execution_error_tpch(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler, ExecutionError
@@ -579,6 +581,7 @@ class TestErrorHandlerBranches:
         err = ExecutionError("out of memory", include_version=False)
         ctx = ErrorContext(operation="power", stage="query", benchmark_name="tpch")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_execution_error_no_benchmark(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler, ExecutionError
@@ -587,6 +590,7 @@ class TestErrorHandlerBranches:
         err = ExecutionError("timeout", include_version=False)
         ctx = ErrorContext(operation="power", stage="query")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_validation_error(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler, ValidationError
@@ -595,6 +599,7 @@ class TestErrorHandlerBranches:
         err = ValidationError("bad input", include_version=False)
         ctx = ErrorContext(operation="validate", stage="input")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_cloud_storage_error_s3(self):
         from benchbox.cli.exceptions import CloudStorageError, ErrorContext, ErrorHandler
@@ -603,6 +608,7 @@ class TestErrorHandlerBranches:
         err = CloudStorageError("access denied", details={"provider": "s3"}, include_version=False)
         ctx = ErrorContext(operation="upload", stage="transfer")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_cloud_storage_error_gcs(self):
         from benchbox.cli.exceptions import CloudStorageError, ErrorContext, ErrorHandler
@@ -611,6 +617,7 @@ class TestErrorHandlerBranches:
         err = CloudStorageError("not found", details={"provider": "gs"}, include_version=False)
         ctx = ErrorContext(operation="upload", stage="transfer")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_cloud_storage_error_azure(self):
         from benchbox.cli.exceptions import CloudStorageError, ErrorContext, ErrorHandler
@@ -619,6 +626,7 @@ class TestErrorHandlerBranches:
         err = CloudStorageError("forbidden", details={"provider": "azure"}, include_version=False)
         ctx = ErrorContext(operation="upload", stage="transfer")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_platform_error(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler, PlatformError
@@ -627,6 +635,7 @@ class TestErrorHandlerBranches:
         err = PlatformError("driver missing", include_version=False)
         ctx = ErrorContext(operation="connect", stage="init")
         handler.handle_error(err, ctx)
+        assert handler.console.print.called
 
     def test_handle_generic_cli_error(self):
         from benchbox.cli.exceptions import BenchboxCLIError, ErrorHandler
@@ -634,6 +643,7 @@ class TestErrorHandlerBranches:
         handler = ErrorHandler(console=MagicMock())
         err = BenchboxCLIError("generic", include_version=False)
         handler.handle_error(err)
+        assert handler.console.print.called
 
     def test_handle_generic_error_with_traceback(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler
@@ -642,6 +652,7 @@ class TestErrorHandlerBranches:
         err = RuntimeError("unexpected")
         ctx = ErrorContext(operation="run", stage="execute", include_version_info=False)
         handler.handle_error(err, ctx, show_traceback=True)
+        assert handler.console.print.called
 
     def test_handle_cli_error_with_traceback(self):
         from benchbox.cli.exceptions import BenchboxCLIError, ErrorContext, ErrorHandler
@@ -650,6 +661,7 @@ class TestErrorHandlerBranches:
         err = BenchboxCLIError("test error", include_version=False)
         ctx = ErrorContext(operation="run", stage="test", include_version_info=False)
         handler.handle_error(err, ctx, show_traceback=True)
+        assert handler.console.print.called
 
     def test_handle_error_with_version_details(self):
         from benchbox.cli.exceptions import BenchboxCLIError, ErrorHandler
@@ -661,6 +673,7 @@ class TestErrorHandlerBranches:
             include_version=False,
         )
         handler.handle_error(err)
+        assert handler.console.print.called
 
     def test_show_context_with_source_location(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler
@@ -675,6 +688,7 @@ class TestErrorHandlerBranches:
             include_version_info=False,
         )
         handler._show_context_info(ctx)
+        assert handler.console.print.called
 
     def test_show_context_non_benchbox_source(self):
         from benchbox.cli.exceptions import ErrorContext, ErrorHandler
@@ -688,6 +702,7 @@ class TestErrorHandlerBranches:
             include_version_info=False,
         )
         handler._show_context_info(ctx)
+        assert handler.console.print.called
 
 
 # ===================================================================
@@ -717,7 +732,7 @@ class TestValidationRules:
     def test_validate_scale_factor_valid(self):
         from benchbox.cli.exceptions import ValidationRules
 
-        ValidationRules.validate_scale_factor(1.0)  # should not raise
+        assert ValidationRules.validate_scale_factor(1.0) is None
 
     def test_validate_benchmark_name_empty(self):
         from benchbox.cli.exceptions import ValidationError, ValidationRules
@@ -734,7 +749,7 @@ class TestValidationRules:
     def test_validate_benchmark_name_case_insensitive(self):
         from benchbox.cli.exceptions import ValidationRules
 
-        ValidationRules.validate_benchmark_name("TPCH", ["tpch", "tpcds"])
+        assert ValidationRules.validate_benchmark_name("TPCH", ["tpch", "tpcds"]) is None
 
     def test_validate_output_directory_local(self, tmp_path):
         from benchbox.cli.exceptions import ValidationRules

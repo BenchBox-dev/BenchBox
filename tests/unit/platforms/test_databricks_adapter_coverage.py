@@ -1490,6 +1490,7 @@ class TestAnalyzeTable:
 
         # Should not raise
         adapter.analyze_table(mock_conn, "lineitem")
+        mock_cursor.execute.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1923,15 +1924,17 @@ class TestApplyPlatformOptimizations:
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_platform_optimizations(None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(None, mock_conn)
+            mock_info.assert_not_called()
 
     def test_logs_when_config_provided(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_config = MagicMock()
-        # Should not raise
-        adapter.apply_platform_optimizations(mock_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_platform_optimizations(mock_config, mock_conn)
+            mock_info.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -1945,8 +1948,13 @@ class TestApplyUnifiedTuning:
     def test_no_op_when_config_is_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_unified_tuning(None, mock_conn)
+        with (
+            patch.object(adapter, "apply_platform_optimizations") as mock_plat,
+            patch.object(adapter, "apply_constraint_configuration") as mock_constraint,
+        ):
+            adapter.apply_unified_tuning(None, mock_conn)
+            mock_plat.assert_not_called()
+            mock_constraint.assert_not_called()
 
     def test_calls_apply_platform_optimizations(self):
         adapter = _make_adapter()
@@ -1979,8 +1987,9 @@ class TestApplyConstraintConfiguration:
     def test_no_op_when_pk_and_fk_are_none(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
-        # Should not raise
-        adapter.apply_constraint_configuration(None, None, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(None, None, mock_conn)
+            mock_info.assert_not_called()
 
     def test_logs_when_pk_enabled(self):
         adapter = _make_adapter()
@@ -1992,8 +2001,9 @@ class TestApplyConstraintConfiguration:
         fk_config = MagicMock()
         fk_config.enabled = False
 
-        # Should not raise
-        adapter.apply_constraint_configuration(pk_config, fk_config, mock_conn)
+        with patch.object(adapter.logger, "info") as mock_info:
+            adapter.apply_constraint_configuration(pk_config, fk_config, mock_conn)
+            mock_info.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -2050,8 +2060,9 @@ class TestValidateExternalTableRequirements:
         adapter.uc_schema = None
         adapter.uc_volume = None
 
-        # Should not raise
-        adapter.validate_external_table_requirements()
+        with patch.object(adapter, "_is_cloud_uri", wraps=adapter._is_cloud_uri) as mock_check:
+            adapter.validate_external_table_requirements()
+            mock_check.assert_called_once_with("s3://bucket/path")
 
     def test_passes_when_uc_volume_configured(self):
         adapter = _make_adapter()
@@ -2060,8 +2071,9 @@ class TestValidateExternalTableRequirements:
         adapter.uc_schema = "sch"
         adapter.uc_volume = "vol"
 
-        # Should not raise
+        # Valid UC volume triple satisfies requirement without raising ValueError
         adapter.validate_external_table_requirements()
+        assert adapter.uc_catalog == "cat" and adapter.uc_schema == "sch" and adapter.uc_volume == "vol"
 
 
 # ---------------------------------------------------------------------------
@@ -2217,15 +2229,18 @@ class TestCloseConnection:
 
     def test_handles_none_connection(self):
         adapter = _make_adapter()
-        # Should not raise
-        adapter.close_connection(None)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(None)
+            mock_warn.assert_not_called()
 
     def test_handles_close_exception(self):
         adapter = _make_adapter()
         mock_conn = MagicMock()
         mock_conn.close.side_effect = RuntimeError("close failed")
-        # Should not raise - exception is caught and logged as warning
-        adapter.close_connection(mock_conn)
+        with patch.object(adapter.logger, "warning") as mock_warn:
+            adapter.close_connection(mock_conn)
+            mock_warn.assert_called_once()
+            assert "close failed" in mock_warn.call_args[0][0]
 
 
 # ---------------------------------------------------------------------------

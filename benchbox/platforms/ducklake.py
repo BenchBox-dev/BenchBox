@@ -694,7 +694,7 @@ class DuckLakeAdapter(DuckDBAdapter):
             )
             return
 
-        if self.dry_run:
+        if self.is_dry_run:
             # Never mutate on-disk artifacts during a dry run.
             self.log_verbose("DuckLake catalog validation skipped (dry run mode)")
             return
@@ -889,7 +889,7 @@ class DuckLakeAdapter(DuckDBAdapter):
         Parquet in DATA_PATH is not reclaimed here - see _reset_ducklake_catalog
         for the same caveat on cloud storage.
         """
-        if self.dry_run:
+        if self.is_dry_run:
             self.log_verbose("DuckLake postgres catalog reuse detection skipped (dry run mode)")
             return
 
