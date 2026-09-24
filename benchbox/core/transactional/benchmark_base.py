@@ -19,7 +19,11 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect, table_exists
+from benchbox.core.primitives_benchmark_utils import (
+    failed_platform_error,
+    quote_identifier_for_dialect,
+    table_exists,
+)
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
 
 ResultT = TypeVar("ResultT")
@@ -451,8 +455,12 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         for table in source_tables:
             try:
                 quoted = self._quote_identifier(table)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                count = result[0] if result else 0
+                res = connection.execute(f"SELECT COUNT(*) FROM {quoted}")
+                if failed_platform_error(res) is not None:
+                    count = 0
+                else:
+                    result = res.fetchone()
+                    count = result[0] if result else 0
             except Exception:
                 count = 0
             parts.append(f"{table}:{count}")
@@ -471,18 +479,26 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
 
-        connection.execute(
+        res1 = connection.execute(
             f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
             "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
             "source_digest VARCHAR, created_at VARCHAR)"
         )
-        connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res1)) is not None:
+            raise RuntimeError(f"Failed to create staging manifest table: {err}")
+
+        res2 = connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res2)) is not None:
+            raise RuntimeError(f"Failed to delete previous staging manifest entry: {err}")
+
         created_at = datetime.now(timezone.utc).isoformat()
-        connection.execute(
+        res3 = connection.execute(
             f"INSERT INTO {quoted_table} (benchmark, scale, spec_version, source_digest, created_at) VALUES "
             f"('{_sql_escape(benchmark_id)}', '{_sql_escape(scale)}', '{_sql_escape(spec_version)}', "
             f"'{_sql_escape(source_digest)}', '{_sql_escape(created_at)}')"
         )
+        if (err := failed_platform_error(res3)) is not None:
+            raise RuntimeError(f"Failed to insert staging manifest entry: {err}")
 
     def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
         """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
@@ -503,7 +519,10 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 f"spec_version = '{_sql_escape(spec_version)}' AND "
                 f"source_digest = '{_sql_escape(source_digest)}'"
             )
-            result = connection.execute(query).fetchone()
+            res = connection.execute(query)
+            if failed_platform_error(res) is not None:
+                return False
+            result = res.fetchone()
             return bool(result and result[0])
         except Exception:
             return False

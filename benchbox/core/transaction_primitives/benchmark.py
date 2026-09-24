@@ -195,13 +195,16 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
         # Create lock table if it doesn't exist (atomic operation)
         try:
-            connection.execute("""
+            lock_res = connection.execute("""
                 CREATE TABLE IF NOT EXISTS transaction_primitives_setup_lock (
                     lock_name VARCHAR(255) PRIMARY KEY,
                     holder_info VARCHAR(1000),
                     acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            if (err := failed_platform_error(lock_res)) is not None:
+                self.log_verbose(f"Warning: Could not create lock table: {err}")
+                return False
         except Exception as e:
             self.log_verbose(f"Warning: Could not create lock table: {e}")
             return False
@@ -221,10 +224,19 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 escaped_lock_name = lock_name.replace("'", "''")
                 escaped_holder_info = holder_info.replace("'", "''")
 
-                connection.execute(
+                ins_res = connection.execute(
                     f"INSERT INTO transaction_primitives_setup_lock (lock_name, holder_info) "
                     f"VALUES ('{escaped_lock_name}', '{escaped_holder_info}')"
                 )
+                if (err := failed_platform_error(ins_res)) is not None:
+                    error_msg = err.lower()
+                    if "unique" in error_msg or "duplicate" in error_msg or "constraint" in error_msg:
+                        # Lock held by another process - wait and retry
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        self.log_verbose(f"Unexpected error acquiring lock: {err}")
+                        return False
                 self.log_verbose(f"Acquired setup lock (waited {elapsed_seconds(start_time):.1f}s)")
                 return True
             except Exception as e:
@@ -310,8 +322,62 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         SELECT * FROM {source_table}
         """
 
-        connection.execute(populate_sql)
+        populate_res = connection.execute(populate_sql)
+        if (err := failed_platform_error(populate_res)) is not None:
+            raise RuntimeError(f"Failed to populate {staging_table} from {source_table}: {err}")
         self.log_verbose(f"{staging_table} populated successfully")
+
+    def _ensure_staging_table_populated(
+        self,
+        connection: DatabaseConnection,
+        table_name: str,
+    ) -> int:
+        """Ensure a staging table is populated and return its row count."""
+        if table_name not in ["txn_orders", "txn_lineitem", "txn_customer"]:
+            try:
+                quoted_empty = self._quote_identifier(table_name)
+                return fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_empty}")
+            except Exception:
+                return 0
+
+        source_table = "orders" if "orders" in table_name else ("lineitem" if "lineitem" in table_name else "customer")
+        quoted_table = self._quote_identifier(table_name)
+
+        try:
+            current_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
+        except Exception:
+            current_count = 0
+
+        if current_count > 0:
+            self.log_verbose(f"Table {table_name} already populated ({current_count} rows)")
+            return current_count
+
+        # Validate source table has data before copying
+        try:
+            quoted_source = self._quote_identifier(source_table)
+            source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
+        except Exception as e:
+            raise RuntimeError(
+                f"Cannot validate source table '{source_table}' before populating '{table_name}': {e}"
+            ) from e
+
+        if source_count == 0:
+            raise RuntimeError(
+                f"Source table '{source_table}' is empty (0 rows). "
+                f"Cannot populate staging table '{table_name}'. "
+                f"Please ensure TPC-H data is loaded before running setup()."
+            )
+
+        self.log_verbose(f"Populating {table_name} from {source_table} ({source_count} rows)...")
+        self._populate_staging_table(connection, table_name, source_table)
+        final_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
+        self.log_verbose(f"✅ Populated {table_name} with {final_count} rows")
+
+        if final_count != source_count:
+            self.log_verbose(
+                f"⚠️ Warning: Row count mismatch after population. Source: {source_count}, Destination: {final_count}"
+            )
+        return final_count
 
     def setup(self, connection: DatabaseConnection, force: bool = False, dialect: str = "standard") -> dict[str, Any]:
         """Setup benchmark for execution.
@@ -342,7 +408,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         required_tables = ["orders", "lineitem", "customer"]
         for table in required_tables:
             try:
-                connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                probe_res = connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                if (err := failed_platform_error(probe_res)) is not None:
+                    raise RuntimeError(f"Source table check failed: {err}")
             except Exception as e:
                 raise RuntimeError(
                     f"Required TPC-H table '{table}' not found. "
@@ -393,7 +461,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 # Create table if not exists (atomic operation)
                 create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
                 try:
-                    connection.execute(create_sql)
+                    create_res = connection.execute(create_sql)
+                    if (err := failed_platform_error(create_res)) is not None:
+                        raise RuntimeError(f"Failed to create {table_name}: {err}")
 
                     # Track newly created tables (didn't exist before)
                     if not table_existed:
@@ -404,59 +474,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                 except Exception as e:
                     raise RuntimeError(f"Failed to create {table_name}: {e}") from e
 
-                # Populate staging tables that are based on TPC-H tables
-                if table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
-                    source_table = (
-                        "orders" if "orders" in table_name else ("lineitem" if "lineitem" in table_name else "customer")
-                    )
-
-                    # Check if table needs population
-                    try:
-                        quoted_table = self._quote_identifier(table_name)
-                        current_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
-                    except Exception:
-                        current_count = 0
-
-                    if current_count == 0:
-                        # Validate source table has data before copying
-                        try:
-                            quoted_source = self._quote_identifier(source_table)
-                            source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
-                        except Exception as e:
-                            raise RuntimeError(
-                                f"Cannot validate source table '{source_table}' before populating '{table_name}': {e}"
-                            ) from e
-
-                        if source_count == 0:
-                            raise RuntimeError(
-                                f"Source table '{source_table}' is empty (0 rows). "
-                                f"Cannot populate staging table '{table_name}'. "
-                                f"Please ensure TPC-H data is loaded before running setup()."
-                            )
-
-                        # Table is empty - populate it (lock prevents concurrent population)
-                        self.log_verbose(f"Populating {table_name} from {source_table} ({source_count} rows)...")
-                        self._populate_staging_table(connection, table_name, source_table)
-                        status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
-                        self.log_verbose(f"✅ Populated {table_name} with {status[table_name]} rows")
-
-                        # Verify row count matches (detect copy failures)
-                        if status[table_name] != source_count:
-                            self.log_verbose(
-                                f"⚠️ Warning: Row count mismatch after population. "
-                                f"Source: {source_count}, Destination: {status[table_name]}"
-                            )
-                    else:
-                        # Table already has data
-                        status[table_name] = current_count
-                        self.log_verbose(f"Table {table_name} already populated ({current_count} rows)")
-                else:
-                    # Other staging tables start empty - just count rows
-                    try:
-                        result = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
-                        status[table_name] = result[0] if result else 0
-                    except Exception:
-                        status[table_name] = 0
+                status[table_name] = self._ensure_staging_table_populated(connection, table_name)
 
             # Record this setup()'s provenance (benchmark, scale, spec version,
             # source digest) so is_setup() can require an exact match rather
@@ -578,8 +596,8 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             # the dialect so uppercase catalogs (Snowflake, BigQuery) resolve.
             for table_name in ["txn_orders", "txn_lineitem", "txn_customer"]:
                 quoted = self._quote_identifier(table_name)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                if not result or result[0] == 0:
+                count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
+                if count <= 0:
                     return False
             return self._staging_manifest_matches(connection, ["orders", "lineitem", "customer"])
         except Exception:
@@ -827,7 +845,9 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
             if operation.cleanup_sql:
                 # Execute cleanup SQL
                 try:
-                    connection.execute(operation.cleanup_sql)
+                    cleanup_res = connection.execute(operation.cleanup_sql)
+                    if (cleanup_err := failed_platform_error(cleanup_res)) is not None:
+                        raise RuntimeError(cleanup_err)
                 except Exception as e:
                     cleanup_error = str(e)
                     self.log_verbose(f"Cleanup SQL failed for {operation_id}: {cleanup_error}")

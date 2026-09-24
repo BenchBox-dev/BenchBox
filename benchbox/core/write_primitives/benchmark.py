@@ -282,13 +282,16 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         # Create lock table if it doesn't exist (atomic operation)
         try:
-            connection.execute("""
+            lock_res = connection.execute("""
                 CREATE TABLE IF NOT EXISTS write_primitives_setup_lock (
                     lock_name VARCHAR(255) PRIMARY KEY,
                     holder_info VARCHAR(1000),
                     acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            if (err := failed_platform_error(lock_res)) is not None:
+                self.log_verbose(f"Warning: Could not create lock table: {err}")
+                return False
         except Exception as e:
             self.log_verbose(f"Warning: Could not create lock table: {e}")
             return False
@@ -308,10 +311,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 escaped_lock_name = lock_name.replace("'", "''")
                 escaped_holder_info = holder_info.replace("'", "''")
 
-                connection.execute(
+                ins_res = connection.execute(
                     f"INSERT INTO write_primitives_setup_lock (lock_name, holder_info) "
                     f"VALUES ('{escaped_lock_name}', '{escaped_holder_info}')"
                 )
+                if (err := failed_platform_error(ins_res)) is not None:
+                    error_msg = err.lower()
+                    if "unique" in error_msg or "duplicate" in error_msg or "constraint" in error_msg:
+                        # Lock held by another process - wait and retry
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        self.log_verbose(f"Unexpected error acquiring lock: {err}")
+                        return False
                 self.log_verbose(f"Acquired setup lock (waited {elapsed_seconds(start_time):.1f}s)")
                 return True
             except Exception as e:
@@ -512,8 +524,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 continue
             try:
                 quoted = self._quote_identifier(table_name)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                row_count = result[0] if result else 0
+                row_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
             except Exception:
                 # Table missing entirely (never created) is the same "unavailable" case.
                 row_count = 0
@@ -715,9 +726,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if self._setup_dialect.lower() == "sqlite":
             for statement in sql.split(";"):
                 if statement.strip():
-                    connection.execute(statement)
+                    stmt_res = connection.execute(statement)
+                    if (err := failed_platform_error(stmt_res)) is not None:
+                        raise RuntimeError(f"Population SQL statement failed: {err}")
             return
-        connection.execute(sql)
+        res = connection.execute(sql)
+        if (err := failed_platform_error(res)) is not None:
+            raise RuntimeError(f"Population SQL failed: {err}")
 
     def _populate_staging_tables(self, connection: DatabaseConnection, tables: dict[str, str]) -> dict[str, int]:
         """Populate staging tables from source tables.
@@ -817,7 +832,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         required_tables = ["orders", "lineitem"]
         for table in required_tables:
             try:
-                connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                probe_res = connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                if (err := failed_platform_error(probe_res)) is not None:
+                    raise RuntimeError(f"Source table check failed: {err}")
             except Exception as e:
                 raise RuntimeError(
                     f"Required TPC-H table '{table}' not found. "
@@ -863,7 +880,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 table_existed = self._table_exists(connection, table_name)
                 create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
                 try:
-                    connection.execute(create_sql)
+                    create_res = connection.execute(create_sql)
+                    if (err := failed_platform_error(create_res)) is not None:
+                        raise RuntimeError(f"Failed to create {table_name}: {err}")
                     if not table_existed:
                         created_tables.append(table_name)
                         self.log_verbose(f"Created {table_name}")
@@ -894,8 +913,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 if table_name not in status:
                     try:
                         quoted = self._quote_identifier(table_name)
-                        result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                        status[table_name] = result[0] if result else 0
+                        status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
                     except Exception:
                         status[table_name] = 0
 
@@ -1040,8 +1058,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             for table_name in required_tables:
                 quoted = self._quote_identifier(table_name)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                if not result or result[0] == 0:
+                count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
+                if count <= 0:
                     return False
             return self._staging_manifest_matches(connection, ["orders", "lineitem"])
         except Exception:
@@ -1447,7 +1465,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         if operation.cleanup_sql:
             try:
-                connection.execute(operation.cleanup_sql)
+                cleanup_res = connection.execute(operation.cleanup_sql)
+                if (cleanup_err := failed_platform_error(cleanup_res)) is not None:
+                    raise RuntimeError(cleanup_err)
                 self.log_verbose(f"Executed cleanup SQL for {operation_id}")
             except Exception as e:
                 cleanup_error = str(e)

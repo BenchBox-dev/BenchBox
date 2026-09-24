@@ -94,6 +94,8 @@ def failed_platform_error(cursor: Any) -> str | None:
     platform_result = getattr(cursor, "platform_result", None)
     if isinstance(platform_result, dict) and platform_result.get("status") == "FAILED":
         return str(platform_result.get("error", "unknown error"))
+    if isinstance(cursor, dict) and cursor.get("status") == "FAILED":
+        return str(cursor.get("error", "unknown error"))
     return None
 
 
@@ -121,7 +123,16 @@ def table_exists(
     """Check whether a table exists without requiring information schema access."""
     try:
         quoted_table = quote_identifier_for_dialect(table_name, dialect)
-        connection.execute(f"SELECT 1 FROM {quoted_table} LIMIT 0")
+        cursor = connection.execute(f"SELECT 1 FROM {quoted_table} LIMIT 0")
+        if (error := failed_platform_error(cursor)) is not None:
+            error_msg = error.lower()
+            if any(
+                phrase in error_msg
+                for phrase in ["does not exist", "doesn't exist", "no such table", "unknown table", "not found"]
+            ):
+                return False
+            log_verbose(f"Unexpected error checking table '{table_name}': {error}")
+            return False
         return True
     except ValueError as exc:
         log_verbose(f"Invalid table name '{table_name}': {exc}")
