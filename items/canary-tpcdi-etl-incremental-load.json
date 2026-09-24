@@ -60,6 +60,15 @@
       "op": "update",
       "op_id": "1a58f20719b5495cbd517de64bd28034",
       "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-24T01:23:53Z",
+      "client": "codex-mcp-client",
+      "generation": "cc1027cc87be4f92852f0098515a0fdc",
+      "op": "take",
+      "op_id": "8dbf8f1bae5e4df597bd7b7b0cdb5ec8",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
 }

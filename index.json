@@ -1765,9 +1765,9 @@
     },
     "canary-tpcdi-etl-incremental-load": {
       "claim": {
-        "expires_at": "2026-09-24T23:23:46Z",
-        "generation": "be14c404eebc4c168c8c42e87fc10144",
-        "renewals": 0,
+        "expires_at": "2026-09-25T01:23:53Z",
+        "generation": "cc1027cc87be4f92852f0098515a0fdc",
+        "renewals": 1,
         "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d"
       },
       "needs": [],
