@@ -14,6 +14,7 @@ from scripts.canary_impact import (
     CANT_AFFECT_CANARY,
     WHOLE_SUITE_PATHS,
     FileDeps,
+    _resolve_plugin_file,
     build_dependency_map,
     compute_selection,
     files_from_node_ids,
@@ -265,6 +266,47 @@ class TestDependencyRules:
         selection = _select(root, test_files, node_ids, ["mypkg/unit_helper.py"])
         assert selection["whole_suite"] is False
         assert [s["node_id"] for s in selection["selected"]] == ["tests/unit/test_x.py::test_a"]
+
+    def test_package_plugin_resolves_exact_file(self, tmp_path: Path) -> None:
+        root = tmp_path
+        _write_tree(
+            root,
+            {
+                "tests/conftest.py": 'pytest_plugins = ["pkg.plug"]\n',
+                "pkg/__init__.py": "MARKER = 1\n",
+                "pkg/plug.py": "import mypkg.leaf\n",
+                "mypkg/__init__.py": "",
+                "mypkg/leaf.py": "VALUE = 1\n",
+                "tests/test_x.py": "def test_a(): ...\n",
+            },
+        )
+        assert _resolve_plugin_file("pkg.plug", root / "tests" / "conftest.py", root) == "pkg/plug.py"
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        deps = dep_map["tests/test_x.py"].deps
+        # The plugin module itself, its package initializer, and the
+        # plugin's transitive dependencies must all be shared edges.
+        assert "pkg/plug.py" in deps
+        assert "pkg/__init__.py" in deps
+        assert "mypkg/leaf.py" in deps
+
+    def test_from_import_submodule_of_regular_package(self, tmp_path: Path) -> None:
+        root = _fixture_root(
+            tmp_path,
+            {
+                # The initializer deliberately does not import sub: the
+                # submodule edge must come from probing, not the closure.
+                "mypkg/__init__.py": "MARKER = 1\n",
+                "mypkg/sub.py": "VALUE = 1\n",
+                "tests/test_x.py": "from mypkg import sub\n",
+            },
+        )
+        dep_map, fallback, _sites = build_dependency_map(root, ["tests/test_x.py"])
+        assert fallback is None
+        assert "mypkg/sub.py" in dep_map["tests/test_x.py"].deps
+        selection = _select(root, ["tests/test_x.py"], _nodes("tests/test_x.py", ["test_a"]), ["mypkg/sub.py"])
+        assert selection["whole_suite"] is False
+        assert [s["node_id"] for s in selection["selected"]] == ["tests/test_x.py::test_a"]
 
     def test_changed_canary_test_selects_itself(self, tmp_path: Path) -> None:
         root = _fixture_root(

@@ -911,11 +911,15 @@ class _FileAnalyzer(ast.NodeVisitor):
             deps.update(candidate_deps)
             if candidate_unknown and _could_be_repo(candidate, self.root):
                 unknown = True
-        # ``from package import submodule``: probe each name as a submodule.
+        # ``from package import submodule``: probe each name as a submodule
+        # whenever the package is a directory. The old condition also
+        # required no ``__init__.py``, which skipped regular packages
+        # precisely when the submodule edge matters: with only the
+        # initializer recorded, a changed submodule mapped by another
+        # test would silently omit this importer.
         if node.module and not node.level:
-            module_file = _module_file(node.module, self.root)
             package_dir = self.root.joinpath(*node.module.split("."))
-            if module_file is None and package_dir.is_dir():
+            if _is_dir(package_dir):
                 for alias in node.names:
                     if alias.name == "*":
                         continue
@@ -1365,11 +1369,59 @@ def _read_pytest_plugins(conftest: Path) -> tuple[list[str], str | None]:
 
 
 def _resolve_plugin_file(plugin: str, conftest: Path, root: Path) -> str | None:
-    """Return the repo-relative file of a plugin module, or None."""
-    deps, unknown = _resolve_import(plugin, conftest, root)
-    if unknown:
+    """Return the repo-relative file of a plugin module, or None.
+
+    Resolves the exact module file for the full dotted name. Taking an
+    arbitrary ``.py`` from the general import dependencies is wrong: that
+    set also holds the parent package ``__init__.py`` files, and set
+    iteration order varies with hash randomization, so the seed would
+    sometimes be an initializer with the plugin's own transitive
+    dependencies omitted.
+    """
+    if plugin.startswith("."):
+        level = len(plugin) - len(plugin.lstrip("."))
+        remainder = plugin.lstrip(".")
+        try:
+            package_dir = conftest.parent.relative_to(root)
+        except ValueError:
+            return None
+        for _ in range(level - 1):
+            package_dir = package_dir.parent
+        dotted = ".".join([*package_dir.parts, remainder] if remainder else list(package_dir.parts))
+        if not dotted:
+            return None
+    else:
+        dotted = plugin
+    if "." in dotted:
+        module_file = _module_file(dotted, root)
+    else:
+        module_file = None
+        for search_dir in BARE_MODULE_SEARCH_DIRS:
+            base = root if not search_dir else root / search_dir
+            for candidate in (base / f"{dotted}.py", base / dotted / "__init__.py"):
+                if candidate.is_file():
+                    module_file = candidate
+                    break
+            if module_file is not None:
+                break
+    if module_file is None:
         return None
-    return next((dep for dep in deps if dep.endswith(".py")), None)
+    return _rel(module_file, root)
+
+
+def _seed_with_parent_inits(seeds: set[str], rel: str, root: Path) -> None:
+    """Add a repo file and its parent package initializers to seeds.
+
+    Importing a module executes every parent package ``__init__.py``, so
+    a seed that omits them misses real edges (and a change to an
+    initializer would otherwise fall through to the whole-suite backstop
+    instead of selecting precisely the affected tests).
+    """
+    seeds.add(rel)
+    for init in _parent_inits(root / rel, root):
+        init_rel = _rel(init, root)
+        if init_rel is not None:
+            seeds.add(init_rel)
 
 
 def _build_shared_deps(root: Path, cache: dict[str, FileDeps]) -> tuple[set[str], str | None, list[str]]:
@@ -1397,7 +1449,7 @@ def _build_shared_deps(root: Path, cache: dict[str, FileDeps]) -> tuple[set[str]
         plugin_file = _resolve_plugin_file(plugin, conftest, root)
         if plugin_file is None:
             return set(), f"plugin_unresolvable:{plugin}", []
-        shared_seeds.add(plugin_file)
+        _seed_with_parent_inits(shared_seeds, plugin_file, root)
     shared_deps, dynamic_files = _expand_closure(shared_seeds, root, cache)
     direct_dynamic = sorted(
         f"{kind}:{rel}" for rel, kinds in dynamic_files.items() for kind in kinds if rel in shared_seeds
@@ -1454,7 +1506,7 @@ def build_dependency_map(root: Path, test_files: list[str]) -> tuple[dict[str, F
                 if plugin_file is None:
                     dynamic_kinds.append(f"chain_plugin_unresolvable:{chain_rel}:{plugin}")
                 else:
-                    seeds.add(plugin_file)
+                    _seed_with_parent_inits(seeds, plugin_file, root)
         expanded, closure_dynamic = _expand_closure(seeds, root, cache)
         handled = set(chain_files) | {test_file}
         library_sites.extend(
