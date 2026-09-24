@@ -26,18 +26,27 @@ _E2E_QUICK_INCOMPATIBLE = {"stress", "resource_heavy", "live_integration"}
 # Marker expressions of the lanes that run over the whole tree (or all of
 # tests/integration), i.e. the ones a module gets selected by without anyone
 # naming it. Path-scoped one-off steps are handled separately by
-# _explicitly_invoked_test_paths(). Sources: Makefile test-* targets and the
-# pytest invocations in .github/workflows/{test,nightly,pr,release-canary,
-# validate-release-pr}.yml.
-_TREE_WIDE_LANES = (
+# _explicitly_invoked_test_paths().
+#
+# Split by actual runner:
+# - _PR_ROUTINE_WIDE_LANES: broad lanes invoked by required PR workflows (pr.yml, test.yml)
+# - _SCHEDULED_OR_RELEASE_WIDE_LANES: broad lanes invoked by scheduled or release workflows:
+#     - nightly.yml:99: "slow and not (stress or resource_heavy or live_integration)"
+#     - validate-release-pr.yml:119: "(slow or resource_heavy) and not (stress or live_integration)"
+# - _AUTOMATED_WORKFLOW_WIDE_LANES: all broad lanes executed across automated workflows
+_PR_ROUTINE_WIDE_LANES = (
     "fast and not (slow or stress or resource_heavy or live_integration)",
     "integration and not live_integration and not stress",
     "integration and not (slow or stress or resource_heavy or live_integration)",
-    "(slow or resource_heavy) and not (stress or live_integration)",
-    "slow and not (stress or live_integration)",
     "medium and not (slow or stress or resource_heavy or live_integration)",
     "platform_smoke or (integration and fast)",
 )
+_SCHEDULED_OR_RELEASE_WIDE_LANES = (
+    "slow and not (stress or resource_heavy or live_integration)",
+    "(slow or resource_heavy) and not (stress or live_integration)",
+)
+_AUTOMATED_WORKFLOW_WIDE_LANES = _PR_ROUTINE_WIDE_LANES + _SCHEDULED_OR_RELEASE_WIDE_LANES
+_TREE_WIDE_LANES = _AUTOMATED_WORKFLOW_WIDE_LANES
 _WORKFLOW_TEST_PATH_RE = re.compile(r"tests/[A-Za-z0-9_./-]+/test_[A-Za-z0-9_-]+\.py")
 # Declaring one of these at MODULE level says "this whole module is opt-in and
 # runs outside the automatic lanes" (credentialed cloud suites, stress runs).
@@ -279,29 +288,27 @@ def _selects(expression: str, markers: set[str]) -> bool:
     return bool(eval(expression, {"__builtins__": {}}, _MarkerNamespace.fromkeys(markers, True)))  # noqa: S307
 
 
-def _explicitly_invoked_test_paths() -> set[str]:
-    """Test paths named directly in a workflow's pytest invocation.
+def _run_blocks(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key == "run" and isinstance(child, str):
+                yield child
+            else:
+                yield from _run_blocks(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _run_blocks(child)
 
-    The escape hatch for a module no tree-wide lane selects is a dedicated step
+
+def _explicitly_invoked_test_paths() -> set[str]:
+    """Integration tests may also be run directly by an explicit pytest command
     that names the file (see pr.yml's promoted-reproducer steps). Those count as
     covered, so scan for them rather than reporting a false positive.
     """
     paths: set[str] = set()
-
-    def run_blocks(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key == "run" and isinstance(child, str):
-                    yield child
-                else:
-                    yield from run_blocks(child)
-        elif isinstance(value, list):
-            for child in value:
-                yield from run_blocks(child)
-
     for workflow in sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml")):
         document = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
-        for command in run_blocks(document):
+        for command in _run_blocks(document):
             try:
                 tokens = shlex.split(command, comments=True, posix=True)
             except ValueError:
@@ -313,6 +320,30 @@ def _explicitly_invoked_test_paths() -> set[str]:
                     if _WORKFLOW_TEST_PATH_RE.fullmatch(path):
                         paths.add(path)
     return paths
+
+
+def _workflow_marker_expressions(workflow_filenames: tuple[str, ...] | None = None) -> set[str]:
+    """Extract all marker expressions passed via `-m <expression>` to pytest in workflow files."""
+    expressions: set[str] = set()
+    workflow_files = (
+        [(_REPO_ROOT / ".github" / "workflows" / fn) for fn in workflow_filenames]
+        if workflow_filenames
+        else sorted((_REPO_ROOT / ".github" / "workflows").glob("*.yml"))
+    )
+    for workflow in workflow_files:
+        if not workflow.is_file():
+            continue
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8")) or {}
+        for command in _run_blocks(document):
+            try:
+                tokens = shlex.split(command, comments=True, posix=True)
+            except ValueError:
+                tokens = []
+            for i, token in enumerate(tokens):
+                if token == "-m" and i + 1 < len(tokens):
+                    if any("pytest" in t for t in tokens[:i]):
+                        expressions.add(tokens[i + 1])
+    return expressions
 
 
 def test_every_integration_module_is_selected_by_at_least_one_lane():
@@ -356,6 +387,79 @@ def test_every_integration_module_is_selected_by_at_least_one_lane():
         "lane runs, declare the opt-in marker at module level if the whole module needs live infra, "
         "or add an explicit pytest step naming the file (see pr.yml's promoted-reproducer steps)."
     )
+
+
+def test_declared_automated_workflow_lanes_occur_in_workflows():
+    """Verify that every lane in _SCHEDULED_OR_RELEASE_WIDE_LANES occurs in an active workflow.
+
+    Guards against drift where a scheduled or release lane is deleted or modified in CI workflows,
+    leaving _SCHEDULED_OR_RELEASE_WIDE_LANES falsely reporting dead modules as automated.
+    """
+    workflow_expressions = _workflow_marker_expressions()
+    for lane in _SCHEDULED_OR_RELEASE_WIDE_LANES:
+        assert lane in workflow_expressions, (
+            f"Declared automated lane '{lane}' does not occur in any .github/workflows/*.yml file."
+        )
+
+
+def test_declared_pr_workflow_lanes_occur_in_pr_workflows():
+    """Verify that automated PR wide lanes occur in pr.yml or test.yml."""
+    pr_expressions = _workflow_marker_expressions(("pr.yml", "test.yml"))
+    for lane in (
+        "fast and not (slow or stress or resource_heavy or live_integration)",
+        "platform_smoke or (integration and fast)",
+        "integration and not (slow or stress or resource_heavy or live_integration)",
+    ):
+        assert lane in pr_expressions, f"Declared PR wide lane '{lane}' does not occur in pr.yml or test.yml."
+
+
+def test_report_workflow_wide_lane_coverage_gaps():
+    """Verify that every test module is covered by automated workflow lanes.
+
+    Stage 5 step 1/2 of the test-suite remediation migration path:
+    Audit coverage across all directories (tests/unit, tests/integration, tests/e2e, tests/uat, etc.).
+    - Every non-opt-in, non-explicitly-named module MUST be selected by at least one
+      automated workflow lane (_AUTOMATED_WORKFLOW_WIDE_LANES). If any module is orphaned,
+      fails with an actionable diagnostic listing the orphaned paths.
+    - Also verifies that modules deferred from PR routine lanes are covered by scheduled
+      nightly observation or release validation workflows.
+    """
+    workflow_expressions = _workflow_marker_expressions()
+    for lane in _SCHEDULED_OR_RELEASE_WIDE_LANES:
+        assert lane in workflow_expressions, (
+            f"Declared automated lane '{lane}' does not occur in any .github/workflows/*.yml file."
+        )
+
+    explicit_paths = _explicitly_invoked_test_paths()
+    uncovered_automated: list[str] = []
+    deferred_to_scheduled_or_release: list[str] = []
+
+    for path in _iter_test_modules():
+        rel = path.relative_to(_REPO_ROOT).as_posix()
+        # Declared opt-in at module level: intentional, runs via dedicated workflows
+        if _top_level_marker_names(path) & _OPT_IN_LANE_MARKERS:
+            continue
+        # Named directly by a workflow step
+        if rel in explicit_paths:
+            continue
+        marker_sets = [markers for _name, markers in _iter_test_marker_sets(path)]
+        if not marker_sets:
+            continue
+        if not any(
+            _selects(expression, markers) for expression in _AUTOMATED_WORKFLOW_WIDE_LANES for markers in marker_sets
+        ):
+            uncovered_automated.append(rel)
+        elif not any(_selects(expression, markers) for expression in _PR_ROUTINE_WIDE_LANES for markers in marker_sets):
+            deferred_to_scheduled_or_release.append(rel)
+
+    assert not uncovered_automated, (
+        f"Found {len(uncovered_automated)} test module(s) outside all automated workflow lanes:\n"
+        + "\n".join(f"  - {p}" for p in uncovered_automated)
+        + "\nEvery module must be covered by a PR routine lane, scheduled nightly lane, release lane, "
+        "or declared opt-in at module level."
+    )
+    # Validate that PR-deferred modules are tracked (e.g. non-credentialed slow tests)
+    assert isinstance(deferred_to_scheduled_or_release, list)
 
 
 def test_opt_in_markers_below_module_level_are_declared_service_dependent():

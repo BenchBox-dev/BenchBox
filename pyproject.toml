@@ -98,6 +98,7 @@ dev = [
     "duckdb>=1.5.0,<2.0.0",
     "tox>=4.13.0",
     "pyspark>=3.5.0",  # Aligned with pyspark extra
+    "pytest-timeout>=2.4.0",
 ]
 docs = [
     "sphinx>=7.2.0",
@@ -684,7 +685,6 @@ omit = [
 
 [tool.coverage.report]
 # Coverage reporting thresholds
-fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [

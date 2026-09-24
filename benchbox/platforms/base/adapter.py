@@ -271,7 +271,8 @@ class PlatformAdapter(
         self.requested_table_format: str | None = None
 
         # Dry-run mode support
-        self.dry_run = config.get("dry_run", False)
+        self._initial_dry_run = bool(config.get("dry_run", False))
+        self.dry_run = self._initial_dry_run
         self.dry_run_mode = False
         self.captured_sql = []
         self.query_counter = 0
@@ -325,6 +326,11 @@ class PlatformAdapter(
         Returns:
             Platform adapter instance
         """
+
+    @property
+    def is_dry_run(self) -> bool:
+        """Return True if dry run is active via configuration or execution mode."""
+        return bool(getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False))
 
     @property
     def platform_name(self) -> str:

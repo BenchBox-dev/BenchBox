@@ -825,6 +825,7 @@ class TestConfigureForBenchmark:
         mock_session.conf.set.side_effect = Exception("read-only conf")
         # Should not propagate
         a.configure_for_benchmark(mock_session, "olap")
+        mock_session.conf.set.assert_called()
 
 
 # ---------------------------------------------------------------------------
@@ -950,6 +951,7 @@ class TestApplyTableTunings:
 
         # Should not raise
         a.apply_table_tunings(mock_tuning, mock_session)
+        mock_session.sql.assert_called()
 
     def test_parquet_partition_columns_logged(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -970,6 +972,7 @@ class TestApplyTableTunings:
 
         # Should not raise; logging only for parquet partitioning
         a.apply_table_tunings(mock_tuning, mock_session)
+        mock_session.sql.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -985,8 +988,14 @@ class TestApplyUnifiedTuning:
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter()
-        # Should not raise
-        a.apply_unified_tuning(None, mock_session)
+        with (
+            patch.object(a, "apply_platform_optimizations") as mock_plat,
+            patch.object(a, "apply_constraint_configuration") as mock_constraint,
+        ):
+            a.apply_unified_tuning(None, mock_session)
+            mock_plat.assert_not_called()
+            mock_constraint.assert_not_called()
+            mock_session.conf.set.assert_not_called()
 
     def test_applies_platform_optimizations(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -1080,6 +1089,7 @@ class TestApplyPlatformOptimizations:
 
         # Should not raise
         a.apply_platform_optimizations(mock_platform_cfg, mock_session)
+        mock_session.conf.set.assert_called_with("spark.bad.key", "value")
 
 
 # ---------------------------------------------------------------------------
@@ -1101,8 +1111,10 @@ class TestApplyConstraintConfiguration:
         fk = MagicMock()
         fk.enabled = False
 
-        # Should not raise
-        a.apply_constraint_configuration(pk, fk, mock_session)
+        with patch.object(a.logger, "info") as mock_info:
+            a.apply_constraint_configuration(pk, fk, mock_session)
+            mock_info.assert_called_once()
+            assert "Primary key" in mock_info.call_args[0][0]
 
     def test_fk_enabled_logs(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -1115,14 +1127,19 @@ class TestApplyConstraintConfiguration:
         fk = MagicMock()
         fk.enabled = True
 
-        a.apply_constraint_configuration(pk, fk, mock_session)
+        with patch.object(a.logger, "info") as mock_info:
+            a.apply_constraint_configuration(pk, fk, mock_session)
+            mock_info.assert_called_once()
+            assert "Foreign key" in mock_info.call_args[0][0]
 
     def test_both_none_noop(self, mock_pyspark):
         _, mock_session = mock_pyspark
         from benchbox.platforms.spark import SparkAdapter
 
         a = SparkAdapter()
-        a.apply_constraint_configuration(None, None, mock_session)
+        with patch.object(a.logger, "info") as mock_info:
+            a.apply_constraint_configuration(None, None, mock_session)
+            mock_info.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1149,6 +1166,7 @@ class TestCloseConnection:
 
         a = SparkAdapter()
         a.close_connection(None)
+        assert a._spark_session is None
 
     def test_stop_exception_swallowed(self, mock_pyspark):
         _, mock_session = mock_pyspark
@@ -1157,6 +1175,8 @@ class TestCloseConnection:
         a = SparkAdapter()
         mock_session.stop.side_effect = Exception("stop failed")
         a.close_connection(mock_session)
+        mock_session.stop.assert_called_once()
+        assert a._spark_session is None
 
 
 # ---------------------------------------------------------------------------
@@ -1215,6 +1235,7 @@ class TestAnalyzeTable:
         mock_session.sql.side_effect = Exception("permission denied")
         # Should not raise
         a.analyze_table(mock_session, "orders")
+        mock_session.sql.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
