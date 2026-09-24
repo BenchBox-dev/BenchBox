@@ -1299,10 +1299,105 @@ benchbox-fixture-key-material
         executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
         assert executed[0] == "ALTER SESSION SET QUERY_TAG = 'BenchBox_q_multi'"
         assert executed[1:] == [
+            "BEGIN",
             "DELETE FROM t WHERE k BETWEEN 1 AND 10",
             "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
             "SELECT COUNT(*) FROM t WHERE k BETWEEN 1 AND 10",
+            "COMMIT",
         ]
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_multi_statement_dml_failure_rolls_back_and_leaves_data_unchanged(self, mock_snowflake):
+        """Second-statement failure in multi-statement DML rolls back earlier statements."""
+        table_data = {"rows": [{"id": 1, "is_current": True}]}
+
+        class FakeCursor:
+            def __init__(self):
+                self.in_transaction = False
+                self.uncommitted_data = None
+                self.executed_statements = []
+
+            def execute(self, stmt):
+                self.executed_statements.append(stmt)
+                if stmt == "BEGIN":
+                    self.in_transaction = True
+                    self.uncommitted_data = [dict(r) for r in table_data["rows"]]
+                elif stmt == "COMMIT":
+                    if self.uncommitted_data is not None:
+                        table_data["rows"] = self.uncommitted_data
+                    self.in_transaction = False
+                elif stmt == "ROLLBACK":
+                    self.uncommitted_data = None
+                    self.in_transaction = False
+                elif stmt.startswith("UPDATE"):
+                    assert self.in_transaction
+                    for r in self.uncommitted_data:
+                        r["is_current"] = False
+                elif stmt.startswith("INSERT"):
+                    raise RuntimeError("Syntax error or constraint failure on INSERT")
+
+            def fetchall(self):
+                return []
+
+            def close(self):
+                pass
+
+        fake_cursor = FakeCursor()
+        mock_connection = Mock()
+        mock_connection.cursor.return_value = fake_cursor
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        scd2_batch = (
+            "UPDATE dim_customer SET is_current = FALSE WHERE id = 1;\n"
+            "INSERT INTO dim_customer (id, is_current) VALUES (2, TRUE);\n"
+        )
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            result = adapter.execute_query(mock_connection, scd2_batch, "scd2_fail")
+
+        assert result["status"] == "FAILED"
+        assert "Syntax error or constraint failure on INSERT" in result["error"]
+
+        assert fake_cursor.executed_statements[1:] == [
+            "BEGIN",
+            "UPDATE dim_customer SET is_current = FALSE WHERE id = 1",
+            "INSERT INTO dim_customer (id, is_current) VALUES (2, TRUE)",
+            "ROLLBACK",
+        ]
+        # CRITICAL: data remains unchanged because ROLLBACK discarded the uncommitted update
+        assert table_data["rows"] == [{"id": 1, "is_current": True}]
+
+    @patch("benchbox.platforms.snowflake.snowflake")
+    def test_multi_statement_ddl_skips_explicit_transaction(self, mock_snowflake):
+        """Multi-statement DDL batches do not execute BEGIN/COMMIT (DDL commits implicitly)."""
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = []
+
+        adapter = SnowflakeAdapter(
+            account="test_account",
+            username="test_user",
+            password="test_pass",
+            warehouse="TEST_WH",
+            database="TEST_DB",
+        )
+
+        ddl_batch = "CREATE TABLE t1 (id INT); CREATE TABLE t2 (id INT);"
+        with patch.object(adapter, "_get_query_statistics", return_value={}):
+            result = adapter.execute_query(mock_connection, ddl_batch, "q_ddl")
+
+        assert result["status"] == "SUCCESS"
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert "BEGIN" not in executed
+        assert "COMMIT" not in executed
+        assert executed[1:] == ["CREATE TABLE t1 (id INT)", "CREATE TABLE t2 (id INT)"]
 
     @patch("benchbox.platforms.snowflake.snowflake")
     def test_execute_query_single_statement_executes_once(self, mock_snowflake):

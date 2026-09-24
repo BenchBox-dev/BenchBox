@@ -1328,6 +1328,15 @@ class SnowflakeAdapter(PlatformAdapter):
             value_column_index=1,
         )
 
+    @staticmethod
+    def _first_statement_keyword(statement: str) -> str:
+        """Extract the first uppercase keyword from a SQL statement, ignoring comments."""
+        import re
+
+        cleaned = re.sub(r"^(?:\s*--(?:[^\n]*)\n|\s*/\*.*?\*/)+", "", statement, flags=re.DOTALL)
+        m = re.match(r"^\s*([A-Za-z]+)", cleaned)
+        return m.group(1).upper() if m else ""
+
     def execute_query(
         self,
         connection: Any,
@@ -1375,13 +1384,41 @@ class SnowflakeAdapter(PlatformAdapter):
             # Run each statement in session order and report the last
             # statement's rows; a single statement takes the identical
             # single-execute path as before.
+            # Multi-statement DML sequences (such as SCD2 close-then-insert)
+            # are executed in an explicit transaction (BEGIN ... COMMIT) so
+            # failure at a later statement triggers ROLLBACK rather than
+            # committing earlier statements under autocommit=True.
             from benchbox.platforms.base.mysql_wire import split_sql_statements
 
             statements = split_sql_statements(query)
+            statements_to_run = statements or [query]
             result = []
-            for statement in statements or [query]:
-                cursor.execute(statement)
-                result = cursor.fetchall()
+
+            keywords = [self._first_statement_keyword(s) for s in statements_to_run]
+            has_tx_control = any(kw in {"BEGIN", "START", "COMMIT", "ROLLBACK"} for kw in keywords)
+            has_ddl = any(
+                kw in {"CREATE", "DROP", "ALTER", "TRUNCATE", "RENAME", "COMMENT", "GRANT", "REVOKE", "USE"}
+                for kw in keywords
+            )
+            use_explicit_tx = len(statements_to_run) > 1 and not has_tx_control and not has_ddl
+
+            if use_explicit_tx:
+                cursor.execute("BEGIN")
+                try:
+                    for statement in statements_to_run:
+                        cursor.execute(statement)
+                        result = cursor.fetchall()
+                    cursor.execute("COMMIT")
+                except Exception:
+                    try:
+                        cursor.execute("ROLLBACK")
+                    except Exception as rollback_err:
+                        self.log_very_verbose(f"Rollback failed: {rollback_err}")
+                    raise
+            else:
+                for statement in statements_to_run:
+                    cursor.execute(statement)
+                    result = cursor.fetchall()
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
