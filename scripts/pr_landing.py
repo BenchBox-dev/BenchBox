@@ -48,8 +48,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # noqa: E402
-
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
     "ci-required-result",
@@ -1291,6 +1289,15 @@ def soundness_paths_changed(repo: Path, base: str | None, head: str) -> bool:
         paths = _git(repo, "diff", "--name-only", "--no-renames", f"{base}...{head}").splitlines()
     except subprocess.CalledProcessError as exc:
         raise LandingError("could not derive soundness paths from the exact base and head") from exc
+    # Imported lazily: _project/scripts/auto_merge_soundness_paths.py is
+    # curated out of release trees, and only this classification needs it.
+    try:
+        from _project.scripts.auto_merge_soundness_paths import any_soundness_path
+    except ImportError as exc:
+        raise LandingError(
+            "soundness-path classification requires the development tree: "
+            "_project/scripts/auto_merge_soundness_paths.py is curated out of releases"
+        ) from exc
     return any_soundness_path(paths)
 
 

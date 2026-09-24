@@ -14,6 +14,7 @@ Guarantees:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import datetime
 import json
@@ -27,18 +28,49 @@ from typing import Any, Dict, List, Optional, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.worktree_audit import (  # noqa: E402
-    STRUCTURAL_BASES,
-    _parse_worktree_porcelain_entries,
-    are_descendants_integrated,
-    fetch_prs_for_branch,
-    get_primary_clone_path,
-    get_ref_commit_sha,
-    get_remote_repository_slug,
-    is_ancestor,
-    is_pr_merged,
-    resolve_github_token,
-    resolve_repository_identity,
+# _project/scripts/worktree_audit.py is curated out of release trees. The
+# direct import keeps static references resolvable; when it is absent (a
+# curated tree) the fallback below raises with a clear reason instead of a
+# bare ModuleNotFoundError at import time.
+with contextlib.suppress(ImportError):
+    from _project.scripts.worktree_audit import (  # noqa: E402
+        STRUCTURAL_BASES,
+        _parse_worktree_porcelain_entries,
+        are_descendants_integrated,
+        fetch_prs_for_branch,
+        get_primary_clone_path,
+        get_ref_commit_sha,
+        get_remote_repository_slug,
+        is_ancestor,
+        is_pr_merged,
+        resolve_github_token,
+        resolve_repository_identity,
+    )
+
+
+def __getattr__(name: str):
+    if name in _AUDIT_NAMES:
+        raise ImportError(
+            "worktree_finish requires the development tree: "
+            "_project/scripts/worktree_audit.py is curated out of releases"
+        )
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+_AUDIT_NAMES = frozenset(
+    {
+        "STRUCTURAL_BASES",
+        "_parse_worktree_porcelain_entries",
+        "are_descendants_integrated",
+        "fetch_prs_for_branch",
+        "get_primary_clone_path",
+        "get_ref_commit_sha",
+        "get_remote_repository_slug",
+        "is_ancestor",
+        "is_pr_merged",
+        "resolve_github_token",
+        "resolve_repository_identity",
+    }
 )
 from scripts.branch_prune_merged import (  # noqa: E402
     RepositoryIdentity as BranchPruneRepositoryIdentity,
