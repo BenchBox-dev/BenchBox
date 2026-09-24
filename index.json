@@ -2566,10 +2566,15 @@
       "title": "Live-warehouse verification of cloud-executor fixes"
     },
     "cloud-executor-rebase-reverify": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T15:50:49Z",
+        "generation": "e5e6ee4a02ac44c29ef6fbf667386697",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:1b61f46fc27c4f9766e3b059"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Rebase cloud-executor work onto current develop and re-verify baseline"
     },
     "cloud-executor-snowflake-atomicity": {
