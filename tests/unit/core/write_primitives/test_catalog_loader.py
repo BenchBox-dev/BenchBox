@@ -168,3 +168,9 @@ def test_duckdb_only_cpc_and_req_operations_skip_trino() -> None:
     assert duckdb_only_ops
     assert all("trino" in operation.platform_overrides for operation in duckdb_only_ops)
     assert all(operation.platform_overrides["trino"] is None for operation in duckdb_only_ops)
+
+
+def test_real_catalog_version_is_pinned() -> None:
+    """The real shipped catalog is pinned at version 2."""
+    catalog = load_write_primitives_catalog()
+    assert catalog.version == 2
