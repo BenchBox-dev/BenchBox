@@ -1131,6 +1131,7 @@ def test_read_holder_replaces_invalid_utf8(tmp_path: Path) -> None:
     assert lv.read_holder(lock) == "pid:\ufffd"
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="fcntl is POSIX-only")
 def test_wait_on_fd_posix_propagates_non_contention_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import fcntl
 
