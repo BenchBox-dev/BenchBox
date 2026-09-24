@@ -483,8 +483,9 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
         section["data_generation_version"] = result.data_generation_version
     if getattr(result, "data_generation_hash", None) is not None:
         section["data_generation_hash"] = result.data_generation_hash
-    if result.flightdata_source_provenance is not None:
-        section["source_provenance"] = result.flightdata_source_provenance
+    source_provenance = getattr(result, "flightdata_source_provenance", None)
+    if source_provenance is not None:
+        section["source_provenance"] = source_provenance
     section.update(_dataset_identity_fields(result))
     return section
 
