@@ -5,7 +5,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2319 at 4c0acdc487512d48ab326a43b47ce84743f2b18d. Hosted-submit fixture now uses a full canonical TPC-H bundle and canonical bytes; slim validator fixture includes schema_policy.py; TPC-DS coverage requires both a/b variants and refuses bare multipart IDs. Positive official 103-query and negative 99-bare/one-variant tests protect the contract. Focused 259 tests plus four hosted transport integration tests passed; committed-head make pr-preflight passed with 31497 fast and 2090 medium. Hosted CI green, review finding replied and resolved. This is a soundness path: maintainer approval and manual merge into develop are still required before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2319 merged into develop at 06763f2ac5e5b5fffbcbd709a682ee72640b66b0. Realigned hosted-submit canonical bundles, slim validator fixtures, and TPC-DS paired variant requirements with strict submission validator. Fast-lane ceiling composed cleanly. Full CI and merge group passed.",
   "description": "Diagnose and fix hosted-submit bundle schema drift, slim-checkout validator imports, and the official TPC-DS submission failure. Determine whether TPC-DS has the same root cause; if independent, create a separate owned item. Identify causing commits before changing code. Keep submission validation strict and do not skip tests.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2319"
@@ -60,6 +60,14 @@
       "generation": "82dea7e442a6470e8070b86ff9a0e8dc",
       "op": "take",
       "op_id": "6d6f6eed75f642a9a62e41a049f1b89e",
+      "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829",
+      "at": "2026-09-24T05:43:54Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "0ba2f8549344470b8d61ecb6a2228294",
       "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
     }
   ]
