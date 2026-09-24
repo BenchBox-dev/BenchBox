@@ -4,7 +4,7 @@
     "New tests: reuse of populated staging tables on the BigQuery convert path keeps rows; shared manifest keeps both benchmarks' provenance rows",
     "Touched BigQuery adapter suites green; make pr-preflight passes"
   ],
-  "context": "Adversarial finding Critical-1 (accepted with corrected framing): the IF NOT EXISTS to CREATE OR REPLACE rebuild in _convert_to_bigquery_table predates this change (HEAD lines ~1821-1870), but this change makes cloud staging reuse load-bearing (compatible-database reuse, PR 2310) and widens the funnel into that converter (comment-gated chunks, CTAS qualification). Setup uses IF NOT EXISTS for staging tables (write_primitives/benchmark.py ~882-895) and the shared provenance manifest (transactional/benchmark_base.py ~449-459); replacing erases rows/provenance. Guardrails: do not change create semantics as a drive-by; cover both manifest rows in tests.",
+  "context": "DECISION GATE (a) RECORD: Chose approach 1 (preserve IF NOT EXISTS with target qualification). BigQuery natively supports CREATE TABLE IF NOT EXISTS. Preserving it stops destructive drops of reused staging tables and prevents dropping the shared provenance manifest when multiple benchmarks run on the same database. Bare CREATE TABLE statements continue to convert to CREATE OR REPLACE TABLE for idempotency during benchmark schema creation. Verification: 361 BigQuery adapter tests pass, 684 touched unit tests pass, and full make pr-preflight passes cleanly (2116 passed). Commit: b811b82ac.",
   "description": "Stop BigQuery DDL conversion from destroying reused staging data: preserve IF NOT EXISTS (qualifying its target without changing create semantics) in _convert_to_bigquery_table, covering matched CREATE, CTAS, and comment-prefixed chunks. Staging worktree: wt-cloud-executor-loader, file benchbox/platforms/bigquery.py.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "a8ca94ab0b8541d494f51c1dccc346f0",
       "op": "take",
       "op_id": "46cf2343ad364cbe926549b3c90a3198",
+      "session_id": "94cae8d332f74f19ba0c5da1d103e237"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:1b61f46fc27c4f9766e3b059",
+      "at": "2026-09-24T17:40:56Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "2b4766dc8b964f009dfc56137991704a",
       "session_id": "94cae8d332f74f19ba0c5da1d103e237"
     }
   ]
