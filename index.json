@@ -1772,10 +1772,15 @@
       "title": "Commit DuckDB cursor transactions in TPC-DI customer SCD2 batch loader"
     },
     "canary-tpcdi-duckdb-scd2-commit": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T12:13:57Z",
+        "generation": "5d39f83dc6604f8ca48a70ffb41e934a",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:f9db948de729637aa7c660de"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Commit TPC-DI SCD2 customer loads on the connection that wrote them (DuckDB)"
     },
     "canary-tpcdi-etl-incremental-load": {
