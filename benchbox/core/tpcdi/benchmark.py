@@ -43,7 +43,7 @@ from benchbox.core.tpcdi.etl import (
 from benchbox.core.tpcdi.etl.customer_mgmt_processor import CustomerManagementProcessor
 from benchbox.core.tpcdi.etl.data_quality_monitor import DataQualityMonitor
 from benchbox.core.tpcdi.etl.error_recovery import ErrorRecoveryManager
-from benchbox.core.tpcdi.etl.finwire_processor import FinWireProcessor
+from benchbox.core.tpcdi.etl.finwire_processor import FinWireParser, FinWireProcessor
 from benchbox.core.tpcdi.etl.incremental_loader import IncrementalDataLoader
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult
 from benchbox.core.tpcdi.etl.scd_processor import EnhancedSCDType2Processor
@@ -1549,7 +1549,11 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Phase 3: Load - Load into target warehouse
             load_start = mono_time()
-            load_results = backend.load_dataframes(transformation_results["staged_data"], batch_type=batch_type)
+            load_results = self._load_transformed_data(
+                backend=backend,
+                staged_data=transformation_results["staged_data"],
+                batch_type=batch_type,
+            )
             load_time = elapsed_seconds(load_start)
 
             pipeline_results["phases"]["load"] = {
@@ -1684,12 +1688,14 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         file_name = Path(file_path).name.lower()
         if "customer" in file_name:
             # Map to DimCustomer schema - only essential columns for demo
-            # Generate batch-specific surrogate keys to avoid conflicts
-            sk_offsets = {"historical": 0, "incremental": 1000000, "scd": 2000000}
-            batch_offset = sk_offsets.get(batch_type, 0)
+            # The SQL backend replaces these source defaults with values
+            # allocated from the warehouse inside its SCD transaction.
+            batch_offset = {"historical": 0, "incremental": 1_000_000, "scd": 2_000_000}.get(batch_type, 0)
             df["SK_CustomerID"] = range(batch_offset + 1, batch_offset + len(df) + 1)
             df["IsCurrent"] = True
-            df["BatchID"] = 1
+            df["BatchID"] = batch_offset // 1_000_000 + 1
+            # Preserve the source effective date for the first warehouse
+            # version; subsequent versions are dated by the SQL loader.
 
             # Reorder columns to match DimCustomer schema
             column_order = [
@@ -1712,6 +1718,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "Email1",
                 "IsCurrent",
                 "BatchID",
+                "EffectiveDate",
+                "EndDate",
             ]
             df = df[column_order]
         else:
@@ -1890,6 +1898,35 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             else:
                 staged_data[table_name] = pd.concat(table_parts, ignore_index=True)
         aggregate["staged_data"] = staged_data
+
+    def _load_transformed_data(
+        self,
+        *,
+        backend: TPCDIETLBackend,
+        staged_data: dict[str, pd.DataFrame],
+        batch_type: str,
+    ) -> dict[str, Any]:
+        """Load staged data, applying SCD2 expiration before incremental customer inserts."""
+        customers = staged_data.get("DimCustomer")
+        if customers is None or customers.empty:
+            return backend.load_dataframes(staged_data, batch_type=batch_type)
+
+        load_customer_scd2_batch = getattr(backend, "load_customer_scd2_batch", None)
+        if callable(load_customer_scd2_batch):
+            other_data = {table_name: data for table_name, data in staged_data.items() if table_name != "DimCustomer"}
+            load_results = backend.load_dataframes(other_data, batch_type=batch_type)
+            customer_result = load_customer_scd2_batch(customers, batch_type=batch_type)
+            customer_records = int(customer_result["rows_affected"])
+            load_results["records_loaded"] += customer_records
+            if customer_records and "DimCustomer" not in load_results["tables_updated"]:
+                load_results["tables_updated"].append("DimCustomer")
+            return load_results
+
+        if batch_type in {"incremental", "scd"}:
+            raise RuntimeError(
+                "Incremental TPC-DI customer loads require a backend with durable atomic SCD2 batch support"
+            )
+        return backend.load_dataframes(staged_data, batch_type=batch_type)
 
     def _create_sql_etl_backend(self, *, connection: Any) -> SQLETLBackend:
         """Create SQL ETL backend from benchmark SQL connection."""
@@ -2541,51 +2578,17 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         results = {"success": False, "batches_loaded": 0, "records_loaded": 0}
 
         try:
-            if self.incremental_loader:
-                # Process incremental batches for different tables
-                tables_to_process = ["DimCustomer", "DimAccount", "FactTrade"]
-                batch_id = 2  # Incremental batch
-
-                total_records = 0
-                for table_name in tables_to_process:
-                    try:
-                        # Get watermark for table
-                        last_watermark = self.incremental_loader.get_watermark(table_name)
-
-                        # Detect changes since last watermark
-                        changes = list(self.incremental_loader.detect_changes(table_name, last_watermark, batch_id))
-
-                        if changes:
-                            # Create sample incremental data based on detected changes
-                            incremental_data = pd.DataFrame(
-                                [
-                                    {
-                                        "CustomerID": i,
-                                        "FirstName": f"Customer_{i}",
-                                        "LastModified": datetime.now(),
-                                    }
-                                    for i in range(len(changes))
-                                ]
-                            )
-
-                            # Load incremental batch
-                            load_result = self.incremental_loader.load_incremental_batch(
-                                table_name, incremental_data, batch_id
-                            )
-
-                            if load_result.get("success", False):
-                                total_records += load_result.get("records_loaded", 0)
-                                results["batches_loaded"] += 1
-
-                    except Exception as table_error:
-                        emit(f"⚠️ Error processing incremental data for {table_name}: {table_error}")
-                        continue
-
-                results["records_loaded"] = total_records
-                results["success"] = results["batches_loaded"] > 0
-
-                if not results["success"] and results["batches_loaded"] == 0:
-                    results["error"] = "No incremental batches were successfully loaded"
+            # TPC-DI changes come from the incremental source batch. Warehouse
+            # tables have no LastModified CDC column, so scanning them cannot
+            # discover source changes or produce rows for another load.
+            pipeline = self.run_etl_pipeline(connection=connection, batch_type="incremental", validate_data=False)
+            load = pipeline.get("phases", {}).get("load")
+            if pipeline.get("success") and load is not None:
+                results["success"] = True
+                results["batches_loaded"] = 1
+                results["records_loaded"] = load["records_loaded"]
+            else:
+                results["error"] = pipeline.get("error", "Incremental ETL did not complete its load phase")
 
         except Exception as e:
             emit(f"❌ Incremental data loading failed: {e}")
@@ -2710,42 +2713,72 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         num_securities = max(1, int(500 * self.scale_factor))
         num_financials = max(1, int(200 * self.scale_factor))
 
+        def format_record(layout: dict[str, tuple[int, int, type]], values: dict[str, str | int]) -> str:
+            record = [" "] * max(start + width for start, width, _ in layout.values())
+            for field, value in values.items():
+                start, width, _ = layout[field]
+                text = str(value)
+                if len(text) > width:
+                    raise ValueError(f"FinWire {field} exceeds its {width}-character field")
+                record[start : start + width] = text.ljust(width)
+            return "".join(record)
+
         with open(finwire_file, "w", encoding="utf-8") as f:
             # Generate Company Fundamental records (CMP)
             for i in range(num_companies):
-                pts = "20230101000000"
-                cmp_id = f"{i + 1:012d}"
-                company_name = f"Company_{i + 1:04d}".ljust(60)
-                industry = "Technology".ljust(50)
-                sp_rating = "AAA".ljust(4)
-                ceo_name = f"CEO_{i + 1}".ljust(50)
-
-                # Fixed-width FinWire CMP record format
-                record = f"{pts}CMP{cmp_id}{company_name}{industry}{sp_rating}{ceo_name}"
+                cmp_id = f"{i + 1:010d}"
+                record = format_record(
+                    FinWireParser.CMP_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "CMP",
+                        "company_name": f"Company_{i + 1:04d}",
+                        "cik": cmp_id,
+                        "status": "ACTV",
+                        "industry_id": "01",
+                        "sp_rating": "AAA",
+                        "founding_date": "20000101",
+                        "ceo_name": f"CEO_{i + 1}",
+                    },
+                )
                 f.write(record + "\n")
 
             # Generate Security Master records (SEC)
             for i in range(num_securities):
-                pts = "20230101000000"
-                symbol = f"SEC{i + 1:04d}".ljust(15)
-                issue = f"Security_{i + 1:04d} Inc".ljust(70)
-                status = "Active".ljust(10)
-                exchange = "NYSE".ljust(6)
-                shares = str(1000000 + i * 1000).rjust(15)
-
-                # Fixed-width FinWire SEC record format
-                record = f"{pts}SEC{symbol}{issue}{status}{exchange}{shares}"
+                record = format_record(
+                    FinWireParser.SEC_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "SEC",
+                        "symbol": f"SEC{i + 1:04d}",
+                        "issue_type": "CS",
+                        "status": "A",
+                        "name": f"Security_{i + 1:04d} Inc",
+                        "ex_id": "NYSE",
+                        "sh_out": 1000000 + i * 1000,
+                        "first_trade_date": "20230101",
+                        "first_trade_exchg": "20230101",
+                        "dividend": "0",
+                        "co_name_or_cik": f"{(i % num_companies) + 1:010d}",
+                    },
+                )
                 f.write(record + "\n")
 
             # Generate Financial records (FIN)
             for i in range(num_financials):
-                pts = "20230101000000"
-                symbol = f"SEC{(i % num_securities) + 1:04d}".ljust(15)
-                quarter = "2023Q1".ljust(6)
-                revenue = str(1000000 + i * 10000).rjust(15)
-
-                # Fixed-width FinWire FIN record format
-                record = f"{pts}FIN{symbol}{quarter}{revenue}"
+                record = format_record(
+                    FinWireParser.FIN_LAYOUT,
+                    {
+                        "pts": "20230101000000",
+                        "rec_type": "FIN",
+                        "year": 2023,
+                        "quarter": 1,
+                        "qtrsartdate": "20230101",
+                        "postdate": "20230401",
+                        "revenue": 1000000 + i * 10000,
+                        "co_name_or_cik": f"{(i % num_companies) + 1:010d}",
+                    },
+                )
                 f.write(record + "\n")
 
         finwire_files.append(finwire_file)

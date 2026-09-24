@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import sqlite3
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -10,6 +11,13 @@ import pytest
 
 import benchbox.core.tpcdi.benchmark as benchmark_module
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
+from benchbox.core.tpcdi.etl.dataframe_backend import DataFrameETLBackend
+from benchbox.core.tpcdi.etl.finwire_processor import (
+    CompanyFundamentalRecord,
+    DailyMarketRecord,
+    FinWireParser,
+    SecurityMasterRecord,
+)
 from benchbox.core.tpcdi.etl.results import ETLPhaseResult, ETLResult
 from benchbox.core.tpcdi.metrics import BenchmarkMetrics, BenchmarkReport
 from benchbox.core.tpcdi.validation import DataQualityResult, ValidationResult
@@ -280,3 +288,101 @@ def test_generate_source_data_all_formats_and_invalid_format(tmp_path: Path):
 
     with pytest.raises(ValueError, match="Unsupported format"):
         benchmark.generate_source_data(formats=["bad"], batch_types=["historical"])
+
+
+def test_canonical_incremental_etl_keeps_one_current_customer_version_per_business_key(tmp_path: Path):
+    benchmark = _make_benchmark(tmp_path)
+    with sqlite3.connect(":memory:") as connection:
+        benchmark.create_schema(connection, "sqlite")
+
+        historical = benchmark.run_etl_pipeline(connection, batch_type="historical", validate_data=False)
+        first_incremental = benchmark.run_etl_pipeline(connection, batch_type="incremental", validate_data=False)
+        recovered_benchmark = _make_benchmark(tmp_path)
+        second_incremental = recovered_benchmark.run_etl_pipeline(
+            connection, batch_type="incremental", validate_data=False
+        )
+
+        assert historical["success"] is True
+        assert first_incremental["success"] is True
+        assert second_incremental["success"] is True
+        versions = connection.execute(
+            """
+            SELECT SK_CustomerID, IsCurrent, BatchID, EffectiveDate, EndDate
+            FROM DimCustomer
+            WHERE CustomerID = 100000000
+            ORDER BY SK_CustomerID
+            """
+        ).fetchall()
+        assert [row[0] for row in versions] == [1, 1_000_001, 1_000_002]
+        assert [row[1] for row in versions] == [0, 0, 1]
+        assert [row[2] for row in versions] == [1, 2, 3]
+        assert date.fromisoformat(versions[0][4]) == date.fromisoformat(versions[1][3]) - timedelta(days=1)
+        assert date.fromisoformat(versions[1][4]) == date.fromisoformat(versions[2][3]) - timedelta(days=1)
+        assert date.fromisoformat(versions[2][3]) <= date.today()
+        assert versions[2][4] == "9999-12-31"
+        assert connection.execute(
+            "SELECT COUNT(*) FROM (SELECT CustomerID FROM DimCustomer WHERE IsCurrent = 1 "
+            "GROUP BY CustomerID HAVING COUNT(*) != 1)"
+        ).fetchone() == (0,)
+
+
+def test_canonical_incremental_etl_rolls_back_expiration_when_replacement_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    benchmark = _make_benchmark(tmp_path)
+    with sqlite3.connect(":memory:") as connection:
+        benchmark.create_schema(connection, "sqlite")
+        benchmark.run_etl_pipeline(connection, batch_type="historical", validate_data=False)
+        backend = benchmark._create_sql_etl_backend(connection=connection)
+        monkeypatch.setattr(
+            backend,
+            "_insert_table_dataframe",
+            lambda *_args: (_ for _ in ()).throw(RuntimeError("insert failed")),
+        )
+
+        with pytest.raises(RuntimeError, match="insert failed"):
+            benchmark.run_etl_pipeline(backend=backend, batch_type="incremental", validate_data=False)
+
+        assert connection.execute("SELECT IsCurrent FROM DimCustomer WHERE CustomerID = 100000000").fetchone() == (1,)
+
+
+def test_dataframe_backend_rejects_repeated_incremental_customer_batches_without_atomic_support(tmp_path: Path):
+    class _DataFrameMaintenanceOps:
+        def __init__(self) -> None:
+            self.inserted: list[pd.DataFrame] = []
+
+        def insert_rows(self, _table: Path, dataframe: pd.DataFrame, **_kwargs: Any) -> SimpleNamespace:
+            self.inserted.append(dataframe.copy())
+            return SimpleNamespace(success=True, rows_affected=len(dataframe))
+
+    benchmark = _make_benchmark(tmp_path)
+    maintenance_ops = _DataFrameMaintenanceOps()
+    backend = DataFrameETLBackend(maintenance_ops=maintenance_ops, platform_name="test")
+
+    historical = benchmark.run_etl_pipeline(backend=backend, batch_type="historical", validate_data=False)
+    assert historical["success"] is True
+
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="durable atomic SCD2 batch support"):
+            benchmark.run_etl_pipeline(backend=backend, batch_type="incremental", validate_data=False)
+
+    assert len(maintenance_ops.inserted) == 1
+
+
+def test_generated_finwire_records_match_the_parser_layout(tmp_path: Path):
+    benchmark = _make_benchmark(tmp_path)
+    path = benchmark._generate_finwire_data_files()[0]
+    parser = FinWireParser()
+
+    records = list(parser.parse_file(path))
+
+    assert not parser.errors
+    assert sum(isinstance(record, CompanyFundamentalRecord) for record in records) == 1
+    assert sum(isinstance(record, SecurityMasterRecord) for record in records) == 5
+    assert sum(isinstance(record, DailyMarketRecord) for record in records) == 2
+    assert records[0].company_id == "0000000001"
+    assert records[0].company_name == "Company_0001"
+    assert records[0].ceo == "CEO_1"
+    security = next(record for record in records if isinstance(record, SecurityMasterRecord))
+    assert security.symbol == "SEC0001"
+    assert security.shares_outstanding == 1000000

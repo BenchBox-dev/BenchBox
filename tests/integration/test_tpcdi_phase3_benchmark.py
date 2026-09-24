@@ -24,6 +24,7 @@ pytest.importorskip("pandas")
 
 from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
+from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
 class TestTPCDIPhase3BenchmarkIntegration:
@@ -146,13 +147,15 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert "incremental_loading" in phases
         assert "data_quality_monitoring" in phases
 
-        # Verify basic success metrics
-        # This fixture has no FinWire/customer-management inputs, so the
-        # explicitly requested data-processing phase must fail the pipeline.
-        assert results["success"] is False
-        assert [failure["phase"] for failure in results["failed_phases"]] == ["enhanced_data_processing"]
+        # The enhanced path generates parseable FinWire/customer-management
+        # inputs and loads the incremental source batch.
+        assert results["success"] is True
+        assert results["failed_phases"] == []
         assert results["total_records_processed"] > 0
         assert results["quality_score"] > 0
+        assert test_database.execute(
+            "SELECT CustomerID, FirstName FROM DimCustomer WHERE SK_CustomerID = 1000001"
+        ).fetchone() == (100000000, "FirstName0")
 
     def test_enhanced_data_processing_phase(self, tpcdi_benchmark, test_database):
         """Test enhanced data processing phase with FinWire and Customer Management."""
@@ -205,29 +208,34 @@ class TestTPCDIPhase3BenchmarkIntegration:
     def test_incremental_data_loading_phase(self, tpcdi_benchmark, test_database):
         """Test incremental data loading phase."""
         tpcdi_benchmark.create_schema(test_database, "sqlite")
-        tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
-        # Generate and load initial data to support change detection
-        tpcdi_benchmark.generate_data()
-        tpcdi_benchmark.load_data_to_database(test_database)
+        before = test_database.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
 
-        # Test incremental data loading phase (mock loader)
-        with (
-            patch.object(
-                tpcdi_benchmark.incremental_loader,
-                "detect_changes",
-                return_value=[{"op": "UPDATE"}] * 5,
-            ),
-            patch.object(
-                tpcdi_benchmark.incremental_loader,
-                "load_incremental_batch",
-                return_value={"success": True, "records_loaded": 5},
-            ),
+        results = tpcdi_benchmark._run_incremental_data_loading(test_database)
+        after = test_database.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
+
+        assert results["success"] is True
+        assert results["batches_loaded"] == 1
+        assert after > before
+        assert results["records_loaded"] >= after - before
+        assert test_database.execute(
+            "SELECT CustomerID, FirstName FROM DimCustomer WHERE SK_CustomerID = 1000001"
+        ).fetchone() == (100000000, "FirstName0")
+
+    def test_incremental_data_loading_reports_source_failure(self, tpcdi_benchmark, test_database):
+        """A failed source batch cannot be reported as a successful load."""
+        with patch.object(
+            tpcdi_benchmark,
+            "run_etl_pipeline",
+            return_value={"success": False, "error": "source batch is corrupt", "phases": {}},
         ):
             results = tpcdi_benchmark._run_incremental_data_loading(test_database)
 
-        assert results["success"] is True
-        assert results["batches_loaded"] > 0
-        assert results["records_loaded"] > 0
+        assert results == {
+            "success": False,
+            "batches_loaded": 0,
+            "records_loaded": 0,
+            "error": "source batch is corrupt",
+        }
 
     def test_data_quality_monitoring_phase(self, tpcdi_benchmark, test_database):
         """Test data quality monitoring phase."""
@@ -461,6 +469,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         """Test that scale factor properly integrates with Phase 3 components."""
         # Test different scale factors
         scale_factors = [0.001, 0.01, 0.1]
+        records_loaded = []
 
         for scale_factor in scale_factors:
             config = TPCDIConfig(
@@ -476,70 +485,44 @@ class TestTPCDIPhase3BenchmarkIntegration:
             assert benchmark.scale_factor == scale_factor
             assert benchmark.config.scale_factor == scale_factor
 
-            # Test that incremental loading uses scale factor
+            # The incremental source batch must grow with the scale factor.
             with sqlite3.connect(":memory:") as conn:
-                benchmark._initialize_connection_dependent_systems(conn, "sqlite")
+                benchmark.create_schema(conn, "sqlite")
+                results = benchmark._run_incremental_data_loading(conn)
+                assert results["success"] is True
+                customer_count = conn.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
+                if scale_factor >= 0.01:
+                    assert results["records_loaded"] > 0
+                    assert customer_count > 0
+                else:
+                    assert results["records_loaded"] == 0
+                    assert customer_count == 0
+                assert results["records_loaded"] >= customer_count
+                records_loaded.append(results["records_loaded"])
 
-                expected_records = int(1000 * scale_factor)
-
-                def _detect_changes_side_effect(table_name, last_watermark, batch_id):
-                    return [{"op": "U"}] * expected_records if table_name == "DimCustomer" else []
-
-                with (
-                    patch.object(
-                        benchmark.incremental_loader, "detect_changes", side_effect=_detect_changes_side_effect
-                    ),
-                    patch.object(
-                        benchmark.incremental_loader,
-                        "load_incremental_batch",
-                        return_value={"success": True, "records_loaded": expected_records},
-                    ),
-                ):
-                    results = benchmark._run_incremental_data_loading(conn)
-
-                # Records loaded should scale with scale factor
-                assert results["records_loaded"] == expected_records
+        assert records_loaded[0] <= records_loaded[1] < records_loaded[2]
 
     def test_component_error_isolation(self, tpcdi_benchmark, test_database):
-        """Test that errors in individual Phase 3 components don't affect others."""
-        tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
+        """A failed FinWire phase is reported while the source batch still loads."""
+        tpcdi_benchmark.create_schema(test_database, "sqlite")
+        tpcdi_benchmark.generate_data()
 
-        # Test that error in one component doesn't prevent others from working
-        with patch.object(tpcdi_benchmark, "_run_enhanced_data_processing") as mock_processing:
-            mock_processing.return_value = {
-                "success": False,
-                "error": "Processing failed",
-            }
+        with patch.object(
+            tpcdi_benchmark,
+            "_run_enhanced_data_processing",
+            return_value={"success": False, "error": "FinWire input is corrupt"},
+        ):
+            results = tpcdi_benchmark.run_enhanced_etl_pipeline(
+                test_database, dialect="sqlite", enable_data_quality_monitoring=False
+            )
 
-            # SCD processing should still work
-            with patch.object(
-                tpcdi_benchmark.scd_processor,
-                "process_dimension",
-                return_value={"success": True, "records_processed": 10, "changes_detected": 2},
-            ):
-                scd_results = tpcdi_benchmark._run_enhanced_scd_processing(test_database)
-                assert scd_results["success"] is True
-
-            # Incremental loading should still work
-            with (
-                patch.object(tpcdi_benchmark.incremental_loader, "detect_changes", return_value=[{"op": "U"}] * 3),
-                patch.object(
-                    tpcdi_benchmark.incremental_loader,
-                    "load_incremental_batch",
-                    return_value={"success": True, "records_loaded": 3},
-                ),
-            ):
-                incremental_results = tpcdi_benchmark._run_incremental_data_loading(test_database)
-                assert incremental_results["success"] is True
-
-            # Quality monitoring should still work
-            with patch.object(
-                tpcdi_benchmark.data_quality_monitor,
-                "execute_quality_checks",
-                return_value={"rules_executed": 3, "overall_pass_rate": 0.8, "rules_failed": 0},
-            ):
-                quality_results = tpcdi_benchmark._run_data_quality_monitoring(test_database)
-                assert quality_results["success"] is True
+        assert results["success"] is False
+        assert results["failed_phases"] == [{"phase": "enhanced_data_processing", "error": "FinWire input is corrupt"}]
+        assert results["phases"]["incremental_loading"]["success"] is True
+        assert results["phases"]["incremental_loading"]["records_loaded"] > 0
+        assert test_database.execute(
+            "SELECT CustomerID, FirstName FROM DimCustomer WHERE SK_CustomerID = 1000001"
+        ).fetchone() == (100000000, "FirstName0")
 
 
 class TestTPCDIPhase3PerformanceIntegration:
@@ -582,6 +565,8 @@ class TestTPCDIPhase3PerformanceIntegration:
             "Country",
             "Phone1",
             "Email1",
+            "EffectiveDate",
+            "EndDate",
         ]
         source_files = {"csv": []}
         for index in range(3):
@@ -589,7 +574,9 @@ class TestTPCDIPhase3PerformanceIntegration:
             with open(path, "w", encoding="utf-8") as handle:
                 handle.write(",".join(customer_columns) + "\n")
                 for row in range(5):
-                    handle.write(",".join([f"{col}_{index}_{row}" for col in customer_columns]) + "\n")
+                    values = [f"{column}_{index}_{row}" for column in customer_columns]
+                    values[-2:] = ["1999-01-01", "9999-12-31"]
+                    handle.write(",".join(values) + "\n")
             source_files["csv"].append(str(path))
 
         sequential = performance_benchmark._transform_source_data(dict(source_files), "historical")
@@ -602,43 +589,22 @@ class TestTPCDIPhase3PerformanceIntegration:
         sequential_rows = sequential["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
         parallel_rows = parallel["staged_data"]["DimCustomer"].sort_values("CustomerID").reset_index(drop=True)
         assert parallel_rows.equals(sequential_rows)
+        assert set(parallel_rows["EffectiveDate"]) == {"1999-01-01"}
+        assert set(parallel_rows["EndDate"]) == {"9999-12-31"}
 
     def test_incremental_loading_performance(self, performance_benchmark):
         """Test incremental loading performance characteristics."""
         with sqlite3.connect(":memory:") as conn:
             performance_benchmark.create_schema(conn, "sqlite")
-            performance_benchmark._initialize_connection_dependent_systems(conn, "sqlite")
-            performance_benchmark.generate_data()
-            performance_benchmark.load_data_to_database(conn)
-
-            # Test incremental loading performance (mock loader)
-            start_time = datetime.now()
-            expected_records = int(1000 * performance_benchmark.scale_factor)
-
-            def _perf_detect_changes_side_effect(table_name, last_watermark, batch_id):
-                return [{"op": "U"}] * expected_records if table_name == "DimCustomer" else []
-
-            with (
-                patch.object(
-                    performance_benchmark.incremental_loader,
-                    "detect_changes",
-                    side_effect=_perf_detect_changes_side_effect,
-                ),
-                patch.object(
-                    performance_benchmark.incremental_loader,
-                    "load_incremental_batch",
-                    return_value={"success": True, "records_loaded": expected_records},
-                ),
-            ):
-                incremental_results = performance_benchmark._run_incremental_data_loading(conn)
-            incremental_duration = (datetime.now() - start_time).total_seconds()
+            start_time = mono_time()
+            incremental_results = performance_benchmark._run_incremental_data_loading(conn)
+            incremental_duration = elapsed_seconds(start_time)
 
             assert incremental_results["success"] is True
-            assert incremental_results["records_loaded"] > 0
-            assert incremental_duration >= 0
-
-            # Verify records loaded scales with scale factor
-            assert incremental_results["records_loaded"] == expected_records
+            customer_count = conn.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
+            assert customer_count > 0
+            assert incremental_results["records_loaded"] >= customer_count
+            assert incremental_duration < 30
 
     def test_quality_monitoring_performance(self, performance_benchmark):
         """Test data quality monitoring performance."""
