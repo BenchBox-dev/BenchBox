@@ -84,3 +84,46 @@ target-version = "py311"
     assert data["project"]["version"] == "0.4.1"
     assert data["tool"]["ruff"]["target-version"] == "py311"
     assert update_version.get_current_version_from_pyproject() == "0.4.1"
+
+
+def test_update_version_in_pyproject_ignores_version_keys_in_earlier_tables(tmp_path, monkeypatch):
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        """[build-system]
+requires = ["hatchling"]
+
+[tool.example]
+version = "9.9.9"
+
+[project]
+name = "benchbox"
+version = "0.4.0"
+dependencies = [
+    "duckdb>=1.5.0",
+]
+
+[tool.other]
+version = "1.2.3"
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(update_version, "get_project_root", lambda: tmp_path)
+
+    assert update_version.get_current_version_from_pyproject() == "0.4.0"
+    assert update_version.update_version_in_pyproject("0.4.1")
+
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    assert data["project"]["version"] == "0.4.1"
+    assert data["tool"]["example"]["version"] == "9.9.9"
+    assert data["tool"]["other"]["version"] == "1.2.3"
+
+
+def test_update_version_in_pyproject_reports_missing_project_table(tmp_path, monkeypatch):
+    pyproject = tmp_path / "pyproject.toml"
+    original = '[tool.example]\nversion = "9.9.9"\n'
+    pyproject.write_text(original, encoding="utf-8")
+    monkeypatch.setattr(update_version, "get_project_root", lambda: tmp_path)
+
+    assert update_version.get_current_version_from_pyproject() is None
+    assert not update_version.update_version_in_pyproject("0.4.1")
+    assert pyproject.read_text(encoding="utf-8") == original
