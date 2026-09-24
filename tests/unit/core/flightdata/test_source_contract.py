@@ -56,6 +56,7 @@ def test_source_contract_lists_exact_remote_files(tmp_path):
     assert contract["source"] == "bts-transtats"
     assert contract["base_url"] == BTS_BASE_URL
     assert contract["csv_encoding"] == "cp1252"
+    assert contract["allow_synthetic_fallback"] is False
     assert contract["months"] == [(2024, 12)]
     assert contract["urls"] == [BTS_BASE_URL.format(year=2024, month=12)]
 
@@ -76,6 +77,7 @@ def test_small_scale_records_synthetic_provenance(tmp_path):
     downloader = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
     downloader._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
     assert downloader.source_provenance()["source"] == "synthetic"
+    assert downloader.source_provenance()["synthetic_months"] == ["2024-12"]
     assert downloader.source_provenance()["promotion_eligible"] is False
 
 
@@ -130,7 +132,26 @@ def test_checksum_abort_invalidates_outputs_and_manifest(tmp_path, monkeypatch):
     assert not manifest_path.exists()
 
 
-def test_unparseable_download_is_not_recorded_as_ingested(tmp_path, monkeypatch):
+def test_real_only_download_failure_invalidates_partial_output(tmp_path, monkeypatch):
+    from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
+
+    downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path, force_redownload=True)
+    flights_path = tmp_path / downloader.get_compressed_filename("flights.csv")
+    manifest_path = tmp_path / MANIFEST_FILENAME
+    manifest_path.write_text("stale", encoding="utf-8")
+
+    def fail_with_partial_output(path):
+        path.write_text("partial", encoding="utf-8")
+        raise RuntimeError("BTS download failed for 2024-12; real data is required")
+
+    monkeypatch.setattr(downloader, "_ensure_flights_data", fail_with_partial_output)
+    with pytest.raises(RuntimeError, match="real data is required"):
+        downloader.download()
+    assert not flights_path.exists()
+    assert not manifest_path.exists()
+
+
+def test_unparseable_download_fails_closed_unless_fallback_is_explicit(tmp_path, monkeypatch):
     import csv
     import io
 
@@ -148,10 +169,18 @@ def test_unparseable_download_is_not_recorded_as_ingested(tmp_path, monkeypatch)
 
     monkeypatch.setattr(module.urllib.request, "urlopen", lambda *_args, **_kwargs: _Response())
     downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path)
-    downloader._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
+    with pytest.raises(RuntimeError, match="2024-12.*real data is required"):
+        downloader._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
 
     assert downloader._content_hashes == {}
-    assert downloader.source_provenance()["source"] == "synthetic"
+    assert downloader.source_provenance()["source"] == "unknown"
+    assert downloader.source_provenance()["synthetic_months"] == []
+
+    fallback = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path, allow_synthetic_fallback=True)
+    fallback._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
+    assert fallback.source_provenance()["source"] == "synthetic"
+    assert fallback.source_provenance()["synthetic_months"] == ["2024-12"]
+    assert fallback.source_provenance()["months_synthetic"] == 1
 
 
 def test_contract_id_stable_and_pin_sensitive(tmp_path):
@@ -160,6 +189,8 @@ def test_contract_id_stable_and_pin_sensitive(tmp_path):
     assert first.source_contract_id() == second.source_contract_id()
     other = FlightDataDownloader(scale_factor=1.0, output_dir=tmp_path)
     assert first.source_contract_id() != other.source_contract_id()
+    fallback = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path, allow_synthetic_fallback=True)
+    assert first.source_contract_id() != fallback.source_contract_id()
 
 
 def test_missing_manifest_has_no_persisted_contract(tmp_path):
@@ -182,3 +213,86 @@ def test_manifest_persists_contract_and_hashes(tmp_path):
     assert manifest["content_hashes"] == {"https://example/x.zip": "abc123"}
     assert manifest["source_provenance"]["promotion_eligible"] is False
     assert downloader._persisted_source_contract_id() == downloader.source_contract_id()
+
+
+def test_manifest_reuse_requires_complete_month_evidence_and_real_months(tmp_path):
+    from benchbox.core.flightdata.benchmark import FlightDataBenchmark
+
+    benchmark = FlightDataBenchmark(scale_factor=0.1, output_dir=tmp_path)
+    months = [f"{year}-{month:02d}" for year, month in benchmark.downloader.months]
+    manifest = {
+        "source_contract_id": benchmark.downloader.source_contract_id(),
+        "source_provenance": {
+            "downloaded_months": months,
+            "synthetic_months": [],
+            "months_downloaded": len(months),
+            "months_synthetic": 0,
+        },
+    }
+    assert benchmark.manifest_matches_datagen_identity(manifest)
+    manifest["source_provenance"]["synthetic_months"] = [months[-1]]
+    manifest["source_provenance"]["downloaded_months"] = months[:-1]
+    manifest["source_provenance"]["months_downloaded"] -= 1
+    manifest["source_provenance"]["months_synthetic"] = 1
+    assert not benchmark.manifest_matches_datagen_identity(manifest)
+
+    fallback = FlightDataBenchmark(scale_factor=0.1, output_dir=tmp_path, allow_synthetic_fallback=True)
+    manifest["source_contract_id"] = fallback.downloader.source_contract_id()
+    assert fallback.manifest_matches_datagen_identity(manifest)
+    manifest["source_provenance"]["synthetic_months"] = []
+    assert not fallback.manifest_matches_datagen_identity(manifest)
+
+
+def test_direct_downloader_does_not_reuse_cache_without_month_evidence(tmp_path, monkeypatch):
+    import json
+
+    from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
+
+    downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path)
+    (tmp_path / MANIFEST_FILENAME).write_text(
+        json.dumps({"source_contract_id": downloader.source_contract_id()}), encoding="utf-8"
+    )
+    monkeypatch.setattr(downloader, "_copy_reference_file", lambda _name, path: path.write_text("x\n"))
+    monkeypatch.setattr(downloader, "_record_existing_csv_file", lambda *_args: None)
+    monkeypatch.setattr(downloader, "_write_manifest", lambda _files: None)
+
+    def _flights(path):
+        assert downloader.force_redownload
+        path.write_text("x\n", encoding="utf-8")
+        return path
+
+    monkeypatch.setattr(downloader, "_ensure_flights_data", _flights)
+    downloader.download()
+
+
+def test_verified_month_evidence_round_trips_through_result_bundle(tmp_path):
+    from benchbox.core.flightdata.benchmark import FlightDataBenchmark
+    from benchbox.core.results.loader import reconstruct_benchmark_results
+    from benchbox.core.results.schema import build_result_payload
+    from benchbox.core.runner.runner import _attach_datagen_version
+    from tests.fixtures.result_dict_fixtures import make_benchmark_results
+
+    benchmark = FlightDataBenchmark(scale_factor=0.01, output_dir=tmp_path)
+    downloader = benchmark.downloader
+    downloader._stats["months_synthetic"] = 1
+    downloader._stats["synthetic_months"] = ["2024-12"]
+    flights = tmp_path / "flights.csv"
+    flights.write_text("x", encoding="utf-8")
+    downloader._table_file_row_counts = {flights: 0}
+    downloader._write_manifest({"flights": flights})
+
+    result = _attach_datagen_version(make_benchmark_results(benchmark_name="flightdata", scale_factor=0.01), benchmark)
+    provenance = result.flightdata_source_provenance
+    assert provenance is not None
+    assert provenance["synthetic_months"] == ["2024-12"]
+    assert provenance["months_synthetic"] == 1
+    bundle = build_result_payload(result)
+    assert bundle["benchmark"]["source_provenance"] == provenance
+    assert reconstruct_benchmark_results(bundle).flightdata_source_provenance == provenance
+
+    unlinked = _attach_datagen_version(
+        make_benchmark_results(benchmark_name="flightdata", scale_factor=0.01),
+        benchmark,
+        dataset_identity_established=False,
+    )
+    assert unlinked.flightdata_source_provenance is None
