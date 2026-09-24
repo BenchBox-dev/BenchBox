@@ -2022,7 +2022,9 @@
     },
     "ci-dedupe-11-required-public-site-visual-check": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "ci-dedupe-10-docs-visual-lane-decision"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Require public-site visual acceptance before merging into develop"
