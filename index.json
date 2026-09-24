@@ -1765,10 +1765,15 @@
       "title": "Realign hosted-submit, slim validator, and official TPC-DS bundles with develop's submission validator"
     },
     "canary-tpcdi-duckdb-cursor-transaction": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T12:16:24Z",
+        "generation": "92173b99872843a1bddb3fb915a63e54",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Commit DuckDB cursor transactions in TPC-DI customer SCD2 batch loader"
     },
     "canary-tpcdi-duckdb-scd2-commit": {
