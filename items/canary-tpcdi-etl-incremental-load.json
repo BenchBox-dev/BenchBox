@@ -4,7 +4,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "Commit 306e126224a5d46cd7e70038b8801aae963e7824 on fix/canary-tpcdi-etl-incremental-load; PR https://github.com/BenchBox-dev/BenchBox/pull/2316 targets develop and is open, held. Root cause: enhanced ETL used nonexistent warehouse LastModified and malformed generated FinWire records; empty quality aggregates failed. Focused TPC-DI suite 49 passed; committed-head make pr-preflight passed (31496 fast and 2091 medium tests). Await hosted CI, review, and merge before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2316 now at b697d691031650919ed71903f66df14b25dce334. Fixed historical-to-incremental SCD2 semantics with atomic expiration/insertion, warehouse-assigned surrogate keys and batch IDs, and source-derived effective dates. Regression tests verify historical plus two incremental batches, one current customer version, nonoverlapping dates, rollback, and unsupported-backend refusal. The corrected parallel transform test asserts source dates survive both paths. Focused SQLite regressions 3 passed, full TPC-DI integration 11 passed, exact two medium reruns passed; committed-head make pr-preflight passed with 31499 fast and 2091 medium. P1 review thread replied and resolved. Hosted CI and maintainer review remain; merge into develop before closing.",
   "description": "Repair the TPC-DI full benchmark ETL failures seen in the scheduled release canary, including incremental loader LastModified lookups and data quality monitor null arithmetic. Identify the causing commit before changing code. Preserve valid incremental load and data-quality behavior; do not skip tests or change markers.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2316"
@@ -51,6 +51,14 @@
       "generation": "be14c404eebc4c168c8c42e87fc10144",
       "op": "take",
       "op_id": "f691b5a4393c4cf68b483d5d52e6a89f",
+      "session_id": "59a5adf88cd84b2d911869713e333056"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:4b0d6d5925cf691228d4ee9d",
+      "at": "2026-09-24T01:09:30Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "1a58f20719b5495cbd517de64bd28034",
       "session_id": "59a5adf88cd84b2d911869713e333056"
     }
   ]
