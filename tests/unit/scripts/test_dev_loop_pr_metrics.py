@@ -716,6 +716,15 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "_commit_parent",
         lambda commit: base_freeze if commit == head else real_commit_parent(commit),
     )
+    # The synthetic registration binds head to a single-parent freeze proof,
+    # so the live parent count (a merge ref in PR checkouts, parentless in a
+    # depth-1 checkout) must not leak into the verdict either.
+    real_has_second_parent = metrics._has_second_parent
+    monkeypatch.setattr(
+        metrics,
+        "_has_second_parent",
+        lambda commit: False if commit == head else real_has_second_parent(commit),
+    )
     monkeypatch.setattr(metrics, "_pinned_registration_pointers", lambda commit, path: {head})
     monkeypatch.setattr(metrics, "_commit_timestamp", lambda commit: 100)
     monkeypatch.setattr(

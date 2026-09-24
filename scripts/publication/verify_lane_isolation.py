@@ -124,6 +124,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/queue_certification.py",
     "scripts/sweep_coverage.py",
     "scripts/heavy_tier_needed.py",
+    "scripts/canary_impact.py",
     "scripts/release_canary_incident.py",
     "scripts/update_version.py",
     # Repository guidance and release notes are linked from the site but are

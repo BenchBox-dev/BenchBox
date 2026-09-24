@@ -790,6 +790,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history: the canary live-tree tests diff historical
+          # regression commits, which a shallow checkout cannot resolve.
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
