@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reaches end of life in October 2027.
 - **BREAKING: Newer dependencies.** DataFrame platforms need pandas 3 and
   `dask[distributed]>=2025.1.0`; with pandas 2, BenchBox reports `pandas-df`
-  and Dask as unavailable. DuckDB must be 1.5 or later, DataFusion 54 or later,
-  and `databricks-connect` below 19.
+  and Dask as unavailable. DuckDB must be at least 1.5 and below 2.0,
+  DataFusion 54 or later, and `databricks-connect` below 19.
 - **BREAKING: Removed features.** Modin is no longer supported: use `pandas-df`
   or `dask-df` instead of the `modin` and `modin-df` platforms and extras.
   `PowerRunExecutor` and `ConcurrentQueryExecutor` are removed; see
@@ -26,16 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **More lakehouse and external-table support.** ClickHouse can read Delta
   tables, Redshift Spectrum and BigQuery can read Iceberg tables, and Databricks
   can use Hudi tables. `--table-mode external` works on Athena Spark, EMR
-  Serverless, Dataproc Serverless, and Glue. Delta, Iceberg, and Hudi tables
-  support optimize and vacuum.
+  Serverless, Dataproc Serverless, and Glue. Delta and Hudi tables support
+  optimize and vacuum; Iceberg tables support vacuum.
 - **Better comparisons in Results Explorer.** You can browse results by engine
   version, compare several runs against a baseline, and preview your own
   results before you submit them.
 - **Repeatable downloaded datasets.** NYC Taxi and FlightData download a fixed
-  set of files, so every run uses the same data.
+  set of files, so every run starts from the same source window.
 - **More detail in result files.** Results record the tuning you requested and
   the tuning BenchBox applied, the client's cloud region, and each table's load
-  time.
+  time where the loader captures per-table measurements.
 - **Throughput concurrency option.** `benchbox run --streams` sets how many
   query streams a throughput test runs at once.
 - **More DataFrame queries.** TPC-DS One Big Table has 17 DataFrame queries, up
@@ -54,8 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   come from vendor price lists, and Snowflake cost reflects run time and
   warehouse size.
 - **Safer throughput tests.** BenchBox waits for timed-out queries to stop
-  before the next phase starts. If the throughput phase fails, official results
-  omit Throughput@Size.
+  before the next phase starts. If the throughput phase fails, official result
+  files omit Throughput@Size.
 
 ### Fixed
 
