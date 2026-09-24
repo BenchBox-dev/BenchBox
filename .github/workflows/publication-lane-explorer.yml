@@ -67,7 +67,15 @@ jobs:
         working-directory: results-explorer
 
       - name: Run Python contract tests
-        run: uv run python -m pytest tests/unit/scripts/explorer_pipeline/test_duckdb_browser_contract.py tests/unit/scripts/test_explorer_build_contract.py -q
+        # Curated release trees remove these contract tests (see the
+        # release-cut curation list); skip there instead of failing on
+        # missing paths. The Explorer unit tests above still gate the bundle.
+        run: |
+          if [ -f tests/unit/scripts/test_explorer_build_contract.py ]; then
+            uv run python -m pytest tests/unit/scripts/explorer_pipeline/test_duckdb_browser_contract.py tests/unit/scripts/test_explorer_build_contract.py -q
+          else
+            echo "Contract tests curated out of the release tree; skipping."
+          fi
 
       - name: Validate Explorer compatibility and generate content-addressed manifest
         run: uv run python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist --generate-manifest
