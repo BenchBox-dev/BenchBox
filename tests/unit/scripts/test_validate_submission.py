@@ -1579,6 +1579,49 @@ class TestSubmissionDeterministicGates:
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 
+    def test_tpcds_paired_variants_cover_all_99_logical_queries(self):
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpcds"
+        variants = {14, 23, 24, 39}
+        ids = [f"Q{i}" for i in range(1, 100) if i not in variants]
+        ids += [f"Q{i}{part}" for i in sorted(variants) for part in ("a", "b")]
+        data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+        data["summary"]["queries"] = {"total": 103, "passed": 103, "failed": 0}
+
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+
+        data["queries"] = [query for query in data["queries"] if query["id"] != "Q14b"]
+        data["summary"]["queries"] = {"total": 102, "passed": 102, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+
+    def test_tpcds_bare_ids_cannot_replace_required_variant_pairs(self):
+        variants = {14, 23, 24, 39}
+        for missing_variant, expected_coverage, expected_missing in (
+            (None, 95, "14, 23, 24, 39"),
+            ("Q14b", 98, "14"),
+        ):
+            data = _minimal_bundle()
+            data["benchmark"]["id"] = "tpcds"
+            ids = [f"Q{i}" for i in range(1, 100)]
+            if missing_variant is not None:
+                ids += [f"Q{i}a" for i in sorted(variants)]
+                ids += [f"Q{i}b" for i in sorted(variants) if f"Q{i}b" != missing_variant]
+            data["queries"] = [{"id": qid, "ms": 100, "status": "SUCCESS"} for qid in ids]
+            data["summary"]["queries"] = {"total": len(ids), "passed": len(ids), "failed": 0}
+
+            vr = ValidationResult("test")
+            _validate_bundle(data, vr)
+            assert not vr.ok
+            assert any(
+                f"covers {expected_coverage} of 99 canonical queries" in error
+                and f"missing: {expected_missing}" in error
+                for error in vr.errors
+            )
+
     def test_canonical_id_sets_agree_with_counts(self):
         from benchbox.validation.bundle import (
             CANONICAL_LOGICAL_QUERY_COUNTS,
