@@ -207,6 +207,15 @@
       "op": "update",
       "op_id": "57566b5b8f814002952411459507bd3e",
       "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-24T02:01:39Z",
+      "client": "codex-mcp-client",
+      "generation": "f294a3d819a74fee92a210580595ca48",
+      "op": "release",
+      "op_id": "a07df77af1db4307b000887e16f08c6e",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
 }
