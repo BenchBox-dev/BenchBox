@@ -31,6 +31,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+# Full-tree collection and dependency mapping can exceed the default 60s
+# timeout when the medium suite runs with five workers.
+@pytest.mark.timeout(180)
 class TestLiveTree:
     @pytest.fixture(scope="class")
     def live_canary(self) -> tuple[list[str], dict[str, FileDeps]]:
