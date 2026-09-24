@@ -1690,7 +1690,12 @@
       "title": "Verify malformed reusable FlightData shards are rejected"
     },
     "canary-green-for-v0-4-1": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T14:14:17Z",
+        "generation": "9afc081ecc434866b16c409f2be8c07a",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829"
+      },
       "needs": [
         "canary-flightdata-bad-width-shard",
         "canary-tpcdi-etl-incremental-load",
@@ -1698,7 +1703,7 @@
         "canary-tpcdi-duckdb-cursor-transaction"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Get one green release canary run on develop before v0.4.1"
     },
     "canary-impact-01-junit-durations": {
