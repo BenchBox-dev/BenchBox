@@ -6,7 +6,7 @@
     "Focused tests exercise open/merged PR states, pending and failed required contexts, merge-result races, tag conflicts, and each interrupted state; the release guide names recovery commands and separate publication verification.",
     "make pr-preflight passes on the implementation PR."
   ],
-  "context": "The implementation and release-template follow-up are committed in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery at exact HEAD 56882087a12b87f60255a4d94dcad82ac9103d59; branch is clean and matches origin, base origin/develop 435d07e97c2e0f30a002d721fbc42aca508d6a52. PR #2321 is OPEN/non-draft/mergeable at that exact head. Fresh hosted snapshot: 31 SUCCESS, 12 SKIPPED, all complete. Its only review thread PRRT_kwDOQ7J64c6lXzuz is resolved by commit 56882087a; no release merge/tag has happened. Exact-head local focused, medium, and required-preflight receipts are absent. An unrelated TODO DB preflight is active in /Users/joe/Developer/BenchBox.wt-todo-db-0-8-0 (outer PID 84903; currently inside required preflight). Wait for that entire run to exit before starting this worktree's tests, even though no live test-lock fd appeared in the last snapshot. Next: run make pr-preflight on exact HEAD 56882087a when the other run exits, then refresh the PR checks and threads. No merge or release tag is authorized.",
+  "context": "Implementation and release-template follow-up are committed in /Users/joe/Developer/BenchBox.wt-release-finalize-recovery at exact HEAD 56882087a12b87f60255a4d94dcad82ac9103d59; branch is clean and matches origin, based on origin/develop 435d07e97c2e0f30a002d721fbc42aca508d6a52. PR #2321 is OPEN/non-draft/mergeable at that exact head. Live hosted checks: 31 SUCCESS, 12 SKIPPED, all complete. Review thread PRRT_kwDOQ7J64c6lXzuz is resolved and not outdated by commit 56882087a. Exact-head local focused, medium, and required-preflight receipts are absent. Handoff snapshot 2026-09-24 01:59 UTC: unrelated TODO DB make pr-preflight remains active in /Users/joe/Developer/BenchBox.wt-todo-db-0-8-0 (outer PID 84903); medium test PID 10267 holds /Users/joe/.benchbox/test.lock, verified by lsof. Preserve the process and lock; do not start another test or unlock it. Wait for the outer preflight and lock owner to exit. Only if no process holds the lock and a stale lock remains, use make test-unlock. Then run exact-head make pr-preflight for this PR, followed by PR #2320's preflight sequentially, refreshing each PR's checks and review threads. The handoff is /tmp/benchbox-release-process-handoff.md. This task remains open; no PR merge, release merge, or tag is authorized.",
   "description": "Close the gap between a successful squash merge and a pushed release tag. Prior art: release-finalize already checks the two required PR contexts before merge (Makefile:1248-1271); release.yml verifies tag ancestry and package version before build/publish (.github/workflows/release.yml:22-57). Extend that target rather than adding a second publisher. A fresh finalize must verify required contexts on the exact open PR head before merging. A resumed finalize may accept a confirmed MERGED PR, obtain its non-null merge commit, fetch origin/release and tags, and verify that the commit is on release. Create vX.Y.Z at that exact merge commit; if a local or remote tag exists, accept only an exact match and otherwise fail without moving it. Push the explicit tag ref without checking out a shared local release branch. Decision points: PR still open vs merged; tag absent vs exact match vs mismatch; tag pushed but release.yml pending/failed. Document each resume path in the runbook. Do not force-push, retag, replace a PyPI version, bypass required checks, treat queued/mergeable as merged, or infer publication from a pushed tag.",
   "links": [
     "Makefile",
@@ -198,6 +198,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "58807bd79af54db49d417e9c215eba2c",
+      "session_id": "521a6e20bb65440884f70754a5483e26"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bd7d87e16b39cafcbd703bfa",
+      "at": "2026-09-24T02:01:06Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "57566b5b8f814002952411459507bd3e",
       "session_id": "521a6e20bb65440884f70754a5483e26"
     }
   ]
