@@ -585,6 +585,8 @@ ignore = [
 [tool.ruff.lint.isort]
 force-single-line = false
 combine-as-imports = true
+# Keep _project first-party on release trees, where release-cut removes most of it.
+known-first-party = ["benchbox", "_project"]
 
 [tool.ruff.lint.mccabe]
 # Cyclomatic complexity gate: no function may exceed McCabe 18.
