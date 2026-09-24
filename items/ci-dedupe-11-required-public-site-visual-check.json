@@ -6,12 +6,14 @@
     "The approval path works for intentional visual changes on the exact PR head and does not become an unreviewed merge-group bypass.",
     "The develop-squash-only hosted ruleset requires the new context, and its runbook and drift guard agree with live state; verify a real PR and merge-group result before closeout."
   ],
+  "context": "Source PR https://github.com/BenchBox-dev/BenchBox/pull/2339 at head 59314e038996ea3a00e96ac17b691bacc23c52e4 is open. Exact-head ordered local preflight and all PR checks passed, including Public-site visual regression, Public-site visual acceptance, ruleset-drift, and ci-required-result. No review or review threads as of 2026-09-24 18:00 EDT; auto-merge withheld because soundness paths need independent CODEOWNER approval. After reviewed merge, add Public-site visual acceptance to develop-squash-only ruleset 15611785, verify drift and a real merge-group result, then close this item.",
   "description": "Implement the option 3 decision recorded in _project/decisions/public-site-visual-required-check-2026-09-24.md. Preserve the current visual comparison coverage and fail-closed exact-base-SHA semantics. Make an always-reporting required context on every develop pull request and merge group, with an explicit non-applicable success only when the current visual input set is unaffected. Do not directly require the conditional docs.yml visual job. Update the live develop-squash-only ruleset, runbook, and drift guard together. Treat missing exact-SHA baselines as a distinct producer-availability defect within this implementation: add bounded automatic production or recovery of the protected baseline without promoting PR diagnostics, and retain a manual recovery path. Account for exact-head visual approvals and merge-group identity so intentional changes can merge after review.",
   "links": [
     "_project/decisions/public-site-visual-required-check-2026-09-24.md",
     ".github/workflows/docs.yml",
     "docs/operations/repo-admin-settings.md",
-    "ci-dedupe-10-docs-visual-lane-decision"
+    "ci-dedupe-10-docs-visual-lane-decision",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2339"
   ],
   "sessions": [
     {
@@ -37,6 +39,14 @@
       "generation": "c2ffa0fe0fad472eb39cc574969f70c4",
       "op": "take",
       "op_id": "e8dde25ad8894f68820f14799639623a",
+      "session_id": "58595f50fecb4424b73e70103336ea29"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ecc7115a6c4982502bfd2e92",
+      "at": "2026-09-24T22:02:28Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "6aa6ebd92c45462382066bdade36221e",
       "session_id": "58595f50fecb4424b73e70103336ea29"
     }
   ]
