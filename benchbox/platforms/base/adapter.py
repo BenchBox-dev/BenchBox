@@ -1496,6 +1496,13 @@ class PlatformAdapter(
             else:
                 quiet_console.print("⚠️ Failed to save tuning metadata")
 
+        if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
+            quiet_console.print("Benchmark uses schema only; skipping data loading")
+            data_loading_phase = self._create_enhanced_data_loading_phase({}, 0.0, {})
+            data_loading_phase.status = "SKIPPED"
+            self._last_per_table_timings = {}
+            return schema_time, schema_creation_phase, 0.0, {}, data_loading_phase, tuning_metadata_saved
+
         quiet_console.print("Loading benchmark data...")
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
         quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")

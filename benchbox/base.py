@@ -99,6 +99,11 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
     #: instead of constructing first and mutating ``output_dir`` afterward.
     DATA_SOURCE_BENCHMARK: ClassVar[Optional[str]] = None
 
+    #: Set only for benchmarks whose queries need schema objects but no data files.
+    #: This is distinct from DATA_SOURCE_BENCHMARK=None, which normally means
+    #: that the benchmark generates its own data.
+    SKIP_DATA_LOADING: ClassVar[bool] = False
+
     def __init__(
         self,
         scale_factor: float = 1.0,

@@ -41,6 +41,8 @@ class MetadataPrimitives(QueryCategoryFacadeMixin, QueryFacadeMixin, BaseBenchma
     - Large catalogs (100-500+ tables)
     """
 
+    SKIP_DATA_LOADING = True
+
     def __init__(
         self,
         scale_factor: float = 1.0,
