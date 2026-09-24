@@ -1764,15 +1764,10 @@
       "title": "Realign hosted-submit, slim validator, and official TPC-DS bundles with develop's submission validator"
     },
     "canary-tpcdi-etl-incremental-load": {
-      "claim": {
-        "expires_at": "2026-09-25T04:46:35Z",
-        "generation": "83e947dda35c4420aa4977b674e42d52",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829"
-      },
+      "claim": null,
       "needs": [],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Fix the TPC-DI ETL pipeline failing in the release canary"
     },
     "canonical-benchmark-id-resolution": {
