@@ -10,37 +10,64 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
 
+def _skip_comment(sql: str, i: int, n: int) -> int | None:
+    """Return next index if sql[i] starts a comment, else None."""
+    if sql[i] == "-" and i + 1 < n and sql[i + 1] == "-":
+        i += 2
+        while i < n and sql[i] != "\n":
+            i += 1
+        return i
+    if sql[i] == "/" and i + 1 < n and sql[i + 1] == "*":
+        i += 2
+        while i < n and not (sql[i] == "*" and sql[i + 1] == "/"):
+            i += 1
+        return min(i + 2, n)
+    return None
+
+
+def _skip_quoted(sql: str, i: int, n: int, quote: str) -> int:
+    """Return next index after closing quote for literal or identifier starting at i."""
+    i += 1
+    while i < n:
+        if sql[i] == "\\" and i + 1 < n:
+            i += 2
+            continue
+        if sql[i] == quote:
+            if quote in ("'", '"') and i + 1 < n and sql[i + 1] == quote:
+                i += 2
+                continue
+            return i + 1
+        i += 1
+    return n
+
+
 def split_sql_statements(sql: str) -> list[str]:
-    """Split SQL on semicolons outside single-quoted string literals."""
+    """Split SQL on semicolons outside string literals, identifiers, and comments."""
     statements: list[str] = []
     current: list[str] = []
     i = 0
-    while i < len(sql):
+    n = len(sql)
+    while i < n:
         char = sql[i]
-        if char == "'":
-            start = i
-            i += 1
-            while i < len(sql):
-                if sql[i] == "\\" and i + 1 < len(sql):
-                    i += 2
-                    continue
-                if sql[i] == "'":
-                    if i + 1 < len(sql) and sql[i + 1] == "'":
-                        i += 2
-                        continue
-                    i += 1
-                    break
-                i += 1
-            current.append(sql[start:i])
-        elif char == ";":
+        comment_end = _skip_comment(sql, i, n)
+        if comment_end is not None:
+            current.append(sql[i:comment_end])
+            i = comment_end
+            continue
+        if char in ("'", '"', "`"):
+            quote_end = _skip_quoted(sql, i, n, char)
+            current.append(sql[i:quote_end])
+            i = quote_end
+            continue
+        if char == ";":
             stmt = "".join(current).strip()
             if stmt:
                 statements.append(stmt)
             current = []
             i += 1
-        else:
-            current.append(char)
-            i += 1
+            continue
+        current.append(char)
+        i += 1
     stmt = "".join(current).strip()
     if stmt:
         statements.append(stmt)

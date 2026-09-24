@@ -2602,6 +2602,58 @@ class TestQualifyTableNames:
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         assert adapter._qualify_table_names("", allow_fallback=False) == ""
 
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
+        """Per-statement qualification qualifies tables appearing only in later statements."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        batch_sql = (
+            "CREATE TABLE stage_1 AS SELECT * FROM source_early;\nINSERT INTO target_late SELECT * FROM source_late;\n"
+        )
+        result = adapter._qualify_table_names(batch_sql)
+        assert "CREATE TABLE `p1.d1.STAGE_1` AS SELECT * FROM `p1.d1.SOURCE_EARLY`" in result
+        assert "INSERT INTO `p1.d1.TARGET_LATE` SELECT * FROM `p1.d1.SOURCE_LATE`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_insert_target_with_same_named_references(self, mock_bigquery):
+        """INSERT target tables never gain synthesized AS aliases even if same-named references exist."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "INSERT INTO target (c1) SELECT target.c1 FROM source AS target"
+        result = adapter._qualify_table_names(sql)
+        assert result.startswith("INSERT INTO `p1.d1.TARGET` (c1)")
+        assert "INSERT INTO `p1.d1.TARGET` AS target" not in result
+        assert "FROM `p1.d1.SOURCE` AS target" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_create_target_with_same_named_references(self, mock_bigquery):
+        """CREATE TABLE target tables never gain synthesized AS aliases."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "CREATE TABLE target AS SELECT target.c1 FROM source AS target"
+        result = adapter._qualify_table_names(sql)
+        assert result.startswith("CREATE TABLE `p1.d1.TARGET` AS SELECT")
+        assert "CREATE TABLE `p1.d1.TARGET` AS target" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_drop_alter_truncate_targets(self, mock_bigquery):
+        """DROP, ALTER, and TRUNCATE targets never gain synthesized AS aliases."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+
+        drop_sql = "DROP TABLE IF EXISTS target"
+        assert adapter._qualify_table_names(drop_sql) == "DROP TABLE IF EXISTS `p1.d1.TARGET`"
+
+        alter_sql = "ALTER TABLE target ADD COLUMN target_col INT64"
+        assert adapter._qualify_table_names(alter_sql) == "ALTER TABLE `p1.d1.TARGET` ADD COLUMN target_col INT64"
+
+        truncate_sql = "TRUNCATE TABLE target"
+        assert adapter._qualify_table_names(truncate_sql) == "TRUNCATE TABLE `p1.d1.TARGET`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_permits_alias_on_update_target_with_same_named_references(self, mock_bigquery):
+        """UPDATE targets gain synthesized AS alias when table.col references exist."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "UPDATE target SET target.c = 1"
+        result = adapter._qualify_table_names(sql)
+        assert result == "UPDATE `p1.d1.TARGET` AS target SET target.c = 1"
+
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestNormalizeTableNamesCase:

@@ -665,7 +665,7 @@ class BigQueryAdapter(PlatformAdapter):
 
         Respects catalog ``bigquery`` overrides (including skip ``None``):
         rewrites the override when present, otherwise the default write SQL.
-        Two rewrites, both linear and single-level by construction of the
+        Four rewrites, each linear and single-level by construction of the
         catalog SQL they target (verified live: the unmodified forms fail
         server-side with ``Type not found: VARCHAR`` and ``INT64`` interval
         complaints while COUNT(*) validations kept passing):
@@ -2159,55 +2159,46 @@ class BigQueryAdapter(PlatformAdapter):
             # Parse as BigQuery: the default dialect rejects backtick-quoted
             # identifiers, which sqlglot translations and benchmark setup
             # probes use throughout.
-            tree = sqlglot.parse_one(query, read="bigquery")
+            trees = sqlglot.parse(query, read="bigquery")
         except Exception:
             return None
-        if tree is None:
+        if not trees or any(tree is None for tree in trees):
             return None
-        cte_names = {cte.alias_or_name.upper() for cte in tree.find_all(exp.CTE)}
+        cte_names = set()
+        for tree in trees:
+            for cte in tree.find_all(exp.CTE):
+                name = (cte.alias_or_name or "").upper()
+                if name:
+                    cte_names.add(name)
         tables: list[str] = []
-        for table in tree.find_all(exp.Table):
-            if table.db or table.catalog:
-                continue
-            name = (table.name or "").upper()
-            if not name or name in cte_names or name in tables:
-                continue
-            tables.append(name)
+        for tree in trees:
+            for table in tree.find_all(exp.Table):
+                if table.db or table.catalog:
+                    continue
+                name = (table.name or "").upper()
+                if not name or name in cte_names or name in tables:
+                    continue
+                tables.append(name)
         return tables
 
-    def _qualify_table_names(self, query: str, allow_fallback: bool = True) -> str:
-        """Add full qualification to table names in query.
-
-        Table names are extracted with a SQL parser so benchmarks beyond TPC-H
-        resolve; BigQuery table identifiers are case-sensitive, so every name
-        is normalized to UPPERCASE to match created tables. Falls back to the
-        static TPC-H list when parsing is unavailable (unless allow_fallback
-        is False, in which case an unparseable query is returned unchanged -
-        used for already-translated backtick queries where a static rewrite
-        could corrupt a statement the parser cannot see into).
-
-        Only occurrences in table position are rewritten: after FROM / JOIN,
-        a comma-separated FROM item, or a DML/DDL target keyword (INSERT INTO,
-        UPDATE, DELETE FROM via FROM, TRUNCATE TABLE, DROP TABLE, ALTER TABLE,
-        CREATE TABLE). String literals and comments are masked first, so
-        same-named columns, aliases, and literal text are left alone.
-        """
+    def _qualify_single_statement(self, statement: str, allow_fallback: bool = True) -> str:
+        """Add full qualification to table names in a single SQL statement."""
         import re
 
-        table_names = self._extract_unqualified_tables(query)
+        table_names = self._extract_unqualified_tables(statement)
         if table_names is None:
             if not allow_fallback:
-                return query
+                return statement
             table_names = list(self._FALLBACK_QUALIFY_TABLES)
 
         # Blank string literals and comments length-preservingly so matches
-        # found in the masked copy align with the original query.
+        # found in the masked copy align with the original statement.
         literal_pattern = r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/"
 
         def _mask(text: str) -> str:
             return re.sub(literal_pattern, lambda match: " " * len(match.group(0)), text, flags=re.DOTALL)
 
-        masked = _mask(query)
+        masked = _mask(statement)
 
         for table_name in table_names:
             # Replace unqualified table names. The name alternative also
@@ -2221,11 +2212,14 @@ class BigQueryAdapter(PlatformAdapter):
             # keyword prefix guard keeps them excluded here as well.
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
             # A qualified path creates no implicit range variable on
-            # BigQuery, so `name.column` references elsewhere in the query
+            # BigQuery, so `name.column` references elsewhere in the statement
             # would stop resolving once the table is qualified. When such
-            # references exist and the occurrence carries no alias, append
-            # one spelling the original name (proven live: every bare-prefix
-            # UPDATE/DELETE failed server-side with Unrecognized name).
+            # references exist, the occurrence carries no alias, and the
+            # grammar permits aliases at this position, append one spelling
+            # the original name (proven live: every bare-prefix UPDATE/DELETE
+            # failed server-side with Unrecognized name). BigQuery syntax
+            # forbids aliases on target tables of INSERT, CREATE, DROP,
+            # TRUNCATE, and ALTER statements.
             has_refs = re.search(rf"\b{table_name}\s*\.", masked, flags=re.IGNORECASE) is not None
 
             pattern = (
@@ -2238,18 +2232,56 @@ class BigQueryAdapter(PlatformAdapter):
             segments: list[str] = []
             last = 0
             for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
+                prefix = match.group(1)
                 name_start, name_end = match.span(2)
-                segments.append(query[last:name_start])
+                segments.append(statement[last:name_start])
                 replacement = qualified_name
-                if has_refs and not self._qualify_has_alias(masked[name_end : name_end + 40]):
+                alias_forbidden = bool(re.search(r"(?i)\b(INSERT|CREATE|DROP|TRUNCATE|ALTER)\b", prefix))
+                if has_refs and not alias_forbidden and not self._qualify_has_alias(masked[name_end : name_end + 40]):
                     replacement += f" AS {table_name.lower()}"
                 segments.append(replacement)
                 last = name_end
-            segments.append(query[last:])
-            query = "".join(segments)
-            masked = _mask(query)
+            segments.append(statement[last:])
+            statement = "".join(segments)
+            masked = _mask(statement)
 
-        return query
+        return statement
+
+    def _qualify_table_names(self, query: str, allow_fallback: bool = True) -> str:
+        """Add full qualification to table names in query.
+
+        Table names are extracted with a SQL parser so benchmarks beyond TPC-H
+        resolve; BigQuery table identifiers are case-sensitive, so every name
+        is normalized to UPPERCASE to match created tables. Falls back to the
+        static TPC-H list when parsing is unavailable (unless allow_fallback
+        is False, in which case an unparseable query is returned unchanged -
+        used for already-translated backtick queries where a static rewrite
+        could corrupt a statement the parser cannot see into).
+
+        Qualification is performed per-statement so multi-statement batches
+        resolve tables referenced only in later statements. Only occurrences
+        in table position are rewritten: after FROM / JOIN, a comma-separated
+        FROM item, or a DML/DDL target keyword (INSERT INTO, UPDATE,
+        DELETE FROM via FROM, TRUNCATE TABLE, DROP TABLE, ALTER TABLE,
+        CREATE TABLE). String literals and comments are masked first, so
+        same-named columns, aliases, and literal text are left alone.
+        Synthesized AS aliases are restricted to grammar-permitted positions
+        (withheld from INSERT, CREATE, DROP, TRUNCATE, and ALTER targets).
+        """
+        if not query or not query.strip():
+            return query
+
+        statements = split_sql_statements(query)
+        if not statements:
+            return query
+
+        qualified_parts = [self._qualify_single_statement(stmt, allow_fallback=allow_fallback) for stmt in statements]
+        result = ";\n".join(qualified_parts)
+        if query.rstrip().endswith(";"):
+            result += ";"
+        if query.endswith("\n"):
+            result += "\n"
+        return result
 
     @staticmethod
     def _qualify_has_alias(after: str) -> bool:
