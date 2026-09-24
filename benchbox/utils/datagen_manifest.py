@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -202,9 +203,13 @@ class DataGenerationManifest:
         seed: int | None = None,
         extra_metadata: dict[str, Any] | None = None,
         formats: list[str] | None = None,
+        stamp: bool = True,
     ) -> None:
         self._root = _ensure_path(output_dir)
         self._benchmark = benchmark
+        # Recovery writes for files of unknown vintage pass stamp=False so a
+        # rebuilt manifest never launders old data into current provenance.
+        self._stamp = stamp
         self._scale_factor = scale_factor
         self._compression = compression or {"enabled": False, "type": None, "level": None}
         self._parallel = int(parallel) if parallel not in (None, 0) else 1
@@ -324,17 +329,18 @@ class DataGenerationManifest:
                 }
             }
 
-        try:
-            from benchbox.utils.datagen_version import current_datagen_stamp
+        datagen_stamp: dict[str, Any] = {}
+        if self._stamp:
+            try:
+                from benchbox.utils.datagen_version import current_datagen_stamp
 
-            datagen_stamp = current_datagen_stamp(self._benchmark)
-        except Exception:
-            datagen_stamp = {}
+                datagen_stamp = current_datagen_stamp(self._benchmark)
+            except Exception as exc:
+                logging.getLogger(__name__).debug("datagen stamp unavailable for %s: %s", self._benchmark, exc)
 
         manifest: dict[str, Any] = {
             "version": 2,
             "benchmark": self._benchmark.lower(),
-            **datagen_stamp,
             "scale_factor": float(self._scale_factor),
             "formats": list(self._formats),  # List of available formats
             "format_preference": list(self._formats),  # Default preference order
@@ -350,6 +356,9 @@ class DataGenerationManifest:
 
         if self._extra_metadata:
             manifest.update(self._extra_metadata)
+
+        # The provenance stamp always wins over caller-supplied metadata.
+        manifest.update(datagen_stamp)
 
         return manifest
 

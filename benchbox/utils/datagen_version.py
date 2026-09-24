@@ -9,6 +9,10 @@ inputs so cached datagen directories can be recognized as stale:
   whenever the generator code changes incompatibly.
 - ``compute_base_constants_hash`` fingerprints the base-constant inputs for a
   benchmark, so editing a specs file is detected even without a version bump.
+  Only benchmarks with registered specs files (currently ``tpch``,
+  ``tpch_skew``, ``tsbs_devops``/``tsbs``) get a content fingerprint; every
+  other benchmark falls back to the version marker alone, so its hash cannot
+  detect specs edits. Register a benchmark here when it gains a specs file.
 
 Datagen manifests stamp both values; the runner treats a manifest whose stamp
 differs from current as invalid and regenerates (the automatic equivalent of
@@ -20,6 +24,7 @@ compared.
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -27,10 +32,15 @@ from typing import Any, Mapping
 DATA_GENERATION_VERSION = 1
 
 # Benchmark slug (as stored lowercased in datagen manifests) to the
-# base-constant files that determine its generated data.
+# base-constant files that determine its generated data. tpch_skew carries
+# both specs because skewed output depends on the base TPC-H inputs and on
+# the skew column indices applied on top of them.
 _BENCHMARK_SPECS_FILES: dict[str, tuple[str, ...]] = {
     "tpch": ("benchbox/core/tpch/generator_specs.yaml",),
-    "tpch_skew": ("benchbox/core/tpch_skew/generator_specs.yaml",),
+    "tpch_skew": (
+        "benchbox/core/tpch/generator_specs.yaml",
+        "benchbox/core/tpch_skew/generator_specs.yaml",
+    ),
     "tsbs_devops": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
     "tsbs": ("benchbox/core/tsbs_devops/generator_specs.yaml",),
 }
@@ -67,6 +77,22 @@ def current_datagen_stamp(benchmark: str | None = None) -> dict[str, Any]:
         "data_generation_version": DATA_GENERATION_VERSION,
         "base_constants_hash": compute_base_constants_hash(benchmark),
     }
+
+
+def compute_datagen_identity_hash(benchmark: str | None, configuration: Mapping[str, Any] | None = None) -> str:
+    """Fingerprint generation constants and an optional effective configuration.
+
+    The existing base-constants hash remains part of this value, allowing a
+    benchmark to add runtime generation inputs without weakening YAML-spec
+    invalidation.
+    """
+    payload = {
+        "base_constants_hash": compute_base_constants_hash(benchmark),
+        "configuration": dict(configuration) if configuration is not None else None,
+        "data_generation_version": DATA_GENERATION_VERSION,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def manifest_datagen_is_current(manifest: Mapping[str, Any] | None, benchmark: str | None = None) -> bool:

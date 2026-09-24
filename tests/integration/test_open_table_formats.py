@@ -480,7 +480,7 @@ class TestDeltaLakeFormatSmoke:
         dummy = DummyBenchmark()
         regenerated = _ensure_data_generated(dummy, config)
 
-        assert regenerated is False, "Data should be reused, not regenerated"
+        assert regenerated == (False, True), "Data should be reused, not regenerated"
         dummy.generate_data.assert_not_called()
 
 

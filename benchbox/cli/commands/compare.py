@@ -1273,7 +1273,7 @@ def _perform_comparison(
     if output_format != "json":
         generation = comparison.get("generation_compatibility") or {}
         if generation.get("warning"):
-            if generation.get("compatible") is False:
+            if generation.get("status") == "incompatible":
                 console.print(f"[yellow]Warning: {generation['warning']}[/yellow]")
             else:
                 console.print(f"[dim]Note: {generation['warning']}[/dim]")
@@ -1508,6 +1508,16 @@ def _format_markdown_comparison(comparison: dict[str, Any], baseline: Any, curre
         "",
     ]
 
+    generation = comparison.get("generation_compatibility") or {}
+    if generation.get("warning"):
+        status = str(generation.get("status") or "unknown")
+        lines.extend(
+            [
+                f"> **Data generation {status}:** {_markdown_cell(str(generation['warning']))}",
+                "",
+            ]
+        )
+
     summary = comparison.get("summary", {})
     if summary:
         lines.extend(
@@ -1608,11 +1618,29 @@ def _format_markdown_comparison(comparison: dict[str, Any], baseline: Any, curre
     return "\n".join(lines)
 
 
+def _format_generation_section(lines: list[str], comparison: dict[str, Any]) -> None:
+    """Append the data-generation compatibility warning.
+
+    Saved text must carry the caveat the console prints: without it the file
+    is exactly the misleading artifact the generation check exists to prevent.
+    """
+    generation = comparison.get("generation_compatibility") or {}
+    warning = generation.get("warning")
+    if not warning:
+        return
+    status = str(generation.get("status") or "unknown").upper()
+    lines.append("-" * 80)
+    lines.append(f"DATA GENERATION: {status}")
+    lines.append(str(warning))
+    lines.append("")
+
+
 def _format_text_comparison(comparison: dict[str, Any], baseline: Any, current: Any, show_all: bool) -> str:
     """Format comparison as human-readable text."""
     lines: list[str] = []
 
     _format_header_section(lines, comparison, baseline)
+    _format_generation_section(lines, comparison)
     _format_summary_section(lines, comparison)
     _format_performance_metrics_section(lines, comparison)
 
@@ -1855,11 +1883,22 @@ def _plan_status_label(plans_identical: bool, similarity: float, is_regression: 
     return "✗ Different"
 
 
+def _append_html_generation_section(html: list[str], comparison: dict[str, Any]) -> None:
+    """Append the data-generation compatibility warning to saved HTML."""
+    generation = comparison.get("generation_compatibility") or {}
+    warning = generation.get("warning")
+    if not warning:
+        return
+    status = _escape_html(str(generation.get("status") or "unknown"))
+    html.append(f"<p><strong>Data generation ({status}):</strong> {_escape_html(str(warning))}</p>")
+
+
 def _format_html_comparison(comparison: dict[str, Any], baseline: Any, current: Any) -> str:
     """Format comparison as HTML."""
     html: list[str] = []
     _append_html_header(html)
     _append_html_metadata(html, comparison, baseline)
+    _append_html_generation_section(html, comparison)
     _append_html_summary_table(html, comparison)
     _append_html_query_comparison(html, comparison)
     _append_html_plan_section(html, comparison)

@@ -126,3 +126,60 @@ def test_malformed_sidecar_aborts_without_writing(tmp_path: Path) -> None:
 
     assert old.exists()
     assert json.loads(old.read_text(encoding="utf-8"))["platform"]["name"] == "clickhouse"
+
+
+def test_non_dict_sidecar_aborts_without_writing(tmp_path: Path) -> None:
+    """Valid JSON that is not an object must hit the malformed-sidecar branch."""
+    import pytest
+
+    old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
+    (tmp_path / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.manifest.json").write_text("[1, 2]")
+
+    (hits, _) = migrate_clickhouse_labels.discover_hits(tmp_path)
+
+    with pytest.raises(ValueError, match="malformed manifest sidecar"):
+        migrate_clickhouse_labels.migrate_hit(hits[0], "clickhouse-local")
+
+    assert old.exists()
+
+
+def test_companions_are_not_discovered_as_bundles(tmp_path: Path) -> None:
+    old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
+    (tmp_path / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.plans.json").write_text(json.dumps({"plans": []}))
+
+    (hits, anomalies) = migrate_clickhouse_labels.discover_hits(tmp_path)
+
+    assert [hit.result for hit in hits] == [old]
+    assert not any("plans.json" in anomaly for anomaly in anomalies)
+
+
+def test_migrate_carries_companions_and_leaves_no_temp_files(tmp_path: Path) -> None:
+    old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
+    companion = tmp_path / "tpch_sf1_clickhouse_sql_20200101_000000_abc123.plans.json"
+    companion.write_bytes(b'{"plans": []}')
+
+    (hits, _) = migrate_clickhouse_labels.discover_hits(tmp_path)
+    new_result, _ = migrate_clickhouse_labels.migrate_hit(hits[0], "clickhouse-local")
+
+    new_companion = tmp_path / "tpch_sf1_clickhouse_local_sql_20200101_000000_abc123.plans.json"
+    assert new_companion.read_bytes() == b'{"plans": []}'
+    assert not companion.exists()
+    assert not old.exists()
+    assert list(tmp_path.glob(".*.tmp-*")) == []
+    assert new_result.name == "tpch_sf1_clickhouse_local_sql_20200101_000000_abc123.json"
+
+
+def test_label_only_rewrite_is_atomic_and_keeps_companions(tmp_path: Path) -> None:
+    """A bare payload label without a bare slug rewrites in place, atomically."""
+    stem = "tpch_sf1_duckdb_sql_20200101_000000_abc123"
+    old = _write_bundle(tmp_path, stem, "clickhouse")
+    companion = tmp_path / f"{stem}.tuning.json"
+    companion.write_bytes(b"{}")
+
+    (hits, _) = migrate_clickhouse_labels.discover_hits(tmp_path)
+    new_result, _ = migrate_clickhouse_labels.migrate_hit(hits[0], "clickhouse-server")
+
+    assert new_result == old
+    assert json.loads(old.read_text(encoding="utf-8"))["platform"]["name"] == "ClickHouse Server"
+    assert companion.is_file()
+    assert list(tmp_path.glob(".*.tmp-*")) == []

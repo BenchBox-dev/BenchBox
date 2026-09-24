@@ -169,6 +169,10 @@ class TPCHSkewBenchmark(TPCHBenchmark):
             "config_summary": self.skew_config.get_skew_summary(),
         }
 
+    def manifest_matches_datagen_identity(self, manifest: dict[str, Any]) -> bool:
+        """Return whether ``manifest`` matches this benchmark's skew configuration."""
+        return self.data_generator.manifest_matches_datagen_identity(manifest)
+
     def get_benchmark_info(self) -> dict[str, Any]:
         """Get information about the benchmark.
 

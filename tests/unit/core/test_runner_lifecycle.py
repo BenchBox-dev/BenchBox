@@ -126,7 +126,7 @@ def test_data_only_mode_propagates_duration_seconds():
 
     def _slow_ensure_data_generated(*_args, **_kwargs):
         time.sleep(0.02)
-        return False
+        return False, True
 
     with patch("benchbox.core.runner.runner._ensure_data_generated", side_effect=_slow_ensure_data_generated):
         res = run_benchmark_lifecycle(
@@ -1153,7 +1153,7 @@ def test_representative_benchmarks_data_only_path(benchmark_id: str, tmp_path: P
     )
     benchmark = _mk_representative_benchmark(benchmark_id, tmp_path)
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         result = run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=None,
@@ -1201,7 +1201,7 @@ def test_representative_benchmarks_load_only_path(benchmark_id: str, tmp_path: P
 
     adapter = DummyAdapter()
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         result = run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=db,
@@ -1228,7 +1228,7 @@ def test_representative_benchmarks_setup_only_path(benchmark_id: str, tmp_path: 
     )
     benchmark = _mk_representative_benchmark(benchmark_id, tmp_path)
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         result = run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=None,
@@ -1278,7 +1278,7 @@ def test_representative_benchmarks_standard_path(benchmark_id: str, tmp_path: Pa
 
     adapter = DummyAdapter()
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         result = run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=db,
@@ -1322,7 +1322,7 @@ def test_runner_propagates_benchmark_name_slug_to_adapter(benchmark_id: str, tmp
                 execution_metadata={"mode": "standard"},
             )
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=db,
@@ -1382,7 +1382,7 @@ def test_standard_path_propagates_table_mode_to_adapter(tmp_path: Path) -> None:
 
     adapter = DummyAdapter()
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=db,
@@ -1444,7 +1444,7 @@ def test_standard_path_propagates_conversion_settings_to_adapter(tmp_path: Path)
 
     adapter = DummyAdapter()
 
-    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=False):
+    with patch("benchbox.core.runner.runner._ensure_data_generated", return_value=(False, True)):
         run_benchmark_lifecycle(
             benchmark_config=cfg,
             database_config=db,
