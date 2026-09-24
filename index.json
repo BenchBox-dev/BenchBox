@@ -1710,9 +1710,9 @@
     },
     "canary-impact-02-selector": {
       "claim": {
-        "expires_at": "2026-09-25T01:00:09Z",
-        "generation": "d5b6ccf931554c5facb1d15ea7efa5cd",
-        "renewals": 0,
+        "expires_at": "2026-09-25T12:14:22Z",
+        "generation": "779fd8a902dd454596e7d2034479fbfc",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:aed9b6f728777e9a1155090f"
       },
       "needs": [],
