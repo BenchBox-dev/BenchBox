@@ -1,10 +1,10 @@
-"""Tests for the receipt-bound medium-tier preflight stage (ci-dedupe-05).
+"""Tests for the receipt-bound medium-tier preflight stage.
 
-`make pr-preflight-medium-tests` runs the exact CI medium selection
-(`make test-medium`, no local-only subset) through local_validation's
-medium-tier gate when the path classifier says the diff needs code CI,
-and skips otherwise. Failure propagates: the stage fails pr-preflight
-and leaves no receipt behind.
+`make pr-preflight-medium-tests` runs impact-selected local medium tests
+through local_validation's medium-tier gate when the path classifier says
+the diff needs code CI, and skips otherwise. Merge-group CI still runs
+the full `make test-medium` target. Failure propagates: the stage fails
+pr-preflight and leaves no receipt behind.
 """
 
 from __future__ import annotations
@@ -73,14 +73,13 @@ def _makefile_target_body(target_name: str) -> str:
     return "".join(body)
 
 
-def test_medium_stage_uses_classifier_and_receipt_bound_ci_selection() -> None:
+def test_medium_stage_uses_classifier_and_receipt_bound_impact_selection() -> None:
     body = _makefile_target_body("pr-preflight-medium-tests")
     assert "scripts/path_filter_decision.py" in body
     assert "--check needs-code-ci" in body
     assert "local-validation GATE=medium-tier" in body
-    # Same marker selection as CI: the target must invoke make test-medium,
-    # never its own pytest subset.
-    assert 'CMD="make test-medium"' in body
+    assert 'CMD="make test-medium-selected"' in body
+    assert 'BENCHBOX_MEDIUM_CHANGED_PATHS_JSON="$$CHANGED_JSON"' in body
     assert "pytest -m" not in body
 
 
