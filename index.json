@@ -1757,10 +1757,15 @@
       "title": "Make the impacted canary tests a required merge-queue check, with a rollback trigger"
     },
     "canary-submission-validator-drift": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-25T05:43:40Z",
+        "generation": "82dea7e442a6470e8070b86ff9a0e8dc",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Realign hosted-submit, slim validator, and official TPC-DS bundles with develop's submission validator"
     },
     "canary-tpcdi-etl-incremental-load": {
