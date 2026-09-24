@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "tests/integration/test_tpcdi_end_to_end.py passes all 18 tests under DuckDB and SQLite.",
+    "make pr-preflight passes.",
+    "The fix PR targets develop and merges before this item closes."
+  ],
+  "context": "Diagnosed from Release Canary run 35993930883 on develop SHA 1ba01a835b13d006057282892e526c0d0eeb4c4a. Tests in shards 2, 3, 4, 5, 6 failed with 0 customer records in DimCustomer because DuckDB connection.cursor() has an independent transaction context that was not committed when self.connection.commit() was called. Committing cursor directly resolves all 18 tests in test_tpcdi_end_to_end.py in 6.8s.",
+  "description": "The release canary's non-fast shards 2, 3, 4, 5, and 6 fail in tests/integration/test_tpcdi_end_to_end.py because SQLETLBackend.load_customer_scd2_batch executes BEGIN on cursor (which in DuckDB creates an isolated DuckDBPyConnection transaction context) but commits on self.connection.commit(). On DuckDB, self.connection.commit() does not commit the child cursor's transaction, leaving DimCustomer with 0 committed rows when the cursor is discarded. Ensure SQLETLBackend commits or rolls back cursor when cursor has commit/rollback methods before falling back to self.connection.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829",
+      "at": "2026-09-24T12:01:29Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "929f5263223e42a1a5050288ace36c5b",
+      "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
+    }
+  ]
+}
