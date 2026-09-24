@@ -36,6 +36,14 @@ DOCUMENTATION_PATHS = (
 
 LANDING_PAGE_PATH = Path("landing") / "index.html"
 
+# The [project] version is the first line that starts with "version =". Anchoring
+# to the line start keeps keys that merely end in "version", such as
+# [tool.ruff] target-version, out of the match.
+PYPROJECT_VERSION_PATTERN = re.compile(
+    r'^(?P<prefix>version\s*=\s*["\'])(?P<version>[^"\']+)(?P<suffix>["\'])',
+    re.MULTILINE,
+)
+
 DOC_RELEASE_PATTERN = re.compile(
     r"(?P<prefix>Current\s+release\s*:?\s*)(?P<marker>`?)v?"
     r"(?P<version>\d+\.\d+\.\d+(?:-[\w\.]+)?)(?P=marker)(?P<suffix>[\.]?)",
@@ -78,9 +86,9 @@ def get_current_version_from_pyproject() -> Optional[str]:
         return None
 
     content = pyproject_file.read_text()
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = PYPROJECT_VERSION_PATTERN.search(content)
 
-    return match.group(1) if match else None
+    return match.group("version") if match else None
 
 
 def update_version_in_init(new_version: str, dry_run: bool = False) -> bool:
@@ -122,17 +130,17 @@ def update_version_in_pyproject(new_version: str, dry_run: bool = False) -> bool
         return False
 
     content = pyproject_file.read_text()
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = PYPROJECT_VERSION_PATTERN.search(content)
     if not match:
         print(f"Warning: Version in {pyproject_file} was not updated (pattern not found)")
         return False
 
-    current_version = match.group(1)
+    current_version = match.group("version")
     if current_version == new_version:
         print(f"No version changes needed in {pyproject_file}")
         return True
 
-    new_content = re.sub(r'(version\s*=\s*["\'])[^"\']+(["\'])', rf"\g<1>{new_version}\g<2>", content)
+    new_content = PYPROJECT_VERSION_PATTERN.sub(rf"\g<prefix>{new_version}\g<suffix>", content, count=1)
 
     if dry_run:
         print(f"[dry-run] Would update version in {pyproject_file} to {new_version}")
