@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "DECISION GATE: explicit-transaction atomicity where the platform supports it, OR documented acceptance of non-atomic close-then-insert with the failure window stated (decision recorded)",
+    "New test: second-statement failure leaves data unchanged under the chosen approach",
+    "Touched Snowflake adapter suites green; make pr-preflight passes"
+  ],
+  "context": "Adversarial finding Critical-2 (accepted; verified autocommit=True at snowflake.py ~629 and the new per-statement split loop at ~1370-1384, re-verify after rebase). The SCD2 close-old-then-insert-new operation (operations.yaml scd entries) is no longer atomic: if the insert fails, the close has committed and rollback cannot restore it. The platform supports explicit transactions; use them, or record a deliberate non-atomicity decision. Staging worktree: wt-cloud-executor-loader, file benchbox/platforms/snowflake.py.",
+  "description": "Make multi-statement Snowflake operation execution atomic for dependent sequences (SCD2 close-then-insert): run dependent statements in an explicit transaction where supported, with a failure-injection test proving unchanged data on second-statement failure.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:39:03Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "e6cb312ab1844b4ba9625d7395b3643a",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}

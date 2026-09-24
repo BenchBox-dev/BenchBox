@@ -2548,6 +2548,15 @@
       "status": "open",
       "title": "Rebase cloud-executor work onto current develop and re-verify baseline"
     },
+    "cloud-executor-snowflake-atomicity": {
+      "claim": null,
+      "needs": [
+        "cloud-executor-rebase-reverify"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Restore atomicity for multi-statement Snowflake operations"
+    },
     "cloud-integration-test-gaps": {
       "claim": null,
       "needs": [],
