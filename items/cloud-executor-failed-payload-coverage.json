@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "failed_platform_error (or equivalent) applied at every execution boundary: table_exists, setup source-table checks, population probes, manifest writes, operation cleanup",
+    "New tests: each boundary with a FAILED-payload cursor behaves per its contract (raise or record, never silent success)",
+    "Touched primitives/tuning suites green; make pr-preflight passes"
+  ],
+  "context": "Adversarial finding Required-1 (accepted; verified table_exists try/except ValueError only, so a FAILED payload reads as exists=True). The change adds the guard at write/validation points but misses setup, existence, population, manifest, and cleanup boundaries (cited: primitives_benchmark_utils.py ~123-125, write_primitives/benchmark.py ~838-847 and ~1470-1474; re-verify line numbers after rebase). Contracts differ per boundary: setup checks should raise, cleanup should record failure rather than report success. Staging worktree: wt-cloud-executor-loader.",
+  "description": "Close FAILED-payload gaps at every setup, existence, population, manifest, and cleanup execution boundary in transaction/write primitives so adapter-reported failures can never read as success. Audit all connection.execute call sites in benchbox/core/transaction_primitives, benchbox/core/write_primitives, benchbox/core/primitives_benchmark_utils.py, and benchbox/core/tuning/metadata.py; apply the fail-loud check per each boundary's contract.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:38:27Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "a9be9ed0a7a8481284c9e7d0d3325be4",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}

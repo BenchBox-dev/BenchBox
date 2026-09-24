@@ -2523,6 +2523,15 @@
       "status": "open",
       "title": "Preserve IF NOT EXISTS semantics in BigQuery DDL conversion"
     },
+    "cloud-executor-failed-payload-coverage": {
+      "claim": null,
+      "needs": [
+        "cloud-executor-rebase-reverify"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Apply FAILED-payload checks at all primitives execution boundaries"
+    },
     "cloud-executor-rebase-reverify": {
       "claim": null,
       "needs": [],
