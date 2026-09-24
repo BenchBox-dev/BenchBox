@@ -36,6 +36,17 @@ DOCUMENTATION_PATHS = (
 
 LANDING_PAGE_PATH = Path("landing") / "index.html"
 
+# pyproject.toml's package version is the "version =" line inside the [project]
+# table. Anchoring to the line start keeps keys that merely end in "version",
+# such as [tool.ruff] target-version, out of the match; searching only the
+# [project] table keeps a version key in any other table out of it.
+PYPROJECT_VERSION_PATTERN = re.compile(
+    r'^(?P<prefix>version\s*=\s*["\'])(?P<version>[^"\']+)(?P<suffix>["\'])',
+    re.MULTILINE,
+)
+PYPROJECT_TABLE_HEADER_PATTERN = re.compile(r"^\s*\[", re.MULTILINE)
+PYPROJECT_PROJECT_HEADER_PATTERN = re.compile(r"^\s*\[project\]\s*(?:#.*)?$", re.MULTILINE)
+
 DOC_RELEASE_PATTERN = re.compile(
     r"(?P<prefix>Current\s+release\s*:?\s*)(?P<marker>`?)v?"
     r"(?P<version>\d+\.\d+\.\d+(?:-[\w\.]+)?)(?P=marker)(?P<suffix>[\.]?)",
@@ -55,6 +66,16 @@ LANDING_VERSION_PATTERN = re.compile(
 def get_project_root() -> Path:
     """Get the project root directory."""
     return Path(__file__).parent.parent
+
+
+def find_project_version(content: str) -> Optional[re.Match[str]]:
+    """Return the version match inside pyproject.toml's [project] table."""
+    header = PYPROJECT_PROJECT_HEADER_PATTERN.search(content)
+    if header is None:
+        return None
+    next_table = PYPROJECT_TABLE_HEADER_PATTERN.search(content, header.end())
+    end = next_table.start() if next_table else len(content)
+    return PYPROJECT_VERSION_PATTERN.search(content, header.end(), end)
 
 
 def get_current_version_from_init() -> Optional[str]:
@@ -78,9 +99,9 @@ def get_current_version_from_pyproject() -> Optional[str]:
         return None
 
     content = pyproject_file.read_text()
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = find_project_version(content)
 
-    return match.group(1) if match else None
+    return match.group("version") if match else None
 
 
 def update_version_in_init(new_version: str, dry_run: bool = False) -> bool:
@@ -122,17 +143,17 @@ def update_version_in_pyproject(new_version: str, dry_run: bool = False) -> bool
         return False
 
     content = pyproject_file.read_text()
-    match = re.search(r'version\s*=\s*["\']([^"\']+)["\']', content)
+    match = find_project_version(content)
     if not match:
         print(f"Warning: Version in {pyproject_file} was not updated (pattern not found)")
         return False
 
-    current_version = match.group(1)
+    current_version = match.group("version")
     if current_version == new_version:
         print(f"No version changes needed in {pyproject_file}")
         return True
 
-    new_content = re.sub(r'(version\s*=\s*["\'])[^"\']+(["\'])', rf"\g<1>{new_version}\g<2>", content)
+    new_content = content[: match.start("version")] + new_version + content[match.end("version") :]
 
     if dry_run:
         print(f"[dry-run] Would update version in {pyproject_file} to {new_version}")

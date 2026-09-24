@@ -125,6 +125,7 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/sweep_coverage.py",
     "scripts/heavy_tier_needed.py",
     "scripts/release_canary_incident.py",
+    "scripts/update_version.py",
     # Repository guidance and release notes are linked from the site but are
     # not read while assembling any publication artifact.
     "README.md",
