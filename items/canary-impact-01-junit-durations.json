@@ -10,5 +10,16 @@
     ".github/workflows/release-canary.yml",
     "tests/unit/test_release_infrastructure.py",
     "tests/unit/test_release_canary_sharding.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0456a4b07c5c2d5268d800b2",
+      "at": "2026-09-24T19:10:32Z",
+      "client": "antigravity-client",
+      "generation": "09fb7234715c480382d0fd389502886d",
+      "op": "take",
+      "op_id": "342be35c9c624b47b23e84d8a363d0f3",
+      "session_id": "894293983a5247c696200b222be4e701"
+    }
   ]
 }
