@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "release_cut_start.sh"
 ABORT_SCRIPT = Path(__file__).resolve().parents[3] / "scripts" / "release_cut_abort.sh"
@@ -67,6 +67,42 @@ def test_accepts_exact_fetched_head_and_resumes_without_discarding_edits(cut_rep
     assert result.returncode != 0
     assert "already carries its release commit" in result.stderr
     assert git(primary, "branch", "--show-current") == "develop"
+
+
+def test_rejects_stale_resume_without_discarding_curated_changelog(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    (linked / "CHANGELOG.md").write_text("curated release notes\n", encoding="utf-8")
+    cut_head = git(linked, "rev-parse", "HEAD")
+
+    (primary / "source.txt").write_text("new develop work\n", encoding="utf-8")
+    git(primary, "add", "source.txt")
+    git(primary, "commit", "-m", "Advance develop after cut")
+    git(primary, "push", "origin", "develop")
+
+    result = start(linked)
+
+    assert result.returncode != 0
+    assert "origin/develop advanced" in result.stderr
+    assert git(linked, "branch", "--show-current") == "v9.9.9"
+    assert git(linked, "rev-parse", "HEAD") == cut_head
+    assert (linked / "CHANGELOG.md").read_text(encoding="utf-8") == "curated release notes\n"
+
+
+def test_rejects_local_tag_on_resume_without_discarding_curated_changelog(cut_repo: tuple[Path, Path, Path]) -> None:
+    _, primary, linked = cut_repo
+    assert start(linked).returncode == 0
+    (linked / "CHANGELOG.md").write_text("curated release notes\n", encoding="utf-8")
+    cut_head = git(linked, "rev-parse", "HEAD")
+    git(primary, "tag", "v9.9.9")
+
+    result = start(linked)
+
+    assert result.returncode != 0
+    assert "local tag v9.9.9 already exists" in result.stderr
+    assert git(linked, "branch", "--show-current") == "v9.9.9"
+    assert git(linked, "rev-parse", "HEAD") == cut_head
+    assert (linked / "CHANGELOG.md").read_text(encoding="utf-8") == "curated release notes\n"
 
 
 @pytest.mark.parametrize(
@@ -153,6 +189,8 @@ def test_abort_rejects_release_state_without_discarding_edits(cut_repo: tuple[Pa
     before = git(linked, "rev-parse", "HEAD")
     result = abort(linked)
     assert result.returncode != 0
+    if state == "local-tag":
+        assert "local tag" in result.stderr
     assert git(linked, "branch", "--show-current") == "v9.9.9"
     assert git(linked, "rev-parse", "HEAD") == before
     assert (linked / "source.txt").read_text(encoding="utf-8") == "cut edits\n"

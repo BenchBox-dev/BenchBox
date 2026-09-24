@@ -187,7 +187,11 @@ created and deletes only an uncommitted local release branch. It refuses a
 pushed branch or tag, any local tag, a moved or committed branch, and untracked
 files. Inspect the edits before deliberately discarding them. `release-cut`
 refuses to resume a branch that already carries its `Release vX.Y.Z` commit or
-exists on origin.
+exists on origin or when a local release tag already exists. It also refuses
+when fetched `origin/develop` has advanced
+past the cut's starting commit. The branch and curated files remain untouched;
+review the new develop commits and preserve any authored changelog text before
+deciding whether to discard the cut and start again.
 
 Changelog summarization shells out to the `claude` CLI. It is skipped
 automatically inside a Claude Code session (where the nested call blocks until

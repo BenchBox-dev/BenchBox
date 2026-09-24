@@ -8,10 +8,14 @@ if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-
   exit 1
 fi
 branch="v$version"
-current=$(git symbolic-ref --quiet --short HEAD) || {
+current_ref=$(git symbolic-ref --quiet HEAD) || {
   echo "Error: release-cut requires a named branch." >&2
   exit 1
 }
+case "$current_ref" in
+  refs/heads/*) current=${current_ref#refs/heads/} ;;
+  *) echo "Error: release-cut requires a named branch." >&2; exit 1 ;;
+esac
 
 git_dir=$(git rev-parse --absolute-git-dir)
 common_dir=$(git rev-parse --git-common-dir)
@@ -27,12 +31,22 @@ remote_branch=$(git ls-remote --heads origin "refs/heads/$branch")
 remote_tag=$(git ls-remote --tags origin "refs/tags/$branch")
 
 if [ "$current" = "$branch" ]; then
+  if git show-ref --verify --quiet "refs/tags/$branch"; then
+    echo "Error: local tag $branch already exists; inspect it before resuming." >&2
+    exit 1
+  fi
   if git log --first-parent --format=%s origin/develop..HEAD | grep -Fxq "Release $branch"; then
     echo "Error: $branch already carries its release commit; nothing left to resume." >&2
     exit 1
   fi
   if ! git merge-base --is-ancestor HEAD origin/develop; then
     echo "Error: $branch has commits outside fetched origin/develop; inspect it before resuming." >&2
+    exit 1
+  fi
+  develop=$(git rev-parse 'origin/develop^{commit}')
+  head=$(git rev-parse 'HEAD^{commit}')
+  if [ "$head" != "$develop" ]; then
+    echo "Error: fetched origin/develop advanced from $head to $develop; preserve the cut and its curated files, then inspect before restarting." >&2
     exit 1
   fi
   if [ -n "$remote_branch" ] || [ -n "$remote_tag" ]; then

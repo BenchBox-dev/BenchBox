@@ -8,10 +8,14 @@ if ! printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-
   exit 1
 fi
 branch="v$version"
-current=$(git symbolic-ref --quiet --short HEAD) || {
+current_ref=$(git symbolic-ref --quiet HEAD) || {
   echo "Error: release-cut-abort requires a named branch." >&2
   exit 1
 }
+case "$current_ref" in
+  refs/heads/*) current=${current_ref#refs/heads/} ;;
+  *) echo "Error: release-cut-abort requires a named branch." >&2; exit 1 ;;
+esac
 
 git_dir=$(git rev-parse --absolute-git-dir)
 common_dir=$(git rev-parse --git-common-dir)
