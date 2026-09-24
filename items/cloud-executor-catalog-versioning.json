@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "DECISION GATE: version-bump plus migration/comparability rule recorded (how old-version results compare or are excluded)",
+    "Catalog landed as its own PR, separate from executor plumbing and adapter rewrites; no stacked or feature-base PRs",
+    "Catalog loader tests pin the new version; make pr-preflight passes"
+  ],
+  "context": "Adversarial finding Required-4 (accepted; verified version: 1 at operations.yaml:6 with 86 changed operations, benchmark _version 1.0 unchanged). Old and new measurements would carry the same version despite different workloads, breaking result comparability. Per repository policy, public measurement contracts require a migration path. The catalog change must land separately from executor plumbing. Staging worktree: wt-cloud-executor-loader, file benchbox/core/write_primitives/catalog/operations.yaml.",
+  "description": "Version the changed write-primitives operations catalog and define the migration/comparability rule for existing results. Decide the new version and how old-version bundles compare or migrate, implement the bump plus loader/test pinning, and land the catalog as a standalone PR onto develop.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:9d3bdb55a5112cb83444b7a7",
+      "at": "2026-09-24T14:39:17Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "4748896cfd964167bad75744d7b4d99d",
+      "session_id": "33885da5f36043978d40a3e943ccc33b"
+    }
+  ]
+}

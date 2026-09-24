@@ -2532,6 +2532,15 @@
       "status": "open",
       "title": "Fix BigQuery per-statement qualification and alias positions"
     },
+    "cloud-executor-catalog-versioning": {
+      "claim": null,
+      "needs": [
+        "cloud-executor-rebase-reverify"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Version the operations catalog change and land it separately"
+    },
     "cloud-executor-failed-payload-coverage": {
       "claim": null,
       "needs": [
