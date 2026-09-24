@@ -4,7 +4,7 @@
     "make pr-preflight passes.",
     "The fix PR targets develop and merges before this item closes."
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2316 now at b697d691031650919ed71903f66df14b25dce334. Fixed historical-to-incremental SCD2 semantics with atomic expiration/insertion, warehouse-assigned surrogate keys and batch IDs, and source-derived effective dates. Regression tests verify historical plus two incremental batches, one current customer version, nonoverlapping dates, rollback, and unsupported-backend refusal. The corrected parallel transform test asserts source dates survive both paths. Focused SQLite regressions 3 passed, full TPC-DI integration 11 passed, exact two medium reruns passed; committed-head make pr-preflight passed with 31499 fast and 2091 medium. P1 review thread replied and resolved. Hosted CI and maintainer review remain; merge into develop before closing.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2316 merged into develop at 720a6439c7733c18e8318de09086b573de91f103. Fixed historical-to-incremental SCD2 semantics, surrogate key assignment, source-derived effective dates, and fast-lane ceiling policy. Local make pr-preflight and full CI passed.",
   "description": "Repair the TPC-DI full benchmark ETL failures seen in the scheduled release canary, including incremental loader LastModified lookups and data quality monitor null arithmetic. Identify the causing commit before changing code. Preserve valid incremental load and data-quality behavior; do not skip tests or change markers.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2316"
@@ -86,6 +86,14 @@
       "generation": "83e947dda35c4420aa4977b674e42d52",
       "op": "take",
       "op_id": "7599f05d38ff4b6e9874b2ebd681fa4f",
+      "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:0625451ce24889e4d384c829",
+      "at": "2026-09-24T04:46:49Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "8fcd45affc944f8cb162031ed827dd3c",
       "session_id": "b72fb00a2d7a485d8bf087638c5315f2"
     }
   ]
