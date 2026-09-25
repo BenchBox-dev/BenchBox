@@ -1988,6 +1988,18 @@ class BigQueryAdapter(PlatformAdapter):
         raw_target = ctas.group(3)
         as_and_rest = ctas.group(4)
 
+        # The pattern above matches any CREATE <modifiers> <name> AS shape,
+        # including CREATE VIEW / CREATE TEMP VIEW / CREATE MATERIALIZED
+        # VIEW (the ddl_create_view_simple operation emits plain CREATE
+        # VIEW). Only table creators may be rewritten: rewriting a view
+        # into CREATE OR REPLACE TABLE would materialize a physical table,
+        # breaking information_schema.views validation and DROP VIEW
+        # cleanup. Table modifiers are empty, OR REPLACE, and IF NOT
+        # EXISTS (in any combination); anything mentioning VIEW (VIEW,
+        # TEMP VIEW, TEMPORARY VIEW, MATERIALIZED VIEW) passes through.
+        if "VIEW" in modifiers:
+            return work
+
         leading_space = raw_prefix[: len(raw_prefix) - len(raw_prefix.lstrip())]
         if "IF NOT EXISTS" in modifiers:
             verb = f"{leading_space}CREATE TABLE IF NOT EXISTS "

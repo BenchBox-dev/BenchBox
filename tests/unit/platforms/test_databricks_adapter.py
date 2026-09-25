@@ -385,6 +385,39 @@ class TestDatabricksAdapter:
         # Note: cursor is not closed in create_connection - connection stays open
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_skips_create_schema_when_reused(self, mock_databricks_sql):
+        """Reused catalogs/schemas must connect with USE only.
+
+        CREATE SCHEMA IF NOT EXISTS is still authorized when the schema
+        exists, so principals with USE SCHEMA but no catalog-level
+        CREATE SCHEMA would fail every reconnect. USE CATALOG + USE SCHEMA
+        still run on every connection for pooled-connection correctness.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            for reused, expect_create in ((True, False), (False, True)):
+                mock_cursor.reset_mock()
+                adapter.database_was_reused = reused
+                adapter.create_connection()
+
+                executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+                assert "USE CATALOG test_catalog" in executed
+                assert "USE SCHEMA test_schema" in executed
+                assert ("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema" in executed) is expect_create
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_failure(self, mock_databricks_sql):
         """Test connection creation failure."""
         mock_databricks_sql.connect.side_effect = Exception("Connection failed")

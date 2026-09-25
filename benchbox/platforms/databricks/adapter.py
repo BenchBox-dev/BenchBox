@@ -1182,10 +1182,14 @@ class DatabricksAdapter(PlatformAdapter):
             # USE SCHEMA there leaves them on the default schema and every
             # unqualified probe fails (verified live: staging COUNT(*) probes
             # failed while DDL landed in the default schema). CREATE SCHEMA
-            # is idempotent, so ensuring here is safe on fresh and reused
-            # databases alike; create_schema() keeps owning table creation.
+            # is still authorized even when the schema exists, so only
+            # ensure it for fresh databases: on a reused catalog/schema the
+            # principal may hold USE SCHEMA without catalog-level
+            # CREATE SCHEMA, and requiring it here would block reconnects.
+            # create_schema() keeps owning table creation.
             cursor.execute(f"USE CATALOG {self.catalog}")
-            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
+            if not getattr(self, "database_was_reused", False):
+                cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
             cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
 

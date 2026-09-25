@@ -2399,6 +2399,32 @@ class TestConvertToBigQueryTable:
         # Should not have double OR REPLACE
         assert result.count("OR REPLACE") == 1
 
+    def test_ctas_table_target_still_qualified(self):
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        result = adapter._convert_to_bigquery_table("CREATE TABLE t AS SELECT 1")
+
+        assert "CREATE OR REPLACE TABLE" in result
+        assert "`my-proj.my_ds.T`" in result
+
+    def test_ctas_view_statements_pass_through_unchanged(self):
+        """CREATE VIEW shapes must not be rewritten into CREATE TABLE.
+
+        The ddl_create_view_simple operation emits plain CREATE VIEW; its
+        information_schema.views validation and DROP VIEW cleanup break when
+        the rewrite materializes a physical table instead.
+        """
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        for stmt in (
+            "CREATE VIEW orders_view AS SELECT o_orderkey FROM orders WHERE o_orderkey <= 1000",
+            "CREATE OR REPLACE VIEW v AS SELECT 1",
+            "CREATE TEMP VIEW v AS SELECT 1",
+            "CREATE TEMPORARY VIEW v AS SELECT 1",
+            "CREATE MATERIALIZED VIEW mv AS SELECT 1",
+        ):
+            assert adapter._convert_to_bigquery_table(stmt) == stmt
+
 
 # ---------------------------------------------------------------------------
 # _filter_valid_files and _ensure_file_list

@@ -151,6 +151,44 @@ def test_fetch_one_query_job_connection_empty():
     assert manager._fetch_one(_QueryJobConn([]), "SELECT ...") is None
 
 
+def test_fetch_helpers_qualify_metadata_reads_through_adapter():
+    """Job-style reads must resolve the qualified uppercased table.
+
+    BigQuery creation qualifies/uppercases benchbox_tuning_metadata via
+    execute_query() (_convert_to_bigquery_table -> _qualify_table_target),
+    while the job connection carries no default dataset. The query()-job
+    branch therefore routes SELECTs through the same adapter qualification
+    instead of passing the raw unqualified lowercase SQL to query().
+    """
+
+    class _QualifyingAdapter(_Adapter):
+        def _qualify_table_names(self, sql):
+            return sql.replace("benchbox_tuning_metadata", "`my-proj.my_ds.BENCHBOX_TUNING_METADATA`")
+
+    manager = TuningMetadataManager(_QualifyingAdapter(platform_name="bigquery"))
+    connection = _QueryJobConn([("orders", "sorting")])
+
+    assert manager._fetch_all(connection, "SELECT * FROM benchbox_tuning_metadata") == [("orders", "sorting")]
+    assert connection.queried == ["SELECT * FROM `my-proj.my_ds.BENCHBOX_TUNING_METADATA`"]
+
+    connection = _QueryJobConn([("orders", "sorting")])
+    assert manager._fetch_one(connection, "SELECT * FROM benchbox_tuning_metadata") == ("orders", "sorting")
+    assert connection.queried == ["SELECT * FROM `my-proj.my_ds.BENCHBOX_TUNING_METADATA`"]
+
+
+def test_fetch_helpers_query_job_without_adapter_qualification_passes_sql_through():
+    """Adapters without _qualify_table_names keep the previous behavior."""
+
+    class _PlainAdapter:
+        platform_name = "custom"
+        platform_config = {}
+
+    manager = TuningMetadataManager(_PlainAdapter())
+    connection = _QueryJobConn([("orders", "sorting")])
+    assert manager._fetch_all(connection, "SELECT ...") == [("orders", "sorting")]
+    assert connection.queried == ["SELECT ..."]
+
+
 @pytest.mark.parametrize(
     ("platform", "needle"),
     [

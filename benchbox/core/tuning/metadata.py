@@ -1094,6 +1094,22 @@ class TuningMetadataManager:
             except Exception:
                 return None
 
+    def _qualify_metadata_read_sql(self, sql: str) -> str:
+        """Qualify a metadata SELECT for job-style connections.
+
+        The query()-job branch bypasses the adapter's execute_query(), which
+        is the path that qualifies and uppercases identifiers (BigQuery
+        creation routes through _convert_to_bigquery_table ->
+        _qualify_table_target, and reads through _qualify_table_names; the
+        connection itself carries no default dataset). Run reads through the
+        same adapter qualification when it is reachable so SELECTs resolve
+        the qualified uppercased table that creation wrote.
+        """
+        qualify = getattr(self.platform_adapter, "_qualify_table_names", None)
+        if callable(qualify):
+            return qualify(sql)
+        return sql
+
     def _fetch_all(self, connection, sql: str) -> list[tuple]:
         """Fetch all results from a SELECT query.
 
@@ -1116,10 +1132,13 @@ class TuningMetadataManager:
         # Job-style clients such as BigQuery expose neither cursor() nor
         # execute(): statements run as jobs via query(). Consume the job
         # result the same way so tuning metadata reads work there too.
+        # Qualify through the adapter first: the job connection carries no
+        # default dataset, and creation qualified/uppercased the table via
+        # execute_query(), so raw unqualified lowercase reads would miss it.
         if not hasattr(connection, "cursor"):
             query_fn = getattr(connection, "query", None)
             if callable(query_fn):
-                return list(query_fn(sql).result())
+                return list(query_fn(self._qualify_metadata_read_sql(sql)).result())
 
         cursor = connection.cursor()
         cursor.execute(sql)
@@ -1149,7 +1168,7 @@ class TuningMetadataManager:
         if not hasattr(connection, "cursor"):
             query_fn = getattr(connection, "query", None)
             if callable(query_fn):
-                rows = list(query_fn(sql).result())
+                rows = list(query_fn(self._qualify_metadata_read_sql(sql)).result())
                 return rows[0] if rows else None
 
         cursor = connection.cursor()
