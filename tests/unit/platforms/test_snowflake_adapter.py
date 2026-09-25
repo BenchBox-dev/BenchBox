@@ -1314,7 +1314,7 @@ benchbox-fixture-key-material
         class FakeCursor:
             def __init__(self):
                 self.in_transaction = False
-                self.uncommitted_data = None
+                self.uncommitted_data: list[dict] | None = None
                 self.executed_statements = []
 
             def execute(self, stmt):
@@ -1331,6 +1331,7 @@ benchbox-fixture-key-material
                     self.in_transaction = False
                 elif stmt.startswith("UPDATE"):
                     assert self.in_transaction
+                    assert self.uncommitted_data is not None
                     for r in self.uncommitted_data:
                         r["is_current"] = False
                 elif stmt.startswith("INSERT"):
