@@ -464,6 +464,7 @@ class BenchmarkResults:
     # behind the data this result ran against. Distinguishes datasets whose specs changed without a
     # version bump. None for results predating the stamp.
     data_generation_hash: str | None = None
+    flightdata_source_provenance: dict[str, Any] | None = None
     # Optional detailed per-query timing info (for CSV export and analysis)
     per_query_timings: list[dict[str, Any]] | None = field(default_factory=list)
     # Optional detailed structures

@@ -411,8 +411,13 @@ def _attach_datagen_version(
             return result
         if not _manifest_matches_result(manifest, result, benchmark):
             return result
+        identity_matches = getattr(benchmark, "manifest_matches_datagen_identity", None)
+        if callable(identity_matches) and not identity_matches(manifest):
+            return result
         result.data_generation_version = manifest.get("data_generation_version")
         result.data_generation_hash = manifest.get("data_generation_identity_hash", manifest.get("base_constants_hash"))
+        if str(manifest.get("benchmark", "")).lower() == "flightdata":
+            result.flightdata_source_provenance = manifest.get("source_provenance")
     except Exception as exc:
         logger.debug("leaving data-generation provenance unset: %s", exc)
     return result
