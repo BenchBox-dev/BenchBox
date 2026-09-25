@@ -16,6 +16,13 @@ data_coverage:
   last_available_year: 2024
   approximate_monthly_flights: 600000
   months_per_scale_factor: 41
+  # BTS PREZIP archives verified 2026-09-25: Jan 1987 - Sep 1987 and
+  # Jan 1990 - Dec 1999 return HTTP 404 for every probed month, while
+  # 1987-10..1989-12 and 2000-01 onward return 200. Windows must skip
+  # these gaps instead of failing.
+  unavailable_months:
+  - [1987, 1, 1987, 9]
+  - [1990, 1, 1999, 12]
 flight_shards:
   row_target: 1000000
   dirname: flights

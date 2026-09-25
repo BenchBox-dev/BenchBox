@@ -510,27 +510,48 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         return {table.name: table}
 
     def get_create_tables_sql(self, dialect: str = "standard", tuning_config=None) -> str:
-        """Generate DDL for creating the OBT table.
+        """Generate DDL for creating the OBT table plus its TPC-DS source tables.
 
         Args:
             dialect: Target SQL dialect for the DDL.
             tuning_config: Optional tuning configuration (accepted for API compatibility,
-                not currently used by OBT benchmark).
+                forwarded to the TPC-DS source-table DDL; not used by the OBT table itself).
 
         Returns:
-            DDL SQL string for creating the OBT table.
+            DDL SQL string creating the 25 TPC-DS source tables (needed because
+            cloud loaders resolve data files from ``self.tables``, which holds
+            the per-table source files after datagen) followed by the OBT table.
         """
+        from benchbox.core.tpcds.schema import get_create_all_tables_sql
         from benchbox.core.tpcds_obt import schema
         from benchbox.utils.dialect_utils import translate_sql_query
 
+        enable_primary_keys = tuning_config.primary_keys.enabled if tuning_config else False
+        enable_foreign_keys = tuning_config.foreign_keys.enabled if tuning_config else False
+        source_ddl = get_create_all_tables_sql(
+            enable_primary_keys=enable_primary_keys,
+            enable_foreign_keys=enable_foreign_keys,
+        )
+        # Cloud runs reuse the TPC-DS database/schema via get_data_source_benchmark(),
+        # so plain CREATE TABLE would fail against already-loaded source tables.
+        # IF NOT EXISTS is accepted by every cloud target (BigQuery, Snowflake,
+        # Databricks, Redshift, Synapse) and keeps reruns idempotent.
+        source_ddl = re.sub(
+            r"(?im)^CREATE TABLE (?!IF NOT EXISTS )",
+            "CREATE TABLE IF NOT EXISTS ",
+            source_ddl,
+        )
         # Note: tuning_config is accepted for API compatibility but OBT uses a fixed schema
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
+            source_ddl = translate_sql_query(
+                source_ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
+            )
             ddl = translate_sql_query(
                 ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
             )
-        return ddl
+        return f"{source_ddl}\n\n{ddl}"
 
     def __enter__(self) -> TPCDSOBTBenchmark:
         return self

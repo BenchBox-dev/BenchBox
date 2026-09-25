@@ -219,6 +219,19 @@ class TestQueryManagerVariantIntegration:
             with pytest.raises(ValueError, match="not supported on dialect"):
                 manager.get_query(query_id, dialect="datafusion")
 
+    def test_actual_catalog_databricks_skips_unsupported_queries(self):
+        """Databricks skips queries whose functions it does not implement."""
+        manager = ReadPrimitivesQueryManager()
+
+        for query_id in [
+            "json_extract_nested",
+            "json_aggregates",
+            "timeseries_trend_analysis",
+            "list_reduce",
+        ]:
+            with pytest.raises(QuerySkippedError, match="not supported on dialect"):
+                manager.get_query(query_id, dialect="databricks")
+
     def test_actual_catalog_clickhouse_uses_lowercase_window_functions(self):
         """ClickHouse receives its case-sensitive LAG/LEAD spelling."""
         manager = ReadPrimitivesQueryManager()
