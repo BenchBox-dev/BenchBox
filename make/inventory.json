@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "53d36b9ded8e513848462af1c9725c3a0c2e06598451ae76bbea644b7c07ba95",
+  "contract_sha256": "10a36746e927eece65b7c65fcd16bfc44e97440e625ad63b5b383dc65040259a",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -141,6 +141,7 @@
     "test-integration-smoke",
     "test-local-matrix",
     "test-medium",
+    "test-medium-selected",
     "test-package",
     "test-pyspark",
     "test-pytest",
@@ -179,7 +180,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 209,
+  "public_target_count": 210,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -341,6 +342,7 @@
     "test-live-starburst",
     "test-local-matrix",
     "test-medium",
+    "test-medium-selected",
     "test-no-cloud",
     "test-olap",
     "test-package",
@@ -1230,8 +1232,8 @@
     "pr-preflight-medium-tests": [
       {
         "header": "pr-preflight-medium-tests:",
-        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> medium tier (same marker selection as CI)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
-        "recipe_sha256": "af234b99f9301d79db5efc4683f4f848ec482a40bc35e698e5c4e75f4acb514a"
+        "recipe": "\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\tCHANGED_JSON=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); paths=d[\"changed_paths\"]; assert isinstance(paths, list) and all(isinstance(path, str) for path in paths); print(json.dumps(paths, separators=(\",\", \":\")))' \"$$DECISION\"); \\\n\t\techo \"==> medium tier (impact-selected local tests)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS BENCHBOX_MEDIUM_CHANGED_PATHS_JSON=\"$$CHANGED_JSON\" MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium-selected\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
+        "recipe_sha256": "a74b5fd4906c9c266e0fd18a3ced83524f218fcf4405b6fb8c299fb49cabc98a"
       }
     ],
     "pr-preflight-uncached": [
@@ -1734,6 +1736,13 @@
         "recipe_sha256": "c610a9c46bfb9d737421919e1f45f2fcced8fa1e60c360e453517bfab955b1cd"
       }
     ],
+    "test-medium-selected": [
+      {
+        "header": "test-medium-selected:",
+        "recipe": "\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tuv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
+        "recipe_sha256": "b3ba910e659e37a1aca7b2efd7958c61194a3bb843b43395e8ee0f3e9ecbb232"
+      }
+    ],
     "test-no-cloud": [
       {
         "header": "test-no-cloud:",
@@ -2139,7 +2148,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "43581d5e08586eb536448c1c36b52ad71e03dadea2f0d60a005f2f0f023a3bfc",
+  "semantic_sha256": "3c51e0714a162f8f2584f56fabc925b86fda6e9cf7232af24e812d83100eef64",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2274,9 +2283,9 @@
       "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
+      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
       "kind": "rule",
-      "sha256": "41a0cfc2649d542ffd0302134773065a8e1e8ba6c723d21dfb9fb4c9e7b3bd66",
+      "sha256": "d815d05d9cdf20e952e4f90dfcb90052421f77827e4a7dd97819612d4c18d442",
       "targets": [
         ".PHONY"
       ]
@@ -2445,6 +2454,14 @@
       "sha256": "7837097eb06c892565227c26b6e69c3b46d35b4b00dccfa302fe4ac45b7f23f1",
       "targets": [
         "test-medium"
+      ]
+    },
+    {
+      "body": "test-medium-selected:\n\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tuv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
+      "kind": "rule",
+      "sha256": "4f6998072adf78ac6fd73ef16a46db4c1cb54834389057ab66caa7c62119ca72",
+      "targets": [
+        "test-medium-selected"
       ]
     },
     {
@@ -3832,9 +3849,9 @@
       ]
     },
     {
-      "body": "pr-preflight-medium-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\techo \"==> medium tier (same marker selection as CI)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
+      "body": "pr-preflight-medium-tests:\n\t@set -eu; \\\n\tif [ -n \"$(PATH_DECISION)\" ]; then \\\n\t\t[ -f \"$(PATH_DECISION)\" ] || { echo \"PATH_DECISION is required\" >&2; exit 2; }; \\\n\t\tDECISION=\"$(PATH_DECISION)\"; \\\n\telse \\\n\t\tDECISION=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$DECISION\"' EXIT; \\\n\t\tgit fetch origin develop --quiet; \\\n\t\tuv run -- python scripts/path_filter_decision.py --base-ref origin/develop --json-out \"$$DECISION\" >/dev/null; \\\n\tfi; \\\n\tif uv run -- python scripts/path_filter_decision.py --json-in \"$$DECISION\" --check needs-code-ci >/dev/null; then \\\n\t\tCHANGED_JSON=$$(uv run -- python -c 'import json, sys; d=json.load(open(sys.argv[1], encoding=\"utf-8\")); paths=d[\"changed_paths\"]; assert isinstance(paths, list) and all(isinstance(path, str) for path in paths); print(json.dumps(paths, separators=(\",\", \":\")))' \"$$DECISION\"); \\\n\t\techo \"==> medium tier (impact-selected local tests)\"; \\\n\t\tenv -u PATH_DECISION -u PATH_LISTS -u SKIP_FAST_TESTS BENCHBOX_MEDIUM_CHANGED_PATHS_JSON=\"$$CHANGED_JSON\" MAKEFLAGS= $(MAKE) -s local-validation GATE=medium-tier CMD=\"make test-medium-selected\"; \\\n\telse \\\n\t\techo \"No code changes detected; skipping medium tier.\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "0d5e5bad138747c0b1d6be45506ae3eaba5e44d9ac39a455f534f9320fdc2983",
+      "sha256": "eedd424355f6ac987f4edb9aa3cb10a95901dd09045c9604fbb0c7088c417459",
       "targets": [
         "pr-preflight-medium-tests"
       ]
@@ -4366,7 +4383,7 @@
       ]
     }
   ],
-  "target_count": 215,
+  "target_count": 216,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4534,6 +4551,7 @@
     "test-live-starburst",
     "test-local-matrix",
     "test-medium",
+    "test-medium-selected",
     "test-no-cloud",
     "test-olap",
     "test-package",

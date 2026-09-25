@@ -55,6 +55,7 @@ REQUIRED_CONTEXTS: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
     "ruleset-drift",
+    "Public-site visual acceptance",
 )
 REQUIRED_BATCH_TOOLS = frozenset({"register_batch", "prepare", "bind_batch_pr", "abort_batch"})
 MAX_RERUNS_PER_JOB = 1
