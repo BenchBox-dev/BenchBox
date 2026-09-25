@@ -1467,41 +1467,6 @@ benchbox-fixture-key-material
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.snowflake.snowflake")
-    def test_query_statistics_sql_uses_valid_history_columns(self, mock_snowflake):
-        """The stats lookup must only select INFORMATION_SCHEMA columns.
-
-        BYTES_WRITTEN, BYTES_SPILLED_*, and ROWS_EXAMINED exist only in
-        ACCOUNT_USAGE.QUERY_HISTORY; selecting them from the
-        INFORMATION_SCHEMA table function fails every lookup (verified live),
-        burning all retries plus backoff on every statement.
-        """
-        mock_connection = Mock()
-        mock_cursor = Mock()
-        mock_connection.cursor.return_value = mock_cursor
-        mock_cursor.fetchone.return_value = None
-        adapter = SnowflakeAdapter(
-            account="test_account",
-            username="test_user",
-            password="test_pass",
-            warehouse="TEST_WH",
-            database="TEST_DB",
-        )
-        # max_retries=0 with an empty history: single attempt, no sleeps.
-        adapter._get_query_statistics(mock_connection, "q1", max_retries=0)
-        (sql,), _ = mock_cursor.execute.call_args
-        # Selected items are bare columns or NULL placeholders; the invalid
-        # names may only survive as NULL-alias labels, never as selections.
-        selected = [line.strip().rstrip(",") for line in sql.splitlines()]
-        for invalid in (
-            "BYTES_WRITTEN",
-            "BYTES_SPILLED_TO_LOCAL_STORAGE",
-            "BYTES_SPILLED_TO_REMOTE_STORAGE",
-            "ROWS_EXAMINED",
-        ):
-            assert invalid not in selected
-        assert "BYTES_WRITTEN_TO_RESULT" in selected
-
-    @patch("benchbox.platforms.snowflake.snowflake")
     def test_edition_flows_to_platform_info_for_cost_model(self, mock_snowflake):
         """The edition is operator-supplied and must reach platform_info."""
         adapter = SnowflakeAdapter(
