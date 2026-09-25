@@ -313,6 +313,16 @@ def _tpchavoc_documented_skips(platform_name: Any) -> frozenset[str]:
     return TPCHAVOC_DOCUMENTED_SKIPS.get(platform, frozenset())
 
 
+def _tpchavoc_variant_has_usable_timing(query: dict) -> bool:
+    # A SUCCESS row with no timing (null, non-numeric, non-finite, or zero
+    # ms) must not satisfy variant coverage: it carries no measurement.
+    try:
+        ms = float(query.get("ms"))
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(ms) and ms > 0
+
+
 def _normalize_coverage_query_id(raw_id: Any) -> str | None:
     """Normalize a bundle query ID for coverage membership, or None.
 
@@ -1367,6 +1377,7 @@ def _validate_query_coverage(
             and isinstance(q.get("status"), str)
             and q["status"].upper() in {"SUCCESS", "PASS"}
             and str(q.get("run_type") or "measurement").strip().lower() == "measurement"
+            and _tpchavoc_variant_has_usable_timing(q)
         }
         missing_variants = TPCHAVOC_CANONICAL_VARIANTS - documented_skips - successful
         observed = canonical - {variant.split("_v")[0] for variant in missing_variants}

@@ -1605,6 +1605,23 @@ class TestSubmissionDeterministicGates:
         assert not vr.ok
         assert any("12_v4" in error for error in vr.errors)
 
+    def test_tpchavoc_success_without_timing_does_not_cover_variant(self):
+        # A SUCCESS row with ms null carries no measurement and must not
+        # satisfy variant coverage, even with 219 other timed rows.
+        from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS
+
+        data = _minimal_bundle()
+        data["benchmark"]["id"] = "tpchavoc"
+        data["queries"] = [
+            {"id": query_id, "ms": 100, "status": "SUCCESS"} for query_id in sorted(TPCHAVOC_CANONICAL_VARIANTS)
+        ]
+        data["queries"][0]["ms"] = None
+        data["summary"]["queries"] = {"total": 220, "passed": 220, "failed": 0}
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert not vr.ok
+        assert any(data["queries"][0]["id"] in error for error in vr.errors)
+
     def test_tpchavoc_accepts_only_documented_engine_skips(self):
         from benchbox.validation.bundle import TPCHAVOC_CANONICAL_VARIANTS, TPCHAVOC_DOCUMENTED_SKIPS
 
