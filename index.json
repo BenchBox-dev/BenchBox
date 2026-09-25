@@ -15574,6 +15574,15 @@
       "status": "open",
       "title": "Measure SereneDB TPC performance natively on Linux under the standard timing protocol"
     },
+    "serenedb-parquet-loading": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-functional-evaluation"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Load Parquet data into SereneDB with read_parquet instead of CSV COPY"
+    },
     "serenedb-search-benchmarks": {
       "claim": null,
       "needs": [

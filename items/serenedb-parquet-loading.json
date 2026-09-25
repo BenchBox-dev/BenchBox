@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Parquet-loaded TPC-H SF 0.01 passes the live differential suite",
+    "Load-time comparison recorded",
+    "PR opened with make pr-open"
+  ],
+  "context": "Item-specific guardrails: read-only mounts only; CSV COPY remains the default until measured.\n\nShared SereneDB guardrails: worktree-only repository writes with make agent-write-preflight; explicit-path staging, never git add -A; commit identity check, no attribution trailers; uv only, no new dependency; lazy psycopg import; no credentials in Git, logs, fixtures, or tracker; Mocker never in CI and its timings never published; pin by digest or exact version and record version(); announce long runs and never commit raw logs; code-skill self-review then make pr-preflight and make pr-open, no auto-merge without make pr-ready; durable artifacts carry no tracker IDs or session narrative; stop and report on failed gates, unverified behavior, or unapproved host changes.",
+  "description": "SereneDB reads Parquet natively (`read_parquet`, CTAS). The adapter inherits the PostgreSQL path, which streams Parquet as CSV through COPY FROM STDIN. A native path needs the server to see the files: a bind-mounted data directory, or remote storage.\n\nTasks:\n1. Check whether server-side `read_parquet` can reach BenchBox data through a read-only bind mount in the dev compose stack.\n2. Implement a Parquet load branch behind a platform option. Keep COPY FROM STDIN as the default.\n3. Compare load time and verify DATE and DECIMAL type fidelity. Pass differential validation after a Parquet load.\n\nDecision gates:\n- G1 Start only with explicit user priority.\n- G2 Mounts must be read-only and limited to the data directory. No object-store or HTTP exposure of local data without approval.\n- G3 Change the default format only if Parquet is faster and answers are identical.",
+  "links": [
+    "https://github.com/serenedb/serenedb/tree/main/docs/data_import_and_export/parquet",
+    "benchbox/platforms/postgresql.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:26:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7950fcf4f27248dfb0852c87bb1e269d",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
