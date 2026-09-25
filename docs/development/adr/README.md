@@ -21,3 +21,4 @@ Architecture Decision Records
 - [ADR: Cross-benchmark power and throughput scores](adr-cross-benchmark-power-throughput-scores.md)
 - [ADR: Concurrency Outcome and Resource-Ownership Contract](adr-concurrency-outcome-and-ownership-contract.md)
 - [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
+- [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
