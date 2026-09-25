@@ -41,6 +41,23 @@ def test_all_three_service_jobs_present() -> None:
     assert {"postgres", "clickhouse", "trino"} <= set(jobs)
 
 
+def test_dispatch_input_validated_with_exact_tokens() -> None:
+    workflow = _load_workflow()
+    assert "validate-input" in workflow["jobs"]
+    validate_text = "\n".join(str(s.get("run", "")) for s in workflow["jobs"]["validate-input"]["steps"])
+    assert "Unknown service" in validate_text
+    for job_name in ("postgres", "clickhouse", "trino"):
+        cond = workflow["jobs"][job_name].get("if", "")
+        assert f",{job_name}," in cond, f"{job_name} must match exact tokens"
+
+
+def test_clickhouse_fixture_matches_compose_password() -> None:
+    fixture = (REPO_ROOT / "tests" / "integration" / "platforms" / "test_clickhouse_live.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'password="benchbox"' in fixture
+
+
 def test_each_job_uses_own_compose_stack_and_guards_skips() -> None:
     workflow = _load_workflow()
     expected = {

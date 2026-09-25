@@ -23,8 +23,40 @@ permissions:
   contents: read
 
 jobs:
+  validate-input:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate services input
+        env:
+          SERVICES: ${{ inputs.services }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra TOKENS <<< "$SERVICES"
+          valid="postgres clickhouse trino all"
+          seen=""
+          for tok in "${TOKENS[@]}"; do
+            t="$(echo "$tok" | tr -d '[:space:]')"
+            if [ -z "$t" ]; then
+              echo "::error::Empty service token in services input '$SERVICES'."
+              exit 1
+            fi
+            case " $valid " in
+              *" $t "*) seen="$seen $t" ;;
+              *)
+                echo "::error::Unknown service '$t'. Choices: postgres,clickhouse,trino (or all)."
+                exit 1
+                ;;
+            esac
+          done
+          if [ -z "$seen" ]; then
+            echo "::error::No services selected."
+            exit 1
+          fi
+          echo "Selected:$seen"
+
   postgres:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(inputs.services, 'postgres') }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',postgres,') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -61,7 +93,7 @@ jobs:
         run: docker compose -f docker/postgresql/docker-compose.yml down -v
 
   clickhouse:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(inputs.services, 'clickhouse') }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',clickhouse,') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -100,7 +132,7 @@ jobs:
         run: docker compose -f docker/clickhouse/docker-compose.yml down -v
 
   trino:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(inputs.services, 'trino') }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',trino,') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
