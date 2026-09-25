@@ -15556,6 +15556,15 @@
       "status": "open",
       "title": "Evaluate SereneDB locally under Mocker and record driver, DDL, load, and SQL facts"
     },
+    "serenedb-tpc-differential-validation": {
+      "claim": null,
+      "needs": [
+        "serenedb-live-differential-harness"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make every TPC-H and TPC-DS query match DuckDB on SereneDB or register why not"
+    },
     "server-adapter-independent-connection-optin": {
       "claim": null,
       "needs": [],

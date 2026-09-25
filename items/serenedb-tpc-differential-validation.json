@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "All 22 TPC-H queries match DuckDB exactly or within spec-cited tolerances",
+    "All 99 TPC-DS queries match, or each exception is registered in sql_compat with a reason",
+    "make compat-docs-check passes",
+    "docs/platforms/serenedb.md known differences reflect confirmed results",
+    "PR opened with make pr-open after code-skill self-review"
+  ],
+  "context": "Item-specific guardrails: never edit reference answers or DuckDB output to force a match. Every rewrite or skip is registered with a reason. No blanket tolerance or global order-insensitivity. Do not file upstream issues on SereneDB's tracker without user approval (an outward-facing action).\n\nShared SereneDB guardrails (apply to every serenedb-* item):\n- Worktree only for repository writes: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only. No new dependency: SereneDB uses psycopg[binary], like CedarDB.\n- Adapter SDK imports stay lazy: import benchbox must not import psycopg.\n- Credentials never in Git (except the documented dev/test compose password, labeled as such), logs, test fixtures, or tracker fields.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- Mocker is local-only and never CI. Timings under Mocker are indicative, never published or compared with other platforms.\n- Pin the image by digest; record version() in every result.\n- Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out for write items: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed gate, an unverified engine behavior, or any host-changing action not already approved.",
+  "description": "Run the live differential suite at SF 0.01, then fix or formally register every mismatch. This resolves the open semantic risks: decimal arithmetic on Velox (upstream's own TPC-H test avoids DECIMAL), integer division (the `integer_division` setting conflicts with the docs), NULLS LAST on DESC, implicit equality casts, IEEE float operations, ROLLUP/GROUPING, interval arithmetic, and STDDEV_SAMP.\n\nTasks:\n1. Run `make test-live-serenedb` and record the per-query result table in this item's context, with the image digest and version().\n2. Classify each mismatch. For translation: add a registered query_adapter rewrite. For semantics: add a spec-cited tolerance, or a registered rewrite when no spec rule allows it. For an engine limit: add a registered execution_filter skip with a reason, and link the upstream SereneDB issue if one exists.\n3. Add focused unit tests for each rewrite.\n4. Update docs/platforms/serenedb.md known differences with the confirmed results.\n5. Remove xfail marks that the fixes resolve.\n\nDecision gates:\n- G1 If a mismatch needs a tolerance with no spec citation, stop and ask the user.\n- G2 If 10 or more TPC-DS queries (over 10%) need skips, stop and report before registering them. The platform may not justify an experimental listing yet.\n- G3 If a mismatch traces to BenchBox's shared translation path and would affect other platforms, file a separate item instead of patching it here.\n- G4 If a new SereneDB release lands during this work, keep validating against the pinned digest. Moving versions is a separate decision.",
+  "links": [
+    "docs/development/result-validation.md",
+    "benchbox/sql_compat/README.md",
+    "benchbox/sql_compat/rules/query_adapter",
+    "benchbox/sql_compat/rules/execution_filter",
+    "https://github.com/serenedb/serenedb/issues"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:25:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8cc85605b6004c0699cb063892fccd82",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
