@@ -5476,6 +5476,16 @@
       "status": "open",
       "title": "Add opt-in live Exasol tests that compare TPC answers with DuckDB"
     },
+    "exasol-local-evaluation-runs": {
+      "claim": null,
+      "needs": [
+        "exasol-tpc-differential-validation",
+        "exasol-throughput-streams"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Run cold and warm TPC-H and TPC-DS SF 1 evaluations on local Exasol Personal"
+    },
     "exasol-local-spike": {
       "claim": null,
       "needs": [],

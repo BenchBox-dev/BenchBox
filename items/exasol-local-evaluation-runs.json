@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Summary in context records cold and warm (median and spread) timings for TPC-H SF 1 and TPC-DS SF 1, environment telemetry, and cache-off evidence",
+    "Throughput result recorded, or explicitly skipped because streams are UNSUPPORTED",
+    "Each defect found is filed as its own tracker item",
+    "Deployment state matches the user's choice at the end"
+  ],
+  "context": "Item-specific guardrails: no cross-deployment or cross-platform performance claims, and no publication of results. That is a separate decision under the Exasol Personal EULA. Output goes under ~/Developer/benchmark_runs; nothing from these runs is committed.\n\nShared Exasol guardrails (apply to every exasol-* item):\n- Worktree only: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only; dependencies via uv add, never hand-edited.\n- Adapter SDK imports stay lazy: import benchbox must not import pyexasol.\n- Credentials never in Git, logs, test fixtures, or tracker fields; use env vars. The local default sys/exasol may appear only in docs as the documented default.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- No live cloud runs. The only live target is local Exasol Personal. Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts (commits, PR bodies, comments) carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed decision gate, unverified driver behavior, a license question, or a host-changing action not already approved.",
+  "description": "Produce the first local performance evidence for Exasol under a fixed timing protocol, and decide whether the adapter can stay experimental or needs more work. Findings only: file defects as new items rather than fixing them here.\n\nTiming protocol:\n- Fixed query order and seed.\n- Cold = the first power run after load. It includes Exasol's automatic index and statistics builds.\n- Warm = three further repetitions. Report median and spread.\n- Record VM CPU, RAM, and disk from `exasol info --json`, plus DB and pyexasol versions.\n- Verify cache-off on every session via EXA_SQL_LAST_DAY.EXECUTION_MODE.\n\nTasks:\n1. Before each run, announce the command, maximum runtime, log path, and stop condition.\n2. Run TPC-H SF 1 power: cold, then warm.\n3. Run TPC-DS SF 1 power: cold, then warm.\n4. Run throughput at or below the licensed cap. Skip this if exasol-throughput-streams closed as UNSUPPORTED.\n5. Summarize in this item's context: timings (cold, warm median, spread), failures, anomalies, and cache-off evidence.\n6. File each defect found as a new tracker item. Do not fix defects inside this item.\n7. Destroy the deployment at the end unless the user says otherwise.\n\nDecision gates:\n- G1 Timeouts and out-of-memory errors count as failures, not retries. If more than 2 queries fail at SF 1, stop and report.\n- G2 SF 10 is out of scope (8 GB VM memory makes spills likely). Do not run it.\n- G3 If warm-run spread exceeds 20% of the median for more than a quarter of queries, report the run as unstable before any summary is shared.",
+  "links": [
+    "docs/platforms/exasol.md",
+    "docs/operations/uat-framework.md",
+    "https://docs.exasol.com/db/latest/database_concepts/query_cache.htm"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:40:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "43ceb498086e43b3893df3b9bcd29def",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
