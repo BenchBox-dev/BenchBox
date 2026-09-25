@@ -5529,6 +5529,15 @@
       "status": "open",
       "title": "Make every TPC-H and TPC-DS query match DuckDB on Exasol or register why not"
     },
+    "exasol-tuning-support": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Support Exasol table tuning: distribution, partitioning, and constraints"
+    },
     "execution-harness-extraction-throughput-maintenance-combined": {
       "claim": null,
       "needs": [],
