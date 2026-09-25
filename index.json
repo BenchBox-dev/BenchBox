@@ -2095,15 +2095,10 @@
       "title": "Close three local/CI parity gaps beyond WS3/WS5: Make inventory in guards-fix, brittle inventory assertion, local lane-isolation check"
     },
     "ci-pipeline-for-docker-based-integration-tests": {
-      "claim": {
-        "expires_at": "2026-09-26T13:02:14Z",
-        "generation": "90cdb102b1a94f489270901d1e837ca4",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "CI pipeline for Docker-based integration tests"
     },
     "ci-plan-review-synchronize-fanout": {
