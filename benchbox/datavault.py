@@ -63,13 +63,20 @@ class DataVault(BaseBenchmark):
         """
         return self._impl.generate_data()
 
-    def get_queries(self) -> dict[str, str]:
+    def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
         """Get all Data Vault benchmark queries.
+
+        Args:
+            dialect: Optional target SQL dialect; cloud dialects are translated
+                from the DuckDB source
 
         Returns:
             Dictionary mapping query IDs (1-22) to query strings
         """
-        return self._impl.get_all_queries()
+        queries = self._impl.get_all_queries()
+        if not dialect:
+            return queries
+        return {k: self._impl.translate_for_dialect(v, dialect) for k, v in queries.items()}
 
     def get_query(
         self,
@@ -83,7 +90,7 @@ class DataVault(BaseBenchmark):
         Args:
             query_id: The ID of the query to retrieve (1-22)
             params: Optional parameters (not used, for API compatibility)
-            **kwargs: Additional parameters (not used)
+            **kwargs: Additional parameters; ``dialect`` selects the target SQL dialect
 
         Returns:
             The query string adapted for Data Vault schema
@@ -97,7 +104,7 @@ class DataVault(BaseBenchmark):
         if not (1 <= query_id <= 22):
             raise ValueError(f"Query ID must be 1-22, got {query_id}")
 
-        return self._impl.get_query(query_id)
+        return self._impl.get_query(query_id, dialect=kwargs.get("dialect"))
 
     def get_schema(self) -> dict[str, Any]:
         """Get the Data Vault schema definition.
