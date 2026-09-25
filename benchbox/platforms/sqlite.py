@@ -310,6 +310,15 @@ class SQLiteAdapter(PlatformAdapter):
         )
 
         # Pass through other relevant config (verbose settings, tuning config, etc.)
+        # Plan display/capture keys ride along via shared PLAN_FORWARD_KEYS
+        # (skipping None so adapter defaults apply): __init__ only ever sees
+        # this rebuilt config, so dropping them silently disables console plan
+        # display and plan capture/filtering even when requested.
+        from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
+
+        for key in PLAN_FORWARD_KEYS:
+            if key in config and config[key] is not None:
+                adapter_config[key] = config[key]
         for key in [
             "tuning_config",
             "tuning_enabled",
