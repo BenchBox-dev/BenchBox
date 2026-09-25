@@ -11133,6 +11133,13 @@
       "status": "done",
       "title": "Plan cross-platform multi-driver-version support and cloud engine-version metadata"
     },
+    "platform-expansion-evaluation-2026-09": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide next platform additions and backlog cleanup from the September 2026 platform evaluation"
+    },
     "platform-live-integration-tests": {
       "claim": null,
       "needs": [],
