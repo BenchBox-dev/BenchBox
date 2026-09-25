@@ -250,5 +250,16 @@
         "wid": "w5"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:a3241f1fc7b48fcf4029d4ee",
+      "at": "2026-09-25T12:33:51Z",
+      "client": "jcode",
+      "generation": "e35ea381752544c3b2ee8d7eaa1dbfb8",
+      "op": "take",
+      "op_id": "551a5afa209e42e583f2162b930fa878",
+      "session_id": "bbb79daffee04b6cb5f617a6c7f8491b"
+    }
+  ]
 }
