@@ -106,7 +106,8 @@ Finish preview performs comprehensive live revalidation:
 - Inspects worktree lifecycle metadata (`benchbox.worktree.*`), rejecting malformed or foreign worktrees.
 - Enforces controller safety: worktrees bound to an external controller (e.g. `bossmode`) are held unless explicitly released.
 - Revalidates fresh GitHub PR integration evidence (merged PR, target base branch `develop`/`release`/`published-results`, merge commit reachability, tip commit match, and zero unintegrated descendants).
-- **Strictly read-only / zero mutation**: Emits human or JSON previews naming the exact proposed worktree removal and atomic expected-OID ref deletion commands, while performing zero changes to worktrees, branches, refs, locks, or tracker state.
+- **Preview is the default / zero mutation**: without APPLY=1, emits human or JSON previews naming the exact proposed worktree removal and atomic expected-OID ref deletion commands, while performing zero changes to worktrees, branches, refs, locks, or tracker state.
+- **Separately gated apply**: `APPLY=1 make worktree-finish ...` re-evaluates fresh evidence in the same invocation, then executes normal `git worktree remove` on the canonical path followed by `git update-ref -d` on the local branch with the expected OID. A held target, a moved branch, or a failed removal stops the sequence; partial success (worktree removed, branch preserved) is reported explicitly.
 
 After the PR merges and the worktree is clean, remove the exact registration:
 
