@@ -108,8 +108,8 @@ SF=0.01 and SF=0.1 via `benchbox run --platform <snowflake|databricks>
 
 SF=0.01 latencies exceed SF=0.1 on both warehouses — warehouse
 warm-up dominates at these data volumes, not the sketch evaluation.
-Result bundles: `read_primitives_sf001/sf01_{snowflake,databricks}_sql_20260925_*.json`
-under `$BENCHBOX_OUTPUT_DIR/results/`. BenchBox SHA `1ba01a8`,
+Result bundles: `read_primitives_sf001_<platform>_sql_<timestamp>_<id>.json`
+(SF=0.01; `sf01` for SF=0.1) flat under `$BENCHBOX_OUTPUT_DIR/results/`. BenchBox SHA `1ba01a8`,
 Snowflake driver 4.7.3, Databricks driver 2026.36.
 
 Not yet surveyed (no credentials in `~/.benchbox/credentials.yaml`
