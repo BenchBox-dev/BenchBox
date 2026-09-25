@@ -2863,11 +2863,13 @@ class DatabricksAdapter(PlatformAdapter):
 
         # Default to DELTA format when unspecified. Scan the body only: parens
         # in the comment prefix must not displace the USING DELTA insertion.
-        # USING DELTA precedes AS SELECT on CTAS (there is no column list to
-        # attach it to); only scan for the column-list close paren when the
-        # statement actually defines columns.
+        # On CTAS every table clause (USING, TBLPROPERTIES) precedes
+        # AS SELECT: there is no column list to attach to, and anything
+        # appended after the query is a syntax error. Only scan for the
+        # column-list close paren when the statement actually defines
+        # columns.
+        as_select = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
         if "USING" not in body.upper():
-            as_select = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
             if as_select is not None:
                 body = body[: as_select.start()] + "USING DELTA " + body[as_select.start() :]
             else:
@@ -2889,14 +2891,20 @@ class DatabricksAdapter(PlatformAdapter):
 
         # Include Delta Lake optimization properties
         if "TBLPROPERTIES" not in body.upper():
-            body += " TBLPROPERTIES ("
             properties = []
 
             if self.delta_auto_optimize:
                 properties.append("'delta.autoOptimize.optimizeWrite' = 'true'")
                 properties.append("'delta.autoOptimize.autoCompact' = 'true'")
 
-            body += ", ".join(properties) + ")"
+            clause = "TBLPROPERTIES (" + ", ".join(properties) + ")"
+            if as_select is not None:
+                # Re-find AS SELECT: the USING insertion above shifted it.
+                anchor_match = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
+                anchor = anchor_match.start() if anchor_match else len(body)
+                body = body[:anchor].rstrip() + " " + clause + " " + body[anchor:]
+            else:
+                body += " " + clause
 
         return prefix + body
 

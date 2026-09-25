@@ -2341,7 +2341,7 @@ class BigQueryAdapter(PlatformAdapter):
             return False
         between = before[from_match.end() :]
         if re.search(
-            r"\b(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|WINDOW|QUALIFY|OVER)\b|[);]",
+            r"\b(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|WINDOW|QUALIFY|OVER|ON|USING)\b|[);]",
             between,
             flags=re.IGNORECASE,
         ):

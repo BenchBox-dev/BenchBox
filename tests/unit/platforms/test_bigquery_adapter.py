@@ -2617,6 +2617,15 @@ class TestQualifyTableNames:
         assert "(c_custkey, customer)" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_join_predicate_commas_are_not_table_separators(self, mock_bigquery):
+        """Commas inside ON/USING predicates leave function args unchanged."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT customer.c_name FROM customer JOIN lineitem ON COALESCE(lineitem.x, customer) IS NOT NULL"
+        )
+        assert "COALESCE(lineitem.x, customer) IS NOT NULL" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_backtick_and_commented_aliases_are_not_duplicated(self, mock_bigquery):
         """Existing backtick aliases and aliases past comments suppress synthesis."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")

@@ -1407,12 +1407,21 @@ class TestConvertToDeltaTable:
         """
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM (SELECT 1 AS id) s")
-        assert "USING DELTA AS SELECT" in result
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
         assert ") USING DELTA" not in result
         result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
-        assert result.endswith("USING DELTA AS SELECT 1 AS id TBLPROPERTIES ()") or (
-            "USING DELTA AS SELECT 1 AS id" in result
-        )
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
+
+    def test_ctas_tblproperties_precede_as_select(self):
+        """Table clauses must sit before the terminal AS query on CTAS."""
+        adapter = self._make_adapter(delta_auto_optimize=True)
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        props_idx = result.index("TBLPROPERTIES")
+        select_idx = result.index("AS SELECT")
+        assert props_idx < select_idx
+        assert "SELECT 1 AS id TBLPROPERTIES" not in result
 
     def test_adds_tblproperties_for_auto_optimize(self):
         adapter = self._make_adapter(delta_auto_optimize=True)
