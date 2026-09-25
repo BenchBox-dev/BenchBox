@@ -5445,6 +5445,16 @@
       "status": "done",
       "title": "Examples Code Duplication Consolidation"
     },
+    "exasol-adapter-core": {
+      "claim": null,
+      "needs": [
+        "exasol-local-spike",
+        "exasol-dialect-identifier-policy"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add the experimental Exasol SQL adapter limited to TPC-H and TPC-DS"
+    },
     "exasol-dialect-identifier-policy": {
       "claim": null,
       "needs": [],
