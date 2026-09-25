@@ -248,8 +248,10 @@ so `develop` no longer trails PyPI.
 
 The fast guard
 `tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*`
-pins the published version as its own literal, so the sync updates it too
-(rename the test to the new version). It stays a literal rather than reading
+pins the published version as its own literal. No tooling updates that literal:
+rename the test to the new version by hand at each cut (or extend
+`scripts/update_version.py`, which currently has no reference to it). It stays
+a literal rather than reading
 `pyproject.toml`, because that is exactly what the accounting check validates;
 deriving it from the checked source would let a sync to an unpublished version
 pass. Only PyPI is authoritative for publication state.
@@ -287,8 +289,13 @@ release as if it had been blocked.
   do not finalize until both stable required contexts exist.
 - **`validate-base` or `release-required-result` is pending or failed**: wait
   for GitHub Actions or fix on a feature branch off `develop`, PR back to
-  `develop`, then re-run `make release-cut` (the option-c sweep will delete
-  the stale `vX.Y.Z` branch automatically).
+  `develop`, then inspect the stale `vX.Y.Z` branch and resolve its
+  disposition first (keep, delete locally, delete on origin) before re-running
+  `make release-cut`. The option-c sweep only deletes *prior* release branches
+  (`Makefile` excludes `v$(VERSION)` via `grep -Fxv`), and
+  `scripts/release_cut_start.sh` hard-fails on any branch or tag collision, so
+  re-running the cut without resolving the stale branch stops at the collision
+  check with no further instruction.
 - **UAT campaign evidence is missing, stale, red, dirty, or non-ancestor**:
   follow up with the optional three-stage campaign and review its report (see
   "UAT matrix campaign evidence"). This does not block `release-finalize` and
