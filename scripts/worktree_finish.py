@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
-"""Single-target read-only worktree finish preview with fresh evidence revalidation.
+"""Single-target worktree finish preview with optional separately-gated apply.
 
 Revalidates structural, ownership, cleanliness, exact PR, base, head,
 merge-commit, and remote evidence at invocation time.
 
+Default mode is a read-only preview: never mutates Git state, never removes
+worktrees, never deletes refs. Apply mode (``--apply``) executes exactly the
+two proposed commands -- normal ``git worktree remove`` on the canonical
+path, then ``git update-ref -d`` on the local branch with the expected OID --
+after re-evaluating fresh evidence in the same invocation. Any hold, any
+branch movement, or any partial failure stops the sequence and reports
+partial success explicitly.
+
 Guarantees:
-- Read-only: never mutates Git state, never removes worktrees, never deletes refs.
 - Single-target: accepts exactly one canonical worktree path and expected full OID.
 - Fail-closed: incomplete collection, API errors, dirty states, and ambiguous
   ownership resolve to an explicit hold state.
+- Apply is separately gated: preview stays the default; ``--apply`` must be
+  passed explicitly on the command line for any mutation.
 """
 
 from __future__ import annotations
@@ -58,7 +67,7 @@ class FinishError(RuntimeError):
 
 @dataclasses.dataclass(frozen=True)
 class FinishPreviewResult:
-    """Bounded, read-only preview result for a single worktree target."""
+    """Bounded preview result for a single worktree target."""
 
     target_path: str
     branch: Optional[str]
@@ -83,6 +92,65 @@ class FinishPreviewResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return dataclasses.asdict(self)
+
+
+def apply_finish_actions(
+    res: FinishPreviewResult,
+    repo_root: Path,
+) -> Tuple[bool, Optional[str], List[Dict[str, str]]]:
+    """Execute the two proposed finish commands for an actionable preview.
+
+    Re-checks the branch tip against the expected OID immediately before
+    mutating: if the branch moved, no mutation runs. Executes normal
+    ``git worktree remove`` on the canonical path first, then
+    ``git update-ref -d`` on the local branch with the expected old OID.
+    Returns ``(worktree_removed, branch_deleted, executed)`` where each
+    entry records the command and its outcome; a moved branch or a failed
+    removal stops the sequence and preserves partial success explicitly.
+    """
+    executed: List[Dict[str, str]] = []
+    if res.status != "actionable" or not res.branch:
+        return False, None, executed
+    code, current_tip, _ = _run_git(["rev-parse", "--verify", f"refs/heads/{res.branch}"], repo_root)
+    if code != 0 or current_tip.lower() != res.expected_head.lower():
+        executed.append(
+            {
+                "action": "branch_drift_check",
+                "command": f"git rev-parse --verify refs/heads/{res.branch}",
+                "outcome": f"branch moved (expected {res.expected_head}, found {current_tip or 'missing'}) - no mutation performed",
+            }
+        )
+        return False, None, executed
+    code, _, stderr = _run_git(["worktree", "remove", res.target_path], repo_root)
+    executed.append(
+        {
+            "action": "worktree_removal",
+            "command": f"git worktree remove {res.target_path}",
+            "outcome": "removed" if code == 0 else f"failed: {stderr}",
+        }
+    )
+    if code != 0:
+        return False, None, executed
+    code, _, stderr = _run_git(["update-ref", "-d", f"refs/heads/{res.branch}", res.expected_head], repo_root)
+    executed.append(
+        {
+            "action": "branch_deletion",
+            "command": f"git update-ref -d refs/heads/{res.branch} {res.expected_head}",
+            "outcome": "deleted" if code == 0 else f"failed: {stderr}",
+        }
+    )
+    if code != 0:
+        return True, None, executed
+    return True, res.branch, executed
+
+
+def format_apply_report(executed: List[Dict[str, str]]) -> str:
+    """Render a bounded human report of executed apply actions."""
+    lines = ["Apply actions executed:"]
+    for idx, act in enumerate(executed, 1):
+        lines.append(f"  {idx}. [{act.get('action')}] {act.get('command')}")
+        lines.append(f"     Outcome: {act.get('outcome')}")
+    return "\n".join(lines)
 
 
 def _run_git(args: List[str], cwd: Path) -> Tuple[int, str, str]:
@@ -710,7 +778,7 @@ def format_human_report(res: FinishPreviewResult) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Single-target read-only preview of worktree finish actions with fresh evidence revalidation."
+        description="Single-target worktree finish preview with optional separately-gated apply."
     )
     parser.add_argument(
         "--worktree-path",
@@ -732,6 +800,11 @@ def main() -> int:
         "--repo",
         default="BenchBox-dev/BenchBox",
         help="GitHub repository slug (default: BenchBox-dev/BenchBox).",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Execute the proposed removal and ref deletion after fresh revalidation. Preview stays the default.",
     )
     parser.add_argument(
         "--evidence-file",
@@ -766,7 +839,24 @@ def main() -> int:
     else:
         print(format_human_report(res))
 
-    return 0
+    if not args.apply:
+        return 0
+    if res.status != "actionable":
+        print(f"\nApply refused: target is held ({res.hold_reason or 'no reason recorded'}).", file=sys.stderr)
+        return 1
+    worktree_removed, branch_deleted, executed = apply_finish_actions(res, args.repo_root)
+    if args.format == "json":
+        print(json.dumps({"apply": executed}, indent=2))
+    else:
+        print()
+        print(format_apply_report(executed))
+    if branch_deleted:
+        return 0
+    if worktree_removed:
+        print("\nPartial success: worktree removed but branch ref preserved.", file=sys.stderr)
+        return 1
+    print("\nApply made no mutation (branch moved or removal failed).", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
