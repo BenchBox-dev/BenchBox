@@ -130,6 +130,29 @@ class TestGetQueries:
         queries = tsbs_benchmark.get_queries(dialect="duckdb")
         assert isinstance(queries, dict)
 
+    @pytest.mark.parametrize("dialect", ["snowflake", "bigquery", "databricks"])
+    def test_get_queries_translates_for_cloud_dialects(self, seed, start_time, dialect):
+        queries = TSBSDevOpsBenchmark(num_hosts=100, start_time=start_time, seed=seed).get_queries(dialect=dialect)
+
+        assert len(queries) == 18
+        if dialect == "bigquery":
+            # BigQuery's DATE_TRUNC rejects MINUTE on timestamps.
+            for sql in queries.values():
+                assert "DATE_TRUNC('minute'" not in sql
+            assert "TIMESTAMP_TRUNC(`time`, MINUTE)" in queries["double-groupby-1-hr"]
+
+    @pytest.mark.parametrize("dialect", [None, "duckdb"])
+    def test_get_queries_keeps_duckdb_source(self, seed, start_time, dialect):
+        source = TSBSDevOpsBenchmark(num_hosts=100, start_time=start_time, seed=seed).get_queries()
+        queries = TSBSDevOpsBenchmark(num_hosts=100, start_time=start_time, seed=seed).get_queries(dialect=dialect)
+
+        assert queries == source
+
+    def test_get_query_translates_for_dialect(self, tsbs_benchmark):
+        sql = tsbs_benchmark.get_query("double-groupby-1-hr", dialect="bigquery")
+
+        assert "TIMESTAMP_TRUNC(`time`, MINUTE)" in sql
+
     def test_get_query_by_id(self, tsbs_benchmark):
         """get_query should return specific query."""
         query = tsbs_benchmark.get_query("single-host-12-hr")

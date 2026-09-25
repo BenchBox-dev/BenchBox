@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, Union
 
 from benchbox.base import BaseBenchmark
+from benchbox.core.query_catalog_base import CLOUD_TRANSLATED_DIALECTS, TranslatableQueryMixin
 
 if TYPE_CHECKING:
     from cloudpathlib import CloudPath
@@ -34,7 +35,7 @@ from benchbox.utils.scale_factor import format_scale_factor
 logger = logging.getLogger(__name__)
 
 
-class DataVaultBenchmark(BaseBenchmark):
+class DataVaultBenchmark(TranslatableQueryMixin, BaseBenchmark):
     """Data Vault 2.0 benchmark implementation using TPC-H source data.
 
     This benchmark transforms TPC-H's 8 tables into 21 Data Vault tables:
@@ -57,6 +58,11 @@ class DataVaultBenchmark(BaseBenchmark):
     # All enforcement layers (BenchmarkOptionSpec.choices, transformer validator,
     # HashAlgorithm Literal) must stay in sync with this tuple.
     SUPPORTED_HASH_ALGORITHMS = ("md5", "sha256")
+
+    # Queries are written in DuckDB SQL; cloud engines reject its SUBSTRING
+    # FROM/FOR and INTERVAL '90 days' forms, so translate for them.
+    _source_dialect = "duckdb"
+    _translated_dialects = CLOUD_TRANSLATED_DIALECTS
 
     def __init__(
         self,
@@ -313,11 +319,17 @@ class DataVaultBenchmark(BaseBenchmark):
         self.tables = dv_files
         return dv_files
 
-    def get_query(self, query_id: Union[int, str]) -> str:
+    def supported_dialects(self) -> list[str]:
+        """Return dialects whose query rendering get_queries() actually provides."""
+        return ["duckdb", *self._translated_dialects]
+
+    def get_query(self, query_id: Union[int, str], dialect: Optional[str] = None) -> str:
         """Get the SQL text for a specific Data Vault query.
 
         Args:
             query_id: Query identifier (1-22)
+            dialect: Optional target SQL dialect; cloud dialects are translated
+                from the DuckDB source
 
         Returns:
             SQL query text adapted for Data Vault schema
@@ -325,7 +337,7 @@ class DataVaultBenchmark(BaseBenchmark):
         Raises:
             ValueError: If query_id is not valid
         """
-        return self.query_manager.get_query(query_id)
+        return self.translate_for_dialect(self.query_manager.get_query(query_id), dialect)
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all available Data Vault queries.
@@ -342,13 +354,14 @@ class DataVaultBenchmark(BaseBenchmark):
         benchmark interface expected by the platform adapters.
 
         Args:
-            dialect: Optional SQL dialect for translation (not yet implemented)
+            dialect: Optional target SQL dialect; cloud dialects are translated
+                from the DuckDB source
 
         Returns:
             Dictionary mapping query IDs to SQL text
         """
         # Convert keys to strings for consistency with other benchmarks
-        return {str(k): v for k, v in self.query_manager.get_all_queries().items()}
+        return {str(k): self.translate_for_dialect(v, dialect) for k, v in self.query_manager.get_all_queries().items()}
 
     def execute_query(
         self,

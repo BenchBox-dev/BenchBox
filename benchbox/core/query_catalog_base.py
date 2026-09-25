@@ -151,6 +151,12 @@ class BaseQueryCatalogMixin:
 # ---------------------------------------------------------------------------
 
 
+#: Cloud dialects whose engines reject DuckDB-only syntax (``SUBSTRING(x FROM a
+#: FOR b)``, ``INTERVAL '90 days'``, ``DATE_TRUNC('minute', ts)`` on BigQuery),
+#: so benchmarks written in DuckDB SQL must be translated for them.
+CLOUD_TRANSLATED_DIALECTS: tuple[str, ...] = ("bigquery", "snowflake", "databricks", "spark")
+
+
 class TranslatableQueryMixin:
     """Mixin that provides a shared ``translate_query_text`` method for
     benchmark classes whose queries originate in a common source dialect.
@@ -164,6 +170,23 @@ class TranslatableQueryMixin:
     """
 
     _source_dialect: str = "netezza"
+
+    #: Dialect substrings that :meth:`translate_for_dialect` translates to.
+    #: ``None`` translates every requested dialect.
+    _translated_dialects: tuple[str, ...] | None = None
+
+    def translate_for_dialect(self, query_text: str, dialect: str | None) -> str:
+        """Translate *query_text* when *dialect* is one this benchmark translates to.
+
+        Returns the source text unchanged when *dialect* is empty or is not
+        listed in ``_translated_dialects``.
+        """
+        if not dialect:
+            return query_text
+        d = dialect.lower()
+        if self._translated_dialects is not None and not any(p in d for p in self._translated_dialects):
+            return query_text
+        return self.translate_query_text(query_text, dialect)
 
     def translate_query_text(self, query_text: str, target_dialect: str) -> str:
         """Translate a query from the benchmark's source dialect to *target_dialect*.
@@ -186,6 +209,7 @@ class TranslatableQueryMixin:
 
 
 __all__ = [
+    "CLOUD_TRANSLATED_DIALECTS",
     "BaseQueryCatalogMixin",
     "CatalogEntry",
     "QuerySkippedError",

@@ -244,8 +244,8 @@ def _benchmark_supports_dialect(bm: Any, dialect: str | None) -> bool:
             except Exception:
                 pass
     # Otherwise check for translation capability (translate_query_text or catalog variants).
-    # Benchmarks without this capability (e.g. TSBS DevOps, NYC Taxi, DataVault) silently ignore
-    # dialect in get_queries / get_query and return native SQL.
+    # Benchmarks without this capability silently ignore dialect in
+    # get_queries / get_query and return native SQL.
     for obj in objs:
         if hasattr(obj, "translate_query_text") or hasattr(obj, "has_dialect_variant"):
             return True

@@ -123,7 +123,8 @@ class TSBSDevOps(BaseBenchmark):
         """Get all benchmark queries.
 
         Args:
-            dialect: Target SQL dialect (not used - queries are standard SQL)
+            dialect: Target SQL dialect; cloud dialects are translated from the
+                DuckDB source
 
         Returns:
             Dictionary mapping query IDs to query strings
