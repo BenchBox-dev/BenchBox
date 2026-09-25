@@ -7320,7 +7320,7 @@
       "needs": [],
       "priority": "low",
       "status": "open",
-      "title": "Future Ideas Backlog - Specialized Benchmarks and Infrastructure"
+      "title": "Future Ideas Backlog - Graph and Streaming Benchmarks"
     },
     "gate-cloud-output-default-by-deployment-mode": {
       "claim": null,
