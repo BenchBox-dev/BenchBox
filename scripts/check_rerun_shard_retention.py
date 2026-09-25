@@ -49,19 +49,27 @@ def shard_sweep_date(path: Path) -> date | None:
         return None
 
 
-def find_expired(today: date, retention_days: int) -> list[tuple[Path, date, int]]:
-    """Return ``(path, sweep_date, age_days)`` for shards past retention, sorted."""
+def find_expired(today: date, retention_days: int) -> tuple[list[tuple[Path, date, int]], list[Path]]:
+    """Return ``(expired, undated)`` for shards in the shard directory.
+
+    ``expired`` holds ``(path, sweep_date, age_days)`` for shards at or past
+    retention, sorted. ``undated`` holds shards whose filename carries no
+    parseable ``-<YYYYMMDD>`` sweep date; those fail the check too, since an
+    undated shard can never expire on its own.
+    """
     expired: list[tuple[Path, date, int]] = []
+    undated: list[Path] = []
     if not SHARD_DIR.is_dir():
-        return expired
+        return expired, undated
     for path in sorted(SHARD_DIR.glob("*.yaml")) + sorted(SHARD_DIR.glob("*.yml")):
         sweep = shard_sweep_date(path)
         if sweep is None:
+            undated.append(path)
             continue
         age = (today - sweep).days
-        if age > retention_days:
+        if age >= retention_days:
             expired.append((path, sweep, age))
-    return expired
+    return expired, undated
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -74,15 +82,22 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    expired = find_expired(date.today(), args.retention_days)
-    if not expired:
+    expired, undated = find_expired(date.today(), args.retention_days)
+    if not expired and not undated:
         print("rerun shards: OK - no expired generated shards.")
         return 0
-    print(f"rerun shards: {len(expired)} expired shard(s) (retention {args.retention_days}d):")
-    for path, sweep, age in expired:
-        target = ARCHIVE_PARENT / f"generated-rerun-shards-{sweep.strftime('%Y%m%d')}"
-        print(f"  {path.name}: sweep {sweep.isoformat()} ({age}d old)")
-        print(f"    archive: git mv {path.relative_to(REPO_ROOT)} {target.relative_to(REPO_ROOT)}/")
+    if undated:
+        print(f"rerun shards: {len(undated)} shard(s) carry no parseable -<YYYYMMDD> sweep date:")
+        for path in undated:
+            print(f"  {path.name}: rename to stem-<YYYYMMDD>.yaml or archive it.")
+    if expired:
+        print(f"rerun shards: {len(expired)} expired shard(s) (retention {args.retention_days}d):")
+        for path, sweep, age in expired:
+            target = ARCHIVE_PARENT / f"generated-rerun-shards-{sweep.strftime('%Y%m%d')}"
+            print(f"  {path.name}: sweep {sweep.isoformat()} ({age}d old)")
+            print(
+                f"    archive: mkdir -p {target.relative_to(REPO_ROOT)} && git mv {path.relative_to(REPO_ROOT)} {target.relative_to(REPO_ROOT)}/"
+            )
     print("\nArchived shards stay tracked evidence under _project/_archive/ (outside corpus discovery).")
     return 1
 

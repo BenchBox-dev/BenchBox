@@ -44,16 +44,27 @@ class TestStemDates:
 
 
 class TestExpiry:
-    def test_live_shards_within_default_retention(self):
-        expired = checker.find_expired(date(2026, 9, 25), checker.RETENTION_DAYS)
+    def test_boundary_is_inclusive(self, tmp_path, monkeypatch):
+        shard = tmp_path / "sweep-20260101.yaml"
+        shard.write_text("name: x\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
+        expired, _ = checker.find_expired(date(2026, 6, 30), 180)
+        assert [p.name for p, _, _ in expired] == ["sweep-20260101.yaml"]
+
+    def test_undated_shards_fail(self, tmp_path, monkeypatch):
+        (tmp_path / "sweep-undated.yaml").write_text("name: x\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
+        expired, undated = checker.find_expired(date(2026, 9, 25), 180)
         assert expired == []
+        assert [p.name for p in undated] == ["sweep-undated.yaml"]
 
-    def test_short_retention_expires_known_shards(self):
-        expired = checker.find_expired(date(2026, 9, 25), 30)
-        assert len(expired) == 17
-        names = [p.name for p, _, _ in expired]
-        assert "uat-tuned-followup-resume-20260505.yaml" in names
+    def test_current_shards_pass(self, tmp_path, monkeypatch):
+        (tmp_path / "sweep-20260901.yaml").write_text("name: x\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
+        assert checker.find_expired(date(2026, 9, 25), 180) == ([], [])
 
-    def test_main_reports_ok_when_current(self, capsys):
+    def test_main_reports_ok_when_current(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "sweep-20260901.yaml").write_text("name: x\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
         assert checker.main([]) == 0
         assert "OK" in capsys.readouterr().out
