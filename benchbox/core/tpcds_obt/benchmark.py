@@ -532,6 +532,15 @@ class TPCDSOBTBenchmark(BaseBenchmark):
             enable_primary_keys=enable_primary_keys,
             enable_foreign_keys=enable_foreign_keys,
         )
+        # Cloud runs reuse the TPC-DS database/schema via get_data_source_benchmark(),
+        # so plain CREATE TABLE would fail against already-loaded source tables.
+        # IF NOT EXISTS is accepted by every cloud target (BigQuery, Snowflake,
+        # Databricks, Redshift, Synapse) and keeps reruns idempotent.
+        source_ddl = re.sub(
+            r"(?im)^CREATE TABLE (?!IF NOT EXISTS )",
+            "CREATE TABLE IF NOT EXISTS ",
+            source_ddl,
+        )
         # Note: tuning_config is accepted for API compatibility but OBT uses a fixed schema
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"

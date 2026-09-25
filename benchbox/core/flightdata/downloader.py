@@ -230,6 +230,18 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
         self._rng = random.Random(self.seed)
         self._num_months = _scale_to_months(scale_factor)
         self._months = _months_sequence(self._num_months)
+        if len(self._months) < self._num_months:
+            # Gaps in the provider archive (see unavailable_months in the
+            # downloader spec) mean fewer months are downloadable than the
+            # scale factor requests. Report the effective count so manifests
+            # and logs describe the corpus that was actually generated.
+            logger.warning(
+                "FlightData: only %d of %d requested months are available; "
+                "corpus is capped at the downloadable window.",
+                len(self._months),
+                self._num_months,
+            )
+            self._num_months = len(self._months)
         self._stats: dict[str, Any] = {
             "source": "bts-transtats",
             "scale_factor": scale_factor,

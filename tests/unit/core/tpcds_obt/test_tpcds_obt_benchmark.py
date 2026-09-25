@@ -187,10 +187,12 @@ def test_get_create_tables_sql_includes_source_tables() -> None:
 
     # 25 TPC-DS source tables plus the single OBT table: cloud loaders
     # resolve per-table source files from benchmark.tables, so the source
-    # DDL must ship with the OBT DDL.
+    # DDL must ship with the OBT DDL. Source CREATEs carry IF NOT EXISTS
+    # because cloud runs share the TPC-DS schema with prior loads.
     assert len(statements) == 26
     lowered = ddl.lower()
-    assert "create table call_center" in lowered
+    assert "create table if not exists call_center" in lowered
+    assert lowered.count("create table if not exists") == 25
     assert f"create table {OBT_TABLE_NAME.lower()}" in lowered
 
 
