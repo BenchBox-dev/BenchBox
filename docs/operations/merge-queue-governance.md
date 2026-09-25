@@ -28,7 +28,7 @@ The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queu
 
 A queue follower runs against a speculative base: `GROUP_BASE_SHA` is the leader's speculative head, which can never carry a published protected baseline (baselines are produced only by `push` to `develop`). A follower whose tree changes public-site inputs therefore fails closed at the baseline-download step. This is the correct outcome, not a defect to engineer around: resolving the speculative base to a nearby baselined develop ancestor would compare against a tree the follower does not actually merge onto, weakening the exact-base guarantee that justifies the gate.
 
-Expected operator flow: after the leader merges, the follower re-queues against the new develop head. Its own `pull_request` run already proved the comparison against its real base; the fresh queue run then compares against the updated head. No code change is needed; do not add ancestor-resolution fallback to the download script.
+Expected operator flow: after the leader merges, the follower re-queues against the new develop head. Its own `pull_request` run already proved the comparison against its real base; the fresh queue run then compares against the updated head. Before re-queueing, confirm the `public-site-visual-baseline-<leader SHA>` artifact exists and is unexpired on the develop push Documentation run for the new head, and re-queue at the back (`jump:false`) so no speculative predecessor reintroduces the follower failure. No code change is needed; do not add ancestor-resolution fallback to the download script.
 
 ---
 
