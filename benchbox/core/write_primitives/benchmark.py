@@ -233,7 +233,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         super().__init__(scale_factor, quiet=quiet, **config)
 
         self._name = "Write Primitives Benchmark"
-        self._version = "1.0"
+        self._version = "2.0"
         self._description = "Write Primitives benchmark - Testing fundamental write operations using TPC-H schema"
 
         # Setup directories
