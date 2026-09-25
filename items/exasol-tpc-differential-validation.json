@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "All 22 TPC-H queries match DuckDB exactly or within spec-cited tolerances",
+    "All 99 TPC-DS queries match, or each exception is registered in sql_compat with a reason",
+    "make compat-docs-check passes",
+    "docs/platforms/exasol.md known-differences section reflects confirmed results",
+    "PR opened with make pr-open after code-skill self-review"
+  ],
+  "context": "Item-specific guardrails: never edit reference answers or DuckDB output to force a match. Every rewrite or skip is registered in sql_compat with a reason. No blanket tolerance or global order-insensitivity.\n\nShared Exasol guardrails (apply to every exasol-* item):\n- Worktree only: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only; dependencies via uv add, never hand-edited.\n- Adapter SDK imports stay lazy: import benchbox must not import pyexasol.\n- Credentials never in Git, logs, test fixtures, or tracker fields; use env vars. The local default sys/exasol may appear only in docs as the documented default.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- No live cloud runs. The only live target is local Exasol Personal. Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts (commits, PR bodies, comments) carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed decision gate, unverified driver behavior, a license question, or a host-changing action not already approved.",
+  "description": "Run the live differential suite at SF 0.01, then fix or formally register every mismatch. This resolves the semantic risks the planning review left open: integer division (Exasol INT is DECIMAL(18,0) and division returns a decimal), AVG/SUM scale, CHAR padding, `||` skipping NULL operands (CONCAT_COALESCE; TPC-DS Q5/Q66/Q80/Q84 use `||`), empty string treated as NULL, NULL ordering, and ties under LIMIT.\n\nTasks:\n1. Run `make test-live-exasol` and record the per-query result table in this item's context.\n2. Classify each mismatch:\n   - translation: fix with a registered query_adapter rewrite under benchbox/sql_compat/rules/query_adapter/;\n   - semantics: use a spec-cited tolerance, or a registered rewrite when no spec rule allows the difference;\n   - engine limit: add a registered execution_filter skip with a reason.\n3. Add focused unit tests for each rewrite, asserting the rewritten SQL.\n4. Update the known-differences section of docs/platforms/exasol.md with the confirmed results.\n5. Remove xfail marks that the fixes resolve.\n\nDecision gates:\n- G1 If any mismatch would need a tolerance with no spec citation, stop and ask the user.\n- G2 If more than 10% of TPC-DS queries (10 or more) need skips, stop and report before registering them; the adapter may not be worth keeping experimental.\n- G3 If a mismatch traces to BenchBox's shared translation path (affecting other platforms), file a separate item instead of patching it here.",
+  "links": [
+    "docs/development/result-validation.md",
+    "benchbox/sql_compat/README.md",
+    "benchbox/sql_compat/rules/query_adapter",
+    "benchbox/sql_compat/rules/execution_filter"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:40:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5e8e45d3ced6462ba92f3d8ec7cd7ec8",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

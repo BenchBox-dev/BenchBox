@@ -5492,6 +5492,15 @@
       "status": "open",
       "title": "Support Exasol throughput streams within the licensed connection cap"
     },
+    "exasol-tpc-differential-validation": {
+      "claim": null,
+      "needs": [
+        "exasol-live-differential-harness"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make every TPC-H and TPC-DS query match DuckDB on Exasol or register why not"
+    },
     "execution-harness-extraction-throughput-maintenance-combined": {
       "claim": null,
       "needs": [],
