@@ -6487,14 +6487,19 @@
       "title": "Extending the logical profile beyond TPC-H and TPC-DS"
     },
     "external-contributor-submission-dry-run": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-26T13:18:25Z",
+        "generation": "232e3fa4a1dd4adba6573f969be65905",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [
         "surface-contributor-onboarding-for-results",
         "verify-ci-validation-workflow-end-to-end",
         "verify-trust-badge-rendering-in-explorer"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Validate the public submission path end to end from a fork, without recruiting an external person"
     },
     "external-harness-identity-instruction-boundary": {
