@@ -15540,6 +15540,15 @@
       "status": "open",
       "title": "Add the experimental SereneDB SQL adapter limited to TPC-H and TPC-DS"
     },
+    "serenedb-live-differential-harness": {
+      "claim": null,
+      "needs": [
+        "serenedb-adapter-core"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add opt-in live SereneDB tests that compare TPC answers with DuckDB"
+    },
     "serenedb-local-spike": {
       "claim": null,
       "needs": [],

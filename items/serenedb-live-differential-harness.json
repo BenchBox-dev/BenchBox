@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Default pytest run collects zero live_serenedb tests, proven by a committed test",
+    "make test-live-serenedb runs serially against the Mocker stack and reports per-query pass/fail for 121 queries",
+    "Every non-exact tolerance carries a TPC spec citation",
+    "PR opened with make pr-open after code-skill self-review"
+  ],
+  "context": "Item-specific guardrails: no blanket tolerance and no global ordering_required=False. These tests never run in default CI, and Mocker is never used in CI. Never edit DuckDB reference output.\n\nShared SereneDB guardrails (apply to every serenedb-* item):\n- Worktree only for repository writes: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only. No new dependency: SereneDB uses psycopg[binary], like CedarDB.\n- Adapter SDK imports stay lazy: import benchbox must not import psycopg.\n- Credentials never in Git (except the documented dev/test compose password, labeled as such), logs, test fixtures, or tracker fields.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- Mocker is local-only and never CI. Timings under Mocker are indicative, never published or compared with other platforms.\n- Pin the image by digest; record version() in every result.\n- Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out for write items: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed gate, an unverified engine behavior, or any host-changing action not already approved.",
+  "description": "Add a live test suite, off by default, that runs against the Mocker SereneDB stack. It loads TPC-H and TPC-DS at SF 0.01 and compares every query's answer with DuckDB through `benchbox/core/validation/cross_platform.py`. This is the evidence that answers are equal; transpiling only proves the syntax works.\n\nTasks:\n1. `tests/integration/platforms/test_serenedb_live.py`, modeled on test_cedardb_live.py: pytestmark `integration`, `docker_integration`, `live_integration`, and `live_serenedb`. Skip via the existing `skip_unless_docker_service` helper when the service is not up. Read connection settings from SERENEDB_HOST/PORT/USER/PASSWORD/DATABASE environment variables.\n2. Connection and load tests, then parametrized differential tests for all 22 TPC-H and 99 TPC-DS queries at SF 0.01. The default is exact match with rows in order. The only allowed loosening is a floating-point epsilon for aggregates over decimal division, with a TPC-H §2.6.4 citation in the `Tolerance` rationale. SereneDB returns DOUBLE for decimal division, as DuckDB does.\n3. A collection test proving the default `uv run -- pytest` run deselects every live_serenedb test.\n4. Ensure `make test-live-serenedb` runs serially (`-n 0`) against `make test-docker-up-serenedb CONTAINER_ENGINE=mocker`.\n\nDecision gates:\n- G1 Never add a tolerance without a spec citation. A query that seems to need one gets xfail with a reason naming the observed difference, and is handed to serenedb-tpc-differential-validation.\n- G2 If a full run takes more than 15 minutes locally, split the TPC-H and TPC-DS fixtures or modules before merging.",
+  "links": [
+    "tests/integration/platforms/test_cedardb_live.py",
+    "docs/development/result-validation.md",
+    "benchbox/core/validation/cross_platform.py",
+    "make/platform-tests.mk",
+    "pytest.ini"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:24:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b2a0960483c04a8091031cd001481d2c",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
