@@ -10,6 +10,7 @@ from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.cloud_compat import BIGQUERY_FILTER_IDS, rewrite_cloud_variant
 from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
+from benchbox.tpchavoc import TPCHavoc
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
@@ -65,6 +66,16 @@ def test_cloud_skips_flow_through_benchmark_runtime_mapping():
     for platform in ("BigQuery", "Snowflake", "Databricks"):
         assert set(benchmark.get_platform_skip_queries(platform)) == set(CLOUD_TPCHAVOC_SKIPS[platform.lower()])
     assert benchmark.get_platform_skip_queries("DuckDB") == []
+
+
+def test_public_facade_get_query_forwards_bigquery_dialect(tmp_path):
+    facade = TPCHavoc(scale_factor=0.1, output_dir=tmp_path)
+
+    translated = facade.get_query("1_v6", dialect="bigquery")
+    untranslated = facade.get_query("1_v6")
+
+    assert translated != untranslated
+    assert "COUNTIF(" in translated
 
 
 def test_databricks_reuses_spark_variant_rewrites():
