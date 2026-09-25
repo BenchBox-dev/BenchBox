@@ -183,6 +183,41 @@ def test_unparseable_download_fails_closed_unless_fallback_is_explicit(tmp_path,
     assert fallback.source_provenance()["months_synthetic"] == 1
 
 
+def test_valid_zip_without_csv_routes_through_fallback_cleanup(tmp_path, monkeypatch):
+    # A valid ZIP with no CSV raises ValueError inside _download_bts_month;
+    # it must take the same path as transport failures, not escape cleanup.
+    import csv
+    import io
+    import zipfile
+
+    from benchbox.core.flightdata import downloader as module
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("readme.txt", "no csv here")
+    payload = buf.getvalue()
+
+    class _Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return payload
+
+    monkeypatch.setattr(module.urllib.request, "urlopen", lambda *_args, **_kwargs: _Response())
+    downloader = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path)
+    with pytest.raises(RuntimeError, match="2024-12.*real data is required"):
+        downloader._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
+
+    fallback = FlightDataDownloader(scale_factor=0.1, output_dir=tmp_path, allow_synthetic_fallback=True)
+    fallback._process_month(csv.writer(io.StringIO()), 2024, 12, 0)
+    assert fallback.source_provenance()["source"] == "synthetic"
+    assert fallback.source_provenance()["synthetic_months"] == ["2024-12"]
+
+
 def test_contract_id_stable_and_pin_sensitive(tmp_path):
     first = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)
     second = FlightDataDownloader(scale_factor=0.01, output_dir=tmp_path)

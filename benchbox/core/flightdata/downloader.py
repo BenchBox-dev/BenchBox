@@ -790,7 +790,12 @@ class FlightDataDownloader(CompressionMixin, VerbosityMixin):
             self._stats["months_downloaded"] += 1
             self._stats["downloaded_months"].append(f"{year}-{month:02d}")
             return rows
-        except (urllib.error.URLError, urllib.error.HTTPError, OSError, zipfile.BadZipFile) as e:
+        except (urllib.error.URLError, urllib.error.HTTPError, OSError, zipfile.BadZipFile, ValueError) as e:
+            # ValueError covers archive/content parsing failures: a valid ZIP
+            # with no CSV, and UnicodeDecodeError (a ValueError subclass) from
+            # undecodable rows. Without this, those errors bypass the fallback
+            # and the top-level cleanup, leaving partial output beside the old
+            # manifest, which a later run could mislabel as complete.
             if not self.allow_synthetic_fallback:
                 raise RuntimeError(f"BTS download failed for {year}-{month:02d}; real data is required") from e
             logger.warning(f"BTS download failed for {year}-{month:02d}: {e}. Using synthetic data.")
