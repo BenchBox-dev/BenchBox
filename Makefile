@@ -848,6 +848,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed complexity-check"; \
 	$(MAKE) spellcheck; \
 	[ $$? -eq 0 ] || failed="$$failed spellcheck"; \
+	uv run -- python scripts/check_rerun_shard_retention.py; \
+	[ $$? -eq 0 ] || failed="$$failed rerun-shard-retention"; \
 	if [ -n "$$failed" ]; then \
 		echo ""; \
 		echo "❌ FAILED guards:$$failed"; \
