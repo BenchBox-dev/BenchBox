@@ -280,6 +280,15 @@
       "op": "take",
       "op_id": "d9a7079d2fea48a7b1c03aedfa8e5380",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T13:13:07Z",
+      "client": "jcode",
+      "generation": "02dc0bf0125249ff896dbfd6cdb9b2d7",
+      "op": "finish",
+      "op_id": "58793f24035d4380af3505c1ea074307",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
     }
   ]
 }
