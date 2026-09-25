@@ -207,6 +207,43 @@ class TestDataVaultBenchmarkExtraOps:
         assert "1" in queries
         assert "22" in queries
 
+    @pytest.mark.parametrize("dialect", ["snowflake", "bigquery", "databricks"])
+    def test_get_queries_translates_duckdb_syntax_for_cloud_dialects(self, dialect):
+        """Cloud engines reject DuckDB SUBSTRING FROM/FOR and INTERVAL '90 days'."""
+        queries = DataVaultBenchmark(scale_factor=0.01).get_queries(dialect=dialect)
+
+        assert len(queries) == 22
+        for sql in queries.values():
+            assert "FROM 1 FOR" not in sql.upper()
+        assert "SUBSTRING(" in queries["22"].upper()
+        if dialect == "bigquery":
+            # Snowflake and Databricks accept INTERVAL '90 days'; BigQuery does not.
+            assert "INTERVAL '90 DAYS'" not in queries["1"].upper()
+            assert "INTERVAL '90' DAY" in queries["1"].upper()
+
+    @pytest.mark.parametrize("dialect", [None, "duckdb"])
+    def test_get_queries_keeps_duckdb_source(self, dialect):
+        benchmark = DataVaultBenchmark(scale_factor=0.01)
+        source = {str(k): v for k, v in benchmark.get_all_queries().items()}
+
+        assert benchmark.get_queries(dialect=dialect) == source
+
+    def test_get_query_translates_for_dialect(self):
+        benchmark = DataVaultBenchmark(scale_factor=0.01)
+
+        assert "FROM 1 FOR" in benchmark.get_query(22).upper()
+        assert "FROM 1 FOR" not in benchmark.get_query(22, dialect="snowflake").upper()
+
+    def test_wrapper_passes_dialect_and_keeps_keys(self):
+        from benchbox.datavault import DataVault
+
+        benchmark = DataVault(scale_factor=0.01)
+        translated = benchmark.get_queries(dialect="bigquery")
+
+        assert translated.keys() == benchmark.get_queries().keys()
+        assert "FROM 1 FOR" not in translated[22].upper()
+        assert "FROM 1 FOR" not in benchmark.get_query(22, dialect="bigquery").upper()
+
     def test_get_schema_returns_tables_dict(self):
         benchmark = DataVaultBenchmark(scale_factor=0.01)
         schema = benchmark.get_schema()
