@@ -578,6 +578,55 @@ class TestModernSQLFeatures:
         assert "SELECT DISTINCT" in percentile_sql
         assert "OVER (PARTITION BY" in percentile_sql
 
+    def test_cloud_array_and_ordering_variants_keep_the_measured_operations(self):
+        benchmark = ReadPrimitivesBenchmark()
+        snowflake = benchmark.get_queries(dialect="snowflake")
+        bigquery = benchmark.get_queries(dialect="bigquery")
+
+        assert "ARRAY_SIZE(parts)" in snowflake["array_length"]
+        assert "ARRAY_LENGTH(parts)" in bigquery["array_length"]
+        for query_id in ("orderby_all_simple", "orderby_all_desc"):
+            assert "ORDER BY ALL" not in bigquery[query_id].upper()
+            assert "ORDER BY" in bigquery[query_id].upper()
+        assert "UNIX_DATE(o_orderdate)" in bigquery["window_moving_frame"]
+        assert "RANGE BETWEEN 30 PRECEDING" in bigquery["window_moving_frame"]
+
+    def test_cloud_json_and_struct_variants_preserve_result_shapes(self):
+        benchmark = ReadPrimitivesBenchmark()
+        snowflake = benchmark.get_queries(dialect="snowflake")
+        bigquery = benchmark.get_queries(dialect="bigquery")
+
+        assert "OBJECT_AGG(" in snowflake["json_aggregates"]
+        assert "JSON_OBJECT(" in bigquery["json_aggregates"]
+        # TPC-H c_comment is plain text, so nested extraction would record a
+        # successful zero-row timing on these dialects; both skip instead.
+        for queries in (snowflake, bigquery):
+            assert "json_extract_nested" not in queries
+        # BigQuery builds the JSON object from two independent aggregations;
+        # both must share one ordering or keys can pair with wrong values.
+        assert "ARRAY_AGG(CAST(p_partkey AS STRING) ORDER BY p_partkey)" in bigquery["json_aggregates"]
+        assert "ARRAY_AGG(p_retailprice ORDER BY p_partkey)" in bigquery["json_aggregates"]
+        assert "OBJECT_CONSTRUCT(" in snowflake["struct_access"]
+        for queries in (snowflake, bigquery):
+            assert "json_extract_simple" not in queries
+        assert "json_extract_simple" not in benchmark.get_queries(dialect="databricks")
+        for query_id in ("map_construction", "map_access", "map_keys_values"):
+            assert query_id not in snowflake
+
+    def test_bigquery_statistical_variants_remain_exact(self):
+        queries = ReadPrimitivesBenchmark().get_queries(dialect="bigquery")
+        percentiles = queries["statistical_percentiles"].upper()
+        correlation = queries["statistical_correlation"].upper()
+        trend = queries["timeseries_trend_analysis"].upper()
+
+        assert "PERCENTILE_CONT(" in percentiles
+        assert "APPROX" not in percentiles
+        assert "SELECT DISTINCT" in percentiles
+        assert "COVAR_POP(" in correlation and "VAR_POP(" in correlation
+        assert "WHEN VAR_POP(L_EXTENDEDPRICE) = 0 THEN 1" in correlation
+        assert "UNIX_SECONDS(" in trend
+        assert "COVAR_POP(" in trend and "VAR_POP(" in trend
+
     def test_redshift_skips_non_comparable_array_scalar_fallbacks(self):
         """Redshift should skip array queries when only scalar rewrites are available."""
         benchmark = ReadPrimitivesBenchmark()

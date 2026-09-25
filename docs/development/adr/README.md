@@ -21,3 +21,4 @@ Architecture Decision Records
 - [ADR: Concurrency Outcome and Resource-Ownership Contract](adr-concurrency-outcome-and-ownership-contract.md)
 - [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
 - [ADR: Prove FlightData Source Months Before Reusing a Corpus](adr-flightdata-month-source-policy.md)
+- [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
