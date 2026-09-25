@@ -977,15 +977,10 @@
       "title": "auto-merge-on-open.yml re-arms what #1567 made pr-open withhold"
     },
     "auto-retirement-workflow-run-repros-on-every-sqlglot-upgrade": {
-      "claim": {
-        "expires_at": "2026-09-26T13:28:52Z",
-        "generation": "386fc550b5464b9a8407721510b1823a",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Auto-retirement workflow (run repros on every sqlglot upgrade)"
     },
     "auto-revert-code-under-test-attribution": {
