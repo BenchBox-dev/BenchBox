@@ -5511,6 +5511,15 @@
       "status": "open",
       "title": "Capture Exasol query plans from profiling data without skewing timings"
     },
+    "exasol-saas-token-auth": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Add Exasol SaaS personal-access-token authentication"
+    },
     "exasol-throughput-streams": {
       "claim": null,
       "needs": [
