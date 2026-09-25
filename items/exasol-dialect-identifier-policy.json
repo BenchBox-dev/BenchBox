@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "New unit tests pass and existing dialect/translation tests pass unchanged",
+    "BenchBox translation helpers produce unquoted TPC-H/TPC-DS identifiers for the exasol target while reserved words are quoted",
+    "Stale exasol->postgres docs example removed",
+    "make duplicate-check-delta passes",
+    "PR opened with make pr-open after code-skill self-review"
+  ],
+  "context": "Item-specific guardrails: touch only the two identifier sites, their tests, and the one docs line. No adapter code and no manifest changes.\n\nShared Exasol guardrails (apply to every exasol-* item):\n- Worktree only: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only; dependencies via uv add, never hand-edited.\n- Adapter SDK imports stay lazy: import benchbox must not import pyexasol.\n- Credentials never in Git, logs, test fixtures, or tracker fields; use env vars. The local default sys/exasol may appear only in docs as the documented default.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- No live cloud runs. The only live target is local Exasol Personal. Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts (commits, PR bodies, comments) carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed decision gate, unverified driver behavior, a license question, or a host-changing action not already approved.",
+  "description": "Exasol folds unquoted identifiers to UPPERCASE. BenchBox quotes every identifier by default (`identify=True`), which would create lower-case quoted names that adapter-internal unquoted SQL (row counts, validation) cannot find. Add `exasol` to the targets translated with `identify=False` in both translation paths. Reserved words stay safe because sqlglot's `ExasolGenerator.RESERVED_KEYWORDS` still quotes them. A planning probe confirmed that TPC-DS reserved aliases (`year`, `returns`, `state`, `at`, `catalog`, `cs`) come out quoted, and no TPC DDL column is reserved.\n\nThis change affects only the `exasol` target. It can land before the adapter.\n\nTasks:\n1. In `benchbox/platforms/base/dialect_translation.py` (~line 87, `should_identify = tgt not in (...)`) and `benchbox/utils/dialect_utils.py` (~line 467), add \"exasol\" to the no-identify tuple. If both sites can share one constant without a layering violation (utils < core < platforms < cli), extract it. Otherwise keep them in sync with a cross-reference comment.\n2. Confirm `normalize_dialect_for_sqlglot(\"exasol\")` returns \"exasol\" unchanged (sqlglot 30.18 ships the dialect), and update the docstring list of supported dialects.\n3. Unit tests: TPC-H DDL and a TPC-H query translated to exasol emit unquoted identifiers; TPC-DS reserved aliases stay quoted; a synthetic DDL column named after a reserved word (e.g. `year`) is quoted; translation output for every other existing target is unchanged.\n4. Remove the stale `\"exasol\": \"postgres\"` example mapping at `docs/reference/python-api/utilities.rst:337`.\n\nDecision gates:\n- G1 If any existing target's translation output changes in the dialect test suite, stop. The change must be Exasol-only.\n- G2 If extracting a shared constant would add an import from utils into platforms, or the reverse, keep two literals and add the comment instead.",
+  "links": [
+    "benchbox/platforms/base/dialect_translation.py",
+    "benchbox/utils/dialect_utils.py",
+    "docs/reference/python-api/utilities.rst",
+    "https://docs.exasol.com/db/latest/sql_references/basiclanguageelements.htm"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:37:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b93def5a1fe242e186f5e53cf24ad0ca",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

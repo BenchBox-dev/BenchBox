@@ -5445,6 +5445,13 @@
       "status": "done",
       "title": "Examples Code Duplication Consolidation"
     },
+    "exasol-dialect-identifier-policy": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Emit unquoted identifiers for the Exasol sqlglot target"
+    },
     "exasol-local-spike": {
       "claim": null,
       "needs": [],
