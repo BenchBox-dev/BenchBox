@@ -15,7 +15,7 @@ This document defines the operational architecture, required status check contra
 
 ## 2. Required Status Checks Contract
 
-The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queue/develop/...`) and dispatches GitHub Actions runs under the `merge_group: [checks_requested]` event. Exactly three status checks are required on `develop`:
+The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queue/develop/...`) and dispatches GitHub Actions runs under the `merge_group: [checks_requested]` event. Exactly four status checks are required on `develop`:
 
 | Required Context | Workflow Path | Trigger Events | Contract on `merge_group` |
 |---|---|---|---|
@@ -23,6 +23,12 @@ The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queu
 | `Results Explorer browser gate` | `.github/workflows/results-explorer-browser.yml` | `pull_request`, `push`, `merge_group` | Always-reporting contract. Runs Chromium on explorer changes; posts success on unaffected paths. |
 | `ruleset-drift` | `.github/workflows/develop-ruleset-drift.yml` | `pull_request`, `push`, `merge_group`, `schedule` | Executes trusted base check to ensure no ruleset mutation occurs. |
 | `Public-site visual acceptance` | `.github/workflows/docs.yml` | `pull_request`, `merge_group` | Always reports. On changed public-site inputs, requires a successful assembled-site build and comparison against the exact protected base SHA. An absent baseline fails closed. |
+
+### Merge-queue follower visual baseline policy
+
+A queue follower runs against a speculative base: `GROUP_BASE_SHA` is the leader's speculative head, which can never carry a published protected baseline (baselines are produced only by `push` to `develop`). A follower whose tree changes public-site inputs therefore fails closed at the baseline-download step. This is the correct outcome, not a defect to engineer around: resolving the speculative base to a nearby baselined develop ancestor would compare against a tree the follower does not actually merge onto, weakening the exact-base guarantee that justifies the gate.
+
+Expected operator flow: after the leader merges, the follower re-queues against the new develop head. Its own `pull_request` run already proved the comparison against its real base; the fresh queue run then compares against the updated head. No code change is needed; do not add ancestor-resolution fallback to the download script.
 
 ---
 
