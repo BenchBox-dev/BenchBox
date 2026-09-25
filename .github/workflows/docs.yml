@@ -415,7 +415,34 @@ jobs:
           echo "active=$ACTIVE" >> "$GITHUB_OUTPUT"
           if [ "$ACTIVE" = "true" ]; then
             echo "::notice::Independent publication owns Pages; skipping the legacy release deployment"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Record skipped deployment
+        id: record-skip
+        if: steps.independent.outputs.skipped == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The github-pages environment pre-creates a deployment record when this
+          # job starts. When the independent-publication receipt gates off the real
+          # deploy, that record would otherwise transition to `success` on job exit
+          # even though nothing was published. Mark the record `inactive` so
+          # deployment history distinguishes "skipped, independent pipeline owns
+          # Pages" from a real deployment.
+          DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&sha=${{ github.sha }}&per_page=1" \
+            --jq '.[0].id // empty')
+          if [ -n "${DEPLOYMENT_ID:-}" ]; then
+            gh api --method POST "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
+              -f state="inactive" \
+              -f description="Superseded: independent publication owns Pages; legacy release deployment skipped." \
+              --jq '.state' > /dev/null
+          fi
+          echo "::notice::Legacy release deployment skipped and recorded as inactive; independent publication owns Pages."
 
       - name: Deploy to GitHub Pages
         id: deployment
