@@ -673,6 +673,18 @@ class DataSourceResolver:
         """Return a mapping value using exact or lower-case key lookup."""
         return mapping.get(key, mapping.get(key.lower()))
 
+    @staticmethod
+    def _infer_format_from_paths(paths: set[Path]) -> str | None:
+        """Infer the data format from file extensions.
+
+        v1 manifests carry no table_formats entry, so derive the format
+        (e.g. "tbl") from the replacement paths, transparent to compression
+        suffixes. Returns None when no path carries a recognized extension.
+        """
+        inferred = [get_data_extension(path) for path in sorted(paths)]
+        inferred = [ext[1:] for ext in inferred if ext]
+        return inferred[0] if inferred else None
+
     def _select_manifest_override_tables(
         self,
         source: DataSource,
@@ -713,11 +725,17 @@ class DataSourceResolver:
                 current_paths = set(self._normalize_paths(table_paths))
                 replacement_paths = set(self._normalize_paths(replacement))
                 replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+                if replacement_format is None:
+                    # v1 manifests carry no table_formats; infer from the
+                    # replacement paths so legacy manifests keep working.
+                    replacement_format = self._infer_format_from_paths(replacement_paths)
                 if replacement_format != "tbl" or not current_paths < replacement_paths:
                     continue
 
             source.tables[table_name] = replacement
             replacement_format = self._get_case_insensitive(manifest_source.table_formats, table_name)
+            if replacement_format is None and platform_name == "bigquery":
+                replacement_format = self._infer_format_from_paths(set(self._normalize_paths(replacement)))
             if replacement_format:
                 source.table_formats[table_name.lower()] = str(replacement_format).lower()
 
