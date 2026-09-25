@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -179,6 +180,47 @@ def test_batch_values_casts_use_explicit_decimal_scale() -> None:
         assert bigquery_sql is not None
         assert "DECIMAL(15,2)" not in bigquery_sql
         assert "CAST(0.05 AS NUMERIC)" in bigquery_sql
+
+
+def test_batch_values_snowflake_keys_stay_inside_cleanup_range() -> None:
+    """Snowflake row keys must be dense and bounded by the cleanup range.
+
+    `SEQ4()` returns increasing integers but is explicitly not gap-free, so
+    `9000100 + SEQ4()` can emit keys past the upper bound that cleanup deletes
+    (`l_orderkey BETWEEN 9000100 AND 9000199`). The leaked rows survive every
+    later operation, and the validation query cannot notice: it checks the row
+    count returned by an aggregate, which is always one row.
+
+    `ROW_NUMBER() OVER (ORDER BY SEQ4())` is gap-free and one-based, so the
+    `- 1` offset reproduces the zero-based `generate_series` domain that the
+    base SQL and the cleanup range assume.
+    """
+    catalog = load_write_primitives_catalog()
+
+    for operation_id, expected_rows in (("insert_batch_values_100", 100), ("insert_batch_values_1000", 1000)):
+        operation = catalog.operations[operation_id]
+        override = operation.platform_overrides["snowflake"]
+        assert override is not None
+
+        assert "ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS n" in override, operation_id
+        assert re.search(r"SELECT\s+SEQ4\(\)\s+AS\s+n", override) is None, operation_id
+
+        rowcount_match = re.search(r"GENERATOR\(ROWCOUNT => (\d+)\)", override)
+        assert rowcount_match is not None, operation_id
+        rowcount = int(rowcount_match.group(1))
+        assert rowcount == expected_rows, operation_id
+
+        base_key_match = re.search(r"SELECT (\d+) \+ n", override)
+        assert base_key_match is not None, operation_id
+        base_key = int(base_key_match.group(1))
+
+        cleanup_match = re.search(r"l_orderkey BETWEEN (\d+) AND (\d+)", operation.cleanup_sql or "")
+        assert cleanup_match is not None, operation_id
+        low, high = int(cleanup_match.group(1)), int(cleanup_match.group(2))
+
+        # Generated keys are exactly [low, high], so cleanup removes every row.
+        assert base_key == low, operation_id
+        assert base_key + rowcount - 1 == high, operation_id
 
 
 def test_datafusion_skips_slash_date_format_bulk_load() -> None:

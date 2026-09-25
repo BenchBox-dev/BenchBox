@@ -218,14 +218,21 @@ class TestSnowflakeCatalogCoverage:
         assert operation.platform_overrides.get("snowflake") is None
 
 
-class TestPortableCorrelation:
-    """DML self-references must use explicit aliases, not bare table names.
+class TestPortableDmlTargetCorrelation:
+    """UPDATE/DELETE targets must not carry a target-table alias.
 
-    BigQuery creates no implicit range variable for a qualified target, so
-    ``UPDATE t ... WHERE t.col`` fails with ``Unrecognized name`` once the
-    adapter qualifies the target (proven live: every bare-prefix op errored
-    server-side while COUNT(*) validations kept passing). Explicit aliases
-    resolve on every engine including SQLite.
+    Base SQL runs verbatim through ``connection.execute()``: the write path
+    bypasses ``execute_query()``, so neither dialect translation nor BigQuery
+    table qualification rewrites these statements. Correlating a self-reference
+    by table name (``UPDATE t ... WHERE t.col``) is the portable form. T-SQL
+    has no alias slot in its UPDATE/DELETE target, so ``UPDATE t AS u`` is a
+    syntax error on Synapse Dedicated SQL Pools and Fabric Warehouse; SQL
+    Server itself only accepts an alias that a FROM clause introduces.
+    BigQuery's grammar makes the alias optional and its own documented
+    examples correlate by table name without one.
+
+    ``MERGE INTO t AS x`` is deliberate and stays allowed: the MERGE target
+    alias is valid T-SQL, and these operations need it to qualify the source.
     """
 
     @pytest.fixture
@@ -233,22 +240,50 @@ class TestPortableCorrelation:
         """Create a benchmark instance for testing."""
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
-    def test_no_bare_self_prefix_in_write_or_cleanup(self, wp_benchmark):
+    def test_no_update_or_delete_target_alias_anywhere(self, wp_benchmark):
+        """UPDATE/DELETE targets stay unaliased so T-SQL can parse them."""
         import re
 
-        bare_prefix = re.compile(r"(update_ops_orders|delete_ops_orders|scd2_ops_dim_customer)\s*\.")
+        aliased_target = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+[\w.`\"]+\s+AS\s+\w+", re.IGNORECASE)
         offenders = []
         for op_id, operation in wp_benchmark.get_all_operations().items():
-            for field in ("write_sql", "cleanup_sql"):
-                if bare_prefix.search(getattr(operation, field, None) or ""):
+            statements = [(field, getattr(operation, field, None)) for field in ("write_sql", "cleanup_sql")]
+            statements.extend(operation.platform_overrides.items())
+            for field, sql in statements:
+                if sql and aliased_target.search(sql):
                     offenders.append(f"{op_id}.{field}")
         assert offenders == []
 
-    def test_scd2_update_targets_carry_alias(self, wp_benchmark):
+    def test_update_and_delete_self_reference_by_table_name(self, wp_benchmark):
+        """Correlated self-references qualify by table name, not by alias."""
+        expectations = {
+            "delete_with_aggregation": "delete_ops_orders.o_orderkey",
+            "delete_with_join": "delete_ops_orders.o_custkey",
+            "delete_with_not_exists": "delete_ops_orders.o_orderkey",
+            "update_from_select": "update_ops_orders.o_orderkey",
+            "update_with_aggregate": "update_ops_orders.o_orderkey",
+            "update_with_join": "update_ops_orders.o_custkey",
+            "update_with_subquery": "update_ops_orders.o_orderkey",
+        }
+        for op_id, qualified_column in expectations.items():
+            operation = wp_benchmark.get_operation(op_id)
+            assert qualified_column in operation.write_sql
+
+    def test_scd2_update_targets_self_reference_by_table_name(self, wp_benchmark):
         for op_id in ("merge_scd_type2_basic", "merge_scd_type2_no_change"):
             operation = wp_benchmark.get_operation(op_id)
-            assert "UPDATE scd2_ops_dim_customer AS tgt" in operation.write_sql
-            assert "tgt.c_custkey" in operation.write_sql
+            assert "UPDATE scd2_ops_dim_customer\n" in operation.write_sql
+            assert "scd2_ops_dim_customer.c_custkey" in operation.write_sql
+            assert "scd2_ops_dim_customer.row_hash" in operation.write_sql
+
+    def test_cleanup_sql_matches_write_sql_correlation_style(self, wp_benchmark):
+        """Cleanup runs raw too, so it must stay as portable as the write."""
+        for op_id in ("update_with_aggregate", "update_with_subquery"):
+            operation = wp_benchmark.get_operation(op_id)
+            cleanup = operation.cleanup_sql or ""
+            assert cleanup.strip()
+            assert "AS u" not in cleanup
+            assert "update_ops_orders.o_orderkey" in cleanup
 
 
 class TestSnowflakeMergeAndIndexCoverage:
