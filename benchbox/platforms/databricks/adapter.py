@@ -1229,6 +1229,9 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.execute(f"CREATE CATALOG IF NOT EXISTS {self.catalog}")
                 cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 self.log_verbose(f"Created catalog and schema: {self.catalog}.{self.schema}")
+                # The catalog now exists: later connections take the normal
+                # context-selection path instead of deferring again.
+                self.create_catalog = False
             else:
                 # Just create schema if catalog already exists
                 cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
@@ -2868,8 +2871,11 @@ class DatabricksAdapter(PlatformAdapter):
         # appended after the query is a syntax error. Only scan for the
         # column-list close paren when the statement actually defines
         # columns.
-        as_select = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
-        if "USING" not in body.upper():
+        as_select = re.search(r"\bAS\s+(?:SELECT\b|WITH\b)", body, flags=re.IGNORECASE)
+        has_using_clause = re.search(
+            r"\bUSING\s+(?:DELTA|HUDI|PARQUET|CSV|JSON|TEXT|ORC|AVRO)\b", body, flags=re.IGNORECASE
+        )
+        if has_using_clause is None:
             if as_select is not None:
                 body = body[: as_select.start()] + "USING DELTA " + body[as_select.start() :]
             else:
@@ -2900,7 +2906,7 @@ class DatabricksAdapter(PlatformAdapter):
             clause = "TBLPROPERTIES (" + ", ".join(properties) + ")"
             if as_select is not None:
                 # Re-find AS SELECT: the USING insertion above shifted it.
-                anchor_match = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
+                anchor_match = re.search(r"\bAS\s+(?:SELECT\b|WITH\b)", body, flags=re.IGNORECASE)
                 anchor = anchor_match.start() if anchor_match else len(body)
                 body = body[:anchor].rstrip() + " " + clause + " " + body[anchor:]
             else:
@@ -2922,7 +2928,12 @@ class DatabricksAdapter(PlatformAdapter):
         Record-key values are validated as SQL identifiers at init, so the
         f-string interpolation below cannot break quoting.
         """
-        if "USING" not in statement.upper():
+        import re
+
+        has_using_clause = re.search(
+            r"\bUSING\s+(?:DELTA|HUDI|PARQUET|CSV|JSON|TEXT|ORC|AVRO)\b", statement, flags=re.IGNORECASE
+        )
+        if has_using_clause is None:
             paren_count = 0
             using_pos = len(statement)
 

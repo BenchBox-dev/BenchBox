@@ -1905,10 +1905,8 @@ class BigQueryAdapter(PlatformAdapter):
         if not re.search(r"PRIMARY\s+KEY", search_text, flags=re.IGNORECASE):
             return []
         _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
-        # Column definitions may share one line (single-line DDL), so match
-        # per comma-separated segment rather than per line.
-        names = []
-        for segment in re.split(r",", search_text):
+
+        def _match_segment(segment: str) -> str | None:
             match = re.search(
                 r"[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
                 r"PRIMARY\s+KEY(?!\s*\()",
@@ -1916,7 +1914,31 @@ class BigQueryAdapter(PlatformAdapter):
                 flags=re.IGNORECASE,
             )
             if match and match.group(1).upper() not in _pk_keywords:
-                names.append(match.group(1))
+                return match.group(1)
+            return None
+
+        # Column definitions may share one line (single-line DDL), so match
+        # per comma-separated segment rather than per line. Split on commas
+        # outside parentheses so parameterized types (DECIMAL(10, 2)) stay
+        # in one segment.
+        names = []
+        depth = 0
+        current: list[str] = []
+        for char in search_text:
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth = max(0, depth - 1)
+            if char == "," and depth == 0:
+                found = _match_segment("".join(current))
+                if found is not None:
+                    names.append(found)
+                current = []
+            else:
+                current.append(char)
+        found = _match_segment("".join(current))
+        if found is not None:
+            names.append(found)
         return names
 
     @staticmethod
@@ -2006,7 +2028,11 @@ class BigQueryAdapter(PlatformAdapter):
         # A plain CREATE VIEW keeps its shape but still needs its target
         # qualified: the query-time connection carries no default dataset.
         if "VIEW" in modifiers or "TEMP" in modifiers or "TEMPORARY" in modifiers:
-            if re.fullmatch(r"(?:VIEW|OR\s+REPLACE\s+VIEW)", modifiers.strip(), flags=re.IGNORECASE):
+            if re.fullmatch(
+                r"(?:VIEW|OR\s+REPLACE\s+VIEW|MATERIALIZED\s+VIEW|OR\s+REPLACE\s+MATERIALIZED\s+VIEW)",
+                modifiers.strip(),
+                flags=re.IGNORECASE,
+            ):
                 qualified_target = self._qualify_table_target(raw_target)
                 return raw_prefix + qualified_target + as_and_rest
             return work
@@ -2081,13 +2107,14 @@ class BigQueryAdapter(PlatformAdapter):
             rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
             has_table_pk = re.search(r"PRIMARY\s+KEY\s*\(", rest, flags=re.IGNORECASE) is not None
             if pk_cols and not has_table_pk:
-                # Scan the literal-masked text so a parenthesis inside a
-                # string default (DEFAULT "done)") cannot end the column
-                # list early and inject the constraint inside the literal.
+                # Scan masked text so a parenthesis inside a string default
+                # (DEFAULT "done)") or a comment (/* note ) */) cannot end
+                # the column list early and inject the constraint inside it.
                 scan = re.sub(
-                    r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"",
+                    r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/",
                     lambda match: " " * len(match.group(0)),
                     rest,
+                    flags=re.DOTALL,
                 )
                 depth = 0
                 for i, ch in enumerate(scan):
@@ -2203,6 +2230,17 @@ class BigQueryAdapter(PlatformAdapter):
                     cte_names.add(name)
         tables: list[str] = []
         for tree in trees:
+            # A CTE name shadows later references to that name, but a table
+            # with the same spelling inside the CTE's own body is still the
+            # base table. Walk each CTE body first so shadowed base tables
+            # are collected, then skip only the shadowing outer references.
+            for cte in tree.find_all(exp.CTE):
+                for table in cte.this.find_all(exp.Table):
+                    if table.db or table.catalog:
+                        continue
+                    name = (table.name or "").upper()
+                    if name and name not in tables:
+                        tables.append(name)
             for table in tree.find_all(exp.Table):
                 if table.db or table.catalog:
                     continue
@@ -2260,9 +2298,10 @@ class BigQueryAdapter(PlatformAdapter):
             pattern = (
                 rf"(\bFROM\s+|\bJOIN\s+|\bINSERT\s+INTO\s+|\bUPDATE\s+"
                 rf"|\bMERGE\s+INTO\s+|\bUSING\s+"
-                rf"|\bTRUNCATE\s+(?:TABLE\s+)?|\bDROP\s+(?:TABLE\s+|VIEW\s+)(?:IF\s+EXISTS\s+)?"
+                rf"|\bTRUNCATE\s+(?:TABLE\s+)?|\bDROP\s+(?:TABLE\s+|VIEW\s+|MATERIALIZED\s+VIEW\s+)(?:IF\s+EXISTS\s+)?"
                 rf"|\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?|\bCREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
-                rf"|\bCREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?|,\s*)"
+                rf"|\bCREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+                rf"|\bFROM\s*\(\s*|\bJOIN\s*\(\s*|,\s*)"
                 rf"(`{re.escape(table_name)}`|{re.escape(table_name)}\b)"
             )
             segments: list[str] = []
@@ -2270,7 +2309,7 @@ class BigQueryAdapter(PlatformAdapter):
             for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
                 prefix = match.group(1)
                 name_start, name_end = match.span(2)
-                if prefix.strip() == "," and not self._in_from_clause(masked, match.start(1)):
+                if prefix.strip() == "," and not self._in_from_clause(masked, match.end(1)):
                     continue
                 segments.append(statement[last:name_start])
                 replacement = qualified_name
@@ -2321,32 +2360,95 @@ class BigQueryAdapter(PlatformAdapter):
             result += "\n"
         return result
 
+    _FROM_SCAN_TOKEN = None
+
+    @staticmethod
+    def _from_scan_token():
+        """Compiled token pattern for FROM-list scanning (built once)."""
+        import re
+
+        if BigQueryAdapter._FROM_SCAN_TOKEN is None:
+            BigQueryAdapter._FROM_SCAN_TOKEN = re.compile(
+                r"(?P<lparen>\()|(?P<rparen>\))|(?P<kw>\bFROM\b|\bJOIN\b|\bWHERE\b|\bGROUP\s+BY\b"
+                r"|\bORDER\s+BY\b|\bHAVING\b|\bLIMIT\b|\bWINDOW\b|\bQUALIFY\b|\bOVER\b|\bON\b"
+                r"|\bUSING\b|\bINTO\b|\bSET\b|\bVALUES\b)|(?P<comma>,)|(?P<semi>;)",
+                flags=re.IGNORECASE,
+            )
+        return BigQueryAdapter._FROM_SCAN_TOKEN
+
+    @staticmethod
+    def _from_scan_keyword(stack: list[list], depth: int, first: str) -> None:
+        """Fold one clause keyword into the FROM-list stack (in place)."""
+        if first == "FROM":
+            stack.append([depth, False])
+        elif first == "JOIN":
+            # A JOIN target continues the enclosing list; a JOIN
+            # inside a predicate's parens starts nothing.
+            if stack and stack[-1][0] == depth:
+                stack[-1][1] = False
+        elif first in ("WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "WINDOW", "QUALIFY", "OVER"):
+            while stack and stack[-1][0] >= depth:
+                stack.pop()
+        elif first == "ON":
+            if stack and stack[-1][0] == depth:
+                stack[-1][1] = True
+        elif first == "USING":
+            # JOIN ... USING (cols) is a predicate; DELETE ... USING
+            # opens a table list when no list is open at this depth.
+            if stack and stack[-1][0] == depth:
+                stack[-1][1] = True
+            else:
+                stack.append([depth, False])
+        elif first in ("INTO", "SET", "VALUES"):
+            while stack and stack[-1][0] >= depth:
+                stack.pop()
+
     @staticmethod
     def _in_from_clause(masked: str, pos: int) -> bool:
-        """Whether a position sits inside a FROM clause's table list.
+        """Whether a comma at a position separates tables in a FROM list.
 
-        A comma-separated name is a table only between FROM (or JOIN...ON
-        completion) and the next clause keyword (WHERE, GROUP BY, ORDER BY,
-        HAVING, LIMIT, WINDOW, QUALIFY, or a closing paren/semicolon).
-        Anywhere else the comma separates projection columns, function
-        arguments, or INSERT columns, which must never be qualified.
+        Scans from the statement start tracking parenthesis depth, FROM
+        lists, and JOIN predicates: a comma counts only at the depth of an
+        open FROM list while no JOIN predicate is open. A new FROM, JOIN,
+        or comma-separated table reopens the list; WHERE/GROUP/ORDER and
+        friends close it; ON opens a predicate that commas cannot belong
+        to; the predicate closes at WHERE or at a comma followed by a new
+        table at the list depth. Keywords inside deeper parens (a
+        subquery's own FROM/ON) never touch the outer list.
         """
         import re
 
-        before = masked[:pos]
-        from_match = None
-        for match in re.finditer(r"\bFROM\b", before, flags=re.IGNORECASE):
-            from_match = match
-        if from_match is None:
-            return False
-        between = before[from_match.end() :]
-        if re.search(
-            r"\b(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|WINDOW|QUALIFY|OVER|ON|USING)\b|[);]",
-            between,
-            flags=re.IGNORECASE,
-        ):
-            return False
-        return True
+        depth = 0
+        # Each entry: [depth, predicate_open] for a FROM list still open.
+        stack: list[list] = []
+        token = BigQueryAdapter._from_scan_token()
+        for match in token.finditer(masked[:pos]):
+            kind = match.lastgroup
+            word = (match.group("kw") or "").upper().split()
+            first = word[0] if word else ""
+            if kind == "lparen":
+                depth += 1
+            elif kind == "rparen":
+                depth = max(0, depth - 1)
+                while stack and stack[-1][0] > depth:
+                    stack.pop()
+            elif kind == "semi":
+                stack.clear()
+            elif kind == "kw":
+                BigQueryAdapter._from_scan_keyword(stack, depth, first)
+            elif kind == "comma":
+                if stack and stack[-1][0] == depth and not stack[-1][1]:
+                    return True
+                # A comma after a completed predicate (ON ... <table>) ends
+                # the predicate when a query-valued tail follows: treat it
+                # as a separator and close the predicate.
+                if stack and stack[-1][0] == depth and stack[-1][1]:
+                    tail = masked[match.end() :]
+                    if re.match(r"\s*[A-Za-z_][\w$]*", tail):
+                        stack[-1][1] = False
+                        return True
+                return False
+        return False
 
     @staticmethod
     def _qualify_has_alias(after: str) -> bool:
@@ -2365,12 +2467,16 @@ class BigQueryAdapter(PlatformAdapter):
         scan = re.sub(r"/\*.*?\*/", " ", after, flags=re.DOTALL)
         as_match = re.match(r"\s+AS\s+(?:`([^`]+)`|([A-Za-z_]\w*))", scan, flags=re.IGNORECASE)
         if as_match:
-            name = as_match.group(1) or as_match.group(2)
-            return name.upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+            if as_match.group(1) is not None:
+                # A quoted alias is always an identifier, even when its
+                # spelling matches a clause keyword (`order`, `where`).
+                return True
+            return as_match.group(2).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
         bare_match = re.match(r"\s+(?:`([^`]+)`|([A-Za-z_]\w*))", scan)
         if bare_match:
-            name = bare_match.group(1) or bare_match.group(2)
-            return name.upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+            if bare_match.group(1) is not None:
+                return True
+            return bare_match.group(2).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
         return False
 
     def _normalize_table_names_case(self, query: str) -> str:

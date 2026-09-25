@@ -2433,9 +2433,15 @@ class TestConvertToBigQueryTable:
         for stmt in (
             "CREATE TEMP VIEW v AS SELECT 1",
             "CREATE TEMPORARY VIEW v AS SELECT 1",
-            "CREATE MATERIALIZED VIEW mv AS SELECT 1",
         ):
             assert adapter._convert_to_bigquery_table(stmt) == stmt
+
+    def test_ctas_materialized_view_keeps_shape_with_qualified_target(self):
+        """Materialized views are dataset objects: qualify, do not tablify."""
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        result = adapter._convert_to_bigquery_table("CREATE MATERIALIZED VIEW mv AS SELECT 1")
+        assert result == "CREATE MATERIALIZED VIEW `my-proj.my_ds.MV` AS SELECT 1"
 
     def test_ctas_temp_tables_pass_through_unqualified(self):
         """TEMP tables stay session-scoped: no dataset qualification.

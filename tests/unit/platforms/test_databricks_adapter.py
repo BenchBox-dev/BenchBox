@@ -1423,6 +1423,28 @@ class TestConvertToDeltaTable:
         assert props_idx < select_idx
         assert "SELECT 1 AS id TBLPROPERTIES" not in result
 
+    def test_ctas_with_join_using_keeps_using_delta(self):
+        """JOIN ... USING (cols) is not a format clause: USING DELTA stays."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM a JOIN b USING (id)")
+        assert "USING DELTA" in result
+        assert "USING (id)" in result
+
+    def test_using_named_columns_do_not_suppress_using_delta(self):
+        """Columns named using_* must not read as a format clause."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (id INT, using_status STRING)")
+        assert "USING DELTA" in result
+
+    def test_cte_ctas_places_clauses_before_with(self):
+        """CTE-based CTAS anchors clauses before AS WITH, not in the CTE."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS WITH cte AS (SELECT 1 AS id) SELECT * FROM cte")
+        using_idx = result.index("USING DELTA")
+        with_idx = result.index("AS WITH")
+        assert using_idx < with_idx
+        assert "(SELECT 1 AS id) USING DELTA" not in result
+
     def test_adds_tblproperties_for_auto_optimize(self):
         adapter = self._make_adapter(delta_auto_optimize=True)
         result = adapter._convert_to_delta_table("CREATE TABLE t (a INT)")

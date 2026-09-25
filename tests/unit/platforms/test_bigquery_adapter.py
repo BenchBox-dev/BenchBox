@@ -2166,6 +2166,25 @@ class TestConvertToBigqueryTable:
         assert "PRIMARY KEY (id) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_inline_pk_survives_parameterized_types(self, mock_bigquery):
+        """Commas inside DECIMAL(10, 2) must not split the column definition."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE t (id INT, price DECIMAL(10, 2) PRIMARY KEY, col3 STRING)"
+        )
+        assert "PRIMARY KEY (price) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_inline_pk_ignores_parens_in_comments(self, mock_bigquery):
+        """A closing paren inside a comment must not end the column list."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE t (id INT PRIMARY KEY, val INT /* note ) */, name STRING)"
+        )
+        assert "/* note ) */" in result
+        assert result.rstrip().endswith("PRIMARY KEY (id) NOT ENFORCED)")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_preprocess_operation_sql_rewrites_bq_gaps(self, mock_bigquery):
         """CAST AS VARCHAR and quoted INTERVAL literals fail server-side."""
         from types import SimpleNamespace
@@ -2644,6 +2663,46 @@ class TestQualifyTableNames:
         assert "CREATE VIEW `p1.d1.ORDERS_VIEW` AS" in result
         result = adapter._qualify_table_names("DROP VIEW IF EXISTS orders_view")
         assert result == "DROP VIEW IF EXISTS `p1.d1.ORDERS_VIEW`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_materialized_view_targets_are_qualified(self, mock_bigquery):
+        """Materialized views are dataset objects: targets must qualify."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("CREATE MATERIALIZED VIEW mv AS SELECT * FROM orders")
+        assert "CREATE MATERIALIZED VIEW `p1.d1.MV` AS" in result
+        result = adapter._qualify_table_names("DROP MATERIALIZED VIEW IF EXISTS mv")
+        assert result == "DROP MATERIALIZED VIEW IF EXISTS `p1.d1.MV`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_parenthesized_join_tables_are_qualified(self, mock_bigquery):
+        """Tables led by a paren in FROM (... JOIN ...) still qualify."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT * FROM (customer JOIN orders ON customer.c_custkey = 1) JOIN nation ON 1=1"
+        )
+        assert "(`p1.d1.CUSTOMER`" in result
+        assert "SELECT coalesce(a, b)" in adapter._qualify_table_names("SELECT coalesce(a, b) FROM customer")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_keyword_spelled_backtick_aliases_are_not_duplicated(self, mock_bigquery):
+        """Quoted aliases are identifiers even when they spell keywords."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `order` WHERE 1=1")
+        assert result.count("`order`") == 1
+        assert "AS orders" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_subquery_and_mixed_join_commas_qualify(self, mock_bigquery):
+        """Commas after subqueries and explicit JOINs still separate tables."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT * FROM (SELECT 1 FROM lineitem) sub, customer WHERE 1=1")
+        assert ", `p1.d1.CUSTOMER`" in result
+        result = adapter._qualify_table_names(
+            "SELECT * FROM customer JOIN orders ON customer.c_custkey = 1, nation WHERE 1=1"
+        )
+        assert ", `p1.d1.NATION`" in result
+        result = adapter._qualify_table_names("DELETE FROM customer USING orders, lineitem WHERE 1=1")
+        assert ", `p1.d1.LINEITEM`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
