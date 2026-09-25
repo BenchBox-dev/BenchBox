@@ -111,7 +111,21 @@ def apply_finish_actions(
     executed: List[Dict[str, str]] = []
     if res.status != "actionable" or not res.branch:
         return False, None, executed
-    code, current_tip, _ = _run_git(["rev-parse", "--verify", f"refs/heads/{res.branch}"], repo_root)
+    # Resolve a surviving cwd BEFORE mutating: when invoked from inside the
+    # target worktree, `git worktree remove` deletes that cwd, so the later
+    # ref deletion must run from the common repository dir instead.
+    code, common_dir, stderr = _run_git(["rev-parse", "--git-common-dir"], repo_root)
+    if code != 0:
+        executed.append(
+            {
+                "action": "resolve_common_dir",
+                "command": "git rev-parse --git-common-dir",
+                "outcome": f"failed: {stderr} - no mutation performed",
+            }
+        )
+        return False, None, executed
+    git_cwd = Path(common_dir) if Path(common_dir).is_absolute() else repo_root / common_dir
+    code, current_tip, _ = _run_git(["rev-parse", "--verify", f"refs/heads/{res.branch}"], git_cwd)
     if code != 0 or current_tip.lower() != res.expected_head.lower():
         executed.append(
             {
@@ -121,7 +135,7 @@ def apply_finish_actions(
             }
         )
         return False, None, executed
-    code, _, stderr = _run_git(["worktree", "remove", res.target_path], repo_root)
+    code, _, stderr = _run_git(["worktree", "remove", res.target_path], git_cwd)
     executed.append(
         {
             "action": "worktree_removal",
@@ -131,7 +145,7 @@ def apply_finish_actions(
     )
     if code != 0:
         return False, None, executed
-    code, _, stderr = _run_git(["update-ref", "-d", f"refs/heads/{res.branch}", res.expected_head], repo_root)
+    code, _, stderr = _run_git(["update-ref", "-d", f"refs/heads/{res.branch}", res.expected_head], git_cwd)
     executed.append(
         {
             "action": "branch_deletion",
@@ -834,20 +848,21 @@ def main() -> int:
         print(f"Error: {err}", file=sys.stderr)
         return 1
 
-    if args.format == "json":
-        print(json.dumps(res.to_dict(), indent=2))
-    else:
-        print(format_human_report(res))
-
     if not args.apply:
+        if args.format == "json":
+            print(json.dumps(res.to_dict(), indent=2))
+        else:
+            print(format_human_report(res))
         return 0
     if res.status != "actionable":
         print(f"\nApply refused: target is held ({res.hold_reason or 'no reason recorded'}).", file=sys.stderr)
         return 1
     worktree_removed, branch_deleted, executed = apply_finish_actions(res, args.repo_root)
     if args.format == "json":
-        print(json.dumps({"apply": executed}, indent=2))
+        # Single document: embed the preview result alongside the apply outcome.
+        print(json.dumps({"preview": res.to_dict(), "apply": executed}, indent=2))
     else:
+        print(format_human_report(res))
         print()
         print(format_apply_report(executed))
     if branch_deleted:

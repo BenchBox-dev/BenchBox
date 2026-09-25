@@ -669,3 +669,59 @@ def test_apply_refuses_branch_drift_without_mutation(tmp_path: Path):
     assert deleted is None
     assert [e["action"] for e in executed] == ["branch_drift_check"]
     assert wt.exists()
+
+
+def test_apply_from_inside_target_worktree_still_deletes_ref(tmp_path: Path, monkeypatch):
+    """Apply survives its own cwd deletion: git runs from the common dir."""
+    repo = init_repo_with_origin(tmp_path / "repo")
+    wt = add_linked_worktree(repo, "feat/apply-cwd", tmp_path / "wt_cwd")
+
+    (wt / "feature.txt").write_text("feature code\n", encoding="utf-8")
+    _git(["add", "feature.txt"], wt)
+    _git(["commit", "-m", "feature commit"], wt)
+    branch_tip = _git(["rev-parse", "HEAD"], wt)
+
+    init_metadata(
+        wt,
+        branch="feat/apply-cwd",
+        base_ref="origin/develop",
+        base_oid=_git(["rev-parse", "develop"], repo),
+    )
+
+    _git(["checkout", "develop"], repo)
+    _git(["merge", "--no-ff", "-m", "Merge PR #108", "feat/apply-cwd"], repo)
+    merge_oid = _git(["rev-parse", "HEAD"], repo)
+    _git(["push", "origin", "develop"], repo)
+
+    evidence = [
+        {
+            "number": 108,
+            "state": "closed",
+            "merged_at": "2026-09-06T14:00:00Z",
+            "base": {"ref": "develop"},
+            "head": {"sha": branch_tip},
+            "merge_commit_sha": merge_oid,
+        }
+    ]
+    evidence_file = write_canned_evidence(tmp_path / "evidence.json", evidence)
+
+    res = evaluate_finish_preview(
+        target_path=wt,
+        expected_head_oid=branch_tip,
+        repo_root=repo,
+        evidence_file=evidence_file,
+    )
+    assert res.status == "actionable"
+
+    # Simulate invocation from inside the target worktree with repo_root=wt.
+    monkeypatch.chdir(wt)
+    removed, deleted, executed = apply_finish_actions(res, wt)
+    assert removed is True
+    assert deleted == "feat/apply-cwd"
+    proc = subprocess.run(
+        ["git", "rev-parse", "--verify", "refs/heads/feat/apply-cwd"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
