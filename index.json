@@ -10024,15 +10024,10 @@
       "title": "Migrate Snowflake, Fabric Warehouse, DataFusion, Azure Synapse, and dataframe adapters to the CSV resolver"
     },
     "migrate-scripts-top-level-to-an-isolated-env": {
-      "claim": {
-        "expires_at": "2026-09-26T13:38:03Z",
-        "generation": "f93c58515a334af3b8725683b1a4a061",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Migrate `scripts/` (top-level) to an isolated env"
     },
     "migrate-test-docker-stacks-to-mocker": {
