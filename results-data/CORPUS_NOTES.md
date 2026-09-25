@@ -138,6 +138,30 @@ Restoring any withdrawn cohort means fresh runs, not reverting this commit.
 `REGENERATION.md` is the precedent for how to document what a restore needs.
 The removal commit carries the exact 244-path list.
 
+## Cloud TPC-H results withdrawn (2026-09-25)
+
+The nine TPC-H bundles from the first live cloud runs (BigQuery, Databricks,
+and Snowflake at SF 0.1, 1, and 10, run 2026-09-18/19) were removed from the
+corpus with their nine `.manifest.json` sidecars (18 files). The maintainer
+identified the published results as incorrect. They must not be shown in the
+Results Explorer or used for comparisons.
+
+Removed public result IDs:
+
+- `tpch-bigquery-sf0.1-20260918-97c7acc0`, `tpch-bigquery-sf1.0-20260918-47b8218f`,
+  `tpch-bigquery-sf10.0-20260918-ad3f00af`
+- `tpch-databricks-sf0.1-20260918-45dbaeea`, `tpch-databricks-sf1.0-20260918-01a3150a`,
+  `tpch-databricks-sf10.0-20260918-a0ee4f11`
+- `tpch-snowflake-sf0.1-20260919-c5d751f5`, `tpch-snowflake-sf1.0-20260919-11abeacf`,
+  `tpch-snowflake-sf10.0-20260919-08fb3536`
+
+The TPC-H SF 0.1 and SF 1 cohorts keep at least three local platforms. The
+SF 10 cohort held only these three cloud results, so it no longer exists.
+The same paths must also be removed from `published-results` by a
+deletion-only PR, because the mirror's union overlay does not propagate
+develop-side deletions. Restoring cloud coverage means fresh runs, not
+reverting this removal.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
