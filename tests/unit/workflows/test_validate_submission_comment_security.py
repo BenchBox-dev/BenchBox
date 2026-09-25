@@ -56,3 +56,13 @@ def test_producer_no_longer_stages_a_pr_number_in_the_artifact() -> None:
     # trusted value.
     text = PRODUCER_PATH.read_text(encoding="utf-8")
     assert "pr_number.txt" not in text
+
+
+def test_comment_job_runs_for_pull_request_target_runs() -> None:
+    # The validator fires on pull_request_target (fork-safe base context), so
+    # the workflow_run event name is 'pull_request_target'. A filter pinned
+    # to 'pull_request' would silently skip comment posting on exactly the
+    # fork path this workflow exists for.
+    workflow_yaml = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    cond = workflow_yaml["jobs"]["comment"].get("if", "")
+    assert "pull_request_target" in cond

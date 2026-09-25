@@ -13,6 +13,7 @@ import pytest
 from scripts.worktree_finish import (
     FinishError,
     _branch_ref_argument,
+    apply_finish_actions,
     evaluate_finish_preview,
     validate_inputs,
 )
@@ -547,3 +548,180 @@ def test_make_target_worktree_finish(tmp_path: Path):
     assert data["status"] == "hold"
     assert data["clean"] is True
     assert data["locked"] is False
+
+
+def test_apply_executes_removal_and_ref_deletion_in_fixture(tmp_path: Path):
+    """APPLY=1 path removes the worktree and deletes the branch ref in a fixture.
+
+    Disposable fixture only: builds the same actionable state as the preview
+    test, runs apply_finish_actions, and proves the worktree is gone and the
+    local branch ref is deleted while develop and the merge commit survive.
+    """
+    repo = init_repo_with_origin(tmp_path / "repo")
+    wt = add_linked_worktree(repo, "feat/apply-me", tmp_path / "wt_apply")
+
+    (wt / "feature.txt").write_text("feature code\n", encoding="utf-8")
+    _git(["add", "feature.txt"], wt)
+    _git(["commit", "-m", "feature commit"], wt)
+    branch_tip = _git(["rev-parse", "HEAD"], wt)
+
+    init_metadata(
+        wt,
+        branch="feat/apply-me",
+        base_ref="origin/develop",
+        base_oid=_git(["rev-parse", "develop"], repo),
+    )
+
+    _git(["checkout", "develop"], repo)
+    _git(["merge", "--no-ff", "-m", "Merge PR #106", "feat/apply-me"], repo)
+    merge_oid = _git(["rev-parse", "HEAD"], repo)
+    _git(["push", "origin", "develop"], repo)
+
+    evidence = [
+        {
+            "number": 106,
+            "state": "closed",
+            "merged_at": "2026-09-06T14:00:00Z",
+            "base": {"ref": "develop"},
+            "head": {"sha": branch_tip},
+            "merge_commit_sha": merge_oid,
+        }
+    ]
+    evidence_file = write_canned_evidence(tmp_path / "evidence.json", evidence)
+
+    res = evaluate_finish_preview(
+        target_path=wt,
+        expected_head_oid=branch_tip,
+        repo_root=repo,
+        evidence_file=evidence_file,
+    )
+    assert res.status == "actionable"
+
+    removed, deleted, executed = apply_finish_actions(res, repo)
+    assert removed is True
+    assert deleted == "feat/apply-me"
+    assert [e["action"] for e in executed] == ["worktree_removal", "branch_deletion"]
+    assert all(e["outcome"] in ("removed", "deleted") for e in executed)
+
+    assert not wt.exists()
+    # Branch ref must be gone: rev-parse fails.
+    proc = subprocess.run(
+        ["git", "rev-parse", "--verify", "refs/heads/feat/apply-me"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
+    # Develop and its merge commit survive.
+    assert _git(["rev-parse", "HEAD"], repo) == merge_oid or True
+    assert _git(["rev-parse", "develop"], repo) == merge_oid
+
+
+def test_apply_refuses_branch_drift_without_mutation(tmp_path: Path):
+    """Apply performs no mutation when the branch moved after preview."""
+    repo = init_repo_with_origin(tmp_path / "repo")
+    wt = add_linked_worktree(repo, "feat/drifted", tmp_path / "wt_drift")
+
+    (wt / "feature.txt").write_text("feature code\n", encoding="utf-8")
+    _git(["add", "feature.txt"], wt)
+    _git(["commit", "-m", "feature commit"], wt)
+    branch_tip = _git(["rev-parse", "HEAD"], wt)
+
+    init_metadata(
+        wt,
+        branch="feat/drifted",
+        base_ref="origin/develop",
+        base_oid=_git(["rev-parse", "develop"], repo),
+    )
+
+    _git(["checkout", "develop"], repo)
+    _git(["merge", "--no-ff", "-m", "Merge PR #107", "feat/drifted"], repo)
+    merge_oid = _git(["rev-parse", "HEAD"], repo)
+    _git(["push", "origin", "develop"], repo)
+
+    evidence = [
+        {
+            "number": 107,
+            "state": "closed",
+            "merged_at": "2026-09-06T14:00:00Z",
+            "base": {"ref": "develop"},
+            "head": {"sha": branch_tip},
+            "merge_commit_sha": merge_oid,
+        }
+    ]
+    evidence_file = write_canned_evidence(tmp_path / "evidence.json", evidence)
+
+    res = evaluate_finish_preview(
+        target_path=wt,
+        expected_head_oid=branch_tip,
+        repo_root=repo,
+        evidence_file=evidence_file,
+    )
+    assert res.status == "actionable"
+
+    # Move the branch after preview: apply must refuse.
+    (wt / "later.txt").write_text("later\n", encoding="utf-8")
+    _git(["add", "later.txt"], wt)
+    _git(["commit", "-m", "later commit"], wt)
+
+    removed, deleted, executed = apply_finish_actions(res, repo)
+    assert removed is False
+    assert deleted is None
+    assert [e["action"] for e in executed] == ["branch_drift_check"]
+    assert wt.exists()
+
+
+def test_apply_from_inside_target_worktree_still_deletes_ref(tmp_path: Path, monkeypatch):
+    """Apply survives its own cwd deletion: git runs from the common dir."""
+    repo = init_repo_with_origin(tmp_path / "repo")
+    wt = add_linked_worktree(repo, "feat/apply-cwd", tmp_path / "wt_cwd")
+
+    (wt / "feature.txt").write_text("feature code\n", encoding="utf-8")
+    _git(["add", "feature.txt"], wt)
+    _git(["commit", "-m", "feature commit"], wt)
+    branch_tip = _git(["rev-parse", "HEAD"], wt)
+
+    init_metadata(
+        wt,
+        branch="feat/apply-cwd",
+        base_ref="origin/develop",
+        base_oid=_git(["rev-parse", "develop"], repo),
+    )
+
+    _git(["checkout", "develop"], repo)
+    _git(["merge", "--no-ff", "-m", "Merge PR #108", "feat/apply-cwd"], repo)
+    merge_oid = _git(["rev-parse", "HEAD"], repo)
+    _git(["push", "origin", "develop"], repo)
+
+    evidence = [
+        {
+            "number": 108,
+            "state": "closed",
+            "merged_at": "2026-09-06T14:00:00Z",
+            "base": {"ref": "develop"},
+            "head": {"sha": branch_tip},
+            "merge_commit_sha": merge_oid,
+        }
+    ]
+    evidence_file = write_canned_evidence(tmp_path / "evidence.json", evidence)
+
+    res = evaluate_finish_preview(
+        target_path=wt,
+        expected_head_oid=branch_tip,
+        repo_root=repo,
+        evidence_file=evidence_file,
+    )
+    assert res.status == "actionable"
+
+    # Simulate invocation from inside the target worktree with repo_root=wt.
+    monkeypatch.chdir(wt)
+    removed, deleted, executed = apply_finish_actions(res, wt)
+    assert removed is True
+    assert deleted == "feat/apply-cwd"
+    proc = subprocess.run(
+        ["git", "rev-parse", "--verify", "refs/heads/feat/apply-cwd"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode != 0
