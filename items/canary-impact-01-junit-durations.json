@@ -4,7 +4,7 @@
     "Setup time and test time per shard are recoverable from the run (step timings or a small summary field).",
     "Workflow contract tests assert the JUnit output path and that the marker expression, shard count, and aggregation are unchanged."
   ],
-  "context": "FINAL HEAD 55430b359 (rebased onto develop 2c95cbf3f, single commit, same 4 files; blob-identical to 2764d0655 across rebase). CI GREEN at this head: all non-skipping checks pass, mergeStateStatus CLEAN, mergeable MERGEABLE (live read 03:54Z). Preflight at this head: exit 0, fast 31627 passed/22 skipped, focused 108 passed (evidence 13), medium impact-selected zero (correct: workflow-YAML+fast-test-only change; full 2120 medium evidence from 36823a920 covers identical test content). Receipts bound to 55430b359: local-focused-check 02:31:34Z, medium-tier 02:33:15Z, required-pr-preflight 02:33:16Z. Auto-merge withheld.",
+  "context": "MERGED: PR #2340 squash-merged to develop as 27a9fc1a1 (live read 11:28Z; empty diff vs 55430b359; author Joe Harris). Preflight at merged head: exit 0, fast 31627 passed/22 skipped, focused 108 passed (evidence 13), medium impact-selected zero (workflow-YAML+fast-test-only change; full 2120 medium evidence from 36823a920 covers identical test content). Receipts bound to 55430b359: local-focused-check 02:31:34Z, medium-tier 02:33:15Z, required-pr-preflight 02:33:16Z. CI was green pre-merge (CLEAN/MERGEABLE). Stale branch note: local fix/canary-junit-durations and origin remote both still point at 55430b359; upstream shows [gone]; worktree at ../BenchBox.wt-canary-junit-durations needs removal.",
   "description": "The pre-merge canary-impact selector needs measured per-test durations to size shards and to estimate runner-minutes and wall time; selected-file counts alone cannot establish cost, because each shard also pays several minutes of setup and test runtimes vary widely. Today the canary shards write only a pytest text log.\n\nChange: each release-canary.yml shard also writes a JUnit XML report (pytest --junitxml) into its existing uploaded artifact directory, and the run records per-shard setup time (checkout, uv sync) separately from test time.",
   "links": [
     ".github/workflows/release-canary.yml",
@@ -61,6 +61,14 @@
       "op": "update",
       "op_id": "beef2df03b554a89b2ed297823e1ef43",
       "session_id": "93de43fbd69345b38c8ad7ced05d0986"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:a3241f1fc7b48fcf4029d4ee",
+      "at": "2026-09-25T11:31:23Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "3b1feaef7c7c42f88751fc4fcbb356eb",
+      "session_id": "bbb79daffee04b6cb5f617a6c7f8491b"
     }
   ]
 }
