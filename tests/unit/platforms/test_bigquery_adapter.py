@@ -1825,7 +1825,9 @@ class TestBigQuerySqlGenerationHelpers:
         ]
 
     @patch("benchbox.platforms.bigquery.bigquery")
-    def test_load_table_via_cloud_storage_uses_write_append_for_chunks(self, mock_bigquery, dependencies_available):
+    def test_load_table_via_cloud_storage_uses_one_job_for_all_files(self, mock_bigquery, dependencies_available):
+        from threading import Barrier
+
         mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
         mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
         mock_bigquery.SourceFormat.CSV = "CSV"
@@ -1836,6 +1838,7 @@ class TestBigQuerySqlGenerationHelpers:
             config = Mock()
             for key, value in kwargs.items():
                 setattr(config, key, value)
+            config.to_api_repr.return_value = kwargs
             job_configs.append(config)
             return config
 
@@ -1848,6 +1851,14 @@ class TestBigQuerySqlGenerationHelpers:
             storage_prefix="benchbox-data",
         )
         bucket = Mock()
+        uploads_started = Barrier(2, timeout=10)
+
+        def make_blob(_name):
+            blob = Mock()
+            blob.upload_from_filename.side_effect = lambda _path: uploads_started.wait()
+            return blob
+
+        bucket.blob.side_effect = make_blob
         mock_connection = Mock()
         mock_dataset = Mock()
         mock_table_ref = Mock()
@@ -1871,11 +1882,42 @@ class TestBigQuerySqlGenerationHelpers:
                 )
 
         assert row_count == 2
-        assert mock_connection.load_table_from_uri.call_count == 2
+        mock_connection.load_table_from_uri.assert_called_once()
+        uris, _table_ref = mock_connection.load_table_from_uri.call_args.args
+        assert uris == [
+            "gs://benchbox-bucket/benchbox-data/customer_0.dat",
+            "gs://benchbox-bucket/benchbox-data/customer_1.dat",
+        ]
+        assert bucket.blob.call_count == 2
         assert job_configs[0].write_disposition == "WRITE_TRUNCATE"
-        assert job_configs[1].write_disposition == "WRITE_APPEND"
+        assert job_configs[1].write_disposition == "WRITE_TRUNCATE"
         assert job_configs[0].field_delimiter == "|"
         assert job_configs[1].field_delimiter == "|"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_cloud_load_rejects_mixed_file_settings_before_upload(
+        self, mock_bigquery, dependencies_available, tmp_path
+    ):
+        mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
+        adapter = BigQueryAdapter(
+            project_id="test-project",
+            dataset_id="test_dataset",
+            storage_bucket="benchbox-bucket",
+        )
+        first = tmp_path / "one.csv"
+        second = tmp_path / "two.tbl"
+        first.write_text("x\n")
+        second.write_text("x|\n")
+        configs = [Mock(), Mock()]
+        configs[0].to_api_repr.return_value = {"sourceFormat": "CSV", "fieldDelimiter": ","}
+        configs[1].to_api_repr.return_value = {"sourceFormat": "CSV", "fieldDelimiter": "|"}
+        bucket = Mock()
+        connection = Mock()
+        with patch.object(adapter, "_build_load_job_config", side_effect=configs):
+            with pytest.raises(ValueError, match="incompatible load settings"):
+                adapter._load_table_via_cloud_storage(connection, bucket, "customer", [first, second])
+        bucket.blob.assert_not_called()
+        connection.load_table_from_uri.assert_not_called()
 
     @patch("benchbox.platforms.bigquery.time.sleep")
     @patch("benchbox.platforms.bigquery.bigquery")

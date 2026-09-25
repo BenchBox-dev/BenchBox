@@ -17,6 +17,7 @@ import logging
 import tempfile
 import time
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -1250,54 +1251,61 @@ class BigQueryAdapter(PlatformAdapter):
         benchmark: Any | None = None,
     ) -> int:
         """Load one table through GCS staging."""
+        if not valid_files:
+            raise ValueError(f"No source files for BigQuery table {table_name}")
+        if len(valid_files) > 10_000:
+            raise ValueError(f"BigQuery table {table_name} exceeds the 10,000 source URI limit")
         resolved_name, table_ref = self._resolve_target_table(connection, table_name)
 
-        for file_idx, file_path in enumerate(valid_files):
-            chunk_info = f" (chunk {file_idx + 1}/{len(valid_files)})" if len(valid_files) > 1 else ""
-
-            blob_name = f"{self.storage_prefix}/{table_name}_{file_idx}{''.join(file_path.suffixes)}"
-            self.log_very_verbose(f"Uploading to Cloud Storage{chunk_info}: {blob_name}")
-            blob = bucket.blob(blob_name)
-            blob.upload_from_filename(str(file_path))
-
-            write_disposition = (
-                bigquery.WriteDisposition.WRITE_TRUNCATE if file_idx == 0 else bigquery.WriteDisposition.WRITE_APPEND
-            )
-            job_config = self._build_load_job_config(
+        job_configs = [
+            self._build_load_job_config(
                 file_path,
-                write_disposition=write_disposition,
+                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
                 allow_quoted_newlines=True,
                 table_name=table_name,
                 data_source=data_source,
                 benchmark=benchmark,
             )
-            if file_idx > 0:
-                # BigQuery limits table update operations to 5 per 10s per table.
-                # Small throttle between chunks prevents hitting rate limits on small multi-file tables.
-                time.sleep(1.0)
+            for file_path in valid_files
+        ]
+        job_config = job_configs[0]
+        if any(config.to_api_repr() != job_config.to_api_repr() for config in job_configs[1:]):
+            raise ValueError(f"BigQuery source files for {table_name} have incompatible load settings")
 
-            uri = f"gs://{self.storage_bucket}/{blob_name}"
-            max_retries = 5
-            load_job = None
-            for attempt in range(max_retries):
-                try:
-                    if load_job is None:
-                        # A submission 429 means BigQuery rejected the
-                        # request, so resubmitting is safe.
-                        load_job = connection.load_table_from_uri(uri, table_ref, job_config=job_config)
-                    # A polling 429 means the accepted job may already be
-                    # running or done server-side: re-poll the same job
-                    # instead of submitting a duplicate append.
-                    load_job.result()
-                    break
-                except TooManyRequests as e:
-                    if attempt >= max_retries - 1:
-                        raise
-                    sleep_seconds = 2.5 * (2**attempt)
-                    self.logger.warning(
-                        f"Hit BigQuery rate limit on {table_name} chunk {file_idx + 1}, retrying in {sleep_seconds:.1f}s: {e}"
-                    )
-                    time.sleep(sleep_seconds)
+        def upload_file(item: tuple[int, Any]) -> str:
+            file_idx, file_path = item
+            if is_cloud_path(str(file_path)):
+                return str(file_path)
+            path = Path(file_path)
+            blob_name = f"{self.storage_prefix}/{table_name}_{file_idx}{''.join(path.suffixes)}"
+            self.log_very_verbose(f"Uploading to Cloud Storage: {blob_name}")
+            bucket.blob(blob_name).upload_from_filename(str(path))
+            return f"gs://{self.storage_bucket}/{blob_name}"
+
+        with ThreadPoolExecutor(max_workers=min(8, len(valid_files))) as uploads:
+            uris = list(uploads.map(upload_file, enumerate(valid_files)))
+
+        max_retries = 5
+        load_job = None
+        for attempt in range(max_retries):
+            try:
+                if load_job is None:
+                    # A submission 429 means BigQuery rejected the request;
+                    # a polling 429 must re-poll the accepted job.
+                    load_job = connection.load_table_from_uri(uris, table_ref, job_config=job_config)
+                load_job.result()
+                break
+            except TooManyRequests as e:
+                if attempt >= max_retries - 1:
+                    raise
+                sleep_seconds = 2.5 * (2**attempt)
+                self.logger.warning(
+                    "Hit BigQuery rate limit loading %s, retrying in %.1fs: %s",
+                    table_name,
+                    sleep_seconds,
+                    e,
+                )
+                time.sleep(sleep_seconds)
 
         return self._get_table_row_count(connection, resolved_name)
 

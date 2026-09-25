@@ -1300,6 +1300,67 @@ class TestDataSourceResolver:
         assert ds.source_type == "benchmark_tables"
         assert ds.table_formats.get("lineitem") == "tbl"
 
+    def test_bigquery_native_uses_all_manifest_tbl_shards(self, tmp_path):
+        """A one-file benchmark mapping must not hide additional manifest shards."""
+        first = tmp_path / "lineitem_000.tbl.gz"
+        second = tmp_path / "lineitem_001.tbl.gz"
+        first.write_bytes(b"a")
+        second.write_bytes(b"b")
+        benchmark = MagicMock()
+        benchmark.tables = {"lineitem": first}
+        manifest_data = {
+            "version": 2,
+            "benchmark": "tpch",
+            "scale_factor": 0.01,
+            "format_preference": ["tbl"],
+            "tables": {
+                "lineitem": {
+                    "formats": {
+                        "tbl": [
+                            {"path": first.name, "size_bytes": 1, "row_count": 1},
+                            {"path": second.name, "size_bytes": 1, "row_count": 1},
+                        ]
+                    }
+                }
+            },
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
+
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [first, second]
+        assert source.table_formats["lineitem"] == "tbl"
+
+        external = tmp_path / "external.tbl.gz"
+        external.write_bytes(b"c")
+        benchmark.tables = {"lineitem": external}
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [external]
+
+    def test_bigquery_native_infers_tbl_format_for_v1_manifest(self, tmp_path):
+        """A v1 manifest carries no table_formats; the format is inferred from paths."""
+        first = tmp_path / "lineitem_000.tbl.gz"
+        second = tmp_path / "lineitem_001.tbl.gz"
+        first.write_bytes(b"a")
+        second.write_bytes(b"b")
+        benchmark = MagicMock()
+        benchmark.tables = {"lineitem": first}
+        manifest_data = {
+            "tables": {
+                "lineitem": [
+                    {"path": first.name},
+                    {"path": second.name},
+                ]
+            }
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
+
+        source = DataSourceResolver(platform_name="bigquery", table_mode="native").resolve(benchmark, tmp_path)
+        assert source is not None
+        assert source.tables["lineitem"] == [first, second]
+        assert source.table_formats["lineitem"] == "tbl"
+
     def test_format_hints_injected_for_mixed_case_benchmark_tables_source(self, tmp_path):
         """Resolver normalizes mixed-case format hints so downstream lowercase lookups succeed."""
         benchmark = MagicMock()
