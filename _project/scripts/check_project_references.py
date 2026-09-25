@@ -41,9 +41,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = REPO_ROOT / "_project" / "scripts" / "project_references_baseline.txt"
 
-# Matches `_project/<path>` mentions with a doc/data suffix. Trailing
-# punctuation (`,`, `)`, `.`) is stripped during normalization.
-_REFERENCE_RE = re.compile(r"_project/[A-Za-z0-9_./@-]+\.(?:md|yaml|yml|json)")
+# Matches `_project/<path>` mentions with a doc/data suffix. The suffix must
+# be followed by a filename boundary (end of string, whitespace, or trailing
+# punctuation) so `_project/compat/inventory.jsonl` is not captured as the
+# shorter `_project/compat/inventory.json`. Trailing punctuation is stripped
+# during normalization.
+_REFERENCE_RE = re.compile(r"_project/[A-Za-z0-9_./@-]+\.(?:md|yaml|yml|json)(?![A-Za-z0-9_.~-])")
 
 # Placeholder path segments that mark a synthetic fixture string, not a real
 # reference. Ignored in every scanned file.
@@ -152,8 +155,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"project references: {len(fixed)} baseline entr(y/ies) now resolve - regenerate:")
         for key in fixed:
             print(f"  {key}")
-        print(f"\nRun: uv run -- python {BASELINE_PATH.relative_to(REPO_ROOT)} --update-baseline")
-        print("(invoke via _project/scripts/check_project_references.py --update-baseline)")
+        print("\nRun: uv run -- python _project/scripts/check_project_references.py --update-baseline")
     print("\nFix new entries by updating the link, restoring the file, or removing the reference.")
     return 1
 

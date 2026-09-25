@@ -24,14 +24,8 @@ benchbox/cli/platform_hooks.py::_project/TODO/main/planning/relocate-cli-hook-re
 benchbox/core/hooks/__init__.py::_project/TODO/main/planning/relocate-cli-hook-registries.yaml
 benchbox/core/plan_capture_phase.py::_project/TODO/main/planning/query-plan-capture-canonical-isolation.yaml
 benchbox/core/results/result_digest.py::_project/TODO/main/planning/bounded-correctness-gate-value-oracle.yaml
-benchbox/platforms/bigquery.py::_project/TODO/main/planning/query-plan-capture-sideeffect-engine-policy.yaml
-benchbox/sql_compat/baseline_tool.py::_project/compat/baseline.v1.json
-benchbox/sql_compat/inventory.py::_project/compat/inventory.json
-benchbox/utils/version.py::_project/TODO/main/planning/break-root-import-cycle.yaml
 docs/development/adr/adr-explorer-cli-surface.md::_project/DONE/main/active/explorer-emit-comparison-artifact-from-pipeline.yaml
 docs/development/adr/adr-published-results-slim-corpus-branch.md::_project/DONE/main/published-results-slim-down-and-corpus-mirror.yaml
-docs/development/adr/adr-sql-compat-phase-aware-pipeline.md::_project/compat/baseline.v1.json
-docs/development/adr/adr-sql-compat-phase-aware-pipeline.md::_project/compat/inventory.json
 docs/development/benchbox-results-platform-strategy.md::_project/_archive/specs/cli/config.md
 docs/development/browser-test-architecture.md::_project/_archive/handoffs/handoff-results-publishing-phase2.md
 docs/development/tuning-adr-001-trust-and-hash-semantics.md::_project/TODO/main/planning/tuning-applied-ledger-and-validation-status-20260712.yaml
@@ -58,7 +52,6 @@ tests/unit/scripts/test_pr_review_followups.py::_project/DONE/main/active/codex-
 tests/unit/scripts/test_shrink_rollup.py::_project/shrink-ledger/cli.md
 tests/unit/scripts/test_sqlglot_generator_known_failures.py::_project/sqlglot-upstream/failures/postgres-to-duckdb-seed-42.json
 tests/unit/test_canary_impact.py::_project/audits/2026-01-01-review.md
-tests/unit/test_import_isolation.py::_project/TODO/main/planning/break-root-import-cycle.yaml
 tests/unit/test_release_infrastructure.py::_project/PROJECT_TODO.md
 tests/unit/test_self_binding_detector.py::_project/TODO/main/active/correlated-subquery-self-binding-cross-surface-audit.yaml
 tests/unit/tpcds/test_dsqgen_streams.py::_project/DONE/main/planning/tpcds-throughput-permutation-compliance.yaml
