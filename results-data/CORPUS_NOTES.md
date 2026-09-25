@@ -156,7 +156,8 @@ Removed public result IDs:
   `tpch-snowflake-sf10.0-20260919-08fb3536`
 
 The TPC-H SF 0.1 and SF 1 cohorts keep at least three local platforms. The
-SF 10 cohort held only these three cloud results, so it no longer exists.
+SF 10 cohort retains its seven local DuckDB version-matrix results; only
+cloud-platform coverage at SF 10 is gone.
 The same paths must also be removed from `published-results` by a
 deletion-only PR, because the mirror's union overlay does not propagate
 develop-side deletions. Restoring cloud coverage means fresh runs, not
