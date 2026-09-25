@@ -761,6 +761,12 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Schema-integrity validation will check that the tables exist in the catalog.
         return {}
 
+    def materialize_schema_only_tables(self, benchmark, connection: Any) -> dict[str, int]:
+        # create_schema() only records _table_schemas on DataFusion, so the
+        # SKIP_DATA_LOADING path must retain this materialization step or
+        # schema validation reports every expected table missing.
+        return self._create_empty_schema_tables(connection)
+
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
