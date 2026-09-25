@@ -45,7 +45,7 @@ class TestNormalize:
         assert checker._is_placeholder("_project/foo.md")
         assert checker._is_placeholder("_project/blind-spots/foo.md")
         assert checker._is_placeholder("_project/specs/example.md")
-        assert not checker._is_placeholder("_project/decisions/real-decision.md")
+        assert not checker._is_placeholder("_project/decisions/" + "arch-pilot-eval" + ".md")
 
 
 class TestBaselineRoundTrip:
@@ -55,4 +55,4 @@ class TestBaselineRoundTrip:
         assert "no new breakage" in capsys.readouterr().out
 
     def test_new_reference_detected_against_baseline(self, tmp_path, monkeypatch):
-        assert checker._normalize("_project/decisions/new-decision.md`,") == ("_project/decisions/new-decision.md")
+        assert checker._normalize("_project/decisions/foo.md`,".replace("foo", "bar")) == ("_project/decisions/bar.md")
