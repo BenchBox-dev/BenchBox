@@ -44,7 +44,10 @@ _LOCK_VERSION_RE = re.compile(r'name = "sqlglot"\nversion = "([^"]+)"')
 def locked_sqlglot_version(ref: str | None = None) -> str | None:
     """Return the locked sqlglot version at ``ref`` (None = working tree)."""
     if ref is None:
-        text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
+        try:
+            text = (REPO_ROOT / "uv.lock").read_text(encoding="utf-8")
+        except OSError as err:
+            raise ValueError(f"cannot read working-tree uv.lock: {err}") from err
     else:
         proc = subprocess.run(
             ["git", "show", f"{ref}:uv.lock"],
@@ -105,7 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base-ref",
         default=None,
-        help="Base ref for upgrade detection (default: merge-base with origin/develop).",
+        help="Branch or ref to compute the merge-base against (default: origin/develop).",
     )
     parser.add_argument(
         "--check",
@@ -115,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        base = args.base_ref or merge_base()
+        base = merge_base(args.base_ref) if args.base_ref else merge_base()
         old = locked_sqlglot_version(base)
         new = locked_sqlglot_version(None)
     except ValueError as err:

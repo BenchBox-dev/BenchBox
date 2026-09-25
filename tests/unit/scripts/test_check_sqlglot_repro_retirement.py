@@ -59,3 +59,38 @@ class TestNoUpgradePath:
         monkeypatch.setattr(checker, "locked_sqlglot_version", lambda ref=None: "30.18.0")
         assert checker.main([]) == 0
         assert "no upgrade" in capsys.readouterr().out
+
+    def test_base_ref_goes_through_merge_base(self, monkeypatch, capsys):
+        seen: dict[str, str] = {}
+
+        def fake_merge_base(ref="origin/develop"):
+            seen["ref"] = ref
+            return "base123"
+
+        monkeypatch.setattr(checker, "merge_base", fake_merge_base)
+        monkeypatch.setattr(checker, "locked_sqlglot_version", lambda ref=None: "30.18.0")
+        assert checker.main(["--base-ref", "origin/develop"]) == 0
+        assert seen["ref"] == "origin/develop"
+
+    def test_crash_without_summary_fails_closed(self, monkeypatch, capsys):
+        monkeypatch.setattr(checker, "merge_base", lambda ref="origin/develop": "abc123")
+        monkeypatch.setattr(
+            checker,
+            "locked_sqlglot_version",
+            lambda ref=None: "30.17.0" if ref else "30.18.0",
+        )
+        monkeypatch.setattr(checker, "run_repros", lambda: (2, "Traceback: boom\n"))
+        assert checker.main([]) == 1
+        assert "crashed" in capsys.readouterr().err
+
+    def test_upgrade_with_all_fail_exits_zero(self, monkeypatch, capsys):
+        monkeypatch.setattr(checker, "merge_base", lambda ref="origin/develop": "abc123")
+        monkeypatch.setattr(
+            checker,
+            "locked_sqlglot_version",
+            lambda ref=None: "30.17.0" if ref else "30.18.0",
+        )
+        summary = "=== Summary\n  [FAIL] #1 x\n"
+        monkeypatch.setattr(checker, "run_repros", lambda: (1, summary))
+        assert checker.main([]) == 0
+        assert "no retirement candidates" in capsys.readouterr().out
