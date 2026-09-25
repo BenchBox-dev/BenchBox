@@ -24,39 +24,58 @@ permissions:
 
 jobs:
   validate-input:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
+    outputs:
+      run_postgres: ${{ steps.select.outputs.run_postgres }}
+      run_clickhouse: ${{ steps.select.outputs.run_clickhouse }}
+      run_trino: ${{ steps.select.outputs.run_trino }}
     steps:
-      - name: Validate services input
+      - name: Validate services input and select jobs
+        id: select
         env:
+          EVENT_NAME: ${{ github.event_name }}
           SERVICES: ${{ inputs.services }}
         run: |
           set -euo pipefail
+          if [ "$EVENT_NAME" != workflow_dispatch ]; then
+            echo "run_postgres=true" >> "$GITHUB_OUTPUT"
+            echo "run_clickhouse=true" >> "$GITHUB_OUTPUT"
+            echo "run_trino=true" >> "$GITHUB_OUTPUT"
+            echo "Scheduled run: all services selected."
+            exit 0
+          fi
+          run_postgres=false; run_clickhouse=false; run_trino=false
           IFS=',' read -ra TOKENS <<< "$SERVICES"
-          valid="postgres clickhouse trino all"
-          seen=""
           for tok in "${TOKENS[@]}"; do
             t="$(echo "$tok" | tr -d '[:space:]')"
-            if [ -z "$t" ]; then
-              echo "::error::Empty service token in services input '$SERVICES'."
-              exit 1
-            fi
-            case " $valid " in
-              *" $t "*) seen="$seen $t" ;;
+            case "$t" in
+              all) run_postgres=true; run_clickhouse=true; run_trino=true ;;
+              postgres) run_postgres=true ;;
+              clickhouse) run_clickhouse=true ;;
+              trino) run_trino=true ;;
+              '')
+                echo "::error::Empty service token in services input '$SERVICES'."
+                exit 1
+                ;;
               *)
                 echo "::error::Unknown service '$t'. Choices: postgres,clickhouse,trino (or all)."
                 exit 1
                 ;;
             esac
           done
-          if [ -z "$seen" ]; then
+          # Literal comparison: glob metacharacters in input cannot match.
+          if [ "$run_postgres" = false ] && [ "$run_clickhouse" = false ] && [ "$run_trino" = false ]; then
             echo "::error::No services selected."
             exit 1
           fi
-          echo "Selected:$seen"
+          echo "run_postgres=$run_postgres" >> "$GITHUB_OUTPUT"
+          echo "run_clickhouse=$run_clickhouse" >> "$GITHUB_OUTPUT"
+          echo "run_trino=$run_trino" >> "$GITHUB_OUTPUT"
+          echo "Selected: postgres=$run_postgres clickhouse=$run_clickhouse trino=$run_trino"
 
   postgres:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',postgres,') }}
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_postgres == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -93,7 +112,8 @@ jobs:
         run: docker compose -f docker/postgresql/docker-compose.yml down -v
 
   clickhouse:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',clickhouse,') }}
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_clickhouse == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -132,7 +152,8 @@ jobs:
         run: docker compose -f docker/clickhouse/docker-compose.yml down -v
 
   trino:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.services == 'all' || contains(format(',{0},', join(split(replace(inputs.services, ' ', ''), ','), ',')), ',trino,') }}
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_trino == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

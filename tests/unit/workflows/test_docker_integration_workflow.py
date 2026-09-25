@@ -44,11 +44,19 @@ def test_all_three_service_jobs_present() -> None:
 def test_dispatch_input_validated_with_exact_tokens() -> None:
     workflow = _load_workflow()
     assert "validate-input" in workflow["jobs"]
-    validate_text = "\n".join(str(s.get("run", "")) for s in workflow["jobs"]["validate-input"]["steps"])
+    validate = workflow["jobs"]["validate-input"]
+    outputs = validate.get("outputs", {})
+    assert set(outputs) >= {"run_postgres", "run_clickhouse", "run_trino"}
+    validate_text = "\n".join(str(s.get("run", "")) for s in validate["steps"])
     assert "Unknown service" in validate_text
-    for job_name in ("postgres", "clickhouse", "trino"):
-        cond = workflow["jobs"][job_name].get("if", "")
-        assert f",{job_name}," in cond, f"{job_name} must match exact tokens"
+    for job_name, flag in (
+        ("postgres", "run_postgres"),
+        ("clickhouse", "run_clickhouse"),
+        ("trino", "run_trino"),
+    ):
+        job = workflow["jobs"][job_name]
+        assert job.get("needs") == ["validate-input"], f"{job_name} must wait for validation"
+        assert flag in job.get("if", ""), f"{job_name} must gate on {flag}"
 
 
 def test_clickhouse_fixture_matches_compose_password() -> None:
