@@ -1632,18 +1632,18 @@ class SnowflakeAdapter(PlatformAdapter):
             return "FAILED", validation_details
 
     def _get_query_statistics(
-        self, connection: Any, query_id: str, max_retries: int = 3, initial_delay: float = 0.5
+        self, connection: Any, query_id: str, max_retries: int = 0, initial_delay: float = 0.5
     ) -> dict[str, Any]:
         """Get detailed query statistics from Snowflake query history.
 
         Snowflake query history may not be immediately available after query execution.
-        This method implements retry logic with exponential backoff to handle delayed
-        statistics availability.
+        The timed query result remains valid when optional statistics are absent, so
+        the normal path makes one lookup. Explicit callers may retry a missing row.
 
         Args:
             connection: Snowflake connection
             query_id: Query identifier to look up in history
-            max_retries: Maximum number of retry attempts (default: 3)
+            max_retries: Maximum number of retries for a missing row (default: 0)
             initial_delay: Initial delay in seconds between retries (default: 0.5s)
 
         Returns:
@@ -1652,24 +1652,17 @@ class SnowflakeAdapter(PlatformAdapter):
         import time as time_module
 
         cursor = connection.cursor()
-        last_error = None
-
         for attempt in range(max_retries + 1):
             try:
-                # Query the QUERY_HISTORY view for performance metrics
+                # Use the Information Schema table function's column set.
                 cursor.execute(f"""
                     SELECT
                         QUERY_ID,
-                        QUERY_TEXT,
                         TOTAL_ELAPSED_TIME,
                         EXECUTION_TIME,
                         COMPILATION_TIME,
                         BYTES_SCANNED,
-                        BYTES_WRITTEN,
-                        BYTES_SPILLED_TO_LOCAL_STORAGE,
-                        BYTES_SPILLED_TO_REMOTE_STORAGE,
                         ROWS_PRODUCED,
-                        ROWS_EXAMINED,
                         CREDITS_USED_CLOUD_SERVICES,
                         WAREHOUSE_SIZE,
                         CLUSTER_NUMBER
@@ -1677,7 +1670,7 @@ class SnowflakeAdapter(PlatformAdapter):
                         END_TIME_RANGE_START => DATEADD('MINUTE', -5, CURRENT_TIMESTAMP()),
                         END_TIME_RANGE_END => CURRENT_TIMESTAMP()
                     ))
-                    WHERE QUERY_TAG LIKE '%{query_id}%'
+                    WHERE QUERY_TAG = '{self.query_tag}_{query_id}'
                     ORDER BY START_TIME DESC
                     LIMIT 1
                 """)
@@ -1689,22 +1682,18 @@ class SnowflakeAdapter(PlatformAdapter):
                     cursor.close()
                     return {
                         "snowflake_query_id": result[0],
-                        "total_elapsed_time_ms": result[2],
-                        "execution_time_ms": result[3],
-                        "compilation_time_ms": result[4],
-                        "bytes_scanned": result[5],
-                        "bytes_written": result[6],
-                        "bytes_spilled_local": result[7],
-                        "bytes_spilled_remote": result[8],
-                        "rows_produced": result[9],
-                        "rows_examined": result[10],
+                        "total_elapsed_time_ms": result[1],
+                        "execution_time_ms": result[2],
+                        "compilation_time_ms": result[3],
+                        "bytes_scanned": result[4],
+                        "rows_produced": result[5],
                         # CREDITS_USED_CLOUD_SERVICES covers the cloud-services
                         # layer only, not warehouse compute. It is reported
                         # under a truthful key and never priced; warehouse cost
                         # is estimated from execution time and warehouse size.
-                        "credits_used_cloud_services": result[11],
-                        "warehouse_size": result[12],
-                        "cluster_number": result[13],
+                        "credits_used_cloud_services": result[6],
+                        "warehouse_size": result[7],
+                        "cluster_number": result[8],
                         "retrieval_attempts": attempt + 1,
                     }
                 else:
@@ -1726,21 +1715,11 @@ class SnowflakeAdapter(PlatformAdapter):
                             "retrieval_attempts": max_retries + 1,
                         }
 
-            except Exception as e:
-                last_error = e
-                if attempt < max_retries:
-                    delay = initial_delay * (2**attempt)
-                    self.logger.debug(
-                        f"Error retrieving query statistics for {query_id}: {e}, "
-                        f"retrying in {delay:.1f}s (attempt {attempt + 1}/{max_retries})"
-                    )
-                    time_module.sleep(delay)
-                else:
-                    cursor.close()
-                    return {
-                        "statistics_error": str(last_error),
-                        "retrieval_attempts": max_retries + 1,
-                    }
+            except Exception as exc:
+                # A bad projection or permission error will not become valid
+                # after sleeping. Keep optional telemetry off the query path.
+                cursor.close()
+                return {"statistics_error": str(exc), "retrieval_attempts": attempt + 1}
 
         cursor.close()
         return {"note": "Query statistics not yet available", "retrieval_attempts": max_retries + 1}
