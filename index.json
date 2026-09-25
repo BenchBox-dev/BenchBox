@@ -15531,6 +15531,13 @@
       "status": "open",
       "title": "Seek formal legal review of IMDb / Dataverse terms"
     },
+    "serenedb-local-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Evaluate SereneDB locally under Mocker and record driver, DDL, load, and SQL facts"
+    },
     "server-adapter-independent-connection-optin": {
       "claim": null,
       "needs": [],
