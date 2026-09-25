@@ -15531,6 +15531,15 @@
       "status": "open",
       "title": "Seek formal legal review of IMDb / Dataverse terms"
     },
+    "serenedb-adapter-core": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-spike"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add the experimental SereneDB SQL adapter limited to TPC-H and TPC-DS"
+    },
     "serenedb-local-spike": {
       "claim": null,
       "needs": [],
