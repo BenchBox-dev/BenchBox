@@ -784,7 +784,10 @@ location:
    often one file per platform). These are NOT reusable templates. They live
    under `tests/uat/configs/generated-rerun-shards/` (see that directory's
    README), not at the top level, so they cannot masquerade as editable
-   starting points.
+   starting points. Shards expire 180 days after the sweep date in their
+   filename stem; `scripts/check_rerun_shard_retention.py` (ci-lint) fails
+   with the archive command, and expired shards move to
+   `_project/_archive/` as tracked evidence outside corpus discovery.
 
 New sweeps clone a template:
 

@@ -68,3 +68,11 @@ class TestExpiry:
         monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
         assert checker.main([]) == 0
         assert "OK" in capsys.readouterr().out
+
+    def test_main_fails_with_archive_command_when_expired(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "sweep-20260101.yaml").write_text("name: x\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
+        assert checker.main([]) == 1
+        out = capsys.readouterr().out
+        assert "expired" in out
+        assert "mkdir -p" in out and "git mv" in out

@@ -94,9 +94,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"rerun shards: {len(expired)} expired shard(s) (retention {args.retention_days}d):")
         for path, sweep, age in expired:
             target = ARCHIVE_PARENT / f"generated-rerun-shards-{sweep.strftime('%Y%m%d')}"
+            try:
+                rel = str(path.relative_to(REPO_ROOT))
+            except ValueError:
+                rel = str(path)
             print(f"  {path.name}: sweep {sweep.isoformat()} ({age}d old)")
             print(
-                f"    archive: mkdir -p {target.relative_to(REPO_ROOT)} && git mv {path.relative_to(REPO_ROOT)} {target.relative_to(REPO_ROOT)}/"
+                f"    archive: mkdir -p {target.relative_to(REPO_ROOT)} && git mv {rel} {target.relative_to(REPO_ROOT)}/"
             )
     print("\nArchived shards stay tracked evidence under _project/_archive/ (outside corpus discovery).")
     return 1
