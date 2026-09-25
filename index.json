@@ -15549,6 +15549,15 @@
       "status": "open",
       "title": "Add opt-in live SereneDB tests that compare TPC answers with DuckDB"
     },
+    "serenedb-local-functional-evaluation": {
+      "claim": null,
+      "needs": [
+        "serenedb-tpc-differential-validation"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Run SereneDB TPC-H and TPC-DS SF 1 functional evaluation under Mocker"
+    },
     "serenedb-local-spike": {
       "claim": null,
       "needs": [],

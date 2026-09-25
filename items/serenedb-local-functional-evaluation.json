@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "SF 1 TPC-H and TPC-DS completion results, row counts, and indicative timings recorded with the digest and version()",
+    "Throughput smoke result recorded",
+    "Defects filed as separate items",
+    "Stack torn down; no global prune"
+  ],
+  "context": "Item-specific guardrails: no performance claims, publication, or cross-platform comparisons from Mocker timings; measured performance belongs to serenedb-native-linux-performance. Output goes under ~/Developer/benchmark_runs and nothing is committed.\n\nShared SereneDB guardrails (apply to every serenedb-* item):\n- Worktree only for repository writes: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only. No new dependency: SereneDB uses psycopg[binary], like CedarDB.\n- Adapter SDK imports stay lazy: import benchbox must not import psycopg.\n- Credentials never in Git (except the documented dev/test compose password, labeled as such), logs, test fixtures, or tracker fields.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- Mocker is local-only and never CI. Timings under Mocker are indicative, never published or compared with other platforms.\n- Pin the image by digest; record version() in every result.\n- Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out for write items: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed gate, an unverified engine behavior, or any host-changing action not already approved.",
+  "description": "Check that the adapter completes realistic runs locally: SF 1 loads, power runs, and a throughput smoke test. This is functional validation only. Timings are recorded as indicative, because Mocker adds VM, I/O, and port-forward overhead. Findings only: file defects as new items.\n\nTasks:\n1. Before each run, announce the command, maximum runtime, log path, and stop condition.\n2. `make test-docker-up-serenedb CONTAINER_ENGINE=mocker` with the digest-pinned image.\n3. `benchbox run --platform serenedb --benchmark tpch --scale 1` and the same for tpcds. Record completion, row counts, failures, and indicative timings.\n4. A throughput smoke test with streams at or below the proven session cap.\n5. Record the image digest, version(), and the container memory and CPU limits.\n6. Summarize in this item's context; file each defect as its own item.\n7. Bring the stack down with `make test-docker-down-serenedb` (volumes removed by name; no global prune).\n\nDecision gates:\n- G1 Timeouts and out-of-memory errors count as failures, not retries. If more than 2 SF 1 queries fail, stop and report.\n- G2 No SF 10 under Mocker.\n- G3 If the container is killed for memory at SF 1, record it and stop. Do not raise mem_limit beyond 10 GB on this 16 GB host without asking.",
+  "links": [
+    "docs/platforms/serenedb.md",
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:25:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ecabb07f126849098f2c1a70adb3ad5c",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
