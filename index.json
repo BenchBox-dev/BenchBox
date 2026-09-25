@@ -19501,15 +19501,10 @@
       "title": "Add a read-only worktree audit with exact Git, PR, and ownership evidence"
     },
     "worktree-pool-01-artifact-cleanup": {
-      "claim": {
-        "expires_at": "2026-09-26T13:05:33Z",
-        "generation": "625f616922be4f9bb883455e669e1dfe",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Orphaned results-explorer build artifacts in pool-01 break make pr-preflight for the next claimant"
     },
     "worktree-release-force-does-not-force-past-dirty-tree-20260806": {

@@ -117,6 +117,15 @@
       "op": "take",
       "op_id": "f6bbeec11f1f4f0d83549a95e4877ecf",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T13:06:16Z",
+      "client": "jcode",
+      "generation": "625f616922be4f9bb883455e669e1dfe",
+      "op": "finish",
+      "op_id": "867f4596a21b4e7dba21b6206a6202a2",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
     }
   ]
 }
