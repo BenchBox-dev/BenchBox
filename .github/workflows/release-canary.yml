@@ -122,6 +122,30 @@ jobs:
           ref: ${{ needs.collect-credential-free-non-fast.outputs.checked_sha }}
           fetch-depth: 0
 
+      - name: Record setup start
+        # Runs right after checkout (checkout wipes untracked workspace files,
+        # so nothing can be recorded earlier). The setup interval therefore
+        # covers artifact download, Python/uv install, uv sync, and
+        # partitioning; checkout itself stays recoverable from step timings.
+        # The stamp lives outside the uploaded artifact directory; only the
+        # summary JSON carries the durations.
+        #
+        # The stamp is monotonic seconds since boot, not wall-clock time. An
+        # NTP adjustment during the job would otherwise publish skewed or
+        # negative durations, and these durations are what shard sizing is
+        # supposed to be built on. This step runs before Python and uv are
+        # installed, so benchbox.utils.clock.mono_time() is not reachable yet
+        # and the monotonic source has to come straight from the kernel.
+        shell: bash
+        run: |
+          setup_mono=""
+          if [ -r /proc/uptime ]; then
+            # `|| true`: read returns non-zero at EOF on an input without a
+            # trailing newline, and errexit is still active in this step.
+            read -r setup_mono _ < /proc/uptime || true
+          fi
+          echo "$setup_mono" > "${GITHUB_WORKSPACE}/.canary-setup-start-mono"
+
       - name: Download collected node IDs
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -158,8 +182,29 @@ jobs:
           SHARD_INDEX: ${{ matrix.shard_index }}
         run: |
           set -o pipefail
+          junit_xml="release-canary-artifacts/shard-${SHARD_INDEX}-junit.xml"
+          # Monotonic seconds since boot, for the same reason as the setup
+          # stamp: these two stamps bound test_seconds, and a wall clock that
+          # NTP moves mid-job would publish a skewed or negative duration.
+          # Python is installed by this point, but the stamp is read from the
+          # kernel so it shares one time base with the setup stamp.
+          mono_stamp() {
+            local uptime_value=""
+            if [ -r /proc/uptime ]; then
+              read -r uptime_value _ < /proc/uptime || true
+            fi
+            echo "$uptime_value"
+          }
+          tests_start=$(mono_stamp)
+          echo "$tests_start" > "${GITHUB_WORKSPACE}/.canary-tests-start-mono"
           mapfile -t node_ids < "release-canary-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
           rc=0
+          # GitHub runs `shell: bash` under errexit, so a failing pytest would
+          # abort this step at the pipeline and skip the exit-code capture and
+          # every piece of evidence below. errexit stays off from here on: this
+          # step's result is decided by `exit "$rc"` alone, and a failure to
+          # record evidence must not change that result.
+          set +e
           if [ "${#node_ids[@]}" -eq 0 ]; then
             echo "No tests assigned to shard ${SHARD_INDEX}." | tee "release-canary-artifacts/shard-${SHARD_INDEX}-pytest.log"
           else
@@ -168,8 +213,11 @@ jobs:
               -n 0 \
               --tb=short \
               --maxfail=5 \
+              --junitxml="$junit_xml" \
               "${node_ids[@]}" \
               2>&1 | tee "release-canary-artifacts/shard-${SHARD_INDEX}-pytest.log"
+            # Read PIPESTATUS in a single assignment: reading the two elements
+            # separately resets it after the first read.
             pipeline_status=("${PIPESTATUS[@]}")
             rc=${pipeline_status[0]}
             tee_rc=${pipeline_status[1]}
@@ -177,6 +225,36 @@ jobs:
               rc="$tee_rc"
             fi
           fi
+          tests_end=$(mono_stamp)
+          echo "$tests_end" > "${GITHUB_WORKSPACE}/.canary-tests-end-mono"
+          # The JUnit report is best-effort evidence: a missing file must never
+          # change the shard result, so fall back to a marked empty report.
+          # Record which of the two happened, because a fallback report is
+          # present but carries no durations; a consumer sizing shards from
+          # these numbers must be able to tell them apart.
+          #
+          # A non-empty file is not sufficient. pytest exits 5 when it
+          # collected nothing to run -- every node ID deselected by the marker
+          # expression, or a typo'd path -- and still writes a well-formed,
+          # non-empty report with no <testcase> in it. That report is genuine
+          # evidence that pytest ran, so keep it, but it carries no durations
+          # and must not be published as a capture.
+          junit_captured="true"
+          if [ ! -s "$junit_xml" ]; then
+            junit_captured="false"
+            cat > "$junit_xml" <<EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <testsuite tests="0" errors="0" failures="0" skipped="0">
+            <properties>
+              <property name="junit_captured" value="false"/>
+            </properties>
+            <system-out>No per-test durations were captured for shard ${SHARD_INDEX}.</system-out>
+          </testsuite>
+          EOF
+          elif ! grep -q "<testcase" "$junit_xml"; then
+            junit_captured="false"
+          fi
+          echo "$junit_captured" > "${GITHUB_WORKSPACE}/.canary-junit-captured"
           echo "pytest_exit_code=$rc" >> "$GITHUB_OUTPUT"
           exit "$rc"
 
@@ -195,6 +273,51 @@ jobs:
           if [ -f "$shard_nodeids" ]; then
             assigned_count=$(wc -l < "$shard_nodeids" | tr -d ' ')
           fi
+          # Setup covers post-checkout preparation (artifact download, uv sync,
+          # partitioning); test time covers pytest only. The stamps are
+          # monotonic seconds since boot, so the differences are elapsed time
+          # even if the runner's wall clock moves. A missing stamp degrades to
+          # an empty field, never to a failed summary.
+          setup_start=""
+          tests_start=""
+          tests_end=""
+          if [ -f "${GITHUB_WORKSPACE}/.canary-setup-start-mono" ]; then
+            setup_start=$(cat "${GITHUB_WORKSPACE}/.canary-setup-start-mono")
+          fi
+          if [ -f "${GITHUB_WORKSPACE}/.canary-tests-start-mono" ]; then
+            tests_start=$(cat "${GITHUB_WORKSPACE}/.canary-tests-start-mono")
+          fi
+          if [ -f "${GITHUB_WORKSPACE}/.canary-tests-end-mono" ]; then
+            tests_end=$(cat "${GITHUB_WORKSPACE}/.canary-tests-end-mono")
+          fi
+          # Durations are whole elapsed seconds, computed only when both stamps
+          # are present. awk subtracts the floats and int() truncates, which is
+          # what the previous integer arithmetic did and what "elapsed seconds"
+          # should mean; rounding would silently inflate short intervals.
+          setup_seconds=""
+          test_seconds=""
+          if [ -n "$setup_start" ] && [ -n "$tests_start" ]; then
+            setup_seconds=$(awk -v a="$setup_start" -v b="$tests_start" 'BEGIN{printf "%d", int(b - a)}')
+          fi
+          if [ -n "$tests_start" ] && [ -n "$tests_end" ]; then
+            test_seconds=$(awk -v a="$tests_start" -v b="$tests_end" 'BEGIN{printf "%d", int(b - a)}')
+          fi
+          junit_xml="release-canary-artifacts/shard-${SHARD_INDEX}-junit.xml"
+          junit_present="false"
+          if [ -s "$junit_xml" ]; then
+            junit_present="true"
+          fi
+          # junit_present says a report file exists; junit_captured says it
+          # holds real per-test durations. A shard whose test step never ran
+          # leaves no marker, and anything other than an exact "true" degrades
+          # to false, so the summary never claims durations it cannot back.
+          junit_captured="false"
+          if [ -f "${GITHUB_WORKSPACE}/.canary-junit-captured" ]; then
+            junit_captured=$(cat "${GITHUB_WORKSPACE}/.canary-junit-captured")
+          fi
+          if [ "$junit_captured" != "true" ]; then
+            junit_captured="false"
+          fi
           cat > "release-canary-artifacts/shard-${SHARD_INDEX}-summary.json" <<EOF
           {
             "workflow": "release-canary.yml",
@@ -207,7 +330,15 @@ jobs:
             "marker_expression": "(slow or resource_heavy) and not (stress or live_integration)",
             "collected_count": "${COLLECTED_COUNT}",
             "assigned_count": "${assigned_count}",
-            "pytest_exit_code": "${PYTEST_EXIT_CODE}"
+            "pytest_exit_code": "${PYTEST_EXIT_CODE}",
+            "setup_start_mono": "${setup_start}",
+            "tests_start_mono": "${tests_start}",
+            "tests_end_mono": "${tests_end}",
+            "setup_seconds": "${setup_seconds}",
+            "test_seconds": "${test_seconds}",
+            "junit_xml": "shard-${SHARD_INDEX}-junit.xml",
+            "junit_present": ${junit_present},
+            "junit_captured": ${junit_captured}
           }
           EOF
 
