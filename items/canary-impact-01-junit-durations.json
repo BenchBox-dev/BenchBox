@@ -9,7 +9,8 @@
   "links": [
     ".github/workflows/release-canary.yml",
     "tests/unit/test_release_infrastructure.py",
-    "tests/unit/test_release_canary_sharding.py"
+    "tests/unit/test_release_canary_sharding.py",
+    "tests/unit/workflows/test_release_canary_shard_evidence.py"
   ],
   "sessions": [
     {
@@ -35,6 +36,14 @@
       "client": "jcode",
       "op": "update",
       "op_id": "afe16d19e1364cfbafb466b50374936a",
+      "session_id": "93de43fbd69345b38c8ad7ced05d0986"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:77ce0c25be6b85c4006c7459",
+      "at": "2026-09-25T00:46:12Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "ced9fbb35b954c45a496b91d575df264",
       "session_id": "93de43fbd69345b38c8ad7ced05d0986"
     }
   ]
