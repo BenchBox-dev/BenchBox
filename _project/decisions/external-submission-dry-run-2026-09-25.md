@@ -1,8 +1,8 @@
 # External contributor submission dry run (maintainer-executed)
 
 Date: 2026-09-25
-Status: Engineering validation complete. Residual: live fork-PR firing needs a
-secondary account with no write access; no code change gates on it.
+Status: Engineering validation complete. Residual: live fork-PR firing is an
+explicit open gate (see below); no further code change gates on it.
 
 ## What was verified (following docs/contributing-results.md literally)
 
