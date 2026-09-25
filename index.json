@@ -15438,15 +15438,10 @@
       "title": "Opt a real server adapter into per-stream INDEPENDENT_CONNECTION so the throughput session seam is used in production"
     },
     "set-a-ci-loc-budget-guard-that-fails-when-uat-exceeds-the-ag": {
-      "claim": {
-        "expires_at": "2026-09-26T12:37:21Z",
-        "generation": "0bb2c735138a4909bd10e1323a801e4b",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:a3241f1fc7b48fcf4029d4ee"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Set a CI LOC-budget guard that fails when UAT exceeds the agreed budget"
     },
     "share-tpch-datagen-with-primitives": {
