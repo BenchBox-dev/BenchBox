@@ -432,7 +432,7 @@ jobs:
         continue-on-error: true
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: uv run -- python scripts/check_sqlglot_repro_retirement.py --base-ref "$BASE_REF" --check
+        run: make sqlglot-repro-retirement-check
 
       - name: Lint and format check with ruff
         id: guard-ruff

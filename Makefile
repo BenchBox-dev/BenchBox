@@ -36,7 +36,7 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	correctness-gate-digests-regen cross-surface-baseline-autodetect \
 	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
 	joinorder-verify-reference-results complexity-check complexity-report \
-	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
+	quality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
 	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
@@ -466,6 +466,12 @@ lint:
 uv-lock-revision-check:
 	uv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
+# SQLGlot repro retirement: re-run upstream repros when the locked sqlglot
+# version changed vs base; fails with retirement guidance on newly-passing repros.
+.PHONY: sqlglot-repro-retirement-check
+sqlglot-repro-retirement-check:
+	uv run -- python scripts/check_sqlglot_repro_retirement.py $(if $(BASE_REF),--base-ref "$(BASE_REF)",) --check
+
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:
@@ -792,6 +798,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed quality-governance-typecheck"; \
 	$(MAKE) uv-lock-revision-check; \
 	[ $$? -eq 0 ] || failed="$$failed uv-lock-revision"; \
+	$(MAKE) sqlglot-repro-retirement-check; \
+	[ $$? -eq 0 ] || failed="$$failed sqlglot-repro-retirement"; \
 	$(MAKE) lint-markers; \
 	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
 	$(MAKE) lint-imports; \

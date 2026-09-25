@@ -81,8 +81,12 @@ def run_repros() -> tuple[int, str]:
     return proc.returncode, proc.stdout + proc.stderr
 
 
-def newly_passing(output: str) -> list[str]:
-    """Extract repro labels that PASS in the summary section."""
+def newly_passing(output: str) -> list[str] | None:
+    """Extract repro labels that PASS in the summary section.
+
+    Returns None when no summary section exists (harness crashed before
+    reporting), so callers cannot mistake a crash for an all-FAIL run.
+    """
     passing: list[str] = []
     in_summary = False
     for line in output.splitlines():
@@ -93,7 +97,7 @@ def newly_passing(output: str) -> list[str]:
             match = re.match(r"\s*\[(PASS|FAIL)\]\s+(.+)", line)
             if match and match.group(1) == "PASS":
                 passing.append(match.group(2).strip())
-    return passing
+    return passing if in_summary else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -125,9 +129,22 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(f"sqlglot repro retirement: upgrade {old} -> {new}; running repros...")
-    _, output = run_repros()
+    status, output = run_repros()
     print(output)
+    if status != 0 and "=== Summary" not in output:
+        print(
+            "sqlglot repro retirement: repro harness crashed before reporting "
+            f"(exit {status}); cannot assess retirement - inspect the output above.",
+            file=sys.stderr,
+        )
+        return 1
     passing = newly_passing(output)
+    if passing is None:
+        print(
+            "sqlglot repro retirement: no summary section in repro output; cannot assess retirement.",
+            file=sys.stderr,
+        )
+        return 1
     if not passing:
         print("sqlglot repro retirement: OK - all repros still FAIL; no retirement candidates.")
         return 0
