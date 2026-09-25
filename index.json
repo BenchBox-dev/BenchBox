@@ -15574,6 +15574,15 @@
       "status": "open",
       "title": "Measure SereneDB TPC performance natively on Linux under the standard timing protocol"
     },
+    "serenedb-search-benchmarks": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-functional-evaluation"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Enable BenchBox search benchmarks on SereneDB using its inverted indexes"
+    },
     "serenedb-tpc-differential-validation": {
       "claim": null,
       "needs": [

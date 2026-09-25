@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "vector_search runs on SereneDB with registered rules and a documented recall tolerance",
+    "Gate lifted only for validated benchmarks",
+    "PR opened with make pr-open"
+  ],
+  "context": "Item-specific guardrails: no external AI endpoints; no gate lifted without validation.\n\nShared SereneDB guardrails: worktree-only repository writes with make agent-write-preflight; explicit-path staging, never git add -A; commit identity check, no attribution trailers; uv only, no new dependency; lazy psycopg import; no credentials in Git, logs, fixtures, or tracker; Mocker never in CI and its timings never published; pin by digest or exact version and record version(); announce long runs and never commit raw logs; code-skill self-review then make pr-preflight and make pr-open, no auto-merge without make pr-ready; durable artifacts carry no tracker IDs or session narrative; stop and report on failed gates, unverified behavior, or unapproved host changes.",
+  "description": "SereneDB's main differentiator is search: BM25 full-text and IVF vector search through inverted indexes (`CREATE INDEX ... USING inverted`, the `@@` operator, `<=>` distance). Evaluate BenchBox's vector_search benchmark (and any full-text workload) on SereneDB with native index DDL and query rewrites.\n\nTasks:\n1. Map the vector_search benchmark's DDL and queries to SereneDB syntax (FLOAT[N] columns, an inverted index with ivf, `<=>` ranking).\n2. Register the required schema_emit, query_source, or query_adapter rules in sql_compat.\n3. Validate recall and result equivalence against the existing reference platform for that benchmark.\n4. Lift the vector_search gate only after validation passes.\n\nDecision gates:\n- G1 Start only with explicit user priority.\n- G2 Approximate-search results need a documented recall tolerance. If the benchmark has no recall contract, stop and ask.\n- G3 AI functions (`ai_embed`) call external model endpoints. Never use them in benchmarks without explicit approval.",
+  "links": [
+    "https://github.com/serenedb/serenedb/tree/main/docs/sql/indexes/inverted",
+    "benchbox/vector_search.py",
+    "benchbox/sql_compat/rules/query_source/vector_search_variants.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:26:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "638da6389d7c435ca2a4069e46c42468",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
