@@ -15549,6 +15549,15 @@
       "status": "open",
       "title": "Support SereneDB primary and foreign key tuning once upstream allows it"
     },
+    "serenedb-lift-benchmark-gates": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-functional-evaluation"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Lift SereneDB benchmark gates one benchmark at a time with differential coverage"
+    },
     "serenedb-live-differential-harness": {
       "claim": null,
       "needs": [
