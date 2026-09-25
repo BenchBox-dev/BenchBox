@@ -243,6 +243,15 @@
       "op": "take",
       "op_id": "e351e3bf032d41d5b21cdc2dd0d8f98d",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T13:28:34Z",
+      "client": "jcode",
+      "generation": "55f50fcaa7bf40669a99aa5c4dc16478",
+      "op": "release",
+      "op_id": "8f232d4bf2704221b49491294621222d",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
     }
   ]
 }
