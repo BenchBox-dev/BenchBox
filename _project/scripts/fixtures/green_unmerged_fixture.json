@@ -33,6 +33,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -67,6 +73,12 @@
         },
         {
           "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -112,6 +124,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -142,6 +160,12 @@
         },
         {
           "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -182,6 +206,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -216,6 +246,12 @@
         },
         {
           "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -265,6 +301,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -299,6 +341,12 @@
         },
         {
           "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -342,6 +390,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -381,6 +435,12 @@
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
         }
       ]
     },
@@ -403,6 +463,12 @@
       "check_runs": [
         {
           "name": "ci-required-result",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:10:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -440,6 +506,12 @@
         },
         {
           "name": "ruleset-drift",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:12:00Z"
+        },
+        {
+          "name": "Public-site visual acceptance",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"

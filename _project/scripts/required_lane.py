@@ -23,6 +23,7 @@ REQUIRED_CHECK_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
     "ruleset-drift",
+    "Public-site visual acceptance",
 )
 
 

@@ -114,6 +114,7 @@ def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
         _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),
         _check("Results Explorer browser gate", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:01:00Z"),
         _check("ruleset-drift", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
+        _check("Public-site visual acceptance", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:03:00Z"),
     ]
     runs = [
         {
@@ -180,6 +181,7 @@ def test_required_gate_uses_latest_rerun_and_ignores_stale_failure() -> None:
         _check("ci-required-result", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:20:00Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
         _check("ruleset-drift", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
+        _check("Public-site visual acceptance", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
     ]
     assert metrics.required_gate_seconds(checks) == 8 * 60.0
     assert metrics.merge_unblock_seconds(checks) == 8 * 60.0
@@ -288,6 +290,7 @@ def test_event_fanout_separates_required_gate_from_documentation() -> None:
         _check("ci-required-result", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:20Z"),
         _check("ruleset-drift", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:30Z"),
+        _check("Public-site visual acceptance", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:05:00Z"),
     ]
     runs = [
         {

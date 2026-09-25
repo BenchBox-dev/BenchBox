@@ -51,6 +51,7 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
         "ci-required-result",
         "Results Explorer browser gate",
         "ruleset-drift",
+        "Public-site visual acceptance",
     )
     assert expected["develop-squash-only"].strict_required_status_checks_policy is True
     assert expected["release-only"].ref == "refs/heads/release"
@@ -250,7 +251,7 @@ def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
 def _verified_develop_queue() -> dict:
     live = _live_ruleset(
         "refs/heads/develop",
-        ["ci-required-result", "Results Explorer browser gate", "ruleset-drift"],
+        ["ci-required-result", "Results Explorer browser gate", "ruleset-drift", "Public-site visual acceptance"],
         strict=True,
     )
     live["name"] = "develop-squash-only"
