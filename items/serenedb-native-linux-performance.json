@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Native Linux cold and warm results recorded with environment and version metadata",
+    "Differential validation passes on the same build before timing"
+  ],
+  "context": "Item-specific guardrails: no publication or cross-platform claims without a user decision; no cloud spend without approval.\n\nShared SereneDB guardrails: worktree-only repository writes with make agent-write-preflight; explicit-path staging, never git add -A; commit identity check, no attribution trailers; uv only, no new dependency; lazy psycopg import; no credentials in Git, logs, fixtures, or tracker; Mocker never in CI and its timings never published; pin by digest or exact version and record version(); announce long runs and never commit raw logs; code-skill self-review then make pr-preflight and make pr-open, no auto-merge without make pr-ready; durable artifacts carry no tracker IDs or session narrative; stop and report on failed gates, unverified behavior, or unapproved host changes.",
+  "description": "Mocker timings are indicative only. Produce measured SereneDB performance on a native Linux host using the official tarball or .deb (amd64 or arm64), outside any VM or container runtime overhead.\n\nTasks:\n1. Choose a Linux host. Record CPU, RAM, disk, and kernel. Install the digest-matched SereneDB release (tarball or .deb) and record `serened --version` and version().\n2. Protocol: fixed query order and seed; cold run after load, then three warm repetitions with median and spread; explicit `threads` and `memory_limit` settings recorded.\n3. TPC-H and TPC-DS at SF 1 and SF 10, with differential validation passing first.\n4. Record results with full environment metadata.\n\nDecision gates:\n- G1 Start only with explicit user priority and a user-approved host. A cloud host is a live cloud run and needs explicit approval with cost bounds.\n- G2 Publishing or comparing results is a separate user decision.",
+  "links": [
+    "https://github.com/serenedb/serenedb/releases",
+    "https://github.com/serenedb/serenedb/blob/main/docs/installation/tarball.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T14:26:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "dcec4513e4d447fc9a7d9de602d0b505",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

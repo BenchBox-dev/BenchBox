@@ -15565,6 +15565,15 @@
       "status": "open",
       "title": "Evaluate SereneDB locally under Mocker and record driver, DDL, load, and SQL facts"
     },
+    "serenedb-native-linux-performance": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-functional-evaluation"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Measure SereneDB TPC performance natively on Linux under the standard timing protocol"
+    },
     "serenedb-tpc-differential-validation": {
       "claim": null,
       "needs": [
