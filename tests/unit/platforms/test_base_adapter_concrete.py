@@ -1252,6 +1252,23 @@ class TestDuckDBAdapterInit:
         assert adapter.show_query_plans is True
         assert snapshot["plan_capture_timeout_seconds"] == before
 
+    def test_apply_run_plan_flags_none_show_query_plans_preserves_adapter_value(self):
+        """RunConfig show_query_plans=None leaves a preconfigured adapter value alone.
+
+        Covers the reported case: the caller sets show_query_plans=True via
+        platform_config (or a preconfigured adapter) without duplicating it
+        in DatabaseConfig, so the runner passes None and the adapter must
+        keep True instead of resetting to False.
+        """
+        adapter = DuckDBAdapter(database_path=":memory:", show_query_plans=True)
+        assert adapter.show_query_plans is True
+
+        snapshot = adapter._apply_run_plan_flags({"show_query_plans": None})
+        assert adapter.show_query_plans is True
+        assert snapshot["show_query_plans"] is True
+        adapter.show_query_plans = snapshot["show_query_plans"]
+        assert adapter.show_query_plans is True
+
     def test_dry_run_mode_default_false(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.dry_run_mode is False

@@ -781,8 +781,12 @@ def test_lifecycle_run_config_carries_show_query_plans_from_database_options() -
     assert run_config.show_query_plans is True
 
 
-def test_lifecycle_run_config_show_query_plans_defaults_false() -> None:
-    """Runs without --show-plans must not display plans."""
+def test_lifecycle_run_config_show_query_plans_defaults_none() -> None:
+    """Runs without --show-plans leave the adapter's own setting untouched.
+
+    The runner passes None (not False) so _apply_run_plan_flags preserves a
+    preconfigured adapter value (e.g. from platform_config).
+    """
     benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
 
     run_config = _build_run_config_from_options(
@@ -796,7 +800,7 @@ def test_lifecycle_run_config_show_query_plans_defaults_false() -> None:
         table_format=None,
     )
 
-    assert run_config.show_query_plans is False
+    assert run_config.show_query_plans is None
 
 
 def test_lifecycle_run_config_carries_show_query_plans_from_database_extra() -> None:
@@ -822,3 +826,26 @@ def test_lifecycle_run_config_carries_show_query_plans_from_database_extra() -> 
     )
 
     assert run_config.show_query_plans is True
+
+
+def test_lifecycle_run_config_explicit_false_show_query_plans_overrides_adapter() -> None:
+    """An explicit False database option still overrides the adapter setting."""
+    benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
+    database_config = DatabaseConfig(
+        type="duckdb",
+        name="DuckDB",
+        options={"show_query_plans": False},
+    )
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=benchmark_config.options,
+        platform_config={},
+        database_config=database_config,
+        validation_opts=ValidationOptions(),
+        verbosity_settings=VerbositySettings.default(),
+        test_type="standard",
+        table_format=None,
+    )
+
+    assert run_config.show_query_plans is False

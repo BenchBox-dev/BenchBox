@@ -112,7 +112,10 @@ class RunConfig(BaseModel):
     # plan-capture metadata, phases, or query results. Suppressed while
     # capture_plans is active (see display_query_plan_if_enabled) to avoid
     # issuing EXPLAIN twice.
-    show_query_plans: bool = False
+    # Tri-state, mirroring analyze_plans: None = not specified (the adapter's
+    # own show_query_plans value, e.g. from platform_config or a
+    # preconfigured adapter, applies); True/False = explicitly override it.
+    show_query_plans: bool | None = None
     # analyze_plans is the single capture-detail knob (ANALYZE vs estimated EXPLAIN).
     # Tri-state: None = not specified (the adapter default, True, applies); the
     # first-class --analyze-plans/--no-analyze-plans flag sets it True/False.

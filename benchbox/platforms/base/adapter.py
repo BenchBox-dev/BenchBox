@@ -825,8 +825,14 @@ class PlatformAdapter(
             "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
         }
         new_capture_plans = bool(run_config["capture_plans"]) if "capture_plans" in run_config else self.capture_plans
+        # show_query_plans is tri-state in RunConfig: only override the
+        # adapter's value when the database option was explicitly set
+        # (non-None); None leaves the adapter default (e.g. from
+        # platform_config or a preconfigured adapter).
         new_show_query_plans = (
-            bool(run_config["show_query_plans"]) if "show_query_plans" in run_config else self.show_query_plans
+            bool(run_config["show_query_plans"])
+            if run_config.get("show_query_plans") is not None
+            else self.show_query_plans
         )
         # analyze_plans is tri-state in RunConfig: only override the adapter's value
         # when the first-class flag was set (non-None); None leaves the adapter default.
