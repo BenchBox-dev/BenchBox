@@ -270,6 +270,25 @@ class TestDuckDBAdapter:
             assert adapter.capture_plans is True
             assert adapter.plan_query_filter == {"1", "6"}
 
+    def test_from_config_skips_none_plan_keys(self):
+        """Explicit None plan keys must fall back to adapter defaults, not crash int(None)."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            adapter = DuckDBAdapter.from_config(
+                {
+                    "benchmark": "tpch",
+                    "scale_factor": 0.01,
+                    "database_path": ":memory:",
+                    "plan_capture_timeout_seconds": None,
+                    "plan_max_depth": None,
+                    "analyze_plans": None,
+                }
+            )
+            assert adapter.plan_capture_timeout_seconds == 30
+            assert adapter.analyze_plans is False
+            from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
+
+            assert adapter.plan_max_depth == DEFAULT_PLAN_MAX_DEPTH
+
     def test_from_config_passes_through_temp_size_and_progress_bar(self):
         """from_config must not drop max_temp_directory_size or progress_bar."""
         with patch("benchbox.platforms.duckdb.duckdb") as mock_duckdb:

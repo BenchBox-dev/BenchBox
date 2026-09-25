@@ -797,3 +797,28 @@ def test_lifecycle_run_config_show_query_plans_defaults_false() -> None:
     )
 
     assert run_config.show_query_plans is False
+
+
+def test_lifecycle_run_config_carries_show_query_plans_from_database_extra() -> None:
+    """The interactive path sets show_query_plans as a DatabaseConfig extra.
+
+    Mirrors benchbox/cli/commands/run.py, where the flag is assigned onto the
+    config object instead of going through options. Guards against
+    _database_platform_options losing extra fields after schema changes.
+    """
+    benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
+    database_config = DatabaseConfig(type="duckdb", name="DuckDB", options={})
+    database_config.show_query_plans = True
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=benchmark_config.options,
+        platform_config={},
+        database_config=database_config,
+        validation_opts=ValidationOptions(),
+        verbosity_settings=VerbositySettings.default(),
+        test_type="standard",
+        table_format=None,
+    )
+
+    assert run_config.show_query_plans is True
