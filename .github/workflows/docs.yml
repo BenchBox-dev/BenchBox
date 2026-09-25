@@ -443,12 +443,29 @@ jobs:
           # record when the job started seconds ago; select the newest
           # release-ref record for this SHA created after this workflow run
           # started, which only this run's record can satisfy.
-          RUN_STARTED="${{ github.event.repository.pushed_at }}"
+          # Use this run's ISO-8601 start time as the selection boundary so
+          # both operands share a representation (deployment `created_at`
+          # values are ISO-8601 while the push event's `pushed_at` is an
+          # epoch value frozen at the original push, which also breaks
+          # reruns). Querying the Actions API anchors reruns to the current
+          # attempt, not merely the run: full reruns must not reuse a stale
+          # boundary from an earlier attempt.
+          RUN_STARTED=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}" \
+            --jq '.run_started_at // .created_at // empty')
+          if [ -z "${RUN_STARTED:-}" ]; then
+            echo "::warning::Could not determine current run start time; skipping inactive marker."
+            echo "deployment_id=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # NOTE: deployment records carry the bare branch name in `.ref`
           # ("release", not "refs/heads/release") — verified against live
           # github-pages records.
+          # NOTE: this gh version has no `--arg` flag, so the boundary is
+          # passed via the environment (`env.SINCE`) inside a single valid
+          # `--jq` argument.
+          export SINCE="$RUN_STARTED"
           DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&sha=${{ github.sha }}&per_page=100" \
-            --jq --arg since "$RUN_STARTED" '[.[] | select(.ref == "release") | select(.created_at >= $since)] | sort_by(.created_at) | last | .id // empty')
+            --jq '[.[] | select(.ref == "release") | select(.created_at >= env.SINCE)] | sort_by(.created_at) | last | .id // empty')
           if [ -z "${DEPLOYMENT_ID:-}" ]; then
             echo "::warning::No release-ref github-pages deployment record found for this run; skipping inactive marker."
           fi
@@ -489,7 +506,7 @@ jobs:
           # deployment. Only this run's own skipped record may change.
           gh api --method POST "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
             -f state="inactive" \
-            -f auto_inactive=false \
+            -F auto_inactive=false \
             -f description="Superseded: independent publication owns Pages; legacy release deployment skipped." \
             --jq '.state' > /dev/null
           echo "::notice::Legacy release deployment skipped and recorded as inactive; independent publication owns Pages."
