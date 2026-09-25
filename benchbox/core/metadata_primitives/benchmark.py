@@ -225,6 +225,8 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         query_manager: Query manager for loading catalog queries
     """
 
+    SKIP_DATA_LOADING = True
+
     def __init__(
         self,
         scale_factor: float = 1.0,

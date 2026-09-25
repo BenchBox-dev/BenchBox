@@ -71,6 +71,23 @@ class TestDataFusionAdapter:
             assert result == expected
             mock_load_data.assert_called_once_with(benchmark, connection, Path(tmpdir))
 
+    def test_schema_only_materialization_retains_empty_table_creation(self):
+        """SKIP_DATA_LOADING must retain DataFusion catalog materialization.
+
+        create_schema() only records _table_schemas, so skipping load_data()
+        without this hook leaves every expected table missing from the catalog.
+        """
+        with patch("benchbox.platforms.datafusion.SessionContext"), tempfile.TemporaryDirectory() as tmpdir:
+            adapter = DataFusionAdapter(working_dir=tmpdir)
+            benchmark = Mock()
+            connection = Mock()
+
+            with patch.object(adapter, "_create_empty_schema_tables", return_value={}) as mock_create_empty:
+                result = adapter.materialize_schema_only_tables(benchmark, connection)
+
+            assert result == {}
+            mock_create_empty.assert_called_once_with(connection)
+
     def test_initialization_missing_driver(self):
         """Test initialization when DataFusion driver is not available."""
         with patch("benchbox.platforms.datafusion.SessionContext", None):
