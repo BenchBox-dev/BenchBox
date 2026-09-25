@@ -74,22 +74,43 @@ baseline artifacts, and pull requests compare against the exact base-SHA
 artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
 artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
 and Pages-shaped server are reusable building blocks. `.github/workflows/docs.yml`
-now uploads the protected baseline from `develop` and retrieves the exact
-base-SHA artifact for pull requests; the comparison is blocking once the
-one-time bootstrap baseline exists.
+uploads the protected baseline from `develop` and retrieves the exact
+base-SHA artifact for pull requests and merge groups. A changed public-site
+tree cannot pass without that comparison. `Public-site visual acceptance`
+reports on every develop PR and merge group; it skips the build only when
+the former documentation input paths are unaffected.
+
+If a protected `develop` push was dropped or its baseline expired, dispatch
+Documentation on `develop` with `baseline_source_sha` set to the exact base
+SHA shown by the failing PR or merge group:
+
+```bash
+gh workflow run docs.yml --ref develop -f baseline_source_sha=<full-protected-develop-base-sha>
+```
+
+The dispatch validates that the SHA is an ancestor of protected `develop`,
+checks out that exact tree, and uploads a SHA-named artifact. The downloader
+verifies the protected run and manifest source SHA. Wait for its visual job to
+finish, then rerun the failed workflow. A PR diagnostic artifact cannot serve
+as recovery input.
 
 An intentional visual change or route/viewport addition needs explicit
 maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-*`
 artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
 head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
 failed workflow. The approval applies only when both values are present and the
-approved SHA exactly equals GitHub's current PR head SHA. It may accept changed
+approved SHA exactly equals GitHub's current PR head SHA. For a merge group,
+the maintainer must inspect that group's diagnostics, set
+`APPROVED_MERGE_GROUP_SHA` to its synthetic `merge_group.head_sha`, and set
+`MERGE_GROUP_APPROVAL_REASON` to a nonempty review note. PR approval variables
+cannot approve a merge group. Clear the group variables after the reviewed
+run. It may accept changed
 digests and unexpected new captures, but it never accepts a capture missing
 from the current matrix. Clear both variables after the approved run so only
 one reviewed head occupies the repository-wide approval slot.
 
 This approval does not create or replace a baseline. Only the protected
-`develop` push or its `workflow_dispatch` run uploads the next SHA-bound
+`develop` push or its validated `workflow_dispatch` run uploads the next SHA-bound
 baseline after the reviewed PR merges; PR diagnostic artifacts remain
 short-lived and non-promotable.
 

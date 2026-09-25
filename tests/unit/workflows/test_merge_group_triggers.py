@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr.yml"
 BROWSER_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "results-explorer-browser.yml"
 DRIFT_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "develop-ruleset-drift.yml"
+DOCS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "docs.yml"
 
 
 def _load_workflow(path: Path) -> dict[str, Any]:
@@ -28,14 +29,16 @@ def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
 
 
 def test_required_workflows_include_merge_group_trigger() -> None:
-    """All three required-gate workflows must listen to merge_group: checks_requested."""
+    """Every required-gate workflow must listen to merge_group: checks_requested."""
     pr = _load_workflow(PR_WORKFLOW)
     browser = _load_workflow(BROWSER_WORKFLOW)
     drift = _load_workflow(DRIFT_WORKFLOW)
+    docs = _load_workflow(DOCS_WORKFLOW)
 
     assert "merge_group" in _triggers(pr), "pr.yml missing merge_group trigger"
     assert "merge_group" in _triggers(browser), "results-explorer-browser.yml missing merge_group trigger"
     assert "merge_group" in _triggers(drift), "develop-ruleset-drift.yml missing merge_group trigger"
+    assert "merge_group" in _triggers(docs), "docs.yml missing merge_group trigger"
 
 
 def test_required_status_check_names_match_ruleset_contract() -> None:
@@ -43,10 +46,12 @@ def test_required_status_check_names_match_ruleset_contract() -> None:
     pr = _load_workflow(PR_WORKFLOW)
     browser = _load_workflow(BROWSER_WORKFLOW)
     drift = _load_workflow(DRIFT_WORKFLOW)
+    docs = _load_workflow(DOCS_WORKFLOW)
 
     assert "ci-required-result" in pr["jobs"], "pr.yml must define job ci-required-result"
     assert browser["jobs"]["browser-required-result"]["name"] == "Results Explorer browser gate"
     assert drift["jobs"]["ruleset-drift"]["name"] == "ruleset-drift"
+    assert docs["jobs"]["public-site-visual-required"]["name"] == "Public-site visual acceptance"
 
 
 def test_concurrency_groups_handle_merge_group_synthetic_ref() -> None:
