@@ -1,0 +1,190 @@
+name: Docker integration
+
+# Owned pipeline for Docker-based integration tests: brings up the compose
+# stacks under docker/ and runs the matching live-marker suites against them.
+# Scheduled nightly (per-PR would burn runner time on heavy images); also
+# runnable on demand via workflow_dispatch with an optional service filter.
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Comma-separated subset to run (default: all). Choices: postgres,clickhouse,trino'
+        required: false
+        default: 'all'
+  schedule:
+    - cron: '0 7 * * *'
+
+concurrency:
+  group: docker-integration-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-input:
+    runs-on: ubuntu-latest
+    outputs:
+      run_postgres: ${{ steps.select.outputs.run_postgres }}
+      run_clickhouse: ${{ steps.select.outputs.run_clickhouse }}
+      run_trino: ${{ steps.select.outputs.run_trino }}
+    steps:
+      - name: Validate services input and select jobs
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SERVICES: ${{ inputs.services }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != workflow_dispatch ]; then
+            echo "run_postgres=true" >> "$GITHUB_OUTPUT"
+            echo "run_clickhouse=true" >> "$GITHUB_OUTPUT"
+            echo "run_trino=true" >> "$GITHUB_OUTPUT"
+            echo "Scheduled run: all services selected."
+            exit 0
+          fi
+          run_postgres=false; run_clickhouse=false; run_trino=false
+          IFS=',' read -ra TOKENS <<< "$SERVICES"
+          for tok in "${TOKENS[@]}"; do
+            t="$(echo "$tok" | tr -d '[:space:]')"
+            case "$t" in
+              all) run_postgres=true; run_clickhouse=true; run_trino=true ;;
+              postgres) run_postgres=true ;;
+              clickhouse) run_clickhouse=true ;;
+              trino) run_trino=true ;;
+              '')
+                echo "::error::Empty service token in services input '$SERVICES'."
+                exit 1
+                ;;
+              *)
+                echo "::error::Unknown service '$t'. Choices: postgres,clickhouse,trino (or all)."
+                exit 1
+                ;;
+            esac
+          done
+          # Literal comparison: glob metacharacters in input cannot match.
+          if [ "$run_postgres" = false ] && [ "$run_clickhouse" = false ] && [ "$run_trino" = false ]; then
+            echo "::error::No services selected."
+            exit 1
+          fi
+          echo "run_postgres=$run_postgres" >> "$GITHUB_OUTPUT"
+          echo "run_clickhouse=$run_clickhouse" >> "$GITHUB_OUTPUT"
+          echo "run_trino=$run_trino" >> "$GITHUB_OUTPUT"
+          echo "Selected: postgres=$run_postgres clickhouse=$run_clickhouse trino=$run_trino"
+
+  postgres:
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_postgres == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Bring up PostgreSQL compose stack
+        run: docker compose -f docker/postgresql/docker-compose.yml up -d --wait
+
+      - name: Run PostgreSQL live integration tests
+        run: |
+          set -o pipefail
+          uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+            -m "live_postgresql" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/pg_docker_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/pg_docker_output.txt; then
+            echo "::error::PostgreSQL Docker integration produced no passing tests."
+            exit 1
+          fi
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker/postgresql/docker-compose.yml down -v
+
+  clickhouse:
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_clickhouse == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Bring up ClickHouse compose stack
+        env:
+          CLICKHOUSE_MEMORY_LIMIT: 4g
+        run: docker compose -f docker/clickhouse/docker-compose.yml up -d --wait
+
+      - name: Run ClickHouse live integration tests
+        run: |
+          set -o pipefail
+          uv run -- python -m pytest tests/integration/platforms/test_clickhouse_live.py \
+            -m "live_clickhouse" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/ch_docker_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/ch_docker_output.txt; then
+            echo "::error::ClickHouse Docker integration produced no passing tests."
+            exit 1
+          fi
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker/clickhouse/docker-compose.yml down -v
+
+  trino:
+    needs: [validate-input]
+    if: ${{ needs.validate-input.outputs.run_trino == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Bring up Trino compose stack
+        run: docker compose -f docker/trino/docker-compose.yml up -d --wait
+
+      - name: Run Trino live integration tests
+        run: |
+          set -o pipefail
+          uv run -- python -m pytest tests/integration/platforms/test_trino_live.py \
+            -m "live_trino" --tb=short -v -p no:cacheprovider \
+            | tee /tmp/trino_docker_output.txt
+          if ! grep -Eq '[0-9]+ passed' /tmp/trino_docker_output.txt; then
+            echo "::error::Trino Docker integration produced no passing tests."
+            exit 1
+          fi
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f docker/trino/docker-compose.yml down -v
