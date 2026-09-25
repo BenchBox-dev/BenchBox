@@ -69,7 +69,7 @@ def test_skip_marker_posts_inactive_without_side_effects() -> None:
     assert "skipped_deployment_id" in record["if"]
     step = _steps(record)[0]
     run = step["run"]
-    assert "-f auto_inactive=false" in run
+    assert "-F auto_inactive=false" in run
     assert '-f state="inactive"' in run
     assert "deployments/$DEPLOYMENT_ID/statuses" in run
 
