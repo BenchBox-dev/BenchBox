@@ -1191,6 +1191,18 @@ class TestDuckDBAdapterInit:
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.show_query_plans is False
 
+    def test_apply_run_plan_flags_applies_and_restores_show_query_plans(self):
+        """--show-plans applies for one run and never leaks into later runs."""
+        adapter = DuckDBAdapter(database_path=":memory:")
+        assert adapter.show_query_plans is False
+
+        snapshot = adapter._apply_run_plan_flags({"show_query_plans": True})
+        try:
+            assert adapter.show_query_plans is True
+        finally:
+            adapter.show_query_plans = snapshot["show_query_plans"]
+        assert adapter.show_query_plans is False
+
     def test_dry_run_mode_default_false(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.dry_run_mode is False

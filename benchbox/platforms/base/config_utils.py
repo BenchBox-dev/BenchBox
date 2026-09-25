@@ -205,6 +205,23 @@ TUNING_FORWARD_KEYS: tuple[str, ...] = (
 )
 
 
+# Plan display/capture keys established alongside TUNING_FORWARD_KEYS. Every
+# from_config implementation built on build_adapter_config forwards these
+# verbatim when present in the input config -- no per-platform bespoke channel
+# names. ``None`` means unset and is skipped so adapter defaults apply (this
+# matters for the int-coerced keys, where an explicit None would crash).
+PLAN_FORWARD_KEYS: tuple[str, ...] = (
+    "show_query_plans",
+    "capture_plans",
+    "analyze_plans",
+    "strict_plan_capture",
+    "normalize_plan_literals",
+    "plan_queries",
+    "plan_capture_timeout_seconds",
+    "plan_max_depth",
+)
+
+
 def build_adapter_config(
     config: dict[str, Any],
     *,
@@ -236,6 +253,14 @@ def build_adapter_config(
     # whether the caller listed them in `fields`. See TUNING_FORWARD_KEYS.
     for key in TUNING_FORWARD_KEYS:
         if key in config:
+            adapter_config[key] = config[key]
+
+    # Same contract for plan display/capture keys: a from_config built on this
+    # helper must not silently drop --show-plans/--capture-plans. See
+    # PLAN_FORWARD_KEYS. None means unset and is skipped so adapter defaults
+    # (including int-coerced timeouts) apply.
+    for key in PLAN_FORWARD_KEYS:
+        if key in config and config[key] is not None:
             adapter_config[key] = config[key]
 
     return adapter_config

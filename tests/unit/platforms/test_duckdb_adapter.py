@@ -254,6 +254,22 @@ class TestDuckDBAdapter:
         with pytest.raises(RuntimeError, match="DuckDB cannot read these Vortex files"):
             adapter.create_external_tables(benchmark, connection, tmp_path)
 
+    def test_from_config_forwards_plan_display_and_capture_flags(self):
+        """from_config must not drop show_query_plans or the capture keys."""
+        with patch("benchbox.platforms.duckdb.duckdb"):
+            config = {
+                "benchmark": "tpch",
+                "scale_factor": 0.01,
+                "database_path": ":memory:",
+                "show_query_plans": True,
+                "capture_plans": True,
+                "plan_queries": "1,6",
+            }
+            adapter = DuckDBAdapter.from_config(config)
+            assert adapter.show_query_plans is True
+            assert adapter.capture_plans is True
+            assert adapter.plan_query_filter == {"1", "6"}
+
     def test_from_config_passes_through_temp_size_and_progress_bar(self):
         """from_config must not drop max_temp_directory_size or progress_bar."""
         with patch("benchbox.platforms.duckdb.duckdb") as mock_duckdb:

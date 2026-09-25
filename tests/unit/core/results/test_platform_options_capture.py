@@ -756,3 +756,44 @@ def test_dsn_and_sas_credential_keys_are_redacted(key: str) -> None:
     from benchbox.core.results.platform_options import sanitize_platform_options
 
     assert sanitize_platform_options({key: "CREDENTIAL-SENTINEL"})[key] == REDACTED_VALUE
+
+
+def test_lifecycle_run_config_carries_show_query_plans_from_database_options() -> None:
+    """--show-plans reaches the adapter through RunConfig, not BenchmarkConfig."""
+    benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
+    database_config = DatabaseConfig(
+        type="duckdb",
+        name="DuckDB",
+        options={"show_query_plans": True},
+    )
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=benchmark_config.options,
+        platform_config={},
+        database_config=database_config,
+        validation_opts=ValidationOptions(),
+        verbosity_settings=VerbositySettings.default(),
+        test_type="standard",
+        table_format=None,
+    )
+
+    assert run_config.show_query_plans is True
+
+
+def test_lifecycle_run_config_show_query_plans_defaults_false() -> None:
+    """Runs without --show-plans must not display plans."""
+    benchmark_config = BenchmarkConfig(name="tpch", display_name="TPC-H")
+
+    run_config = _build_run_config_from_options(
+        benchmark_config=benchmark_config,
+        options=benchmark_config.options,
+        platform_config={},
+        database_config=None,
+        validation_opts=ValidationOptions(),
+        verbosity_settings=VerbositySettings.default(),
+        test_type="standard",
+        table_format=None,
+    )
+
+    assert run_config.show_query_plans is False

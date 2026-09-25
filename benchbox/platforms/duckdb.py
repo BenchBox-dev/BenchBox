@@ -608,10 +608,22 @@ class DuckDBAdapter(PlatformAdapter):
         # `__init__` and applied as a DuckDB `SET threads` statement; omitting it
         # here silently discards the caller's request, because `__init__` only
         # ever sees this rebuilt config, never the original.
+        # Plan flags ride along too: `show_query_plans` (CLI --show-plans)
+        # controls console plan display, while the capture_* keys control
+        # result-bundle plan capture. Dropping them here silently disables
+        # both even when the caller requested them.
         for key in [
             "thread_limit",
             "max_temp_directory_size",
             "progress_bar",
+            "show_query_plans",
+            "capture_plans",
+            "analyze_plans",
+            "strict_plan_capture",
+            "normalize_plan_literals",
+            "plan_queries",
+            "plan_capture_timeout_seconds",
+            "plan_max_depth",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

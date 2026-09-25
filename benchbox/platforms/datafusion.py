@@ -298,8 +298,13 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other relevant config
+        # Pass through other relevant config. show_query_plans (CLI --show-plans)
+        # must ride along: __init__ only ever sees this rebuilt config, so
+        # dropping it silently disables console plan display even when the
+        # caller requested it. (Nested options were already merged into config
+        # above, so a top-level read sees both shapes.)
         for key in [
+            "show_query_plans",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

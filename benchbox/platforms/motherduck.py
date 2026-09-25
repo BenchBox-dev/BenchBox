@@ -167,8 +167,11 @@ class MotherDuckAdapter(PlatformAdapter):
         if config.get("memory_limit"):
             adapter_config["memory_limit"] = config["memory_limit"]
 
-        # Pass through tuning provenance/config
+        # Pass through tuning provenance/config. show_query_plans (CLI
+        # --show-plans) rides along too: __init__ only ever sees this rebuilt
+        # config, so dropping it silently disables console plan display.
         for key in [
+            "show_query_plans",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

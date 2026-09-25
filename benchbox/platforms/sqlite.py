@@ -310,7 +310,11 @@ class SQLiteAdapter(PlatformAdapter):
         )
 
         # Pass through other relevant config (verbose settings, tuning config, etc.)
+        # show_query_plans (CLI --show-plans) must ride along: __init__ only
+        # ever sees this rebuilt config, so dropping it silently disables
+        # console plan display even when the caller requested it.
         for key in [
+            "show_query_plans",
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

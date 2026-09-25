@@ -106,6 +106,13 @@ class RunConfig(BaseModel):
     options: dict[str, Any] = Field(default_factory=dict)
     enable_postload_validation: bool = False
     capture_plans: bool = False
+    # Display the EXPLAIN plan in the console after each query (CLI --show-plans).
+    # Runtime display-only flag: it is recorded in run-input provenance
+    # (config.platform_options, like other CLI inputs) but never enters
+    # plan-capture metadata, phases, or query results. Suppressed while
+    # capture_plans is active (see display_query_plan_if_enabled) to avoid
+    # issuing EXPLAIN twice.
+    show_query_plans: bool = False
     # analyze_plans is the single capture-detail knob (ANALYZE vs estimated EXPLAIN).
     # Tri-state: None = not specified (the adapter default, True, applies); the
     # first-class --analyze-plans/--no-analyze-plans flag sets it True/False.

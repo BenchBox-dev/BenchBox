@@ -804,19 +804,25 @@ class PlatformAdapter(
             details=platform_info,
         )
 
-    def run_enhanced_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
-        """Run complete benchmark with enhanced phase tracking."""
-        start_time = mono_time()
-        execution_id = str(uuid.uuid4())[:8]
-        self._reset_run_scoped_state()
-        plan_capture_config = {
+    def _apply_run_plan_flags(self, run_config: Mapping[str, Any]) -> dict[str, Any]:
+        """Snapshot run-scoped plan flags, then apply the run's values.
+
+        Returns the snapshot so the caller can restore it in a finally block;
+        adapters are reused across runs and these flags must not leak.
+        `show_query_plans` (--show-plans) is display-only: it stays in
+        run-input provenance and never enters plan-capture metadata.
+        """
+        snapshot = {
             "capture_plans": self.capture_plans,
+            "show_query_plans": self.show_query_plans,
             "analyze_plans": self.analyze_plans,
             "strict_plan_capture": self.strict_plan_capture,
             "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
         }
         if "capture_plans" in run_config:
             self.capture_plans = bool(run_config.get("capture_plans"))
+        if "show_query_plans" in run_config:
+            self.show_query_plans = bool(run_config.get("show_query_plans"))
         # analyze_plans is tri-state in RunConfig: only override the adapter's value
         # when the first-class flag was set (non-None); None leaves the adapter default.
         if run_config.get("analyze_plans") is not None:
@@ -827,6 +833,14 @@ class PlatformAdapter(
             self.normalize_plan_literals = bool(run_config.get("normalize_plan_literals"))
         if "plan_capture_timeout_seconds" in run_config:
             self.plan_capture_timeout_seconds = int(run_config.get("plan_capture_timeout_seconds"))
+        return snapshot
+
+    def run_enhanced_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
+        """Run complete benchmark with enhanced phase tracking."""
+        start_time = mono_time()
+        execution_id = str(uuid.uuid4())[:8]
+        self._reset_run_scoped_state()
+        plan_capture_config = self._apply_run_plan_flags(run_config)
 
         try:
             # Step 1: Data generation phase (handled by run_benchmark_lifecycle before this call)
@@ -1147,6 +1161,7 @@ class PlatformAdapter(
 
         finally:
             self.capture_plans = plan_capture_config["capture_plans"]
+            self.show_query_plans = plan_capture_config["show_query_plans"]
             self.analyze_plans = plan_capture_config["analyze_plans"]
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
