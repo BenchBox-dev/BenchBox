@@ -499,6 +499,7 @@ queries:
   - trino
   - presto
   - firebolt
+  - databricks
   variants:
     redshift: "SELECT\n    identity_name AS grantee,\n    namespace_name AS table_schema,\n    relation_name AS table_name,\n    column_name,\n    privilege_type\nFROM svv_column_privileges\nORDER BY relation_name, column_name, identity_name;\n"
     synapse: "SELECT\n    dp.name AS grantee,\n    SCHEMA_NAME(t.schema_id) AS table_schema,\n    t.name AS table_name,\n    c.name AS column_name,\n    p.permission_name AS privilege_type\nFROM sys.database_permissions p\nJOIN sys.database_principals dp ON p.grantee_principal_id = dp.principal_id\nJOIN sys.columns c ON p.major_id = c.object_id AND p.minor_id = c.column_id\nJOIN sys.tables t ON c.object_id = t.object_id\nWHERE p.class = 1 AND p.minor_id > 0\nORDER BY t.name, c.name, dp.name;\n"
@@ -519,6 +520,7 @@ queries:
   - trino
   - presto
   - starrocks
+  - databricks
   variants:
     duckdb: "-- DuckDB lacks role introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS role_name,\n    CAST(NULL AS BOOLEAN) AS is_superuser,\n    CAST(NULL AS BOOLEAN) AS can_create_db,\n    CAST(NULL AS BOOLEAN) AS can_create_role\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    name AS role_name,\n    0 AS is_superuser,\n    0 AS can_create_db,\n    0 AS can_create_role\nFROM system.roles\nORDER BY name;\n"
@@ -545,6 +547,7 @@ queries:
   - firebolt
   - snowflake
   - starrocks
+  - databricks
   variants:
     clickhouse: "SELECT\n    role_name,\n    granted_role_name AS member_name,\n    with_admin_option AS admin_option\nFROM system.role_grants\nORDER BY role_name, granted_role_name;\n"
     redshift: "SELECT\n    pg_get_userbyid(roleid) AS role_name,\n    pg_get_userbyid(member) AS member_name,\n    admin_option\nFROM pg_auth_members\nORDER BY role_name, member_name;\n"

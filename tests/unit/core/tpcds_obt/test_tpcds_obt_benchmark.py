@@ -179,6 +179,21 @@ def test_get_data_source_benchmark_declares_tpcds() -> None:
     assert benchmark.get_data_source_benchmark() == "tpcds"
 
 
+def test_get_create_tables_sql_includes_source_tables() -> None:
+    benchmark = TPCDSOBTBenchmark(scale_factor=1.0)
+
+    ddl = benchmark.get_create_tables_sql()
+    statements = [stmt.strip() for stmt in ddl.split(";") if stmt.strip()]
+
+    # 25 TPC-DS source tables plus the single OBT table: cloud loaders
+    # resolve per-table source files from benchmark.tables, so the source
+    # DDL must ship with the OBT DDL.
+    assert len(statements) == 26
+    lowered = ddl.lower()
+    assert "create table call_center" in lowered
+    assert f"create table {OBT_TABLE_NAME.lower()}" in lowered
+
+
 def test_get_query_and_execute_query(tmp_path: Path) -> None:
     benchmark = TPCDSOBTBenchmark(scale_factor=1.0, output_dir=tmp_path / "out", force_regenerate=True)
 

@@ -74,6 +74,29 @@ FIRST_AVAILABLE_YEAR = int(_DATA_COVERAGE["first_available_year"])
 LAST_AVAILABLE_YEAR = int(_DATA_COVERAGE["last_available_year"])
 APPROXIMATE_MONTHLY_FLIGHTS = int(_DATA_COVERAGE["approximate_monthly_flights"])
 MONTHS_PER_SCALE_FACTOR = int(_DATA_COVERAGE["months_per_scale_factor"])
+
+
+def _unavailable_months() -> set[tuple[int, int]]:
+    """Expand ``unavailable_months`` ranges from the downloader spec.
+
+    Each entry is ``[start_year, start_month, end_year, end_month]`` covering
+    BTS PREZIP archives the provider no longer serves (verified by HTTP
+    probing, not assumed). Returns an empty set when the spec lists none.
+    """
+    missing: set[tuple[int, int]] = set()
+    for entry in _DATA_COVERAGE.get("unavailable_months") or []:
+        start_year, start_month, end_year, end_month = (int(v) for v in entry)
+        year, month = start_year, start_month
+        while (year, month) <= (end_year, end_month):
+            missing.add((year, month))
+            month += 1
+            if month == 13:
+                month = 1
+                year += 1
+    return missing
+
+
+UNAVAILABLE_MONTHS = _unavailable_months()
 FLIGHTS_SHARD_ROW_TARGET = int(_FLIGHT_SHARDS["row_target"])
 FLIGHTS_SHARD_DIRNAME = _FLIGHT_SHARDS["dirname"]
 FLIGHTS_SHARD_PREFIX = _FLIGHT_SHARDS["prefix"]
@@ -138,13 +161,30 @@ def _months_sequence(
     result = []
     year, month = end_year, end_month
     for _ in range(num_months):
-        result.append((year, month))
+        if (year, month) in UNAVAILABLE_MONTHS:
+            logger.warning(
+                "FlightData: BTS archive for %d-%02d is unavailable; substituting an older available month.",
+                year,
+                month,
+            )
+        else:
+            result.append((year, month))
         month -= 1
         if month == 0:
             month = 12
             year -= 1
         if year < FIRST_AVAILABLE_YEAR:
             break
+    # Backfill past skipped months so the window keeps its month count when
+    # older archives exist; if the corpus edge is reached first, the window
+    # is shorter and _scale_to_months already logged the ceiling.
+    while len(result) < num_months and year >= FIRST_AVAILABLE_YEAR:
+        if (year, month) not in UNAVAILABLE_MONTHS:
+            result.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
     return result
 
 
