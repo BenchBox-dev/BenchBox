@@ -598,8 +598,14 @@ class TestModernSQLFeatures:
 
         assert "OBJECT_AGG(" in snowflake["json_aggregates"]
         assert "JSON_OBJECT(" in bigquery["json_aggregates"]
-        assert "TRY_PARSE_JSON(c_comment)" in snowflake["json_extract_nested"]
-        assert "SAFE.PARSE_JSON(c_comment)" in bigquery["json_extract_nested"]
+        # TPC-H c_comment is plain text, so nested extraction would record a
+        # successful zero-row timing on these dialects; both skip instead.
+        for queries in (snowflake, bigquery):
+            assert "json_extract_nested" not in queries
+        # BigQuery builds the JSON object from two independent aggregations;
+        # both must share one ordering or keys can pair with wrong values.
+        assert "ARRAY_AGG(CAST(p_partkey AS STRING) ORDER BY p_partkey)" in bigquery["json_aggregates"]
+        assert "ARRAY_AGG(p_retailprice ORDER BY p_partkey)" in bigquery["json_aggregates"]
         assert "OBJECT_CONSTRUCT(" in snowflake["struct_access"]
         for queries in (snowflake, bigquery):
             assert "json_extract_simple" not in queries
