@@ -1,0 +1,30 @@
+{
+  "acceptance": [
+    "Findings record in context lists: launcher version and installer SHA-256, EULA version, DB version, DSN/fingerprint method, required facade settings, socket-timeout outcome, proven import parameters, cache-off evidence, connection cap with its source, and a per-query failure table for TPC-H and TPC-DS",
+    "Gate G2 (driver viability) and G3 (throughput) outcomes are recorded explicitly as pass/fail with evidence",
+    "Dependent items (exasol-adapter-core, exasol-throughput-streams) are updated with the relevant findings",
+    "Host state matches the G4 decision (deployment destroyed and launcher removed, unless the user chose to keep it)",
+    "No repository files changed and no secrets recorded in the tracker"
+  ],
+  "context": "Item-specific guardrails: host-changing actions (installer, VM) need explicit user approval in the current session. Budgets: 40 GB disk, 2 h wall time, log at /tmp/exasol-spike.log. Stop on install error, VM crash, or disk over budget. Capacity probes never count as license permission: the Exasol Personal EULA (2026-01-21) grants a single-user license with a 'limited number of connections' set by the offer or license file. No repository writes. No secrets (passwords, secrets.json contents) in tracker fields or logs.\n\nKnown facts from planning research (2026-09-25): host is arm64, 16 GB, macOS 26.6, no Docker (Mocker installed). pyexasol 2.4.1: the facade wraps one ExaConnection exposed as `.connection`; defaults autocommit=True, tls=True, certificate_validation=True; hard-codes socket_timeout=30 and compression=False. import_params include csv_cols, column_separator, null, encoding, skip, format. A static sqlglot 30.18 probe transpiles all 22 TPC-H and 99 TPC-DS queries and both DDL sets without error. That proves syntax only.\n\nShared guardrails: see the exasol-adapter-core context block. They apply to every Exasol item.",
+  "description": "Install Exasol Personal on the local Apple Silicon Mac and answer the open questions that every later Exasol item depends on. Findings only: no repository writes. The output is a findings record written into this item's `context` at finish, then copied into the dependent items with `update_item`.\n\nWhy: BenchBox has no Exasol adapter. Exasol Personal (launcher 2.3, DB 2026.1.0) now runs locally on Apple Silicon macOS 15+ in a launcher-managed Podman VM with no data cap. `exasol/docker-db` needs a Linux x86-64 host with `--privileged`, so it cannot run on this Mac or under Mocker. Community Edition is an x86-64 OVA only. Personal is therefore the only local target.\n\nTasks:\n1. Ask the user for explicit approval to install the launcher and a VM on the host. Do not proceed without it (gate G1).\n2. Download https://downloads.exasol.com/exasol-personal/installer.sh to the scratchpad. Read it, record its SHA-256 and the launcher version, then run it. Record the accepted EULA version.\n3. Run `exasol install local` with 8 GB VM memory. Record `exasol info --json` (secrets redacted), DB version, TLS certificate fingerprint, and the secrets file path.\n4. Contract probe: a scratch script run with `uv run --with pyexasol==2.4.1`, using the DB-API facade `exasol.driver.websocket.dbapi2.connect`:\n   a. Fingerprint DSN (`host/FINGERPRINT:port`) with `certificate_validation=True`.\n   b. Round-trip DECIMAL(15,2), DECIMAL(36,x), INT, DATE, CHAR padding, and NULL. Check `cursor.description`, error classes, autocommit (facade default is True in the 2.4.1 source), and the facade's NLS_DATE_FORMAT/NLS_TIMESTAMP_FORMAT checks.\n   c. Run a query longer than 30 s, because the facade hard-codes `socket_timeout=30`. If it fails, prove a fix, such as overriding `_options[\"socket_timeout\"]` before `connect()` in a small facade subclass.\n   d. Load TPC-H SF 0.01 `lineitem.tbl` and a `.tbl.gz` with `facade.connection.import_from_file` after `prepare_local_load_file(strip_trailing_delim=True)`. Row counts must match the generator.\n   e. Run `ALTER SESSION SET QUERY_CACHE='OFF'` and confirm it through `EXA_SQL_LAST_DAY.EXECUTION_MODE`.\n   f. Connection cap: first find the licensed limit (license parameters, system tables, docs). Then open 1, 2, 4, and 8 concurrent sessions to measure capacity only.\n5. SQL probe: run all 22 TPC-H and 99 TPC-DS queries at SF 0.01, translated with sqlglot to `exasol` using `identify=False`. Classify each failure as translation, semantics, or engine limit.\n6. Cleanup decision (gate G4).\n\nDecision gates:\n- G1 Install approval: without explicit user approval, stop and leave the item open.\n- G2 Driver viability: pass only if the facade connects with certificate validation on, imports work, and long queries survive (natively or with a proven override). On failure, stop and report whether the native API or another driver is required. `exasol-adapter-core` stays blocked.\n- G3 Throughput: a documented licensed cap of 2 or more → record the stream count. No documented cap → record \"max 2 streams\". A cap below 2 → record \"throughput UNSUPPORTED\".\n- G4 Keep or destroy: ask the user whether to keep the deployment for later items. The default is `exasol destroy --remove` plus removal of the launcher from ~/.local/bin.",
+  "links": [
+    "https://exasol.github.io/exasol-personal/2.3/local-deployment/",
+    "https://exasol.github.io/exasol-personal/2.3/system-requirements/",
+    "https://exasol.github.io/pyexasol/2.4.1/user_guide/exploring_features/advanced_topics/dbapi.html",
+    "https://exasol.github.io/pyexasol/master/user_guide/exploring_features/import_and_export/parameters.html",
+    "https://docs.exasol.com/db/latest/database_concepts/query_cache.htm",
+    "https://www.exasol.com/terms-and-conditions/",
+    "benchbox/platforms/base/data_loading.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:36:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d4694e9b754246e38da06be78fd1c757",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

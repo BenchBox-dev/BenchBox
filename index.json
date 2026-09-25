@@ -5450,6 +5450,13 @@
       "status": "done",
       "title": "Examples Code Duplication Consolidation"
     },
+    "exasol-local-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Evaluate Exasol Personal locally and record driver, SQL, and connection-limit facts"
+    },
     "execution-harness-extraction-throughput-maintenance-combined": {
       "claim": null,
       "needs": [],
