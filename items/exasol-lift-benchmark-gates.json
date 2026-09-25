@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Each un-gated benchmark has live differential coverage and registered compat rules",
+    "Gate rules remain for every benchmark not yet validated",
+    "One PR per benchmark, each opened with make pr-open"
+  ],
+  "context": "Item-specific guardrails: never lift a gate without live differential coverage. Never lift several gates in one PR.\n\nShared Exasol guardrails: worktree-only writes with make agent-write-preflight; explicit-path staging, never git add -A; commit identity check, no attribution trailers; uv only; lazy pyexasol import; no credentials in Git, logs, fixtures, or tracker; no live cloud runs; code-skill self-review then make pr-preflight and make pr-open, no auto-merge without make pr-ready; durable artifacts carry no tracker IDs or session narrative; stop and report on failed gates, unverified behavior, license questions, or unapproved host changes.",
+  "description": "The adapter core blocks every benchmark except TPC-H and TPC-DS, because Exasol's upper-case identifier folding, empty-string-as-NULL, missing types (TIME, BLOB, UUID, arrays, JSON), and reserved words may silently change other benchmarks' answers. Lift the gate one benchmark at a time, starting with SSB, then read_primitives, then ClickBench (mixed-case columns, large data).\n\nTasks, per benchmark:\n1. Translate its DDL and queries to exasol; check reserved-word collisions against sqlglot's list and a live EXA_SQL_KEYWORDS query; check column types.\n2. Add live differential coverage against DuckDB at the smallest scale.\n3. Register any needed rewrites or skips in sql_compat with reasons.\n4. Remove only that benchmark's gate rule and update docs/platforms/exasol.md.\n\nDecision gates:\n- G1 Start only with explicit user priority. One benchmark per PR.\n- G2 If a benchmark's data contains meaningful empty strings (distinct from NULL), stop and decide with the user whether to keep it gated.\n- G3 If a benchmark needs an unsupported type, keep it gated and record the reason in the rule.",
+  "links": [
+    "benchbox/sql_compat/rules/benchmark_gate",
+    "https://docs.exasol.com/db/latest/sql_references/data_types/datatypesoverview.htm",
+    "docs/development/result-validation.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:43:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c153a6a251c040318643ab7fd0c4354f",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

@@ -5476,6 +5476,15 @@
       "status": "open",
       "title": "Add a Linux CI smoke test for Exasol using exasol/docker-db"
     },
+    "exasol-lift-benchmark-gates": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Lift Exasol benchmark gates one benchmark at a time with differential coverage"
+    },
     "exasol-live-differential-harness": {
       "claim": null,
       "needs": [
