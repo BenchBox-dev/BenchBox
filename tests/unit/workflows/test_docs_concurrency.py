@@ -25,7 +25,9 @@ EXPECTED_GROUP = (
 )
 EXPECTED_CANCEL = "${{ github.event_name == 'pull_request' }}"
 
-REQUIRED_CONTEXTS = frozenset({"ci-required-result", "Results Explorer browser gate", "ruleset-drift"})
+REQUIRED_CONTEXTS = frozenset(
+    {"ci-required-result", "Results Explorer browser gate", "ruleset-drift", "Public-site visual acceptance"}
+)
 
 
 def _workflow() -> dict[str, object]:
@@ -65,15 +67,14 @@ def test_develop_and_release_pushes_never_cancel() -> None:
 
 
 def test_path_filter_not_narrowed() -> None:
-    # NOTE: PyYAML parses the bare `on:` trigger key as boolean True.
+    # Required checks must report even for a diff outside the site inputs.
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
-    paths = triggers["pull_request"]["paths"]
-    for required in ("benchbox/**", "scripts/**", "Makefile", "docs/**"):
-        assert required in paths
+    assert "paths" not in triggers["pull_request"]
+    assert "merge_group" in triggers
 
 
-def test_docs_declares_no_required_check() -> None:
+def test_docs_declares_only_the_visual_required_check() -> None:
     jobs = _workflow()["jobs"]
     names = {str(job.get("name", job_id)) for job_id, job in jobs.items()}
-    assert not (names & REQUIRED_CONTEXTS)
+    assert names & REQUIRED_CONTEXTS == {"Public-site visual acceptance"}

@@ -246,6 +246,14 @@ then PR back to `develop`. This realigns all six version sources
 markers, and the `landing/index.html` badge) with the latest published release,
 so `develop` no longer trails PyPI.
 
+The fast guard
+`tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*`
+pins the published version as its own literal, so the sync updates it too
+(rename the test to the new version). It stays a literal rather than reading
+`pyproject.toml`, because that is exactly what the accounting check validates;
+deriving it from the checked source would let a sync to an unpublished version
+pass. Only PyPI is authoritative for publication state.
+
 After the synchronization PR is prepared, verify it against PyPI's live
 publication state rather than assuming the newest git tag was published:
 

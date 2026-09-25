@@ -1,5 +1,8 @@
 name: Validate release PR base
 
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
 on:
   pull_request:
     branches:
