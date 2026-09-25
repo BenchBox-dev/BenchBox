@@ -19,8 +19,9 @@ import json
 import logging
 import shutil
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator, Sequence
 
 import numpy as np
 import yaml
@@ -352,37 +353,45 @@ class TPCHSkewDataGenerator(VerbosityMixin):
             return merged
         return path_or_paths
 
-    def _read_tbl_file(self, path: Path) -> list[list[str]]:
-        """Read a .tbl file into list of rows.
-
-        Args:
-            path: Path to .tbl file
-
-        Returns:
-            List of rows, each row is a list of field values
-        """
-        rows = []
-        with open(path, encoding="utf-8") as f:
-            reader = csv.reader(f, delimiter="|")
-            for row in reader:
-                # Remove trailing empty element from TPC-H format
+    def _iter_tbl_rows(self, path: Path) -> Iterator[list[str]]:
+        """Yield normalized TPC-H rows without retaining the table in memory."""
+        with path.open(encoding="utf-8") as handle:
+            for row in csv.reader(handle, delimiter="|"):
                 if row and row[-1] == "":
                     row = row[:-1]
                 if row:
-                    rows.append(row)
-        return rows
+                    yield row
 
-    def _write_tbl_file(self, rows: list[list[str]], path: Path) -> None:
-        """Write rows to a .tbl file.
+    def _stream_tbl_file(
+        self,
+        input_path: Path,
+        output_path: Path,
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]],
+    ) -> None:
+        """Apply pre-drawn skew values in row order while retaining only one row."""
+        with output_path.open("w", encoding="utf-8", newline="") as output:
+            for index, row in enumerate(self._iter_tbl_rows(input_path)):
+                for column, (values, choices) in replacements.items():
+                    value = int(values[index])
+                    row[column] = choices[value] if choices is not None else str(value)
+                output.write("|".join(row) + "\n")
 
-        Args:
-            rows: List of rows to write
-            path: Output path
-        """
-        with open(path, "w", encoding="utf-8", newline="") as f:
-            for row in rows:
-                # Match native dbgen output format: fields separated by |, NO trailing |
-                f.write("|".join(row) + "\n")
+    def _count_tbl_rows(self, path: Path) -> int:
+        return sum(1 for _ in self._iter_tbl_rows(path))
+
+    def _temporal_day_offsets(self, num_rows: int, skew_factor: float) -> np.ndarray:
+        """Draw the same date offsets as the in-memory temporal transform."""
+        total_days = (datetime(1998, 12, 31) - datetime(1992, 1, 1)).days
+        dist = ExponentialDistribution(rate=0.5 + skew_factor * 4)
+        samples = dist.sample(num_rows, self.rng)
+        concentrated = 1 - samples
+        return (concentrated * total_days).astype(int)
+
+    @staticmethod
+    def _date_choices() -> list[str]:
+        start_date = datetime(1992, 1, 1)
+        total_days = (datetime(1998, 12, 31) - start_date).days
+        return [(start_date + timedelta(days=day)).strftime("%Y-%m-%d") for day in range(total_days + 1)]
 
     def _generate_skewed_values(
         self,
@@ -430,19 +439,18 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         - c_nationkey: Customer nationality distribution
         - c_mktsegment: Market segment distribution
         """
-        rows = self._read_tbl_file(input_path)
         attr_config = self.skew_config.attribute_skew
+        num_rows = self._count_tbl_rows(input_path)
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]] = {}
 
         if attr_config.customer_nation_skew > 0 or attr_config.customer_segment_skew > 0:
-            num_rows = len(rows)
             nation_col = _COLUMN_INDICES["customer"]["c_nationkey"]
             segment_col = _COLUMN_INDICES["customer"]["c_mktsegment"]
 
             # Skew nationkey (0-24)
             if attr_config.customer_nation_skew > 0:
                 skewed_nations = self._generate_skewed_values(num_rows, 0, 24, attr_config.customer_nation_skew)
-                for i, row in enumerate(rows):
-                    row[nation_col] = str(skewed_nations[i])
+                replacements[nation_col] = (skewed_nations, None)
 
             # Skew market segment
             if attr_config.customer_segment_skew > 0:
@@ -450,10 +458,9 @@ class TPCHSkewDataGenerator(VerbosityMixin):
                 skewed_indices = self._generate_skewed_values(
                     num_rows, 0, len(segments) - 1, attr_config.customer_segment_skew
                 )
-                for i, row in enumerate(rows):
-                    row[segment_col] = segments[skewed_indices[i]]
+                replacements[segment_col] = (skewed_indices, segments)
 
-        self._write_tbl_file(rows, output_path)
+        self._stream_tbl_file(input_path, output_path, replacements)
 
     def _transform_supplier(self, input_path: Path, output_path: Path) -> None:
         """Apply skew to supplier table.
@@ -461,18 +468,17 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         Skews applied:
         - s_nationkey: Supplier nationality distribution
         """
-        rows = self._read_tbl_file(input_path)
         attr_config = self.skew_config.attribute_skew
+        num_rows = self._count_tbl_rows(input_path)
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]] = {}
 
         if attr_config.supplier_nation_skew > 0:
-            num_rows = len(rows)
             nation_col = _COLUMN_INDICES["supplier"]["s_nationkey"]
 
             skewed_nations = self._generate_skewed_values(num_rows, 0, 24, attr_config.supplier_nation_skew)
-            for i, row in enumerate(rows):
-                row[nation_col] = str(skewed_nations[i])
+            replacements[nation_col] = (skewed_nations, None)
 
-        self._write_tbl_file(rows, output_path)
+        self._stream_tbl_file(input_path, output_path, replacements)
 
     def _transform_part(self, input_path: Path, output_path: Path) -> None:
         """Apply skew to part table.
@@ -482,20 +488,19 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         - p_type: Part type distribution
         - p_container: Container type distribution
         """
-        rows = self._read_tbl_file(input_path)
         attr_config = self.skew_config.attribute_skew
 
-        num_rows = len(rows)
+        num_rows = self._count_tbl_rows(input_path)
         brand_col = _COLUMN_INDICES["part"]["p_brand"]
         type_col = _COLUMN_INDICES["part"]["p_type"]
         container_col = _COLUMN_INDICES["part"]["p_container"]
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]] = {}
 
         # Brands: Brand#11 through Brand#55
         if attr_config.part_brand_skew > 0:
             brands = [f"Brand#{i}{j}" for i in range(1, 6) for j in range(1, 6)]
             skewed_indices = self._generate_skewed_values(num_rows, 0, len(brands) - 1, attr_config.part_brand_skew)
-            for i, row in enumerate(rows):
-                row[brand_col] = brands[skewed_indices[i]]
+            replacements[brand_col] = (skewed_indices, brands)
 
         # Part types: combinations of type, metal, finish
         if attr_config.part_type_skew > 0:
@@ -522,8 +527,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
                 "PROMO PLATED BRASS",
             ]
             skewed_indices = self._generate_skewed_values(num_rows, 0, len(types) - 1, attr_config.part_type_skew)
-            for i, row in enumerate(rows):
-                row[type_col] = types[skewed_indices[i]]
+            replacements[type_col] = (skewed_indices, types)
 
         # Container types
         if attr_config.part_container_skew > 0:
@@ -557,10 +561,9 @@ class TPCHSkewDataGenerator(VerbosityMixin):
             skewed_indices = self._generate_skewed_values(
                 num_rows, 0, len(containers) - 1, attr_config.part_container_skew
             )
-            for i, row in enumerate(rows):
-                row[container_col] = containers[skewed_indices[i]]
+            replacements[container_col] = (skewed_indices, containers)
 
-        self._write_tbl_file(rows, output_path)
+        self._stream_tbl_file(input_path, output_path, replacements)
 
     def _transform_partsupp(self, input_path: Path, output_path: Path) -> None:
         """Apply skew to partsupp table.
@@ -580,15 +583,15 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         - o_orderpriority: Order priority distribution
         - o_orderdate: Temporal skew (if enabled)
         """
-        rows = self._read_tbl_file(input_path)
         attr_config = self.skew_config.attribute_skew
         join_config = self.skew_config.join_skew
         temporal_config = self.skew_config.temporal_skew
 
-        num_rows = len(rows)
+        num_rows = self._count_tbl_rows(input_path)
         custkey_col = _COLUMN_INDICES["orders"]["o_custkey"]
         priority_col = _COLUMN_INDICES["orders"]["o_orderpriority"]
         orderdate_col = _COLUMN_INDICES["orders"]["o_orderdate"]
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]] = {}
 
         # Calculate max customer key
         max_custkey = int(150_000 * self.scale_factor)
@@ -596,8 +599,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         # Apply customer ordering frequency skew (join skew)
         if join_config.customer_order_skew > 0 and self.skew_config.enable_join_skew:
             skewed_custkeys = self._generate_skewed_values(num_rows, 1, max_custkey, join_config.customer_order_skew)
-            for i, row in enumerate(rows):
-                row[custkey_col] = str(skewed_custkeys[i])
+            replacements[custkey_col] = (skewed_custkeys, None)
 
         # Apply order priority skew
         if attr_config.order_priority_skew > 0 and self.skew_config.enable_attribute_skew:
@@ -605,14 +607,16 @@ class TPCHSkewDataGenerator(VerbosityMixin):
             skewed_indices = self._generate_skewed_values(
                 num_rows, 0, len(priorities) - 1, attr_config.order_priority_skew
             )
-            for i, row in enumerate(rows):
-                row[priority_col] = priorities[skewed_indices[i]]
+            replacements[priority_col] = (skewed_indices, priorities)
 
         # Apply temporal skew to order dates
         if temporal_config.order_date_skew > 0 and self.skew_config.enable_temporal_skew:
-            self._apply_temporal_skew_to_dates(rows, orderdate_col, temporal_config.order_date_skew)
+            replacements[orderdate_col] = (
+                self._temporal_day_offsets(num_rows, temporal_config.order_date_skew),
+                self._date_choices(),
+            )
 
-        self._write_tbl_file(rows, output_path)
+        self._stream_tbl_file(input_path, output_path, replacements)
 
     def _transform_lineitem(self, input_path: Path, output_path: Path) -> None:
         """Apply skew to lineitem table.
@@ -624,17 +628,17 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         - l_returnflag: Return flag distribution
         - l_shipdate: Temporal skew (if enabled)
         """
-        rows = self._read_tbl_file(input_path)
         attr_config = self.skew_config.attribute_skew
         join_config = self.skew_config.join_skew
         temporal_config = self.skew_config.temporal_skew
 
-        num_rows = len(rows)
+        num_rows = self._count_tbl_rows(input_path)
         partkey_col = _COLUMN_INDICES["lineitem"]["l_partkey"]
         suppkey_col = _COLUMN_INDICES["lineitem"]["l_suppkey"]
         shipmode_col = _COLUMN_INDICES["lineitem"]["l_shipmode"]
         returnflag_col = _COLUMN_INDICES["lineitem"]["l_returnflag"]
         shipdate_col = _COLUMN_INDICES["lineitem"]["l_shipdate"]
+        replacements: dict[int, tuple[np.ndarray, Sequence[str] | None]] = {}
 
         # Calculate max keys
         max_partkey = int(200_000 * self.scale_factor)
@@ -643,66 +647,34 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         # Apply part popularity skew (join skew)
         if join_config.part_popularity_skew > 0 and self.skew_config.enable_join_skew:
             skewed_partkeys = self._generate_skewed_values(num_rows, 1, max_partkey, join_config.part_popularity_skew)
-            for i, row in enumerate(rows):
-                row[partkey_col] = str(skewed_partkeys[i])
+            replacements[partkey_col] = (skewed_partkeys, None)
 
         # Apply supplier volume skew (join skew)
         if join_config.supplier_volume_skew > 0 and self.skew_config.enable_join_skew:
             skewed_suppkeys = self._generate_skewed_values(num_rows, 1, max_suppkey, join_config.supplier_volume_skew)
-            for i, row in enumerate(rows):
-                row[suppkey_col] = str(skewed_suppkeys[i])
+            replacements[suppkey_col] = (skewed_suppkeys, None)
 
         # Apply ship mode skew
         if attr_config.shipmode_skew > 0 and self.skew_config.enable_attribute_skew:
             shipmodes = ["REG AIR", "AIR", "RAIL", "SHIP", "TRUCK", "MAIL", "FOB"]
             skewed_indices = self._generate_skewed_values(num_rows, 0, len(shipmodes) - 1, attr_config.shipmode_skew)
-            for i, row in enumerate(rows):
-                row[shipmode_col] = shipmodes[skewed_indices[i]]
+            replacements[shipmode_col] = (skewed_indices, shipmodes)
 
         # Apply return flag skew (most items not returned)
         if attr_config.returnflag_skew > 0 and self.skew_config.enable_attribute_skew:
             # Return flags: N (not returned), R (returned), A (accepted)
             flags = ["N", "R", "A"]
             skewed_indices = self._generate_skewed_values(num_rows, 0, len(flags) - 1, attr_config.returnflag_skew)
-            for i, row in enumerate(rows):
-                row[returnflag_col] = flags[skewed_indices[i]]
+            replacements[returnflag_col] = (skewed_indices, flags)
 
         # Apply temporal skew to ship dates
         if temporal_config.ship_date_seasonality > 0 and self.skew_config.enable_temporal_skew:
-            self._apply_temporal_skew_to_dates(rows, shipdate_col, temporal_config.ship_date_seasonality)
+            replacements[shipdate_col] = (
+                self._temporal_day_offsets(num_rows, temporal_config.ship_date_seasonality),
+                self._date_choices(),
+            )
 
-        self._write_tbl_file(rows, output_path)
-
-    def _apply_temporal_skew_to_dates(self, rows: list[list[str]], date_col: int, skew_factor: float) -> None:
-        """Apply temporal skew to date column.
-
-        Concentrates dates toward more recent periods.
-
-        Args:
-            rows: Data rows to modify
-            date_col: Index of date column
-            skew_factor: Intensity of temporal skew
-        """
-        from datetime import datetime, timedelta
-
-        # TPC-H date range: 1992-01-01 to 1998-12-31
-        start_date = datetime(1992, 1, 1)
-        end_date = datetime(1998, 12, 31)
-        total_days = (end_date - start_date).days
-
-        # Generate skewed day offsets
-        num_rows = len(rows)
-        dist = ExponentialDistribution(rate=0.5 + skew_factor * 4)
-        samples = dist.sample(num_rows, self.rng)
-
-        # Concentrate toward end of range (recent dates)
-        # samples in [0,1] -> map to concentrate at high values
-        concentrated = 1 - samples  # Flip to concentrate at 1
-        day_offsets = (concentrated * total_days).astype(int)
-
-        for i, row in enumerate(rows):
-            new_date = start_date + timedelta(days=int(day_offsets[i]))
-            row[date_col] = new_date.strftime("%Y-%m-%d")
+        self._stream_tbl_file(input_path, output_path, replacements)
 
     def get_skew_statistics(self) -> dict:
         """Get statistics about the applied skew.
