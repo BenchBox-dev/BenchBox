@@ -49,8 +49,9 @@ BASELINE_PATH = REPO_ROOT / "_project" / "scripts" / "project_references_baselin
 _REFERENCE_RE = re.compile(r"_project/[A-Za-z0-9_./@-]+\.(?:md|yaml|yml|json)(?![A-Za-z0-9_.~-])")
 
 # Placeholder path segments that mark a synthetic fixture string, not a real
-# reference. Ignored in every scanned file.
-_PLACEHOLDER_SEGMENTS = frozenset({"foo.md", "bar.md", "example.md"})
+# reference. The stem (foo/bar/example) is what matters, not the suffix:
+# fixtures may use any supported doc/data extension. Ignored in every file.
+_PLACEHOLDER_STEMS = frozenset({"foo", "bar", "example"})
 
 # File extensions that are never scanned (scanning is text-based).
 _SKIP_SUFFIXES = frozenset(
@@ -85,11 +86,12 @@ def _tracked_files() -> list[str]:
 
 
 def _normalize(match: str) -> str:
-    return match.rstrip("`.,:;!?)]}'\"")
+    return match.rstrip("`.,:;!?)]}'\">")
 
 
 def _is_placeholder(ref: str) -> bool:
-    return any(ref.endswith("/" + name) or ref == "_project/" + name for name in _PLACEHOLDER_SEGMENTS)
+    stem = ref.rsplit("/", 1)[-1].rsplit(".", 1)[0] if "." in ref.rsplit("/", 1)[-1] else ref
+    return stem in _PLACEHOLDER_STEMS
 
 
 def find_stale() -> list[str]:

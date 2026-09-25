@@ -45,7 +45,14 @@ class TestNormalize:
         assert checker._is_placeholder("_project/foo.md")
         assert checker._is_placeholder("_project/blind-spots/foo.md")
         assert checker._is_placeholder("_project/specs/example.md")
-        assert not checker._is_placeholder("_project/decisions/" + "arch-pilot-eval" + ".md")
+        assert checker._is_placeholder("_project/specs/" + "foo" + ".yaml")
+        assert checker._is_placeholder("_project/specs/" + "bar" + ".json")
+        assert not checker._is_placeholder("_project/decisions/" + "arch-pilot" + "-eval.md")
+
+    def test_normalize_strips_autolink_bracket(self):
+        assert checker._normalize("_project/decisions/" + "arch-pilot" + "-eval.md>") == (
+            "_project/decisions/arch-pilot" + "-eval.md"
+        )
 
 
 class TestBaselineRoundTrip:
@@ -54,5 +61,22 @@ class TestBaselineRoundTrip:
         assert checker.main([]) == 0
         assert "no new breakage" in capsys.readouterr().out
 
-    def test_new_reference_detected_against_baseline(self, tmp_path, monkeypatch):
-        assert checker._normalize("_project/decisions/foo.md`,".replace("foo", "bar")) == ("_project/decisions/bar.md")
+    def test_new_reference_detected_against_baseline(self, tmp_path, monkeypatch, capsys):
+        scanned = tmp_path / "scanned.md"
+        scanned.write_text("see _project/decisions/synthetic-new-1" + "234.md\n", encoding="utf-8")
+        monkeypatch.setattr(checker, "_tracked_files", lambda: ["scanned.md"])
+        monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(checker, "BASELINE_PATH", tmp_path / "baseline.txt")
+        (tmp_path / "baseline.txt").write_text("", encoding="utf-8")
+        assert checker.main([]) == 1
+        assert "NEW stale" in capsys.readouterr().out
+
+    def test_fixed_baseline_entry_forces_regen(self, tmp_path, monkeypatch, capsys):
+        (tmp_path / "baseline.txt").write_text(
+            "gone.md::_project/decisions/synthetic-gone-99" + "9.md\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(checker, "_tracked_files", list)
+        monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+        monkeypatch.setattr(checker, "BASELINE_PATH", tmp_path / "baseline.txt")
+        assert checker.main([]) == 1
+        assert "regenerate" in capsys.readouterr().out
