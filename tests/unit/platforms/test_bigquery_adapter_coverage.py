@@ -2407,21 +2407,47 @@ class TestConvertToBigQueryTable:
         assert "CREATE OR REPLACE TABLE" in result
         assert "`my-proj.my_ds.T`" in result
 
-    def test_ctas_view_statements_pass_through_unchanged(self):
+    def test_ctas_view_statements_keep_view_shape_with_qualified_target(self):
         """CREATE VIEW shapes must not be rewritten into CREATE TABLE.
 
         The ddl_create_view_simple operation emits plain CREATE VIEW; its
         information_schema.views validation and DROP VIEW cleanup break when
-        the rewrite materializes a physical table instead.
+        the rewrite materializes a physical table instead. View targets are
+        still dataset-qualified: the query-time connection carries no
+        default dataset, so an unqualified target fails server-side.
+        """
+        adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
+
+        result = adapter._convert_to_bigquery_table(
+            "CREATE VIEW orders_view AS SELECT o_orderkey FROM orders WHERE o_orderkey <= 1000"
+        )
+        assert result.startswith("CREATE VIEW `my-proj.my_ds.ORDERS_VIEW` AS")
+        assert "TABLE" not in result.split("AS")[0]
+
+        # OR REPLACE views keep their shape with a qualified target; TEMP,
+        # TEMPORARY, and MATERIALIZED views pass through untouched.
+        assert (
+            adapter._convert_to_bigquery_table("CREATE OR REPLACE VIEW v AS SELECT 1")
+            == "CREATE OR REPLACE VIEW `my-proj.my_ds.V` AS SELECT 1"
+        )
+        for stmt in (
+            "CREATE TEMP VIEW v AS SELECT 1",
+            "CREATE TEMPORARY VIEW v AS SELECT 1",
+            "CREATE MATERIALIZED VIEW mv AS SELECT 1",
+        ):
+            assert adapter._convert_to_bigquery_table(stmt) == stmt
+
+    def test_ctas_temp_tables_pass_through_unqualified(self):
+        """TEMP tables stay session-scoped: no dataset qualification.
+
+        Qualifying the target or dropping TEMP would convert a temporary
+        table into a permanent dataset table.
         """
         adapter = _make_adapter(project_id="my-proj", dataset_id="my_ds")
 
         for stmt in (
-            "CREATE VIEW orders_view AS SELECT o_orderkey FROM orders WHERE o_orderkey <= 1000",
-            "CREATE OR REPLACE VIEW v AS SELECT 1",
-            "CREATE TEMP VIEW v AS SELECT 1",
-            "CREATE TEMPORARY VIEW v AS SELECT 1",
-            "CREATE MATERIALIZED VIEW mv AS SELECT 1",
+            "CREATE TEMP TABLE temp_orders AS SELECT * FROM orders",
+            "CREATE TEMPORARY TABLE temp_orders AS SELECT * FROM orders",
         ):
             assert adapter._convert_to_bigquery_table(stmt) == stmt
 

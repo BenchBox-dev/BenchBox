@@ -159,7 +159,14 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
         if not val_result:
             return False
         for row in val_result:
-            if not row:
+            if not row or row[0] is None:
+                # A None first column means the row is a placeholder the
+                # adapter synthesized for a FAILED payload or an
+                # unmaterialized result (PlatformAdapterCursor emits (None,)
+                # past index 0 without real rows): it certifies nothing, so
+                # the value check fails. Count modes are mutually exclusive
+                # with value modes at load time, so no count fallback exists
+                # here.
                 return False
             try:
                 scalar = float(row[0])

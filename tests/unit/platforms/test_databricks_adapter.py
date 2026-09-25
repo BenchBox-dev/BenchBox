@@ -418,6 +418,37 @@ class TestDatabricksAdapter:
                 assert ("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema" in executed) is expect_create
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_defers_context_when_creating_catalog(self, mock_databricks_sql):
+        """Fresh catalog creation must not select the catalog first.
+
+        When create_catalog is set and the database was not reused,
+        create_schema() owns catalog creation: USE CATALOG would fail with
+        CATALOG_NOT_FOUND before it runs, so the connection issues no
+        context statements at all.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+            create_catalog=True,
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            adapter.database_was_reused = False
+            adapter.create_connection()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "USE CATALOG test_catalog" not in executed
+        assert "USE SCHEMA test_schema" not in executed
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_failure(self, mock_databricks_sql):
         """Test connection creation failure."""
         mock_databricks_sql.connect.side_effect = Exception("Connection failed")
@@ -1367,6 +1398,21 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t (a INT) USING DELTA")
         assert result.count("USING DELTA") == 1
+
+    def test_ctas_places_using_delta_before_as_select(self):
+        """CTAS has no column list: USING DELTA precedes AS SELECT.
+
+        Scanning for the column-list close paren lands inside the query
+        (a subquery close paren) or appends at the end, both invalid.
+        """
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM (SELECT 1 AS id) s")
+        assert "USING DELTA AS SELECT" in result
+        assert ") USING DELTA" not in result
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        assert result.endswith("USING DELTA AS SELECT 1 AS id TBLPROPERTIES ()") or (
+            "USING DELTA AS SELECT 1 AS id" in result
+        )
 
     def test_adds_tblproperties_for_auto_optimize(self):
         adapter = self._make_adapter(delta_auto_optimize=True)

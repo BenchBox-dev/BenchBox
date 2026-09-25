@@ -1186,11 +1186,15 @@ class DatabricksAdapter(PlatformAdapter):
             # ensure it for fresh databases: on a reused catalog/schema the
             # principal may hold USE SCHEMA without catalog-level
             # CREATE SCHEMA, and requiring it here would block reconnects.
+            # USE CATALOG is likewise deferred when this connection is meant
+            # to create the catalog: create_schema() owns catalog creation,
+            # and selecting a not-yet-created catalog fails before it runs.
             # create_schema() keeps owning table creation.
-            cursor.execute(f"USE CATALOG {self.catalog}")
-            if not getattr(self, "database_was_reused", False):
-                cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
-            cursor.execute(f"USE SCHEMA {self.schema}")
+            if not (getattr(self, "create_catalog", False) and not getattr(self, "database_was_reused", False)):
+                cursor.execute(f"USE CATALOG {self.catalog}")
+                if not getattr(self, "database_was_reused", False):
+                    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
+                cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
 
             self.log_operation_complete(
@@ -2859,22 +2863,29 @@ class DatabricksAdapter(PlatformAdapter):
 
         # Default to DELTA format when unspecified. Scan the body only: parens
         # in the comment prefix must not displace the USING DELTA insertion.
+        # USING DELTA precedes AS SELECT on CTAS (there is no column list to
+        # attach it to); only scan for the column-list close paren when the
+        # statement actually defines columns.
         if "USING" not in body.upper():
-            # Find the closing parenthesis of column definitions
-            paren_count = 0
-            using_pos = len(body)
+            as_select = re.search(r"\bAS\s+SELECT\b", body, flags=re.IGNORECASE)
+            if as_select is not None:
+                body = body[: as_select.start()] + "USING DELTA " + body[as_select.start() :]
+            else:
+                # Find the closing parenthesis of column definitions
+                paren_count = 0
+                using_pos = len(body)
 
-            for i, char in enumerate(body):
-                if char == "(":
-                    paren_count += 1
-                elif char == ")":
-                    paren_count -= 1
-                    if paren_count == 0:
-                        using_pos = i + 1
-                        break
+                for i, char in enumerate(body):
+                    if char == "(":
+                        paren_count += 1
+                    elif char == ")":
+                        paren_count -= 1
+                        if paren_count == 0:
+                            using_pos = i + 1
+                            break
 
-            # Insert USING DELTA clause
-            body = body[:using_pos] + " USING DELTA" + body[using_pos:]
+                # Insert USING DELTA clause
+                body = body[:using_pos] + " USING DELTA" + body[using_pos:]
 
         # Include Delta Lake optimization properties
         if "TBLPROPERTIES" not in body.upper():

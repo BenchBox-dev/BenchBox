@@ -2603,6 +2603,40 @@ class TestQualifyTableNames:
         assert adapter._qualify_table_names("", allow_fallback=False) == ""
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_comma_identifiers_outside_from_are_not_tables(self, mock_bigquery):
+        """Projection columns, function args, and INSERT columns keep their names."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT count(*) AS total, customer FROM lineitem JOIN customer ON lineitem.l_custkey = customer.c_custkey"
+        )
+        assert ", customer FROM" in result
+        assert "`p1.d1.CUSTOMER` AS customer" in result
+        result = adapter._qualify_table_names("SELECT coalesce(c_name, customer) FROM customer")
+        assert "coalesce(c_name, customer)" in result
+        result = adapter._qualify_table_names("INSERT INTO customer (c_custkey, customer) VALUES (1, 'v')")
+        assert "(c_custkey, customer)" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_backtick_and_commented_aliases_are_not_duplicated(self, mock_bigquery):
+        """Existing backtick aliases and aliases past comments suppress synthesis."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `o`")
+        assert result.count("`o`") == 1
+        assert "AS orders" not in result
+        long_comment = "/* " + "x" * 60 + " */"
+        result = adapter._qualify_table_names(f"SELECT o FROM orders {long_comment} o")
+        assert "AS orders" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_view_targets_are_qualified(self, mock_bigquery):
+        """CREATE VIEW and DROP VIEW targets resolve on a dataset-less connection."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("CREATE VIEW orders_view AS SELECT * FROM orders")
+        assert "CREATE VIEW `p1.d1.ORDERS_VIEW` AS" in result
+        result = adapter._qualify_table_names("DROP VIEW IF EXISTS orders_view")
+        assert result == "DROP VIEW IF EXISTS `p1.d1.ORDERS_VIEW`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
         """Per-statement qualification qualifies tables appearing only in later statements."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")

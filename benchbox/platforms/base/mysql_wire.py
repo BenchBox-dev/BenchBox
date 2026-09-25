@@ -19,7 +19,7 @@ def _skip_comment(sql: str, i: int, n: int) -> int | None:
         return i
     if sql[i] == "/" and i + 1 < n and sql[i + 1] == "*":
         i += 2
-        while i < n and not (sql[i] == "*" and sql[i + 1] == "/"):
+        while i < n and not (sql[i] == "*" and i + 1 < n and sql[i + 1] == "/"):
             i += 1
         return min(i + 2, n)
     return None

@@ -711,6 +711,25 @@ class TuningMetadataManager:
             result.add_error(f"Validation failed with error: {e}")
             return result
 
+    def _format_literal(self, value: Any) -> str:
+        """Render a value as an inline SQL literal for job-style clients.
+
+        Only the tuning-metadata INSERT path uses this: job-style clients
+        such as BigQuery accept no ``?`` placeholders, so values are inlined
+        into the statement the adapter qualifies. Strings are single-quoted
+        with embedded quotes doubled; datetimes use ISO format; booleans
+        render as TRUE/FALSE; None renders as NULL.
+        """
+        if value is None:
+            return "NULL"
+        if isinstance(value, bool):
+            return "TRUE" if value else "FALSE"
+        if isinstance(value, (int, float)):
+            return str(value)
+        if isinstance(value, datetime):
+            return f"'{value.isoformat()}'"
+        return "'" + str(value).replace("'", "''") + "'"
+
     def _batch_insert_records(self, records: list[TuningMetadata]) -> None:
         """Insert metadata records in batch."""
         if not records:
@@ -742,6 +761,21 @@ class TuningMetadataManager:
         # Execute batch insert - handle platforms that don't support batch operations
         temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
         try:
+            if not hasattr(temp_conn, "cursor"):
+                # Job-style clients (BigQuery) expose query() instead of a
+                # DBAPI cursor and accept no ? placeholders: run one
+                # qualified INSERT per record through the adapter so the
+                # table resolves and values are inlined safely.
+                for params in param_lists:
+                    values = ", ".join(self._format_literal(value) for value in params)
+                    insert_sql = f"""
+        INSERT INTO {self._metadata_table_name}
+        (table_name, tuning_type, column_name, column_order,
+         configuration_hash, created_at, platform)
+        VALUES ({values})
+        """
+                    self._execute_sql(temp_conn, insert_sql)
+                return
             cursor = temp_conn.cursor()
             for params in param_lists:
                 res = cursor.execute(insert_sql, params)
@@ -999,8 +1033,10 @@ class TuningMetadataManager:
             if not self._table_exists_check():
                 return True  # Nothing to clear
 
-            # Delete all records (could be filtered by benchmark_name if we stored it)
-            delete_sql = f"DELETE FROM {self._metadata_table_name}"
+            # Delete all records (could be filtered by benchmark_name if we stored it).
+            # BigQuery rejects WHERE-less DELETE, so spell the full-table
+            # clear in a form every engine accepts.
+            delete_sql = f"DELETE FROM {self._metadata_table_name} WHERE TRUE"
             temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
             try:
                 self._execute_sql(temp_conn, delete_sql)
@@ -1074,6 +1110,11 @@ class TuningMetadataManager:
         """
         # Use platform adapter's query execution method
         if hasattr(self.platform_adapter, "execute_query"):
+            if not hasattr(connection, "cursor"):
+                # Job-style clients bypass the adapter's DDL qualification
+                # for reads; writes take the same path so INSERT and DELETE
+                # resolve the qualified table the creation path wrote.
+                sql = self._qualify_metadata_read_sql(sql)
             result = self.platform_adapter.execute_query(connection, sql, "metadata")
             if (err := failed_platform_error(result)) is not None:
                 raise RuntimeError(f"Tuning metadata execution failed: {err}")

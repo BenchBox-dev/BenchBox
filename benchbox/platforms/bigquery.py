@@ -1905,16 +1905,19 @@ class BigQueryAdapter(PlatformAdapter):
         if not re.search(r"PRIMARY\s+KEY", search_text, flags=re.IGNORECASE):
             return []
         _pk_keywords = {"PRIMARY", "CONSTRAINT", "FOREIGN", "UNIQUE", "CHECK", "KEY"}
-        return [
-            name
-            for name in re.findall(
-                r"^\s*[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
+        # Column definitions may share one line (single-line DDL), so match
+        # per comma-separated segment rather than per line.
+        names = []
+        for segment in re.split(r",", search_text):
+            match = re.search(
+                r"[`\"']?(\w+)[`\"']?\s+(?:[A-Z0-9_]+\s*(?:\([^()]*\))?\s*)+?"
                 r"PRIMARY\s+KEY(?!\s*\()",
-                search_text,
-                flags=re.IGNORECASE | re.MULTILINE,
+                segment,
+                flags=re.IGNORECASE,
             )
-            if name.upper() not in _pk_keywords
-        ]
+            if match and match.group(1).upper() not in _pk_keywords:
+                names.append(match.group(1))
+        return names
 
     @staticmethod
     def _normalize_bq_column_types(text: str) -> str:
@@ -1997,7 +2000,15 @@ class BigQueryAdapter(PlatformAdapter):
         # cleanup. Table modifiers are empty, OR REPLACE, and IF NOT
         # EXISTS (in any combination); anything mentioning VIEW (VIEW,
         # TEMP VIEW, TEMPORARY VIEW, MATERIALIZED VIEW) passes through.
-        if "VIEW" in modifiers:
+        # TEMP and TEMPORARY tables also pass through: BigQuery scopes them
+        # to the session, so dataset-qualifying the target or dropping the
+        # TEMP keyword would convert them into permanent dataset tables.
+        # A plain CREATE VIEW keeps its shape but still needs its target
+        # qualified: the query-time connection carries no default dataset.
+        if "VIEW" in modifiers or "TEMP" in modifiers or "TEMPORARY" in modifiers:
+            if re.fullmatch(r"(?:VIEW|OR\s+REPLACE\s+VIEW)", modifiers.strip(), flags=re.IGNORECASE):
+                qualified_target = self._qualify_table_target(raw_target)
+                return raw_prefix + qualified_target + as_and_rest
             return work
 
         leading_space = raw_prefix[: len(raw_prefix) - len(raw_prefix.lstrip())]
@@ -2070,8 +2081,16 @@ class BigQueryAdapter(PlatformAdapter):
             rest = re.sub(r"\s+PRIMARY\s+KEY(?!\s*\()\b", "", rest, flags=re.IGNORECASE)
             has_table_pk = re.search(r"PRIMARY\s+KEY\s*\(", rest, flags=re.IGNORECASE) is not None
             if pk_cols and not has_table_pk:
+                # Scan the literal-masked text so a parenthesis inside a
+                # string default (DEFAULT "done)") cannot end the column
+                # list early and inject the constraint inside the literal.
+                scan = re.sub(
+                    r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"",
+                    lambda match: " " * len(match.group(0)),
+                    rest,
+                )
                 depth = 0
-                for i, ch in enumerate(rest):
+                for i, ch in enumerate(scan):
                     if ch == "(":
                         depth += 1
                     elif ch == ")":
@@ -2222,6 +2241,10 @@ class BigQueryAdapter(PlatformAdapter):
             # backticked column references are never rewritten. Qualified
             # references (db.table) are excluded by the extractor, and the
             # keyword prefix guard keeps them excluded here as well.
+            # A comma matches only inside the FROM clause (between FROM and
+            # the next clause keyword): elsewhere a comma-separated
+            # identifier is a projection column, function argument, or
+            # INSERT column, and qualifying it corrupts the statement.
             qualified_name = f"`{self.project_id}.{self.dataset_id}.{table_name}`"
             # A qualified path creates no implicit range variable on
             # BigQuery, so `name.column` references elsewhere in the statement
@@ -2237,8 +2260,9 @@ class BigQueryAdapter(PlatformAdapter):
             pattern = (
                 rf"(\bFROM\s+|\bJOIN\s+|\bINSERT\s+INTO\s+|\bUPDATE\s+"
                 rf"|\bMERGE\s+INTO\s+|\bUSING\s+"
-                rf"|\bTRUNCATE\s+(?:TABLE\s+)?|\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?"
-                rf"|\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?|\bCREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?|,\s*)"
+                rf"|\bTRUNCATE\s+(?:TABLE\s+)?|\bDROP\s+(?:TABLE\s+|VIEW\s+)(?:IF\s+EXISTS\s+)?"
+                rf"|\bALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?|\bCREATE\s+(?:OR\s+REPLACE\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+                rf"|\bCREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?|,\s*)"
                 rf"(`{re.escape(table_name)}`|{re.escape(table_name)}\b)"
             )
             segments: list[str] = []
@@ -2246,10 +2270,12 @@ class BigQueryAdapter(PlatformAdapter):
             for match in re.finditer(pattern, masked, flags=re.IGNORECASE):
                 prefix = match.group(1)
                 name_start, name_end = match.span(2)
+                if prefix.strip() == "," and not self._in_from_clause(masked, match.start(1)):
+                    continue
                 segments.append(statement[last:name_start])
                 replacement = qualified_name
                 alias_forbidden = bool(re.search(r"(?i)\b(INSERT|CREATE|DROP|TRUNCATE|ALTER)\b", prefix))
-                if has_refs and not alias_forbidden and not self._qualify_has_alias(masked[name_end : name_end + 40]):
+                if has_refs and not alias_forbidden and not self._qualify_has_alias(masked[name_end:]):
                     replacement += f" AS {table_name.lower()}"
                 segments.append(replacement)
                 last = name_end
@@ -2296,21 +2322,55 @@ class BigQueryAdapter(PlatformAdapter):
         return result
 
     @staticmethod
+    def _in_from_clause(masked: str, pos: int) -> bool:
+        """Whether a position sits inside a FROM clause's table list.
+
+        A comma-separated name is a table only between FROM (or JOIN...ON
+        completion) and the next clause keyword (WHERE, GROUP BY, ORDER BY,
+        HAVING, LIMIT, WINDOW, QUALIFY, or a closing paren/semicolon).
+        Anywhere else the comma separates projection columns, function
+        arguments, or INSERT columns, which must never be qualified.
+        """
+        import re
+
+        before = masked[:pos]
+        from_match = None
+        for match in re.finditer(r"\bFROM\b", before, flags=re.IGNORECASE):
+            from_match = match
+        if from_match is None:
+            return False
+        between = before[from_match.end() :]
+        if re.search(
+            r"\b(WHERE|GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT|WINDOW|QUALIFY|OVER)\b|[);]",
+            between,
+            flags=re.IGNORECASE,
+        ):
+            return False
+        return True
+
+    @staticmethod
     def _qualify_has_alias(after: str) -> bool:
         """Whether a rewritten table occurrence already carries an alias.
 
         Only explicit ``AS alias`` and bare-identifier aliases count; a
         following clause keyword, punctuation, or end of input means the
         occurrence is unaliased. Checked against the literal-masked query.
+        Backtick-quoted aliases (which sqlglot emits with ``identify=True``)
+        count, and over-long inline comments between the table and its alias
+        are skipped rather than truncating the scan.
         """
         import re
 
-        as_match = re.match(r"\s+AS\s+([A-Za-z_]\w*)", after, flags=re.IGNORECASE)
+        # Skip block comments of any length before looking for the alias.
+        scan = re.sub(r"/\*.*?\*/", " ", after, flags=re.DOTALL)
+        as_match = re.match(r"\s+AS\s+(?:`([^`]+)`|([A-Za-z_]\w*))", scan, flags=re.IGNORECASE)
         if as_match:
-            return as_match.group(1).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
-        bare_match = re.match(r"\s+([A-Za-z_]\w*)", after)
+            name = as_match.group(1) or as_match.group(2)
+            return name.upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+        bare_match = re.match(r"\s+(?:`([^`]+)`|([A-Za-z_]\w*))", scan)
         if bare_match:
-            return bare_match.group(1).upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
+            name = bare_match.group(1) or bare_match.group(2)
+            return name.upper() not in BigQueryAdapter._QUALIFY_CLAUSE_KEYWORDS
         return False
 
     def _normalize_table_names_case(self, query: str) -> str:
