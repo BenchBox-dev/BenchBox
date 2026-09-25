@@ -502,7 +502,26 @@ class TestReleaseInfrastructure:
         assert "actions/download-artifact@v4" not in non_fast_text
         assert "mapfile -t node_ids" in non_fast_text
         assert "-n 0" in non_fast_text
+        assert "--maxfail=5" in non_fast_text
         assert 'exit "$rc"' in non_fast_text
+        # Each shard publishes per-test durations (JUnit XML) and records
+        # setup time separately from test time, without changing the marker
+        # expression, shard count, --maxfail, selection, timeouts, or the
+        # release-canary-result aggregation.
+        assert "release-canary-artifacts/shard-${SHARD_INDEX}-junit.xml" in non_fast_text
+        assert ".canary-setup-start-mono" in non_fast_text
+        assert '"setup_seconds": "${setup_seconds}"' in non_fast_text
+        assert '"test_seconds": "${test_seconds}"' in non_fast_text
+        assert '"junit_present": ${junit_present}' in non_fast_text
+        # Durations derive from monotonic stamps, never wall-clock subtraction,
+        # and errexit must not abort the step before the evidence is written.
+        assert "/proc/uptime" in non_fast_text
+        assert "date +%s" not in non_fast_text
+        assert "set +e" in non_fast_text
+        # Capture state is reported separately from file presence, because the
+        # fallback report is present yet carries no durations.
+        assert '"junit_captured": ${junit_captured}' in non_fast_text
+        assert ".canary-junit-captured" in non_fast_text
 
         ruleset_text = _workflow_job_run_text("release-canary.yml", "ruleset-drift")
         assert "scripts/ruleset_drift_check.py" in ruleset_text
