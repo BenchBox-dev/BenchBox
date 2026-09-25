@@ -2216,6 +2216,9 @@ class TestUnityCatalogNaming:
         calls = [c.args[0] for c in cursor.execute.call_args_list]
         assert "CREATE CATALOG IF NOT EXISTS new_catalog" in calls
         assert "CREATE SCHEMA IF NOT EXISTS new_catalog.new_schema" in calls
+        # One-shot creation state clears so later connections take the
+        # normal USE CATALOG / USE SCHEMA path instead of deferring again.
+        assert adapter.create_catalog is False
 
 
 class TestCopyIntoSqlGeneration:
