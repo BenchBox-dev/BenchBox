@@ -33,10 +33,12 @@ None. Every docs step behaved as written. The salt prerequisite
 (`BENCHBOX_MACHINE_ID_SALT`) is documented before first use and the submit
 command errors clearly without it.
 
-## Residual (not gating)
+## Residual (open gate)
 
-Firing the real `pull_request_target` workflow from a fork PR requires a
-maintainer-owned secondary account with no write access. That proves CI
-delivery, not logic: the validator, gates, and trust mapping above are the
-logic, and they are verified. Recruiting a genuine outsider remains a
-research nicety for friction data only.
+Local verification above covers logic, not delivery: the validator, gates,
+and trust mapping are verified, but they cannot exercise authentication as
+an outside contributor, event delivery, permissions, or `workflow_run`
+comment posting. The live fork-PR run (unaided external human, real fork
+PR, `workflow_run` comment path) remains an explicit open gate before
+broader promotion of the external-submission flow, unless the tracker
+decision is explicitly superseded. That run has not happened; outstanding.
