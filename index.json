@@ -683,10 +683,15 @@
       "title": "Anonymized exports leak raw introspection error text and identifiers via receipt.error and entries[].reason; scrub them and stop interpolating raw detail into reason"
     },
     "approx-analytics-cloud-survey": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-26T15:35:37Z",
+        "generation": "5da8dfd737694ac99a998a8d25248614",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Approximate Analytics Cloud SQL Survey — read_primitives + SQL write_primitives at SF=0.1/1/10"
     },
     "arch-canonical-sql-execute-primitive": {
