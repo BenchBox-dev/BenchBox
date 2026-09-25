@@ -5502,6 +5502,15 @@
       "status": "open",
       "title": "Evaluate Exasol Personal locally and record driver, SQL, and connection-limit facts"
     },
+    "exasol-plan-capture-profiling": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Capture Exasol query plans from profiling data without skewing timings"
+    },
     "exasol-throughput-streams": {
       "claim": null,
       "needs": [
