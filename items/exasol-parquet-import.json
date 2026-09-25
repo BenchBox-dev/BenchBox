@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Parquet-loaded TPC-H SF 0.01 passes the live differential suite",
+    "Load-time comparison at SF 1 recorded in this item's context",
+    "Format preference changed only if G3 holds",
+    "PR opened with make pr-open"
+  ],
+  "context": "Item-specific guardrails: keep CSV as the default until Parquet is measured. Do not expose local data over network services without approval.\n\nShared Exasol guardrails: worktree-only writes with make agent-write-preflight; explicit-path staging, never git add -A; commit identity check, no attribution trailers; uv only; lazy pyexasol import; no credentials in Git, logs, fixtures, or tracker; no live cloud runs; code-skill self-review then make pr-preflight and make pr-open, no auto-merge without make pr-ready; durable artifacts carry no tracker IDs or session narrative; stop and report on failed gates, unverified behavior, license questions, or unapproved host changes.",
+  "description": "The adapter core rejects Parquet inputs. Exasol supports `IMPORT FROM PARQUET`, and its docs describe a LOCAL form that reads files from the client machine. Add a Parquet load path and compare it with the CSV path.\n\nTasks:\n1. Verify which client paths support LOCAL Parquet import (pyexasol HTTP transport vs `IMPORT ... FROM LOCAL PARQUET`) on the tested DB version.\n2. Implement the Parquet branch in load_data, keeping the CSV path as the default until measured.\n3. Map Parquet types to the target schema and confirm DATE and DECIMAL fidelity.\n4. Measure load time for CSV and Parquet at TPC-H SF 1, then pass differential validation after a Parquet load.\n\nDecision gates:\n- G1 Start only with explicit user priority.\n- G2 If Parquet import needs the database server to reach a URL (S3/HTTP) rather than the client streaming local files, stop and ask. No local HTTP servers or object stores without approval.\n- G3 Switch the platform's preferred format to Parquet only if it is faster with identical answers.",
+  "links": [
+    "https://docs.exasol.com/db/latest/sql/import.htm",
+    "https://exasol.github.io/exasol-personal/2.3/load-data/",
+    "benchbox/platforms/base/format_capabilities.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:42:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "73580fb718664e4e95b62c24424fa40d",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

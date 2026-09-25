@@ -5502,6 +5502,15 @@
       "status": "open",
       "title": "Evaluate Exasol Personal locally and record driver, SQL, and connection-limit facts"
     },
+    "exasol-parquet-import": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Load Parquet data into Exasol with IMPORT FROM PARQUET"
+    },
     "exasol-plan-capture-profiling": {
       "claim": null,
       "needs": [
