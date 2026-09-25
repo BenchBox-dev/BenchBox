@@ -1,0 +1,13 @@
+{
+  "description": "Wire sketch-category ops into the SQL CLI path. WritePrimitivesBenchmark.get_queries() and get_queries_by_category() filter out category='sketch', so `benchbox run --benchmark write_primitives --queries sketch_*` fails with 'Invalid query IDs'. The 2026-09-25 approx cloud survey had to drive catalog SQL directly. Add a supported selection path (e.g. --categories sketch, or include sketch ops in --queries) with per-platform skip handling preserved.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T16:08:01Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "d4e1f0efd2ba4edc97dfe9a3c0180256",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}

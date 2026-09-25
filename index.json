@@ -694,6 +694,13 @@
       "status": "active",
       "title": "Approximate Analytics Cloud SQL Survey — read_primitives + SQL write_primitives at SF=0.1/1/10"
     },
+    "approx-sketch-cli-selection": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Wire sketch-category ops into SQL CLI query selection"
+    },
     "arch-canonical-sql-execute-primitive": {
       "claim": null,
       "needs": [
