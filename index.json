@@ -2109,15 +2109,10 @@
       "title": "CI savings reviews must account for same-event workflow fan-out"
     },
     "ci-visual-baseline-queue-follower-gap": {
-      "claim": {
-        "expires_at": "2026-09-26T13:13:27Z",
-        "generation": "e1476a5fedec4ea6857dbb842f9c0964",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Decide merge-queue follower visual baseline policy (speculative base has no published baseline)"
     },
     "ci-waste-dev-loop-remeasure": {
