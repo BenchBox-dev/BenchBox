@@ -5467,6 +5467,15 @@
       "status": "open",
       "title": "Emit unquoted identifiers for the Exasol sqlglot target"
     },
+    "exasol-live-differential-harness": {
+      "claim": null,
+      "needs": [
+        "exasol-adapter-core"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add opt-in live Exasol tests that compare TPC answers with DuckDB"
+    },
     "exasol-local-spike": {
       "claim": null,
       "needs": [],

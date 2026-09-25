@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Default pytest run collects zero live_exasol tests, proven by a committed test",
+    "make test-live-exasol runs serially against a local Exasol Personal deployment and reports per-query pass/fail for 121 queries",
+    "Every non-exact tolerance carries a TPC spec citation in its rationale",
+    "Exasol UAT config exists with bounded runtime, log path, and stop conditions",
+    "PR opened with make pr-open after code-skill self-review"
+  ],
+  "context": "Item-specific guardrails: no blanket tolerances and no global ordering_required=False. These tests never run in default CI. No credentials in test files; read them from env. Do not edit DuckDB reference output.\n\nShared Exasol guardrails (apply to every exasol-* item):\n- Worktree only: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only; dependencies via uv add, never hand-edited.\n- Adapter SDK imports stay lazy: import benchbox must not import pyexasol.\n- Credentials never in Git, logs, test fixtures, or tracker fields; use env vars. The local default sys/exasol may appear only in docs as the documented default.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- No live cloud runs. The only live target is local Exasol Personal. Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts (commits, PR bodies, comments) carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed decision gate, unverified driver behavior, a license question, or a host-changing action not already approved.",
+  "description": "Add a live test suite, off by default, that loads TPC-H and TPC-DS at SF 0.01 into Exasol and compares every query's answer with DuckDB through `benchbox/core/validation/cross_platform.py`. Add an Exasol UAT configuration. Transpiling proves syntax only; this harness is the evidence that answers are equal.\n\nTasks:\n1. `pytest.ini`: register the `live_exasol` marker. Every live Exasol test carries both `live_integration` (excluded by the default addopts) and `live_exasol`, and skips when EXASOL_HOST is unset.\n2. `make/platform-tests.mk`: add a `test-live-exasol` target that runs the marker serially (`-n 0`).\n3. `tests/integration/platforms/test_exasol_live.py`: parametrize over all 22 TPC-H and 99 TPC-DS queries. Load both engines at SF 0.01 and compare with the cross-platform comparator. The default tolerance is exact, rows in order. Any loosening uses `Tolerance` with a TPC spec citation in `rationale`, per docs/development/result-validation.md.\n4. Add a collection test proving the default `uv run -- pytest` invocation deselects every live_exasol test.\n5. `tests/uat/`: an Exasol configuration following existing platform configs, with bounded runtime, log path, validation, and stop conditions.\n\nDecision gates:\n- G1 Never add a tolerance without a spec citation. If a query appears to need one and no citation exists, mark it as expected failure (xfail with a reason naming the observed difference) and leave it to exasol-tpc-differential-validation.\n- G2 If loading or running both engines in one test session takes more than 15 minutes locally, split TPC-H and TPC-DS into separate modules or fixtures before merging.",
+  "links": [
+    "docs/development/result-validation.md",
+    "benchbox/core/validation/cross_platform.py",
+    "pytest.ini",
+    "make/platform-tests.mk",
+    "tests/integration/platforms/test_singlestore_live.py",
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:38:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4518001431b349119ff75ab73677c953",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
