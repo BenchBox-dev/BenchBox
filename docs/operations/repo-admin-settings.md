@@ -55,17 +55,30 @@ Required status checks:
 - ci-required-result
 - Results Explorer browser gate
 - ruleset-drift
+- Public-site visual acceptance
 ```
+
+Visual-check activation is ordered because `ruleset-drift` runs from the
+trusted `develop` tree. Land the PR containing the always-reporting workflow,
+this expected list, and its drift/landing pins while the hosted ruleset still
+requires the prior three checks. After the merge, add `Public-site visual
+acceptance` to ruleset `15611785` without changing strictness, review,
+queue, or bypass settings. The interval between merge and ruleset update is
+fail closed: the new trusted drift check reports the missing hosted context.
+Read the live ruleset back and run `scripts/ruleset_drift_check.py` before
+claiming activation. Record a real develop PR and merge-group check run with
+the exact head SHA; a green PR run alone does not prove queue coverage.
 
 A code-PR `synchronize` is not one Develop PR run. The same head SHA also
 starts Results Explorer browser tests, PR base guard, auto-merge revocation,
 the unconditional `develop-refresh-shadow` observational workflow, and
 ruleset-drift (plus path-filtered siblings such as extension-smoke and
-gitignore lint). Documentation (`docs.yml`) only starts when the diff touches
-its own path filter (`benchbox/**`, `docs/**`, `examples/**`, and similar) —
-for example a `tests/**`-only PR does not start it. Split runner minutes from
-wall minutes by workflow when judging savings; the next-slowest sibling can
-dominate remaining wall time after `pr.yml` jobs are skipped.
+gitignore lint). Documentation (`docs.yml`) reports `Public-site visual
+acceptance` on every develop PR and merge group. Its input classifier skips
+the build and comparison only when the former documentation path filter is
+unaffected. Split runner minutes from wall minutes by workflow when judging
+savings; the next-slowest sibling can dominate remaining wall time after
+`pr.yml` jobs are skipped.
 
 `ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
 that aggregates the jobs in its `needs` contract: `ci-paths`,
