@@ -5467,6 +5467,15 @@
       "status": "open",
       "title": "Emit unquoted identifiers for the Exasol sqlglot target"
     },
+    "exasol-docker-ci-smoke": {
+      "claim": null,
+      "needs": [
+        "exasol-local-evaluation-runs"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Add a Linux CI smoke test for Exasol using exasol/docker-db"
+    },
     "exasol-live-differential-harness": {
       "claim": null,
       "needs": [
