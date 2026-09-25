@@ -15540,6 +15540,15 @@
       "status": "open",
       "title": "Add the experimental SereneDB SQL adapter limited to TPC-H and TPC-DS"
     },
+    "serenedb-constraint-tuning": {
+      "claim": null,
+      "needs": [
+        "serenedb-local-functional-evaluation"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Support SereneDB primary and foreign key tuning once upstream allows it"
+    },
     "serenedb-live-differential-harness": {
       "claim": null,
       "needs": [
