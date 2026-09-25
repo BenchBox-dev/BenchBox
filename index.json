@@ -5483,6 +5483,15 @@
       "status": "open",
       "title": "Evaluate Exasol Personal locally and record driver, SQL, and connection-limit facts"
     },
+    "exasol-throughput-streams": {
+      "claim": null,
+      "needs": [
+        "exasol-adapter-core"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Support Exasol throughput streams within the licensed connection cap"
+    },
     "execution-harness-extraction-throughput-maintenance-combined": {
       "claim": null,
       "needs": [],

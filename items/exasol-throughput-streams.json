@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "Throughput run with stream count at or below the cap completes on local Exasol Personal",
+    "Every stream session has QUERY_CACHE off, verified via EXA_SQL_LAST_DAY.EXECUTION_MODE",
+    "A stream count above the cap is refused with a clear message",
+    "Capability snapshot and manifest agree; make platform-manifest-check passes",
+    "PR opened with make pr-open (or a docs-only PR in the UNSUPPORTED branch)"
+  ],
+  "context": "Item-specific guardrails: do not change base-class stream semantics. Never declare INDEPENDENT_CONNECTION without the new_stream_connection() override; the base class raises by design (adapter.py ~736-752). Respect the Exasol Personal EULA single-user, limited-connections terms.\n\nShared Exasol guardrails (apply to every exasol-* item):\n- Worktree only: make worktree-create BRANCH=... WORKTREE_PATH=../BenchBox.wt-..., then make agent-write-preflight. Never write in the primary clone.\n- Stage explicit paths only; never git add -A. Check commit identity and its config origin first (COMMIT-IDENTITY-001). No agent attribution trailers.\n- Python via uv only; dependencies via uv add, never hand-edited.\n- Adapter SDK imports stay lazy: import benchbox must not import pyexasol.\n- Credentials never in Git, logs, test fixtures, or tracker fields; use env vars. The local default sys/exasol may appear only in docs as the documented default.\n- Timings use benchbox.utils.clock.mono_time()/elapsed_seconds().\n- No live cloud runs. The only live target is local Exasol Personal. Long runs use BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs and announce command, maximum runtime, log path, and stop condition. Never commit raw logs.\n- Close-out: self-review with the code skill, fix Critical/Required, then make pr-preflight once and make pr-open. No auto-merge without make pr-ready.\n- Durable artifacts (commits, PR bodies, comments) carry no tracker IDs, phase labels, or session narrative.\n- Stop and report rather than improvise on: a failed decision gate, unverified driver behavior, a license question, or a host-changing action not already approved.",
+  "description": "Implement per-stream sessions so that throughput and pool tests run on independent Exasol connections, each configured like the main connection. The spike's connection-cap finding (exasol-local-spike gate G3) decides whether to implement. `exasol-adapter-core` ships with `stream_connection_capability = UNSUPPORTED`.\n\nTasks:\n1. Read the spike's G3 outcome from the exasol-local-spike context.\n2. If the cap is 2 or more: set `stream_connection_capability = INDEPENDENT_CONNECTION` and override `new_stream_connection()`. The override opens a new facade session with the same DSN, fingerprint, schema, autocommit, and spike-proven settings, then calls `configure_for_benchmark(stream_conn, benchmark_type or \"olap\")` and the `_apply_stream_session_state` hook if applicable. Close stream connections correctly. Update the manifest's `stream_connection_capability` and `tests/unit/platforms/throughput_session_capability_snapshot.json`.\n3. Enforce the cap: refuse any stream count above it with a clear message naming the cap and its source.\n4. Unit tests: the stream factory applies cache-off and schema; over-cap requests are refused; the capability snapshot matches.\n5. Live check: two concurrent streams run TPC-H SF 0.01, and EXA_SQL_LAST_DAY shows no cached executions in any stream session.\n6. If the cap is below 2: keep UNSUPPORTED, document the limit in docs/platforms/exasol.md, and close with a docs-only PR.\n\nDecision gates:\n- G1 The cap comes from the documented license limit, or defaults to 2 when none is documented. Capacity probes never raise it.\n- G2 If any stream session shows cached executions or different session settings than the main session, stop and fix before merging.",
+  "links": [
+    "benchbox/platforms/base/adapter.py",
+    "benchbox/platforms/base/execution.py",
+    "tests/unit/platforms/throughput_session_capability_snapshot.json",
+    "tests/integration/test_throughput_session_isolation.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-25T12:39:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "32bdbe4ae0b64472838e06249d6701fa",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}
