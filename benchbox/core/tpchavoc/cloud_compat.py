@@ -35,7 +35,7 @@ BIGQUERY_FILTER_IDS = frozenset(
 def rewrite_cloud_variant(query_id: str, query: str, target_dialect: str) -> str:
     """Preserve variant semantics where the target rejects translated syntax."""
     if target_dialect == "databricks":
-        from benchbox.platforms.spark_query_transformer import SparkTPCHavocQueryTransformer
+        from benchbox.core.tpchavoc.spark_query_transformer import SparkTPCHavocQueryTransformer
 
         if query_id in SparkTPCHavocQueryTransformer.known_variant_ids():
             return SparkTPCHavocQueryTransformer().transform(query, query_id)
