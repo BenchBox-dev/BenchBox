@@ -12,6 +12,7 @@ import pytest
 
 from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+from benchbox.metadata_primitives import MetadataPrimitives
 from benchbox.platforms.base.result_capture import ResultCaptureMixin
 from benchbox.platforms.sqlite import SQLiteAdapter
 
@@ -32,6 +33,38 @@ class TestSQLiteAdapter:
         assert adapter.database_path == ":memory:"
         assert adapter.timeout == 30.0
         assert adapter.check_same_thread is False
+
+    def test_schema_only_benchmark_skips_data_loading(self, tmp_path):
+        adapter = SQLiteAdapter(database_path=":memory:")
+        adapter.create_schema = Mock(return_value=0.1)
+        adapter.load_data = Mock(side_effect=AssertionError("data loading should be skipped"))
+        benchmark = MetadataPrimitives(output_dir=tmp_path)
+
+        result = adapter._setup_fresh_database_phases(benchmark, adapter.create_connection(), None)
+
+        adapter.create_schema.assert_called_once()
+        adapter.load_data.assert_not_called()
+        assert result[2] == 0.0
+        assert result[3] == {}
+        assert result[4].status == "SKIPPED"
+        assert result[4].tables_loaded == 0
+
+    def test_benchmark_with_own_data_still_loads(self, tmp_path):
+        class OwnDataBenchmark:
+            output_dir = tmp_path
+
+            def get_data_source_benchmark(self):
+                return None
+
+        adapter = SQLiteAdapter(database_path=":memory:")
+        adapter.create_schema = Mock(return_value=0.1)
+        adapter.load_data = Mock(return_value=({"t": 1}, 0.2, {}))
+
+        result = adapter._setup_fresh_database_phases(OwnDataBenchmark(), adapter.create_connection(), None)
+
+        adapter.load_data.assert_called_once()
+        assert result[2] == 0.2
+        assert result[3] == {"t": 1}
 
     def test_tuned_schema_executescript_captures_constraint_ddl_only(self, tmp_path):
         config = UnifiedTuningConfiguration()
