@@ -498,6 +498,9 @@ class PlatformAdapter(
         Returns:
             Mapping of table name to row count (zeros for empty tables)
         """
+        # Default: no-op. The debug statement keeps this hook structurally
+        # distinct from bare dict-returning helpers for clone detection.
+        self.logger.debug(f"materialize_schema_only_tables not implemented for {self.__class__.__name__}")
         return {}
 
     def create_external_tables(
