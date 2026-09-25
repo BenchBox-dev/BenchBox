@@ -4,13 +4,20 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 352
+**Total rules:** 357
 
 **Platforms with rules:** 22
 
 ## Will not run
 
 Queries or benchmarks that are **omitted from the result set** - either because the benchmark is refused at preflight (BLOCKED) or a specific query is excluded from execution (SKIPPED_QUERY). Users see these as missing entries in result counts.
+
+### bigquery
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | BigQuery does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.bigquery.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | BigQuery rejects the correlated scalar subquery in this grouped variant. | `execution_filter.bigquery.tpchavoc.2_v2` |
 
 ### clickhouse-cloud
 
@@ -96,6 +103,12 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | SKIPPED_QUERY | benchmark=tpchavoc, query=7_v1 | execution_filter | ClickHouse cannot execute this correlated revenue subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.7_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=8_v1 | execution_filter | ClickHouse cannot execute the two correlated market-share subqueries (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.8_v1` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=9_v1 | execution_filter | ClickHouse cannot execute this correlated profit subquery (Code 1/48 correlated subquery planning failure). | `execution_filter.clickhouse-server.tpchavoc.9_v1` |
+
+### databricks
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Databricks SQL has array aggregation but not DuckDB's LIST_SUM and LIST_ZIP functions used here. | `execution_filter.databricks.tpchavoc.1_v7` |
 
 ### datafusion
 
@@ -366,6 +379,13 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | BLOCKED | benchmark=vector_search | benchmark_gate | QuestDB 9.3.4 has no VECTOR column type. Schema creation fails immediately. No fix planned: requires QuestDB to add native vector support. | `benchmark_gate.questdb.vector_search.unsupported` |
+
+### snowflake
+
+| support | scope | phase | reason | rule_id |
+|---|---|---|---|---|
+| SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Snowflake does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.snowflake.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | Snowflake rejects the correlated scalar subquery in this grouped variant. | `execution_filter.snowflake.tpchavoc.2_v2` |
 
 ### starrocks
 
