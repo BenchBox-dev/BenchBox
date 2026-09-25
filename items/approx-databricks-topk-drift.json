@@ -1,0 +1,13 @@
+{
+  "description": "The 2026-09-25 approx cloud survey found the Databricks sketch_insert_topk_per_shard / sketch_query_topk_combine overrides failing with DATATYPE_MISMATCH on approx_top_k_accumulate(l_shipmode, 10000): the current Databricks runtime rejects the catalog's hardcoded second argument. Update the Top-K override SQL to the current function signature. Evidence: $BENCHBOX_OUTPUT_DIR/logs/approx-survey-20260925-1136/databricks-sketch-{sf01,sf1}.jsonl.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T16:08:42Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "40fe310ccabb43be9ee74f0f4fb5cf6a",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}
