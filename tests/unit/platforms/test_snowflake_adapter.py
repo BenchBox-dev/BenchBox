@@ -1272,16 +1272,11 @@ benchbox-fixture-key-material
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.return_value = [
             "query_id_123",
-            "SELECT * FROM test",
             1000,
             800,
             200,
             1024000,
-            512000,
-            0,
-            0,
             10,
-            1000,
             5.5,
             "MEDIUM",
             1,
