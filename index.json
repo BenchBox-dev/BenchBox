@@ -701,6 +701,13 @@
       "status": "open",
       "title": "Wire sketch-category ops into SQL CLI query selection"
     },
+    "approx-snowflake-datasketches-scope": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Scope Snowflake DATASKETCHES sketch overrides to account capability"
+    },
     "arch-canonical-sql-execute-primitive": {
       "claim": null,
       "needs": [

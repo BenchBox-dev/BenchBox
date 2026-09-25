@@ -1,0 +1,13 @@
+{
+  "description": "The 2026-09-25 approx cloud survey found DATASKETCHES_THETA_ACCUMULATE / DATASKETCHES_KLL_ACCUMULATE unknown on Snowflake account ZY50805 (COMPUTE_WH, ACCOUNTADMIN), and APPROX_TOP_K_ACCUMULATE returning OBJECT against the BINARY sketch column. Either scope the Snowflake sketch overrides to the account feature that provides them (document the requirement), or add a fallback path. Evidence: $BENCHBOX_OUTPUT_DIR/logs/approx-survey-20260925-1136/snowflake-sketch-{sf01,sf1}.jsonl.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T16:08:24Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "01cb7dbcd66c47cc8f8e8d38b69e4057",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}
