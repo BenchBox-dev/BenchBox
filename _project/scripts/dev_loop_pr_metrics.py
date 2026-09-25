@@ -104,6 +104,7 @@ REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
     "Results Explorer browser gate",
     "ruleset-drift",
+    "Public-site visual acceptance",
 )
 SYNCHRONIZE_WORKFLOW_NAMES: tuple[str, ...] = (
     "Develop PR",

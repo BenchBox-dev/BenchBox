@@ -280,8 +280,20 @@ def test_repo_changelog_has_no_untagged_released_section_on_this_branch():
     assert ok, f"CHANGELOG.md claims untagged version(s): {untagged}"
 
 
-def test_repo_release_accounting_matches_v040_published_state():
-    ok, errors = gce.check_release_accounting(REPO_ROOT, "0.4.0")
+def test_repo_release_accounting_matches_v041_published_state():
+    """The published version is an independently maintained literal.
+
+    Deriving it from pyproject.toml (or from the newest v* tag) would make the
+    check circular: it validates exactly those sources, so a sync that moved
+    the declared version, the changelog section, and the comparison anchor to
+    an unpublished release would pass while PyPI still served the previous
+    one. That is the case
+    test_release_accounting_does_not_infer_pypi_publication_from_a_newer_git_tag
+    guards. PyPI itself is the only authority, and this fast test must stay
+    offline, so the release version-sync PR updates this literal along with
+    the six version sources.
+    """
+    ok, errors = gce.check_release_accounting(REPO_ROOT, "0.4.1")
     assert ok, "\n".join(errors)
 
 
