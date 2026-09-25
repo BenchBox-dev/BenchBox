@@ -482,6 +482,24 @@ class PlatformAdapter(
             where per_table_timings is optional dict with detailed timing per table
         """
 
+    def materialize_schema_only_tables(self, benchmark, connection: Any) -> dict[str, int]:
+        """Materialize catalog objects for schema-only benchmarks.
+
+        The ``SKIP_DATA_LOADING`` path bypasses ``load_data()``, but some
+        adapters only create catalog objects there (DataFusion builds empty
+        tables from the schema recorded by ``create_schema()``). Overrides
+        must create empty tables without loading files; the default is a
+        no-op for adapters whose ``create_schema()`` already materializes.
+
+        Args:
+            benchmark: Benchmark instance with schema definitions
+            connection: Database connection
+
+        Returns:
+            Mapping of table name to row count (zeros for empty tables)
+        """
+        return {}
+
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
@@ -1498,10 +1516,14 @@ class PlatformAdapter(
 
         if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
             quiet_console.print("Benchmark uses schema only; skipping data loading")
-            data_loading_phase = self._create_enhanced_data_loading_phase({}, 0.0, {})
+            # Some adapters only materialize catalog objects inside load_data()
+            # (e.g. DataFusion creates empty tables from the recorded schema),
+            # so give them a hook to retain that step without loading files.
+            schema_only_stats = self.materialize_schema_only_tables(benchmark, connection)
+            data_loading_phase = self._create_enhanced_data_loading_phase(schema_only_stats, 0.0, {})
             data_loading_phase.status = "SKIPPED"
             self._last_per_table_timings = {}
-            return schema_time, schema_creation_phase, 0.0, {}, data_loading_phase, tuning_metadata_saved
+            return schema_time, schema_creation_phase, 0.0, schema_only_stats, data_loading_phase, tuning_metadata_saved
 
         quiet_console.print("Loading benchmark data...")
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
