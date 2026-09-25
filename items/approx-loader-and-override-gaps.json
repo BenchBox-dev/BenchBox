@@ -1,0 +1,13 @@
+{
+  "description": "BigQuery's _validate_compression_support runs even for --phases power with no load, so power-only runs against existing datasets fail on the shared zstd cache. The 2026-09-25 approx survey was blocked on BigQuery for this reason (datasets tpch_sf01/sf1/sf10 exist but hold 0 rows). Skip the compression gate when the load phase is not selected, or document the gzip-reload path. Separately, CPC/REQ/lgk/k100/lgmm sketch ops have no Snowflake or Databricks platform_overrides and fail on base BLOB DDL; extend overrides or document the gap.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T16:09:07Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "eadcb551b8c4455f94edd86a9caea7b2",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}

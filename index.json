@@ -701,6 +701,13 @@
       "status": "open",
       "title": "Fix Databricks Top-K sketch override signature drift"
     },
+    "approx-loader-and-override-gaps": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "BigQuery power-only compression gate plus CPC/REQ sketch override gaps"
+    },
     "approx-sketch-cli-selection": {
       "claim": null,
       "needs": [],
