@@ -153,6 +153,47 @@ def test_release_canary_workflow_uses_collection_artifact_and_six_single_threade
     assert "release_canary_sharding.py" in shard_text
     assert "mapfile -t node_ids" in shard_text
     assert "-n 0" in shard_text
+    assert "--maxfail=5" in shard_text
+    # Every shard publishes per-test durations and setup/test timing without
+    # changing selection, sharding, or the pass/fail signal.
+    assert '--junitxml="$junit_xml"' in shard_text
+    assert "shard-${SHARD_INDEX}-junit.xml" in shard_text
+    assert ".canary-setup-start-mono" in shard_text
+    assert ".canary-tests-start-mono" in shard_text
+    assert ".canary-tests-end-mono" in shard_text
+    assert '"setup_seconds": "${setup_seconds}"' in shard_text
+    assert '"test_seconds": "${test_seconds}"' in shard_text
+    assert '"junit_present": ${junit_present}' in shard_text
+    # Durations are monotonic, so an NTP correction during the job cannot
+    # publish a skewed or negative setup_seconds or test_seconds. These stamps
+    # are read from the kernel rather than from benchbox.utils.clock because
+    # the setup stamp is taken before Python and uv are installed.
+    assert "/proc/uptime" in shard_text
+    assert "date +%s" not in shard_text
+    # GitHub runs `shell: bash` under errexit. Without `set +e` a failing pytest
+    # aborts the step at the pipeline and skips the exit-code capture, the end
+    # stamp, the JUnit fallback, and the capture marker.
+    assert "set +e" in shard_text
+    # A missing JUnit file falls back to a marked empty report; the exit code
+    # still comes only from pytest (or the log tee). The fallback report is
+    # present but holds no durations, so the summary reports capture state
+    # separately: junit_captured is set false on the fallback path, carried
+    # between steps on a marker file, and re-checked against "true" before it
+    # is published. A consumer sizing shards must never read junit_present
+    # alone as evidence that per-test durations exist.
+    assert 'junit_captured="true"' in shard_text
+    assert 'junit_captured="false"' in shard_text
+    assert ".canary-junit-captured" in shard_text
+    assert '"junit_captured": ${junit_captured}' in shard_text
+    assert '[ "$junit_captured" != "true" ]' in shard_text
+    assert 'name="junit_captured" value="false"' in shard_text
+    # pytest exits 5 when it collected nothing and still writes a well-formed,
+    # non-empty report with no <testcase> in it. A size check alone would
+    # publish that as a capture, so capture state also requires a real
+    # testcase. pytest escapes captured output, so this cannot be forged by a
+    # test that prints the tag.
+    assert 'grep -q "<testcase" "$junit_xml"' in shard_text
+    assert 'exit "$rc"' in shard_text
 
 
 def test_release_canary_aggregation_fails_closed_and_preserves_summary_contract():
