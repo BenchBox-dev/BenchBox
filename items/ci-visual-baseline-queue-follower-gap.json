@@ -1,0 +1,16 @@
+{
+  "context": "Found during ci-dedupe-11 takeover verification 2026-09-25 ~11:45 UTC. Queue leader #2346 (real base 2d97c55f3) passed visual acceptance in run 36128856741. Follower #2341 (queue branch pr-2341-f2321782) received GROUP_BASE_SHA=f23217827234ec7f1e6fef862f11a8dbfe26b65b (leader speculative head); both attempts failed at baseline download (runs 36125414422, 36129430763); entry now UNMERGEABLE at position 2. Evidence in ci-dedupe-11 context.",
+  "links": [
+    "ci-dedupe-11-required-public-site-visual-check"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:a3241f1fc7b48fcf4029d4ee",
+      "at": "2026-09-25T11:46:24Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "11a99e6a56f847bbaa2454143a2a2ebd",
+      "session_id": "bbb79daffee04b6cb5f617a6c7f8491b"
+    }
+  ]
+}

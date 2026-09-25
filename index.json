@@ -2108,6 +2108,13 @@
       "status": "done",
       "title": "CI savings reviews must account for same-event workflow fan-out"
     },
+    "ci-visual-baseline-queue-follower-gap": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide merge-queue follower visual baseline policy (speculative base has no published baseline)"
+    },
     "ci-waste-dev-loop-remeasure": {
       "claim": null,
       "needs": [
