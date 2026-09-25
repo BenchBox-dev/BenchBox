@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import duckdb
+import pytest
 import sqlglot
 
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.cloud_compat import BIGQUERY_FILTER_IDS, rewrite_cloud_variant
 from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
+
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def test_bigquery_rewrites_all_filtered_aggregates_and_known_subqueries():
