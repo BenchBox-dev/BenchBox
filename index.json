@@ -722,6 +722,13 @@
       "status": "open",
       "title": "Scope Snowflake DATASKETCHES sketch overrides to account capability"
     },
+    "approx-survey-remaining-legs": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Approx survey remaining legs: BigQuery reload, Redshift reachability, 4 uncredentialed platforms"
+    },
     "arch-canonical-sql-execute-primitive": {
       "claim": null,
       "needs": [

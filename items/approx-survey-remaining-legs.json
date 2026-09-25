@@ -1,0 +1,13 @@
+{
+  "description": "The 2026-09-25 approx survey completed Snowflake + Databricks (read SF=0.01/0.1, sketch SF=0.1/1.0). Remaining legs need operator setup: (1) BigQuery gzip reload of TPC-H data (datasets exist, 0 rows; shared cache is zstd-only); (2) Redshift cluster reachable from the run host (credentials valid, connection timed out); (3) credentials for ClickHouse Cloud, Firebolt, Starburst/Trino, MotherDuck (absent from ~/.benchbox/credentials.yaml). Also note the registry caps read_primitives at SF 0.01/0.1 and write_primitives at 0.01/0.1/1.0, so the original SF=10 target needs a registry scale-option expansion first.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-25T16:09:35Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "ea85fac99d934f3bb595d29164dee36a",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}
