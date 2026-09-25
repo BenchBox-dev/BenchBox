@@ -2705,6 +2705,20 @@ class TestQualifyTableNames:
         assert ", `p1.d1.LINEITEM`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_later_from_commas_qualify_after_earlier_commas(self, mock_bigquery):
+        """A projection or predicate comma never ends the FROM-list scan."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT a, b FROM customer, orders")
+        assert "FROM `p1.d1.CUSTOMER`, `p1.d1.ORDERS`" in result
+        result = adapter._qualify_table_names("SELECT * FROM customer JOIN lineitem ON COALESCE(a, b) = c, orders")
+        assert "ON COALESCE(a, b) = c, `p1.d1.ORDERS`" in result
+        result = adapter._qualify_table_names(
+            "SELECT customer.c_name FROM customer JOIN lineitem ON COALESCE(lineitem.x, customer) IS NOT NULL, orders"
+        )
+        assert "COALESCE(lineitem.x, customer) IS NOT NULL" in result
+        assert ", `p1.d1.ORDERS`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
         """Per-statement qualification qualifies tables appearing only in later statements."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")

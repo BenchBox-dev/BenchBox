@@ -2414,7 +2414,10 @@ class BigQueryAdapter(PlatformAdapter):
         friends close it; ON opens a predicate that commas cannot belong
         to; the predicate closes at WHERE or at a comma followed by a new
         table at the list depth. Keywords inside deeper parens (a
-        subquery's own FROM/ON) never touch the outer list.
+        subquery's own FROM/ON) never touch the outer list. A comma that
+        is itself outside any FROM list (a projection comma, a function
+        argument, an INSERT column) is skipped rather than ending the
+        scan, so a later comma-separated FROM item still qualifies.
         """
         import re
 
@@ -2447,7 +2450,11 @@ class BigQueryAdapter(PlatformAdapter):
                     if re.match(r"\s*[A-Za-z_][\w$]*", tail):
                         stack[-1][1] = False
                         return True
-                return False
+                # Otherwise the comma is outside any open FROM list (a
+                # projection comma, a function argument, an INSERT column,
+                # or a comma inside a JOIN predicate): skip it and keep
+                # scanning so a later FROM-list comma can still match.
+                continue
         return False
 
     @staticmethod

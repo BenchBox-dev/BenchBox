@@ -337,3 +337,37 @@ class TestStagingManifestHelpers:
 
         bench._version = "2.0"
         assert bench._staging_manifest_matches(loaded_tpch_conn, ["orders", "lineitem", "customer"]) is False
+
+    def test_prepare_operation_seeds_setup_dialect_before_reuse_probe(self, tmp_path: Path):
+        """_prepare_operation quotes reuse probes with the platform dialect.
+
+        On a fresh benchmark object against an initialized cloud database,
+        is_setup() must quote staging probes with platform_key (backticked
+        UPPERCASE on BigQuery), not the default "standard" quoting, or a
+        healthy reused database mis-probes and reruns setup.
+        """
+        from unittest.mock import MagicMock
+
+        from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
+
+        bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        assert bench._setup_dialect == "standard"
+
+        seen_sql: list[str] = []
+
+        connection = MagicMock()
+        cursor = MagicMock()
+        cursor.fetchone.return_value = (1,)
+        connection.execute.side_effect = lambda sql: (seen_sql.append(sql), cursor)[1]
+
+        operation = MagicMock()
+        operation.requires_setup = True
+        bench.operations_manager = MagicMock()
+        bench.operations_manager.get_operation.return_value = operation
+        bench.setup = MagicMock()
+
+        bench._prepare_operation("op1", connection, platform_key="bigquery")
+
+        assert bench._setup_dialect == "bigquery"
+        assert bench.setup.call_count == 0
+        assert any("`TXN_ORDERS`" in sql for sql in seen_sql), seen_sql

@@ -288,6 +288,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
         operation = self.operations_manager.get_operation(operation_id)
 
+        # Seed the quoting dialect before the reuse probe: is_setup()
+        # quotes staging probes through _setup_dialect, which setup() only
+        # copies from platform_key afterwards. On a fresh benchmark object
+        # against an already-initialized cloud database the probe would
+        # otherwise use the default "standard" quoting (double-quoted
+        # source-case names), miss backticked UPPERCASE tables on BigQuery
+        # or quoted-uppercase tables on Snowflake, and rerun setup —
+        # including lock/table DDL a reuse principal may not run.
+        if platform_key:
+            self._setup_dialect = platform_key
         if operation.requires_setup and not self.is_setup(connection):
             self.log_verbose("Staging tables not initialized - running setup() automatically...")
             try:
