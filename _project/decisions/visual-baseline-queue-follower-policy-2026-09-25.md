@@ -1,7 +1,8 @@
 # Merge-queue follower visual baseline policy
 
 Date: 2026-09-25
-Status: Decided. Governance doc updated; no workflow change.
+Status: Superseded by `visual-baseline-queue-candidate-2026-09-26.md`. The
+option (a) rejection below still stands.
 
 ## Observation
 
