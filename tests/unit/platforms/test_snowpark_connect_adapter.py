@@ -690,8 +690,10 @@ class TestSnowparkConnectAdapterTuning:
         assert adapter._applied_tuning_ledger.is_empty()
 
     def test_apply_platform_optimizations_records_nothing(self, mock_snowpark):
-        """Snowpark has no tuning-derived session surface: nothing applies,
-        nothing records, and the run stays honestly noop."""
+        """Snowpark has no tuning-derived session surface: nothing applies.
+
+        An empty platform config records no statements and no dropped
+        intents, and the run stays honestly noop."""
         from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
@@ -707,6 +709,30 @@ class TestSnowparkConnectAdapterTuning:
         config.enable_all_constraints()
         assert adapter.apply_platform_optimizations(config.platform_optimizations) == []
         assert adapter._applied_tuning_ledger.is_empty()
+
+    def test_apply_platform_optimizations_records_dropped_intents(self, mock_snowpark):
+        """Requested optimizations are surfaced as dropped, never applied.
+
+        A Z-ordering request cannot map to a Snowflake session setting, so
+        it lands in the ledger's dropped intents with a reason instead of
+        silently vanishing or falsely reporting applied."""
+        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+        from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+
+        config = UnifiedTuningConfiguration()
+        config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["l_orderkey"])
+        assert adapter.apply_platform_optimizations(config.platform_optimizations) == []
+        assert adapter._applied_tuning_ledger.statements == []
+        dropped = adapter._applied_tuning_ledger.dropped
+        assert any("z_ordering_enabled" in intent.intent for intent in dropped)
 
 
 class TestSnowparkConnectAdapterConnectionParams:
