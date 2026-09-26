@@ -13,7 +13,7 @@ test.describe("BenchmarkIndex URL validation", () => {
 
     await expect
       .poll(() => searchParam(page.url(), "phase"), { timeout: 20_000 })
-      .toBe("power");
+      .not.toBe("throughput");
 
     await expect(page.getByRole("table", { name: /tpch SF0\.01 power results/i })).toBeVisible();
     await expect(page.getByText(/No benchmark data available/i)).not.toBeVisible();

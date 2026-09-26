@@ -20,12 +20,13 @@ test.describe("direct route parity", () => {
     await page.goto("/results/p/polars/");
     await waitForShell(page);
     await waitForDataElement(page, page.getByRole("heading", { name: /^Polars Results$/ }));
-    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(1);
+    // Genuine Polars source plus its tuned sibling.
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(2);
     await expectNoFalsePlatformEmpty(page);
 
     await page.reload();
     await waitForDataElement(page, page.getByRole("heading", { name: /^Polars Results$/ }));
-    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(1);
+    await expect(page.locator("main table tbody tr[data-testid]")).toHaveCount(2);
     await expectNoFalsePlatformEmpty(page);
 
     await page.goto("/results/p/duckdb/");
