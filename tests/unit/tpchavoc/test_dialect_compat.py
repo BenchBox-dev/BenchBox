@@ -7,10 +7,12 @@ from sqlglot import exp
 
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.dialect_compat import (
+    CLICKHOUSE_FILTER_VARIANT_IDS,
     POSTGRES_ALIAS_VARIANT_IDS,
     POSTGRES_DUAL_VARIANT_IDS,
     POSTGRES_QUALIFIED_COLUMNS,
 )
+from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
 
@@ -91,3 +93,35 @@ def test_postgres_alias_rewrite_preserves_order_by_aliases():
 
     assert "HAVING SUM(" in query
     assert "ORDER BY revenue DESC" in query
+
+
+def test_clickhouse_filtered_aggregates_use_native_combinators():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+
+    for query_id in CLICKHOUSE_FILTER_VARIANT_IDS:
+        query = benchmark.get_query(query_id, dialect="clickhouse")
+
+        assert " FILTER(" not in query
+        assert query_id not in CLICKHOUSE_TPCHAVOC_SKIPS
+        assert sqlglot.parse_one(query, read="clickhouse")
+
+    q1 = benchmark.get_query("1_v6", dialect="clickhouse")
+    q12 = benchmark.get_query("12_v7", dialect="clickhouse")
+    assert "sumOrNullIf(" in q1
+    assert "avgOrNullIf(" in q1
+    assert "countIf(" in q1
+    assert q12.count("countIf(") == 2
+
+
+def test_clickhouse_filter_rules_cover_each_deployment_mode():
+    import benchbox.sql_compat.rules.query_adapter.clickhouse_tpchavoc_rewrites  # noqa: F401
+    from benchbox.sql_compat.context import Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    for platform in ("clickhouse-local", "clickhouse-server", "clickhouse-cloud"):
+        registered = {
+            key[3]
+            for key, _ in REGISTRY.all_rules()
+            if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc") and key[3] in CLICKHOUSE_FILTER_VARIANT_IDS
+        }
+        assert registered == CLICKHOUSE_FILTER_VARIANT_IDS

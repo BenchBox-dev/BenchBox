@@ -13,6 +13,7 @@ POSTGRES_QUALIFIED_COLUMNS: dict[str, dict[str, str]] = {
     "17_v2": {"l_partkey": "lineitem", "l_quantity": "lineitem", "l_extendedprice": "lineitem"},
 }
 POSTGRES_DUAL_VARIANT_IDS = frozenset({"17_v4"})
+CLICKHOUSE_FILTER_VARIANT_IDS = frozenset({"1_v6", "12_v7"})
 _CLOUD_DIALECTS = frozenset({"bigquery", "databricks", "snowflake"})
 _POSTGRES_DIALECTS = frozenset({"postgres", "postgresql"})
 
@@ -22,6 +23,8 @@ def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> s
     target = target_dialect.lower()
     if target in _CLOUD_DIALECTS:
         return rewrite_cloud_variant(query_id, query, target)
+    if target == "clickhouse" and query_id in CLICKHOUSE_FILTER_VARIANT_IDS:
+        return _rewrite_clickhouse_filters(query)
     if target in _POSTGRES_DIALECTS:
         if query_id in POSTGRES_ALIAS_VARIANT_IDS:
             query = _inline_postgres_select_aliases(query)
@@ -78,7 +81,27 @@ def _rewrite_postgres_dual(query: str) -> str:
     return tree.sql(dialect="postgres")
 
 
+def _rewrite_clickhouse_filters(query: str) -> str:
+    """Replace aggregate FILTER clauses with ClickHouse aggregate combinators."""
+    tree = sqlglot.parse_one(query, read="clickhouse")
+    return tree.transform(_clickhouse_filter_node).sql(dialect="clickhouse")
+
+
+def _clickhouse_filter_node(node: exp.Expression) -> exp.Expression:
+    if not isinstance(node, exp.Filter):
+        return node
+    aggregate = node.this
+    condition = node.expression.this.copy()
+    if isinstance(aggregate, exp.Count) and isinstance(aggregate.this, exp.Star):
+        return exp.Anonymous(this="countIf", expressions=[condition])
+    combinator = {exp.Sum: "sumOrNullIf", exp.Avg: "avgOrNullIf"}.get(type(aggregate))
+    if combinator is None:
+        return node
+    return exp.Anonymous(this=combinator, expressions=[aggregate.this.copy(), condition])
+
+
 __all__ = [
+    "CLICKHOUSE_FILTER_VARIANT_IDS",
     "POSTGRES_ALIAS_VARIANT_IDS",
     "POSTGRES_DUAL_VARIANT_IDS",
     "POSTGRES_QUALIFIED_COLUMNS",
