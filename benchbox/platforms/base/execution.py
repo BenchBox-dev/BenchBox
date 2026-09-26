@@ -1156,6 +1156,16 @@ class TestDriversMixin:
 
     def _execute_operation_query(self, benchmark, connection: Any, query_id: str) -> dict[str, Any]:
         """Execute a benchmark operation (INSERT/UPDATE/DELETE) and return result dict."""
+        # Operation benchmarks drive every statement (setup probes, writes,
+        # validation reads, cleanup) through ``connection.execute``. Embedded
+        # engines expose that directly, but several adapters hand back handles
+        # without it (Snowflake's DBAPI connection, BigQuery's Client), which
+        # previously failed every op with "Invalid connection type". Adapt such
+        # handles through PlatformAdapterConnection so statements flow through
+        # the adapter's own execute_query path. Handles that already expose
+        # ``.execute`` keep the existing direct path unchanged.
+        if not hasattr(connection, "execute"):
+            connection = PlatformAdapterConnection(connection, self)
         op_kwargs: dict[str, Any] = {}
         # Engines sharing a SQL dialect but differing in capability (e.g. DuckLake
         # on the DuckDB dialect) set operation_platform_key so benchmarks resolve

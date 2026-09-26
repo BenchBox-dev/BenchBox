@@ -779,8 +779,16 @@ class SnowflakeAdapter(PlatformAdapter):
             self.log_very_verbose("Retrieving schema SQL from benchmark")
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
-            statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
+            # Split schema into individual statements and execute. Chunks that
+            # hold only decorative "--" comments (a ";" inside a comment
+            # splits one off) carry no DDL: skip the no-op round trip.
+            from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+            statements = [
+                stmt.strip()
+                for stmt in schema_sql.split(";")
+                if stmt.strip() and split_leading_sql_comments(stmt)[1].strip()
+            ]
 
             self.log_verbose(f"Executing {len(statements)} schema statements")
 
@@ -1320,6 +1328,15 @@ class SnowflakeAdapter(PlatformAdapter):
             value_column_index=1,
         )
 
+    @staticmethod
+    def _first_statement_keyword(statement: str) -> str:
+        """Extract the first uppercase keyword from a SQL statement, ignoring comments."""
+        import re
+
+        cleaned = re.sub(r"^(?:\s*--(?:[^\n]*)\n|\s*/\*.*?\*/)+", "", statement, flags=re.DOTALL)
+        m = re.match(r"^\s*([A-Za-z]+)", cleaned)
+        return m.group(1).upper() if m else ""
+
     def execute_query(
         self,
         connection: Any,
@@ -1360,8 +1377,48 @@ class SnowflakeAdapter(PlatformAdapter):
             # Zero-divisor guard is a no-op unless the query divides.
             query = self._safeguard_snowflake_division(query)
             self.log_verbose(f"Executing query {query_id} on Snowflake")
-            cursor.execute(query)
-            result = cursor.fetchall()
+            # Snowflake's driver rejects multi-statement strings ("Actual
+            # statement count N did not match the desired statement count
+            # 1"), which operation benchmarks emit routinely (DELETE+INSERT
+            # pairs, the 3-statement SCD2 stage batch, DDL sequences).
+            # Run each statement in session order and report the last
+            # statement's rows; a single statement takes the identical
+            # single-execute path as before.
+            # Multi-statement DML sequences (such as SCD2 close-then-insert)
+            # are executed in an explicit transaction (BEGIN ... COMMIT) so
+            # failure at a later statement triggers ROLLBACK rather than
+            # committing earlier statements under autocommit=True.
+            from benchbox.platforms.base.mysql_wire import split_sql_statements
+
+            statements = split_sql_statements(query)
+            statements_to_run = statements or [query]
+            result = []
+
+            keywords = [self._first_statement_keyword(s) for s in statements_to_run]
+            has_tx_control = any(kw in {"BEGIN", "START", "COMMIT", "ROLLBACK"} for kw in keywords)
+            has_ddl = any(
+                kw in {"CREATE", "DROP", "ALTER", "TRUNCATE", "RENAME", "COMMENT", "GRANT", "REVOKE", "USE"}
+                for kw in keywords
+            )
+            use_explicit_tx = len(statements_to_run) > 1 and not has_tx_control and not has_ddl
+
+            if use_explicit_tx:
+                cursor.execute("BEGIN")
+                try:
+                    for statement in statements_to_run:
+                        cursor.execute(statement)
+                        result = cursor.fetchall()
+                    cursor.execute("COMMIT")
+                except Exception:
+                    try:
+                        cursor.execute("ROLLBACK")
+                    except Exception as rollback_err:
+                        self.log_very_verbose(f"Rollback failed: {rollback_err}")
+                    raise
+            else:
+                for statement in statements_to_run:
+                    cursor.execute(statement)
+                    result = cursor.fetchall()
 
             execution_time = elapsed_seconds(start_time)
             actual_row_count = len(result) if result else 0
@@ -1490,15 +1547,24 @@ class SnowflakeAdapter(PlatformAdapter):
         Uppercasing quoted identifiers keeps both spellings resolving to the
         same table. Single-quoted string literals are left untouched.
         """
-        if not statement.upper().startswith("CREATE TABLE"):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        # Schema chunks can carry decorative "--" header lines before the real
+        # CREATE (naive ";" splitting preserves them). Gate and rewrite on the
+        # remainder so those chunks still get the idempotent OR REPLACE form;
+        # the prefix is re-attached unchanged at the end.
+        prefix, body = split_leading_sql_comments(statement)
+        if not body.upper().startswith("CREATE TABLE"):
             return statement
 
         # Ensure idempotency with OR REPLACE (defense-in-depth), unless the
         # statement already has IF NOT EXISTS (OR REPLACE + IF NOT EXISTS
-        # is a Snowflake syntax error).
-        if "CREATE TABLE" in statement and "OR REPLACE" not in statement.upper():
-            if "IF NOT EXISTS" not in statement.upper():
-                statement = statement.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        # is a Snowflake syntax error). Rewrite the body only, so a comment
+        # that happens to mention CREATE TABLE is never corrupted.
+        if "CREATE TABLE" in body and "OR REPLACE" not in body.upper():
+            if "IF NOT EXISTS" not in body.upper():
+                body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+        statement = prefix + body
 
         import re
 

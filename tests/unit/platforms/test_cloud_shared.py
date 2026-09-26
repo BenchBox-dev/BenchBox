@@ -187,3 +187,37 @@ class TestExplicitCacheEnabledReceipt:
         assert any("explicitly left enabled" in w for w in receipt["warnings"])
         # The deterministic receipt must survive sanitization intact.
         assert sanitize_cache_control_receipt(receipt) == receipt
+
+
+class TestSplitLeadingSqlComments:
+    """Schema chunks can start with decorative "--" header lines."""
+
+    def test_plain_statement_has_empty_prefix(self):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        prefix, body = split_leading_sql_comments("CREATE TABLE t (id INT)")
+        assert prefix == ""
+        assert body == "CREATE TABLE t (id INT)"
+
+    def test_comment_headers_split_off(self):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        chunk = "-- header line\n-- second line\nCREATE TABLE orders_stage (id INT)"
+        prefix, body = split_leading_sql_comments(chunk)
+        assert prefix == "-- header line\n-- second line\n"
+        assert body == "CREATE TABLE orders_stage (id INT)"
+
+    def test_pure_comment_chunk_has_empty_body(self):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        prefix, body = split_leading_sql_comments("-- just a comment\n-- another")
+        assert body.strip() == ""
+        assert prefix != ""
+
+    def test_block_comments_split_off(self):
+        from benchbox.platforms.cloud_shared import split_leading_sql_comments
+
+        chunk = "/* header */ /* second */\nCREATE TABLE orders_stage (id INT)"
+        prefix, body = split_leading_sql_comments(chunk)
+        assert body == "CREATE TABLE orders_stage (id INT)"
+        assert prefix == "/* header */ /* second */\n"
