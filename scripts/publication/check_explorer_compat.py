@@ -181,6 +181,7 @@ TABLE_COLUMNS_V9: dict[str, dict[str, str]] = {
         "bundle_download_url": "VARCHAR",
         "physical_mechanisms": "VARCHAR",
         "physical_rendering_id": "VARCHAR",
+        "benchmark_support_status": "VARCHAR",
     },
     "query_display_timings": {
         "result_id": "VARCHAR",
