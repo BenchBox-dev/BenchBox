@@ -49,6 +49,31 @@ def test_filtered_aggregate_rewrite_preserves_null_and_distinct_semantics():
     assert duckdb.sql(executable).fetchall() == expected
 
 
+def test_q1_v7_uses_native_array_reductions_on_cloud_engines():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+    queries = {dialect: benchmark.get_query("1_v7", dialect=dialect) for dialect in CLOUD_TPCHAVOC_SKIPS}
+
+    for dialect, query in queries.items():
+        assert "1_v7" not in CLOUD_TPCHAVOC_SKIPS[dialect]
+        assert sqlglot.parse_one(query, read=dialect)
+        assert "LIST_SUM" not in query.upper()
+        assert "LIST_ZIP" not in query.upper()
+
+    assert "ARRAY_AGG(" in queries["snowflake"]
+    assert "WITHIN GROUP (ORDER BY l_orderkey, l_linenumber)" in queries["snowflake"]
+    assert "REDUCE(" in queries["snowflake"]
+    assert "TRANSFORM(" in queries["snowflake"]
+    assert "ARRAY_AGG(" in queries["bigquery"]
+    assert "ORDER BY l_orderkey, l_linenumber" in queries["bigquery"]
+    assert "FROM UNNEST(" in queries["bigquery"]
+    assert "SAFE_OFFSET(" in queries["bigquery"]
+    assert "COLLECT_LIST(" in queries["databricks"]
+    assert "SORT_ARRAY(" in queries["databricks"]
+    assert "AGGREGATE(" in queries["databricks"]
+    assert "TRANSFORM(" in queries["databricks"]
+    assert "ZIP_WITH(" in queries["databricks"]
+
+
 def test_snowflake_2_v2_is_unskipped_and_parseable():
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     query = benchmark.get_query("2_v2", dialect="snowflake")
@@ -109,6 +134,15 @@ def test_registry_describes_runtime_rewrites():
         platform: {key[3] for key, _ in REGISTRY.all_rules() if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc")}
         for platform in ("bigquery", "snowflake", "databricks")
     }
-    assert registered["bigquery"] == BIGQUERY_FILTER_IDS | {"7_v8", "12_v8", "13_v8", "18_v4", "5_v4", "11_v4", "3_v9"}
-    assert registered["snowflake"] == {"6_v2", "14_v2"}
-    assert len(registered["databricks"]) == 11
+    assert registered["bigquery"] == BIGQUERY_FILTER_IDS | {
+        "1_v7",
+        "7_v8",
+        "12_v8",
+        "13_v8",
+        "18_v4",
+        "5_v4",
+        "11_v4",
+        "3_v9",
+    }
+    assert registered["snowflake"] == {"1_v7", "6_v2", "14_v2"}
+    assert len(registered["databricks"]) == 12

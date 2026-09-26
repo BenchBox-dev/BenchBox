@@ -10,6 +10,10 @@ from benchbox.sql_compat.registry import REGISTRY
 
 _RULES = (
     *(
+        (platform, "1_v7", "array_aggregation", "Use native arrays and higher-order reductions")
+        for platform in ("bigquery", "snowflake", "databricks")
+    ),
+    *(
         ("bigquery", query_id, "filtered_aggregate", "Use conditional aggregates instead of FILTER")
         for query_id in BIGQUERY_FILTER_IDS
     ),

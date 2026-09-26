@@ -9,15 +9,10 @@ from benchbox.sql_compat.registry import REGISTRY
 
 CLOUD_TPCHAVOC_SKIPS: dict[str, dict[str, str]] = {
     "bigquery": {
-        "1_v7": "BigQuery does not support DuckDB LIST aggregates and LIST lambda functions in this variant.",
         "2_v2": "BigQuery rejects the correlated scalar subquery in this grouped variant.",
     },
-    "snowflake": {
-        "1_v7": "Snowflake does not support DuckDB LIST aggregates and LIST lambda functions in this variant.",
-    },
-    "databricks": {
-        "1_v7": "Databricks SQL has array aggregation but not DuckDB's LIST_SUM and LIST_ZIP functions used here.",
-    },
+    "snowflake": {},
+    "databricks": {},
 }
 
 for _platform, _skips in CLOUD_TPCHAVOC_SKIPS.items():
