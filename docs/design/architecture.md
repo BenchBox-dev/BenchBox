@@ -181,5 +181,5 @@ carries contract obligations from the map:
 - [Benchmark Support Status Criteria](../benchmarks/support-status.md) — per-benchmark rationale
 - [Backward Compatibility](../reference/backward-compatibility.md) — deprecation and removal paths
 - [MCP Reference](../reference/mcp.md) — scoped surface and omission ledger
-- [One-engine scoped surfaces ADR](development/adr/adr-one-engine-scoped-surfaces.md) — why CLI and MCP share `run_service`
-- [Concepts: Architecture](concepts/architecture.md) — user-facing component tour with examples
+- [One-engine scoped surfaces ADR](../development/adr/adr-one-engine-scoped-surfaces.md) — why CLI and MCP share `run_service`
+- [Concepts: Architecture](../concepts/architecture.md) — user-facing component tour with examples
