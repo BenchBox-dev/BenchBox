@@ -12937,9 +12937,9 @@
     },
     "re-audit-databend-firebolt-starburst-and-clickhouse-cloud-fo": {
       "claim": {
-        "expires_at": "2026-09-27T04:31:22Z",
-        "generation": "f79a6e5a12194fb3882f7ce72c345191",
-        "renewals": 0,
+        "expires_at": "2026-09-27T04:31:33Z",
+        "generation": "b7505d0147e7490b93dd01e52ee5018a",
+        "renewals": 1,
         "worker": "jcode-batch-c"
       },
       "needs": [],
