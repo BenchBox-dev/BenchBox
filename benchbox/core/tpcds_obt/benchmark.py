@@ -12,6 +12,7 @@ from benchbox.base import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 logger = logging.getLogger(__name__)
@@ -169,15 +170,17 @@ class TPCDSOBTBenchmark(BaseBenchmark):
 
         # Determine standard paths via the shared helper so BENCHBOX_OUTPUT_DIR is
         # honored; falls back to Path.cwd()/benchmark_runs/datagen when unset.
-        # OBT output directory (for transformed OBT table)
+        # OBT output directory (for transformed OBT table). normalize_output_dir
+        # keeps a CloudStagingPath/DatabricksPath handler intact; Path(...)
+        # would stringify it to the local cache and drop the cloud target.
         if output_dir:
-            self.output_dir = Path(output_dir)
+            self.output_dir = normalize_output_dir(output_dir)
         else:
             self.output_dir = get_benchmark_runs_datagen_path("tpcds_obt", scale_factor)
 
         # TPC-DS source directory (for base TPC-DS data)
         if tpcds_source_dir:
-            self.tpcds_source_dir = Path(tpcds_source_dir)
+            self.tpcds_source_dir = normalize_output_dir(tpcds_source_dir)
         else:
             self.tpcds_source_dir = get_benchmark_runs_datagen_path("tpcds", scale_factor)
 

@@ -26,6 +26,7 @@ from benchbox.core.ai_primitives.cost import (
     format_cost_warning,
 )
 from benchbox.core.ai_primitives.queries import AIQueryManager
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 logger = logging.getLogger(__name__)
@@ -152,7 +153,10 @@ class AIPrimitivesBenchmark(BaseBenchmark):
         # Setup directories (reuse TPC-H data)
         if output_dir is None:
             output_dir = get_benchmark_runs_datagen_path("tpch", scale_factor)
-        self.output_dir = Path(output_dir)
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; Path(...) would stringify it to the local cache and drop the
+        # cloud upload target the orchestrator resolved at construction time.
+        self.output_dir = normalize_output_dir(output_dir)
 
         # Initialize components
         self.query_manager: AIQueryManager = AIQueryManager()
