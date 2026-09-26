@@ -375,3 +375,53 @@ class TestPatternIteration:
         for pattern in patterns:
             for phase in pattern.get_phases():
                 assert isinstance(phase, WorkloadPhase)
+
+
+class TestMultiWriterPattern:
+    """Tests for MultiWriterPattern."""
+
+    def test_basic_configuration(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=3, readers=5, duration_seconds=60)
+        assert pattern.max_concurrency == 8
+        assert pattern.total_duration == 65.0
+        assert pattern.writer_count == 3
+        assert pattern.reader_count == 5
+
+    def test_two_phases(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=2, readers=2, duration_seconds=30, drain_seconds=5)
+        phases = pattern.get_phases()
+        assert len(phases) == 2
+        assert phases[0].concurrency == 4
+        assert phases[0].phase_name == "read-write"
+        assert phases[1].concurrency == 2
+        assert phases[1].phase_name == "write-drain"
+
+    def test_no_drain_single_phase(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=2, readers=2, duration_seconds=30, drain_seconds=0)
+        assert len(pattern.get_phases()) == 1
+
+    def test_concurrency_over_time(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=2, readers=3, duration_seconds=30, drain_seconds=10)
+        assert pattern.get_concurrency_at(-1) == 0
+        assert pattern.get_concurrency_at(0) == 5
+        assert pattern.get_concurrency_at(30) == 5
+        assert pattern.get_concurrency_at(35) == 2
+        assert pattern.get_concurrency_at(41) == 0
+
+    def test_rejects_bad_inputs(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        with pytest.raises(ValueError):
+            MultiWriterPattern(writers=0, readers=1, duration_seconds=10)
+        with pytest.raises(ValueError):
+            MultiWriterPattern(writers=1, readers=0, duration_seconds=10)
+        with pytest.raises(ValueError):
+            MultiWriterPattern(writers=1, readers=1, duration_seconds=0)

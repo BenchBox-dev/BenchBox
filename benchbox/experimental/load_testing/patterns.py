@@ -522,3 +522,88 @@ class WavePattern(WorkloadPattern):
     @property
     def max_concurrency(self) -> int:
         return self._max
+
+
+class MultiWriterPattern(WorkloadPattern):
+    """Concurrent-writer pattern: N writers plus M readers ("multiplayer").
+
+    Models the multi-client concurrent-writer story: several writers issue
+    INSERT/UPDATE statements against one table while readers run SELECTs.
+    The writer and reader phases overlap in time so lock contention,
+    snapshot isolation, and write-serialization behavior are exercised.
+    Readers scale down first so the run ends with writers draining.
+    """
+
+    def __init__(
+        self,
+        writers: int,
+        readers: int,
+        duration_seconds: float,
+        drain_seconds: float = 5.0,
+    ):
+        """Initialize the multi-writer pattern.
+
+        Args:
+            writers: Number of concurrent writer streams.
+            readers: Number of concurrent reader streams.
+            duration_seconds: Overlapped read/write duration.
+            drain_seconds: Writer-only drain tail after readers stop.
+        """
+        if writers < 1:
+            raise ValueError("writers must be at least 1")
+        if readers < 1:
+            raise ValueError("readers must be at least 1")
+        if duration_seconds <= 0:
+            raise ValueError("duration_seconds must be positive")
+        if drain_seconds < 0:
+            raise ValueError("drain_seconds must be non-negative")
+
+        self._writers = writers
+        self._readers = readers
+        self._duration = duration_seconds
+        self._drain = drain_seconds
+
+    def get_phases(self) -> list[WorkloadPhase]:
+        phases = [
+            WorkloadPhase(
+                concurrency=self._writers + self._readers,
+                duration_seconds=self._duration,
+                phase_name="read-write",
+            )
+        ]
+        if self._drain > 0:
+            phases.append(
+                WorkloadPhase(
+                    concurrency=self._writers,
+                    duration_seconds=self._drain,
+                    phase_name="write-drain",
+                )
+            )
+        return phases
+
+    def get_concurrency_at(self, elapsed_seconds: float) -> int:
+        if elapsed_seconds < 0:
+            return 0
+        if elapsed_seconds <= self._duration:
+            return self._writers + self._readers
+        if elapsed_seconds <= self._duration + self._drain:
+            return self._writers
+        return 0
+
+    @property
+    def total_duration(self) -> float:
+        return self._duration + self._drain
+
+    @property
+    def max_concurrency(self) -> int:
+        return self._writers + self._readers
+
+    @property
+    def writer_count(self) -> int:
+        """Number of writer streams."""
+        return self._writers
+
+    @property
+    def reader_count(self) -> int:
+        """Number of reader streams."""
+        return self._readers
