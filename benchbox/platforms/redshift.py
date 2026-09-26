@@ -44,6 +44,7 @@ from .base.data_loading import (
     FileFormatRegistry,
     resolve_adapter_data_source,
     resolve_csv_dialect,
+    run_staged_table_loads,
 )
 from .base.runtime_metadata import build_default_normalized_result_metadata
 
@@ -1934,9 +1935,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Load data using Redshift COPY command with S3 integration."""
-        start_time = mono_time()
-        table_stats = {}
-
         cursor = connection.cursor()
 
         try:
@@ -1948,69 +1946,40 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if self.s3_bucket and boto3:
                 s3_client = self._create_s3_client()
 
-                for table_name, file_paths in data_source.tables.items():
-                    valid_files = self._filter_valid_files(file_paths)
+                def load_via_s3(table_name: str, valid_files: list[Path]) -> int:
+                    return self._load_table_via_s3(
+                        cursor, s3_client, table_name, valid_files, connection, data_source, benchmark
+                    )
 
-                    if not valid_files:
-                        self.logger.warning(f"Skipping {table_name} - no valid data files")
-                        table_stats[table_name.lower()] = 0
-                        continue
-
-                    chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                    self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
-
-                    try:
-                        load_start = mono_time()
-                        row_count = self._load_table_via_s3(
-                            cursor, s3_client, table_name, valid_files, connection, data_source, benchmark
-                        )
-                        table_stats[table_name.lower()] = row_count
-
-                        load_time = elapsed_seconds(load_start)
-                        self.logger.info(
-                            f"✅ Loaded {row_count:,} rows into {table_name.lower()}{chunk_info} in {load_time:.2f}s"
-                        )
-
-                    except Exception as e:
-                        error_message = str(e) or repr(e) or type(e).__name__
-                        self.logger.error(f"Failed to load {table_name}: {error_message}")
-                        table_stats[table_name.lower()] = 0
+                table_stats, total_time, _ = run_staged_table_loads(
+                    self,
+                    tables=data_source.tables,
+                    stat_key=str.lower,
+                    filter_files=self._filter_valid_files,
+                    load_one=load_via_s3,
+                    record_timings=False,
+                    fail_fast=False,
+                )
 
             else:
                 # Direct loading without S3 (less efficient)
                 self.logger.warning("No S3 bucket configured, using direct INSERT loading")
 
-                for table_name, file_paths in data_source.tables.items():
-                    valid_files = self._filter_valid_files(file_paths)
+                def load_via_insert(table_name: str, valid_files: list[Path]) -> int:
+                    return self._load_table_via_insert(
+                        cursor, table_name, valid_files, connection, data_source, benchmark
+                    )
 
-                    if not valid_files:
-                        self.logger.warning(f"Skipping {table_name} - no valid data files")
-                        table_stats[table_name.lower()] = 0
-                        continue
-
-                    try:
-                        self.log_verbose(f"Direct loading data for table: {table_name}")
-                        load_start = mono_time()
-
-                        total_rows_loaded = self._load_table_via_insert(
-                            cursor, table_name, valid_files, connection, data_source, benchmark
-                        )
-                        table_stats[table_name.lower()] = total_rows_loaded
-
-                        load_time = elapsed_seconds(load_start)
-                        chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                        self.logger.info(
-                            f"✅ Loaded {total_rows_loaded:,} rows into {table_name.lower()}{chunk_info} in {load_time:.2f}s"
-                        )
-
-                    except Exception as e:
-                        error_message = str(e) or repr(e) or type(e).__name__
-                        self.logger.error(f"Failed to load {table_name}: {error_message}")
-                        table_stats[table_name.lower()] = 0
-
-            total_time = elapsed_seconds(start_time)
-            total_rows = sum(table_stats.values())
-            self.logger.info(f"✅ Loaded {total_rows:,} total rows in {total_time:.2f}s")
+                table_stats, total_time, _ = run_staged_table_loads(
+                    self,
+                    tables=data_source.tables,
+                    stat_key=str.lower,
+                    filter_files=self._filter_valid_files,
+                    load_one=load_via_insert,
+                    record_timings=False,
+                    fail_fast=False,
+                    describe_start=lambda table_name, chunk_info: f"Direct loading data for table: {table_name}",
+                )
 
         except Exception as e:
             self.logger.error(f"Data loading failed: {e}")
