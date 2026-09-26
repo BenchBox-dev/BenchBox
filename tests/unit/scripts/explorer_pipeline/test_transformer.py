@@ -1339,18 +1339,18 @@ class TestExecutionModeExtraction:
 
     def test_reads_the_key_path_current_develop_writes(self) -> None:
         bundle = {"platform": {"config": {"execution_mode": "sql"}}}
-        assert transformer_module._execution_mode(bundle) == "sql"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "sql"
 
     def test_reads_legacy_config_mode(self) -> None:
         bundle = {"config": {"mode": "dataframe"}}
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_documented_schema_location_wins(self) -> None:
         bundle = {
             "config": {"execution_mode": "dataframe", "mode": "sql"},
             "platform": {"config": {"execution_mode": "sql"}},
         }
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_execution_mode_field_is_not_consulted(self) -> None:
         """``execution.mode`` says "sql" for 105 DataFrame runs in the corpus.
@@ -1363,21 +1363,29 @@ class TestExecutionModeExtraction:
             "execution": {"mode": "sql"},
             "platform": {"config": {"execution_mode": "dataframe"}},
         }
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_unknown_vocabulary_stays_none(self) -> None:
         """An invented mode is worse than an honestly empty facet."""
-        assert transformer_module._execution_mode({"config": {"mode": "balanced"}}) is None
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": {"mode": "balanced"}}))
+            is None
+        )
 
     def test_missing_everywhere_stays_none(self) -> None:
-        assert transformer_module._execution_mode({}) is None
+        assert transformer_module._execution_mode(transformer_module._parse_bundle({})) is None
 
     def test_case_is_normalized(self) -> None:
-        assert transformer_module._execution_mode({"config": {"mode": "SQL"}}) == "sql"
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": {"mode": "SQL"}})) == "sql"
+        )
 
     @pytest.mark.parametrize("node", [None, "not-a-dict", 42, []])
     def test_non_dict_nodes_do_not_raise(self, node: object) -> None:
-        assert transformer_module._execution_mode({"config": node, "platform": node}) is None
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": node, "platform": node}))
+            is None
+        )
 
 
 class TestPublishedCorpusResolvesExecutionMode:
@@ -1399,7 +1407,7 @@ class TestPublishedCorpusResolvesExecutionMode:
                 continue
             total += 1
             data = json.loads(path.read_text(encoding="utf-8"))
-            if transformer_module._execution_mode(data) is None:
+            if transformer_module._execution_mode(transformer_module._parse_bundle(data)) is None:
                 unresolved.append(path.name)
 
         assert total > 0, "no bundles discovered"
@@ -1422,7 +1430,7 @@ class TestPublishedCorpusResolvesExecutionMode:
             else:
                 continue
             data = json.loads(path.read_text(encoding="utf-8"))
-            actual = transformer_module._execution_mode(data)
+            actual = transformer_module._execution_mode(transformer_module._parse_bundle(data))
             if actual != expected:
                 mismatches.append((path.name, expected, actual))
 
@@ -1462,9 +1470,9 @@ class TestClientLinkProducerShape:
     def test_remote_host_endpoint_classifies_remote(self) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "remote_host"}
-        assert transformer_module._deployment_class_from_contract(data) == "remote"
+        assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "remote"
 
     def test_cloud_endpoint_still_classifies_cloud(self) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "cloud_endpoint"}
-        assert transformer_module._deployment_class_from_contract(data) == "cloud"
+        assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "cloud"

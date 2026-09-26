@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from benchbox.core.cost.models import NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
@@ -740,8 +741,396 @@ class MetaRank(BaseModel):
     primary_order: str | None = None  # "asc" | "desc"
 
 
+# ---------------------------------------------------------------------------
+# Bundle input document (schema-v2 result bundle JSON, ingest side)
+# ---------------------------------------------------------------------------
+
+
+class _BundleBlock(BaseModel):
+    """Lenient base for schema-v2 bundle input blocks.
+
+    The explorer input gate (``_ensure_explorer_input_schema``) only pins the
+    bundle schema version, not block structure, so every nested block carries
+    legacy variants: missing blocks, explicit nulls, and occasionally a scalar
+    where a mapping belongs. Coercing all of those to an empty block preserves
+    the historical ingest behavior (every extractor treats them as "absent")
+    while letting the rest of the pipeline work with typed models. Unknown
+    keys are kept (``extra=\"allow\"``) so the typed view never drops
+    evidence the raw bundle carries.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_mapping(cls, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            return data
+        return {}
+
+
+class BundleRunBlock(_BundleBlock):
+    """Typed view of a bundle ``run`` block."""
+
+    # Timestamp stays untyped: ``_utc_run_date_from_timestamp`` enforces the
+    # strict UTC-calendar-date grammar and must keep raising its own errors.
+    timestamp: Any = None
+    total_duration_ms: float = 0.0
+
+    @field_validator("total_duration_ms", mode="before")
+    @classmethod
+    def _coerce_duration(cls, value: Any) -> Any:
+        if value is None:
+            return 0.0
+        return value
+
+
+class BundleBenchmarkBlock(_BundleBlock):
+    """Typed view of a bundle ``benchmark`` block."""
+
+    id: str = "unknown"
+    scale_factor: float = 0.0
+    test_type: str | None = None
+    compliance_class: str | None = None
+
+    @field_validator("test_type", mode="before")
+    @classmethod
+    def _coerce_test_type(cls, value: Any) -> Any:
+        # Falsy (including "") means "not recorded"; the extractor falls back
+        # to the phases block. Verbatim otherwise: no stripping.
+        return str(value) if value else None
+
+    @field_validator("compliance_class", mode="before")
+    @classmethod
+    def _coerce_compliance_class(cls, value: Any) -> Any:
+        # Verbatim ingest: only an explicit null means "not recorded".
+        return None if value is None else str(value)
+
+
+class BundleLogicalProfile(_BundleBlock):
+    """Typed view of ``platform.tuning.logical_profile`` (ADR-2 section 3)."""
+
+    physical_mechanisms: Any = None
+    physical_rendering_id: Any = None
+
+
+class BundleAppliedBlock(_BundleBlock):
+    """Typed view of ``platform.tuning.applied``."""
+
+    receipt: Any = None
+
+
+class BundleTuningBlock(_BundleBlock):
+    """Typed view of a bundle ``platform.tuning`` summary block."""
+
+    requested_config_hash: str | None = None
+    applied_ledger_hash: str | None = None
+    validation_status: str | None = None
+    tuning_policy_generation: str | None = None
+    requested: Any = None
+    applied: BundleAppliedBlock = Field(default_factory=BundleAppliedBlock)
+    logical_profile: BundleLogicalProfile | None = None
+
+    @field_validator("logical_profile", mode="before")
+    @classmethod
+    def _coerce_logical_profile(cls, value: Any) -> Any:
+        # A non-object profile is "no profile recorded" (unknown), not an
+        # empty recording: only a real mapping carries the tri-state split
+        # `_physical_mechanisms` depends on.
+        if value is None or isinstance(value, Mapping):
+            return value
+        return None
+
+    @field_validator(
+        "requested_config_hash",
+        "applied_ledger_hash",
+        "validation_status",
+        "tuning_policy_generation",
+        mode="before",
+    )
+    @classmethod
+    def _coerce_verbatim_hash(cls, value: Any) -> Any:
+        # ADR-1 identities are ingested verbatim and display-only; falsy
+        # values (including explicit nulls) mean "not recorded".
+        return str(value) if value else None
+
+
+class BundleCloudBlock(_BundleBlock):
+    """Typed view of a bundle ``platform.cloud`` block."""
+
+    provider: Any = None
+    region: Any = None
+    location: Any = None
+
+
+class BundleComputeBlock(_BundleBlock):
+    """Typed view of a bundle ``platform.compute`` block."""
+
+    node_type: Any = None
+    warehouse_size: Any = None
+    warehouse: Any = None
+    cluster_id: Any = None
+    cluster_name: Any = None
+    rpu: Any = None
+    serverless_slots: Any = None
+    worker_shape: Any = None
+    driver_shape: Any = None
+
+
+class BundleStorageBlock(_BundleBlock):
+    """Typed view of a bundle ``platform.storage`` block."""
+
+    table_format: Any = None
+
+
+class BundlePlatformConfig(_BundleBlock):
+    """Typed view of a bundle ``platform.config`` block."""
+
+    execution_mode: Any = None
+
+
+class BundleDeploymentBlock(_BundleBlock):
+    """Typed view of a bundle ``platform.deployment`` block."""
+
+    deployment_type: Any = None
+    endpoint_class: Any = None
+    cloud_provider: Any = None
+    cloud_region: Any = None
+    instance_type: Any = None
+    warehouse_size: Any = None
+    node_count: Any = None
+    cluster_size: Any = None
+    storage_format: Any = None
+    storage_tier: Any = None
+
+
+class BundlePlatformRuntime(_BundleBlock):
+    """Typed view of an ``environment.platform_runtime`` block."""
+
+    runtime_type: Any = None
+
+
+class BundleContainerBlock(_BundleBlock):
+    """Typed view of an ``environment.container`` block (presence only)."""
+
+
+class BundlePlatformBlock(_BundleBlock):
+    """Typed view of a bundle ``platform`` block."""
+
+    name: str = "unknown"
+    version: Any = None
+    client_version: Any = None
+    config: BundlePlatformConfig = Field(default_factory=BundlePlatformConfig)
+    tuning: BundleTuningBlock = Field(default_factory=BundleTuningBlock)
+    deployment: BundleDeploymentBlock = Field(default_factory=BundleDeploymentBlock)
+    cloud: BundleCloudBlock = Field(default_factory=BundleCloudBlock)
+    compute: BundleComputeBlock = Field(default_factory=BundleComputeBlock)
+    storage: BundleStorageBlock = Field(default_factory=BundleStorageBlock)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _coerce_name(cls, value: Any) -> Any:
+        if value is None:
+            return "unknown"
+        return value
+
+
+class BundleConfigBlock(_BundleBlock):
+    """Typed view of a bundle top-level ``config`` block."""
+
+    tuning_mode: Any = None
+    tuning_config: Any = None
+    tuning: Any = None
+    execution_mode: Any = None
+    mode: Any = None
+    options: Any = None
+
+
+class BundleExecutionBlock(_BundleBlock):
+    """Typed view of a bundle top-level ``execution`` block."""
+
+    tuning_mode: Any = None
+    execution_mode: Any = None
+    mode: Any = None
+    driver_version_actual: Any = None
+    driver_version_resolved: Any = None
+    driver_version_requested: Any = None
+    driver_actual_version: Any = None
+    driver_resolved_version: Any = None
+    driver_requested_version: Any = None
+
+
+class BundleSummaryQueries(_BundleBlock):
+    """Typed view of a bundle ``summary.queries`` block."""
+
+    total: Any = None
+
+
+class BundleTpcMetrics(_BundleBlock):
+    """Typed view of a bundle ``summary.tpc_metrics`` block."""
+
+    power_at_size: Any = None
+    qphh_at_size: Any = None
+    qphds_at_size: Any = None
+
+
+class BundleSummaryBlock(_BundleBlock):
+    """Typed view of a bundle ``summary`` block."""
+
+    queries: BundleSummaryQueries = Field(default_factory=BundleSummaryQueries)
+    # ``validation`` is str-or-mapping by schema; ``normalize_validation_status``
+    # owns that split, so the leaf stays variant-typed.
+    validation: Any = None
+    tpc_metrics: BundleTpcMetrics = Field(default_factory=BundleTpcMetrics)
+
+
+class BundlePhaseBlock(_BundleBlock):
+    """Typed view of one entry in a bundle ``phases`` block."""
+
+    duration_ms: Any = None
+
+
+class BundleQueryRow(_BundleBlock):
+    """One execution row from a bundle ``queries`` list.
+
+    ``query_id`` is resolved at parse time from the legacy ``id`` / ``query_id``
+    key split. Numeric leaves stay variant-typed: each consumer coerces them
+    with its own fallback (skip the row, default to zero, ...), so the model
+    preserves the raw value instead of pre-deciding.
+    """
+
+    query_id: str = ""
+    run_type: str | None = None
+    status: str = "pass"
+    ms: Any = None
+    execution_time_ms: Any = None
+    iter: Any = None
+    stream: Any = None
+    dataframe_skip_summary: Any = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _resolve_identity(cls, data: Any) -> Any:
+        if not isinstance(data, Mapping):
+            return {}
+        resolved = dict(data)
+        resolved["query_id"] = str(data.get("id") or data.get("query_id", ""))
+        if "status" in data and data["status"] is None:
+            # Explicit null is not a pass; downstream normalizes any
+            # non-allow-listed value to "fail".
+            resolved["status"] = "fail"
+        return resolved
+
+    @field_validator("run_type", mode="before")
+    @classmethod
+    def _coerce_run_type(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return value if isinstance(value, str) else str(value)
+
+
+class BundleStatementOverhead(_BundleBlock):
+    """Typed view of ``environment.client_link.statement_overhead_ms``."""
+
+    min: Any = None
+    median: Any = None
+
+
+class BundleClientLink(_BundleBlock):
+    """Typed view of an ``environment.client_link`` block."""
+
+    collection_status: Any = None
+    client_region: Any = None
+    client_cloud: Any = None
+    statement_overhead_ms: BundleStatementOverhead = Field(default_factory=BundleStatementOverhead)
+
+
+class BundleEnvironmentBlock(_BundleBlock):
+    """Typed view of a bundle ``environment`` block."""
+
+    os: Any = None
+    arch: Any = None
+    cpu_count: Any = None
+    memory_gb: Any = None
+    python: Any = None
+    cpu_model: Any = None
+    cpu_identity_provenance: Any = None
+    platform_runtime: BundlePlatformRuntime = Field(default_factory=BundlePlatformRuntime)
+    container: BundleContainerBlock = Field(default_factory=BundleContainerBlock)
+    client_link: BundleClientLink = Field(default_factory=BundleClientLink)
+
+
+class BundleProvenanceBlock(_BundleBlock):
+    """Typed view of a bundle ``provenance`` block."""
+
+    funding: Any = None
+
+
+class BundleDocument(_BundleBlock):
+    """Typed view of one schema-v2 result bundle for explorer ingest.
+
+    This is the ingest-side counterpart to the ``ManifestEntry`` /
+    ``DetailResult`` read models: every transformer extractor takes this
+    document (or one of its blocks) instead of a raw ``dict[str, Any]``.
+    Only the fields the explorer projects are declared; everything else
+    rides along as extras.
+    """
+
+    run: BundleRunBlock = Field(default_factory=BundleRunBlock)
+    benchmark: BundleBenchmarkBlock = Field(default_factory=BundleBenchmarkBlock)
+    platform: BundlePlatformBlock = Field(default_factory=BundlePlatformBlock)
+    config: BundleConfigBlock = Field(default_factory=BundleConfigBlock)
+    execution: BundleExecutionBlock = Field(default_factory=BundleExecutionBlock)
+    summary: BundleSummaryBlock = Field(default_factory=BundleSummaryBlock)
+    phases: dict[str, BundlePhaseBlock] = Field(default_factory=dict)
+    queries: list[BundleQueryRow] = Field(default_factory=list)
+    environment: BundleEnvironmentBlock = Field(default_factory=BundleEnvironmentBlock)
+    provenance: BundleProvenanceBlock = Field(default_factory=BundleProvenanceBlock)
+    cost: dict[str, Any] = Field(default_factory=dict)
+    normalized_cost: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("phases", mode="before")
+    @classmethod
+    def _coerce_phases(cls, value: Any) -> Any:
+        if not isinstance(value, Mapping):
+            return {}
+        return {str(name): block for name, block in value.items()}
+
+    @field_validator("queries", mode="before")
+    @classmethod
+    def _coerce_queries(cls, value: Any) -> Any:
+        # Non-object rows are skipped downstream; drop them at parse time so
+        # the typed list only carries real execution rows.
+        if not isinstance(value, list):
+            return []
+        return [row for row in value if isinstance(row, Mapping)]
+
+    @field_validator("cost", "normalized_cost", mode="before")
+    @classmethod
+    def _coerce_cost_block(cls, value: Any) -> Any:
+        # Cost blocks stay raw mappings: ``_normalized_cost_from_block`` owns
+        # their strict validation and error messages.
+        if isinstance(value, Mapping):
+            return dict(value)
+        return {}
+
+
 __all__ = [
     "BenchmarkSummary",
+    "BundleAppliedBlock",
+    "BundleBenchmarkBlock",
+    "BundleConfigBlock",
+    "BundleDeploymentBlock",
+    "BundleDocument",
+    "BundleEnvironmentBlock",
+    "BundleExecutionBlock",
+    "BundleLogicalProfile",
+    "BundlePlatformBlock",
+    "BundleProvenanceBlock",
+    "BundleQueryRow",
+    "BundleRunBlock",
+    "BundleSummaryBlock",
+    "BundleTuningBlock",
     "CANONICAL_BENCHMARK_ALIASES",
     "DetailResult",
     "ManifestEntry",
