@@ -33,10 +33,21 @@ class JoinOrderQueryManager:
 
         Args:
             queries_dir: Path to directory containing Join Order Benchmark query files.
-                        If None, uses embedded queries.
+                        If None, uses embedded queries. A supplied directory is the
+                        complete replacement query set: only its files are visible,
+                        with no canonical fallback.
         """
         self._queries_dir = queries_dir
         self._queries = self._load_queries()
+
+    def _uses_custom_query_directory(self) -> bool:
+        """Whether a caller-supplied query directory replaces the built-in set.
+
+        Returns:
+            True when ``queries_dir`` pointed at an existing directory, in which
+            case the files on disk are the complete query set.
+        """
+        return bool(self._queries_dir) and os.path.exists(self._queries_dir)
 
     def _load_queries(self) -> dict[str, str]:
         """Load all Join Order Benchmark queries.
@@ -465,6 +476,9 @@ WHERE cn.country_code = '[us]'
         """
         if query_id in self._queries:
             return self._queries[query_id]
+        if self._uses_custom_query_directory():
+            available = ", ".join(sorted(self._queries))
+            raise ValueError(f"Invalid query ID: {query_id}. Available: {available}")
         if _CanonicalQueryManager is not None:
             try:
                 # Canonical manager applies portable-alias normalization
@@ -480,11 +494,15 @@ WHERE cn.country_code = '[us]'
         """Get all Join Order Benchmark queries.
 
         Merges the 13 embedded smoke-test queries with the remaining
-        canonical JOB queries, covering the full 113-query set.
+        canonical JOB queries, covering the full 113-query set. When a custom
+        query directory was supplied, the directory remains the complete
+        replacement query set and no canonical queries are merged in.
 
         Returns:
             Dictionary mapping query IDs to SQL text
         """
+        if self._uses_custom_query_directory():
+            return dict(self._queries)
         if _CanonicalQueryManager is not None:
             merged = _CanonicalQueryManager().get_all_queries()
         else:
@@ -511,12 +529,15 @@ WHERE cn.country_code = '[us]'
     def get_queries_by_complexity(self) -> dict[str, list[str]]:
         """Categorize queries by complexity based on table count.
 
+        Classifies the same merged query set reported by ``get_all_queries``,
+        so the distribution accounts for all exposed queries.
+
         Returns:
             Dictionary mapping complexity levels to query IDs
         """
         complexity_map = {"simple": [], "medium": [], "complex": []}
 
-        for query_id, query_sql in self._queries.items():
+        for query_id, query_sql in self.get_all_queries().items():
             # Count FROM clauses and JOIN keywords to estimate complexity
             from_count = query_sql.upper().count("FROM")
             join_count = query_sql.upper().count("JOIN")
@@ -543,6 +564,9 @@ WHERE cn.country_code = '[us]'
     def get_queries_by_pattern(self) -> dict[str, list[str]]:
         """Categorize queries by join pattern.
 
+        Classifies the same merged query set reported by ``get_all_queries``,
+        so the distribution accounts for all exposed queries.
+
         Returns:
             Dictionary mapping join patterns to query IDs
         """
@@ -552,7 +576,7 @@ WHERE cn.country_code = '[us]'
             "complex_join": [],  # Mixed patterns
         }
 
-        for query_id, query_sql in self._queries.items():
+        for query_id, query_sql in self.get_all_queries().items():
             # Simple heuristic based on table patterns
             if "movie_companies" in query_sql and "movie_info" in query_sql:
                 pattern_map["star_join"].append(query_id)

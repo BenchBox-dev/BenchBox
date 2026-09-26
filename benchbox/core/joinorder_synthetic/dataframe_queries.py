@@ -1,6 +1,7 @@
 """Synthetic JoinOrder DataFrame queries for Expression and Pandas families.
 
-Implements the 13 historical JoinOrder smoke-test queries through a restricted
+Implements the 113 JoinOrder queries (13 historical smoke-test queries plus
+the remaining canonical extensions) through a restricted
 JOB SQL-to-DataFrame translator.
 
 Copyright 2026 Joe Harris / BenchBox Project
