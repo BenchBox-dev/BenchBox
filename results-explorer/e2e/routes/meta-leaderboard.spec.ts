@@ -28,7 +28,9 @@ test.describe("cross-benchmark leaderboard disclosure", () => {
   test("all excluded ranking states why no evidence is ranked and offers the detail route", async ({ page }) => {
     await page.goto("/results/compare/?platform=fixture-aws-sql");
     await waitForShell(page);
-    const state = page.getByTestId("all-excluded-ranking-tpch-sf0.01-standard");
+    // The Fixture AWS SQL environment variant is a power-phase bundle, so its
+    // all-excluded ranking state renders under the power cohort key.
+    const state = page.getByTestId("all-excluded-ranking-tpch-sf0.01-power");
     await waitForDataElement(page, state);
 
     await expect(state).toContainText("No ranked evidence");
