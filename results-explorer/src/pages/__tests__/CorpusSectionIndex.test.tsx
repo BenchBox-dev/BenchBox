@@ -182,6 +182,62 @@ describe("corpus section indexes", () => {
       expect(within(list).getByRole("link", { name: expectedLinkName })).toHaveAttribute("href", expectedHref);
     },
   );
+
+  it("benchmarks group cards by support status with badges", async () => {
+    vi.mocked(listResults).mockResolvedValue([
+      resultRow({
+        result_id: "duckdb-tpch",
+        benchmark: "tpch",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-20T12:00:00Z",
+        benchmark_support_status: "stable",
+      }),
+      resultRow({
+        result_id: "duckdb-vector",
+        benchmark: "vector_search",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-21T12:00:00Z",
+        benchmark_support_status: "beta",
+      }),
+      resultRow({
+        result_id: "duckdb-custom",
+        benchmark: "custom-internal",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-22T12:00:00Z",
+        benchmark_support_status: null,
+      }),
+    ]);
+
+    render(<BenchmarksIndex />);
+
+    const list = await screen.findByTestId("benchmarks-index-list");
+    // Groups render most-supported first, unclassified last.
+    const headings = within(list).getAllByRole("heading", { level: 2 });
+    expect(headings.map((heading) => heading.textContent)).toEqual([
+      "Stable benchmarks",
+      "Beta benchmarks",
+      "Other benchmarks",
+    ]);
+    // Cards carry their status badge; unclassified cards carry none.
+    expect(within(list).getByTestId("support-badge-stable")).toHaveTextContent("Stable");
+    expect(within(list).getByTestId("support-badge-beta")).toHaveTextContent("Beta");
+    expect(within(list).queryByTestId("support-badge-other")).toBeNull();
+    expect(within(list).getAllByRole("link")).toHaveLength(3);
+  });
+
+  it("platforms render one ungrouped list without badges", async () => {
+    vi.mocked(listResults).mockResolvedValue(ROWS);
+
+    render(<PlatformsIndex />);
+
+    const list = await screen.findByTestId("platforms-index-list");
+    expect(within(list).queryByRole("heading", { level: 2 })).toBeNull();
+    expect(within(list).queryByTestId(/support-badge-/)).toBeNull();
+    expect(within(list).getAllByRole("link")).toHaveLength(2);
+  });
 });
 
 function resultRow(overrides: Partial<ResultRow>): ResultRow {
