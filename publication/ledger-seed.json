@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-25T17:35:48.546462+00:00",
-  "source": "eaf4202bd9aed302a68f40d8b6945731fee1437d",
+  "generated_at": "2026-09-26T11:55:16.382488+00:00",
+  "source": "59f35610c24ed4424d5b73fb05eb068f2466477f",
   "source_ref": "origin/published-results",
-  "source_resolved_at": "2026-09-20T02:20:51.172075+00:00",
+  "source_resolved_at": "2026-09-26T11:55:16.382488+00:00",
   "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
-  "bidirectional": true,
+  "bidirectional": false,
   "union": [
     "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
     "results-data/bundles/amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
@@ -222,6 +222,10 @@
     "results-data/bundles/tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.json",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260828_213108_3bd92bcc.json",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224454_6155be3c.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224522_0d8b1e17.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224539_eeeb3da1.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224553_0d266bf3.json",
     "results-data/bundles/tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json",
     "results-data/bundles/tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
     "results-data/bundles/tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
@@ -468,6 +472,10 @@
     "results-data/bundles/tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.json": "accepted",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260828_213108_3bd92bcc.json": "accepted",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json": "accepted",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224454_6155be3c.json": "legacy_overlay",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224522_0d8b1e17.json": "legacy_overlay",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224539_eeeb3da1.json": "legacy_overlay",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224553_0d266bf3.json": "legacy_overlay",
     "results-data/bundles/tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json": "accepted",
     "results-data/bundles/tpch_sf1_polars_df_20260824_193005_54a9e53f.json": "accepted",
     "results-data/bundles/tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json": "accepted",
@@ -714,6 +722,10 @@
     "results-data/bundles/tpch_sf1_duckdb_sql_20260826_162117_67e59fb6.json": "e175e64f3221c254604f89f123fd6fcf046763e157ad872f3f63b808728a2969",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260828_213108_3bd92bcc.json": "0e8c178156cca79cca62e94a86dcb47fd1f17479ac89f43941455bce60cc2b34",
     "results-data/bundles/tpch_sf1_duckdb_sql_20260829_211318_8b8d7c16.json": "e5831deeb4e24618231411334d444ec37c86d1d3f7e889be070f627e16b0470c",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224454_6155be3c.json": "d721e109b1b4769f1acd3cfd923f3432575f0989acda9526428fe9f904a3be15",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224522_0d8b1e17.json": "5bf3ed6a0e69c6974ca0e582c4701ec2cbd0d56f5b756a763f56415fe810a85b",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224539_eeeb3da1.json": "83eee4223584c7bde89f7f0a14839a4bd81d19890467034c6279a5f58ba51495",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224553_0d266bf3.json": "bd359ac39f62737ed78b860cb35452beb21390973394755155074effa51a0f80",
     "results-data/bundles/tpch_sf1_ducklake_sql_20260828_091755_137bc87e.json": "e325d60187a6924f8cc54124da537130815c6bf1d1ffb87f3e5f3cb1ac51b74a",
     "results-data/bundles/tpch_sf1_polars_df_20260824_193005_54a9e53f.json": "f3f4cf32dcb3ae575f797cd0a29f86acdef17f4b3df0409e974c565517d86a3b",
     "results-data/bundles/tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json": "fba87dcfa681e550927593ff9ca9cc26a4d33c710fbb67d5fe7e044106e09b75",
@@ -746,6 +758,11 @@
     "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
   },
   "published_only": [],
-  "legacy_overlay": [],
-  "count": 244
+  "legacy_overlay": [
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224454_6155be3c.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224522_0d8b1e17.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224539_eeeb3da1.json",
+    "results-data/bundles/tpch_sf1_duckdb_sql_20260925_224553_0d266bf3.json"
+  ],
+  "count": 248
 }
