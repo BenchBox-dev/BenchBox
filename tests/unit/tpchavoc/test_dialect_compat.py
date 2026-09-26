@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 import sqlglot
 from sqlglot import exp
 
@@ -16,6 +17,8 @@ from benchbox.core.tpchavoc.dialect_compat import (
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
+
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def test_postgres_alias_variants_inline_having_and_where_references():
