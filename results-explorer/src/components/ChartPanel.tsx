@@ -645,6 +645,11 @@ function ChartFigure({
 
   return (
     <div data-chart-container data-chart-id={chart.id} data-testid={`chart-panel-chart-${chart.id}`}>
+      {!datasetEmpty && (
+        <div class="mb-2 flex justify-end">
+          <SaveChartView chartId={chart.id} chartTitle={chart.title ?? chart.shortTitle} />
+        </div>
+      )}
       <div class="mt-3">
         {datasetEmpty ? (
           <ChartDatasetEmptyState chart={chart} summary={summary!} />

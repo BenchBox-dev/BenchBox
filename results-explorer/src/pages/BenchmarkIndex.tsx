@@ -58,11 +58,35 @@ import { groupCohortRows, limitCohortGroups, type CohortGroupBy } from "@/lib/qu
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
-// Deep-link ids for the expandable analysis cards.
+// Deep-link ids for the expandable analysis cards. Every saveable card needs
+// an entry: SaveChartView stores its card's anchor in the saved URL, and a
+// saved view only restores the selected chart when the anchor resolves to a
+// card the page can open.
 const CHART_CARD_ANCHORS: Readonly<Record<string, string>> = {
   query_heatmap: "benchmark-section-matrix",
+  percentile_ladder: "benchmark-section-percentiles",
+  cdf_chart: "benchmark-section-cdf",
+  query_histogram: "benchmark-section-histogram",
+  stacked_phase: "benchmark-section-phases",
+  time_series: "benchmark-section-trend",
   rank_table: "benchmark-section-ranks",
+  cost_scatter: "benchmark-section-cost",
 };
+
+// Section suffixes derived from the card anchors above, so adding a saveable
+// card cannot leave its deep link unrecognized. `list` is the results table,
+// not an analysis card, so it stays a separate member of ViewMode.
+const ANALYSIS_SECTION_SUFFIXES: readonly string[] = Object.values(CHART_CARD_ANCHORS).map((anchor) =>
+  anchor.replace("benchmark-section-", "")
+);
+
+// Analysis section suffix back to the chart card it opens.
+const ANALYSIS_CHART_BY_SECTION: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(CHART_CARD_ANCHORS).map(([chartId, anchorId]) => [
+    anchorId.replace("benchmark-section-", ""),
+    chartId,
+  ]),
+);
 
 const DATE_WINDOW_OPTIONS: { value: DateWindowFacet; label: string }[] = [
   { value: "all", label: "All time" },
@@ -75,7 +99,7 @@ interface BenchmarkIndexProps extends RoutableProps {
   benchmark?: string;
 }
 
-type ViewMode = "matrix" | "ranks" | "list";
+type ViewMode = "list" | (string & {});
 type BenchmarkListSortKey = "platform" | "scale_factor" | "arch" | "cpu_family" | "memory_gb" | "run_date" | "power_score" | "display_geomean_ms" | "query_count";
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
@@ -114,9 +138,15 @@ const BENCHMARK_ROW_FACET_KEYS: ExplorerFacetKey[] = [
   "memory_gb",
 ];
 
+function requestedAnalysisChart(): string | null {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#benchmark-section-")) return null;
+  return ANALYSIS_CHART_BY_SECTION[hash.replace("#benchmark-section-", "")] ?? null;
+}
+
 function requestedBenchmarkSection(): ViewMode | null {
   const hash = window.location.hash.replace("#benchmark-section-", "");
-  if (window.location.hash.startsWith("#benchmark-section-") && ["matrix", "ranks", "list"].includes(hash)) {
+  if (window.location.hash.startsWith("#benchmark-section-") && (hash === "list" || ANALYSIS_SECTION_SUFFIXES.includes(hash))) {
     return hash as ViewMode;
   }
   const legacyView = new URLSearchParams(window.location.search).get("view");
@@ -941,7 +971,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
             summaryLayout="long"
             cardAnchors={CHART_CARD_ANCHORS}
             forceOpenChartId={
-              requestedSection === "matrix" ? "query_heatmap" : requestedSection === "ranks" ? "rank_table" : undefined
+              requestedAnalysisChart() ?? (requestedSection === "ranks" ? "rank_table" : undefined)
             }
             rankGateReason={rankGateReason}
             rankGateContext={{ benchmark: title, scaleFactor: effectiveSf, phase: effectivePhase }}
