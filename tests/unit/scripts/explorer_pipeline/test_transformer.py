@@ -1091,6 +1091,29 @@ class TestExtendedManifestFields:
         with pytest.raises(ValueError, match="cost_model_version"):
             transformer.to_manifest_entry(bundle)
 
+    def test_explicitly_empty_normalized_cost_rejected(self, tmp_path: Path) -> None:
+        """An explicit ``"normalized_cost": {}`` block is malformed evidence.
+
+        It must reach strict ingest validation (missing provenance fields)
+        rather than degrade to synthetic unavailable metadata as if no cost
+        block had been supplied.
+        """
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = {}
+        bundle = tmp_path / "empty_normalized_cost.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="cost_model_version"):
+            transformer.to_manifest_entry(bundle)
+
+    def test_absent_normalized_cost_stays_unavailable(self, bundle_file: Path) -> None:
+        """A bundle with no cost block still gets synthetic unavailable metadata."""
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.normalized_cost.cost_status == "unavailable"
+        assert entry.normalized_cost.normalized_cost_usd is None
+
     @pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
     def test_non_finite_normalized_cost_rejected(self, tmp_path: Path, value: str) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
