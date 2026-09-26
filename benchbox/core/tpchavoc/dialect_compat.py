@@ -8,6 +8,10 @@ from sqlglot import exp
 from benchbox.core.tpchavoc.cloud_compat import rewrite_cloud_variant
 
 POSTGRES_ALIAS_VARIANT_IDS = frozenset({"3_v7", "4_v7", "5_v7", "7_v7", "9_v7", "10_v7", "11_v7"})
+POSTGRES_QUALIFIED_COLUMNS: dict[str, dict[str, str]] = {
+    "2_v5": {"ps_partkey": "partsupp", "ps_supplycost": "partsupp"},
+    "17_v2": {"l_partkey": "lineitem", "l_quantity": "lineitem", "l_extendedprice": "lineitem"},
+}
 _CLOUD_DIALECTS = frozenset({"bigquery", "databricks", "snowflake"})
 _POSTGRES_DIALECTS = frozenset({"postgres", "postgresql"})
 
@@ -17,8 +21,11 @@ def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> s
     target = target_dialect.lower()
     if target in _CLOUD_DIALECTS:
         return rewrite_cloud_variant(query_id, query, target)
-    if target in _POSTGRES_DIALECTS and query_id in POSTGRES_ALIAS_VARIANT_IDS:
-        return _inline_postgres_select_aliases(query)
+    if target in _POSTGRES_DIALECTS:
+        if query_id in POSTGRES_ALIAS_VARIANT_IDS:
+            query = _inline_postgres_select_aliases(query)
+        if columns := POSTGRES_QUALIFIED_COLUMNS.get(query_id):
+            query = _qualify_postgres_columns(query, columns)
     return query
 
 
@@ -45,4 +52,13 @@ def _inline_postgres_select_aliases(query: str) -> str:
     return tree.sql(dialect="postgres")
 
 
-__all__ = ["POSTGRES_ALIAS_VARIANT_IDS", "rewrite_dialect_variant"]
+def _qualify_postgres_columns(query: str, columns: dict[str, str]) -> str:
+    """Qualify variant columns whose unqualified names collide after translation."""
+    tree = sqlglot.parse_one(query, read="postgres")
+    for column in tree.find_all(exp.Column):
+        if not column.table and (table := columns.get(column.name)):
+            column.set("table", exp.to_identifier(table))
+    return tree.sql(dialect="postgres")
+
+
+__all__ = ["POSTGRES_ALIAS_VARIANT_IDS", "POSTGRES_QUALIFIED_COLUMNS", "rewrite_dialect_variant"]

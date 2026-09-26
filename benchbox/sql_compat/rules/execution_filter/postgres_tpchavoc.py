@@ -9,14 +9,12 @@ from benchbox.sql_compat.registry import REGISTRY
 
 POSTGRES_TPCHAVOC_SKIPS: dict[str, str] = {
     "1_v7": "PostgreSQL-family engines do not provide DuckDB's `LIST()` aggregate used by this variant.",
-    "2_v5": "PostgreSQL-family engines report ambiguous `ps_partkey` resolution for this variant shape.",
     "5_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
     "7_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
     "9_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
     "10_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
     "11_v9": "PostgreSQL-family engines reject this window expression in WHERE.",
     "13_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
-    "17_v2": "PostgreSQL-family engines report ambiguous `l_partkey` resolution for this variant shape.",
     "17_v4": "PostgreSQL-family engines do not provide Oracle's `dual` table.",
 }
 
