@@ -58,13 +58,27 @@ function asStringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+/** True for same-origin explorer paths. Rejects protocol-relative URLs
+ * (`//host/...`), backslash escapes (`/\...`), and absolute URLs, so a
+ * seeded or imported payload can never turn a saved view into an
+ * open redirect off the explorer origin. */
+export function isInternalExplorerPath(url: string): boolean {
+  if (!url.startsWith("/") || url.startsWith("//") || url.startsWith("/\\")) return false;
+  try {
+    const parsed = new URL(url, "https://explorer.internal");
+    return parsed.origin === "https://explorer.internal" && parsed.pathname.startsWith("/");
+  } catch {
+    return false;
+  }
+}
+
 function parseSavedView(raw: unknown): SavedChartView | null {
   if (!isRecord(raw)) return null;
   const id = asNonEmptyString(raw.id);
   const name = asNonEmptyString(raw.name);
   const url = asNonEmptyString(raw.url);
   if (id === null || name === null || url === null) return null;
-  if (!url.startsWith("/")) return null;
+  if (!isInternalExplorerPath(url)) return null;
   const chartId = asStringOrNull(raw.chartId);
   const savedAt = asNonEmptyString(raw.savedAt) ?? nowIso();
   return { id, name, url, chartId, savedAt };
@@ -105,6 +119,12 @@ export function parseDashboardsPayload(raw: unknown): Dashboard[] {
 // page reload. Only used in the browser; server-side writes stay no-ops.
 let memoryDashboards: Dashboard[] | null = null;
 
+// Ids deleted while localStorage writes were failing. Without tombstones a
+// delete followed by a failed write would resurrect: the in-memory snapshot
+// no longer contains the id, so the merge in readStorage would re-admit the
+// stale stored copy.
+let memoryTombstones: Set<string> = new Set();
+
 function cloneDashboards(dashboards: Dashboard[]): Dashboard[] {
   return dashboards.map((dashboard) => ({ ...dashboard, items: dashboard.items.map((item) => ({ ...item })) }));
 }
@@ -112,35 +132,59 @@ function cloneDashboards(dashboards: Dashboard[]): Dashboard[] {
 function readStorage(): Dashboard[] {
   let stored: Dashboard[];
   try {
-    if (typeof window === "undefined" || !window.localStorage) return [];
-    const raw = window.localStorage.getItem(DASHBOARD_STORAGE_KEY);
+    if (typeof window === "undefined") return [];
+    // Property access itself can throw SecurityError when storage is
+    // blocked (private browsing, restricted iframes), so it stays inside
+    // the try alongside getItem/parse.
+    const storage = window.localStorage;
+    if (!storage) return [];
+    const raw = storage.getItem(DASHBOARD_STORAGE_KEY);
     if (raw === null || raw === "") stored = [];
     else stored = parseDashboardsPayload(JSON.parse(raw));
   } catch {
     stored = [];
   }
-  if (memoryDashboards === null) return stored;
+  if (memoryDashboards === null) return stored.filter((dashboard) => !memoryTombstones.has(dashboard.id));
   // The failed-write snapshot is authoritative for its ids; entries stored by
   // another tab that the snapshot never saw are preserved alongside it.
+  // Tombstoned ids stay deleted even though the snapshot no longer lists them.
   const memoryIds = new Set(memoryDashboards.map((dashboard) => dashboard.id));
-  return [...cloneDashboards(memoryDashboards), ...stored.filter((dashboard) => !memoryIds.has(dashboard.id))];
+  return [
+    ...cloneDashboards(memoryDashboards),
+    ...stored.filter((dashboard) => !memoryIds.has(dashboard.id) && !memoryTombstones.has(dashboard.id)),
+  ];
 }
 
 function writeStorage(dashboards: Dashboard[]): void {
-  if (typeof window !== "undefined" && window.localStorage) {
+  if (typeof window !== "undefined") {
     try {
-      const payload = dashboards.map((dashboard) => ({ ...dashboard, version: DASHBOARD_MODEL_VERSION }));
-      window.localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
-      memoryDashboards = null;
-      return;
+      // window.localStorage access stays inside the try: it throws
+      // SecurityError when storage is blocked, and that must fall back
+      // to memory rather than crash the caller.
+      const storage = window.localStorage;
+      if (storage) {
+        const payload = dashboards.map((dashboard) => ({ ...dashboard, version: DASHBOARD_MODEL_VERSION }));
+        storage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
+        memoryDashboards = null;
+        memoryTombstones = new Set();
+        return;
+      }
     } catch {
       // Fall through to the session fallback below.
     }
   }
   // Storage is unavailable: keep the snapshot in memory so the session still
   // sees what it saved. Callers return the mutated model, which now matches
-  // what loadDashboards() reads back until the page reloads.
+  // what loadDashboards() reads back until the page reloads. Ids absent from
+  // the new snapshot but present in the old one were deleted, so tombstone
+  // them to keep the stale stored copy from resurrecting.
   if (typeof window !== "undefined") {
+    if (memoryDashboards !== null) {
+      const nextIds = new Set(dashboards.map((dashboard) => dashboard.id));
+      for (const dashboard of memoryDashboards) {
+        if (!nextIds.has(dashboard.id)) memoryTombstones.add(dashboard.id);
+      }
+    }
     memoryDashboards = cloneDashboards(dashboards);
   }
 }
@@ -177,6 +221,11 @@ export function renameDashboard(id: string, name: string): Dashboard[] {
 export function deleteDashboard(id: string): Dashboard[] {
   const next = readStorage().filter((dashboard) => dashboard.id !== id);
   writeStorage(next);
+  // If the write fell back to memory, tombstone the id explicitly. The
+  // snapshot diff in writeStorage only covers deletes after the first
+  // failed write; without this, deleting while memoryDashboards is still
+  // null would resurrect the stale stored copy on the next read.
+  if (memoryDashboards !== null) memoryTombstones.add(id);
   return next;
 }
 
@@ -185,7 +234,7 @@ export function addChartView(
   view: { name: string; url: string; chartId?: string | null },
 ): Dashboard[] {
   const name = view.name.trim();
-  if (name === "" || !view.url.startsWith("/")) return readStorage();
+  if (name === "" || !isInternalExplorerPath(view.url)) return readStorage();
   const next = readStorage().map((dashboard) =>
     dashboard.id === dashboardId
       ? {

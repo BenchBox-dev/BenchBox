@@ -3,6 +3,7 @@ import {
   addChartView,
   createDashboard,
   deleteDashboard,
+  isInternalExplorerPath,
   loadDashboards,
   parseDashboardsPayload,
   removeChartView,
@@ -107,6 +108,48 @@ describe("dashboard store", () => {
     const dashboard = createDashboard("Board")!;
     expect(addChartView(dashboard.id, { name: "  ", url: "/results/" })[0]?.items).toEqual([]);
     expect(addChartView(dashboard.id, { name: "X", url: "https://evil.example/" })[0]?.items).toEqual([]);
+  });
+
+  it("rejects protocol-relative and backslash urls as open redirects", () => {
+    expect(isInternalExplorerPath("/results/tpch/")).toBe(true);
+    expect(isInternalExplorerPath("/results/compare/?a=1&b=2#chart")).toBe(true);
+    expect(isInternalExplorerPath("//attacker.example/exploit")).toBe(false);
+    expect(isInternalExplorerPath("/\\attacker.example/exploit")).toBe(false);
+    expect(isInternalExplorerPath("https://evil.example/")).toBe(false);
+    const dashboard = createDashboard("Board")!;
+    expect(
+      addChartView(dashboard.id, { name: "X", url: "//attacker.example/exploit" })[0]?.items,
+    ).toEqual([]);
+    expect(parseDashboardsPayload([{ version: 1, id: "d", name: "D", createdAt: "t", updatedAt: "t", items: [
+      { id: "v", name: "X", url: "//attacker.example/exploit", savedAt: "t" },
+    ] }])[0]?.items).toEqual([]);
+  });
+
+  it("keeps deletes deleted when storage writes fail", () => {
+    const dashboard = createDashboard("Board")!;
+    // Fail every write from here on; the stored copy still holds the board.
+    const storage = window.localStorage;
+    vi.spyOn(storage, "setItem").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    expect(deleteDashboard(dashboard.id)).toEqual([]);
+    // The stale stored copy must not resurrect through the memory merge.
+    expect(loadDashboards()).toEqual([]);
+    expect(deleteDashboard("missing")).toEqual([]);
+  });
+
+  it("falls back to memory when localStorage access throws SecurityError", () => {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      get() {
+        throw new DOMException("blocked", "SecurityError");
+      },
+    });
+    const dashboard = createDashboard("Board")!;
+    expect(dashboard?.name).toBe("Board");
+    expect(loadDashboards()).toHaveLength(1);
+    expect(deleteDashboard(dashboard!.id)).toEqual([]);
+    expect(loadDashboards()).toEqual([]);
   });
 
   it("ignores unknown dashboard ids", () => {
