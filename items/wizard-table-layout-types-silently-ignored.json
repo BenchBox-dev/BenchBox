@@ -1,0 +1,13 @@
+{
+  "description": "The tuning wizard records table-layout tuning types (PARTITIONING, CLUSTERING, DISTRIBUTION, SORTING) through UnifiedTuningConfiguration.enable_platform_optimization, which only handles platform optimizations (Z-ordering, liquid clustering, auto optimize/compact, bloom filters, materialized views) and silently ignores the table-layout types. The wizard prints success messages (e.g. Snowflake clustering keys, BigQuery partitioning, Redshift distribution/sort keys) but the resulting config carries none of them. Found by rewriting the wizard tests against real UnifiedTuningConfiguration objects: the previous _DummyConfig stand-in accepted every type, masking the gap. Affected sites: _run_simple_wizard (snowflake/bigquery/redshift branches), _run_advanced_wizard platform paths, _apply_defaults_to_config non-interactive defaults, and all _configure_*_optimizations except Databricks. Fix direction: route table-layout types to table_tunings entries (or extend enable_platform_optimization) so confirmed choices persist, with tests asserting presence.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396",
+      "at": "2026-09-26T02:49:59Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "01e8e24414ec4d44a6017a0647571972",
+      "session_id": "c1e61be617094a0c855156fb176d5c08"
+    }
+  ]
+}

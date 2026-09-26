@@ -19593,6 +19593,13 @@
       "status": "done",
       "title": "Wire the FlightData cross-surface gate (staged) once its DataFrame date window is fixed"
     },
+    "wizard-table-layout-types-silently-ignored": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Wizard table-layout choices are silently ignored by enable_platform_optimization"
+    },
     "workflow-lint-guard-for-invalid-context-references": {
       "claim": null,
       "needs": [],
