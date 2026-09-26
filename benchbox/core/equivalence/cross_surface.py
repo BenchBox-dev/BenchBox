@@ -914,6 +914,18 @@ _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
     ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
 )
 
+_DATAVAULT_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell: Q17 is a scalar SUM(...) with no "
+    "GROUP BY over the small-quantity-order conjunction (brand + container literals "
+    "against part/partsupp/lineitem). Verified 2026-09-26 by executing the reference "
+    "SQL over every brand/container combination present in the built cell (25 brands x "
+    "40 containers = 1000 combos): every combination returns the single all-NULL row, "
+    "so neither surface can discriminate anything. Data/literal artifact of the bounded "
+    "cell, not a load or logic bug. Tracked: plant a satisfying brand/container pair "
+    "in the generator or gate a larger cell (do NOT change the canonical Q17 query)."
+)
+_DATAVAULT_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q17",), _DATAVAULT_Q17_VACUOUS)
+
 _JOINORDER_SYNTHETIC_VACUOUS = (
     "Synthetic selectivity, not a bug: the query's multi-table conjunction needs coordinated "
     "real-world literals (specific keywords, notes, countries, ratings, link types) that the "
@@ -1636,6 +1648,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "datavault": CrossSurfaceGate(
         name="datavault",
         build=build_datavault_duckdb,
+        legitimately_empty=_DATAVAULT_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "Data Vault expression and pandas DataFrame implementations are separately handwritten for each "
