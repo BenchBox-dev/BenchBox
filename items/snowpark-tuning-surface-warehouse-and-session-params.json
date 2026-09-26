@@ -1,0 +1,13 @@
+{
+  "description": "Snowpark (snowpark_connect.py) applies no tuning-derived session settings: unified platform-optimization fields are Spark/Databricks concepts with no Snowflake ALTER SESSION mapping, and warehouse_size is stored but never applied. The adapter now documents this explicitly (apply_platform_optimizations returns [] with rationale; hygiene ALTER stays out of the ledger). Open maintainer decisions: (1) Should tuning be able to resize/switch the Snowflake warehouse (USE WAREHOUSE / ALTER WAREHOUSE SET WAREHOUSE_SIZE)? That mutates shared billable infrastructure and needs an explicit opt-in mirroring modify_warehouse_settings on the SQL Snowflake adapter -- do NOT implement implicitly. (2) Is there any Snowflake session parameter worth driving from tuning configs (e.g. STATEMENT_TIMEOUT_IN_SECONDS, QUERY_TAG)? (3) Snowpark per-table tuning (clustering) parity with the SQL Snowflake adapter is also unimplemented. Any implementation must record via the shared applied_ledger PHASE_SESSION vocab so runs report honestly.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396",
+      "at": "2026-09-26T03:03:32Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "dad9f87ff5514ded80befa0078afca0a",
+      "session_id": "c1e61be617094a0c855156fb176d5c08"
+    }
+  ]
+}

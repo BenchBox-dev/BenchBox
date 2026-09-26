@@ -16136,6 +16136,13 @@
       "status": "done",
       "title": "Snowpark Connect for Spark Platform"
     },
+    "snowpark-tuning-surface-warehouse-and-session-params": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide Snowpark tuning surface: warehouse sizing and session params"
+    },
     "soundness-classifier-prefix-vs-exact-file": {
       "claim": null,
       "needs": [],
