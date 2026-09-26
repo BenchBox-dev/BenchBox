@@ -15547,10 +15547,15 @@
       "title": "Security Audit"
     },
     "seed-a-richer-qa-fixture-corpus-multi-tier-trust-tuned-notun": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T02:13:31Z",
+        "generation": "687e7af65cee41cab798781249f10786",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Seed a richer QA fixture corpus (multi-tier trust, tuned/notuned pairs, ≥4 platforms in one cohort)"
     },
     "seed-corpus-proof-verification-window-v2": {
